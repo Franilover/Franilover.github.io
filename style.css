@@ -9,7 +9,7 @@ hr {
     width: 90%;
 }
 
-.Flower,.crazyGirl, .Dorian, .PinkKiller {
+.Flower,.crazyGirl, .Dorian, .PinkKiller, .Icarus {
     width: 90%;
     max-width: 500px;
     margin: 0 auto;
@@ -21,10 +21,13 @@ div > div {
     align-items: center; /* Centra los elementos horizontalmente */
 }
 
-.IceFlower, .title, .PlantGirl, .Dorian-Text, .PinkKiller-Text, .Intro{
+.IceFlower, .title, .PlantGirl, .Dorian-Text, .PinkKiller-Text, .Intro, .Icarus-Text{
     text-align: center;
 }
 
+.Icarus-Text {
+    color: rgb(113, 16, 16);
+}
 .IceFlower {
     color: rgb(54, 54, 104);
 }
