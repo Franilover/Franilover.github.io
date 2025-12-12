@@ -21,13 +21,16 @@ div > div {
     align-items: center; /* Centra los elementos horizontalmente */
 }
 
-.IceFlower, .title  {
+.IceFlower, .title, .PlantGirl, .Dorian-Text {
     text-align: center;
 }
 
 .IceFlower {
     color: rgb(54, 54, 104);
-    
+}
+
+.PlantGirl {
+    color: rgb(22, 37, 22);
 }
 
 .title {
