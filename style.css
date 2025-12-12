@@ -9,7 +9,7 @@ hr {
     width: 90%;
 }
 
-.Flower,.crazyGirl, .Dorian {
+.Flower,.crazyGirl, .Dorian, .PinkKiller {
     width: 90%;
     max-width: 500px;
     margin: 0 auto;
@@ -21,12 +21,15 @@ div > div {
     align-items: center; /* Centra los elementos horizontalmente */
 }
 
-.IceFlower, .title, .PlantGirl, .Dorian-Text {
+.IceFlower, .title, .PlantGirl, .Dorian-Text, .PinkKiller-Text, .Intro{
     text-align: center;
 }
 
 .IceFlower {
     color: rgb(54, 54, 104);
+}
+.PinkKiller-Text{
+    color: rgb(114, 33, 116);
 }
 
 .PlantGirl {
