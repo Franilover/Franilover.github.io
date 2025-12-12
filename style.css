@@ -1,0 +1,27 @@
+h1 {
+    background-color: rgb(119, 161, 98);
+    text-align: center;
+}
+
+img {
+    border-radius: 15px;
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+hr {
+    width: 90%;
+}
+
+.crazyGirl, .Dorian {
+    width: 90%;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+div > div {
+    display: flex; /* Usa Flexbox para alinear la imagen y el título h2 */
+    flex-direction: column; /* Apila los elementos en vertical */
+    align-items: center; /* Centra los elementos horizontalmente */
+}
