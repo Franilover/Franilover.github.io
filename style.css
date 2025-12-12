@@ -25,18 +25,32 @@ div > div {
     text-align: center;
 }
 
+.Dorian-Text {
+    color: rgb(27, 3, 54);
+    background-color: rgb(118, 108, 124);
+    border-radius: 12px;
+}
 .Icarus-Text {
     color: rgb(113, 16, 16);
+    background-color: rgb(203, 142, 109);
+    border-radius: 12px;
 }
 .IceFlower {
-    color: rgb(54, 54, 104);
+    color: rgb(32, 32, 94);
+    background-color: rgb(138, 196, 175);
+    border-radius: 12px;
 }
 .PinkKiller-Text{
     color: rgb(114, 33, 116);
+    background-color: rgb(197, 168, 192);
+    border-radius: 12px;
 }
 
 .PlantGirl {
     color: rgb(22, 37, 22);
+    background-color: rgb(138, 181, 110);
+    border-radius: 12px;
+
 }
 
 .title {
