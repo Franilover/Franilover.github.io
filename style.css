@@ -9,7 +9,7 @@ hr {
     width: 90%;
 }
 
-.Flower,.crazyGirl, .Dorian, .PinkKiller, .Icarus, .Faker {
+.Flower,.crazyGirl, .Dorian, .PinkKiller, .Icarus, .Faker, .Frani {
     width: 90%;
     max-width: 500px;
     margin: 0 auto;
@@ -21,10 +21,23 @@ div > div {
     align-items: center; /* Centra los elementos horizontalmente */
 }
 
-.IceFlower, .title, .PlantGirl, .Dorian-Text, .PinkKiller-Text, .Intro, .Icarus-Text, .Faker-Text{
+.IceFlower, .title, .PlantGirl, .Dorian-Text, .PinkKiller-Text, 
+.Intro, .Icarus-Text, .Faker-Text, .Frani-Text
+{
     text-align: center;
 }
 
+.Frani-Text {
+    color: rgb(47, 48, 41);
+    background-color: rgb(183, 194, 114);
+    border-radius: 12px;
+}
+
+.Faker-Text {
+    color: rgb(47, 48, 41);
+    background-color: rgb(183, 194, 114);
+    border-radius: 12px;
+}
 
 .Dorian-Text {
     color: rgb(27, 3, 54);
