@@ -1350,7 +1350,19 @@ export function RichEditor({
               <RichTextPlugin
                 ErrorBoundary={LexicalErrorBoundary}
                 contentEditable={
+                  // key={spellCheckOn}: fuerza a React a desmontar y volver
+                  // a montar el <div contentEditable> cuando cambia el
+                  // toggle. Necesario porque varios navegadores (Chrome
+                  // incluido) NO vuelven a correr el corrector ortográfico
+                  // sobre texto que ya estaba en pantalla si solo cambia el
+                  // atributo spellcheck de un elemento ya montado — las
+                  // líneas onduladas rojas que ya se dibujaron quedan
+                  // "pegadas" hasta que ese texto puntual se edite. Remontar
+                  // el elemento entero es la única forma confiable de que
+                  // el navegador vuelva a evaluar (o deje de evaluar) todo
+                  // el contenido de una.
                   <ContentEditable
+                    key={String(spellCheckOn)}
                     spellCheck={spellCheckOn}
                     style={editorStyle}
                   />
