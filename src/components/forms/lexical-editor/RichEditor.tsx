@@ -500,7 +500,12 @@ const ACCENT = "var(--color-primary, #7c6af7)";
 // No podemos compartir las clases Tailwind del theme de Lexical porque
 // ese objeto vive en otro componente (RichEditor no lo exporta), así que
 // se replica acá — cambiar un nivel implica tocar ambos lugares.
-function renderHeadingBlock(level: 1 | 2 | 3 | 4, text: string, key: number) {
+function renderHeadingBlock(
+  level: 1 | 2 | 3 | 4,
+  text: string,
+  key: number,
+  prevLevel: 1 | 2 | 3 | 4 | null,
+) {
   const html = applyInlinePlainMarkdown(text);
 
   // H1 — "portada de sección": centrado, ancho acotado a 500px (mx-auto)
@@ -583,6 +588,10 @@ function renderHeadingBlock(level: 1 | 2 | 3 | 4, text: string, key: number) {
   }
 
   // H3 — barra vertical de acento corta al costado del texto.
+  // Si viene inmediatamente después de un H2 (prevLevel === 2), quitamos
+  // el margen superior — mismo criterio que "[h2+&]:mt-0" en el theme de
+  // Lexical — para que la barra vertical del H3 quede pegada al borde
+  // inferior del H2 de arriba, como un solo trazo en L.
   if (level === 3) {
     return (
       <div
@@ -590,7 +599,7 @@ function renderHeadingBlock(level: 1 | 2 | 3 | 4, text: string, key: number) {
         style={{
           position: "relative",
           paddingLeft: 12,
-          margin: "20px 0 8px",
+          margin: prevLevel === 2 ? "0 0 8px" : "20px 0 8px",
           borderLeft:
             "2px solid color-mix(in srgb, " + ACCENT + " 50%, transparent)",
         }}
@@ -618,7 +627,10 @@ function renderHeadingBlock(level: 1 | 2 | 3 | 4, text: string, key: number) {
   const firstChar = text.charAt(0);
   const rest = text.slice(1);
   return (
-    <div key={key} style={{ margin: "16px 0 6px" }}>
+    <div
+      key={key}
+      style={{ margin: prevLevel === 4 ? "6px 0 6px" : "16px 0 6px" }}
+    >
       <span
         style={{
           fontSize: "1.1rem",
@@ -640,6 +652,11 @@ function renderHeadingBlock(level: 1 | 2 | 3 | 4, text: string, key: number) {
 
 function PlainMarkdownFallback({ value }: { value: string }) {
   const bloques = value.split(/\n{2,}/);
+  // Rastrea el nivel del ÚLTIMO heading renderizado (bloques vacíos o de
+  // texto normal no lo tocan) para que renderHeadingBlock pueda achicar el
+  // margen cuando dos headings de niveles específicos quedan adyacentes
+  // (H2→H3, H4→H4) — ver comentarios dentro de renderHeadingBlock.
+  let prevHeadingLevel: 1 | 2 | 3 | 4 | null = null;
   return (
     <>
       {bloques.map((bloque, bi) => {
@@ -652,8 +669,16 @@ function PlainMarkdownFallback({ value }: { value: string }) {
         const headingMatch = HEADING_LINE_RE.exec(bloque);
         if (headingMatch) {
           const level = Math.min(4, headingMatch[1].length) as 1 | 2 | 3 | 4;
-          return renderHeadingBlock(level, headingMatch[2], bi);
+          const block = renderHeadingBlock(
+            level,
+            headingMatch[2],
+            bi,
+            prevHeadingLevel,
+          );
+          prevHeadingLevel = level;
+          return block;
         }
+        prevHeadingLevel = null;
 
         const lineas = bloque.split("\n");
         return (
@@ -944,12 +969,29 @@ export function RichEditor({
             "relative pl-3 mt-5 mb-2 scroll-mt-4",
             "text-lg font-semibold leading-snug",
             "border-l-2 border-l-primary/50",
+            // Espejo del selector de arriba: acá NO podemos usar "hermano
+            // anterior" en CSS puro (no existe selector "prev+"), así que
+            // agregamos la clase directamente sobre el H3 usando un truco
+            // de Tailwind arbitrario: aplicar el estilo "si el hermano
+            // anterior es h2", que Tailwind traduce a "h2 + &" (sí soportado,
+            // porque el elemento actual es el que va DESPUÉS en el DOM).
+            //   - mt-5 → mt-0: sin salto entre el H2 de arriba y este H3.
+            //   - el borde izquierdo (border-l) arranca desde el tope del
+            //     bloque (ya lo hace por defecto, es un div/heading normal),
+            //     así que con mt-0 queda pegado justo debajo del border-b
+            //     del H2 → efecto de línea en "L" continua.
+            "[h2+&]:mt-0",
           ].join(" "),
           h4: [
             "mt-4 mb-1.5 scroll-mt-4",
             "text-sm font-semibold leading-snug",
             "first-letter:text-lg first-letter:font-bold first-letter:text-primary/70",
             "first-letter:mr-px",
+            // H4 consecutivos (ej. una lista de sub-apartados cortos) no
+            // necesitan el mismo respiro que un H4 que viene después de
+            // texto normal — acá se ven mejor más compactos, casi como
+            // ítems de una lista con jerarquía.
+            "[h4+&]:mt-1.5",
           ].join(" "),
         },
         quote: "border-l-2 border-primary/30 pl-4 italic opacity-75 my-4",
