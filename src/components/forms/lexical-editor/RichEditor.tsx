@@ -35,7 +35,7 @@ import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
-import { HeadingNode, QuoteNode } from "@lexical/rich-text";
+import { HeadingNode, QuoteNode, $isHeadingNode } from "@lexical/rich-text";
 import { $getRoot } from "lexical";
 import type { EditorState, LexicalEditor } from "lexical";
 import { Edit3, Eye, Columns2 } from "lucide-react";
@@ -366,6 +366,104 @@ function SectionGraphPlugin({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Plugin: extiende la barra vertical (border-left) de cada H3 hacia abajo
+// hasta el próximo heading de nivel <= 3 (otro H3, o un H2/H1), para que la
+// línea "abrace" visualmente todo el contenido de esa sub-sección en vez de
+// ser una rayita corta pegada solo al título.
+//
+// Por qué necesita JS (no se puede resolver con CSS de hermanos): la altura
+// de la barra depende de CUÁNTO contenido variable hay entre este H3 y el
+// próximo heading de rango mayor o igual — un dato que solo conocemos
+// midiendo el DOM real después de cada render, no algo expresable con
+// selectores CSS estáticos.
+//
+// Cómo funciona:
+//   1. Tras cada update del editor, recorre los HeadingNode del root.
+//   2. Para cada H3, busca el próximo heading con tag h1/h2/h3 (se detiene
+//      ahí — un h4 no corta la sección, sigue perteneciendo a este H3).
+//   3. Mide con getBoundingClientRect() la distancia real en píxeles entre
+//      el tope del H3 y el tope de ese próximo heading (o el fondo del
+//      editor si no hay ninguno después).
+//   4. Escribe esa altura como CSS custom property (--h3-rail-h) en el
+//      propio elemento DOM del H3 — el border-left "extendido" se dibuja
+//      con un pseudo-elemento ::after posicionado absoluto que lee esa
+//      variable (ver theme.heading.h3 más abajo).
+function HeadingRailPlugin() {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    const updateRails = () => {
+      // Lista ordenada de { key, tag } de TODOS los headings del root —
+      // necesitamos el documento completo (no solo los H3) para saber
+      // cuál es el "próximo heading de nivel <=3" de cada uno.
+      const headings: { key: string; tag: string }[] = [];
+      editor.getEditorState().read(() => {
+        const children = $getRoot().getChildren();
+        for (const child of children) {
+          if ($isHeadingNode(child)) {
+            const tag = (child as any).getTag?.() as string; // "h1".."h6"
+            headings.push({ key: child.getKey(), tag: tag ?? "h1" });
+          }
+        }
+      });
+
+      const rootEl = editor.getRootElement();
+      if (!rootEl) return;
+      const rootRect = rootEl.getBoundingClientRect();
+
+      headings.forEach((h, i) => {
+        if (h.tag !== "h3") return;
+        const el = editor.getElementByKey(h.key) as HTMLElement | null;
+        if (!el) return;
+
+        // Buscar el próximo heading de nivel <=3 (h1, h2 o h3) — un h4 de
+        // ahí en más sigue "dentro" de esta sección, así que no corta la
+        // barra.
+        let stopEl: HTMLElement | null = null;
+        for (let j = i + 1; j < headings.length; j++) {
+          if (["h1", "h2", "h3"].includes(headings[j].tag)) {
+            stopEl = editor.getElementByKey(headings[j].key) as HTMLElement | null;
+            break;
+          }
+        }
+
+        const startTop = el.getBoundingClientRect().top;
+        const endTop = stopEl
+          ? stopEl.getBoundingClientRect().top
+          : rootRect.bottom;
+
+        // Alto de la barra: desde el tope del H3 hasta el tope del próximo
+        // heading relevante (o el fondo del editor si es el último). Se
+        // resta la altura del propio H3 porque el ::after arranca desde
+        // abajo de su bloque, no desde su tope — así no se solapa con la
+        // línea corta que ya dibuja border-l en el propio H3.
+        const ownHeight = el.getBoundingClientRect().height;
+        const railHeight = Math.max(0, endTop - startTop - ownHeight);
+
+        el.style.setProperty("--h3-rail-h", `${railHeight}px`);
+      });
+    };
+
+    updateRails();
+    // También recalcular en resize — el reflow del texto puede cambiar
+    // cuánto ocupa cada sección aunque el contenido no haya cambiado.
+    window.addEventListener("resize", updateRails);
+    const unregister = editor.registerUpdateListener(() => {
+      // rAF: esperamos al frame siguiente para medir DOM ya actualizado
+      // por Lexical (registerUpdateListener dispara antes de que el
+      // reconciler termine de pintar en algunos casos).
+      requestAnimationFrame(updateRails);
+    });
+    return () => {
+      window.removeEventListener("resize", updateRails);
+      unregister();
+    };
+  }, [editor]);
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Plugin: expone insertTableRef para que el padre inserte tablas desde /tabla
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -511,7 +609,10 @@ function renderHeadingBlock(
   // H1 — "portada de sección": centrado, ancho acotado a 500px (mx-auto)
   // para que títulos largos hagan wrap sin desalinear las líneas
   // laterales; las líneas van a los costados vía posicionamiento
-  // absoluto dentro de un wrapper relative.
+  // absoluto dentro de un wrapper relative. Cada costado tiene DOS líneas
+  // (una principal + una fina debajo vía boxShadow) — replica en inline
+  // styles lo mismo que el theme.heading.h1 de Lexical hace con
+  // ::before/::after + box-shadow arbitrario de Tailwind.
   if (level === 1) {
     return (
       <div
@@ -534,6 +635,10 @@ function renderHeadingBlock(
             height: 1,
             transform: "translateY(-50%)",
             background: "color-mix(in srgb, " + ACCENT + " 40%, transparent)",
+            boxShadow:
+              "0 4px 0 -0.5px color-mix(in srgb, " +
+              ACCENT +
+              " 25%, transparent)",
           }}
         />
         <span
@@ -546,6 +651,10 @@ function renderHeadingBlock(
             height: 1,
             transform: "translateY(-50%)",
             background: "color-mix(in srgb, " + ACCENT + " 40%, transparent)",
+            boxShadow:
+              "0 4px 0 -0.5px color-mix(in srgb, " +
+              ACCENT +
+              " 25%, transparent)",
           }}
         />
         <span
@@ -955,10 +1064,19 @@ export function RichEditor({
             "relative mx-auto mt-8 mb-6 max-w-[500px]",
             "text-center text-3xl font-bold tracking-tight leading-tight",
             "px-5",
+            // Línea doble a cada costado: el pseudo-elemento dibuja la
+            // línea principal (before:h-px + bg-primary/40) y un
+            // box-shadow arbitrario agrega una segunda línea fina 4px
+            // debajo, más tenue (opacity vía color con menos alpha) —
+            // no se puede usar un segundo :: pseudo-elemento en el mismo
+            // ::before, así que la 2da línea se simula con box-shadow en
+            // vez de un elemento propio.
             "before:content-[''] before:absolute before:top-1/2 before:-translate-y-1/2",
             "before:left-0 before:w-3 before:h-px before:bg-primary/40",
+            "before:[box-shadow:0_4px_0_-0.5px_color-mix(in_srgb,var(--color-primary,#7c6af7)_25%,transparent)]",
             "after:content-[''] after:absolute after:top-1/2 after:-translate-y-1/2",
             "after:right-0 after:w-3 after:h-px after:bg-primary/40",
+            "after:[box-shadow:0_4px_0_-0.5px_color-mix(in_srgb,var(--color-primary,#7c6af7)_25%,transparent)]",
           ].join(" "),
           h2: [
             "mt-6 mb-4 pb-2 scroll-mt-4",
@@ -981,6 +1099,19 @@ export function RichEditor({
             //     así que con mt-0 queda pegado justo debajo del border-b
             //     del H2 → efecto de línea en "L" continua.
             "[h2+&]:mt-0",
+            // Barra extendida hacia abajo (ver HeadingRailPlugin): un
+            // ::after posicionado absoluto, ancho de 2px (mismo grosor que
+            // el border-l-2 del propio H3), que arranca justo debajo del
+            // bloque del H3 y baja `--h3-rail-h` píxeles — la altura real
+            // medida en el DOM hasta el próximo heading de nivel <=3.
+            // Sin JS, esta altura sería un valor fijo adivinado; con la
+            // variable CSS seteada dinámicamente, la línea "abraza" el
+            // contenido real de cada sub-sección sea cual sea su largo.
+            // La variable arranca en 0 (por defecto, vía fallback) para
+            // que headings sin JS corrido todavía (primer paint) no
+            // dibujen una barra gigante o con altura indefinida.
+            "after:content-[''] after:absolute after:left-0 after:top-full",
+            "after:w-0.5 after:h-[var(--h3-rail-h,0px)] after:bg-primary/50",
           ].join(" "),
           h4: [
             "mt-4 mb-1.5 scroll-mt-4",
@@ -1133,6 +1264,7 @@ export function RichEditor({
               />
               <MarkdownCommandInsertPlugin insertRef={mdInsertRef} />
               <SectionGraphPlugin onHasSectionsChange={setHasSections} />
+              <HeadingRailPlugin />
               <EditablePlugin editable={editable} />
               <SlashCommandPlugin
                 isMenuOpen={mdPalette.open}
