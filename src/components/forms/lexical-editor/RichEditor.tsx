@@ -437,8 +437,19 @@ function HeadingRailPlugin() {
         // resta la altura del propio H3 porque el ::after arranca desde
         // abajo de su bloque, no desde su tope — así no se solapa con la
         // línea corta que ya dibuja border-l en el propio H3.
+        //
+        // STOP_GAP_PX: además, si hay un próximo heading (stopEl !== null),
+        // recortamos unos píxeles extra para que la barra termine ANTES de
+        // tocar ese heading — sin esto, la línea llegaba justo hasta el
+        // borde superior del siguiente título y se sentía "pegada"/como si
+        // lo tocara, en vez de leerse como el cierre de la sección
+        // anterior. Si no hay próximo heading (es la última sección del
+        // documento), no aplica: ahí la barra sí llega hasta el fondo real
+        // del contenido.
+        const STOP_GAP_PX = 12;
         const ownHeight = el.getBoundingClientRect().height;
-        const railHeight = Math.max(0, endTop - startTop - ownHeight);
+        const gap = stopEl ? STOP_GAP_PX : 0;
+        const railHeight = Math.max(0, endTop - startTop - ownHeight - gap);
 
         el.style.setProperty("--h3-rail-h", `${railHeight}px`);
       });
@@ -1100,21 +1111,23 @@ export function RichEditor({
             //     del H2 → efecto de línea en "L" continua.
             "[h2+&]:mt-0",
             // Barra extendida hacia abajo (ver HeadingRailPlugin): un
-            // ::after posicionado absoluto, ancho de 2px (mismo grosor que
-            // el border-l-2 del propio H3), que arranca justo debajo del
-            // bloque del H3 y baja `--h3-rail-h` píxeles — la altura real
-            // medida en el DOM hasta el próximo heading de nivel <=3.
-            // Sin JS, esta altura sería un valor fijo adivinado; con la
-            // variable CSS seteada dinámicamente, la línea "abraza" el
-            // contenido real de cada sub-sección sea cual sea su largo.
-            // La variable arranca en 0 (por defecto, vía fallback) para
-            // que headings sin JS corrido todavía (primer paint) no
-            // dibujen una barra gigante o con altura indefinida.
+            // ::after posicionado absoluto que continúa la línea del H3
+            // más allá de su propio bloque. Usa border-left (no
+            // width+background) para garantizar EXACTAMENTE el mismo
+            // grosor de trazo que el border-l-2 del título — un
+            // background de "2px de ancho" y un border de "2px" no
+            // siempre renderizan idénticos por redondeo de subpíxel del
+            // navegador, así que unificamos el mecanismo.
+            // HeadingRailPlugin ya resta un margen de separación antes
+            // del próximo heading al calcular --h3-rail-h, así que la
+            // barra corta ANTES de que empiece el siguiente h1/h2/h3 en
+            // vez de tocarlo.
             "after:content-[''] after:absolute after:left-0 after:top-full",
-            "after:w-0.5 after:h-[var(--h3-rail-h,0px)] after:bg-primary/50",
+            "after:w-0 after:h-[var(--h3-rail-h,0px)]",
+            "after:border-l-2 after:border-l-primary/50",
           ].join(" "),
           h4: [
-            "mt-4 mb-1.5 scroll-mt-4",
+            "mt-4 mb-1.5 scroll-mt-4 pl-3",
             "text-sm font-semibold leading-snug",
             "first-letter:text-lg first-letter:font-bold first-letter:text-primary/70",
             "first-letter:mr-px",
@@ -1123,6 +1136,13 @@ export function RichEditor({
             // texto normal — acá se ven mejor más compactos, casi como
             // ítems de una lista con jerarquía.
             "[h4+&]:mt-1.5",
+            // pl-3 (mismo padding que el H3, ver arriba): la barra vertical
+            // del H3 ahora atraviesa TODA la sección hasta el próximo
+            // heading de rango <=3 (HeadingRailPlugin), así que cualquier
+            // H4 dentro de esa sección queda a la derecha de la barra. Sin
+            // este padding, el texto del H4 (que no tiene su propio
+            // border-l) empezaría pegado al margen izquierdo y se
+            // solaparía visualmente con la línea que pasa por ahí.
           ].join(" "),
         },
         quote: "border-l-2 border-primary/30 pl-4 italic opacity-75 my-4",
