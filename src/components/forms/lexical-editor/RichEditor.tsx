@@ -38,7 +38,7 @@ import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode, $isHeadingNode } from "@lexical/rich-text";
 import { $getRoot } from "lexical";
 import type { EditorState, LexicalEditor } from "lexical";
-import { Edit3, Eye, Columns2 } from "lucide-react";
+import { Edit3, Eye, Columns2, SpellCheck2 } from "lucide-react";
 import React, {
   useCallback,
   useEffect,
@@ -369,40 +369,51 @@ function SectionGraphPlugin({
 // Plugin: extiende la barra vertical (border-left) de cada H3 hacia abajo
 // hasta el próximo heading de nivel <= 3 (otro H3, o un H2/H1), para que la
 // línea "abrace" visualmente todo el contenido de esa sub-sección en vez de
-// ser una rayita corta pegada solo al título.
+// ser una rayita corta pegada solo al título. Además marca con
+// data-in-h3-section="true" a cada bloque (párrafo, lista, etc. — cualquier
+// top-level child que NO sea heading) que cae dentro de esa sección, para
+// que el theme pueda darles sangría (pl-3, igual que el H4) y así no choquen
+// visualmente con la barra que ahora pasa por al lado.
 //
 // Por qué necesita JS (no se puede resolver con CSS de hermanos): la altura
 // de la barra depende de CUÁNTO contenido variable hay entre este H3 y el
 // próximo heading de rango mayor o igual — un dato que solo conocemos
 // midiendo el DOM real después de cada render, no algo expresable con
-// selectores CSS estáticos.
+// selectores CSS estáticos. Lo mismo aplica para saber CUÁLES bloques caen
+// "dentro" de la sección: depende del orden real de los nodos del documento,
+// no de un patrón de hermanos fijo.
 //
 // Cómo funciona:
-//   1. Tras cada update del editor, recorre los HeadingNode del root.
+//   1. Tras cada update del editor, recorre TODOS los top-level children.
 //   2. Para cada H3, busca el próximo heading con tag h1/h2/h3 (se detiene
-//      ahí — un h4 no corta la sección, sigue perteneciendo a este H3).
-//   3. Mide con getBoundingClientRect() la distancia real en píxeles entre
-//      el tope del H3 y el tope de ese próximo heading (o el fondo del
-//      editor si no hay ninguno después).
-//   4. Escribe esa altura como CSS custom property (--h3-rail-h) en el
+//      ahí — un h4 no corta la sección, sigue perteneciendo a este H3) y
+//      mide con getBoundingClientRect() la distancia real hasta ahí.
+//   3. Escribe esa altura como CSS custom property (--h3-rail-h) en el
 //      propio elemento DOM del H3 — el border-left "extendido" se dibuja
 //      con un pseudo-elemento ::after posicionado absoluto que lee esa
 //      variable (ver theme.heading.h3 más abajo).
+//   4. Marca con data-in-h3-section="true" cada nodo NO-heading entre un H3
+//      y el siguiente heading de nivel <=3, y lo limpia (removeAttribute)
+//      en cualquier otro caso — necesario porque el usuario puede borrar un
+//      H3 y ese párrafo debe perder la sangría en el próximo render.
 function HeadingRailPlugin() {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
     const updateRails = () => {
-      // Lista ordenada de { key, tag } de TODOS los headings del root —
-      // necesitamos el documento completo (no solo los H3) para saber
-      // cuál es el "próximo heading de nivel <=3" de cada uno.
-      const headings: { key: string; tag: string }[] = [];
+      // Lista ordenada de TODOS los top-level children con su key, tag
+      // ("h1".."h6" para headings, null para el resto) — necesitamos el
+      // documento completo, no solo los headings, para poder marcar los
+      // párrafos intermedios de cada sección.
+      const nodes: { key: string; tag: string | null }[] = [];
       editor.getEditorState().read(() => {
         const children = $getRoot().getChildren();
         for (const child of children) {
           if ($isHeadingNode(child)) {
             const tag = (child as any).getTag?.() as string; // "h1".."h6"
-            headings.push({ key: child.getKey(), tag: tag ?? "h1" });
+            nodes.push({ key: child.getKey(), tag: tag ?? "h1" });
+          } else {
+            nodes.push({ key: child.getKey(), tag: null });
           }
         }
       });
@@ -411,20 +422,33 @@ function HeadingRailPlugin() {
       if (!rootEl) return;
       const rootRect = rootEl.getBoundingClientRect();
 
-      headings.forEach((h, i) => {
-        if (h.tag !== "h3") return;
-        const el = editor.getElementByKey(h.key) as HTMLElement | null;
+      nodes.forEach((n, i) => {
+        if (n.tag !== "h3") return;
+        const el = editor.getElementByKey(n.key) as HTMLElement | null;
         if (!el) return;
 
         // Buscar el próximo heading de nivel <=3 (h1, h2 o h3) — un h4 de
         // ahí en más sigue "dentro" de esta sección, así que no corta la
-        // barra.
+        // barra ni la sangría. También vamos marcando cada nodo NO-heading
+        // en el camino con data-in-h3-section, hasta llegar al stop (o al
+        // final del documento).
         let stopEl: HTMLElement | null = null;
-        for (let j = i + 1; j < headings.length; j++) {
-          if (["h1", "h2", "h3"].includes(headings[j].tag)) {
-            stopEl = editor.getElementByKey(headings[j].key) as HTMLElement | null;
+        let stopIdx = nodes.length;
+        for (let j = i + 1; j < nodes.length; j++) {
+          if (
+            nodes[j].tag === "h1" ||
+            nodes[j].tag === "h2" ||
+            nodes[j].tag === "h3"
+          ) {
+            stopEl = editor.getElementByKey(nodes[j].key) as HTMLElement | null;
+            stopIdx = j;
             break;
           }
+        }
+        for (let j = i + 1; j < stopIdx; j++) {
+          if (nodes[j].tag !== null) continue; // otro heading (h4-h6): no se toca acá
+          const bodyEl = editor.getElementByKey(nodes[j].key) as HTMLElement | null;
+          bodyEl?.setAttribute("data-in-h3-section", "true");
         }
 
         const startTop = el.getBoundingClientRect().top;
@@ -452,6 +476,36 @@ function HeadingRailPlugin() {
         const railHeight = Math.max(0, endTop - startTop - ownHeight - gap);
 
         el.style.setProperty("--h3-rail-h", `${railHeight}px`);
+      });
+
+      // Limpieza: cualquier nodo NO-heading que NO haya sido marcado en
+      // este pase (porque ya no está dentro de ninguna sección H3 — el
+      // usuario borró el H3, o movió el párrafo afuera) pierde el
+      // atributo. Sin esto, un párrafo que salió de una sección quedaría
+      // con la sangría "pegada" para siempre.
+      const markedKeys = new Set<string>();
+      nodes.forEach((n, i) => {
+        if (n.tag !== "h3") return;
+        let stopIdx = nodes.length;
+        for (let j = i + 1; j < nodes.length; j++) {
+          if (
+            nodes[j].tag === "h1" ||
+            nodes[j].tag === "h2" ||
+            nodes[j].tag === "h3"
+          ) {
+            stopIdx = j;
+            break;
+          }
+        }
+        for (let j = i + 1; j < stopIdx; j++) {
+          if (nodes[j].tag === null) markedKeys.add(nodes[j].key);
+        }
+      });
+      nodes.forEach((n) => {
+        if (n.tag !== null) return;
+        if (markedKeys.has(n.key)) return;
+        const el = editor.getElementByKey(n.key) as HTMLElement | null;
+        el?.removeAttribute("data-in-h3-section");
       });
     };
 
@@ -849,6 +903,23 @@ export function RichEditor({
   const mode = modeProp ?? internalMode;
   const handleModeChange = onModeChange ?? setInternalMode;
   const [hasSections, setHasSections] = useState(false);
+  // Toggle de corrector ortográfico nativo del navegador (spellCheck de
+  // ContentEditable). Persistido en localStorage porque es una preferencia
+  // de la persona que escribe, no del documento — debe mantenerse igual al
+  // cambiar de capítulo/ensayo o recargar la página. Arranca en `true`
+  // (comportamiento actual, sin cambios, para quien nunca lo tocó).
+  const [spellCheckOn, setSpellCheckOn] = useState(true);
+  useEffect(() => {
+    const stored = localStorage.getItem("rich-editor-spellcheck");
+    if (stored !== null) setSpellCheckOn(stored === "true");
+  }, []);
+  const toggleSpellCheck = useCallback(() => {
+    setSpellCheckOn((prev) => {
+      const next = !prev;
+      localStorage.setItem("rich-editor-spellcheck", String(next));
+      return next;
+    });
+  }, []);
 
   // Conecta el handler global de edición de snippets con la callback del padre
   useEffect(() => {
@@ -1044,7 +1115,8 @@ export function RichEditor({
         console.error("Lexical error:", error);
       },
       theme: {
-        paragraph: "mb-[0.4em] leading-[1.7]",
+        paragraph:
+          "mb-[0.4em] leading-[1.7] data-[in-h3-section=true]:pl-3",
         // ── Headings ──────────────────────────────────────────────────
         // Rediseño final — cada nivel tiene su propio lenguaje visual en
         // vez de repetir el mismo patrón (borde + etiqueta) escalado por
@@ -1222,6 +1294,31 @@ export function RichEditor({
             onClose={() => setTocOpen(false)}
             onToggle={() => setTocOpen((o) => !o)}
           />
+          <button
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 22,
+              height: 20,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: spellCheckOn
+                ? "color-mix(in srgb, var(--foreground) 60%, transparent)"
+                : "color-mix(in srgb, var(--foreground) 18%, transparent)",
+              transition: "color 0.1s",
+            }}
+            title={
+              spellCheckOn
+                ? "Corrector ortográfico activado — click para desactivar"
+                : "Corrector ortográfico desactivado — click para activar"
+            }
+            type="button"
+            onClick={toggleSpellCheck}
+          >
+            <SpellCheck2 size={11} />
+          </button>
           {showSplitMode && (modeProp === undefined || onModeChange) && (
             <ModeTogglePlugin mode={mode} onModeChange={handleModeChange} />
           )}
@@ -1252,7 +1349,12 @@ export function RichEditor({
               />
               <RichTextPlugin
                 ErrorBoundary={LexicalErrorBoundary}
-                contentEditable={<ContentEditable style={editorStyle} />}
+                contentEditable={
+                  <ContentEditable
+                    spellCheck={spellCheckOn}
+                    style={editorStyle}
+                  />
+                }
                 placeholder={
                   <div
                     style={{
