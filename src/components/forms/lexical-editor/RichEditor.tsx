@@ -1116,7 +1116,7 @@ export function RichEditor({
       },
       theme: {
         paragraph:
-          "mb-[0.4em] leading-[1.7] data-[in-h3-section=true]:pl-3",
+          "mb-[0.4em] leading-[1.7] data-[in-h3-section=true]:pl-[14px]",
         // ── Headings ──────────────────────────────────────────────────
         // Rediseño final — cada nivel tiene su propio lenguaje visual en
         // vez de repetir el mismo patrón (borde + etiqueta) escalado por
@@ -1182,6 +1182,18 @@ export function RichEditor({
             //     así que con mt-0 queda pegado justo debajo del border-b
             //     del H2 → efecto de línea en "L" continua.
             "[h2+&]:mt-0",
+            // Esquina de conexión H2→H3: cuando el H3 viene justo después
+            // de un H2, agregamos un ::before extra — un trazo horizontal
+            // corto de 8px en la esquina superior-izquierda del H3 — para
+            // que la línea horizontal del border-b del H2 (que ocupa TODO
+            // el ancho del bloque) tenga un punto de unión visual con el
+            // border-l vertical del H3 (que arranca en x=0 pero bien a la
+            // izquierda, lejos del centro donde suele estar el H2). Sin
+            // este trazo, ambas líneas quedan como dos elementos sueltos
+            // que solo coinciden en altura, no en un punto de unión real.
+            "[h2+&]:before:content-[''] [h2+&]:before:absolute",
+            "[h2+&]:before:-top-px [h2+&]:before:left-0",
+            "[h2+&]:before:w-2 [h2+&]:before:h-0.5 [h2+&]:before:bg-primary/50",
             // Barra extendida hacia abajo (ver HeadingRailPlugin): un
             // ::after posicionado absoluto que continúa la línea del H3
             // más allá de su propio bloque. Usa border-left (no
@@ -1199,22 +1211,30 @@ export function RichEditor({
             "after:border-l-2 after:border-l-primary/50",
           ].join(" "),
           h4: [
-            "mt-4 mb-1.5 scroll-mt-4 pl-3",
+            // El texto arranca en pl-[26px] (14px de alineación con el H3,
+            // + 12px extra para dejarle lugar al guión "- " que se dibuja
+            // en ese hueco vía ::before). Sin este padding extra, el
+            // guión (posicionado absoluto) quedaría superpuesto sobre la
+            // primera letra del texto en vez de ir antes.
+            "relative mt-4 mb-1.5 scroll-mt-4 pl-[26px]",
             "text-sm font-semibold leading-snug",
             "first-letter:text-lg first-letter:font-bold first-letter:text-primary/70",
             "first-letter:mr-px",
+            // Guión visual tipo lista antes del texto, vía ::before — NO
+            // se agrega al contenido real del nodo (el usuario sigue
+            // escribiendo "#### Texto" normal): es puro adorno CSS, así
+            // que no aparece si se copia el texto ni rompe el parseo
+            // markdown. Posicionado en el hueco de 12px que deja el pl
+            // extra de arriba, alineado a la misma columna x=14px donde
+            // arranca el texto del H3 (mismo criterio de alineación que
+            // ya usábamos antes de agregar el guión).
+            "before:content-['-'] before:absolute before:left-[14px] before:top-0",
+            "before:font-normal before:text-primary/60",
             // H4 consecutivos (ej. una lista de sub-apartados cortos) no
             // necesitan el mismo respiro que un H4 que viene después de
             // texto normal — acá se ven mejor más compactos, casi como
             // ítems de una lista con jerarquía.
             "[h4+&]:mt-1.5",
-            // pl-3 (mismo padding que el H3, ver arriba): la barra vertical
-            // del H3 ahora atraviesa TODA la sección hasta el próximo
-            // heading de rango <=3 (HeadingRailPlugin), así que cualquier
-            // H4 dentro de esa sección queda a la derecha de la barra. Sin
-            // este padding, el texto del H4 (que no tiene su propio
-            // border-l) empezaría pegado al margen izquierdo y se
-            // solaparía visualmente con la línea que pasa por ahí.
           ].join(" "),
         },
         quote: "border-l-2 border-primary/30 pl-4 italic opacity-75 my-4",

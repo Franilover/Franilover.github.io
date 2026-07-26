@@ -15,6 +15,7 @@ import { OfflineSyncActivator } from "@/providers/OfflineSyncActivator";
 import { PresenciaActivator } from "@/providers/PresenciaActivator";
 import { PushActivator } from "@/providers/PushActivator";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { ServiceWorkerManager } from "@/providers/ServiceWorkerManager";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
@@ -107,6 +108,7 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased bg-bg-main min-h-screen flex flex-col selection:bg-primary/20">
+        <ServiceWorkerManager />
         <OfflineSyncActivator />
         <AuthProvider>
           <QueryProvider>
