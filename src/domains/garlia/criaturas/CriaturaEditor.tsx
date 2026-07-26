@@ -1,8 +1,8 @@
 "use client";
 
-import { EditorCriatura } from "@/domains/garlia/_legacy/views/EditorCriatura";
+import { EditorCriatura } from "@/domains/garlia/criaturas/EditorCriatura";
 
-import { useMundoNavigation } from "../../hooks/mundo/useMundoNavigationStore";
+import { useMundoNavigation } from "@/domains/garlia/_legacy/hooks/mundo/useMundoNavigationStore";
 
 interface Criatura {
   id: string;

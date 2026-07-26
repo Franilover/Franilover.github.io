@@ -20,7 +20,7 @@ import React from "react";
 import {
   useEntidadesDeCriatura,
   type EntidadDeCriaturaMin,
-} from "@/domains/garlia/_legacy/hooks/criaturas/useEntidadesDeCriatura";
+} from "@/domains/garlia/criaturas/useEntidadesDeCriatura";
 
 const GRUPOS_CFG = [
   { key: "dones" as const, label: "Dones", Icon: Star },

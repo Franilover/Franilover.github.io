@@ -51,22 +51,22 @@ import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import {
   BloqueGrupoCategoria,
   type GrupoMinExt,
-} from "@/domains/garlia/_legacy/components/criaturas/BloqueGruposCriatura";
+} from "@/domains/garlia/criaturas/BloqueGruposCriatura";
 import {
   useCriaturaReinos,
   useCriaturaCiudades,
-} from "@/domains/garlia/_legacy/components/criaturas/CriaturaHabitat";
-import { useCraftedItems } from "@/domains/garlia/_legacy/components/criaturas/CriaturaItemsCraftedos";
-import { BloqueMagico } from "@/domains/garlia/_legacy/components/criaturas/CriaturaMagia";
-import { CriaturaStatsDndEditor } from "@/domains/garlia/_legacy/components/criaturas/CriaturaStatsDnd";
-import { PickerImagenCriaturaBtn } from "@/domains/garlia/_legacy/components/criaturas/PickerImagenCriaturaBtn";
+} from "@/domains/garlia/criaturas/CriaturaHabitat";
+import { useCraftedItems } from "@/domains/garlia/criaturas/CriaturaItemsCraftedos";
+import { BloqueMagico } from "@/domains/garlia/criaturas/CriaturaMagia";
+import { CriaturaStatsDndEditor } from "@/domains/garlia/criaturas/CriaturaStatsDnd";
+import { PickerImagenCriaturaBtn } from "@/domains/garlia/criaturas/PickerImagenCriaturaBtn";
 import {
   SelectorImagen,
   SaveIndicator,
 } from "@/domains/garlia/_legacy/components/shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
-import { useCriaturaAsideCatalogs } from "@/domains/garlia/_legacy/hooks/criaturas/useCriaturaAsideCatalogs";
-import { usePersonajesDeCriatura } from "@/domains/garlia/_legacy/hooks/criaturas/usePersonajesDeCriatura";
+import { useCriaturaAsideCatalogs } from "@/domains/garlia/criaturas/useCriaturaAsideCatalogs";
+import { usePersonajesDeCriatura } from "@/domains/garlia/criaturas/usePersonajesDeCriatura";
 import { useMembresiaGruposCriatura } from "@/domains/garlia/_legacy/hooks/grupos/useMembresiaGruposCriatura";
 import { supabase } from "@/lib/api/client/supabase";
 import { dexiePut, dexieDelete } from "@/lib/utils/dexieHelpers";
