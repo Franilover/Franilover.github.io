@@ -1,2 +1,0 @@
-com.frani.garlia.installer
-xml file_paths
