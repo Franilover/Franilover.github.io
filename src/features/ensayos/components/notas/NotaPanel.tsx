@@ -1,11 +1,38 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Tag, Hash, AtSign, FileText, ChevronRight, Plus } from "lucide-react";
+import {
+  Tag,
+  Hash,
+  AtSign,
+  FileText,
+  ChevronRight,
+  Plus,
+  Pencil,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  Heading1,
+  Heading2,
+  Heading3,
+  Heading4,
+  Pilcrow,
+  List as ListIcon,
+  ListOrdered,
+  Quote,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  LayoutList,
+} from "lucide-react";
 import React, { useState, useMemo } from "react";
 
+import type { RichEditorFormatCommand } from "@/components/forms/lexical-editor";
+
 // ── Tipos ──────────────────────────────────────────────────────────────────────
-type NotaPanelTab = "indice" | "contexto";
+type NotaPanelTab = "indice" | "contexto" | "formato";
 
 export interface TocEntry {
   level: number;
@@ -20,6 +47,11 @@ export interface NotaPanelProps {
   onUpdateField: (id: string, field: string, value: any) => void;
   onNavigateToPage: (name: string) => void;
   onTagClick?: (t: string) => void;
+  /** Ref imperativo hacia RichEditor para aplicar comandos de formato
+   * desde la tab "formato" — ver EditorEnsayo.tsx y RichEditor.tsx. */
+  formatCommandRef?: React.MutableRefObject<
+    ((commandId: RichEditorFormatCommand) => void) | null
+  >;
 }
 
 // ── Tab button ─────────────────────────────────────────────────────────────────
@@ -608,6 +640,277 @@ function SeccionContexto({
   );
 }
 
+// ── Sección Formato ──────────────────────────────────────────────────────────
+// Aplica comandos de formato sobre el RichEditor activo vía formatCommandRef
+// (ver EditorEnsayo.tsx). Cada botón llama a un solo comando — no hay estado
+// de "formato activo" acá (ej. si la selección ya está en negrita) porque
+// leer eso en tiempo real requeriría escuchar la selección de Lexical desde
+// afuera del árbol, algo que ninguna otra parte de NotaPanel hace hoy; se
+// puede agregar más adelante si hace falta, pero por ahora los botones
+// funcionan como "aplicar/insertar", igual que el menú "/" existente.
+function FormatBtn({
+  label,
+  icon: Icon,
+  onClick,
+  mono,
+}: {
+  label: string;
+  icon: React.ElementType;
+  onClick: () => void;
+  mono: React.CSSProperties;
+}) {
+  return (
+    <button
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        padding: "10px 4px",
+        borderRadius: 6,
+        border: "1px solid transparent",
+        background: "color-mix(in srgb, var(--foreground) 3%, transparent)",
+        cursor: "pointer",
+        transition: "all 0.12s",
+      }}
+      title={label}
+      type="button"
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.background =
+          "color-mix(in srgb, var(--accent) 12%, transparent)";
+        (e.currentTarget as HTMLElement).style.borderColor =
+          "color-mix(in srgb, var(--accent) 25%, transparent)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.background =
+          "color-mix(in srgb, var(--foreground) 3%, transparent)";
+        (e.currentTarget as HTMLElement).style.borderColor = "transparent";
+      }}
+      // Sin esto, el mousedown le saca el foco al contentEditable del
+      // editor ANTES del click — al perder el foco, la selección de
+      // Lexical colapsa y el comando (que depende de $getSelection()
+      // dentro de FormatCommandPlugin) no tiene dónde aplicarse. Mismo
+      // fix que ya usa MarkdownCommandPalette para su propio menú "/".
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      <Icon
+        color="color-mix(in srgb, var(--foreground) 60%, transparent)"
+        size={15}
+        strokeWidth={1.7}
+      />
+      <span
+        style={{
+          ...mono,
+          fontSize: 7,
+          color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
+          textAlign: "center",
+          lineHeight: 1.2,
+        }}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function SeccionFormato({
+  formatCommandRef,
+  mono,
+}: {
+  formatCommandRef?: React.MutableRefObject<
+    ((commandId: RichEditorFormatCommand) => void) | null
+  >;
+  mono: React.CSSProperties;
+}) {
+  const apply = (commandId: RichEditorFormatCommand) => {
+    formatCommandRef?.current?.(commandId);
+  };
+
+  const labelStyle: React.CSSProperties = {
+    ...mono,
+    fontSize: 8,
+    textTransform: "uppercase",
+    letterSpacing: "0.12em",
+    color: "color-mix(in srgb, var(--foreground) 25%, transparent)",
+    padding: "8px 12px 4px",
+    display: "flex",
+    alignItems: "center",
+    gap: 5,
+  };
+
+  const gridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: 4,
+    padding: "0 12px",
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {/* ── TEXTO ── */}
+      <div style={labelStyle}>
+        <Pencil size={7} strokeWidth={1.8} />
+        texto
+      </div>
+      <div style={gridStyle}>
+        <FormatBtn
+          icon={Bold}
+          label="negrita"
+          mono={mono}
+          onClick={() => apply("bold")}
+        />
+        <FormatBtn
+          icon={Italic}
+          label="cursiva"
+          mono={mono}
+          onClick={() => apply("italic")}
+        />
+        <FormatBtn
+          icon={Underline}
+          label="subrayado"
+          mono={mono}
+          onClick={() => apply("underline")}
+        />
+        <FormatBtn
+          icon={Strikethrough}
+          label="tachado"
+          mono={mono}
+          onClick={() => apply("strikethrough")}
+        />
+      </div>
+
+      {/* ── DIVISOR ── */}
+      <div
+        style={{
+          margin: "10px 12px 0",
+          borderTop:
+            "1px solid color-mix(in srgb, var(--foreground) 6%, transparent)",
+        }}
+      />
+
+      {/* ── ENCABEZADOS ── */}
+      <div style={labelStyle}>
+        <Hash size={7} strokeWidth={1.8} />
+        encabezados
+      </div>
+      <div style={gridStyle}>
+        <FormatBtn
+          icon={Heading1}
+          label="título 1"
+          mono={mono}
+          onClick={() => apply("h1")}
+        />
+        <FormatBtn
+          icon={Heading2}
+          label="título 2"
+          mono={mono}
+          onClick={() => apply("h2")}
+        />
+        <FormatBtn
+          icon={Heading3}
+          label="título 3"
+          mono={mono}
+          onClick={() => apply("h3")}
+        />
+        <FormatBtn
+          icon={Heading4}
+          label="título 4"
+          mono={mono}
+          onClick={() => apply("h4")}
+        />
+      </div>
+      <div style={{ ...gridStyle, marginTop: 4 }}>
+        <FormatBtn
+          icon={Pilcrow}
+          label="normal"
+          mono={mono}
+          onClick={() => apply("paragraph")}
+        />
+      </div>
+
+      {/* ── DIVISOR ── */}
+      <div
+        style={{
+          margin: "10px 12px 0",
+          borderTop:
+            "1px solid color-mix(in srgb, var(--foreground) 6%, transparent)",
+        }}
+      />
+
+      {/* ── ALINEACIÓN ── */}
+      <div style={labelStyle}>
+        <AlignLeft size={7} strokeWidth={1.8} />
+        alineación
+      </div>
+      <div style={gridStyle}>
+        <FormatBtn
+          icon={AlignLeft}
+          label="izquierda"
+          mono={mono}
+          onClick={() => apply("align-left")}
+        />
+        <FormatBtn
+          icon={AlignCenter}
+          label="centro"
+          mono={mono}
+          onClick={() => apply("align-center")}
+        />
+        <FormatBtn
+          icon={AlignRight}
+          label="derecha"
+          mono={mono}
+          onClick={() => apply("align-right")}
+        />
+        <FormatBtn
+          icon={AlignJustify}
+          label="justificar"
+          mono={mono}
+          onClick={() => apply("align-justify")}
+        />
+      </div>
+
+      {/* ── DIVISOR ── */}
+      <div
+        style={{
+          margin: "10px 12px 0",
+          borderTop:
+            "1px solid color-mix(in srgb, var(--foreground) 6%, transparent)",
+        }}
+      />
+
+      {/* ── BLOQUES ── */}
+      <div style={labelStyle}>
+        <Quote size={7} strokeWidth={1.8} />
+        bloques
+      </div>
+      <div style={gridStyle}>
+        <FormatBtn
+          icon={ListIcon}
+          label="viñetas"
+          mono={mono}
+          onClick={() => apply("bullet")}
+        />
+        <FormatBtn
+          icon={ListOrdered}
+          label="numerada"
+          mono={mono}
+          onClick={() => apply("numbered")}
+        />
+        <FormatBtn
+          icon={Quote}
+          label="cita"
+          mono={mono}
+          onClick={() => apply("quote")}
+        />
+      </div>
+
+      <div style={{ height: 12 }} />
+    </div>
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export function NotaPanel({
@@ -617,6 +920,7 @@ export function NotaPanel({
   onUpdateField,
   onNavigateToPage,
   onTagClick,
+  formatCommandRef,
 }: NotaPanelProps) {
   const [tab, setTab] = useState<NotaPanelTab>("indice");
 
@@ -679,6 +983,13 @@ export function NotaPanel({
           mono={mono}
           onClick={() => setTab("contexto")}
         />
+        <TabBtn
+          active={tab === "formato"}
+          icon={LayoutList}
+          label="estructura"
+          mono={mono}
+          onClick={() => setTab("formato")}
+        />
       </div>
 
       {/* ── Contenido ── */}
@@ -711,6 +1022,17 @@ export function NotaPanel({
                 onTagClick={onTagClick}
                 onUpdateField={onUpdateField}
               />
+            </motion.div>
+          )}
+          {tab === "formato" && (
+            <motion.div
+              key="formato"
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              initial={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.12 }}
+            >
+              <SeccionFormato formatCommandRef={formatCommandRef} mono={mono} />
             </motion.div>
           )}
         </AnimatePresence>

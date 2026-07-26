@@ -43,7 +43,8 @@ import {
   $createTextNode,
   $getRoot,
   $getSelection,
-  $isRangeSelection
+  $isRangeSelection,
+  FORMAT_ELEMENT_COMMAND,
 } from "lexical";
 import type {
   LexicalEditor} from "lexical";
@@ -58,6 +59,10 @@ import {
   Code,
   Table as TableIcon,
   Minus,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef } from "react";
 
@@ -216,6 +221,59 @@ export const MARKDOWN_COMMAND_ITEMS: MarkdownCommandItem[] = [
         if (!selection) return;
         selection.insertText("—".repeat(3));
       });
+    },
+  },
+  // ── Alineación de párrafo ────────────────────────────────────────────
+  // FORMAT_ELEMENT_COMMAND es el comando nativo de Lexical para alinear
+  // el bloque completo donde está el cursor (funciona con paragraph,
+  // heading, quote, listitem — cualquier ElementNode). No requiere crear
+  // un nodo nuevo como los headings de arriba: solo setea la propiedad
+  // "format" del bloque actual, que el reconciler traduce a
+  // text-align en el DOM automáticamente. editor.focus() antes de
+  // dispatchCommand asegura que la selección siga viva si el usuario
+  // llegó acá con el mouse (mismo patrón que insertHeading/tabla).
+  {
+    id: "align-left",
+    label: "Alinear a la izquierda",
+    hint: "←",
+    keywords: ["alinear", "izquierda", "left", "align"],
+    Icon: AlignLeft,
+    run: (editor) => {
+      editor.focus();
+      editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "left");
+    },
+  },
+  {
+    id: "align-center",
+    label: "Centrar",
+    hint: "↔",
+    keywords: ["alinear", "centrar", "centro", "center", "align"],
+    Icon: AlignCenter,
+    run: (editor) => {
+      editor.focus();
+      editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "center");
+    },
+  },
+  {
+    id: "align-right",
+    label: "Alinear a la derecha",
+    hint: "→",
+    keywords: ["alinear", "derecha", "right", "align"],
+    Icon: AlignRight,
+    run: (editor) => {
+      editor.focus();
+      editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "right");
+    },
+  },
+  {
+    id: "align-justify",
+    label: "Justificar",
+    hint: "≡",
+    keywords: ["alinear", "justificar", "justify", "align"],
+    Icon: AlignJustify,
+    run: (editor) => {
+      editor.focus();
+      editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, "justify");
     },
   },
 ];
