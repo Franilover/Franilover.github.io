@@ -7,7 +7,11 @@
  *   import { RichEditor } from "@/components/forms/lexical-editor";
  */
 export { RichEditor } from "./RichEditor";
-export type { RichEditorProps, ViewMode } from "./RichEditor";
+export type {
+  RichEditorProps,
+  ViewMode,
+  RichEditorFormatCommand,
+} from "./RichEditor";
 
 // Nodos (útiles si necesitas crear/inspeccionar nodos fuera del editor)
 export {

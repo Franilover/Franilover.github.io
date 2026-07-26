@@ -36,7 +36,14 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { HeadingNode, QuoteNode, $isHeadingNode } from "@lexical/rich-text";
-import { $getRoot } from "lexical";
+import {
+  $getRoot,
+  $getSelection,
+  $isRangeSelection,
+  $createParagraphNode,
+  FORMAT_TEXT_COMMAND,
+} from "lexical";
+import { $setBlocksType } from "@lexical/selection";
 import type { EditorState, LexicalEditor } from "lexical";
 import { Edit3, Eye, Columns2, SpellCheck2 } from "lucide-react";
 import React, {
@@ -59,6 +66,7 @@ import {
   MarkdownCommandInsertPlugin,
   MarkdownCommandPalette,
   filterMarkdownCommands,
+  MARKDOWN_COMMAND_ITEMS,
 } from "./MarkdownCommandPalette";
 import { ChoiceNode } from "./nodes/ChoiceNode";
 import { DropNode } from "./nodes/DropNode";
@@ -91,6 +99,34 @@ import { WikilinkPlugin, type WikilinkMatch } from "./WikilinkPlugin";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ViewMode = "edit" | "preview" | "split";
+
+/**
+ * Comandos de formato aplicables desde afuera del editor vía
+ * formatCommandRef (ver RichEditorProps). Dos familias:
+ *   - Formato de texto en línea (bold/italic/underline/strikethrough):
+ *     aplican sobre la SELECCIÓN actual, vía FORMAT_TEXT_COMMAND nativo.
+ *   - Formato de bloque (h1-h4, alineación, cita, listas): mismos ids que
+ *     MARKDOWN_COMMAND_ITEMS del menú "/", para no duplicar la lógica de
+ *     inserción — FormatCommandPlugin delega en MARKDOWN_COMMAND_ITEMS
+ *     para estos casos.
+ */
+export type RichEditorFormatCommand =
+  | "bold"
+  | "italic"
+  | "underline"
+  | "strikethrough"
+  | "h1"
+  | "h2"
+  | "h3"
+  | "h4"
+  | "paragraph"
+  | "bullet"
+  | "numbered"
+  | "quote"
+  | "align-left"
+  | "align-center"
+  | "align-right"
+  | "align-justify";
 
 export interface RichEditorProps {
   value: string;
@@ -130,6 +166,18 @@ export interface RichEditorProps {
    */
   insertTableRef?: React.MutableRefObject<
     ((rows?: number, cols?: number) => void) | null
+  >;
+  /**
+   * Ref imperativo para aplicar comandos de formato desde un panel externo
+   * (ej. la tab "formato" de NotaPanel en EditorEnsayo). Cubre lo mismo que
+   * el menú "/" (MARKDOWN_COMMAND_ITEMS) pero invocable con un solo click
+   * desde fuera del árbol de Lexical, sin que el usuario tenga que escribir
+   * "/" dentro del editor. Además de los bloques (headings, alineación)
+   * cubre formato de texto en línea (bold/italic/etc) que el menú "/" no
+   * maneja porque opera sobre selección, no sobre el bloque completo.
+   */
+  formatCommandRef?: React.MutableRefObject<
+    ((commandId: RichEditorFormatCommand) => void) | null
   >;
   /** Handler de edición de un snippet existente → abre SnippetCommandPalette */
   onSnippetEdit?: (req: SnippetEditRequest<any>) => void;
@@ -555,6 +603,66 @@ function InsertTablePlugin({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Plugin: expone formatCommandRef para aplicar comandos de formato desde un
+// panel externo (ej. tab "formato" de NotaPanel en EditorEnsayo) sin que el
+// usuario tenga que escribir "/" dentro del editor.
+//
+// Dos caminos según el tipo de comando:
+//   - Texto en línea (bold/italic/underline/strikethrough): usa el comando
+//     nativo FORMAT_TEXT_COMMAND de Lexical, que alterna el formato sobre
+//     la SELECCIÓN actual (igual que Ctrl+B nativo del navegador).
+//   - Bloque (headings, alineación, listas, cita): delega en
+//     MARKDOWN_COMMAND_ITEMS (mismo array que usa el menú "/"), evitando
+//     reimplementar esa lógica de inserción dos veces. Los ids coinciden
+//     a propósito con los de MARKDOWN_COMMAND_ITEMS para este subconjunto.
+function FormatCommandPlugin({
+  formatCommandRef,
+}: {
+  formatCommandRef?: React.MutableRefObject<
+    ((commandId: RichEditorFormatCommand) => void) | null
+  >;
+}) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    if (!formatCommandRef) return;
+    formatCommandRef.current = (commandId) => {
+      if (
+        commandId === "bold" ||
+        commandId === "italic" ||
+        commandId === "underline" ||
+        commandId === "strikethrough"
+      ) {
+        editor.focus();
+        editor.dispatchCommand(FORMAT_TEXT_COMMAND, commandId);
+        return;
+      }
+      // "paragraph" no existe en MARKDOWN_COMMAND_ITEMS (ese menú solo
+      // inserta bloques nuevos, nunca "vuelve a texto normal" — no hace
+      // falta ahí porque no hay forma de escribir "/parrafo" con sentido).
+      // Este panel sí lo necesita: si el cursor está en un heading, la
+      // persona debe poder volver a párrafo normal con un click.
+      if (commandId === "paragraph") {
+        editor.focus();
+        editor.update(() => {
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection)) return;
+          $setBlocksType(selection, () => $createParagraphNode());
+        });
+        return;
+      }
+      const item = MARKDOWN_COMMAND_ITEMS.find((i) => i.id === commandId);
+      item?.run(editor);
+    };
+    return () => {
+      if (formatCommandRef) formatCommandRef.current = null;
+    };
+  }, [editor, formatCommandRef]);
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Toggle de modo — icon-only, sin caja ni bordes (igual que el mobile toggle
 // de MarkdownEditor). Sin botones de formato: bold/italic/etc ya se aplican
 // con los shortcuts de markdown (**, *, #...) vía MarkdownShortcutPlugin.
@@ -890,6 +998,7 @@ export function RichEditor({
   editable = true,
   insertRef,
   insertTableRef,
+  formatCommandRef,
   onSnippetEdit,
   onOpenPalette,
   onClosePalette,
@@ -1462,6 +1571,7 @@ export function RichEditor({
               <TablePlugin />
               <ListPlugin />
               <InsertTablePlugin insertTableRef={insertTableRef} />
+              <FormatCommandPlugin formatCommandRef={formatCommandRef} />
               <AutoClosePlugin />
               <HeadingBackspacePlugin />
               <ListBackspacePlugin />
