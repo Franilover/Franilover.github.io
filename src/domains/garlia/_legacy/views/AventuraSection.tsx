@@ -61,7 +61,7 @@ import { PanelTiposMoneda } from "@/domains/garlia/_legacy-public/views/PanelTip
 import { useTableroEscala, CARD_SCALE_MIN, CARD_SCALE_MAX } from "@/domains/garlia/_legacy-public/hooks/useTableroEscala";
 import { FichaDetalle } from "@/domains/garlia/_legacy-public/views/fichaComponents";
 import type { FichaDnd } from "@/domains/garlia/_legacy-public/hooks/useFichasDnd";
-import { CriaturaStatsDndEditor } from "../components/criaturas/CriaturaStatsDnd";
+import { CriaturaStatsDndEditor } from "@/domains/garlia/criaturas/CriaturaStatsDnd";
 import type { CriaturaStatsDnd } from "../hooks/types";
 import { supabase } from "@/lib/api/client/supabase";
 

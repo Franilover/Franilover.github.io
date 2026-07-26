@@ -34,7 +34,7 @@ import { useSupabaseData } from "@/hooks/data/useSupabaseData";
 import { supabase } from "@/lib/api/client/supabase";
 
 import { CiudadEditor } from "../components/ciudades/CiudadEditor";
-import { CriaturaEditor } from "../components/criaturas/CriaturaEditor";
+import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { ItemEditor } from "../components/items/ItemEditor";
 import { PersonajeEditor } from "../components/personajes/PersonajeEditor";
 import { ReinoEditor } from "../components/reinos/ReinoEditor";
