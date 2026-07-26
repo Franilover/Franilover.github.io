@@ -20,10 +20,10 @@
 import { Loader2, ArrowLeft } from "lucide-react";
 import React from "react";
 
-import { Editor } from "@/features/ensayos/components/notas/EditorEnsayo";
-import NewNoteModal from "@/features/ensayos/components/notas/newNoteModal";
-import { useEnsayoEditorLogic } from "@/features/ensayos/hooks/notas/useEnsayoEditorLogic";
-import { useZotero } from "@/features/ensayos/hooks/notas/useZotero";
+import { Editor } from "@/editor/notas/components/EditorEnsayo";
+import NewNoteModal from "@/editor/notas/components/newNoteModal";
+import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
+import { useZotero } from "@/editor/notas/hooks/useZotero";
 
 interface Props {
   ensayoId: string;

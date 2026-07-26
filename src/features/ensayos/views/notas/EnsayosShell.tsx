@@ -6,17 +6,17 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { AdminOnly } from "@/components/forms/AdminOnly";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { ToastContainer } from "@/components/ui/ToastContainer";
-import Editor from "@/features/ensayos/components/notas/EditorEnsayo";
-import { GrafoEnsayos } from "@/features/ensayos/components/notas/GrafoEnsayos";
-import NewNoteModal from "@/features/ensayos/components/notas/newNoteModal";
+import Editor from "@/editor/notas/components/EditorEnsayo";
+import { GrafoEnsayos } from "@/editor/notas/components/GrafoEnsayos";
+import NewNoteModal from "@/editor/notas/components/newNoteModal";
 import ArmarioPage from "@/features/ensayos/components/ropa/ropa";
 import RecetasPage from "@/features/ensayos/views/cocina/recetas";
 import { IngredientesPage } from "@/features/ensayos/views/cocina/ingredientes";
 import { PaginaEjercicios } from "@/features/ensayos/views/ejercicios/ejerciciosComponent";
 import { HomeDashboard } from "@/features/ensayos/views/notas/HomeDashboard";
 import { LibrosDashboard } from "@/features/ensayos/views/notas/LibrosDashboard";
-import { useEscritorioNavigation } from "@/features/ensayos/hooks/notas/useEscritorioNavigationStore";
-import { useZotero } from "@/features/ensayos/hooks/notas/useZotero";
+import { useEscritorioNavigation } from "@/editor/notas/hooks/useEscritorioNavigationStore";
+import { useZotero } from "@/editor/notas/hooks/useZotero";
 
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
 import { useToast } from "@/hooks/ui/useToast";

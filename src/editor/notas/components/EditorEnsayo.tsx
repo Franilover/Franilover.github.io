@@ -14,7 +14,7 @@ import {
   type RichEditorFormatCommand,
 } from "@/components/forms/lexical-editor";
 import { MotionDiv } from "@/components/ui/Motion";
-import type { ZoteroSource } from "@/features/ensayos/hooks/notas/useZotero";
+import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
 
 import { CitePopup } from "./citePopup";
 import { LibroPanel } from "./LibroPanel";

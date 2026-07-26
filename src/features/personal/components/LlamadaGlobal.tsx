@@ -26,7 +26,7 @@ import {
   type SenalLlamada,
 } from "@/lib/api/client/callEngine";
 import { supabase } from "@/lib/api/client/supabase";
-import { useLlamadaStore } from "@/features/personal/hooks/useLlamadaStore";
+import { useLlamadaStore } from "@/infra/realtime/useLlamadaStore";
 import { useAuth } from "@/providers/AuthProvider";
 
 export default function LlamadaGlobal() {

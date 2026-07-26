@@ -6,7 +6,7 @@ import React, { useEffect, useState, useRef } from "react";
 
 import { Loading } from "@/components/ui";
 import { SmartImage } from "@/components/ui/SmartImage";
-import { useUsuariosEnLinea } from "@/features/personal/hooks/useEnLinea";
+import { useUsuariosEnLinea } from "@/infra/realtime/useEnLinea";
 import {
   listarConversaciones,
   buscarPerfiles,

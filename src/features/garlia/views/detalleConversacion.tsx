@@ -6,8 +6,8 @@ import React, { useEffect, useRef, useState } from "react";
 
 import { Loading } from "@/components/ui";
 import { SmartImage } from "@/components/ui/SmartImage";
-import { useLlamadaStore } from "@/features/personal/hooks/useLlamadaStore";
-import { useEstaEnLinea } from "@/features/personal/hooks/useEnLinea";
+import { useLlamadaStore } from "@/infra/realtime/useLlamadaStore";
+import { useEstaEnLinea } from "@/infra/realtime/useEnLinea";
 import {
   cargarMensajes,
   cargarReacciones,

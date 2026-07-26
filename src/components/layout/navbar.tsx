@@ -39,7 +39,7 @@ import {
   useMundoNavigation,
   type SectionKey,
 } from "@/features/editorGarlia/hooks/mundo/useMundoNavigationStore";
-import { useEscritorioNavigation } from "@/features/ensayos/hooks/notas/useEscritorioNavigationStore";
+import { useEscritorioNavigation } from "@/editor/notas/hooks/useEscritorioNavigationStore";
 import { useGotoHotkeys } from "@/hooks/ui/useGotoHotkeys";
 import { useMobileAsidePanel } from "@/hooks/ui/useMobileAsidePanel";
 import { useAuth } from "@/providers/AuthProvider";

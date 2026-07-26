@@ -17,8 +17,8 @@
 import { FileText, Plus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-import NewNoteModal from "@/features/ensayos/components/notas/newNoteModal";
-import { useEnsayoEditorLogic } from "@/features/ensayos/hooks/notas/useEnsayoEditorLogic";
+import NewNoteModal from "@/editor/notas/components/newNoteModal";
+import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
 interface Props {
   onOpen: (ensayoId: string) => void;
