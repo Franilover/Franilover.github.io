@@ -58,7 +58,7 @@ function ImagePickerModal({
 }) {
   const [Picker, setPicker] = useState<React.ComponentType<any> | null>(null);
   useEffect(() => {
-    void import("@/features/editorGarlia/components/libros/snippets/forms/SimpleImagePicker").then(
+    void import("@/components/ui/SimpleImagePicker").then(
       (m) => setPicker(() => m.default),
     );
   }, []);

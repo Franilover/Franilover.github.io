@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml:2:13-83
+INJECTED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml:2:13-83
+	package
+		INJECTED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml
+	xmlns:android
+		ADDED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml:2:23-81
+uses-sdk
+INJECTED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml reason: use-sdk injection requested
+INJECTED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml
+INJECTED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml
+	android:targetSdkVersion
+		INJECTED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml
+	android:minSdkVersion
+		INJECTED from /home/frani/Code/agenda-next/src-tauri/android-installer/android/build/intermediates/tmp/ProcessLibraryManifest/release/tempAndroidManifest18442904123936810940.xml

@@ -1,0 +1,4 @@
+
+# Build artifacts de Tauri Android
+src-tauri/android-installer/**/build/
+src-tauri/android-installer/**/.tauri/

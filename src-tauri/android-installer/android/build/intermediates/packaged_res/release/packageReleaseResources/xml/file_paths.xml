@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Le dice al FileProvider qué carpetas puede exponer via content:// URIs.
+  El APK descargado se guarda en el directorio de datos privados de la app
+  (files dir), así que solo necesitamos exponer esa carpeta — nada de
+  almacenamiento externo ni permisos extra de storage.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <files-path name="apk_updates" path="updates/" />
+</paths>

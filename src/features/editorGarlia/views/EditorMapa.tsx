@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import SimpleImagePicker from "@/features/editorGarlia/components/libros/snippets/forms/SimpleImagePicker";
+import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
 import { UnifiedTileCanvas } from "@/features/editorGarlia/components/shared/UnifiedTileCanvas";
 import type { MapTile } from "@/features/editorGarlia/components/shared/UnifiedTileCanvas";
 import { supabase } from "@/lib/api/client/supabase";

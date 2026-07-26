@@ -4,7 +4,7 @@ import Image from "next/image";
 import React, { useState } from "react";
 
 import { ChipGroup } from "@/components/ui/Chip";
-import SimpleImagePicker from "@/features/editorGarlia/components/libros/snippets/forms/SimpleImagePicker";
+import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
 import { cn } from "@/lib/utils/index";
 
 export type Categoria = "Superior" | "Inferior" | "Calzado" | "Accesorios" | "Outfit";

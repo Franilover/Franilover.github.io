@@ -43,7 +43,7 @@ import { useConfirm } from "@/components/ui/ConfirmModal";
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import { SelectorFechaMundo } from "@/features/editorGarlia/components/calendario/SelectorFechaMundo";
 import { useCalendario } from "@/features/editorGarlia/hooks/calendario/useCalendario";
-import SimpleImagePicker from "@/features/editorGarlia/components/libros/snippets/forms/SimpleImagePicker";
+import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 import { diasPorAnio as calcDiasPorAnio } from "@/lib/utils/calendario";

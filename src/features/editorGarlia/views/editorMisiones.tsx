@@ -29,7 +29,7 @@ import Image from "next/image";
 import React, { useCallback, useEffect, useState } from "react";
 
 import { MotionDiv } from "@/components/ui/Motion";
-import SimpleImagePicker from "@/features/editorGarlia/components/libros/snippets/forms/SimpleImagePicker";
+import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
 import { supabase } from "@/lib/api/client/supabase";
 import { loadMisionesAdmin } from "@/lib/api/client/syncEngine";

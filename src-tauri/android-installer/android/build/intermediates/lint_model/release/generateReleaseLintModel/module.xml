@@ -1,0 +1,19 @@
+<lint-module
+    format="1"
+    dir="/home/frani/Code/agenda-next/src-tauri/android-installer/android"
+    name=":tauri-plugin-android-installer"
+    type="LIBRARY"
+    maven="android:tauri-plugin-android-installer:unspecified"
+    agpVersion="8.5.1"
+    buildFolder="build"
+    bootClassPath="/home/frani/.config/android/android-sdk/platforms/android-34/android.jar:/home/frani/.config/android/android-sdk/build-tools/34.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="1.8"
+    compileTarget="android-34"
+    neverShrinking="true">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>
