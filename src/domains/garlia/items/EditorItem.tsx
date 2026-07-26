@@ -92,7 +92,7 @@ export function EditorItem({
   const field =
     (k: keyof Item) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((f) => ({ ...f, [k]: e.target.value }));
+      setForm((f: Item) => ({ ...f, [k]: e.target.value }));
 
   const save = async () => {
     setStatus("saving");
@@ -214,7 +214,7 @@ export function EditorItem({
                   <PickerImagenItemBtn
                     value={form.imagen_url ?? ""}
                     onChange={(url) =>
-                      setForm((f) => ({ ...f, imagen_url: url }))
+                      setForm((f: Item) => ({ ...f, imagen_url: url }))
                     }
                   />
                 </div>
@@ -227,7 +227,7 @@ export function EditorItem({
                   placeholder={<Package className="opacity-20" size={20} />}
                   value={form.imagen_url ?? ""}
                   onChange={(url) =>
-                    setForm((f) => ({ ...f, imagen_url: url }))
+                    setForm((f: Item) => ({ ...f, imagen_url: url }))
                   }
                 />
               </div>
@@ -242,7 +242,7 @@ export function EditorItem({
                 subtipo="Tipo"
                 value={form.categoria ?? null}
                 onChange={(nombre) =>
-                  setForm((f) => ({ ...f, categoria: nombre ?? "" }))
+                  setForm((f: Item) => ({ ...f, categoria: nombre ?? "" }))
                 }
                 onSelectGrupo={onSelectGrupo}
               />
@@ -262,7 +262,7 @@ export function EditorItem({
                 placeholder="Vincular a una criatura…"
                 value={form.criatura_id ?? null}
                 onChange={(id) =>
-                  setForm((f) => ({ ...f, criatura_id: id }))
+                  setForm((f: Item) => ({ ...f, criatura_id: id }))
                 }
                 onNavigate={
                   onNavigateCriatura
@@ -286,7 +286,7 @@ export function EditorItem({
                       subtipo="Origen"
                       value={form.origen ?? null}
                       onChange={(nombre) =>
-                        setForm((f) => ({
+                        setForm((f: Item) => ({
                           ...f,
                           origen: (nombre ?? null) as Item["origen"],
                         }))
@@ -305,7 +305,7 @@ export function EditorItem({
                     loadingReinos={loadingReinos}
                     value={form.reino_ids ?? []}
                     onChange={(ids) =>
-                      setForm((f) => ({ ...f, reino_ids: ids }))
+                      setForm((f: Item) => ({ ...f, reino_ids: ids }))
                     }
                     onNavigateReino={onNavigateReino}
                     onSelectedCountChange={setCountTerritorio}
@@ -337,12 +337,12 @@ export function EditorItem({
                   showSplitMode={false}
                   value={form.descripcion ?? ""}
                   wikiEntities={entities}
-                  onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
+                  onChange={(v) => setForm((f: Item) => ({ ...f, descripcion: v }))}
                   onWikilinkNavigate={onWikilink}
                 />
               </div>
 
-              <PanelReglasDnd form={form} onChange={(cambios) => setForm((f) => ({ ...f, ...cambios }))} />
+              <PanelReglasDnd form={form} onChange={(cambios) => setForm((f: Item) => ({ ...f, ...cambios }))} />
             </div>
           </div>
         </div>
