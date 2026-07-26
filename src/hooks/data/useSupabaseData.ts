@@ -8,7 +8,7 @@ import {
 } from "@/hooks/data/useOfflineSync";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
-import { cancionesQueries } from "@/lib/api/queries/garlia/canciones";
+import { cancionesQueries } from "@/domains/garlia/canciones/queries";
 import { criaturasQueries } from "@/lib/api/queries/garlia/criaturas";
 import { itemsQueries } from "@/lib/api/queries/garlia/items";
 import { librosQueries } from "@/lib/api/queries/garlia/libros";

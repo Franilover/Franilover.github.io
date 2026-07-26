@@ -1,4 +1,4 @@
-import DetalleConversacion from '@/features/garlia/views/detalleConversacion';
+import DetalleConversacion from '@/domains/garlia/_legacy-public/views/detalleConversacion';
 
 // Requerido por `output: export`. Ver nota en garlia/libros/[id]/page.tsx.
 export async function generateStaticParams() {

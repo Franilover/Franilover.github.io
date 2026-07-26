@@ -1,4 +1,4 @@
-import Leer from '@/features/garlia/views/leerLibro';
+import Leer from '@/domains/garlia/_legacy-public/views/leerLibro';
 
 // Requerido por `output: export`. En rutas anidadas con dos segmentos
 // dinámicos (libros/[id]/leer/[capId]), Next.js necesita que el

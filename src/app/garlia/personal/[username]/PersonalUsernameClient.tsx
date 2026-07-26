@@ -1,6 +1,6 @@
 "use client";
 import { useParams } from "next/navigation";
-import PersonalUsername from "@/features/garlia/views/personalUsername";
+import PersonalUsername from "@/domains/garlia/_legacy-public/views/personalUsername";
 
 export default function PersonalUsernameClient() {
   const params   = useParams();

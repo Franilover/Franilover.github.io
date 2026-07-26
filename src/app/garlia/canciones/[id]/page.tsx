@@ -1,4 +1,4 @@
-import CancionDetalles from "@/features/garlia/views/detallesCancion";
+import CancionDetalles from "@/domains/garlia/_legacy-public/views/detallesCancion";
 
 // Requerido por `output: export`. Este page.tsx debe ser Server Component
 // (sin "use client") para que generateStaticParams funcione — por eso NO
