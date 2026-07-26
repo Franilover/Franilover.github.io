@@ -35,20 +35,21 @@ import {
 import { ComboSelector } from "@/components/ui/ComboSelector";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import {
+  BloqueDones,
+  PersonajeLineaDeTiempo,
+  PersonajeSidebarPanel,
   PickerCaraBtn,
   PickerImagen,
-} from "@/domains/garlia/_legacy/components/personajes/PersonajeImagePickers";
-import { PersonajeLineaDeTiempo } from "@/domains/garlia/_legacy/components/personajes/PersonajeLineaDeTiempo";
-import { PersonajeSidebarPanel } from "@/domains/garlia/_legacy/components/personajes/PersonajeSidebarPanel";
+  usePersonajeForm,
+  type Personaje,
+} from "@garlia/personajes";
+import { type SaveStatus } from "@/components/ui/saveStatus";
 import { useCiudades } from "@/domains/garlia/_legacy/hooks/ciudades/useCiudades";
 import { useGruposDeCriatura } from "@/domains/garlia/_legacy/hooks/grupos/useGruposDeCriatura";
-import { usePersonajeForm } from "@/domains/garlia/_legacy/hooks/personajes/usePersonajeForm";
 import { useReinosMin } from "@/domains/garlia/_legacy/hooks/reinos/useReinosMin";
 
-import { BloqueDones } from "@/domains/garlia/_legacy/components/personajes/BloqueDones";
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
 import { useNombresDeTabla } from "../hooks/misc/useNombresDeTabla";
-import { type Personaje, type SaveStatus } from "../hooks/types";
 
 // ─── FormularioPersonaje ──────────────────────────────────────────────────────
 

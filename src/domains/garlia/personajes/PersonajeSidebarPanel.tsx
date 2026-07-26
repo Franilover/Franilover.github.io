@@ -13,11 +13,11 @@
 
 import { BookOpen, Music2, SlidersHorizontal, X } from "lucide-react";
 
-import { BloqueRelaciones } from "@/domains/garlia/_legacy/components/personajes/BloqueRelaciones";
-import { PersonajeCancionesAsociadas } from "@/domains/garlia/_legacy/components/personajes/PersonajeCancionesAsociadas";
-import { PersonajeCapitulosAparece } from "@/domains/garlia/_legacy/components/personajes/PersonajeCapitulosAparece";
-import { PersonajeGrupos } from "@/domains/garlia/_legacy/components/personajes/PersonajeGrupos";
-import { PersonajeHechizos } from "@/domains/garlia/_legacy/components/personajes/PersonajeHechizos";
+import { BloqueRelaciones } from "./BloqueRelaciones";
+import { PersonajeCancionesAsociadas } from "./PersonajeCancionesAsociadas";
+import { PersonajeCapitulosAparece } from "./PersonajeCapitulosAparece";
+import { PersonajeGrupos } from "./PersonajeGrupos";
+import { PersonajeHechizos } from "./PersonajeHechizos";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface PersonajeSidebarPanelProps {

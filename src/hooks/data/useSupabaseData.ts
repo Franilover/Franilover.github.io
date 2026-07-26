@@ -12,7 +12,7 @@ import { cancionesQueries } from "@/domains/garlia/canciones/queries";
 import { criaturasQueries } from "@/domains/garlia/criaturas/queries";
 import { itemsQueries } from "@/domains/garlia/items/queries";
 import { librosQueries } from "@/lib/api/queries/garlia/libros";
-import { personajesQueries } from "@/lib/api/queries/garlia/personajes";
+import { personajesQueries } from "@garlia/personajes";
 import { comprasQueries } from "@/lib/api/queries/personal/cocina/carrito";
 import { ingredientesQueries } from "@/lib/api/queries/personal/cocina/ingredientes";
 import { recetasQueries } from "@/lib/api/queries/personal/cocina/recetas";

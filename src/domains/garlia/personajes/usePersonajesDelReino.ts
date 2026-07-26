@@ -1,21 +1,10 @@
-/**
- * usePersonajesDelReino.ts
- * ──────────────────────────
- * Personajes que pertenecen a un reino dado (por nombre, no ID).
- *
- * Extraído de `hooks/hooks.ts` (archivo cajón-de-sastre con 11 hooks
- * mezclados) al partirlo por dominio.
- *
- * Ruta: src/features/editorGarlia/hooks/personajes/usePersonajesDelReino.ts
- */
-
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { SESSION_CACHE_TTL_MS } from "@/lib/sessionCache";
 
-import { SESSION_CACHE_TTL_MS } from "../sessionCache";
-import { type Personaje } from "../types";
+import { personajesQueries } from "./queries";
+import { type Personaje } from "./model";
 
 export function usePersonajesDelReino(reinoNombre: string | null | undefined) {
   const [personajes, setPersonajes] = useState<Personaje[]>([]);
@@ -69,13 +58,8 @@ export function usePersonajesDelReino(reinoNombre: string | null | undefined) {
         return;
       }
 
-      const { data } = await supabase
-        .from("personajes")
-        .select("id, nombre, img_url, img_cuerpo_url, especie, reino, sobre")
-        .ilike("reino", `%${reinoNombre}%`)
-        .order("nombre");
+      const result = await personajesQueries.getByReinoNombre(reinoNombre);
       if (cancelled) return;
-      const result = data || [];
       setPersonajes(result);
       setLoading(false);
 

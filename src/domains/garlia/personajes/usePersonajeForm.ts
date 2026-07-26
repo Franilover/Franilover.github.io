@@ -14,7 +14,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/api/client/supabase";
 import { dexieDelete, dexiePut } from "@/lib/utils/dexieHelpers";
 
-import { type Personaje, type SaveStatus } from "../types";
+import { type SaveStatus } from "@/components/ui/saveStatus";
+
+import { type Personaje } from "./model";
 
 export function usePersonajeForm(
   item: Personaje,

@@ -20,7 +20,7 @@ import { useConfirm } from "@/components/ui/ConfirmModal";
 import { LoreTab } from "@/domains/garlia/_legacy/components/shared/LoreTab";
 import { ReinoTileCanvas } from "@/domains/garlia/_legacy/components/reinos/ReinoTileCanvas";
 import { SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
-import { usePersonajesDelReino } from "@/domains/garlia/_legacy/hooks/personajes/usePersonajesDelReino";
+import { usePersonajesDelReino } from "@garlia/personajes";
 import {
   type Reino,
   type SaveStatus,

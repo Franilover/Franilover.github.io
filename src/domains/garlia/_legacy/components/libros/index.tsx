@@ -49,8 +49,7 @@ import { supabase } from "@/lib/api/client/supabase";
 import { diasPorAnio as calcDiasPorAnio } from "@/lib/utils/calendario";
 
 import { useCapitulos } from "@/domains/garlia/_legacy/hooks/capitulos/useCapitulosEditor";
-import { useEdicionRapidaNarrador } from "@/domains/garlia/_legacy/hooks/personajes/useEdicionRapidaNarrador";
-import { useEstadoMundoCapitulo } from "@/domains/garlia/_legacy/hooks/personajes/useEstadoMundoCapitulo";
+import { useEdicionRapidaNarrador, useEstadoMundoCapitulo } from "@garlia/personajes";
 import { useEntidadesLore } from "@/domains/garlia/_legacy/context/EntidadesLoreContext";
 // ─── EstadisticasEscritura ────────────────────────────────────────────────────
 

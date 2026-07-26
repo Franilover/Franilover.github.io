@@ -63,8 +63,8 @@ import {
 import {
   type Era,
   useErasDelPersonaje,
-} from "@/domains/garlia/_legacy/hooks/personajes/useErasDelPersonaje";
-import { useGuardarCumpleanos } from "@/domains/garlia/_legacy/hooks/personajes/useGuardarCumpleanos";
+} from "./useErasDelPersonaje";
+import { useGuardarCumpleanos } from "./useGuardarCumpleanos";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

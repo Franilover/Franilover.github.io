@@ -36,7 +36,7 @@ import { supabase } from "@/lib/api/client/supabase";
 import { CiudadEditor } from "../components/ciudades/CiudadEditor";
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { ItemEditor } from "@/domains/garlia/items/ItemEditor";
-import { PersonajeEditor } from "../components/personajes/PersonajeEditor";
+import { PersonajeEditor } from "@garlia/personajes";
 import { ReinoEditor } from "../components/reinos/ReinoEditor";
 import { EntityCardGrid } from "../components/shared/EntityCardGrid";
 import { GeografiaJerarquica } from "../components/shared/GeografiaJerarquica";
