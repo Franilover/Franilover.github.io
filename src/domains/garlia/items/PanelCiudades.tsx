@@ -16,7 +16,7 @@ import { MapPin } from "lucide-react";
 import { useState } from "react";
 
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
-import { useCiudadesItem } from "@/domains/garlia/_legacy/hooks/ciudades/useCiudadesItem";
+import { useCiudadesItem } from "./useCiudadesItem";
 import { type CiudadMin } from "@/domains/garlia/_legacy/hooks/misc/useItemCatalogosUbicacion";
 
 export function PanelCiudades({

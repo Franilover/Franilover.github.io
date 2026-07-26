@@ -16,8 +16,8 @@
 
 import { MAESTRIAS_ARMA_DND } from "@/domains/garlia/_legacy-public/hooks/useFichasDnd";
 
-import { INPUT_CLS } from "../../hooks/types";
-import type { Item } from "../../hooks/types";
+import { INPUT_CLS } from "@/domains/garlia/_legacy/hooks/types";
+import type { Item } from "@garlia/items";
 
 type TipoReglaDnd = "ninguno" | "arma" | "armadura" | "escudo";
 

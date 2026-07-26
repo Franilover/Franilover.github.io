@@ -45,7 +45,8 @@ import { supabase } from "@/lib/api/client/supabase";
 
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
-import { type Item, type SaveStatus } from "../hooks/types";
+import { type Item } from "@garlia/items";
+import { type SaveStatus } from "@/components/ui/saveStatus";
 
 export function EditorItem({
   item,
