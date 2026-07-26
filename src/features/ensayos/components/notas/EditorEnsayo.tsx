@@ -9,7 +9,10 @@ import React, {
   useMemo,
 } from "react";
 
-import { RichEditor } from "@/components/forms/lexical-editor";
+import {
+  RichEditor,
+  type RichEditorFormatCommand,
+} from "@/components/forms/lexical-editor";
 import { MotionDiv } from "@/components/ui/Motion";
 import type { ZoteroSource } from "@/features/ensayos/hooks/notas/useZotero";
 
@@ -76,6 +79,12 @@ export function Editor({
 }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tituloOriginalRef = useRef<string | null>(null);
+  // Ref imperativo hacia RichEditor para que NotaPanel (tab "formato")
+  // pueda aplicar comandos de bloque/texto sin pasar por el "/" —
+  // ver RichEditor.tsx (FormatCommandPlugin) y NotaPanel.tsx.
+  const formatCommandRef = useRef<
+    ((commandId: RichEditorFormatCommand) => void) | null
+  >(null);
 
   const [localTitulo, setLocalTitulo] = useState<string>(ensayo.titulo || "");
   const [localContenido, setLocalContenido] = useState<string>(
@@ -305,6 +314,7 @@ export function Editor({
       }}
     >
       <RichEditor
+        formatCommandRef={formatCommandRef}
         mode={richMode}
         placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"
         showSplitMode={false}
@@ -801,6 +811,7 @@ export function Editor({
                 <NotaPanel
                   ensayo={ensayo}
                   ensayos={ensayos}
+                  formatCommandRef={formatCommandRef}
                   tocEntries={tocEntries}
                   onNavigateToPage={onNavigateToPage}
                   onTagClick={onTagClick ?? onNavigateToPage}
@@ -900,6 +911,7 @@ export function Editor({
                       <NotaPanel
                         ensayo={ensayo}
                         ensayos={ensayos}
+                        formatCommandRef={formatCommandRef}
                         tocEntries={tocEntries}
                         onNavigateToPage={(name) => {
                           setNotaPanelOpen(false);
