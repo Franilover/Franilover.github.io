@@ -10,7 +10,7 @@ import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 import { cancionesQueries } from "@/domains/garlia/canciones/queries";
 import { criaturasQueries } from "@/domains/garlia/criaturas/queries";
-import { itemsQueries } from "@/lib/api/queries/garlia/items";
+import { itemsQueries } from "@/domains/garlia/items/queries";
 import { librosQueries } from "@/lib/api/queries/garlia/libros";
 import { personajesQueries } from "@/lib/api/queries/garlia/personajes";
 import { comprasQueries } from "@/lib/api/queries/personal/cocina/carrito";

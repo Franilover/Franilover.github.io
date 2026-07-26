@@ -1,6 +1,6 @@
 "use client";
 
-import { EditorItem } from "@/domains/garlia/_legacy/views/EditorItem";
+import { EditorItem } from "@/domains/garlia/items/EditorItem";
 
 import { useMundoNavigation } from "../../hooks/mundo/useMundoNavigationStore";
 
