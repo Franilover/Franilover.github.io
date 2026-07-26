@@ -39,6 +39,7 @@ import React, {
 
 import type { SnippetEditRequest } from "@/components/forms/lexical-editor";
 import { RichEditor ,
+  type RichEditorFormatCommand,
   dropPayloadToRaw,
   soundPayloadToRaw,
   imgPayloadToRaw,
@@ -258,6 +259,12 @@ const PanelEditor = ({
   const timer = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const mdInsertRef = useRef<((raw: string) => void) | null>(null);
+  // Ref imperativo de RichEditor para aplicar comandos de formato de
+  // bloque (ej. "align-right") desde el menú "/" — ver directAction en
+  // SnippetCommandPalette/CATS.
+  const formatCommandRef = useRef<
+    ((commandId: RichEditorFormatCommand) => void) | null
+  >(null);
   const closePaletteRef = useRef<(() => void) | null>(null);
   const pendingReplaceRef = useRef<((next: string) => void) | null>(null);
   const pendingSnippetRawRef = useRef<string | null>(null);
@@ -1298,6 +1305,7 @@ const PanelEditor = ({
                   // más arriba para la segunda capa de esta protección.
                   closePaletteRef={closePaletteRef}
                   editable={!loading && initializedCapId === cap?.id}
+                  formatCommandRef={formatCommandRef}
                   insertRef={mdInsertRef}
                   minHeight={focusMode ? "30rem" : "20rem"}
                   mode={focusMode ? "split" : "edit"}
@@ -1361,6 +1369,9 @@ const PanelEditor = ({
             pendingReplaceRef.current = null;
             pendingSnippetRawRef.current = null;
             closePaletteRef.current?.();
+          }}
+          onFormatCommand={(commandId) => {
+            formatCommandRef.current?.(commandId);
           }}
         />
       )}

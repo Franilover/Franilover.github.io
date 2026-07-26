@@ -49,6 +49,7 @@ export type TreeNode = FileEntry | FolderEntry;
 export type Segment =
   | { type: "text"; value: string }
   | { type: "cita"; content: string }
+  | { type: "epigrafe"; texto: string; atribucion: string }
   | { type: "img"; url: string; caption?: string }
   | { type: "float"; word: string; url: string; caption?: string }
   | { type: "sound"; url: string; volume: number }
@@ -291,6 +292,12 @@ export function parseContenido(texto: string): Segment[] {
     const parts = rest.split("|").map((p: string) => p.trim());
 
     if (kind === "cita") segs.push({ type: "cita", content: parts[0] });
+    else if (kind === "epigrafe")
+      segs.push({
+        type: "epigrafe",
+        texto: parts[0] ?? "",
+        atribucion: parts[1] ?? "",
+      });
     else if (kind === "img")
       segs.push({ type: "img", url: parts[0], caption: parts[1] });
     else if (kind === "float")
@@ -377,6 +384,7 @@ export type ParsedSnippet =
     }
   | { kind: "section"; id: string; label: string }
   | { kind: "sound"; src: string; label: string }
+  | { kind: "epigrafe"; texto: string; atribucion: string }
   | { kind: "flag-set"; flagId: string; valor: string }
   | { kind: "unknown"; parts: string[] };
 
@@ -503,6 +511,13 @@ export function parseSnippetRaw(raw: string | undefined): ParsedSnippet | null {
     }
     case "section":
       return { kind: "section", id: parts[1] ?? "", label: parts[2] ?? "" };
+    case "epigrafe":
+      // [[epigrafe|Texto|Atribución]] — atribución puede venir vacía
+      return {
+        kind: "epigrafe",
+        texto: parts[1] ?? "",
+        atribucion: parts[2] ?? "",
+      };
     case "sound":
       return { kind: "sound", src: parts[1] ?? "", label: parts[2] ?? "" };
     case "flag": {

@@ -13,6 +13,9 @@ import {
   PawPrint,
   Package,
   Flag,
+  Quote,
+  AlignRight,
+  Pilcrow,
 } from "lucide-react";
 
 import { fetchEntidades } from "@/lib/api/queries/entidades";
@@ -43,7 +46,13 @@ type SnippetType =
   | "flag"
   | "section"
   | "imagen"
-  | "sound";
+  | "sound"
+  | "epigrafe"
+  // Los siguientes tres nunca abren selectedType (ver directAction en
+  // CATS) — existen como id solo para que la key de React sea única.
+  | "cita"
+  | "align-right"
+  | "parrafo";
 
 interface PaletteProps {
   anchorRect: { top: number; left: number };
@@ -53,6 +62,11 @@ interface PaletteProps {
   listaCapitulos?: { id: string; orden: number; titulo_capitulo: string }[];
   listaSecciones?: { id: string; label: string }[];
   onInsert: (raw: string) => void;
+  /** Aplica un comando de formato de bloque (ej. "align-right") sobre el
+   * párrafo actual — usado por directAction, ver CATS. Si no se pasa,
+   * esos items se ignoran silenciosamente (no deberían aparecer en ese
+   * caso; el padre es responsable de pasarlo si expone el grupo). */
+  onFormatCommand?: (commandId: "align-right") => void;
   onClose: () => void;
 }
 
@@ -60,8 +74,18 @@ const CATS: {
   id: SnippetType;
   label: string;
   Icon: typeof Swords;
-  group: "narrativa" | "media";
+  group: "narrativa" | "media" | "estructura";
   keywords: string[];
+  /**
+   * Si está presente, el click ejecuta esto directo e inserta/aplica
+   * sin pasar por el formulario paso 2 (selectedType). Se usa para
+   * comandos que no tienen campos que llenar: insertan texto plano
+   * (onInsert) o aplican un formato de bloque (formatCommand).
+   */
+  directAction?: {
+    insert?: string;
+    formatCommand?: "align-right";
+  };
 }[] = [
   {
     id: "drop",
@@ -119,11 +143,46 @@ const CATS: {
     group: "media",
     keywords: ["sonido", "sound", "música", "musica", "audio"],
   },
+  {
+    id: "epigrafe",
+    label: "Epígrafe",
+    Icon: Quote,
+    group: "estructura",
+    keywords: ["epigrafe", "epígrafe", "cita literaria", "atribución"],
+  },
+  {
+    // "cita" bibliográfica ya existente ([[cita|Texto — Fuente]]), se
+    // inserta como texto plano (cae al default de rawSnippetToNode).
+    // Distinta del epígrafe de arriba — conviven sin pisarse.
+    id: "cita",
+    label: "Cita",
+    Icon: Quote,
+    group: "estructura",
+    keywords: ["cita", "quote", "fuente", "bibliográfica"],
+    directAction: { insert: "[[cita|Texto de la cita — Fuente]]" },
+  },
+  {
+    id: "align-right",
+    label: "Alinear a la derecha",
+    Icon: AlignRight,
+    group: "estructura",
+    keywords: ["alinear", "derecha", "align", "right"],
+    directAction: { formatCommand: "align-right" },
+  },
+  {
+    id: "parrafo",
+    label: "Párrafo",
+    Icon: Pilcrow,
+    group: "estructura",
+    keywords: ["parrafo", "párrafo", "salto"],
+    directAction: { insert: " " },
+  },
 ];
 
-const GROUP_LABELS: Record<"narrativa" | "media", string> = {
+const GROUP_LABELS: Record<"narrativa" | "media" | "estructura", string> = {
   narrativa: "Narrativa",
   media: "Media",
+  estructura: "Estructura",
 };
 
 const S = {
@@ -744,6 +803,82 @@ function FormChoice({
 }
 
 // ── Form Section ─────────────────────────────────────────────────────────────
+
+// ── Form Epígrafe ────────────────────────────────────────────────────────────
+// Cita/epígrafe literario de inicio de capítulo: texto en cursiva +
+// atribución alineada a la derecha. Distinto del "cita" bibliográfico
+// (directAction en CATS, texto plano [[cita|...]]) — este es un tipo con
+// form propio porque separa mejor los dos campos (texto largo vs.
+// atribución corta) y deja lugar para estilos propios en el render.
+function FormEpigrafe({
+  initialRaw,
+  onInsert,
+  onBack,
+}: {
+  initialRaw?: string;
+  onInsert: (s: string) => void;
+  onBack: () => void;
+}) {
+  const init = parseSnippetRaw(initialRaw);
+  const [texto, setTexto] = useState(
+    init?.kind === "epigrafe" ? (init as any).texto : "",
+  );
+  const [atribucion, setAtribucion] = useState(
+    init?.kind === "epigrafe" ? (init as any).atribucion : "",
+  );
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const snippet = texto.trim()
+    ? `[[epigrafe|${texto.trim()}|${atribucion.trim()}]]`
+    : "";
+
+  return (
+    <>
+      <FormHeader Icon={Quote} label="Epígrafe" onBack={onBack} />
+      <div
+        style={{
+          padding: "10px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        <div>
+          <div style={S.fieldLabel}>Texto</div>
+          <textarea
+            ref={inputRef}
+            placeholder="ej: Todo lo que sé sobre el amor lo aprendí en un naufragio…"
+            rows={3}
+            style={{ ...S.fieldInput, resize: "vertical", fontStyle: "italic" }}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+          />
+        </div>
+        <div>
+          <div style={S.fieldLabel}>Atribución (opcional)</div>
+          <input
+            placeholder="ej: Julia Navarro"
+            style={S.fieldInput}
+            value={atribucion}
+            onChange={(e) => setAtribucion(e.target.value)}
+          />
+        </div>
+        <button
+          disabled={!texto.trim()}
+          style={S.insertBtn("#8b83e8")}
+          onClick={() => snippet && onInsert(snippet)}
+        >
+          <Quote size={12} /> Insertar Epígrafe
+        </button>
+      </div>
+    </>
+  );
+}
+
+// ── Form Sección ─────────────────────────────────────────────────────────────
 
 function FormSection({
   initialRaw,
@@ -1862,6 +1997,7 @@ export function SnippetCommandPalette({
   listaCapitulos: _listaCapitulos = [],
   listaSecciones = [],
   onInsert,
+  onFormatCommand,
   onClose,
 }: PaletteProps) {
   const [q, setQ] = useState(initialQuery);
@@ -1885,6 +2021,7 @@ export function SnippetCommandPalette({
       flag: "flag",
       section: "section",
       sound: "sound",
+      epigrafe: "epigrafe",
     };
     return map[kind] ?? null;
   });
@@ -2079,7 +2216,7 @@ export function SnippetCommandPalette({
             {filteredCats.length === 0 && (
               <div style={S.empty}>Sin resultados</div>
             )}
-            {(["narrativa", "media"] as const).map((group) => {
+            {(["narrativa", "media", "estructura"] as const).map((group) => {
               const itemsInGroup = filteredCats.filter(
                 (c) => c.group === group,
               );
@@ -2095,6 +2232,18 @@ export function SnippetCommandPalette({
                         data-idx={i}
                         style={S.row(i === activeIdx)}
                         onClick={() => {
+                          // directAction: inserta/aplica y cierra directo,
+                          // sin abrir el formulario paso 2 (ver CATS).
+                          if (cat.directAction) {
+                            if (cat.directAction.insert !== undefined) {
+                              onInsert(cat.directAction.insert);
+                            }
+                            if (cat.directAction.formatCommand) {
+                              onFormatCommand?.(cat.directAction.formatCommand);
+                            }
+                            onClose();
+                            return;
+                          }
                           setChildQuery(searchQ);
                           setSelectedType(cat.id);
                         }}
@@ -2151,6 +2300,13 @@ export function SnippetCommandPalette({
       )}
       {selectedType === "section" && (
         <FormSection
+          initialRaw={initialRaw}
+          onBack={handleBack}
+          onInsert={handleInsert}
+        />
+      )}
+      {selectedType === "epigrafe" && (
+        <FormEpigrafe
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}

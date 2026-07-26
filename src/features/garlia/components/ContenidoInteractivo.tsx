@@ -11,6 +11,7 @@ import {
 
 import {
   CitaVisual,
+  EpigrafeVisual,
   ImgInline,
   FloatWord,
   SoundInline,
@@ -272,6 +273,14 @@ export function RenderSegmentos({
 
         if (seg.type === "cita")
           return <CitaVisual key={i} content={seg.content} />;
+        if (seg.type === "epigrafe")
+          return (
+            <EpigrafeVisual
+              key={i}
+              atribucion={seg.atribucion}
+              texto={seg.texto}
+            />
+          );
         if (seg.type === "img")
           return <ImgInline key={i} caption={seg.caption} url={seg.url} />;
         if (seg.type === "float")

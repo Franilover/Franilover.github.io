@@ -118,6 +118,48 @@ export function CitaVisual({ content }: { content: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// EpigrafeVisual — cita/epígrafe literario de inicio de capítulo. Distinto
+// de CitaVisual (bibliográfica, centrada con líneas decorativas): este es
+// el bloque en cursiva alineado a la izquierda, con la atribución en una
+// línea aparte alineada a la derecha — el estilo clásico de epígrafe.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function EpigrafeVisual({
+  texto,
+  atribucion,
+}: {
+  texto: string;
+  atribucion: string;
+}) {
+  return (
+    <div className="my-10 mx-0" style={{ maxWidth: "32rem" }}>
+      <p
+        className="font-serif italic leading-[1.85]"
+        style={{
+          fontSize: "clamp(0.95rem, 2.2vw, 1.05rem)",
+          color: "var(--foreground)",
+          opacity: 0.85,
+        }}
+      >
+        {texto}
+      </p>
+      {atribucion && (
+        <p
+          className="mt-3 font-sans font-medium uppercase tracking-[0.15em] text-right"
+          style={{
+            fontSize: 10,
+            color: "var(--color-primary, var(--primary))",
+            opacity: 0.6,
+          }}
+        >
+          — {atribucion}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ImgInline
 // ─────────────────────────────────────────────────────────────────────────────
 
