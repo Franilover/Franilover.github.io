@@ -1,4 +1,9 @@
 "use client";
+// Migrado desde _legacy/views/EditorReino.tsx a domains/garlia/reinos/components.
+// Las llamadas sueltas a supabase.from("reinos") (save/delete) pasaron a
+// reinosQueries. dexiePut/dexieDelete y SaveIndicator/useWikilink siguen
+// viniendo de _legacy — son compartidos entre entidades, mismo patrón que
+// criaturas/items.
 import {
   Map,
   Trash2,
@@ -17,19 +22,18 @@ import {
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { useConfirm } from "@/components/ui/ConfirmModal";
-import { LoreTab } from "@/domains/garlia/_legacy/components/shared/LoreTab";
-import { ReinoTileCanvas } from "@/domains/garlia/_legacy/components/reinos/ReinoTileCanvas";
 import { SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
+import { type SaveStatus, type Ciudad } from "@/domains/garlia/_legacy/hooks/types";
+import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
 import { usePersonajesDelReino } from "@garlia/personajes";
-import {
-  type Reino,
-  type SaveStatus,
- type Ciudad } from "@/domains/garlia/_legacy/hooks/types";
 import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
 import { supabase } from "@/lib/api/client/supabase";
 import { loadCiudadesPorReino } from "@/lib/api/client/syncEngine";
 
-import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
+import { type Reino } from "../model";
+import { reinosQueries } from "../queries";
+import { LoreTab } from "./LoreTab";
+import { ReinoTileCanvas } from "./ReinoTileCanvas";
 
 // ─── Hook: ciudades del reino ─────────────────────────────────────────────────
 function useCiudadesDelReino(reinoId: string) {
@@ -146,21 +150,7 @@ export function EditorReino({
   const save = async () => {
     setStatus("saving");
     try {
-      const { error } = await supabase
-        .from("reinos")
-        .update({
-          nombre: form.nombre,
-          historia: form.historia,
-          politica: form.politica,
-          economia: form.economia,
-          geografia: form.geografia,
-          cultura: form.cultura,
-          mapa_url: form.mapa_url,
-          coord_x: form.coord_x,
-          coord_y: form.coord_y,
-        })
-        .eq("id", form.id);
-      if (error) throw error;
+      await reinosQueries.update(form.id, form);
       setStatus("saved");
       onSaved(form);
       void dexiePut("reinos", form);
@@ -176,7 +166,7 @@ export function EditorReino({
       danger: true,
     });
     if (!ok) return;
-    await supabase.from("reinos").delete().eq("id", form.id);
+    await reinosQueries.delete(form.id);
     void dexieDelete("reinos", form.id);
     onDeleted(form.id);
   };

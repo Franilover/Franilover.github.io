@@ -46,7 +46,7 @@ import {
 import { type SaveStatus } from "@/components/ui/saveStatus";
 import { useCiudades } from "@/domains/garlia/_legacy/hooks/ciudades/useCiudades";
 import { useGruposDeCriatura } from "@/domains/garlia/_legacy/hooks/grupos/useGruposDeCriatura";
-import { useReinosMin } from "@/domains/garlia/_legacy/hooks/reinos/useReinosMin";
+import { useReinosMin } from "@garlia/reinos";
 
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
 import { useNombresDeTabla } from "../hooks/misc/useNombresDeTabla";

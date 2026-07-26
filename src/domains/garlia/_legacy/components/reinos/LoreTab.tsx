@@ -1,3 +1,9 @@
+// Migrado desde _legacy/components/shared/LoreTab.tsx a domains/garlia/reinos.
+// Es la vista de detalle (tabs de mapa/sociedad/línea de tiempo) de un reino,
+// específica de esta entidad — no la usa ninguna otra vista legacy, a
+// diferencia de SaveIndicator/useWikilink/INPUT_CLS, que sí son compartidos
+// entre entidades y por eso siguen importándose desde _legacy (mismo patrón
+// que ya usan criaturas/items).
 import {
   Mountain,
   Users,
@@ -21,13 +27,17 @@ import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { RichEditor } from "@/components/forms/lexical-editor";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
-import { type Ciudad , INPUT_CLS, type SaveStatus, type Reino } from "@/domains/garlia/_legacy/hooks/types";
+import { INPUT_CLS, type SaveStatus } from "@/domains/garlia/_legacy/hooks/types";
+import { type Ciudad } from "@/domains/garlia/_legacy/hooks/types";
 import { PanelHistoriaMundo } from "@/domains/garlia/_legacy/views/EditorLineaTiempo";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 
-import { SaveIndicator } from "./UIComponents";
-import { useWikilink } from "./WikilinkContext";
+import { SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
+import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
+
+import { type Reino } from "../model";
+import { reinosQueries } from "../queries";
 
 // ─── Tipo Personaje (local) ───────────────────────────────────────────────────
 type Personaje = {
@@ -37,8 +47,6 @@ type Personaje = {
   especie?: string | null;
   sobre?: string | null;
 };
-
-// ─── Tipo Personaje (local) ───────────────────────────────────────────────────
 
 // ─── Dexie helpers ────────────────────────────────────────────────────────────
 async function dexiePut(tabla: string, row: any): Promise<void> {
@@ -403,8 +411,11 @@ function MapaNuevo({
 type CriaturaMin = { id: string; nombre: string; imagen_url?: string | null };
 type PersonajeMin = { id: string; nombre: string; img_url?: string | null };
 type ItemMin = { id: string; nombre: string; imagen_url?: string | null };
+
 // ─── Hook: criaturas vinculadas al reino (criatura_reinos) ────────────────────
 // Soporta add (INSERT) y remove (DELETE) además de carga.
+// Las llamadas a supabase.from("criatura_reinos"/"criaturas") que vivían acá
+// sueltas pasaron a reinosQueries (get/add/removeCriaturaVinculada).
 
 function useCriaturasDelReino(reinoId: string) {
   const [criaturas, setCriaturas] = useState<CriaturaMin[]>([]);
@@ -446,17 +457,13 @@ function useCriaturasDelReino(reinoId: string) {
     }
 
     // ── 2. Remoto Supabase ──────────────────────────────────────────────────
-    const [{ data: linked }, { data: all }] = await Promise.all([
-      supabase
-        .from("criatura_reinos")
-        .select(
-          "id, criatura_id, criaturas!criatura_id(id, nombre, imagen_url)",
-        )
-        .eq("reino_id", reinoId),
+    const [linked, all] = await Promise.all([
+      reinosQueries.getCriaturasVinculadas(reinoId),
       supabase
         .from("criaturas")
         .select("id, nombre, imagen_url")
-        .order("nombre"),
+        .order("nombre")
+        .then((r) => r.data),
     ]);
     if (linked) {
       const map: Record<string, string> = {};
@@ -492,12 +499,8 @@ function useCriaturasDelReino(reinoId: string) {
   }, [load]);
 
   const add = async (criaturaId: string) => {
-    const { data, error } = await supabase
-      .from("criatura_reinos")
-      .insert([{ reino_id: reinoId, criatura_id: criaturaId }])
-      .select()
-      .single();
-    if (!error && data) {
+    try {
+      const data = await reinosQueries.addCriaturaVinculada(reinoId, criaturaId);
       const found = allCriaturas.find((c) => c.id === criaturaId);
       if (found) {
         setCriaturas((prev) => [...prev, found]);
@@ -508,20 +511,22 @@ function useCriaturasDelReino(reinoId: string) {
           criatura_id: criaturaId,
         });
       }
-    }
+    } catch {}
   };
 
   const remove = async (criaturaId: string) => {
     const rowId = rowMap[criaturaId];
     if (!rowId) return;
-    await supabase.from("criatura_reinos").delete().eq("id", rowId);
-    setCriaturas((prev) => prev.filter((c) => c.id !== criaturaId));
-    setRowMap((prev) => {
-      const next = { ...prev };
-      delete next[criaturaId];
-      return next;
-    });
-    void dexieDel("criatura_reinos", rowId);
+    try {
+      await reinosQueries.removeCriaturaVinculada(rowId);
+      setCriaturas((prev) => prev.filter((c) => c.id !== criaturaId));
+      setRowMap((prev) => {
+        const next = { ...prev };
+        delete next[criaturaId];
+        return next;
+      });
+      void dexieDel("criatura_reinos", rowId);
+    } catch {}
   };
 
   return { criaturas, allCriaturas, loading, add, remove };
@@ -656,9 +661,7 @@ function useItemsDelReinoEditable(reinoId: string) {
         .order("nombre"),
     ]);
     if (linked) {
-      setItems(
-        [...linked].sort((a, b) => a.nombre.localeCompare(b.nombre)),
-      );
+      setItems([...linked].sort((a, b) => a.nombre.localeCompare(b.nombre)));
     }
     if (all) {
       setAllItems(all);
@@ -699,9 +702,7 @@ function useItemsDelReinoEditable(reinoId: string) {
       setItems((prev) => prev.filter((i) => i.id !== itemId));
       if (found) {
         const updated = { ...found, reino_ids: nextReinoIds };
-        setAllItems((prev) =>
-          prev.map((i) => (i.id === itemId ? updated : i)),
-        );
+        setAllItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
         void dexiePut("items", updated);
       }
     }

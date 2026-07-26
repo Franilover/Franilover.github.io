@@ -23,7 +23,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 import { MotionDiv, MotionButton } from "@/components/ui/Motion";
 import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
-import { ReinoTileCanvas } from "@/domains/garlia/_legacy/components/reinos/ReinoTileCanvas";
+import { ReinoTileCanvas } from "@garlia/reinos";
 import {
   UnifiedTileCanvas,
   type MapTile,

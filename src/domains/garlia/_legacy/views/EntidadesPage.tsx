@@ -37,7 +37,7 @@ import { CiudadEditor } from "../components/ciudades/CiudadEditor";
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { ItemEditor } from "@/domains/garlia/items/ItemEditor";
 import { PersonajeEditor } from "@garlia/personajes";
-import { ReinoEditor } from "../components/reinos/ReinoEditor";
+import { ReinoEditor } from "@garlia/reinos";
 import { EntityCardGrid } from "../components/shared/EntityCardGrid";
 import { GeografiaJerarquica } from "../components/shared/GeografiaJerarquica";
 import { MagiaJerarquica } from "../components/shared/MagiaJerarquica";

@@ -225,25 +225,30 @@ const eslintConfig = [
   },
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 🆕 GARLIA ↔ PERSONAL — dos productos distintos en el mismo repo, no se
-  // importan entre sí bajo ningún alias (ni relativo, ya bloqueado arriba, ni
-  // absoluto @/features/...). Si comparten algo, ese algo debe vivir en
-  // components/, hooks/ o lib/ (promoción hacia abajo, nunca link de costado).
+  // GARLIA ↔ PERSONAL — dos productos distintos en el mismo repo, no se
+  // importan entre sí bajo ningún alias. Si comparten algo, ese algo debe
+  // vivir en components/, hooks/ o lib/ (promoción hacia abajo, nunca link
+  // de costado).
+  //
+  // Actualizado al Paso 3: Garlia y Personal ya viven en src/domains/, no en
+  // src/features/garlia ni src/features/personal (esas subcarpetas ya no
+  // existen — src/features/ en sí sigue teniendo otros módulos transversales,
+  // como auth/ y actualizaciones/, que no forman parte de esta migración).
+  // El bloque anterior seguía apuntando a features/garlia y features/personal
+  // — quedó sin efecto real desde que se migró la carpeta, así que esta
+  // protección llevaba tiempo sin aplicarse.
   // ───────────────────────────────────────────────────────────────────────────
   {
-    files: [
-      "src/features/garlia/**/*.{ts,tsx}",
-      "src/features/editorGarlia/**/*.{ts,tsx}",
-    ],
+    files: ["src/domains/garlia/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [
         "error",
         {
           patterns: [
             {
-              group: ["@/features/personal/**", "@/features/ensayos/**"],
+              group: ["@/domains/personal/**", "@personal/**"],
               message:
-                "[garlia/] Garlia no importa de Personal. Si ambos necesitan lo mismo, muévelo a components/, hooks/ o lib/.",
+                "[garlia/] Garlia no importa de Personal. Si ambos necesitan lo mismo, muévelo a ui/, editor/ o lib/.",
             },
           ],
         },
@@ -251,65 +256,22 @@ const eslintConfig = [
     },
   },
   {
-    files: [
-      "src/features/personal/**/*.{ts,tsx}",
-      "src/features/ensayos/**/*.{ts,tsx}",
-    ],
+    files: ["src/domains/personal/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [
         "error",
         {
           patterns: [
             {
-              group: ["@/features/garlia/**", "@/features/editorGarlia/**"],
+              group: ["@/domains/garlia/**", "@garlia/**"],
               message:
-                "[personal/] Personal no importa de Garlia. Si ambos necesitan lo mismo, muévelo a components/, hooks/ o lib/.",
+                "[personal/] Personal no importa de Garlia. Si ambos necesitan lo mismo, muévelo a ui/, editor/ o lib/.",
             },
           ],
         },
       ],
     },
   },
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // 🔜 DESTINO (Paso 3) — descomentar estos dos bloques y BORRAR los dos de
-  // arriba (los de features/garlia y features/personal) el día que muevas el
-  // código a src/domains/. No hace falta reescribir nada, solo cambiar el path.
-  // ───────────────────────────────────────────────────────────────────────────
-  // {
-  //   files: ["src/domains/garlia/**/*.{ts,tsx}"],
-  //   rules: {
-  //     "no-restricted-imports": [
-  //       "error",
-  //       {
-  //         patterns: [
-  //           {
-  //             group: ["@/domains/personal/**"],
-  //             message:
-  //               "[garlia/] Garlia no importa de Personal. Si ambos necesitan lo mismo, muévelo a ui/, editor/ o lib/.",
-  //           },
-  //         ],
-  //       },
-  //     ],
-  //   },
-  // },
-  // {
-  //   files: ["src/domains/personal/**/*.{ts,tsx}"],
-  //   rules: {
-  //     "no-restricted-imports": [
-  //       "error",
-  //       {
-  //         patterns: [
-  //           {
-  //             group: ["@/domains/garlia/**"],
-  //             message:
-  //               "[personal/] Personal no importa de Garlia. Si ambos necesitan lo mismo, muévelo a ui/, editor/ o lib/.",
-  //           },
-  //         ],
-  //       },
-  //     ],
-  //   },
-  // },
 
   // ───────────────────────────────────────────────────────────────────────────
   // features/[modulo]/views/ — orquestadora. Puede usar todo, pero NO importar
