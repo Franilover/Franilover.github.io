@@ -21,7 +21,7 @@
 import { ImageIcon, Map, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 
-import type { Ciudad } from "@/domains/garlia/_legacy/hooks/types";
+import type { Ciudad } from "@/domains/garlia/ciudades";
 import { supabase } from "@/lib/api/client/supabase";
 import {
   invalidateReinoTiles,

@@ -6,10 +6,12 @@
  * Formulario completo de edición de una ciudad: header, imagen, tipo,
  * reino, descripción, historia, secretos y entidades relacionadas
  * (personajes / criaturas / ítems). Extraído de EditorCiudad.tsx, que
- * ahora solo orquesta form/status/save/delete y monta este componente.
+ * solo orquesta form/status/save/delete y monta este componente.
  *
- * Ruta destino:
- *   src/features/editorGarlia/components/ciudades/FormularioCiudad.tsx
+ * Migrado desde _legacy/components/ciudades/FormularioCiudad.tsx a
+ * domains/garlia/ciudades, siguiendo el patrón de reinos. Los
+ * supabase.from(...) sueltos de link/unlink (personajes, criaturas, items)
+ * pasaron a ciudadesQueries.
  */
 
 import { MapPin, Save, Trash2, Users, Bug, Package, Mountain, ScrollText } from "lucide-react";
@@ -22,6 +24,9 @@ import { ComboSelector } from "@/components/ui/ComboSelector";
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
+import { type SaveStatus } from "@/domains/garlia/_legacy/hooks/types";
+import { db } from "@/lib/api/client/db";
+
 import {
   useReinos,
   usePersonajesDelCiudad,
@@ -33,10 +38,9 @@ import {
   type PersonajeMin,
   type CriaturaMin,
   type ItemMin,
-} from "@/domains/garlia/_legacy/hooks/ciudades/useCiudadCatalogos";
-import { type Ciudad, type SaveStatus } from "@/domains/garlia/_legacy/hooks/types";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+} from "../useCiudadCatalogos";
+import { type Ciudad } from "../model";
+import { ciudadesQueries } from "../queries";
 
 // ─── Tipos de ciudad predefinidos ──────────────────────────────────────────────
 const TIPOS_CIUDAD = [
@@ -115,10 +119,7 @@ export function FormularioCiudad({
 
   const handleAddPersonaje = async (p: PersonajeMin) => {
     setAddingP(p.id);
-    await supabase
-      .from("personajes")
-      .update({ ciudad_id: form.id })
-      .eq("id", p.id);
+    await ciudadesQueries.linkPersonaje(form.id, p.id);
     if (db)
       try {
         await (db as any).personajes?.update(p.id, { ciudad_id: form.id });
@@ -129,10 +130,7 @@ export function FormularioCiudad({
 
   const handleAddCriatura = async (c: CriaturaMin) => {
     setAddingC(c.id);
-    await supabase
-      .from("criaturas")
-      .update({ ciudad_id: form.id })
-      .eq("id", c.id);
+    await ciudadesQueries.linkCriatura(form.id, c.id);
     if (db)
       try {
         await (db as any).criaturas?.update(c.id, { ciudad_id: form.id });
@@ -143,7 +141,7 @@ export function FormularioCiudad({
 
   const handleAddItem = async (i: ItemMin) => {
     setAddingI(i.id);
-    await supabase.from("items").update({ ciudad_id: form.id }).eq("id", i.id);
+    await ciudadesQueries.linkItem(form.id, i.id);
     if (db)
       try {
         await (db as any).items?.update(i.id, { ciudad_id: form.id });
@@ -154,7 +152,7 @@ export function FormularioCiudad({
 
   const handleRemovePersonaje = async (id: string) => {
     setRemovingP(id);
-    await supabase.from("personajes").update({ ciudad_id: null }).eq("id", id);
+    await ciudadesQueries.unlinkPersonaje(id);
     if (db)
       try {
         await (db as any).personajes?.update(id, { ciudad_id: null });
@@ -165,7 +163,7 @@ export function FormularioCiudad({
 
   const handleRemoveCriatura = async (id: string) => {
     setRemovingC(id);
-    await supabase.from("criaturas").update({ ciudad_id: null }).eq("id", id);
+    await ciudadesQueries.unlinkCriatura(id);
     if (db)
       try {
         await (db as any).criaturas?.update(id, { ciudad_id: null });
@@ -176,7 +174,7 @@ export function FormularioCiudad({
 
   const handleRemoveItem = async (id: string) => {
     setRemovingI(id);
-    await supabase.from("items").update({ ciudad_id: null }).eq("id", id);
+    await ciudadesQueries.unlinkItem(id);
     if (db)
       try {
         await (db as any).items?.update(id, { ciudad_id: null });

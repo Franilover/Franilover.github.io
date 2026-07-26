@@ -1,9 +1,16 @@
+"use client";
+
 /**
  * useCiudadCatalogos.ts
  * ────────────────────────
- * Hooks de fetching extraídos de EditorCiudad.tsx (antes vivían dentro
- * del archivo de la view, mezclados con el JSX de FormularioCiudad).
- * Lógica copiada tal cual del original — sin cambios de comportamiento.
+ * Hooks de fetching usados por FormularioCiudad: catálogo de reinos (para
+ * el selector) y las relaciones de la ciudad con personajes/criaturas/items.
+ *
+ * Migrado desde _legacy/hooks/ciudades/useCiudadCatalogos.ts a
+ * domains/garlia/ciudades, siguiendo el patrón de reinos. Lógica de
+ * fetching sin cambios — sigue usando syncEngine (loadReinos,
+ * loadPersonajesPorCiudad, etc.), que es transversal a varias entidades
+ * y queda fuera del alcance de esta migración, igual que con reinos.
  *
  * Incluye:
  *   useReinos               → catálogo de reinos (para el selector de la ciudad)
@@ -13,9 +20,6 @@
  *   useTodosPersonajes      → catálogo completo de personajes (para buscar/añadir)
  *   useTodasCriaturas       → catálogo completo de criaturas (para buscar/añadir)
  *   useTodosItems           → catálogo completo de ítems (para buscar/añadir)
- *
- * Ruta destino:
- *   src/features/editorGarlia/hooks/useCiudadCatalogos.ts
  */
 
 import { useCallback, useEffect, useState } from "react";

@@ -1,8 +1,12 @@
 "use client";
+// Migrado desde _legacy/components/ciudades/CiudadEditor.tsx a
+// domains/garlia/ciudades/components. useMundoNavigation sigue siendo legacy
+// (navegación compartida entre todas las entidades de Garlia, no propia de
+// ciudades) — mismo criterio que domains/garlia/reinos/components/ReinoEditor.tsx.
 
-import { EditorCiudad } from "@/domains/garlia/_legacy/views/EditorCiudad";
+import { useMundoNavigation } from "@/domains/garlia/_legacy/hooks/mundo/useMundoNavigationStore";
 
-import { useMundoNavigation } from "../../hooks/mundo/useMundoNavigationStore";
+import { EditorCiudad } from "./EditorCiudad";
 
 interface Ciudad {
   id: string;

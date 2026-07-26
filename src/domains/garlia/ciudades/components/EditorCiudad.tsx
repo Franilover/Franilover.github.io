@@ -7,27 +7,21 @@
  * delega el fetching de catálogos y la relación con entidades al
  * componente FormularioCiudad + hooks de useCiudadCatalogos.
  *
- * Antes este archivo tenía ~900 líneas mezclando 7 hooks de fetching,
- * un componente sin uso (BloqueEntidades, código muerto — eliminado)
- * y el formulario completo. Ahora:
- *
- *   Hooks    → hooks/useCiudadCatalogos.ts
- *   UI       → components/ciudades/FormularioCiudad.tsx
- *   Tipo     → hooks/types.ts (Ciudad, junto con Reino/Item/Personaje)
- *
- * Ruta destino:
- *   src/features/editorGarlia/views/EditorCiudad.tsx
+ * Migrado desde _legacy/views/EditorCiudad.tsx a domains/garlia/ciudades,
+ * siguiendo el patrón de reinos. El supabase.from("ciudades") suelto que
+ * vivía acá (update/delete) pasó a ciudadesQueries.
  */
 
 import React, { useEffect, useState } from "react";
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { useConfirm } from "@/components/ui/ConfirmModal";
-import { FormularioCiudad } from "@/domains/garlia/_legacy/components/ciudades/FormularioCiudad";
+import { type SaveStatus } from "@/domains/garlia/_legacy/hooks/types";
 import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
-import { supabase } from "@/lib/api/client/supabase";
 
-import { type Ciudad, type SaveStatus } from "../hooks/types";
+import { FormularioCiudad } from "./FormularioCiudad";
+import { type Ciudad } from "../model";
+import { ciudadesQueries } from "../queries";
 
 // ─── EditorCiudad ──────────────────────────────────────────────────────────────
 export function EditorCiudad({
@@ -61,19 +55,7 @@ export function EditorCiudad({
   const save = async () => {
     setStatus("saving");
     try {
-      const { error } = await supabase
-        .from("ciudades")
-        .update({
-          nombre: form.nombre,
-          tipo: form.tipo || null,
-          descripcion: form.descripcion || null,
-          historia: form.historia || null,
-          secretos: form.secretos || null,
-          imagen_url: form.imagen_url || null,
-          reino_id: form.reino_id || null,
-        })
-        .eq("id", form.id);
-      if (error) throw error;
+      await ciudadesQueries.update(form.id, form);
       setStatus("saved");
       onSaved(form);
       void dexiePut("ciudades", form);
@@ -89,7 +71,7 @@ export function EditorCiudad({
       danger: true,
     });
     if (!ok) return;
-    await supabase.from("ciudades").delete().eq("id", form.id);
+    await ciudadesQueries.delete(form.id);
     void dexieDelete("ciudades", form.id);
     onDeleted(form.id);
   };

@@ -44,7 +44,7 @@ import {
   type Personaje,
 } from "@garlia/personajes";
 import { type SaveStatus } from "@/components/ui/saveStatus";
-import { useCiudades } from "@/domains/garlia/_legacy/hooks/ciudades/useCiudades";
+import { useCiudades } from "@garlia/ciudades";
 import { useGruposDeCriatura } from "@/domains/garlia/_legacy/hooks/grupos/useGruposDeCriatura";
 import { useReinosMin } from "@garlia/reinos";
 

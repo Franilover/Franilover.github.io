@@ -2,24 +2,22 @@
 
 /**
  * useCiudades.ts
- * ───────────────
+ * ────────────────
  * Lista de ciudades mínimas (id, nombre, reino_id).
  * Dexie primero → Supabase en background.
  *
- * Ruta: src/features/editorGarlia/hooks/useCiudades.ts
+ * Migrado desde _legacy/hooks/ciudades/useCiudades.ts a domains/garlia/ciudades,
+ * siguiendo el patrón ya aplicado a personajes/canciones/criaturas/items/reinos.
+ * El supabase.from("ciudades") suelto que vivía acá pasó a ciudadesQueries.listMin.
  */
 
 import { useEffect, useState } from "react";
 
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
 import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
 
-// ─── Tipo ─────────────────────────────────────────────────────────────────────
-
-export type CiudadMin = { id: string; nombre: string; reino_id: string | null };
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+import { type CiudadMin } from "./model";
+import { ciudadesQueries } from "./queries";
 
 export function useCiudades(): CiudadMin[] {
   const [ciudades, setCiudades] = useState<CiudadMin[]>([]);
@@ -48,18 +46,8 @@ export function useCiudades(): CiudadMin[] {
       try {
         const online = await isReallyOnline();
         if (!online || !mounted) return;
-        const { data } = await supabase
-          .from("ciudades")
-          .select("id, nombre, reino_id")
-          .order("nombre");
-        if (data && mounted)
-          setCiudades(
-            data.map((l: any) => ({
-              id: l.id,
-              nombre: l.nombre,
-              reino_id: l.reino_id ?? null,
-            })),
-          );
+        const data = await ciudadesQueries.listMin();
+        if (data && mounted) setCiudades(data);
       } catch {}
     };
 
