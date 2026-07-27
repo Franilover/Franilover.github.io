@@ -27,7 +27,7 @@ import {
   type EntidadModal,
   type Descubrimiento,
   type ItemInventario,
-} from "@/domains/garlia/_legacy-public/views/PersonalComponents";
+} from "@/domains/garlia/perfil-jugador/PersonalComponents";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 import {

@@ -108,7 +108,7 @@ import {
 import { NodeGraphCanvas } from "@/domains/garlia/libros/NodeGraphCanvas";
 import { SnippetCommandPalette } from "@/domains/garlia/libros/snippets/SnippetCommandPalette";
 // SnippetOverlay eliminado — reemplazado por nodos Lexical reales
-import { ContenidoInteractivo } from "@/domains/garlia/_legacy-public/components/ContenidoInteractivo";
+import { ContenidoInteractivo } from "@/domains/garlia/libros/public/ContenidoInteractivo";
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
 import {

@@ -45,7 +45,7 @@ import {
   type ItemResumen,
   type MaestriaArma,
   type NuevaFicha,
-} from "../hooks/useFichasDnd";
+} from "./useFichasDnd";
 
 export const STATS: {
   key: keyof Pick<

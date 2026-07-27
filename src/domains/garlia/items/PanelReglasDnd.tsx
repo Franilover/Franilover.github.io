@@ -14,7 +14,7 @@
  * guardan como 2 booleans independientes por si algún día hace falta.
  */
 
-import { MAESTRIAS_ARMA_DND } from "@/domains/garlia/_legacy-public/hooks/useFichasDnd";
+import { MAESTRIAS_ARMA_DND } from "@/domains/garlia/aventuras/public/useFichasDnd";
 
 import { INPUT_CLS } from "@/domains/garlia/_shared/types";
 import type { Item } from "@garlia/items";

@@ -28,7 +28,7 @@ import {
   UnifiedTileCanvas,
   type MapTile,
 } from "@/domains/garlia/_shared/UnifiedTileCanvas";
-import { ModalDetalle } from "@/domains/garlia/_legacy-public/views/PersonalComponents";
+import { ModalDetalle } from "@/domains/garlia/perfil-jugador/PersonalComponents";
 import { useIsAdmin } from "@/hooks/auth/useIsAdmin";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
 import { db } from "@/lib/api/client/db";

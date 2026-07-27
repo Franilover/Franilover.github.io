@@ -57,10 +57,10 @@ import {
   type TableroItem,
 } from "@/domains/garlia/aventuras/TableroAventura";
 import { PanelManualDnd } from "@/domains/garlia/aventuras/PanelManualDnd";
-import { PanelTiposMoneda } from "@/domains/garlia/_legacy-public/views/PanelTiposMoneda";
-import { useTableroEscala, CARD_SCALE_MIN, CARD_SCALE_MAX } from "@/domains/garlia/_legacy-public/hooks/useTableroEscala";
-import { FichaDetalle } from "@/domains/garlia/_legacy-public/views/fichaComponents";
-import type { FichaDnd } from "@/domains/garlia/_legacy-public/hooks/useFichasDnd";
+import { PanelTiposMoneda } from "@/domains/garlia/aventuras/public/PanelTiposMoneda";
+import { useTableroEscala, CARD_SCALE_MIN, CARD_SCALE_MAX } from "@/domains/garlia/aventuras/public/useTableroEscala";
+import { FichaDetalle } from "@/domains/garlia/aventuras/public/fichaComponents";
+import type { FichaDnd } from "@/domains/garlia/aventuras/public/useFichasDnd";
 import { CriaturaStatsDndEditor } from "@/domains/garlia/criaturas/CriaturaStatsDnd";
 import type { CriaturaStatsDnd } from "@/domains/garlia/criaturas/model";
 import { supabase } from "@/lib/api/client/supabase";

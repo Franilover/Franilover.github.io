@@ -14,8 +14,8 @@ import type {
 import {
   CapituloScrollBlock,
   ToastPortal,
-} from "@/domains/garlia/_legacy-public/components/CapituloScrollBlock";
-import { Vignette } from "@/domains/garlia/_legacy-public/components/LectorUI";
+} from "@/domains/garlia/libros/public/CapituloScrollBlock";
+import { Vignette } from "@/domains/garlia/libros/public/LectorUI";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";

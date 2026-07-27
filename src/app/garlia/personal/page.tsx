@@ -1,4 +1,4 @@
-import Personal from "@/domains/garlia/_legacy-public/views/personal";
+import Personal from "@/domains/garlia/perfil-jugador/PerfilJugador";
 
 export default async function Page() {
   const datos = {

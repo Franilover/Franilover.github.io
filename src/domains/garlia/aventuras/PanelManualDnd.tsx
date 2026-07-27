@@ -26,7 +26,7 @@ import {
   useDotesDisponibles,
   useTrasfondosDisponibles,
   type DoteDnd,
-} from "@/domains/garlia/_legacy-public/hooks/useFichasDnd";
+} from "@/domains/garlia/aventuras/public/useFichasDnd";
 
 type SubTab = "dotes" | "clases" | "trasfondos";
 

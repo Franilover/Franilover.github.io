@@ -18,8 +18,8 @@ import { ChevronDown, Loader2, Search, Swords } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { MotionDiv } from "@/components/ui/Motion";
-import type { CampoFichaValor, FichaDnd } from "@/domains/garlia/_legacy-public/hooks/useFichasDnd";
-import { FichaStatsPanel } from "@/domains/garlia/_legacy-public/views/misiones";
+import type { CampoFichaValor, FichaDnd } from "@/domains/garlia/aventuras/public/useFichasDnd";
+import { FichaStatsPanel } from "@/domains/garlia/aventuras/public/misiones";
 import { supabase } from "@/lib/api/client/supabase";
 
 interface DuenioResumen {

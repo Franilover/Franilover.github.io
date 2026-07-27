@@ -37,7 +37,7 @@ import {
   SKILLS_POR_STAT_DND,
   STATS_DND,
   useDotesDisponibles,
-} from "@/domains/garlia/_legacy-public/hooks/useFichasDnd";
+} from "@/domains/garlia/aventuras/public/useFichasDnd";
 import { supabase } from "@/lib/api/client/supabase";
 import { dexiePut, dexieDelete as dexieDel } from "@/lib/utils/dexieHelpers";
 

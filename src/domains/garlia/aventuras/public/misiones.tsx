@@ -55,7 +55,7 @@ import type {
   MaestriaArma,
   RasgoEspecial,
   TipoMoneda,
-} from "../hooks/useFichasDnd";
+} from "./useFichasDnd";
 import {
   bonoAtaqueConjuros,
   bonusCompetencia,
@@ -82,13 +82,13 @@ import {
   useSubclasesDisponibles,
   useTiposMoneda,
   useTrasfondosDisponibles,
-} from "../hooks/useFichasDnd";
+} from "./useFichasDnd";
 import { SelectorEntidad } from "./fichaComponents";
 import {
   ModalMision,
   type Dificultad,
   type MisionConProgreso,
-} from "../components/MisionesComponents";
+} from "./MisionesComponents";
 
 // Mapa de dificultad → número de estrellas (solo iconos, sin fondo ni texto).
 const ESTRELLAS_POR_DIFICULTAD: Record<Dificultad, number> = {

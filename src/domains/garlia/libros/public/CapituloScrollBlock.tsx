@@ -4,9 +4,9 @@ import { AlignLeft, Clock } from "lucide-react";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
 import type { CapituloScrollItem } from "@/domains/garlia/libros/capitulos/types";
-import { useDesbloquearCiudades, CiudadesDesbloqueadasToast } from "@/domains/garlia/_legacy-public/hooks//useCiudades";
-import { useDesbloquearPersonajes, PersonajesDesbloqueadosToast } from "@/domains/garlia/_legacy-public/hooks//usePersonajes";
-import { useDesbloquearReinos, ReinosDesbloqueadosToast } from "@/domains/garlia/_legacy-public/hooks/useReinos";
+import { useDesbloquearCiudades, CiudadesDesbloqueadasToast } from "@/domains/garlia/ciudades/useCiudades";
+import { useDesbloquearPersonajes, PersonajesDesbloqueadosToast } from "@/domains/garlia/perfil-jugador/useDesbloquearPersonajes";
+import { useDesbloquearReinos, ReinosDesbloqueadosToast } from "@/domains/garlia/perfil-jugador/useDesbloquearReinos";
 import { supabase } from "@/lib/api/client/supabase";
 
 import { ContenidoInteractivo } from "./ContenidoInteractivo";

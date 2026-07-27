@@ -15,7 +15,7 @@
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import { useTiposMoneda } from "../hooks/useFichasDnd";
+import { useTiposMoneda } from "./useFichasDnd";
 
 export function PanelTiposMoneda() {
   const { tipos, loading, crear, renombrar, eliminar } = useTiposMoneda();

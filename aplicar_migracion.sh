@@ -14,8 +14,9 @@
 #   - Borra src/domains/garlia/_legacy (que quedó vacía tras la migración).
 #
 # Qué NO hace (fuera de este parche):
-#   - Incluye src/domains/garlia/_legacy-public (sus imports rotos a _legacy
-#     también se arreglaron, aunque su contenido no se reorganizó por entidad).
+#   - _legacy-public ya no existe: se separó en garlia/{entidad}/public/,
+#     garlia/perfil-jugador/, y domains/personal/mensajes/ (lo que sí era
+#     Personal real: chat/mensajería, antes escondido bajo Garlia).
 #   - No toca src/domains/personal (no migrado todavía).
 #   - No corre tu build ni tests — hacelo vos después para confirmar.
 
@@ -39,11 +40,13 @@ echo "==> Backup de lo que se va a reemplazar en: $BACKUP/"
 [ -d "src/domains/garlia" ] && cp -r "src/domains/garlia" "$BACKUP/garlia"
 [ -d "src/domains/plataforma" ] && cp -r "src/domains/plataforma" "$BACKUP/plataforma"
 [ -d "src/editor/notas" ] && cp -r "src/editor/notas" "$BACKUP/notas"
-mkdir -p "$BACKUP/sueltos/app/myself/garlia" "$BACKUP/sueltos/components/layout" "$BACKUP/sueltos/components/forms/lexical-editor" "$BACKUP/sueltos/hooks/data"
+mkdir -p "$BACKUP/sueltos/app/myself/garlia" "$BACKUP/sueltos/app/garlia/personal" "$BACKUP/sueltos/components/layout" "$BACKUP/sueltos/components/forms/lexical-editor" "$BACKUP/sueltos/hooks/data"
 [ -f "src/app/myself/garlia/page.tsx" ] && cp "src/app/myself/garlia/page.tsx" "$BACKUP/sueltos/app/myself/garlia/page.tsx"
+[ -f "src/app/garlia/personal/page.tsx" ] && cp "src/app/garlia/personal/page.tsx" "$BACKUP/sueltos/app/garlia/personal/page.tsx"
 [ -f "src/components/layout/navbar.tsx" ] && cp "src/components/layout/navbar.tsx" "$BACKUP/sueltos/components/layout/navbar.tsx"
 [ -f "src/components/forms/lexical-editor/types.ts" ] && cp "src/components/forms/lexical-editor/types.ts" "$BACKUP/sueltos/components/forms/lexical-editor/types.ts"
 [ -f "src/hooks/data/useSupabaseData.ts" ] && cp "src/hooks/data/useSupabaseData.ts" "$BACKUP/sueltos/hooks/data/useSupabaseData.ts"
+[ -d "src/domains/personal/mensajes" ] && mkdir -p "$BACKUP/personal_mensajes" && cp -r "src/domains/personal/mensajes" "$BACKUP/personal_mensajes"
 
 echo "==> Extrayendo migración a una carpeta temporal..."
 TMP=$(mktemp -d)
@@ -60,8 +63,13 @@ rsync -a "$TMP/src/domains/plataforma/" "src/domains/plataforma/"
 echo "==> Aplicando sobre src/editor/notas..."
 rsync -a "$TMP/src/editor/notas/" "src/editor/notas/"
 
-echo "==> Aplicando archivos sueltos (navbar.tsx, app/myself/garlia/page.tsx, lexical-editor/types.ts, useSupabaseData.ts)..."
+echo "==> Aplicando sobre src/domains/personal/mensajes (nuevo, separado de Garlia)..."
+mkdir -p "src/domains/personal/mensajes"
+rsync -a "$TMP/src/domains/personal/mensajes/" "src/domains/personal/mensajes/"
+
+echo "==> Aplicando archivos sueltos (navbar.tsx, app pages, lexical-editor/types.ts, useSupabaseData.ts)..."
 [ -f "$TMP/src/app/myself/garlia/page.tsx" ] && cp "$TMP/src/app/myself/garlia/page.tsx" "src/app/myself/garlia/page.tsx"
+[ -f "$TMP/src/app/garlia/personal/page.tsx" ] && cp "$TMP/src/app/garlia/personal/page.tsx" "src/app/garlia/personal/page.tsx"
 [ -f "$TMP/src/components/layout/navbar.tsx" ] && cp "$TMP/src/components/layout/navbar.tsx" "src/components/layout/navbar.tsx"
 [ -f "$TMP/src/components/forms/lexical-editor/types.ts" ] && cp "$TMP/src/components/forms/lexical-editor/types.ts" "src/components/forms/lexical-editor/types.ts"
 [ -f "$TMP/src/hooks/data/useSupabaseData.ts" ] && cp "$TMP/src/hooks/data/useSupabaseData.ts" "src/hooks/data/useSupabaseData.ts"
@@ -80,6 +88,8 @@ echo "  cp -r $BACKUP/garlia src/domains/garlia"
 echo "  cp -r $BACKUP/plataforma src/domains/plataforma  # si existía"
 echo "  cp -r $BACKUP/notas src/editor/notas"
 echo "  cp $BACKUP/sueltos/app/myself/garlia/page.tsx src/app/myself/garlia/page.tsx"
+echo "  cp $BACKUP/sueltos/app/garlia/personal/page.tsx src/app/garlia/personal/page.tsx"
 echo "  cp $BACKUP/sueltos/components/layout/navbar.tsx src/components/layout/navbar.tsx"
 echo "  cp $BACKUP/sueltos/components/forms/lexical-editor/types.ts src/components/forms/lexical-editor/types.ts"
 echo "  cp $BACKUP/sueltos/hooks/data/useSupabaseData.ts src/hooks/data/useSupabaseData.ts"
+echo "  rm -rf src/domains/personal/mensajes && cp -r $BACKUP/personal_mensajes/mensajes src/domains/personal/mensajes  # si existía backup"

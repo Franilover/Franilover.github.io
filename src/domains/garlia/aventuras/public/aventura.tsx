@@ -36,8 +36,8 @@ import {
   type Aventura as AventuraType,
   type AventuraEntidad,
 } from "@/domains/garlia/aventuras/useAventuras";
-import { useFichasDnd, type CampoFichaValor, type FichaDnd, type NuevaFicha } from "../hooks/useFichasDnd";
-import { CARD_SCALE_MAX, CARD_SCALE_MIN, useTableroEscala } from "../hooks/useTableroEscala";
+import { useFichasDnd, type CampoFichaValor, type FichaDnd, type NuevaFicha } from "./useFichasDnd";
+import { CARD_SCALE_MAX, CARD_SCALE_MIN, useTableroEscala } from "./useTableroEscala";
 import { FichaStatsPanel, TiradaDados } from "./misiones";
 
 // Valores por defecto para una ficha recién creada: se crea directo (sin
