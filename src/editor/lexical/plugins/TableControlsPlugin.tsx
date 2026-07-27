@@ -52,6 +52,7 @@ import {
   $insertTableRowAtSelection,
   $isTableCellNode,
   $isTableNode,
+  $isTableRowNode,
   TableCellNode,
   TableNode,
 } from "@lexical/table";
@@ -283,7 +284,8 @@ export function TableControlsPlugin() {
         const tableNode = $getNodeByKey(st.tableKey);
         if (!tableNode || !$isTableNode(tableNode)) return;
         for (const row of tableNode.getChildren()) {
-          const cell = row.getChildren?.()[st.colIndex];
+          if (!$isTableRowNode(row)) continue;
+          const cell = row.getChildren()[st.colIndex];
           if (cell && $isTableCellNode(cell)) {
             (cell as TableCellNode).setWidth(newWidth);
           }
@@ -442,7 +444,8 @@ function findCellAt(
   if (rows.length === 0) return null;
   const r = rowIndex === null ? 0 : rowIndex < 0 ? rows.length - 1 : rowIndex;
   const row = rows[Math.min(r, rows.length - 1)];
-  const cells = row.getChildren?.() ?? [];
+  if (!$isTableRowNode(row)) return null;
+  const cells = row.getChildren();
   if (cells.length === 0) return null;
   const c = colIndex === null ? 0 : colIndex < 0 ? cells.length - 1 : colIndex;
   const cell = cells[Math.min(c, cells.length - 1)];
