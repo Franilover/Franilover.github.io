@@ -1,0 +1,54 @@
+{
+  "compilerOptions": {
+    "removeComments": true,
+    "target": "esnext",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/ui/*": ["./src/ui/*"],
+      "@/layout/*": ["./src/layout/*"],
+      "@/providers/*": ["./src/providers/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/utils/*": ["./src/lib/utils/*"],
+      "@/api/*": ["./src/lib/api/*"],
+      "@/config/*": ["./src/lib/config/*"],
+      "@/types/*": ["./src/lib/api/types/*"],
+      "@/styles/*": ["./src/style/*"],
+      "@/style/*": ["./src/style/*"],
+
+      // 🆕 Destino de la migración (Paso 3) — ya usables hoy vía @/* general,
+      // pero explícitos acá para autocompletado más claro en el editor.
+      "@/domains/*": ["./src/domains/*"],
+      "@garlia/*": ["./src/domains/garlia/*"],
+      "@personal/*": ["./src/domains/personal/*"],
+      "@plataforma/*": ["./src/domains/plataforma/*"],
+      "@/editor/*": ["./src/editor/*"],
+      "@/infra/*": ["./src/infra/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "**/*.js",
+    "**/*.jsx",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", "supabase", "src-tauri"]
+}
