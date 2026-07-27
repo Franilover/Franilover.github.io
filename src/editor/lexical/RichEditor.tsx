@@ -24,7 +24,7 @@
 import { CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ListNode, ListItemNode } from "@lexical/list";
-import { TRANSFORMERS } from "@lexical/markdown";
+
 import { AutoFocusPlugin } from "@lexical/react/LexicalAutoFocusPlugin";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
@@ -35,7 +35,13 @@ import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
-import { HeadingNode, QuoteNode, $isHeadingNode } from "@lexical/rich-text";
+import { QuoteNode } from "@lexical/rich-text";
+import {
+  VariantHeadingNode,
+  $isVariantHeadingNode,
+  stripVariantSuffix,
+  RICH_TRANSFORMERS,
+} from "./nodes/VariantHeadingNode";
 import {
   $getRoot,
   $getSelection,
@@ -44,7 +50,7 @@ import {
   FORMAT_TEXT_COMMAND,
 } from "lexical";
 import { $setBlocksType } from "@lexical/selection";
-import type { EditorState, LexicalEditor } from "lexical";
+import type { EditorState, LexicalEditor, LexicalNode } from "lexical";
 import { Edit3, Eye, Columns2, SpellCheck2 } from "lucide-react";
 import React, {
   useCallback,
@@ -126,7 +132,16 @@ export type RichEditorFormatCommand =
   | "align-left"
   | "align-center"
   | "align-right"
-  | "align-justify";
+  | "align-justify"
+  // Variantes de heading (independientes del nivel h1-h4) — ver
+  // applyHeadingVariant en MarkdownCommandPalette.tsx. Mismos ids que
+  // MARKDOWN_COMMAND_ITEMS, aplican el ornamento al heading donde está
+  // el cursor sin cambiar su nivel.
+  | "variant-linea"
+  | "variant-barra"
+  | "variant-portada"
+  | "variant-dropcap"
+  | "variant-none";
 
 export interface RichEditorProps {
   value: string;
@@ -248,8 +263,11 @@ export interface RichEditorProps {
 // Config del composer (nodos registrados)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// RICH_TRANSFORMERS (con soporte de variante en headings) se importa desde
+// VariantHeadingNode.tsx — fuente única compartida con richTextSerializer.ts.
+
 const RICH_EDITOR_NODES = [
-  HeadingNode,
+  VariantHeadingNode,
   QuoteNode,
   ListNode,
   ListItemNode,
@@ -333,6 +351,35 @@ function EditablePlugin({ editable }: { editable: boolean }) {
   useEffect(() => {
     editor.setEditable(editable);
   }, [editor, editable]);
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plugin: si el usuario tipea manualmente "{barra}" (o linea/portada/dropcap)
+// al final de un heading, lo convierte en la variante real en vez de dejarlo
+// como texto literal. VARIANT_SUFFIX_RE/stripVariantSuffix (ver
+// nodes/VariantHeadingNode.tsx) ya se usan para el round-trip de
+// guardado/carga vía richTextSerializer.ts — este transform cubre el caso
+// EN VIVO, mientras se escribe, para que el comportamiento sea consistente
+// sin importar si la variante se "recuerda" desde antes (recarga) o se
+// escribe a mano ahora mismo. Sin este plugin, "{barra}" tipeado a mano
+// quedaría como texto visible normal hasta el próximo guardado/recarga.
+function VariantSuffixTransformPlugin() {
+  const [editor] = useLexicalComposerContext();
+  useEffect(() => {
+    return editor.registerNodeTransform(VariantHeadingNode, (heading) => {
+      const textChildren = heading.getChildren().filter((c) => c.getType() === "text");
+      const lastText = textChildren[textChildren.length - 1] as
+        | (LexicalNode & { getTextContent(): string; setTextContent(t: string): unknown })
+        | undefined;
+      if (!lastText) return;
+      const raw = lastText.getTextContent() as string;
+      const { text, variant } = stripVariantSuffix(raw);
+      if (variant === "none") return;
+      lastText.setTextContent(text.trimEnd());
+      if (heading.getVariant() !== variant) heading.setVariant(variant);
+    });
+  }, [editor]);
   return null;
 }
 
@@ -453,15 +500,15 @@ function HeadingRailPlugin() {
       // ("h1".."h6" para headings, null para el resto) — necesitamos el
       // documento completo, no solo los headings, para poder marcar los
       // párrafos intermedios de cada sección.
-      const nodes: { key: string; tag: string | null }[] = [];
+      const nodes: { key: string; tag: string | null; variant: string | null }[] = [];
       editor.getEditorState().read(() => {
         const children = $getRoot().getChildren();
         for (const child of children) {
-          if ($isHeadingNode(child)) {
-            const tag = (child as any).getTag?.() as string; // "h1".."h6"
-            nodes.push({ key: child.getKey(), tag: tag ?? "h1" });
+          if ($isVariantHeadingNode(child)) {
+            const tag = child.getTag(); // "h1".."h6"
+            nodes.push({ key: child.getKey(), tag: tag ?? "h1", variant: child.getVariant() });
           } else {
-            nodes.push({ key: child.getKey(), tag: null });
+            nodes.push({ key: child.getKey(), tag: null, variant: null });
           }
         }
       });
@@ -471,30 +518,29 @@ function HeadingRailPlugin() {
       const rootRect = rootEl.getBoundingClientRect();
 
       nodes.forEach((n, i) => {
-        if (n.tag !== "h3") return;
+        // La barra extendida (::after con altura variable) es propia de
+        // la variante "barra" — ANTES estaba atada al nivel h3; ahora
+        // cualquier heading (h1-h4) puede llevar esta variante, así que
+        // el trigger es n.variant, no n.tag.
+        if (n.variant !== "barra") return;
         const el = editor.getElementByKey(n.key) as HTMLElement | null;
         if (!el) return;
 
-        // Buscar el próximo heading de nivel <=3 (h1, h2 o h3) — un h4 de
-        // ahí en más sigue "dentro" de esta sección, así que no corta la
-        // barra ni la sangría. También vamos marcando cada nodo NO-heading
-        // en el camino con data-in-h3-section, hasta llegar al stop (o al
-        // final del documento).
+        // Buscar el próximo heading (cualquier nivel) — corta ahí la
+        // barra y la sangría de sección. También vamos marcando cada nodo
+        // NO-heading en el camino con data-in-h3-section, hasta llegar al
+        // stop (o al final del documento).
         let stopEl: HTMLElement | null = null;
         let stopIdx = nodes.length;
         for (let j = i + 1; j < nodes.length; j++) {
-          if (
-            nodes[j].tag === "h1" ||
-            nodes[j].tag === "h2" ||
-            nodes[j].tag === "h3"
-          ) {
+          if (nodes[j].tag !== null) {
             stopEl = editor.getElementByKey(nodes[j].key) as HTMLElement | null;
             stopIdx = j;
             break;
           }
         }
         for (let j = i + 1; j < stopIdx; j++) {
-          if (nodes[j].tag !== null) continue; // otro heading (h4-h6): no se toca acá
+          if (nodes[j].tag !== null) continue; // otro heading: no se toca acá
           const bodyEl = editor.getElementByKey(nodes[j].key) as HTMLElement | null;
           bodyEl?.setAttribute("data-in-h3-section", "true");
         }
@@ -533,14 +579,10 @@ function HeadingRailPlugin() {
       // con la sangría "pegada" para siempre.
       const markedKeys = new Set<string>();
       nodes.forEach((n, i) => {
-        if (n.tag !== "h3") return;
+        if (n.variant !== "barra") return;
         let stopIdx = nodes.length;
         for (let j = i + 1; j < nodes.length; j++) {
-          if (
-            nodes[j].tag === "h1" ||
-            nodes[j].tag === "h2" ||
-            nodes[j].tag === "h3"
-          ) {
+          if (nodes[j].tag !== null) {
             stopIdx = j;
             break;
           }
@@ -1251,100 +1293,48 @@ export function RichEditor({
         //        árbol de nodos de Lexical ni interfiere con el cursor.
         // Todo con utilidades Tailwind arbitrarias — sin depender de
         // CSS externo, autocontenido en este archivo.
+        // ── Jerarquía de headings ────────────────────────────────────
+        // Rediseño: dos ejes INDEPENDIENTES en vez de uno solo.
+        //
+        //   1) NIVEL (h1-h4, clases de abajo): controla SOLO tamaño +
+        //      peso + color + espaciado. Es lo que el ojo humano procesa
+        //      primero y más rápido para "qué tan importante es esto" —
+        //      antes cada nivel además cambiaba de "truco" decorativo
+        //      (centrado / borde / barra / drop-cap), lo cual hacía que
+        //      reconocer el nivel dependiera de qué ornamento tenía en
+        //      vez de cuán grande/oscuro es. Acá los 4 niveles bajan
+        //      SIEMPRE en conjunto (tamaño↓ + peso↓/igual + color más
+        //      apagado↓), nunca solo un eje.
+        //
+        //   2) VARIANTE (data-[variant=...] de abajo): el ornamento
+        //      visual — línea inferior, barra lateral, portada
+        //      centrada, drop-cap — ahora es un atributo separado
+        //      (VariantHeadingNode.variant, ver nodes/VariantHeadingNode.tsx)
+        //      que el usuario elige desde el menú "/" independientemente
+        //      del nivel: un H2 puede llevar "portada", un H4 puede
+        //      llevar "barra", etc. El selector [&[data-variant=x]] se
+        //      aplica sobre CUALQUIER tag h1-h4 por igual — la variante
+        //      nunca redefine tamaño/peso, solo agrega el ornamento.
         heading: {
-          h1: [
-            "relative mx-auto mt-8 mb-6 max-w-[500px]",
-            "text-center text-3xl font-bold tracking-tight leading-tight",
-            "px-5",
-            // Línea doble a cada costado: el pseudo-elemento dibuja la
-            // línea principal (before:h-px + bg-primary/40) y un
-            // box-shadow arbitrario agrega una segunda línea fina 4px
-            // debajo, más tenue (opacity vía color con menos alpha) —
-            // no se puede usar un segundo :: pseudo-elemento en el mismo
-            // ::before, así que la 2da línea se simula con box-shadow en
-            // vez de un elemento propio.
-            "before:content-[''] before:absolute before:top-1/2 before:-translate-y-1/2",
-            "before:left-0 before:w-3 before:h-px before:bg-primary/40",
-            "before:[box-shadow:0_4px_0_-0.5px_color-mix(in_srgb,var(--color-primary,#7c6af7)_25%,transparent)]",
-            "after:content-[''] after:absolute after:top-1/2 after:-translate-y-1/2",
-            "after:right-0 after:w-3 after:h-px after:bg-primary/40",
-            "after:[box-shadow:0_4px_0_-0.5px_color-mix(in_srgb,var(--color-primary,#7c6af7)_25%,transparent)]",
-          ].join(" "),
-          h2: [
-            "mt-6 mb-4 pb-2 scroll-mt-4",
-            "text-xl font-semibold leading-snug",
-            "border-b border-b-primary/25",
-          ].join(" "),
-          h3: [
-            "relative pl-3 mt-5 mb-2 scroll-mt-4",
-            "text-lg font-semibold leading-snug",
-            "border-l-2 border-l-primary/50",
-            // Espejo del selector de arriba: acá NO podemos usar "hermano
-            // anterior" en CSS puro (no existe selector "prev+"), así que
-            // agregamos la clase directamente sobre el H3 usando un truco
-            // de Tailwind arbitrario: aplicar el estilo "si el hermano
-            // anterior es h2", que Tailwind traduce a "h2 + &" (sí soportado,
-            // porque el elemento actual es el que va DESPUÉS en el DOM).
-            //   - mt-5 → mt-0: sin salto entre el H2 de arriba y este H3.
-            //   - el borde izquierdo (border-l) arranca desde el tope del
-            //     bloque (ya lo hace por defecto, es un div/heading normal),
-            //     así que con mt-0 queda pegado justo debajo del border-b
-            //     del H2 → efecto de línea en "L" continua.
-            "[h2+&]:mt-0",
-            // Esquina de conexión H2→H3: cuando el H3 viene justo después
-            // de un H2, agregamos un ::before extra — un trazo horizontal
-            // corto de 8px en la esquina superior-izquierda del H3 — para
-            // que la línea horizontal del border-b del H2 (que ocupa TODO
-            // el ancho del bloque) tenga un punto de unión visual con el
-            // border-l vertical del H3 (que arranca en x=0 pero bien a la
-            // izquierda, lejos del centro donde suele estar el H2). Sin
-            // este trazo, ambas líneas quedan como dos elementos sueltos
-            // que solo coinciden en altura, no en un punto de unión real.
-            "[h2+&]:before:content-[''] [h2+&]:before:absolute",
-            "[h2+&]:before:-top-px [h2+&]:before:left-0",
-            "[h2+&]:before:w-2 [h2+&]:before:h-0.5 [h2+&]:before:bg-primary/50",
-            // Barra extendida hacia abajo (ver HeadingRailPlugin): un
-            // ::after posicionado absoluto que continúa la línea del H3
-            // más allá de su propio bloque. Usa border-left (no
-            // width+background) para garantizar EXACTAMENTE el mismo
-            // grosor de trazo que el border-l-2 del título — un
-            // background de "2px de ancho" y un border de "2px" no
-            // siempre renderizan idénticos por redondeo de subpíxel del
-            // navegador, así que unificamos el mecanismo.
-            // HeadingRailPlugin ya resta un margen de separación antes
-            // del próximo heading al calcular --h3-rail-h, así que la
-            // barra corta ANTES de que empiece el siguiente h1/h2/h3 en
-            // vez de tocarlo.
-            "after:content-[''] after:absolute after:left-0 after:top-full",
-            "after:w-0 after:h-[var(--h3-rail-h,0px)]",
-            "after:border-l-2 after:border-l-primary/50",
-          ].join(" "),
+          h1: "mt-8 mb-3 scroll-mt-4 text-2xl font-bold tracking-tight leading-tight text-foreground",
+          h2: "mt-6 mb-2.5 scroll-mt-4 text-xl font-semibold leading-snug text-foreground",
+          h3: "mt-5 mb-2 scroll-mt-4 text-base font-semibold leading-snug text-foreground",
           h4: [
-            // El texto arranca en pl-[26px] (14px de alineación con el H3,
-            // + 12px extra para dejarle lugar al guión "- " que se dibuja
-            // en ese hueco vía ::before). Sin este padding extra, el
-            // guión (posicionado absoluto) quedaría superpuesto sobre la
-            // primera letra del texto en vez de ir antes.
-            "relative mt-4 mb-1.5 scroll-mt-4 pl-[26px]",
-            "text-sm font-semibold leading-snug",
-            "first-letter:text-lg first-letter:font-bold first-letter:text-primary/70",
-            "first-letter:mr-px",
-            // Guión visual tipo lista antes del texto, vía ::before — NO
-            // se agrega al contenido real del nodo (el usuario sigue
-            // escribiendo "#### Texto" normal): es puro adorno CSS, así
-            // que no aparece si se copia el texto ni rompe el parseo
-            // markdown. Posicionado en el hueco de 12px que deja el pl
-            // extra de arriba, alineado a la misma columna x=14px donde
-            // arranca el texto del H3 (mismo criterio de alineación que
-            // ya usábamos antes de agregar el guión).
-            "before:content-['-'] before:absolute before:left-[14px] before:top-0",
-            "before:font-normal before:text-primary/60",
-            // H4 consecutivos (ej. una lista de sub-apartados cortos) no
-            // necesitan el mismo respiro que un H4 que viene después de
-            // texto normal — acá se ven mejor más compactos, casi como
-            // ítems de una lista con jerarquía.
-            "[h4+&]:mt-1.5",
+            "mt-4 mb-1.5 scroll-mt-4",
+            "text-sm font-semibold uppercase tracking-wide leading-snug",
+            // Un H4 es el escalón más bajo: además de ser el más chico,
+            // baja también en color (texto secundario/muted en vez de
+            // texto principal) — tercera señal bajando junto a
+            // tamaño+mayúsculas, patrón reconocible tipo "eyebrow/label".
+            "text-foreground/70",
           ].join(" "),
+          // ── Variantes (independientes del nivel) ──────────────────
+          // Nota: Lexical solo permite un string por tag en theme.heading
+          // (no hay "extraHeadingClass"), así que las variantes NO viven
+          // acá — se aplican por separado como reglas CSS globales sobre
+          // cualquier heading vía selector de atributo [data-variant=...],
+          // inyectadas con un <style> inline justo dentro de
+          // <LexicalComposer> (ver más abajo en el JSX de este componente).
         },
         quote: "border-l-2 border-primary/30 pl-4 italic opacity-75 my-4",
         code: "font-mono text-[0.875em] bg-surface-1 px-1.5 py-0.5 rounded",
@@ -1410,6 +1400,73 @@ export function RichEditor({
   return (
     <div className="flex flex-col w-full h-full">
       <LexicalComposer initialConfig={initialConfig}>
+        {/* Variantes de heading — ver theme.heading arriba: el nivel
+            (h1-h4) solo controla tamaño/peso/color; el ornamento visual
+            vive acá, aplicado por data-variant sin importar el tag, así
+            que cualquier nivel puede llevar cualquier variante. Estas 4
+            reglas son la migración 1:1 de los ornamentos que antes
+            estaban hardcodeados por nivel (h1=portada, h2=linea,
+            h3=barra, h4=dropcap) — mismo look, ahora elegible desde "/". */}
+        <style>{`
+          [data-variant="linea"] {
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid color-mix(in srgb, var(--color-primary, #7c6af7) 25%, transparent);
+          }
+          [data-variant="barra"] {
+            position: relative;
+            padding-left: 0.75rem;
+            border-left: 2px solid color-mix(in srgb, var(--color-primary, #7c6af7) 50%, transparent);
+          }
+          [data-variant="barra"]::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 100%;
+            width: 0;
+            height: var(--h3-rail-h, 0px);
+            border-left: 2px solid color-mix(in srgb, var(--color-primary, #7c6af7) 50%, transparent);
+          }
+          [data-variant="portada"] {
+            position: relative;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 500px;
+            text-align: center;
+            padding-left: 1.25rem;
+            padding-right: 1.25rem;
+          }
+          [data-variant="portada"]::before,
+          [data-variant="portada"]::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0.75rem;
+            height: 1px;
+            background: color-mix(in srgb, var(--color-primary, #7c6af7) 40%, transparent);
+            box-shadow: 0 4px 0 -0.5px color-mix(in srgb, var(--color-primary, #7c6af7) 25%, transparent);
+          }
+          [data-variant="portada"]::before { left: 0; }
+          [data-variant="portada"]::after { right: 0; }
+          [data-variant="dropcap"] {
+            position: relative;
+            padding-left: 1rem;
+          }
+          [data-variant="dropcap"]::before {
+            content: "-";
+            position: absolute;
+            left: 0;
+            top: 0;
+            font-weight: 400;
+            color: color-mix(in srgb, var(--color-primary, #7c6af7) 60%, transparent);
+          }
+          [data-variant="dropcap"]::first-letter {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: color-mix(in srgb, var(--color-primary, #7c6af7) 70%, transparent);
+            margin-right: 1px;
+          }
+        `}</style>
         <div
           style={{
             display: "flex",
@@ -1514,7 +1571,7 @@ export function RichEditor({
                   </div>
                 }
               />
-              <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+              <MarkdownShortcutPlugin transformers={RICH_TRANSFORMERS} />
               <HistoryPlugin />
               {autoFocus && <AutoFocusPlugin />}
               <InitialContentPlugin
@@ -1529,6 +1586,7 @@ export function RichEditor({
               <SectionGraphPlugin onHasSectionsChange={setHasSections} />
               <HeadingRailPlugin />
               <EditablePlugin editable={editable} />
+              <VariantSuffixTransformPlugin />
               <SlashCommandPlugin
                 isMenuOpen={mdPalette.open}
                 notifyClosedRef={notifyClosedRef}

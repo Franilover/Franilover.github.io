@@ -33,12 +33,13 @@ import {
   INSERT_UNORDERED_LIST_COMMAND,
 } from "@lexical/list";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { $createQuoteNode } from "@lexical/rich-text";
+import type { HeadingTagType } from "@lexical/rich-text";
 import {
-  $createHeadingNode,
-  $createQuoteNode
-} from "@lexical/rich-text";
-import type {
-  HeadingTagType} from "@lexical/rich-text";
+  $createVariantHeadingNode,
+  $isVariantHeadingNode,
+  type HeadingVariant,
+} from "../nodes/VariantHeadingNode";
 import {
   $createTextNode,
   $getRoot,
@@ -46,8 +47,7 @@ import {
   $isRangeSelection,
   FORMAT_ELEMENT_COMMAND,
 } from "lexical";
-import type {
-  LexicalEditor} from "lexical";
+import type { LexicalEditor, LexicalNode } from "lexical";
 import {
   Heading1,
   Heading2,
@@ -63,6 +63,11 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
+  PanelBottom,
+  PanelLeft,
+  Sparkles,
+  Baseline,
+  Eraser,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef } from "react";
 
@@ -131,6 +136,53 @@ export const MARKDOWN_COMMAND_ITEMS: MarkdownCommandItem[] = [
     keywords: ["h4", "titulo", "subtitulo", "encabezado", "heading"],
     Icon: Heading4,
     run: (editor) => insertHeading(editor, "h4"),
+  },
+  // ── Variantes de heading (independientes del nivel) ────────────────
+  // A diferencia de h1-h4 de arriba, estos NO crean un heading nuevo: le
+  // aplican un ornamento visual al heading donde ya está el cursor, sin
+  // tocar su nivel. Así cualquier # / ## / ### / #### puede llevar
+  // cualquiera de estas variantes — antes cada nivel tenía su ornamento
+  // fijo (h1=portada, h2=línea, h3=barra, h4=drop-cap); ahora nivel y
+  // variante son dos decisiones separadas.
+  {
+    id: "variant-linea",
+    label: "Variante: línea inferior",
+    hint: "—",
+    keywords: ["linea", "línea", "subrayado", "variante", "heading"],
+    Icon: PanelBottom,
+    run: (editor) => applyHeadingVariant(editor, "linea"),
+  },
+  {
+    id: "variant-barra",
+    label: "Variante: barra lateral",
+    hint: "│",
+    keywords: ["barra", "lateral", "variante", "heading"],
+    Icon: PanelLeft,
+    run: (editor) => applyHeadingVariant(editor, "barra"),
+  },
+  {
+    id: "variant-portada",
+    label: "Variante: portada centrada",
+    hint: "◦ ◦",
+    keywords: ["portada", "centrada", "centrado", "variante", "heading"],
+    Icon: Sparkles,
+    run: (editor) => applyHeadingVariant(editor, "portada"),
+  },
+  {
+    id: "variant-dropcap",
+    label: "Variante: drop-cap",
+    hint: "A",
+    keywords: ["dropcap", "drop-cap", "capitular", "variante", "heading"],
+    Icon: Baseline,
+    run: (editor) => applyHeadingVariant(editor, "dropcap"),
+  },
+  {
+    id: "variant-none",
+    label: "Quitar variante",
+    hint: "×",
+    keywords: ["quitar", "sin", "ninguna", "variante", "heading"],
+    Icon: Eraser,
+    run: (editor) => applyHeadingVariant(editor, "none"),
   },
   {
     id: "bullet",
@@ -283,9 +335,31 @@ function insertHeading(editor: LexicalEditor, tag: HeadingTagType) {
   editor.update(() => {
     const selection = getUsableSelection();
     if (!selection) return;
-    const heading = $createHeadingNode(tag);
+    const heading = $createVariantHeadingNode(tag);
     selection.insertNodes([heading]);
     heading.selectStart();
+  });
+}
+
+// Aplica (o quita) una variante visual al heading donde está el cursor,
+// SIN tocar su nivel (h1-h4) — es el mecanismo que hace que las 4
+// variantes (línea, barra, portada, drop-cap) sean independientes del
+// nivel: el usuario puede tener cualquier combinación nivel×variante. Si
+// el cursor no está dentro de un heading, no hace nada (no tiene sentido
+// aplicar una variante a un párrafo).
+function applyHeadingVariant(editor: LexicalEditor, variant: HeadingVariant) {
+  editor.focus();
+  editor.update(() => {
+    const selection = getUsableSelection();
+    if (!selection) return;
+    const anchorNode = selection.anchor.getNode();
+    let node: LexicalNode | null = anchorNode;
+    while (node && !$isVariantHeadingNode(node)) {
+      node = (node as any).getParent?.() ?? null;
+    }
+    if (node && $isVariantHeadingNode(node)) {
+      node.setVariant(variant);
+    }
   });
 }
 

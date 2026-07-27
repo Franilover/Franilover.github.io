@@ -22,8 +22,13 @@
  */
 import { $isCodeNode } from "@lexical/code";
 import { $isListNode, $isListItemNode } from "@lexical/list";
-import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
-import { $isHeadingNode, $isQuoteNode } from "@lexical/rich-text";
+import { $convertFromMarkdownString } from "@lexical/markdown";
+import { $isQuoteNode } from "@lexical/rich-text";
+import {
+  RICH_TRANSFORMERS,
+  $isVariantHeadingNode,
+  stripVariantSuffix,
+} from "./nodes/VariantHeadingNode";
 import {
   $isTableNode,
   $isTableRowNode,
@@ -294,7 +299,7 @@ export function rawTextToLexicalTree(raw: string): void {
   // 5) Una sola conversión de markdown → árbol Lexical real (listas,
   // headings, bold, italic, etc. — todo lo que MarkdownShortcutPlugin
   // aplicaría si el usuario lo tipeara a mano).
-  $convertFromMarkdownString(working, TRANSFORMERS);
+  $convertFromMarkdownString(working, RICH_TRANSFORMERS);
 
   // 6) Post-proceso: recorremos todos los TextNode del árbol recién
   // creado buscando nuestros tokens y los reemplazamos in-place por el
@@ -362,6 +367,39 @@ export function rawTextToLexicalTree(raw: string): void {
   // token vivía en un TextNode dentro de un párrafo), pero TableNode
   // debe ser hijo directo del root, no de un párrafo — lo sacamos.
   hoistTableNodes($getRoot());
+
+  // El sufijo "{variante}" (ej: "{barra}") llega pegado como texto plano
+  // al final del último TextNode de cada heading, porque HEADING_TRANSFORMER
+  // solo controla la creación del HeadingNode, no filtra su contenido de
+  // texto. Lo extraemos acá: buscamos el último hijo de texto de cada
+  // heading, le sacamos el sufijo si matchea, y seteamos node.setVariant().
+  //
+  // Nota: RichEditor.tsx también registra un registerNodeTransform
+  // (VariantSuffixTransformPlugin) que hace este mismo strip en vivo,
+  // mientras el usuario escribe. Este post-proceso de acá NO es
+  // redundante con eso: los node transforms de Lexical se disparan de
+  // forma asíncrona en el próximo ciclo de reconciliación, así que si
+  // algo leyera el árbol inmediatamente después de rawTextToLexicalTree()
+  // (dentro del mismo editor.update()) —por ejemplo InitialContentPlugin
+  // comparando contra el raw original— el transform todavía no habría
+  // corrido. Hacerlo síncronamente acá garantiza que el árbol queda
+  // correcto ANTES de que termine este update.
+  applyVariantSuffixes($getRoot());
+}
+
+function applyVariantSuffixes(root: LexicalNode): void {
+  const children: LexicalNode[] = (root as any).getChildren?.() ?? [];
+  for (const child of children) {
+    if (!$isVariantHeadingNode(child)) continue;
+    const textChildren: LexicalNode[] = (child as any).getChildren?.() ?? [];
+    const lastText = [...textChildren].reverse().find((c) => c.getType() === "text");
+    if (!lastText) continue;
+    const raw = (lastText as any).getTextContent() as string;
+    const { text, variant } = stripVariantSuffix(raw);
+    if (variant === "none") continue;
+    (lastText as any).setTextContent(text.trimEnd());
+    child.setVariant(variant);
+  }
 }
 
 function buildTableNode(rows: string[][]) {
@@ -485,13 +523,12 @@ export function serializeRootToRaw(): string {
   }
 
   function serializeBlock(child: LexicalNode): string {
-    if ($isHeadingNode(child)) {
-      const tag = (child as any).getTag?.() as string; // "h1".."h6"
-      const level = Math.max(
-        1,
-        Math.min(6, parseInt(tag?.[1] ?? "1", 10) || 1),
-      );
-      return "#".repeat(level) + " " + inlineText(child);
+    if ($isVariantHeadingNode(child)) {
+      const tag = child.getTag(); // "h1".."h6"
+      const level = Math.max(1, Math.min(6, parseInt(tag?.[1] ?? "1", 10) || 1));
+      const variant = child.getVariant();
+      const suffix = variant !== "none" ? ` {${variant}}` : "";
+      return "#".repeat(level) + " " + inlineText(child) + suffix;
     }
 
     if ($isQuoteNode(child)) {

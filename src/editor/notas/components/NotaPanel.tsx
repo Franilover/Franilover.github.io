@@ -26,6 +26,11 @@ import {
   AlignRight,
   AlignJustify,
   LayoutList,
+  PanelBottom,
+  PanelLeft,
+  Sparkles,
+  Baseline,
+  Eraser,
 } from "lucide-react";
 import React, { useState, useMemo } from "react";
 
@@ -827,6 +832,54 @@ function SeccionFormato({
           label="normal"
           mono={mono}
           onClick={() => apply("paragraph")}
+        />
+      </div>
+
+      {/* ── VARIANTES DE ENCABEZADO ──────────────────────────────────
+          Independientes del nivel (h1-h4): aplican un ornamento visual
+          (línea inferior, barra lateral, portada centrada, drop-cap) al
+          heading donde está el cursor, SIN cambiar su tamaño/nivel. Ver
+          applyHeadingVariant en MarkdownCommandPalette.tsx — mismo
+          mecanismo que el menú "/", expuesto acá como botones para no
+          depender de recordar el atajo. Si el cursor no está sobre un
+          heading, el click no hace nada (silencioso, igual que el resto
+          de los botones de esta sección). */}
+      <div style={{ ...labelStyle, paddingTop: 10 }}>
+        <Sparkles size={7} strokeWidth={1.8} />
+        variante del encabezado
+      </div>
+      <div style={gridStyle}>
+        <FormatBtn
+          icon={PanelBottom}
+          label="línea"
+          mono={mono}
+          onClick={() => apply("variant-linea")}
+        />
+        <FormatBtn
+          icon={PanelLeft}
+          label="barra"
+          mono={mono}
+          onClick={() => apply("variant-barra")}
+        />
+        <FormatBtn
+          icon={Sparkles}
+          label="portada"
+          mono={mono}
+          onClick={() => apply("variant-portada")}
+        />
+        <FormatBtn
+          icon={Baseline}
+          label="drop-cap"
+          mono={mono}
+          onClick={() => apply("variant-dropcap")}
+        />
+      </div>
+      <div style={{ ...gridStyle, marginTop: 4 }}>
+        <FormatBtn
+          icon={Eraser}
+          label="sin variante"
+          mono={mono}
+          onClick={() => apply("variant-none")}
         />
       </div>
 
