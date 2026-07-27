@@ -12,7 +12,7 @@
 
 import { useEffect } from "react";
 
-import { registrarPushSubscription } from "@/lib/api/client/pushEngine";
+import { registrarPushSubscription } from "@/infra/push/pushEngine";
 import { useAuth } from "@/providers/AuthProvider";
 
 export function PushActivator() {

@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
 import { enqueueOperation, isReallyOnline } from "@/hooks/data/useOfflineSync";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 import { type Nota } from "@/domains/garlia/_shared/types";
 

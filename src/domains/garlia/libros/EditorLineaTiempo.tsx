@@ -43,8 +43,8 @@ import React, {
 import { createPortal } from "react-dom";
 
 import { onSyncDone } from "@/hooks/data/useOfflineSync";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import type { EraMundo} from "@/lib/utils/calendario";
 import { diaAbsolutoAFecha, eraEnAnio } from "@/lib/utils/calendario";
 

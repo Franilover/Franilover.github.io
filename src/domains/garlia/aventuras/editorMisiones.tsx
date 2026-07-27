@@ -31,8 +31,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { MotionDiv } from "@/components/ui/Motion";
 import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
-import { supabase } from "@/lib/api/client/supabase";
-import { loadMisionesAdmin } from "@/lib/api/client/syncEngine";
+import { supabase } from "@/infra/supabase/supabase";
+import { loadMisionesAdmin } from "@/infra/sync/syncEngine";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ const ESTADO_LABEL: Record<EstadoUsuario, string> = {
 
 async function dexieGetOne<T>(tabla: string, id: string): Promise<T | null> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return null;
     return (await (db as any)[tabla]?.get(id)) ?? null;
   } catch {
@@ -126,7 +126,7 @@ async function dexieGetOne<T>(tabla: string, id: string): Promise<T | null> {
 
 async function dexieGetAll<T>(tabla: string): Promise<T[]> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return [];
     const t = (db as any)[tabla];
     if (!t) return [];
@@ -138,7 +138,7 @@ async function dexieGetAll<T>(tabla: string): Promise<T[]> {
 
 async function dexiePutAll(tabla: string, rows: any[]): Promise<void> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return;
     const t = (db as any)[tabla];
     if (!t || rows.length === 0) return;
@@ -153,7 +153,7 @@ async function dexiePutAll(tabla: string, rows: any[]): Promise<void> {
 
 async function _dexiePutOne(tabla: string, row: any): Promise<void> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return;
     await (db as any)[tabla]?.put(row);
   } catch {}
@@ -161,7 +161,7 @@ async function _dexiePutOne(tabla: string, row: any): Promise<void> {
 
 async function dexieDeleteOne(tabla: string, id: string): Promise<void> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return;
     await (db as any)[tabla]?.delete(id);
   } catch {}
@@ -1901,7 +1901,7 @@ function PanelEntidadesMision({ misionId }: { misionId: string }) {
       setLoadingVinculos(true);
       // Dexie primero
       try {
-        const { db } = await import("@/lib/api/client/db");
+        const { db } = await import("@/infra/supabase/db");
         if (db?.mision_entidades) {
           const local = await db.mision_entidades
             .where("mision_id")
@@ -1922,7 +1922,7 @@ function PanelEntidadesMision({ misionId }: { misionId: string }) {
           const resolved = await resolverNombres(data);
           setVinculos(resolved);
           try {
-            const { db } = await import("@/lib/api/client/db");
+            const { db } = await import("@/infra/supabase/db");
             if (db?.mision_entidades)
               await db.mision_entidades.bulkPut(
                 resolved.map((v) => ({ ...v, mision_id: misionId })),
@@ -1947,7 +1947,7 @@ function PanelEntidadesMision({ misionId }: { misionId: string }) {
       const cfg = TIPO_CONFIG[tipoActivo];
       // Dexie primero
       try {
-        const { db } = await import("@/lib/api/client/db");
+        const { db } = await import("@/infra/supabase/db");
         const local: any[] = (await (db as any)?.[cfg.tabla]?.toArray()) ?? [];
         if (!cancelled && local.length > 0) {
           setCatalogo(
@@ -2018,7 +2018,7 @@ function PanelEntidadesMision({ misionId }: { misionId: string }) {
         };
         setVinculos((prev) => [...prev, nuevo]);
         try {
-          const { db } = await import("@/lib/api/client/db");
+          const { db } = await import("@/infra/supabase/db");
           if (db?.mision_entidades)
             await db.mision_entidades.put({ ...nuevo, mision_id: misionId });
         } catch {}
@@ -2034,7 +2034,7 @@ function PanelEntidadesMision({ misionId }: { misionId: string }) {
       await supabase.from("mision_entidades").delete().eq("id", vinculo.id);
       setVinculos((prev) => prev.filter((v) => v.id !== vinculo.id));
       try {
-        const { db } = await import("@/lib/api/client/db");
+        const { db } = await import("@/infra/supabase/db");
         if (db?.mision_entidades) await db.mision_entidades.delete(vinculo.id);
       } catch {}
     }
@@ -2050,7 +2050,7 @@ function PanelEntidadesMision({ misionId }: { misionId: string }) {
       prev.map((v) => (v.id === vinculoId ? { ...v, rol: nuevoRol } : v)),
     );
     try {
-      const { db } = await import("@/lib/api/client/db");
+      const { db } = await import("@/infra/supabase/db");
       if (db?.mision_entidades) {
         const row = await db.mision_entidades.get(vinculoId);
         if (row) await db.mision_entidades.put({ ...row, rol: nuevoRol });
@@ -2409,7 +2409,7 @@ async function resolverNombres(
       const cfg = TIPO_CONFIG[tipo as TipoEntidad];
       if (!cfg) return;
       try {
-        const { db } = await import("@/lib/api/client/db");
+        const { db } = await import("@/infra/supabase/db");
         const local: any[] =
           (await (db as any)?.[cfg.tabla]?.bulkGet(ids)) ?? [];
         for (const e of local.filter(Boolean))

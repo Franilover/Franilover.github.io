@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export type TipoEntidad = "item" | "criatura" | "personaje";
 

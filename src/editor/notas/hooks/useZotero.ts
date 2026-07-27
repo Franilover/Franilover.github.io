@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 
-import { db } from "@/lib/api/client/db";
+import { db } from "@/infra/supabase/db";
 import { useToast } from "@/hooks/ui/useToast";
 
 export interface ZoteroSource {

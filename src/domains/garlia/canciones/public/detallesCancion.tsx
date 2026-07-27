@@ -6,8 +6,8 @@ import React, { useEffect, useState } from "react";
 import { Btn, Loading } from "@/components/ui";
 import { MotionDiv } from "@/components/ui/Motion";
 import { SmartImage } from "@/components/ui/SmartImage";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { toSlug, esUUID } from "@/lib/utils/slugify";
 

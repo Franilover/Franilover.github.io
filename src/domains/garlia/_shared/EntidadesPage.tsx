@@ -31,7 +31,7 @@ import { type Nota } from "@/domains/garlia/_shared/types";
 import { useEntidadesMagicas } from "@/domains/garlia/magia/useEntidadesMagicas";
 import { EditorGrupo, GRUPO_TIPO_CONFIG, useGrupos, type GrupoTipo } from "@/domains/garlia/grupos/EditorGrupo";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { ItemEditor } from "@/domains/garlia/items/ItemEditor";

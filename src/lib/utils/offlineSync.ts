@@ -1,5 +1,5 @@
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 // ─── Este archivo es código puro (sin React). ─────────────────────────────────
 // Contiene la lógica de sincronización offline que antes vivía mezclada con el

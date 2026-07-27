@@ -7,7 +7,7 @@
  * Ruta: src/lib/utils/grafoRelaciones.ts
  */
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 

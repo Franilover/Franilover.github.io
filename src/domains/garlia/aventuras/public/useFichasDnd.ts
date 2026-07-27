@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 // ── Constantes compartidas de reglas D&D (stats/skills) ────────────────────
 // Fuente de verdad única para las 6 características y las 18 habilidades

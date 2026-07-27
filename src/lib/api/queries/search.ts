@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
-import { loadPersonajes } from "@/lib/api/client/syncEngine";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
+import { loadPersonajes } from "@/infra/sync/syncEngine";
 import type { Tables } from "@/lib/types/supabase";
 import { isReallyOnline } from "@/lib/utils/offlineSync";
 

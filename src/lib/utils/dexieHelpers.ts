@@ -8,7 +8,7 @@
  *   src/lib/utils/dexieHelpers.ts
  */
 
-import { db } from "@/lib/api/client/db";
+import { db } from "@/infra/supabase/db";
 
 export async function dexiePut(tabla: string, row: any): Promise<void> {
   try {

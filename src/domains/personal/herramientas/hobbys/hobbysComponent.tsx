@@ -87,7 +87,7 @@ function getTodayIdx(): number {
 // ─── Queries Supabase ─────────────────────────────────────────────────────────
 
 async function getSupabase() {
-  const { supabase } = await import("@/lib/api/client/supabase");
+  const { supabase } = await import("@/infra/supabase/supabase");
   return supabase;
 }
 

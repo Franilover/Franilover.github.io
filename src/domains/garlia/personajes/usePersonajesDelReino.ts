@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { db } from "@/lib/api/client/db";
+import { db } from "@/infra/supabase/db";
 import { SESSION_CACHE_TTL_MS } from "@/lib/sessionCache";
 
 import { personajesQueries } from "./queries";

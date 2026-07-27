@@ -44,8 +44,8 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 
 import { MotionDiv } from "@/components/ui/Motion";
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import { useGlobalSearch } from "@/lib/api/queries/search";
 import { toSlug } from "@/lib/utils/slugify";
 import { useAuth } from "@/providers/AuthProvider";

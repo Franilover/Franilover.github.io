@@ -1,5 +1,5 @@
 // src/lib/api/canciones.ts
-import { supabase } from '@/lib/api/client/supabase';
+import { supabase } from '@/infra/supabase/supabase';
 import type { Cancion, Inserts, Updates } from '@/lib/types/queries';
 
 // Factory: crea un builder fresco en cada llamada para evitar que los

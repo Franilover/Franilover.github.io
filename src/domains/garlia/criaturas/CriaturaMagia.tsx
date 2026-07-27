@@ -15,8 +15,8 @@
 import { ChevronDown, Loader2, Search, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   loreReadRelaciones,
   loreSyncRelaciones,

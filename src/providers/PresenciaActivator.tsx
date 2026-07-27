@@ -18,8 +18,8 @@
 
 import { useEffect } from "react";
 
-import { conectarPresencia } from "@/lib/api/client/presenceEngine";
-import { reconectarRealtimeSiHaceFalta } from "@/lib/api/client/chatEngine";
+import { conectarPresencia } from "@/infra/call/presenceEngine";
+import { reconectarRealtimeSiHaceFalta } from "@/infra/call/chatEngine";
 import { useAuth } from "@/providers/AuthProvider";
 
 export function PresenciaActivator() {

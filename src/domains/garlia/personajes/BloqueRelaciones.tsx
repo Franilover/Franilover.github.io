@@ -26,8 +26,8 @@ import {
   useRelaciones,
   useTiposExistentes,
 } from "@/domains/garlia/relaciones/useRelaciones";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 import { GrafoRelaciones } from "./GrafoRelaciones";
 

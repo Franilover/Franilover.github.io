@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/api/client/supabase';
+import { supabase } from '@/infra/supabase/supabase';
 import type { Dibujo, Inserts, Updates } from '@/lib/types/queries';
 import { dibujoFullQuery } from '@/lib/types/queries';
 

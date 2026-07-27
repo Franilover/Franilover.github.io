@@ -38,7 +38,7 @@ import { useConfirm } from "@/components/ui/ConfirmModal";
 import { MotionDiv, MotionSpan, MotionButton } from "@/components/ui/Motion";
 import { ToastContainer } from "@/components/ui/ToastContainer";
 import { useToast } from "@/hooks/ui/useToast";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import { cn } from "@/lib/utils/index";
 
 // ─────────────────────────────────────────────────────────────────────────────

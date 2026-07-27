@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import type { Inserts, Tables } from "@/lib/types/queries";
 
 const USERNAME = "franilover";

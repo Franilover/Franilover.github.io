@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
 import { MotionDiv, MotionP } from "@/components/ui/Motion";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");

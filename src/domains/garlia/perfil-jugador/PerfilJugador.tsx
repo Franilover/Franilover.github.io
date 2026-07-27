@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 import { MotionDiv } from "@/components/ui/Motion";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   invalidateSessionCache,
   loadCancionesPersonaje,
@@ -34,7 +34,7 @@ import {
   type CiudadDesbloqueada,
   type PerfilResumen,
   type ReinoDesbloqueado,
-} from "@/lib/api/client/syncEngine";
+} from "@/infra/sync/syncEngine";
 
 import {
   EmptyTab,

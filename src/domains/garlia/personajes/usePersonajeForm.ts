@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import { dexieDelete, dexiePut } from "@/lib/utils/dexieHelpers";
 
 import { type SaveStatus } from "@/components/ui/saveStatus";

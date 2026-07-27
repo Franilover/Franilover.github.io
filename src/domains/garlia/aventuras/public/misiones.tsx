@@ -43,7 +43,7 @@ import {
   loadMisiones,
   loadMisionesUsuario,
   reclamarMisionOffline,
-} from "@/lib/api/client/syncEngine";
+} from "@/infra/sync/syncEngine";
 
 import type {
   AtaqueManual,

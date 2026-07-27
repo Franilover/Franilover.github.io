@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-import { db } from "@/lib/api/client/db";
+import { db } from "@/infra/supabase/db";
 import { cancionesQueries } from "@/domains/garlia/canciones/queries";
 
 import { fetchConReintento } from "./fetchConTimeout";

@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import type { CriaturaStatsDnd } from "@/domains/garlia/criaturas/model";
 
 export interface Aventura {

@@ -11,8 +11,8 @@
  *   src/lib/utils/criaturasCache.ts
  */
 
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 export type CriaturaMin = {
   id: string;

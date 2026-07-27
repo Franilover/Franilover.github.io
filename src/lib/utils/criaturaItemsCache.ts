@@ -9,8 +9,8 @@
  *   src/lib/utils/criaturaItemsCache.ts
  */
 
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 export type ItemMin = { id: string; nombre: string; imagen_url?: string | null };
 

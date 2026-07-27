@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/api/client/supabase';
+import { supabase } from '@/infra/supabase/supabase';
 import type { CriaturaFull, Inserts, Updates } from '@/lib/types/queries';
 import { criaturaFullQuery } from '@/lib/types/queries';
 

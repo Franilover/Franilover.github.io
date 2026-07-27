@@ -28,8 +28,8 @@ import {
   type Descubrimiento,
   type ItemInventario,
 } from "@/domains/garlia/perfil-jugador/PersonalComponents";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   loadDescubrimientos,
   loadReinosCiudadesUsuario,
@@ -39,7 +39,7 @@ import {
   type PerfilResumen,
   type ReinoDesbloqueado,
   type CiudadDesbloqueada,
-} from "@/lib/api/client/syncEngine";
+} from "@/infra/sync/syncEngine";
 
 // Caché en memoria para perfiles públicos por username (navegación SPA)
 

@@ -16,8 +16,8 @@ import React, { useEffect, useState, useRef } from "react";
 
 import { Loading, BackBtn } from "@/components/ui";
 import { SmartImage } from "@/components/ui/SmartImage";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   loadCapitulos,
   loadCapituloProximo,
@@ -25,7 +25,7 @@ import {
   loadReinosMap,
   loadCiudadesMap,
   collectIds,
-} from "@/lib/api/client/syncEngine";
+} from "@/infra/sync/syncEngine";
 import { toSlug, esUUID } from "@/lib/utils/slugify";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────

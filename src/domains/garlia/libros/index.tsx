@@ -44,8 +44,8 @@ import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
 import { useCalendario } from "@/domains/garlia/calendario/useCalendario";
 import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import { diasPorAnio as calcDiasPorAnio } from "@/lib/utils/calendario";
 
 import { useCapitulos } from "@/domains/garlia/libros/capitulos/useCapitulosEditor";

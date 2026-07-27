@@ -1,6 +1,6 @@
 import type { QueryData } from '@supabase/supabase-js';
 
-import { supabase } from '@/lib/api/client/supabase';
+import { supabase } from '@/infra/supabase/supabase';
 
 import type { Database } from './supabase';
 

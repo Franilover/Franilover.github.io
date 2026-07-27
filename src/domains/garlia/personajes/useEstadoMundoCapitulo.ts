@@ -15,8 +15,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 type EraRow = {
   personaje_id: string;

@@ -15,8 +15,8 @@ import { Package, Plus, X } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import { fetchAllItems, type ItemMin } from "@/lib/utils/criaturaItemsCache";
 
 // ─── Tipo ─────────────────────────────────────────────────────────────────────

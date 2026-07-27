@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/api/client/supabase';
+import { supabase } from '@/infra/supabase/supabase';
 import type { Item, Inserts, Updates } from '@/lib/types/queries';
 import { itemFullQuery } from '@/lib/types/queries';
 

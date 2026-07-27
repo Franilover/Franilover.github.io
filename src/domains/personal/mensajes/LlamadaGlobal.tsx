@@ -24,8 +24,8 @@ import {
   rechazarLlamada,
   suscribirseASenalesDeLlamada,
   type SenalLlamada,
-} from "@/lib/api/client/callEngine";
-import { supabase } from "@/lib/api/client/supabase";
+} from "@/infra/call/callEngine";
+import { supabase } from "@/infra/supabase/supabase";
 import { useLlamadaStore } from "@/infra/realtime/useLlamadaStore";
 import { useAuth } from "@/providers/AuthProvider";
 

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import type { LibroFull, Inserts, Updates } from "@/lib/types/queries";
 import { libroFullQuery } from "@/lib/types/queries";
 

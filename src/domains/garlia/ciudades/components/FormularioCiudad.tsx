@@ -25,7 +25,7 @@ import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";
-import { db } from "@/lib/api/client/db";
+import { db } from "@/infra/supabase/db";
 
 import {
   useReinos,

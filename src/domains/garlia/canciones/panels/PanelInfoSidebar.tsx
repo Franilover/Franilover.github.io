@@ -27,7 +27,7 @@ import { ComboSelector, type ComboItem } from "@/components/ui/ComboSelector";
 import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
 import { ESTADOS } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 // Mapa de etiquetas legibles por estado
 const ESTADO_LABEL: Record<string, string> = {

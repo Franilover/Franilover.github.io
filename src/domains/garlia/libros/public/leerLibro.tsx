@@ -16,8 +16,8 @@ import {
   ToastPortal,
 } from "@/domains/garlia/libros/public/CapituloScrollBlock";
 import { Vignette } from "@/domains/garlia/libros/public/LectorUI";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 // ⚠️ Ajustar esta ruta si syncEngine.ts vive en otra carpeta del proyecto.
 import {
@@ -25,7 +25,7 @@ import {
   loadCiudadesMap,
   loadPersonajesMap,
   loadReinosMap,
-} from "@/lib/api/client/syncEngine";
+} from "@/infra/sync/syncEngine";
 import { toSlug, esUUID } from "@/lib/utils/slugify";
 
 /* ─────────────────────────────────────────────

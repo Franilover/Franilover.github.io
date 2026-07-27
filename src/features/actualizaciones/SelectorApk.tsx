@@ -17,7 +17,7 @@
 import { Check, Loader2, Package, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import { cn } from "@/lib/utils/index";
 
 interface ApkReleaseOption {

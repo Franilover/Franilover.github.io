@@ -41,7 +41,7 @@ import { SelectorGrupoUnico } from "@/domains/garlia/items/SelectorGrupoUnico";
 import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCatalogo";
 import { useItemCatalogosUbicacion } from "@/domains/garlia/_shared/useItemCatalogosUbicacion";
 import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";

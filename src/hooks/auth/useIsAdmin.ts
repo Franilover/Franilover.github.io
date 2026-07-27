@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export function useIsAdmin() {
   const [isAdmin, setIsAdmin] = useState(false);

@@ -28,8 +28,8 @@ import { type Ciudad } from "@/domains/garlia/ciudades";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { usePersonajesDelReino } from "@garlia/personajes";
 import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
-import { supabase } from "@/lib/api/client/supabase";
-import { loadCiudadesPorReino } from "@/lib/api/client/syncEngine";
+import { supabase } from "@/infra/supabase/supabase";
+import { loadCiudadesPorReino } from "@/infra/sync/syncEngine";
 
 import { type Reino } from "../model";
 import { reinosQueries } from "../queries";

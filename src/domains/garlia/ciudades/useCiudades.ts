@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
-import { db } from "@/lib/api/client/db";
+import { db } from "@/infra/supabase/db";
 
 import { type CiudadMin } from "./model";
 import { ciudadesQueries } from "./queries";

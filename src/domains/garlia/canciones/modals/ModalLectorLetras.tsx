@@ -26,7 +26,7 @@ import type {
   Seccion,
   IdiomaKey,
 } from "@/domains/garlia/canciones/types";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export const ModalLectorLetras = ({
   isOpen,

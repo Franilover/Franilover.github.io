@@ -26,7 +26,7 @@ import { useConfirm } from "@/components/ui/ConfirmModal";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCatalogo";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete as dexieDel } from "@/lib/utils/dexieHelpers";
 
 import { PanelGruposAsignados } from "./PanelGruposAsignados";

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 import type { Seccion, IdiomaKey, KaraokeTimings, LineaConTiempo } from "./types";
 

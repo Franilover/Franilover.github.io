@@ -6,8 +6,8 @@ import {
   isReallyOnline,
   onSyncDone,
 } from "@/hooks/data/useOfflineSync";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import { cancionesQueries } from "@/domains/garlia/canciones/queries";
 import { criaturasQueries } from "@/domains/garlia/criaturas/queries";
 import { itemsQueries } from "@/domains/garlia/items/queries";

@@ -13,8 +13,8 @@
 import { useEffect, useState } from "react";
 
 import { type GrupoMin } from "@/domains/garlia/magia/types";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 
 export function useGruposCriaturas() {

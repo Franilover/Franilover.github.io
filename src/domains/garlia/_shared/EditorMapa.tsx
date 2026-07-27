@@ -30,12 +30,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
 import { UnifiedTileCanvas } from "@/domains/garlia/_shared/UnifiedTileCanvas";
 import type { MapTile } from "@/domains/garlia/_shared/UnifiedTileCanvas";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   invalidateMapTiles,
   loadMapTiles,
   loadReinos,
-} from "@/lib/api/client/syncEngine";
+} from "@/infra/sync/syncEngine";
 
 type ReinoConTile = {
   id: string;

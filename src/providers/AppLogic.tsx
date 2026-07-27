@@ -3,7 +3,7 @@ import { usePathname } from 'next/navigation';
 import React, { useEffect, useRef } from 'react';
 
 import { useLightbox } from "@/components/modal/lightbox";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 const RECONNECT_AFTER_MS = 10_000;
 

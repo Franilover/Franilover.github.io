@@ -27,7 +27,7 @@
 
 import { useEffect, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import { esVersionMasNueva } from "@/lib/utils/semver";
 
 type EstadoDescarga = "idle" | "descargando" | "instalando" | "error";

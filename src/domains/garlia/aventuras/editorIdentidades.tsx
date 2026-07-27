@@ -15,7 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { CampoFichaValor, FichaDnd } from "@/domains/garlia/aventuras/public/useFichasDnd";
 import { FichaStatsPanel } from "@/domains/garlia/aventuras/public/misiones";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 interface DuenioResumen {
   username: string;

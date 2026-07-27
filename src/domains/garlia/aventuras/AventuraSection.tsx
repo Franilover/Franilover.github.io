@@ -63,7 +63,7 @@ import { FichaDetalle } from "@/domains/garlia/aventuras/public/fichaComponents"
 import type { FichaDnd } from "@/domains/garlia/aventuras/public/useFichasDnd";
 import { CriaturaStatsDndEditor } from "@/domains/garlia/criaturas/CriaturaStatsDnd";
 import type { CriaturaStatsDnd } from "@/domains/garlia/criaturas/model";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 const AdminDescubrimientos = lazy(() => import("@/domains/garlia/relaciones/editorRelaciones"));
 

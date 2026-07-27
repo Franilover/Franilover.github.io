@@ -27,7 +27,7 @@ import {
   obtenerVersionActual,
   publicarNuevaVersion,
   type VersionActual,
-} from "@/lib/api/client/updaterEngine";
+} from "@/infra/updater/updaterEngine";
 
 import SelectorApk from "./SelectorApk";
 

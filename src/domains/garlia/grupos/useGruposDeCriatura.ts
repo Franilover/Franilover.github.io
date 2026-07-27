@@ -14,8 +14,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

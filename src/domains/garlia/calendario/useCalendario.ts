@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import type { Estacion, CalendarioConfig, EraMundo } from "@/lib/utils/calendario";
 
 // ─── Hook: cargar calendario — Dexie → memoria → Supabase ────────────────────
@@ -56,7 +56,7 @@ function guardarCacheLocal(data: CalCache) {
 
 async function leerDexie(): Promise<CalCache | null> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return null;
     const [estaciones, configs, eras] = await Promise.all([
       (db as any).calendario_estaciones?.orderBy("orden").toArray() ?? [],
@@ -80,7 +80,7 @@ async function leerDexie(): Promise<CalCache | null> {
 
 async function guardarDexie(data: CalCache): Promise<void> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return;
     await Promise.all([
       (db as any).calendario_estaciones?.bulkPut(data.estaciones),

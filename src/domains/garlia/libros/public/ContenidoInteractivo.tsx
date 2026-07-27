@@ -140,7 +140,7 @@ function CondicionBlock({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { supabase } = await import("@/lib/api/client/supabase");
+      const { supabase } = await import("@/infra/supabase/supabase");
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -195,7 +195,7 @@ function FlagSetBlock({ flagId, valor }: { flagId: string; valor: string }) {
     let cancelled = false;
     void (async () => {
       if (!flagId) return;
-      const { supabase } = await import("@/lib/api/client/supabase");
+      const { supabase } = await import("@/infra/supabase/supabase");
       const {
         data: { user },
       } = await supabase.auth.getUser();

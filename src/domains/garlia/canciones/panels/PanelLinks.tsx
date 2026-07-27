@@ -13,7 +13,7 @@ import React, { useState } from "react";
 
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import type { CancionLink } from "@/domains/garlia/canciones/types";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export const PanelLinks = ({
   cancionId,

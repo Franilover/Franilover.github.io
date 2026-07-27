@@ -672,7 +672,7 @@ export const PaginaEjercicios = () => {
   const fetchRutinas = useCallback(async () => {
     setCargando(true);
     try {
-      const { supabase } = await import("@/lib/api/client/supabase");
+      const { supabase } = await import("@/infra/supabase/supabase");
       const { data, error } = await supabase
         .from("rutinas")
         .select("*, ejercicios(*)")

@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/api/client/supabase';
+import { supabase } from '@/infra/supabase/supabase';
 import type { Reino, Inserts, Updates } from '@/lib/types/queries';
 import { reinoFullQuery } from '@/lib/types/queries';
 

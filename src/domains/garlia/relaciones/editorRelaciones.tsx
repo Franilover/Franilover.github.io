@@ -18,7 +18,7 @@ import Image from "next/image";
 import React, { useEffect, useState, useCallback } from "react";
 
 import { MotionDiv } from "@/components/ui/Motion";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -147,7 +147,7 @@ function fmt(fecha?: string | null) {
 
 async function dexieGetAll<T>(tabla: string): Promise<T[]> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return [];
     const t = (db as any)[tabla];
     if (!t) return [];
@@ -159,7 +159,7 @@ async function dexieGetAll<T>(tabla: string): Promise<T[]> {
 
 async function dexieGetOne<T>(tabla: string, id: string): Promise<T | null> {
   try {
-    const { db } = await import("@/lib/api/client/db");
+    const { db } = await import("@/infra/supabase/db");
     if (!db) return null;
     return (await (db as any)[tabla]?.get(id)) ?? null;
   } catch {
@@ -225,7 +225,7 @@ export default function AdminDescubrimientos() {
       setPerfiles(data as Perfil[]);
       // Persistir para la próxima vez
       try {
-        const { db } = await import("@/lib/api/client/db");
+        const { db } = await import("@/infra/supabase/db");
         if (db) await (db as any).perfiles?.bulkPut(data);
       } catch {}
     };
@@ -394,7 +394,7 @@ export default function AdminDescubrimientos() {
 
       // ✅ Borrar de Dexie para que no reaparezca en la próxima carga
       try {
-        const { db } = await import("@/lib/api/client/db");
+        const { db } = await import("@/infra/supabase/db");
         if (db) await (db as any).perfiles?.delete(p.id);
       } catch {}
 

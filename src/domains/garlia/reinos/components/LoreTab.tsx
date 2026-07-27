@@ -30,8 +30,8 @@ import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import { INPUT_CLS, type SaveStatus } from "@/domains/garlia/_shared/types";
 import { type Ciudad } from "@/domains/garlia/ciudades";
 import { PanelHistoriaMundo } from "@/domains/garlia/libros/EditorLineaTiempo";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";

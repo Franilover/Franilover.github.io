@@ -14,8 +14,8 @@ import {
   suscribirseAConversaciones,
   type ConversacionResumen,
   type PerfilResumen,
-} from "@/lib/api/client/chatEngine";
-import { supabase } from "@/lib/api/client/supabase";
+} from "@/infra/call/chatEngine";
+import { supabase } from "@/infra/supabase/supabase";
 import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";

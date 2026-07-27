@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 import { type CiudadMin } from "@/domains/garlia/_shared/useItemCatalogosUbicacion";
 

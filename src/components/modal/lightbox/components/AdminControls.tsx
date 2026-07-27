@@ -2,7 +2,7 @@
 import { Edit3, Save, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-import { supabase } from '@/lib/api/client/supabase';
+import { supabase } from '@/infra/supabase/supabase';
 
 import { useLightbox } from '../LightboxProvider';
 

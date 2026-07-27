@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export function useValoresUnicos(tabla: string, columna: string) {
   const [valores, setValores] = useState<string[]>([]);

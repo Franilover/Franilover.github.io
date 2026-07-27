@@ -8,7 +8,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────

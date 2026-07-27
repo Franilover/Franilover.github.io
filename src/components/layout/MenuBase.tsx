@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 
 import { MenuCard } from "@/components/layout/MenuCard";
 import { MotionDiv } from '@/components/ui/Motion';
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export interface MenuBaseItem {
   href: string;

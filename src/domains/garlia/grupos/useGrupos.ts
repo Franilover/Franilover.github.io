@@ -33,7 +33,7 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   dexiePut,
   dexieDelete as dexieDel,

@@ -38,7 +38,7 @@ import {
   STATS_DND,
   useDotesDisponibles,
 } from "@/domains/garlia/aventuras/public/useFichasDnd";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete as dexieDel } from "@/lib/utils/dexieHelpers";
 
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";

@@ -20,7 +20,7 @@ import {
 import React from "react";
 
 import { MotionDiv } from "@/components/ui/Motion";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ function useEntidadesMision(misionId: string) {
 
       // 1️⃣ Dexie primero — instantáneo
       try {
-        const { db } = await import("@/lib/api/client/db");
+        const { db } = await import("@/infra/supabase/db");
         if (db?.mision_entidades) {
           const local = await db.mision_entidades
             .where("mision_id")
@@ -279,7 +279,7 @@ function useEntidadesMision(misionId: string) {
           setLoading(false);
           // Cachear en Dexie para la próxima vez
           try {
-            const { db } = await import("@/lib/api/client/db");
+            const { db } = await import("@/infra/supabase/db");
             if (db?.mision_entidades) {
               await db.mision_entidades.bulkPut(
                 resolved.map((e) => ({ ...e, mision_id: misionId })),

@@ -21,12 +21,12 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   _obtenerCanalConversacion,
   _liberarCanalConversacion,
   _usarCanalConversacionSinRef,
-} from "@/lib/api/client/chatEngine";
+} from "@/infra/call/chatEngine";
 
 // ─── Presencia global ("en línea") ─────────────────────────────────────────
 

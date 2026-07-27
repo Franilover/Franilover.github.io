@@ -31,8 +31,8 @@ import {
 import { ModalDetalle } from "@/domains/garlia/perfil-jugador/PersonalComponents";
 import { useIsAdmin } from "@/hooks/auth/useIsAdmin";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 
 // ─── Hourglass — reemplaza Loader2 en todos los indicadores de carga ──────────
 function Hourglass({ size = 14 }: { size?: number }) {

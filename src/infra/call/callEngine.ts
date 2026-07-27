@@ -10,7 +10,7 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 

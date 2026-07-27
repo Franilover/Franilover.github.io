@@ -13,7 +13,7 @@
 import { ExternalLink, Globe, MapPin, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   getAllReinos,
   getAllCiudades,

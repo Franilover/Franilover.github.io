@@ -7,7 +7,7 @@ import { ModalBase, CampoInput, BotonSubmit } from "@/components/layout/EstudioT
 import { ESTADOS } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { SelectPersonaje, SelectIdioma } from "@/hooks/useEditorShared";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 
 import { InputConSugerencias } from "../InputConSugerencias";

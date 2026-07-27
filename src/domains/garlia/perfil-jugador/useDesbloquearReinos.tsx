@@ -4,7 +4,7 @@ import Image from "next/image";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
 import { MotionDiv } from "@/components/ui/Motion";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export function useDesbloquearReinos(capId: string, reinosIds: string[] | undefined) {
   const [desbloqueados,      setDesbloqueados]      = useState<string[]>([]);

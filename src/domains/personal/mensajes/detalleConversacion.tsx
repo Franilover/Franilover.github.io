@@ -27,13 +27,13 @@ import {
   type Mensaje,
   type MensajeReaccion,
   type PerfilResumen,
-} from "@/lib/api/client/chatEngine";
-import { crearLlamada, ofrecerLlamada } from "@/lib/api/client/callEngine";
+} from "@/infra/call/chatEngine";
+import { crearLlamada, ofrecerLlamada } from "@/infra/call/callEngine";
 import {
   emitirEscribiendo,
   suscribirseAEscribiendo,
-} from "@/lib/api/client/presenceEngine";
-import { supabase } from "@/lib/api/client/supabase";
+} from "@/infra/call/presenceEngine";
+import { supabase } from "@/infra/supabase/supabase";
 import { useAuth } from "@/providers/AuthProvider";
 
 export default function DetalleConversacion() {

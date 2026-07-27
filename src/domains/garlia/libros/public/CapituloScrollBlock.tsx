@@ -7,7 +7,7 @@ import type { CapituloScrollItem } from "@/domains/garlia/libros/capitulos/types
 import { useDesbloquearCiudades, CiudadesDesbloqueadasToast } from "@/domains/garlia/perfil-jugador/useDesbloquearCiudades";
 import { useDesbloquearPersonajes, PersonajesDesbloqueadosToast } from "@/domains/garlia/perfil-jugador/useDesbloquearPersonajes";
 import { useDesbloquearReinos, ReinosDesbloqueadosToast } from "@/domains/garlia/perfil-jugador/useDesbloquearReinos";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 import { ContenidoInteractivo } from "./ContenidoInteractivo";
 import { FinCapituloSeparador } from "./LectorUI";

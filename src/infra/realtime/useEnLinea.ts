@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from "react";
 
-import { suscribirseAPresencia } from "@/lib/api/client/presenceEngine";
+import { suscribirseAPresencia } from "@/infra/call/presenceEngine";
 
 /** Devuelve el set de ids de perfil actualmente en línea, reactivo. */
 export function useUsuariosEnLinea(): Set<string> {

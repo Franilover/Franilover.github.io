@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { ESTADO_COLOR } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export const SidebarItem = ({
   cancion, selected, onClick, onEdit, onDelete, onToggleVisible,

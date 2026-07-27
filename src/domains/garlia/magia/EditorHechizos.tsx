@@ -23,7 +23,7 @@ import { FormularioMagico } from "@/domains/garlia/magia/FormularioMagico";
 import { CONFIG, type EntidadMagica, type Modo } from "@/domains/garlia/magia/types";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
 import { useEntidadesMagicas } from "@/domains/garlia/magia/useEntidadesMagicas";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 
 export function EditorHechizos({
   modo,

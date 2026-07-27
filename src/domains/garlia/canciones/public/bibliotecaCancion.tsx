@@ -8,7 +8,7 @@ import { Loading } from "@/components/ui";
 import { MotionDiv } from "@/components/ui/Motion";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { toSlug } from "@/lib/utils/slugify";
 

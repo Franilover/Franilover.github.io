@@ -24,8 +24,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   dexieAll,
   loadReinos,
@@ -35,7 +35,7 @@ import {
   invalidatePersonajesPorCiudad,
   invalidateCriaturasPorCiudad,
   invalidateItemsPorCiudad,
-} from "@/lib/api/client/syncEngine";
+} from "@/infra/sync/syncEngine";
 
 export type ReinoMin = { id: string; nombre: string };
 export type PersonajeMin = { id: string; nombre: string; img_url?: string | null };

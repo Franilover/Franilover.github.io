@@ -19,8 +19,8 @@
 import { useContext, createContext, useMemo } from "react";
 
 import { usePersonajes } from "@/hooks/useEditorShared";
-import { db } from "@/lib/api/client/db";
-import { supabase } from "@/lib/api/client/supabase";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
 import { useState, useEffect } from "react";
 
 import { useReinos } from "@/domains/garlia/libros/capitulos/useCapitulosEditor";

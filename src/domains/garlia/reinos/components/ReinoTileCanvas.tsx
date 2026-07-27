@@ -22,11 +22,11 @@ import { ImageIcon, Map, Plus, X } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 
 import type { Ciudad } from "@/domains/garlia/ciudades";
-import { supabase } from "@/lib/api/client/supabase";
+import { supabase } from "@/infra/supabase/supabase";
 import {
   invalidateReinoTiles,
   loadReinoTiles,
-} from "@/lib/api/client/syncEngine";
+} from "@/infra/sync/syncEngine";
 
 import { UnifiedTileCanvas } from "@/domains/garlia/_shared/UnifiedTileCanvas";
 
