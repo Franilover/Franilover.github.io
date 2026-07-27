@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Save, BookOpen, X, PanelRight, LayoutTemplate } from "lucide-react";
+import { Save, BookOpen, X, PanelRight, PlusSquare } from "lucide-react";
 import React, {
   useRef,
   useState,
@@ -13,7 +13,7 @@ import {
   RichEditor,
   type RichEditorFormatCommand,
 } from "@/editor/lexical";
-import { LayoutCanvas } from "@/editor/notas/layout/LayoutCanvas";
+import { LayoutCanvas, type LayoutCanvasHandle } from "@/editor/notas/layout/LayoutCanvas";
 import { parseLayoutBoxes, type LayoutBox } from "@/editor/notas/layout/types";
 import { MotionDiv } from "@/ui/Motion";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
@@ -93,15 +93,16 @@ export function Editor({
     ensayo.contenido || "",
   );
 
-  // ── Modo maquetación: capa de cajas de texto flotantes ──────────────────
-  // Independiente del documento principal — se guarda en su propio campo
+  // ── Cajas de texto flotantes ("bloques") ─────────────────────────────────
+  // Capa siempre visible, superpuesta al documento — no hay modo on/off.
+  // Independiente del documento principal: se guarda en su propio campo
   // (`layout_boxes`, JSON) vía el mismo mecanismo de autosave con debounce
   // que ya usa `contenido` (ver onUpdateField → scheduleSave en el shell).
-  const [layoutMode, setLayoutMode] = useState(false);
   const [layoutBoxes, setLayoutBoxes] = useState<LayoutBox[]>(() =>
     parseLayoutBoxes(ensayo.layout_boxes),
   );
   const layoutSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const layoutCanvasRef = useRef<LayoutCanvasHandle | null>(null);
 
   const handleLayoutBoxesChange = useCallback(
     (boxes: LayoutBox[]) => {
@@ -182,12 +183,9 @@ export function Editor({
     if (cleaned !== (ensayo.contenido || "")) {
       onUpdateField(ensayo.id, "contenido", cleaned);
     }
-    // Cambiar de ensayo: recargar cajas del nuevo ensayo y salir del modo
-    // maquetación (evita quedar con el toggle prendido mostrando cajas de
-    // un ensayo distinto por una fracción de segundo).
+    // Cambiar de ensayo: recargar las cajas de texto flotantes del nuevo ensayo.
     if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
     setLayoutBoxes(parseLayoutBoxes(ensayo.layout_boxes));
-    setLayoutMode(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ensayo.id]);
 
@@ -355,11 +353,6 @@ export function Editor({
       }}
     >
       <RichEditor
-        // Mientras el modo maquetación está activo, el documento de fondo
-        // queda en solo-lectura: así los clicks se enfocan en las cajas
-        // flotantes y no hay conflicto de foco entre este editor y los
-        // editores independientes de cada FloatingTextBox.
-        editable={!layoutMode}
         formatCommandRef={formatCommandRef}
         mode={richMode}
         placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"
@@ -392,14 +385,15 @@ export function Editor({
         )}
       </AnimatePresence>
 
-      {/* ── Capa de cajas de texto flotantes ("modo maquetación") ──────────
-          Superpuesta al documento de arriba. Solo se muestra/edita cuando
-          layoutMode está activo; al desactivarlo las cajas no se borran,
-          simplemente dejan de renderizarse (siguen viviendo en el estado
-          `layoutBoxes`, que persiste vía autosave). */}
-      {layoutMode && (
-        <LayoutCanvas boxes={layoutBoxes} onBoxesChange={handleLayoutBoxesChange} />
-      )}
+      {/* ── Capa de cajas de texto flotantes ──────────────────────────────
+          Siempre visible, superpuesta al documento de arriba. El fondo
+          sigue siempre editable — la capa no bloquea clicks en el área
+          vacía, solo las cajas mismas capturan sus propios eventos. */}
+      <LayoutCanvas
+        ref={layoutCanvasRef}
+        boxes={layoutBoxes}
+        onBoxesChange={handleLayoutBoxesChange}
+      />
     </div>
   );
 
@@ -815,7 +809,7 @@ export function Editor({
                         )}
                       </span>
                     </div>
-                    {/* Toggle modo maquetación — capa de cajas de texto flotantes */}
+                    {/* Añadir bloque — crea una nueva caja de texto flotante */}
                     <button
                       style={{
                         display: "flex",
@@ -823,28 +817,21 @@ export function Editor({
                         gap: 4,
                         padding: "3px 8px",
                         borderRadius: 5,
-                        border: layoutMode
-                          ? "1px solid color-mix(in srgb, var(--accent) 45%, transparent)"
-                          : "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
-                        background: layoutMode
-                          ? "color-mix(in srgb, var(--accent) 12%, transparent)"
-                          : "color-mix(in srgb, var(--foreground) 4%, transparent)",
-                        color: layoutMode
-                          ? "var(--accent)"
-                          : "color-mix(in srgb, var(--foreground) 45%, transparent)",
+                        border:
+                          "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
+                        background:
+                          "color-mix(in srgb, var(--foreground) 4%, transparent)",
+                        color:
+                          "color-mix(in srgb, var(--foreground) 45%, transparent)",
                         cursor: "pointer",
                         ...monoStyle,
                         fontSize: 9,
                       }}
-                      title={
-                        layoutMode
-                          ? "Salir del modo maquetación"
-                          : "Modo maquetación: cajas de texto flotantes"
-                      }
-                      onClick={() => setLayoutMode((v) => !v)}
+                      title="Añadir bloque de texto flotante"
+                      onClick={() => layoutCanvasRef.current?.addBox()}
                     >
-                      <LayoutTemplate size={9} />
-                      maquetar
+                      <PlusSquare size={9} />
+                      bloque
                     </button>
                     {/* Botón panel lateral — solo en mobile */}
                     {isMobile && (

@@ -174,6 +174,7 @@ export function FloatingTextBox({
         zIndex: box.zIndex,
         display: "flex",
         flexDirection: "column",
+        pointerEvents: "auto",
         background: "var(--bg-main)",
         border: selected
           ? "1.5px solid color-mix(in srgb, var(--accent) 70%, transparent)"
