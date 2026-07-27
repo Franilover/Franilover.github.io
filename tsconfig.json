@@ -19,7 +19,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@/components/*": ["./src/components/*"],
-      "@/ui/*": ["./src/components/ui/*"],
+      "@/ui/*": ["./src/ui/*"],
+      "@/layout/*": ["./src/layout/*"],
       "@/providers/*": ["./src/providers/*"],
       "@/hooks/*": ["./src/hooks/*"],
       "@/lib/*": ["./src/lib/*"],
@@ -51,8 +52,7 @@
     ".next/types/**/*.ts",
     "**/*.js",
     "**/*.jsx",
-    ".next/dev/types/**/*.ts",
-    "src/lib/api/client/db.js"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules", "supabase", "src-tauri"]
 }
