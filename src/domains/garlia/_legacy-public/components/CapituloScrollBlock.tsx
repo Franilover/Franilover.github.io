@@ -3,7 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { AlignLeft, Clock } from "lucide-react";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
-import type { CapituloScrollItem } from "@/domains/garlia/_legacy/hooks/capitulos/types";
+import type { CapituloScrollItem } from "@/domains/garlia/libros/capitulos/types";
 import { useDesbloquearCiudades, CiudadesDesbloqueadasToast } from "@/domains/garlia/_legacy-public/hooks//useCiudades";
 import { useDesbloquearPersonajes, PersonajesDesbloqueadosToast } from "@/domains/garlia/_legacy-public/hooks//usePersonajes";
 import { useDesbloquearReinos, ReinosDesbloqueadosToast } from "@/domains/garlia/_legacy-public/hooks/useReinos";

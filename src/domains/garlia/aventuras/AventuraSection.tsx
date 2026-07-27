@@ -65,7 +65,7 @@ import { CriaturaStatsDndEditor } from "@/domains/garlia/criaturas/CriaturaStats
 import type { CriaturaStatsDnd } from "@/domains/garlia/criaturas/model";
 import { supabase } from "@/lib/api/client/supabase";
 
-const AdminDescubrimientos = lazy(() => import("./editorRelaciones"));
+const AdminDescubrimientos = lazy(() => import("@/domains/garlia/relaciones/editorRelaciones"));
 
 type SubPanel = "aventuras" | "relaciones" | "monedas" | "manual";
 

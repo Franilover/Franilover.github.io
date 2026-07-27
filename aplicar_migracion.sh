@@ -14,7 +14,8 @@
 #   - Borra src/domains/garlia/_legacy (que quedó vacía tras la migración).
 #
 # Qué NO hace (fuera de este parche):
-#   - No toca src/domains/garlia/_legacy-public (pendiente, tema aparte).
+#   - Incluye src/domains/garlia/_legacy-public (sus imports rotos a _legacy
+#     también se arreglaron, aunque su contenido no se reorganizó por entidad).
 #   - No toca src/domains/personal (no migrado todavía).
 #   - No corre tu build ni tests — hacelo vos después para confirmar.
 
@@ -38,17 +39,18 @@ echo "==> Backup de lo que se va a reemplazar en: $BACKUP/"
 [ -d "src/domains/garlia" ] && cp -r "src/domains/garlia" "$BACKUP/garlia"
 [ -d "src/domains/plataforma" ] && cp -r "src/domains/plataforma" "$BACKUP/plataforma"
 [ -d "src/editor/notas" ] && cp -r "src/editor/notas" "$BACKUP/notas"
-mkdir -p "$BACKUP/sueltos/app/myself/garlia" "$BACKUP/sueltos/components/layout"
+mkdir -p "$BACKUP/sueltos/app/myself/garlia" "$BACKUP/sueltos/components/layout" "$BACKUP/sueltos/components/forms/lexical-editor" "$BACKUP/sueltos/hooks/data"
 [ -f "src/app/myself/garlia/page.tsx" ] && cp "src/app/myself/garlia/page.tsx" "$BACKUP/sueltos/app/myself/garlia/page.tsx"
 [ -f "src/components/layout/navbar.tsx" ] && cp "src/components/layout/navbar.tsx" "$BACKUP/sueltos/components/layout/navbar.tsx"
+[ -f "src/components/forms/lexical-editor/types.ts" ] && cp "src/components/forms/lexical-editor/types.ts" "$BACKUP/sueltos/components/forms/lexical-editor/types.ts"
+[ -f "src/hooks/data/useSupabaseData.ts" ] && cp "src/hooks/data/useSupabaseData.ts" "$BACKUP/sueltos/hooks/data/useSupabaseData.ts"
 
 echo "==> Extrayendo migración a una carpeta temporal..."
 TMP=$(mktemp -d)
 tar -xzf domains_garlia_migrado.tar.gz -C "$TMP"
 
-echo "==> Aplicando sobre src/domains/garlia (preservando _legacy-public intacto)..."
+echo "==> Aplicando sobre src/domains/garlia..."
 rsync -a --delete \
-  --exclude "_legacy-public" \
   "$TMP/src/domains/garlia/" "src/domains/garlia/"
 
 echo "==> Aplicando sobre src/domains/plataforma..."
@@ -58,9 +60,11 @@ rsync -a "$TMP/src/domains/plataforma/" "src/domains/plataforma/"
 echo "==> Aplicando sobre src/editor/notas..."
 rsync -a "$TMP/src/editor/notas/" "src/editor/notas/"
 
-echo "==> Aplicando archivos sueltos (navbar.tsx, app/myself/garlia/page.tsx)..."
+echo "==> Aplicando archivos sueltos (navbar.tsx, app/myself/garlia/page.tsx, lexical-editor/types.ts, useSupabaseData.ts)..."
 [ -f "$TMP/src/app/myself/garlia/page.tsx" ] && cp "$TMP/src/app/myself/garlia/page.tsx" "src/app/myself/garlia/page.tsx"
 [ -f "$TMP/src/components/layout/navbar.tsx" ] && cp "$TMP/src/components/layout/navbar.tsx" "src/components/layout/navbar.tsx"
+[ -f "$TMP/src/components/forms/lexical-editor/types.ts" ] && cp "$TMP/src/components/forms/lexical-editor/types.ts" "src/components/forms/lexical-editor/types.ts"
+[ -f "$TMP/src/hooks/data/useSupabaseData.ts" ] && cp "$TMP/src/hooks/data/useSupabaseData.ts" "src/hooks/data/useSupabaseData.ts"
 
 echo "==> Eliminando _legacy vacía si quedó..."
 rmdir "src/domains/garlia/_legacy" 2>/dev/null || true
@@ -77,3 +81,5 @@ echo "  cp -r $BACKUP/plataforma src/domains/plataforma  # si existía"
 echo "  cp -r $BACKUP/notas src/editor/notas"
 echo "  cp $BACKUP/sueltos/app/myself/garlia/page.tsx src/app/myself/garlia/page.tsx"
 echo "  cp $BACKUP/sueltos/components/layout/navbar.tsx src/components/layout/navbar.tsx"
+echo "  cp $BACKUP/sueltos/components/forms/lexical-editor/types.ts src/components/forms/lexical-editor/types.ts"
+echo "  cp $BACKUP/sueltos/hooks/data/useSupabaseData.ts src/hooks/data/useSupabaseData.ts"

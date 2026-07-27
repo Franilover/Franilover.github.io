@@ -27,7 +27,7 @@
 import { Plus, ScrollText, Sparkles, Star, Package, Bug, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
-import { EntityCard } from "./EntityCard";
+import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 interface Criatura {

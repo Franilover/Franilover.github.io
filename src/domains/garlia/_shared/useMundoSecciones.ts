@@ -15,8 +15,8 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 
-import { SESSION_CACHE_TTL_MS } from "../sessionCache";
-import { type MundoSectionKey } from "../types";
+import { SESSION_CACHE_TTL_MS } from "./sessionCache";
+import { type MundoSectionKey } from "./types";
 
 export function useMundoSecciones() {
   const [textos, setTextos] = useState<Record<MundoSectionKey, string>>({

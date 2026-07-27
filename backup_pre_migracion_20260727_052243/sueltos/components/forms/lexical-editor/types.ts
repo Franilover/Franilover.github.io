@@ -2,7 +2,7 @@ import { Globe, Timer, Lock } from "lucide-react";
 
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
-import { librosQueries } from "@/domains/garlia/libros/queries";
+import { librosQueries } from "@/lib/api/queries/garlia/libros";
 import { enqueueOperation, isReallyOnline } from "@/lib/utils/offlineSync";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

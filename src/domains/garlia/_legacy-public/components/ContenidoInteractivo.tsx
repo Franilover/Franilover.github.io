@@ -3,11 +3,11 @@ import { motion } from "framer-motion";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
 import type {
-  Segment} from "@/domains/garlia/_legacy/hooks/capitulos/types";
+  Segment} from "@/domains/garlia/libros/capitulos/types";
 import {
   parseContenido,
   parseSections,
-} from "@/domains/garlia/_legacy/hooks/capitulos/types";
+} from "@/domains/garlia/libros/capitulos/types";
 
 import {
   CitaVisual,

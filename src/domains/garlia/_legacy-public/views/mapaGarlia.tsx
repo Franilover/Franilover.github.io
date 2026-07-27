@@ -27,7 +27,7 @@ import { ReinoTileCanvas } from "@garlia/reinos";
 import {
   UnifiedTileCanvas,
   type MapTile,
-} from "@/domains/garlia/_legacy/components/shared/UnifiedTileCanvas";
+} from "@/domains/garlia/_shared/UnifiedTileCanvas";
 import { ModalDetalle } from "@/domains/garlia/_legacy-public/views/PersonalComponents";
 import { useIsAdmin } from "@/hooks/auth/useIsAdmin";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";

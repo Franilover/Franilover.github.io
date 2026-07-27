@@ -50,16 +50,16 @@ const EntidadesPage = lazy(() =>
   import("./EntidadesPage").then((m) => ({ default: m.EntidadesPage })),
 );
 const CapitulosSection = lazy(() =>
-  import("./CapitulosSection").then((m) => ({ default: m.CapitulosSection })),
+  import("@/domains/garlia/libros/CapitulosSection").then((m) => ({ default: m.CapitulosSection })),
 );
 const MapaSection = lazy(() =>
   import("./MapaSection").then((m) => ({ default: m.MapaSection })),
 );
 const LineaTiempoSection = lazy(() =>
-  import("./LineaTiempoSection").then((m) => ({ default: m.LineaTiempoSection })),
+  import("@/domains/garlia/libros/LineaTiempoSection").then((m) => ({ default: m.LineaTiempoSection })),
 );
 const AventuraSection = lazy(() =>
-  import("./AventuraSection").then((m) => ({ default: m.AventuraSection })),
+  import("@/domains/garlia/aventuras/AventuraSection").then((m) => ({ default: m.AventuraSection })),
 );
 
 function SectionFallback() {

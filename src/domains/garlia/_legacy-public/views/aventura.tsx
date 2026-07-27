@@ -25,8 +25,8 @@ import {
   TABLERO_TOKEN_SIZE,
   TableroAventura,
   type TableroItem,
-} from "@/domains/garlia/_legacy/components/aventuras/TableroAventura";
-import { celdasBloqueadas, GRID_SIZE } from "@/domains/garlia/_legacy/components/aventuras/visionUtils";
+} from "@/domains/garlia/aventuras/TableroAventura";
+import { celdasBloqueadas, GRID_SIZE } from "@/domains/garlia/aventuras/visionUtils";
 import {
   TABLA_LABEL,
   useAventuraEntidades,
@@ -35,7 +35,7 @@ import {
   useAventurasList,
   type Aventura as AventuraType,
   type AventuraEntidad,
-} from "@/domains/garlia/_legacy/hooks/aventuras/useAventuras";
+} from "@/domains/garlia/aventuras/useAventuras";
 import { useFichasDnd, type CampoFichaValor, type FichaDnd, type NuevaFicha } from "../hooks/useFichasDnd";
 import { CARD_SCALE_MAX, CARD_SCALE_MIN, useTableroEscala } from "../hooks/useTableroEscala";
 import { FichaStatsPanel, TiradaDados } from "./misiones";

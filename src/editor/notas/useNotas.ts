@@ -4,7 +4,7 @@ import { enqueueOperation, isReallyOnline } from "@/hooks/data/useOfflineSync";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 
-import { type Nota } from "../types";
+import { type Nota } from "@/domains/garlia/_shared/types";
 
 async function loreReadAll<T>(tabla: string): Promise<T[]> {
   if (!db) return [];

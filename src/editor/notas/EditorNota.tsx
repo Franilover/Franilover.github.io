@@ -17,7 +17,7 @@ import { useConfirm } from "@/components/ui/ConfirmModal";
 
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
-import type { SaveStatus, Nota } from "../hooks/types";
+import type { SaveStatus, Nota } from "@/domains/garlia/_shared/types";
 
 // ─── Etiqueta chip ────────────────────────────────────────────────────────────
 function EtiquetaChip({
