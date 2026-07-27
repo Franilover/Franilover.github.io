@@ -13,8 +13,8 @@ import {
   RichEditor,
   type RichEditorFormatCommand,
 } from "@/editor/lexical";
-import { LayoutCanvas, type LayoutCanvasHandle } from "@/editor/notas/layout/LayoutCanvas";
-import { parseLayoutBoxes, type LayoutBox } from "@/editor/notas/layout/types";
+import { LayoutCanvas, type LayoutCanvasHandle } from "@/editor/layout-boxes/LayoutCanvas";
+import { parseLayoutBoxes, type LayoutBox } from "@/editor/layout-boxes/types";
 import { MotionDiv } from "@/ui/Motion";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
 

@@ -1,10 +1,11 @@
-// ─── Modelo de datos: modo maquetación ──────────────────────────────────────
-// Una LayoutBox es una caja de texto flotante, libre, que vive en una capa
-// superpuesta al documento de texto normal. Se guarda como un array JSON
-// aparte del contenido principal del ensayo (campo `layout_boxes` en la
-// tabla `ensayos`) — dos cosas independientes que conviven visualmente pero
-// no se pisan en el modelo. El texto de fondo (`contenido`) nunca se toca
-// desde acá.
+// ─── Modelo de datos: cajas de texto flotantes ──────────────────────────────
+// Componente compartido — usado tanto por el editor de ensayos (notas) como
+// por EditorCapitulos (libros de Garlia). Una LayoutBox es una caja de texto
+// flotante, libre, que vive en una capa superpuesta al documento de texto
+// normal. Se guarda como un array JSON aparte del contenido principal (campo
+// `layout_boxes` en la tabla correspondiente — `ensayos` o `capitulos`) — dos
+// cosas independientes que conviven visualmente pero no se pisan en el
+// modelo. El texto de fondo nunca se toca desde acá.
 
 export interface LayoutBox {
   id: string;

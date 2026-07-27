@@ -28,6 +28,7 @@ import {
   Ban,
   GripVertical,
   History,
+  PlusSquare,
 } from "lucide-react";
 import React, {
   useState,
@@ -37,6 +38,8 @@ import React, {
   useMemo,
 } from "react";
 
+import { LayoutCanvas, type LayoutCanvasHandle } from "@/editor/layout-boxes/LayoutCanvas";
+import { parseLayoutBoxes, type LayoutBox } from "@/editor/layout-boxes/types";
 import type { SnippetEditRequest } from "@/editor/lexical";
 import { RichEditor ,
   type RichEditorFormatCommand,
@@ -205,6 +208,13 @@ const PanelEditor = ({
   // cuando cambia de capítulo reseteamos todo sincrónicamente.
   const [initializedCapId, setInitializedCapId] = useState<string | null>(null);
   const [contenido, setContenido] = useState("");
+  // Cajas de texto flotantes ("bloques") — capa siempre visible, superpuesta
+  // al documento. Independiente de `contenido`, se inicializa en el mismo
+  // bloque derived-state que el resto de los campos del capítulo (más abajo)
+  // y se guarda con un debounce propio vía capUpdateMeta.
+  const [layoutBoxes, setLayoutBoxes] = useState<LayoutBox[]>([]);
+  const layoutSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const layoutCanvasRef = useRef<LayoutCanvasHandle | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [editingTitle, setEditingTitle] = useState(false);
   const [titulo, setTitulo] = useState("");
@@ -330,6 +340,7 @@ const PanelEditor = ({
     setCriaturasIds((cap as any).criaturas_ids ?? []);
     setItemsIds((cap as any).items_ids ?? []);
     setSaveStatus((cap as any).status === "pending" ? "pending" : "idle");
+    setLayoutBoxes(parseLayoutBoxes(cap.layout_boxes));
     // Recién ACÁ el capítulo tiene datos reales cargados — desbloqueamos
     // onChange/doSave para este capId. Cualquier evento emitido antes de
     // esta línea (por ejemplo por RichEditor montando/reconciliando su
@@ -491,6 +502,30 @@ const PanelEditor = ({
     },
     [doSave, draft, centerCursor, capId],
   );
+
+  // Cajas de texto flotantes: debounce propio (más corto que el de
+  // contenido, porque el drag/resize dispara muchos más eventos por
+  // segundo que tipear) y guardado vía capUpdateMeta — el mismo mecanismo
+  // genérico por campo que ya usa el reordenamiento de capítulos
+  // (handleReorderCaps → capUpdateMeta({ orden })), así que hereda el
+  // manejo de offline/Dexie/enqueue sin código extra acá.
+  const handleLayoutBoxesChange = useCallback(
+    (boxes: LayoutBox[]) => {
+      setLayoutBoxes(boxes);
+      if (lastLoadedCapIdRef.current !== capId) return;
+      if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
+      layoutSaveTimerRef.current = setTimeout(() => {
+        capUpdateMeta(capId, { layout_boxes: boxes as any }).catch(() => {});
+      }, 600);
+    },
+    [capId],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
+    };
+  }, []);
 
   // Fase 3 del rediseño Choice/Gate: dispara al soltar un drag-to-connect en
   // NodeGraphCanvas. Agrega un [[choice]] al final de la sección origen —
@@ -1089,6 +1124,15 @@ const PanelEditor = ({
                 >
                   <Eye size={11} />
                 </button>
+                {vistaEditor !== "grafo" && (
+                  <button
+                    className="p-1.5 rounded hover:bg-primary/8 text-primary/25 hover:text-primary transition-all"
+                    title="Añadir bloque de texto flotante"
+                    onClick={() => layoutCanvasRef.current?.addBox()}
+                  >
+                    <PlusSquare size={11} />
+                  </button>
+                )}
                 <button
                   className={`p-1.5 rounded transition-all disabled:opacity-30 relative ${
                     vistaEditor === "grafo"
@@ -1292,31 +1336,43 @@ const PanelEditor = ({
                   )}
                 </div>
               ) : (
-                <RichEditor
-                  key={capId}
-                  autoFocus={focusMode}
-                  // Bloquea la edición mientras `cap` todavía no cargó datos
-                  // reales para este capId. Es la defensa física: sin esto,
-                  // el usuario podía escribir en el editor durante el frame
-                  // en que `contenido` seguía siendo el valor del capítulo
-                  // anterior (o "") mientras Dexie/Supabase resolvían — y ese
-                  // texto fantasma terminaba autoguardándose sobre el
-                  // capítulo equivocado o vacío. Ver doSave/onChange guards
-                  // más arriba para la segunda capa de esta protección.
-                  closePaletteRef={closePaletteRef}
-                  editable={!loading && initializedCapId === cap?.id}
-                  formatCommandRef={formatCommandRef}
-                  insertRef={mdInsertRef}
-                  minHeight={focusMode ? "30rem" : "20rem"}
-                  mode={focusMode ? "split" : "edit"}
-                  placeholder="Empieza a escribir…"
-                  renderPreview={renderChapterPreview}
-                  value={contenido}
-                  onChange={onChange}
-                  onClosePalette={handleClosePalette}
-                  onOpenPalette={handleOpenPaletteFromSlash}
-                  onSnippetEdit={handleSnippetEdit}
-                />
+                <div style={{ position: "relative" }}>
+                  <RichEditor
+                    key={capId}
+                    autoFocus={focusMode}
+                    // Bloquea la edición mientras `cap` todavía no cargó datos
+                    // reales para este capId. Es la defensa física: sin esto,
+                    // el usuario podía escribir en el editor durante el frame
+                    // en que `contenido` seguía siendo el valor del capítulo
+                    // anterior (o "") mientras Dexie/Supabase resolvían — y ese
+                    // texto fantasma terminaba autoguardándose sobre el
+                    // capítulo equivocado o vacío. Ver doSave/onChange guards
+                    // más arriba para la segunda capa de esta protección.
+                    closePaletteRef={closePaletteRef}
+                    editable={!loading && initializedCapId === cap?.id}
+                    formatCommandRef={formatCommandRef}
+                    insertRef={mdInsertRef}
+                    minHeight={focusMode ? "30rem" : "20rem"}
+                    mode={focusMode ? "split" : "edit"}
+                    placeholder="Empieza a escribir…"
+                    renderPreview={renderChapterPreview}
+                    value={contenido}
+                    onChange={onChange}
+                    onClosePalette={handleClosePalette}
+                    onOpenPalette={handleOpenPaletteFromSlash}
+                    onSnippetEdit={handleSnippetEdit}
+                  />
+                  {/* ── Capa de cajas de texto flotantes ──────────────────
+                      Siempre visible, superpuesta al documento de arriba.
+                      El fondo sigue siempre editable — la capa no bloquea
+                      clicks en el área vacía, solo las cajas mismas
+                      capturan sus propios eventos (ver LayoutCanvas). */}
+                  <LayoutCanvas
+                    ref={layoutCanvasRef}
+                    boxes={layoutBoxes}
+                    onBoxesChange={handleLayoutBoxesChange}
+                  />
+                </div>
               )}
             </div>
           </div>

@@ -35,6 +35,8 @@ export type Capitulo = {
   trigger_warnings?: string[];
   status?: "pending" | "synced";
   deleted?: boolean;
+  /** Cajas de texto flotantes ("bloques") — JSON, ver editor/layout-boxes/types.ts */
+  layout_boxes?: unknown;
 };
 
 export type SaveStatus = "idle" | "saving" | "saved" | "pending" | "error";
