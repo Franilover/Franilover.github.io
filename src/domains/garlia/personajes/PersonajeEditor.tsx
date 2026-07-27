@@ -11,10 +11,10 @@
  * son una sola llamada a openEntity() del store.
  */
 
-import { EditorPersonaje } from "@/domains/garlia/_legacy/views/EditorPersonaje";
+import { EditorPersonaje } from "@/domains/garlia/personajes/EditorPersonaje";
 
-import { useMundoNavigation } from "@/domains/garlia/_legacy/hooks/mundo/useMundoNavigationStore";
-import { useWikilinkNavigate } from "@/domains/garlia/_legacy/hooks/mundo/useWikilinkNavigate";
+import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { useWikilinkNavigate } from "@/domains/garlia/_shared/useWikilinkNavigate";
 
 interface Personaje {
   id: string;

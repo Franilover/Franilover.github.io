@@ -63,15 +63,15 @@ import { PickerImagenCriaturaBtn } from "@/domains/garlia/criaturas/PickerImagen
 import {
   SelectorImagen,
   SaveIndicator,
-} from "@/domains/garlia/_legacy/components/shared/UIComponents";
-import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
+} from "@/domains/garlia/_shared/UIComponents";
+import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { useCriaturaAsideCatalogs } from "@/domains/garlia/criaturas/useCriaturaAsideCatalogs";
 import { usePersonajesDeCriatura } from "@/domains/garlia/criaturas/usePersonajesDeCriatura";
-import { useMembresiaGruposCriatura } from "@/domains/garlia/_legacy/hooks/grupos/useMembresiaGruposCriatura";
+import { useMembresiaGruposCriatura } from "@/domains/garlia/grupos/useMembresiaGruposCriatura";
 import { supabase } from "@/lib/api/client/supabase";
 import { dexiePut, dexieDelete } from "@/lib/utils/dexieHelpers";
 
-import { type Criatura } from "@/domains/garlia/_legacy/hooks/types";
+import { type Criatura } from "@/domains/garlia/criaturas/model";
 import { type SaveStatus } from "@/components/ui/saveStatus";
 
 // ─── EditorCriatura ───────────────────────────────────────────────────────────

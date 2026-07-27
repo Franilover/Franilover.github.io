@@ -38,13 +38,13 @@ import { PanelReglasDnd } from "@/domains/garlia/items/PanelReglasDnd";
 import { PanelTerritorio } from "@/domains/garlia/items/PanelTerritorio";
 import { PickerImagenItemBtn } from "@/domains/garlia/items/PickerImagenItemBtn";
 import { SelectorGrupoUnico } from "@/domains/garlia/items/SelectorGrupoUnico";
-import { useCriaturasCatalogo } from "@/domains/garlia/_legacy/hooks/misc/useCriaturasCatalogo";
-import { useItemCatalogosUbicacion } from "@/domains/garlia/_legacy/hooks/misc/useItemCatalogosUbicacion";
+import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCatalogo";
+import { useItemCatalogosUbicacion } from "@/domains/garlia/_shared/useItemCatalogosUbicacion";
 import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
 import { supabase } from "@/lib/api/client/supabase";
 
-import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
-import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
+import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
+import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { type Item } from "@garlia/items";
 import { type SaveStatus } from "@/components/ui/saveStatus";
 

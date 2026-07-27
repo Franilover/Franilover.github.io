@@ -25,7 +25,7 @@ import {
   type Relacion,
   useRelaciones,
   useTiposExistentes,
-} from "@/domains/garlia/_legacy/hooks/relaciones/useRelaciones";
+} from "@/domains/garlia/relaciones/useRelaciones";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 

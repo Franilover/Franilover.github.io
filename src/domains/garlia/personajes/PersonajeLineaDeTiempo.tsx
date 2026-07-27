@@ -59,7 +59,7 @@ import {
   FechaMundoBadge,
   SelectorFechaMundo,
   useCalendario,
-} from "@/domains/garlia/_legacy/components/shared/CalendarioMundo";
+} from "@/domains/garlia/calendario/CalendarioMundo";
 import {
   type Era,
   useErasDelPersonaje,

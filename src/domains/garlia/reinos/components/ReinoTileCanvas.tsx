@@ -28,7 +28,7 @@ import {
   loadReinoTiles,
 } from "@/lib/api/client/syncEngine";
 
-import { UnifiedTileCanvas } from "@/domains/garlia/_legacy/components/shared/UnifiedTileCanvas";
+import { UnifiedTileCanvas } from "@/domains/garlia/_shared/UnifiedTileCanvas";
 
 // Extiende Ciudad con las coordenadas de tile añadidas en la migración
 type CiudadConTile = Ciudad & {

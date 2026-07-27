@@ -4,7 +4,7 @@
 // (navegación compartida entre todas las entidades de Garlia, no propia de
 // reinos).
 
-import { useMundoNavigation } from "@/domains/garlia/_legacy/hooks/mundo/useMundoNavigationStore";
+import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 import { EditorReino } from "./EditorReino";
 

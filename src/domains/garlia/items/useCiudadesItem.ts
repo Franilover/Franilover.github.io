@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { supabase } from "@/lib/api/client/supabase";
 
-import { type CiudadMin } from "@/domains/garlia/_legacy/hooks/misc/useItemCatalogosUbicacion";
+import { type CiudadMin } from "@/domains/garlia/_shared/useItemCatalogosUbicacion";
 
 export type ItemCiudadRow = {
   rowId: string;

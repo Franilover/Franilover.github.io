@@ -20,7 +20,7 @@
 import { ChevronDown, Loader2, Package, Pencil, Search, X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
-import { useGrupoSelector } from "@/domains/garlia/_legacy/hooks/grupos/useGrupoSelector";
+import { useGrupoSelector } from "@/domains/garlia/grupos/useGrupoSelector";
 
 export function SelectorGrupoUnico({
   subtipo,

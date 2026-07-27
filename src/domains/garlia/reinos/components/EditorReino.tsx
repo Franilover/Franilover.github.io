@@ -22,10 +22,10 @@ import {
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { useConfirm } from "@/components/ui/ConfirmModal";
-import { SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
-import { type SaveStatus } from "@/domains/garlia/_legacy/hooks/types";
+import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
+import { type SaveStatus } from "@/domains/garlia/_shared/types";
 import { type Ciudad } from "@/domains/garlia/ciudades";
-import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
+import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { usePersonajesDelReino } from "@garlia/personajes";
 import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
 import { supabase } from "@/lib/api/client/supabase";

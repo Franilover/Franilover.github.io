@@ -27,14 +27,14 @@ import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { RichEditor } from "@/components/forms/lexical-editor";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
-import { INPUT_CLS, type SaveStatus } from "@/domains/garlia/_legacy/hooks/types";
+import { INPUT_CLS, type SaveStatus } from "@/domains/garlia/_shared/types";
 import { type Ciudad } from "@/domains/garlia/ciudades";
-import { PanelHistoriaMundo } from "@/domains/garlia/_legacy/views/EditorLineaTiempo";
+import { PanelHistoriaMundo } from "@/domains/garlia/libros/EditorLineaTiempo";
 import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 
-import { SaveIndicator } from "@/domains/garlia/_legacy/components/shared/UIComponents";
-import { useWikilink } from "@/domains/garlia/_legacy/components/shared/WikilinkContext";
+import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
+import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 
 import { type Reino } from "../model";
 import { reinosQueries } from "../queries";

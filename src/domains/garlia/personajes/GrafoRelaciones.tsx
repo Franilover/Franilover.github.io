@@ -14,7 +14,7 @@ import * as d3 from "d3";
 import { X, Loader2, GitFork, UserCircle2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 
-import { useGrafoRelaciones } from "@/domains/garlia/_legacy/hooks/relaciones/useGrafoRelaciones";
+import { useGrafoRelaciones } from "@/domains/garlia/relaciones/useGrafoRelaciones";
 import { useCSSVar } from "@/hooks/ui/useCSSVar";
 import { esFamilia, TIPOS_FAM_ARRIBA } from "@/lib/utils/grafoRelaciones";
 import type {

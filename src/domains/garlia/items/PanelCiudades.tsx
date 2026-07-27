@@ -17,7 +17,7 @@ import { useState } from "react";
 
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import { useCiudadesItem } from "./useCiudadesItem";
-import { type CiudadMin } from "@/domains/garlia/_legacy/hooks/misc/useItemCatalogosUbicacion";
+import { type CiudadMin } from "@/domains/garlia/_shared/useItemCatalogosUbicacion";
 
 export function PanelCiudades({
   reinosSeleccionados,
