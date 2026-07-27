@@ -167,17 +167,6 @@ export function TableControlsPlugin() {
   } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
 
-  // Ubica el contenedor con overflow (el <div style={editorStyle}> con
-  // overflow:auto en RichEditor) para medir posiciones relativas a algo
-  // que no se mueve con el propio scroll interno del editor.
-  useEffect(() => {
-    const root = editor.getRootElement();
-    scrollContainerRef.current =
-      (root?.closest('[style*="overflow"]') as HTMLElement) ||
-      (root?.parentElement as HTMLElement) ||
-      root;
-  }, [editor]);
-
   const recompute = useCallback(() => {
     if (!activeTable || !scrollContainerRef.current) {
       setGeometry(null);
@@ -187,11 +176,26 @@ export function TableControlsPlugin() {
     if (g) setGeometry({ ...g, tableKey: activeTable.key });
   }, [activeTable]);
 
-  // Detecta sobre qué tabla está el mouse (mouseover con closest("table")).
+  // Ubica el contenedor con overflow (para medir posiciones relativas a
+  // algo que no se mueve con el scroll interno del editor) Y adjunta el
+  // listener de mousemove que detecta sobre qué tabla está el mouse.
+  //
+  // OJO — bug real que había acá: ambas cosas dependían de leer
+  // editor.getRootElement() UNA SOLA VEZ al montar (`useEffect(..., [editor])`
+  // o `[editor, isResizing]`). En el primer render el `contentEditable`
+  // de Lexical típicamente todavía no existe en el DOM, así que
+  // getRootElement() devuelve null ahí mismo:
+  //   - scrollContainerRef.current quedaba null para siempre →
+  //     recompute() nunca medía nada → geometry nunca se seteaba.
+  //   - el listener de mousemove nunca se adjuntaba (return temprano) y
+  //     como el efecto no reaccionaba a que el root apareciera después,
+  //     activeTable tampoco se detectaba jamás.
+  // Con el guard final `if (!activeTable || !geometry || ...) return null`
+  // el resultado era que el componente jamás renderizaba nada.
+  //
+  // registerRootListener es la forma reactiva de Lexical: se dispara
+  // apenas el root real queda montado (y de nuevo si cambia).
   useEffect(() => {
-    const root = editor.getRootElement();
-    if (!root) return;
-
     const handleMouseMove = (e: MouseEvent) => {
       if (isResizing) return; // no cambiar de tabla activa mientras se arrastra
       if (!editor.isEditable()) return; // sin controles en modo lectura/preview
@@ -216,9 +220,21 @@ export function TableControlsPlugin() {
       });
     };
 
-    root.addEventListener("mousemove", handleMouseMove);
-    return () => root.removeEventListener("mousemove", handleMouseMove);
-  }, [editor, isResizing]);
+    // registerRootListener entrega (nextRoot, prevRoot) y se dispara de
+    // nuevo cada vez que el root real cambia (incluida la primera vez
+    // que deja de ser null tras el montaje inicial de ContentEditable).
+    return editor.registerRootListener((nextRoot, prevRoot) => {
+      prevRoot?.removeEventListener("mousemove", handleMouseMove);
+
+      scrollContainerRef.current =
+        (nextRoot?.closest('[style*="overflow"]') as HTMLElement) ||
+        (nextRoot?.parentElement as HTMLElement) ||
+        nextRoot;
+      recompute();
+
+      nextRoot?.addEventListener("mousemove", handleMouseMove);
+    });
+  }, [editor, isResizing, recompute]);
 
   useEffect(() => {
     recompute();
