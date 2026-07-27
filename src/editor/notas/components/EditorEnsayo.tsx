@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Save, BookOpen, X, PanelRight } from "lucide-react";
+import { Save, BookOpen, X, PanelRight, LayoutTemplate } from "lucide-react";
 import React, {
   useRef,
   useState,
@@ -13,6 +13,8 @@ import {
   RichEditor,
   type RichEditorFormatCommand,
 } from "@/editor/lexical";
+import { LayoutCanvas } from "@/editor/notas/layout/LayoutCanvas";
+import { parseLayoutBoxes, type LayoutBox } from "@/editor/notas/layout/types";
 import { MotionDiv } from "@/ui/Motion";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
 
@@ -90,6 +92,38 @@ export function Editor({
   const [localContenido, setLocalContenido] = useState<string>(
     ensayo.contenido || "",
   );
+
+  // ── Modo maquetación: capa de cajas de texto flotantes ──────────────────
+  // Independiente del documento principal — se guarda en su propio campo
+  // (`layout_boxes`, JSON) vía el mismo mecanismo de autosave con debounce
+  // que ya usa `contenido` (ver onUpdateField → scheduleSave en el shell).
+  const [layoutMode, setLayoutMode] = useState(false);
+  const [layoutBoxes, setLayoutBoxes] = useState<LayoutBox[]>(() =>
+    parseLayoutBoxes(ensayo.layout_boxes),
+  );
+  const layoutSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLayoutBoxesChange = useCallback(
+    (boxes: LayoutBox[]) => {
+      setLayoutBoxes(boxes);
+      // Debounce propio en vez de disparar onUpdateField en cada pixel de
+      // drag/resize — el mismo patrón que ya usa el shell para `contenido`,
+      // pero acá lo hacemos local porque los cambios de posición durante un
+      // arrastre son mucho más frecuentes que un onChange de texto normal.
+      if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
+      layoutSaveTimerRef.current = setTimeout(() => {
+        onUpdateField(ensayo.id, "layout_boxes", boxes);
+      }, 600);
+    },
+    [ensayo.id, onUpdateField],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
+    };
+  }, []);
+
   const [newTagInput, setNewTagInput] = useState("");
   const [_addingTag, setAddingTag] = useState(false);
   const _newTagRef = React.useRef<HTMLInputElement>(null);
@@ -148,6 +182,13 @@ export function Editor({
     if (cleaned !== (ensayo.contenido || "")) {
       onUpdateField(ensayo.id, "contenido", cleaned);
     }
+    // Cambiar de ensayo: recargar cajas del nuevo ensayo y salir del modo
+    // maquetación (evita quedar con el toggle prendido mostrando cajas de
+    // un ensayo distinto por una fracción de segundo).
+    if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
+    setLayoutBoxes(parseLayoutBoxes(ensayo.layout_boxes));
+    setLayoutMode(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ensayo.id]);
 
   const wordCount = localContenido.split(/\s+/).filter(Boolean).length || 0;
@@ -314,6 +355,11 @@ export function Editor({
       }}
     >
       <RichEditor
+        // Mientras el modo maquetación está activo, el documento de fondo
+        // queda en solo-lectura: así los clicks se enfocan en las cajas
+        // flotantes y no hay conflicto de foco entre este editor y los
+        // editores independientes de cada FloatingTextBox.
+        editable={!layoutMode}
         formatCommandRef={formatCommandRef}
         mode={richMode}
         placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"
@@ -345,6 +391,15 @@ export function Editor({
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── Capa de cajas de texto flotantes ("modo maquetación") ──────────
+          Superpuesta al documento de arriba. Solo se muestra/edita cuando
+          layoutMode está activo; al desactivarlo las cajas no se borran,
+          simplemente dejan de renderizarse (siguen viviendo en el estado
+          `layoutBoxes`, que persiste vía autosave). */}
+      {layoutMode && (
+        <LayoutCanvas boxes={layoutBoxes} onBoxesChange={handleLayoutBoxesChange} />
+      )}
     </div>
   );
 
@@ -760,6 +815,37 @@ export function Editor({
                         )}
                       </span>
                     </div>
+                    {/* Toggle modo maquetación — capa de cajas de texto flotantes */}
+                    <button
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "3px 8px",
+                        borderRadius: 5,
+                        border: layoutMode
+                          ? "1px solid color-mix(in srgb, var(--accent) 45%, transparent)"
+                          : "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
+                        background: layoutMode
+                          ? "color-mix(in srgb, var(--accent) 12%, transparent)"
+                          : "color-mix(in srgb, var(--foreground) 4%, transparent)",
+                        color: layoutMode
+                          ? "var(--accent)"
+                          : "color-mix(in srgb, var(--foreground) 45%, transparent)",
+                        cursor: "pointer",
+                        ...monoStyle,
+                        fontSize: 9,
+                      }}
+                      title={
+                        layoutMode
+                          ? "Salir del modo maquetación"
+                          : "Modo maquetación: cajas de texto flotantes"
+                      }
+                      onClick={() => setLayoutMode((v) => !v)}
+                    >
+                      <LayoutTemplate size={9} />
+                      maquetar
+                    </button>
                     {/* Botón panel lateral — solo en mobile */}
                     {isMobile && (
                       <button
