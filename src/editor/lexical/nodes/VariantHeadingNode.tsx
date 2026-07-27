@@ -78,7 +78,17 @@ export class VariantHeadingNode extends HeadingNode {
     dom: HTMLElement,
     config: EditorConfig,
   ): boolean {
-    const changed = super.updateDOM(prevNode, dom, config);
+    // HeadingNode.updateDOM tipa su parámetro como "this" (polimórfico) —
+    // TS no puede garantizar que un VariantHeadingNode sea asignable a
+    // ese "this" genérico dentro de la propia subclase, aunque en runtime
+    // es exactamente el mismo objeto. Cast explícito para pasar el check
+    // de tipos; el comportamiento de super.updateDOM no cambia (solo lee
+    // props del nodo base como tag/format, que sí existen acá).
+    const changed = super.updateDOM(
+      prevNode as unknown as this,
+      dom,
+      config,
+    );
     if (prevNode.__variant !== this.__variant) {
       if (this.__variant === "none") {
         dom.removeAttribute("data-variant");
