@@ -24,7 +24,7 @@ import Image from "next/image";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
-import { RichEditor } from "@/components/forms/lexical-editor";
+import { RichEditor } from "@/editor/lexical";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import { INPUT_CLS, type SaveStatus } from "@/domains/garlia/_shared/types";

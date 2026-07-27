@@ -31,13 +31,13 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 
 import type {
   Libro,
-  Capitulo} from "@/components/forms/lexical-editor/types";
+  Capitulo} from "@/editor/lexical/types";
 import {
   VISIBILIDAD_CONFIG,
   wordCount,
   readingTime,
   capUpdateMeta,
-} from "@/components/forms/lexical-editor/types";
+} from "@/editor/lexical/types";
 import { ComboSelector } from "@/components/ui/ComboSelector";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";

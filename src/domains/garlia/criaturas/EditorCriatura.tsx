@@ -45,7 +45,7 @@ import {
 } from "@/hooks/ui/useMobileAsidePanel";
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
-import { RichEditor } from "@/components/forms/lexical-editor";
+import { RichEditor } from "@/editor/lexical";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
 import {

@@ -3,7 +3,7 @@
 import { Loader2, CheckCircle2, AlertCircle, WifiOff } from "lucide-react";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-import { RichEditor } from "@/components/forms/lexical-editor";
+import { RichEditor } from "@/editor/lexical";
 import { IDIOMAS, IDLE_STATE } from "@/domains/garlia/canciones/constants";
 import { dexieSecGet } from "@/domains/garlia/canciones/seccionesDb";
 import type { Seccion, IdiomaKey, ColState } from "@/domains/garlia/canciones/types";

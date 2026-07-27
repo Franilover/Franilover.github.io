@@ -34,7 +34,7 @@ import {
 import type { EditorState } from "lexical";
 import { useCallback, useEffect, useRef } from "react";
 
-import { $createWikilinkNode } from "./nodes/WikilinkNode";
+import { $createWikilinkNode } from "../nodes/WikilinkNode";
 
 export interface WikilinkMatch {
   /** Texto buscado después de "[[" (sin los corchetes) */

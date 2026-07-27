@@ -4,7 +4,7 @@
  * Barrel de exports del editor Lexical.
  * Importa desde aquí en EditorCapitulos.tsx:
  *
- *   import { RichEditor } from "@/components/forms/lexical-editor";
+ *   import { RichEditor } from "@/editor/lexical";
  */
 export { RichEditor } from "./RichEditor";
 export type {
@@ -78,7 +78,7 @@ export {
 
 // Tabla — helper de inserción imperativa (ver TablePlugin.tsx para cómo
 // conectar "/tabla" desde SnippetCommandPalette)
-export { insertTable } from "./TablePlugin";
+export { insertTable } from "./plugins/TablePlugin";
 
 // Tipos compartidos
 export type { SnippetEditRequest, SnippetKind } from "./nodes/sharedTypes";

@@ -12,7 +12,7 @@ import React, {
 import {
   RichEditor,
   type RichEditorFormatCommand,
-} from "@/components/forms/lexical-editor";
+} from "@/editor/lexical";
 import { MotionDiv } from "@/components/ui/Motion";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
 

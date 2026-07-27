@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import React, { useState, useMemo } from "react";
 
-import type { RichEditorFormatCommand } from "@/components/forms/lexical-editor";
+import type { RichEditorFormatCommand } from "@/editor/lexical";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 type NotaPanelTab = "indice" | "contexto" | "formato";

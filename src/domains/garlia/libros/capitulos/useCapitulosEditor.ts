@@ -11,7 +11,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type {
   Capitulo,
   Reino,
-  HistorialVersionRow} from "@/components/forms/lexical-editor/types";
+  HistorialVersionRow} from "@/editor/lexical/types";
 import {
   TABLA_CAPS,
   dexieCapRead,
@@ -19,7 +19,7 @@ import {
   dexieCapWrite,
   capGuardarVersion,
   capListarVersiones,
-} from "@/components/forms/lexical-editor/types";
+} from "@/editor/lexical/types";
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";

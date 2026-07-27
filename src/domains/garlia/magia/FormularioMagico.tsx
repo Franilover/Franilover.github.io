@@ -20,7 +20,7 @@ import { Bug, Save, Trash2 } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
-import { RichEditor } from "@/components/forms/lexical-editor";
+import { RichEditor } from "@/editor/lexical";
 import { ComboSelector } from "@/components/ui/ComboSelector";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";

@@ -54,20 +54,20 @@ import React, {
   useState,
 } from "react";
 
-import { AutoClosePlugin } from "./AutoClosePlugin";
+import { AutoClosePlugin } from "./plugins/AutoClosePlugin";
 import {
   FindReplacePlugin,
   initialFindReplaceState,
   type FindReplaceState,
-} from "./FindReplacePlugin";
-import { HeadingBackspacePlugin } from "./HeadingBackspacePlugin";
-import { ListBackspacePlugin } from "./ListBackspacePlugin";
+} from "./plugins/FindReplacePlugin";
+import { HeadingBackspacePlugin } from "./plugins/HeadingBackspacePlugin";
+import { ListBackspacePlugin } from "./plugins/ListBackspacePlugin";
 import {
   MarkdownCommandInsertPlugin,
   MarkdownCommandPalette,
   filterMarkdownCommands,
   MARKDOWN_COMMAND_ITEMS,
-} from "./MarkdownCommandPalette";
+} from "./plugins/MarkdownCommandPalette";
 import { ChoiceNode } from "./nodes/ChoiceNode";
 import { DropNode } from "./nodes/DropNode";
 import { FlagNode } from "./nodes/FlagNode";
@@ -88,11 +88,11 @@ import {
   serializeRootToRaw,
   insertSnippetNode,
 } from "./richTextSerializer";
-import { SlashCommandPlugin, type SlashMatch } from "./SlashCommandPlugin";
-import { TABLE_NODES, TablePlugin, insertTable } from "./TablePlugin";
-import { TocPanel } from "./TocPlugin";
+import { SlashCommandPlugin, type SlashMatch } from "./plugins/SlashCommandPlugin";
+import { TABLE_NODES, TablePlugin, insertTable } from "./plugins/TablePlugin";
+import { TocPanel } from "./plugins/TocPlugin";
 import { WikilinkMenuPanel, type WikiEntity } from "./WikilinkMenuPanel";
-import { WikilinkPlugin, type WikilinkMatch } from "./WikilinkPlugin";
+import { WikilinkPlugin, type WikilinkMatch } from "./plugins/WikilinkPlugin";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -726,7 +726,7 @@ function ModeTogglePlugin({
 // ─────────────────────────────────────────────────────────────────────────────
 // Fallback de preview genérico (sin dominio, sin features/)
 // ─────────────────────────────────────────────────────────────────────────────
-// RichEditor es UI genérica (components/forms/lexical-editor/) y no debe
+// RichEditor es UI genérica (editor/lexical/) y no debe
 // importar de features/ (mismo principio que ya documentaba MarkdownEditor.tsx:
 // "no debe conocer features/"). Por eso este fallback es local y chico, en vez
 // de reusar ContenidoInteractivo (que vive en features/garlia/).

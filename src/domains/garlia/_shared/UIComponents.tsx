@@ -6,7 +6,7 @@ import {
 import Image from "next/image";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 
-import { RichEditor } from "@/components/forms/lexical-editor";
+import { RichEditor } from "@/editor/lexical";
 import { normalize } from "@/components/layout/EstudioTemplates";
 import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
 

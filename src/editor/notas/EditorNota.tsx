@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
-import { RichEditor } from "@/components/forms/lexical-editor";
+import { RichEditor } from "@/editor/lexical";
 import { useConfirm } from "@/components/ui/ConfirmModal";
 
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";

@@ -2,16 +2,16 @@
 set -e
 
 # ============================================================
-# aplicar_migracion.sh — Ronda: src/infra (Engines transversales)
+# aplicar_migracion.sh — Ronda: src/editor (Lexical)
 # ============================================================
 # Uso:
-#   1. Poné este script y migracion_transversales_infra.tar.gz
+#   1. Poné este script y migracion_editor_lexical.tar.gz
 #      en la raíz del repo (junto a src/)
 #   2. Corré: bash aplicar_migracion.sh
 #   3. Confirmá: npm run build
 # ============================================================
 
-TARBALL="migracion_transversales_infra.tar.gz"
+TARBALL="migracion_editor_lexical.tar.gz"
 FECHA=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="backup_pre_migracion_${FECHA}"
 
@@ -39,11 +39,11 @@ echo "== 3. Copiando archivos nuevos/modificados sobre src/ =="
 cp -r "$TMP_DIR"/. src/
 
 echo "== 4. Eliminando carpetas obsoletas de esta ronda =="
-if [ -d "src/lib/api/client" ]; then
-  rm -rf "src/lib/api/client"
-  echo "  - eliminada: src/lib/api/client (movida a src/infra/{sync,push,updater,supabase,call})"
+if [ -d "src/components/forms/lexical-editor" ]; then
+  rm -rf "src/components/forms/lexical-editor"
+  echo "  - eliminada: src/components/forms/lexical-editor (movida a src/editor/lexical/)"
 else
-  echo "  - src/lib/api/client ya no existe, nada que borrar"
+  echo "  - src/components/forms/lexical-editor ya no existe, nada que borrar"
 fi
 
 echo "== 5. Limpieza de temporales =="

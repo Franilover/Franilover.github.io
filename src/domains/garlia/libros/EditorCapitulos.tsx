@@ -37,7 +37,7 @@ import React, {
   useMemo,
 } from "react";
 
-import type { SnippetEditRequest } from "@/components/forms/lexical-editor";
+import type { SnippetEditRequest } from "@/editor/lexical";
 import { RichEditor ,
   type RichEditorFormatCommand,
   dropPayloadToRaw,
@@ -47,11 +47,11 @@ import { RichEditor ,
   parseUsePayloadToRaw,
   condicionPayloadToRaw,
   sectionPayloadToRaw,
-} from "@/components/forms/lexical-editor";
+} from "@/editor/lexical";
 import type {
   Libro,
   Capitulo,
-  SaveStatus} from "@/components/forms/lexical-editor/types";
+  SaveStatus} from "@/editor/lexical/types";
 import {
   VISIBILIDAD_CONFIG,
   toDateInput,
@@ -63,7 +63,7 @@ import {
   capGuardarVersion,
   libroUpdateMeta,
   libroDelete,
-} from "@/components/forms/lexical-editor/types";
+} from "@/editor/lexical/types";
 import type {
   CommandItem as MdCommandItem,
   SnippetAction,
