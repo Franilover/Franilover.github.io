@@ -16,7 +16,7 @@ import { db } from "@/lib/api/client/db";
 import { supabase } from "@/lib/api/client/supabase";
 import { dexieReadAll as dexieRead } from "@/lib/utils/dexieHelpers";
 
-import { SESSION_CACHE_TTL_MS } from "../sessionCache";
+import { SESSION_CACHE_TTL_MS } from "./sessionCache";
 
 export function useNombresDeTabla(tabla: string) {
   const [nombres, setNombres] = useState<string[]>([]);

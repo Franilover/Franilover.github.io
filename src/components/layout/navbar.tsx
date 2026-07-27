@@ -38,7 +38,7 @@ import { MotionDiv } from "@/components/ui/Motion";
 import {
   useMundoNavigation,
   type SectionKey,
-} from "@/domains/garlia/_legacy/hooks/mundo/useMundoNavigationStore";
+} from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { useEscritorioNavigation } from "@/editor/notas/hooks/useEscritorioNavigationStore";
 import { useGotoHotkeys } from "@/hooks/ui/useGotoHotkeys";
 import { useMobileAsidePanel } from "@/hooks/ui/useMobileAsidePanel";

@@ -38,6 +38,9 @@ echo "==> Backup de lo que se va a reemplazar en: $BACKUP/"
 [ -d "src/domains/garlia" ] && cp -r "src/domains/garlia" "$BACKUP/garlia"
 [ -d "src/domains/plataforma" ] && cp -r "src/domains/plataforma" "$BACKUP/plataforma"
 [ -d "src/editor/notas" ] && cp -r "src/editor/notas" "$BACKUP/notas"
+mkdir -p "$BACKUP/sueltos/app/myself/garlia" "$BACKUP/sueltos/components/layout"
+[ -f "src/app/myself/garlia/page.tsx" ] && cp "src/app/myself/garlia/page.tsx" "$BACKUP/sueltos/app/myself/garlia/page.tsx"
+[ -f "src/components/layout/navbar.tsx" ] && cp "src/components/layout/navbar.tsx" "$BACKUP/sueltos/components/layout/navbar.tsx"
 
 echo "==> Extrayendo migración a una carpeta temporal..."
 TMP=$(mktemp -d)
@@ -55,6 +58,10 @@ rsync -a "$TMP/src/domains/plataforma/" "src/domains/plataforma/"
 echo "==> Aplicando sobre src/editor/notas..."
 rsync -a "$TMP/src/editor/notas/" "src/editor/notas/"
 
+echo "==> Aplicando archivos sueltos (navbar.tsx, app/myself/garlia/page.tsx)..."
+[ -f "$TMP/src/app/myself/garlia/page.tsx" ] && cp "$TMP/src/app/myself/garlia/page.tsx" "src/app/myself/garlia/page.tsx"
+[ -f "$TMP/src/components/layout/navbar.tsx" ] && cp "$TMP/src/components/layout/navbar.tsx" "src/components/layout/navbar.tsx"
+
 echo "==> Eliminando _legacy vacía si quedó..."
 rmdir "src/domains/garlia/_legacy" 2>/dev/null || true
 
@@ -68,3 +75,5 @@ echo "  rm -rf src/domains/garlia src/domains/plataforma src/editor/notas"
 echo "  cp -r $BACKUP/garlia src/domains/garlia"
 echo "  cp -r $BACKUP/plataforma src/domains/plataforma  # si existía"
 echo "  cp -r $BACKUP/notas src/editor/notas"
+echo "  cp $BACKUP/sueltos/app/myself/garlia/page.tsx src/app/myself/garlia/page.tsx"
+echo "  cp $BACKUP/sueltos/components/layout/navbar.tsx src/components/layout/navbar.tsx"
