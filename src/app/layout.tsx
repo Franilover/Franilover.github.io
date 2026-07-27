@@ -17,6 +17,7 @@ import { PushActivator } from "@/providers/PushActivator";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ServiceWorkerManager } from "@/providers/ServiceWorkerManager";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import "katex/dist/katex.min.css";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 const montserrat = Montserrat({ subsets: ['latin'], display: 'swap', variable: '--font-montserrat' });

@@ -94,6 +94,13 @@ import {
   parseUseRawToPayload,
 } from "./nodes/UseNode";
 import {
+  $createMathNode,
+  $isMathNode,
+  MATH_BLOCK_RE,
+  MATH_INLINE_RE,
+  mathPayloadToRaw,
+} from "./nodes/MathNode";
+import {
   $createWikilinkNode,
   $isWikilinkNode,
   wikilinkPayloadToRaw,
@@ -239,7 +246,12 @@ export function rawTextToLexicalTree(raw: string): void {
   // nodo real (snippet, tabla, wikilink).
   const registry = new Map<
     string,
-    { kind: "snippet" | "table"; raw?: string; rows?: string[][] }
+    {
+      kind: "snippet" | "table" | "math";
+      raw?: string;
+      rows?: string[][];
+      mathPayload?: { formula: string; inline: boolean };
+    }
   >();
   let counter = 0;
   const nextToken = () => `xSnippetTokenxx${counter++}xx`;
@@ -254,6 +266,30 @@ export function rawTextToLexicalTree(raw: string): void {
       return token;
     },
   );
+
+  // 1.5) Fórmulas matemáticas — igual razón que las tablas: "$$...$$" es
+  // multilinea (puede contener \begin{aligned}...\end{aligned}, saltos
+  // de línea propios del LaTeX) y debe salir ANTES del paso 4 de abajo,
+  // que reemplaza saltos de línea sueltos — si no, el LaTeX multilinea
+  // quedaría roto con tokens de salto de línea intercalados. Bloque
+  // ($$) se extrae primero para no dejarle a inline ($) restos de "$$"
+  // a medio consumir.
+  working = working.replace(MATH_BLOCK_RE, (_match, formula: string) => {
+    const token = nextToken();
+    registry.set(token, {
+      kind: "math",
+      mathPayload: { formula: formula.trim(), inline: false },
+    });
+    return token;
+  });
+  working = working.replace(MATH_INLINE_RE, (_match, formula: string) => {
+    const token = nextToken();
+    registry.set(token, {
+      kind: "math",
+      mathPayload: { formula: formula.trim(), inline: true },
+    });
+    return token;
+  });
 
   // 2) Condicion (y sus formatos legacy gate/flag-if) multilinea (mismo
   // motivo: cuerpo con "===" y texto libre que no debe tocar el resto del
@@ -328,6 +364,8 @@ export function rawTextToLexicalTree(raw: string): void {
       replacement = $createLineBreakNode();
     } else if (entry?.kind === "table" && entry.rows) {
       replacement = buildTableNode(entry.rows);
+    } else if (entry?.kind === "math" && entry.mathPayload) {
+      replacement = $createMathNode(entry.mathPayload);
     } else if (entry?.kind === "snippet" && entry.raw) {
       replacement = rawSnippetToNode(entry.raw);
     }
@@ -497,6 +535,7 @@ export function serializeRootToRaw(): string {
     if ($isFlagNode(node)) return flagPayloadToRaw(node.getPayload());
     if ($isSectionNode(node)) return sectionPayloadToRaw(node.getPayload());
     if ($isWikilinkNode(node)) return wikilinkPayloadToRaw(node.getPayload());
+    if ($isMathNode(node)) return mathPayloadToRaw(node.getPayload());
     if ($isTableNode(node)) return serializeTableNode(node, walkNode);
     if ($isLineBreakNode(node)) return "\n";
 

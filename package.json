@@ -38,6 +38,7 @@
     "d3": "^7.9.0",
     "dexie": "^4.3.0",
     "framer-motion": "^12.34.3",
+    "katex": "^0.18.1",
     "lexical": "^0.46.0",
     "livekit-client": "^2.20.2",
     "lucide-react": "^0.562.0",

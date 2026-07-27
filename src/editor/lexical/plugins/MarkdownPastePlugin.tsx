@@ -3,8 +3,9 @@
  * MarkdownPastePlugin.tsx
  * ─────────────────────────
  * Detecta cuando el usuario pega texto con "forma" de markdown (headings,
- * listas, negrita/cursiva, citas, código, tablas, links) y lo convierte en
- * nodos reales de Lexical en vez de pegarlo como texto plano.
+ * listas, negrita/cursiva, citas, código, tablas, links, fórmulas $/$$)
+ * y lo convierte en nodos reales de Lexical en vez de pegarlo como texto
+ * plano.
  *
  * Por qué un plugin aparte y no reusar rawTextToLexicalTree() tal cual:
  * esa función hace $getRoot().clear() — está pensada para cargar el
@@ -37,6 +38,15 @@
  * deja como texto plano (no rompe nada), y rawTextToLexicalTree sigue
  * siendo el único punto de entrada para *cargar* documentos con esa
  * sintaxis completa.
+ *
+ * FÓRMULAS ($ / $$): "$formula$" inline ya está cubierto por
+ * MATH_INLINE_TRANSFORMER dentro de RICH_TRANSFORMERS (ver
+ * VariantHeadingNode.tsx), así que $convertFromMarkdownString lo resuelve
+ * solo. "$$formula$$" en bloque es multilinea — igual que las tablas en
+ * rawTextToLexicalTree, se extrae ANTES de pasarle el texto al editor
+ * headless (si no, $convertFromMarkdownString vería el "$$" como texto
+ * plano de un párrafo cualquiera) y se reinserta como MathNode real
+ * después de la conversión.
  */
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $convertFromMarkdownString } from "@lexical/markdown";
@@ -45,6 +55,7 @@ import { LinkNode } from "@lexical/link";
 import { ListNode, ListItemNode } from "@lexical/list";
 import { QuoteNode } from "@lexical/rich-text";
 import {
+  $createTextNode,
   $getRoot,
   $getSelection,
   $isRangeSelection,
@@ -54,13 +65,14 @@ import {
 } from "lexical";
 import { useEffect } from "react";
 import { RICH_TRANSFORMERS, VariantHeadingNode } from "../nodes/VariantHeadingNode";
+import { $createMathNode, MATH_BLOCK_RE, MathNode } from "../nodes/MathNode";
 import { TABLE_NODES } from "./TablePlugin";
 
 // Nodos mínimos necesarios para que $convertFromMarkdownString reconozca
-// heading, cita, lista, código, link y tabla — el subconjunto de
-// RICH_EDITOR_NODES relevante a markdown estándar. No incluye los nodos
-// custom del proyecto (DropNode, ChoiceNode, etc.) porque texto pegado
-// desde afuera nunca va a producir esa sintaxis propia.
+// heading, cita, lista, código, link, tabla y fórmulas — el subconjunto
+// de RICH_EDITOR_NODES relevante a markdown estándar. No incluye los
+// nodos custom del proyecto (DropNode, ChoiceNode, etc.) porque texto
+// pegado desde afuera nunca va a producir esa sintaxis propia.
 const SCRATCH_EDITOR_NODES = [
   VariantHeadingNode,
   QuoteNode,
@@ -68,6 +80,7 @@ const SCRATCH_EDITOR_NODES = [
   ListItemNode,
   CodeNode,
   LinkNode,
+  MathNode,
   ...TABLE_NODES,
 ];
 
@@ -83,6 +96,7 @@ const TABLE_SEP_RE = /^\|?[\s:-]+\|[\s:|-]+$/m;
 const BOLD_RE = /\*\*[^*\n]+\*\*|__[^_\n]+__/;
 const LINK_RE = /\[[^\]\n]+\]\([^)\n]+\)/;
 const INLINE_CODE_RE = /`[^`\n]+`/;
+const MATH_RE = /\$\$[\s\S]+?\$\$|(?<!\$)\$(?!\s)[^$\n]+?(?<!\s)\$(?!\$)/;
 
 export function looksLikeMarkdown(text: string): boolean {
   const trimmed = text.trim();
@@ -93,6 +107,7 @@ export function looksLikeMarkdown(text: string): boolean {
   if (TABLE_SEP_RE.test(trimmed)) return true;
   if (BOLD_RE.test(trimmed)) return true;
   if (LINK_RE.test(trimmed)) return true;
+  if (MATH_RE.test(trimmed)) return true;
   // Código inline solo cuenta si aparece junto con al menos otra marca
   // débil (evita falsos positivos con texto que usa comillas simples de
   // otro idioma o acentos graves sueltos).
@@ -121,6 +136,18 @@ export function MarkdownPastePlugin() {
 
         event.preventDefault();
 
+        // 0) "$$formula$$" en bloque es multilinea (puede contener \n
+        // propios del LaTeX, ej: \begin{aligned}...) — igual que las
+        // tablas en rawTextToLexicalTree, lo sacamos ANTES de que
+        // $convertFromMarkdownString toque el texto, y lo reemplazamos
+        // por un token ASCII de una sola palabra que no colisiona con
+        // ninguna sintaxis markdown real.
+        const mathBlocks: string[] = [];
+        const textWithMathTokens = text.replace(MATH_BLOCK_RE, (_m, formula: string) => {
+          const idx = mathBlocks.push(formula.trim()) - 1;
+          return `xMathBlockTokenxx${idx}xx`;
+        });
+
         // 1) Editor headless temporal, descartable — el root.clear() que
         // hace $convertFromMarkdownString actúa sobre este documento
         // aislado, nunca sobre el editor real visible en pantalla.
@@ -129,7 +156,33 @@ export function MarkdownPastePlugin() {
 
         scratchEditor.update(
           () => {
-            $convertFromMarkdownString(text, RICH_TRANSFORMERS);
+            $convertFromMarkdownString(textWithMathTokens, RICH_TRANSFORMERS);
+
+            // Reemplazamos cada token de bloque math por su MathNode
+            // real, recorriendo los TextNode resultantes (mismo patrón
+            // que resolveTextNode en richTextSerializer.ts).
+            const tokenRe = /xMathBlockTokenxx(\d+)xx/;
+            const walk = (node: any): void => {
+              if (node.getType?.() === "text") {
+                const content: string = node.getTextContent();
+                const match = tokenRe.exec(content);
+                if (!match) return;
+                const formula = mathBlocks[Number(match[1])];
+                if (formula === undefined) return;
+                const before = content.slice(0, match.index);
+                const after = content.slice(match.index + match[0].length);
+                const mathNode = $createMathNode({ formula, inline: false });
+                if (before) node.insertBefore($createTextNode(before));
+                node.insertBefore(mathNode);
+                if (after) node.insertBefore($createTextNode(after));
+                node.remove();
+                return;
+              }
+              const children = node.getChildren?.() ?? [];
+              for (const child of [...children]) walk(child);
+            };
+            walk($getRoot());
+
             serializedNodes = $getRoot()
               .getChildren()
               .map((n) => n.exportJSON());

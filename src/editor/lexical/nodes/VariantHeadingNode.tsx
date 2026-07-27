@@ -28,8 +28,9 @@ import {
   type SerializedHeadingNode,
   type HeadingTagType,
 } from "@lexical/rich-text";
-import { TRANSFORMERS, type ElementTransformer } from "@lexical/markdown";
-import type { EditorConfig, LexicalNode, NodeKey, Spread } from "lexical";
+import { TRANSFORMERS, type ElementTransformer, type TextMatchTransformer } from "@lexical/markdown";
+import { type EditorConfig, type LexicalNode, type NodeKey, type Spread } from "lexical";
+import { $createMathNode, $isMathNode, MathNode } from "./MathNode";
 
 export type HeadingVariant =
   | "none"
@@ -200,8 +201,35 @@ const HEADING_TRANSFORMER: ElementTransformer = {
   type: "element",
 };
 
-export const RICH_TRANSFORMERS = TRANSFORMERS.map((t) =>
-  (t as ElementTransformer).dependencies?.includes(HeadingNode as any)
-    ? HEADING_TRANSFORMER
-    : t,
-);
+// MATH_INLINE_TRANSFORMER: soporte de "$formula$" tanto al tipear en vivo
+// (MarkdownShortcutPlugin, dispara con "$" como trigger) como al cargar/
+// pegar texto vía $convertFromMarkdownString. El bloque "$$...$$"
+// multilinea NO se cubre acá — es un TextMatchTransformer de una sola
+// línea, igual que LINK; el bloque se resuelve aparte con un paso de
+// tokenización previo (ver richTextSerializer.ts y MarkdownPastePlugin),
+// mismo patrón que usan tablas/condiciones para contenido multilinea.
+const MATH_INLINE_TRANSFORMER: TextMatchTransformer = {
+  dependencies: [MathNode],
+  export: (node) => {
+    if (!$isMathNode(node) || node.getPayload().inline !== true) return null;
+    return `$${node.getPayload().formula}$`;
+  },
+  importRegExp: /(?<!\$)\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\$)/,
+  regExp: /(?<!\$)\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\$)$/,
+  replace: (textNode, match) => {
+    const [, formula] = match;
+    const mathNode = $createMathNode({ formula, inline: true });
+    textNode.replace(mathNode);
+  },
+  trigger: "$",
+  type: "text-match",
+};
+
+export const RICH_TRANSFORMERS = [
+  ...TRANSFORMERS.map((t) =>
+    (t as ElementTransformer).dependencies?.includes(HeadingNode as any)
+      ? HEADING_TRANSFORMER
+      : t,
+  ),
+  MATH_INLINE_TRANSFORMER,
+];

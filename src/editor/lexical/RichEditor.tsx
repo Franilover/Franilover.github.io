@@ -90,6 +90,7 @@ import {
 import { SoundNode } from "./nodes/SoundNode";
 import { UseNode } from "./nodes/UseNode";
 import { WikilinkNode, wikilinkNavigateHandler } from "./nodes/WikilinkNode";
+import { MathNode } from "./nodes/MathNode";
 import {
   rawTextToLexicalTree,
   serializeRootToRaw,
@@ -294,6 +295,7 @@ const RICH_EDITOR_NODES = [
   FlagNode,
   SectionNode,
   WikilinkNode,
+  MathNode,
   ...TABLE_NODES,
 ];
 

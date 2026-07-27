@@ -69,10 +69,12 @@ import {
   Baseline,
   Eraser,
   CaseSensitive,
+  Sigma,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef } from "react";
 
 import { insertTable } from "./TablePlugin";
+import { $createMathNode } from "../nodes/MathNode";
 
 const PRIMARY = "var(--color-primary, #7c6af7)";
 const mono = { fontFamily: "var(--font-mono)" } as const;
@@ -276,6 +278,40 @@ export const MARKDOWN_COMMAND_ITEMS: MarkdownCommandItem[] = [
     run: (editor) => {
       editor.focus();
       insertTable(editor, 3, 3);
+    },
+  },
+  {
+    id: "math-inline",
+    label: "Fórmula (en línea)",
+    hint: "$…$",
+    keywords: ["formula", "fórmula", "math", "latex", "ecuacion", "ecuación", "katex"],
+    Icon: Sigma,
+    run: (editor) => {
+      editor.focus();
+      editor.update(() => {
+        const selection = getUsableSelection();
+        if (!selection) return;
+        // Fórmula vacía: MathNode arranca en modo edición automáticamente
+        // (ver MathNode.tsx) — el usuario escribe el LaTeX directo.
+        const node = $createMathNode({ formula: "", inline: true });
+        selection.insertNodes([node]);
+      });
+    },
+  },
+  {
+    id: "math-block",
+    label: "Fórmula (bloque)",
+    hint: "$$…$$",
+    keywords: ["formula", "fórmula", "math", "latex", "ecuacion", "ecuación", "katex", "bloque"],
+    Icon: Sigma,
+    run: (editor) => {
+      editor.focus();
+      editor.update(() => {
+        const selection = getUsableSelection();
+        if (!selection) return;
+        const node = $createMathNode({ formula: "", inline: false });
+        selection.insertNodes([node]);
+      });
     },
   },
   {
