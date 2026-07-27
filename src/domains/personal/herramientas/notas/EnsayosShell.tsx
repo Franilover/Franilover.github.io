@@ -9,12 +9,12 @@ import { ToastContainer } from "@/components/ui/ToastContainer";
 import Editor from "@/editor/notas/components/EditorEnsayo";
 import { GrafoEnsayos } from "@/editor/notas/components/GrafoEnsayos";
 import NewNoteModal from "@/editor/notas/components/newNoteModal";
-import ArmarioPage from "@/domains/personal/_legacy/components/ropa/ropa";
-import RecetasPage from "@/domains/personal/_legacy/views/cocina/recetas";
-import { IngredientesPage } from "@/domains/personal/_legacy/views/cocina/ingredientes";
-import { PaginaEjercicios } from "@/domains/personal/_legacy/views/ejercicios/ejerciciosComponent";
-import { HomeDashboard } from "@/domains/personal/_legacy/views/notas/HomeDashboard";
-import { LibrosDashboard } from "@/domains/personal/_legacy/views/notas/LibrosDashboard";
+import ArmarioPage from "@/domains/personal/herramientas/ropa/ropa";
+import RecetasPage from "@/domains/personal/herramientas/cocina/recetas";
+import { IngredientesPage } from "@/domains/personal/herramientas/cocina/ingredientes";
+import { PaginaEjercicios } from "@/domains/personal/herramientas/ejercicios/ejerciciosComponent";
+import { HomeDashboard } from "@/domains/personal/herramientas/notas/HomeDashboard";
+import { LibrosDashboard } from "@/domains/personal/herramientas/notas/LibrosDashboard";
 import { useEscritorioNavigation } from "@/editor/notas/hooks/useEscritorioNavigationStore";
 import { useZotero } from "@/editor/notas/hooks/useZotero";
 

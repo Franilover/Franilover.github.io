@@ -8,11 +8,11 @@ import { MotionDiv } from "@/components/ui/Motion";
 import { cn } from "@/lib/utils/index";
 
 import type {
-  VistaOpcion, Evento} from "@/domains/personal/_legacy/components/calendario/types";
+  VistaOpcion, Evento} from "@/domains/personal/herramientas/calendario/types";
 import { EventoBadge,
   DIAS_SEMANA_CORTO, DIAS_SEMANA_LETRA, MESES, VISTAS, TIPOS_EVENTO,
   addDays, isSameDay, toUTCDate,
-} from "@/domains/personal/_legacy/components/calendario/types";
+} from "@/domains/personal/herramientas/calendario/types";
 
 const ColumniaDia = ({
   fecha, eventos, esHoy, seleccionado, onClick, compact,

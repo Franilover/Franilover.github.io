@@ -3,7 +3,7 @@ import { Montserrat, Geist, Pixelify_Sans, Caveat, Lora, Literata } from 'next/f
 
 import { GlobalCommandPalette } from "@/components/command";
 import Navbar from "@/components/layout/navbar";
-import LlamadaGlobal from "@/domains/personal/_legacy-shell/components/LlamadaGlobal";
+import LlamadaGlobal from "@/domains/personal/mensajes/LlamadaGlobal";
 import { LightboxProvider } from "@/components/modal/lightbox/";
 import { cn } from "@/lib/utils/index";
 import AppLogic from "@/providers/AppLogic";

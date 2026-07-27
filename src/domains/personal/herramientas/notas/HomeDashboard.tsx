@@ -16,17 +16,17 @@ import React, { useMemo, useState } from "react";
 
 import { useAppPanels } from "@/components/command/";
 import { MotionDiv } from "@/components/ui/Motion";
-import { RelojDigital } from "@/domains/personal/_legacy/components/calendario/relojDigital";
-import ArmarioPage from "@/domains/personal/_legacy/components/ropa/ropa";
-import type { ModoCalendario } from "@/domains/personal/_legacy/components/calendario/types";
-import { VistaMes } from "@/domains/personal/_legacy/components/calendario/vistaMes";
-import { VistaSemanal } from "@/domains/personal/_legacy/components/calendario/vistaSemanal";
-import { PaginaEjercicios } from "@/domains/personal/_legacy/views/ejercicios/ejerciciosComponent";
-import { PaginaHobbys } from "@/domains/personal/_legacy/views/hobbys/hobbysComponent";
-import { IngredientesPage } from "@/domains/personal/_legacy/views/cocina/ingredientes";
-import { LibrosDashboard } from "@/domains/personal/_legacy/views/notas/LibrosDashboard";
-import { PaginaPendientes } from "@/domains/personal/_legacy/views/pendientes/pendientesComponent";
-import RecetasPage from "@/domains/personal/_legacy/views/cocina/recetas";
+import { RelojDigital } from "@/domains/personal/herramientas/calendario/relojDigital";
+import ArmarioPage from "@/domains/personal/herramientas/ropa/ropa";
+import type { ModoCalendario } from "@/domains/personal/herramientas/calendario/types";
+import { VistaMes } from "@/domains/personal/herramientas/calendario/vistaMes";
+import { VistaSemanal } from "@/domains/personal/herramientas/calendario/vistaSemanal";
+import { PaginaEjercicios } from "@/domains/personal/herramientas/ejercicios/ejerciciosComponent";
+import { PaginaHobbys } from "@/domains/personal/herramientas/hobbys/hobbysComponent";
+import { IngredientesPage } from "@/domains/personal/herramientas/cocina/ingredientes";
+import { LibrosDashboard } from "@/domains/personal/herramientas/notas/LibrosDashboard";
+import { PaginaPendientes } from "@/domains/personal/herramientas/pendientes/pendientesComponent";
+import RecetasPage from "@/domains/personal/herramientas/cocina/recetas";
 
 interface HomeDashboardProps {
   ensayos: any[];

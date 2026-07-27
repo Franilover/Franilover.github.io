@@ -49,9 +49,12 @@ echo "==> Copiando archivos migrados sobre src/ (sobrescribe, no borra lo demás
 # no la carpeta en sí — así se mezcla con lo que ya existe en destino.
 cp -r "$TMP/src/." "src/"
 
-echo "==> Eliminando carpetas obsoletas (_legacy, _legacy-public de garlia)..."
+echo "==> Eliminando carpetas obsoletas (_legacy, _legacy-public de garlia; _legacy, _legacy-shell de personal)..."
 rm -rf "src/domains/garlia/_legacy"
 rm -rf "src/domains/garlia/_legacy-public"
+rm -rf "src/domains/personal/_legacy"
+rm -rf "src/domains/personal/_legacy-shell"
+rm -f "src/lib/api/queries/garlia/libros.ts"
 
 rm -rf "$TMP"
 

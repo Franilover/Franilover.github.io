@@ -1,4 +1,4 @@
-import Galeria from "@/domains/personal/_legacy-shell/views/galeria";
+import Galeria from "@/domains/personal/publico/galeria";
 
 export default function Page() {
   return <Galeria />;

@@ -1,4 +1,4 @@
-import NotasView from "@/domains/personal/_legacy/views/notas/EnsayosShell";
+import NotasView from "@/domains/personal/herramientas/notas/EnsayosShell";
 
 export default function EscritorioPage() {
   return <NotasView />;
