@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Save, BookOpen, X, PanelRight, PlusSquare } from "lucide-react";
+import { Save, BookOpen, X, PanelRight } from "lucide-react";
 import React, {
   useRef,
   useState,
@@ -13,6 +13,7 @@ import {
   RichEditor,
   type RichEditorFormatCommand,
 } from "@/editor/lexical";
+import { AddLayoutBoxButton } from "@/editor/layout-boxes/AddLayoutBoxButton";
 import { LayoutCanvas, type LayoutCanvasHandle } from "@/editor/layout-boxes/LayoutCanvas";
 import { parseLayoutBoxes, type LayoutBox } from "@/editor/layout-boxes/types";
 import { MotionDiv } from "@/ui/Motion";
@@ -353,6 +354,9 @@ export function Editor({
       }}
     >
       <RichEditor
+        extraToolbarAction={
+          <AddLayoutBoxButton onClick={() => layoutCanvasRef.current?.addBox()} />
+        }
         formatCommandRef={formatCommandRef}
         mode={richMode}
         placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"
@@ -809,30 +813,6 @@ export function Editor({
                         )}
                       </span>
                     </div>
-                    {/* Añadir bloque — crea una nueva caja de texto flotante */}
-                    <button
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                        padding: "3px 8px",
-                        borderRadius: 5,
-                        border:
-                          "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
-                        background:
-                          "color-mix(in srgb, var(--foreground) 4%, transparent)",
-                        color:
-                          "color-mix(in srgb, var(--foreground) 45%, transparent)",
-                        cursor: "pointer",
-                        ...monoStyle,
-                        fontSize: 9,
-                      }}
-                      title="Añadir bloque de texto flotante"
-                      onClick={() => layoutCanvasRef.current?.addBox()}
-                    >
-                      <PlusSquare size={9} />
-                      bloque
-                    </button>
                     {/* Botón panel lateral — solo en mobile */}
                     {isMobile && (
                       <button

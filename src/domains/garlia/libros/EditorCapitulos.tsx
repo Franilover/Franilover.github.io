@@ -28,7 +28,6 @@ import {
   Ban,
   GripVertical,
   History,
-  PlusSquare,
 } from "lucide-react";
 import React, {
   useState,
@@ -38,6 +37,7 @@ import React, {
   useMemo,
 } from "react";
 
+import { AddLayoutBoxButton } from "@/editor/layout-boxes/AddLayoutBoxButton";
 import { LayoutCanvas, type LayoutCanvasHandle } from "@/editor/layout-boxes/LayoutCanvas";
 import { parseLayoutBoxes, type LayoutBox } from "@/editor/layout-boxes/types";
 import type { SnippetEditRequest } from "@/editor/lexical";
@@ -1124,15 +1124,6 @@ const PanelEditor = ({
                 >
                   <Eye size={11} />
                 </button>
-                {vistaEditor !== "grafo" && (
-                  <button
-                    className="p-1.5 rounded hover:bg-primary/8 text-primary/25 hover:text-primary transition-all"
-                    title="Añadir bloque de texto flotante"
-                    onClick={() => layoutCanvasRef.current?.addBox()}
-                  >
-                    <PlusSquare size={11} />
-                  </button>
-                )}
                 <button
                   className={`p-1.5 rounded transition-all disabled:opacity-30 relative ${
                     vistaEditor === "grafo"
@@ -1350,6 +1341,11 @@ const PanelEditor = ({
                     // más arriba para la segunda capa de esta protección.
                     closePaletteRef={closePaletteRef}
                     editable={!loading && initializedCapId === cap?.id}
+                    extraToolbarAction={
+                      <AddLayoutBoxButton
+                        onClick={() => layoutCanvasRef.current?.addBox()}
+                      />
+                    }
                     formatCommandRef={formatCommandRef}
                     insertRef={mdInsertRef}
                     minHeight={focusMode ? "30rem" : "20rem"}

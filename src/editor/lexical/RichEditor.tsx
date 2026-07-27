@@ -237,6 +237,15 @@ export interface RichEditorProps {
    */
   showSplitMode?: boolean;
   /**
+   * Nodo extra para renderizar en la toolbar interna, justo a la derecha
+   * del toggle de corrector ortográfico. Pensado para acciones del padre
+   * que necesitan vivir visualmente "dentro" del editor en vez de en una
+   * barra externa — ej. el botón "+ bloque" de LayoutCanvas en
+   * EditorEnsayo/EditorCapitulos. Opcional: si no se pasa, la toolbar se
+   * ve exactamente igual que antes.
+   */
+  extraToolbarAction?: React.ReactNode;
+  /**
    * Cómo renderizar el panel de "Preview"/"Split". RichEditor es
    * genérico — no todos los consumidores usan el formato [[kind|...]]
    * de snippets (drop/choice/gate/etc). Por defecto usa un fallback
@@ -1050,6 +1059,7 @@ export function RichEditor({
   onWikilinkNavigate,
   showSplitMode = true,
   renderPreview,
+  extraToolbarAction,
 }: RichEditorProps) {
   const [internalMode, setInternalMode] = useState<ViewMode>("edit");
   const mode = modeProp ?? internalMode;
@@ -1521,6 +1531,7 @@ export function RichEditor({
           >
             <SpellCheck2 size={11} />
           </button>
+          {extraToolbarAction}
           {showSplitMode && (modeProp === undefined || onModeChange) && (
             <ModeTogglePlugin mode={mode} onModeChange={handleModeChange} />
           )}
