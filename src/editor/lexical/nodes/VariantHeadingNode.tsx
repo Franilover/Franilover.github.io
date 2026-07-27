@@ -31,7 +31,13 @@ import {
 import { TRANSFORMERS, type ElementTransformer } from "@lexical/markdown";
 import type { EditorConfig, LexicalNode, NodeKey, Spread } from "lexical";
 
-export type HeadingVariant = "none" | "linea" | "barra" | "portada" | "dropcap";
+export type HeadingVariant =
+  | "none"
+  | "linea"
+  | "barra"
+  | "portada"
+  | "dropcap"
+  | "primeramayuscula";
 
 export type SerializedVariantHeadingNode = Spread<
   { variant: HeadingVariant },
@@ -146,7 +152,8 @@ export function $createVariantHeadingNode(
 // colisiona con ninguna sintaxis markdown estándar que
 // $convertFromMarkdownString ya interprete, y es fácil de
 // detectar/quitar con una regex simple sobre la línea cruda.
-export const VARIANT_SUFFIX_RE = /\s*\{(linea|barra|portada|dropcap)\}\s*$/;
+export const VARIANT_SUFFIX_RE =
+  /\s*\{(linea|barra|portada|dropcap|primeramayuscula)\}\s*$/;
 
 export function stripVariantSuffix(text: string): {
   text: string;

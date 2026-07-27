@@ -141,6 +141,7 @@ export type RichEditorFormatCommand =
   | "variant-barra"
   | "variant-portada"
   | "variant-dropcap"
+  | "variant-primeramayuscula"
   | "variant-none";
 
 export interface RichEditorProps {
@@ -1465,6 +1466,21 @@ export function RichEditor({
             font-weight: 700;
             color: color-mix(in srgb, var(--color-primary, #7c6af7) 70%, transparent);
             margin-right: 1px;
+          }
+          /* Variante sutil: SOLO la primera letra cambia de color (al
+             acento), sin el guión ni el aumento de tamaño de "dropcap" —
+             útil cuando se quiere marcar el inicio del heading sin que
+             compita visualmente con el resto del texto. Nota: por
+             limitación real de CSS, no existe un selector que detecte
+             "cada letra mayúscula" dentro de una cadena de texto — eso
+             requeriría envolver cada mayúscula en su propio <span>, lo
+             cual rompería la edición en vivo de Lexical (el reconciler
+             gestiona el contenido de los TextNode como texto plano, no
+             tolera DOM inyectado manualmente ahí). Por eso esta variante
+             se limita a ::first-letter, que sí es 100% CSS y no interfiere
+             con el modelo del editor. */
+          [data-variant="primeramayuscula"]::first-letter {
+            color: color-mix(in srgb, var(--color-primary, #7c6af7) 75%, transparent);
           }
         `}</style>
         <div

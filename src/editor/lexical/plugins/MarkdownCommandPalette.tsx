@@ -68,6 +68,7 @@ import {
   Sparkles,
   Baseline,
   Eraser,
+  CaseSensitive,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef } from "react";
 
@@ -175,6 +176,23 @@ export const MARKDOWN_COMMAND_ITEMS: MarkdownCommandItem[] = [
     keywords: ["dropcap", "drop-cap", "capitular", "variante", "heading"],
     Icon: Baseline,
     run: (editor) => applyHeadingVariant(editor, "dropcap"),
+  },
+  {
+    id: "variant-primeramayuscula",
+    label: "Variante: primera letra en acento",
+    hint: "A",
+    keywords: [
+      "primera",
+      "letra",
+      "mayuscula",
+      "mayúscula",
+      "acento",
+      "color",
+      "variante",
+      "heading",
+    ],
+    Icon: CaseSensitive,
+    run: (editor) => applyHeadingVariant(editor, "primeramayuscula"),
   },
   {
     id: "variant-none",

@@ -31,6 +31,7 @@ import {
   Sparkles,
   Baseline,
   Eraser,
+  CaseSensitive,
 } from "lucide-react";
 import React, { useState, useMemo } from "react";
 
@@ -875,6 +876,12 @@ function SeccionFormato({
         />
       </div>
       <div style={{ ...gridStyle, marginTop: 4 }}>
+        <FormatBtn
+          icon={CaseSensitive}
+          label="1ª letra acento"
+          mono={mono}
+          onClick={() => apply("variant-primeramayuscula")}
+        />
         <FormatBtn
           icon={Eraser}
           label="sin variante"
