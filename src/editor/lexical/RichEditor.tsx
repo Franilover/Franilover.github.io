@@ -61,6 +61,7 @@ import React, {
 } from "react";
 
 import { AutoClosePlugin } from "./plugins/AutoClosePlugin";
+import { MarkdownPastePlugin } from "./plugins/MarkdownPastePlugin";
 import {
   FindReplacePlugin,
   initialFindReplaceState,
@@ -1599,6 +1600,7 @@ export function RichEditor({
                 }
               />
               <MarkdownShortcutPlugin transformers={RICH_TRANSFORMERS} />
+              <MarkdownPastePlugin />
               <HistoryPlugin />
               {autoFocus && <AutoFocusPlugin />}
               <InitialContentPlugin
