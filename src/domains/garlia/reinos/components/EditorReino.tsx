@@ -27,7 +27,7 @@ import { type SaveStatus } from "@/domains/garlia/_shared/types";
 import { type Ciudad } from "@/domains/garlia/ciudades";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { usePersonajesDelReino } from "@garlia/personajes";
-import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
+import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 import { loadCiudadesPorReino } from "@/infra/sync/syncEngine";
 

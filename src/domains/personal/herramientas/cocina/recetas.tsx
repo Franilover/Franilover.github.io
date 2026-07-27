@@ -25,7 +25,7 @@ import {
   SectionTitle,
   FieldInput,
 } from "@/domains/personal/herramientas/cocina/SaludUi";
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { useToast } from "@/hooks/ui/useToast";
 import { recetasQueries } from "@/lib/api/queries/personal/cocina/recetas";
 import type { Receta, Ingrediente, Inserts } from "@/lib/types/queries";

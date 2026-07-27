@@ -30,7 +30,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { MotionDiv } from "@/ui/Motion";
 import SimpleImagePicker from "@/ui/SimpleImagePicker";
-import { isReallyOnline } from "@/hooks/data/useOfflineSync";
+import { isReallyOnline } from "@/infra/sync/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 import { loadMisionesAdmin } from "@/infra/sync/syncEngine";
 

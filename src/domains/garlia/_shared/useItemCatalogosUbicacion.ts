@@ -17,7 +17,7 @@
 
 import { useMemo } from "react";
 
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 export type ReinoMin = { id: string; nombre: string };
 export type CiudadMin = { id: string; nombre: string; reino_id?: string | null };

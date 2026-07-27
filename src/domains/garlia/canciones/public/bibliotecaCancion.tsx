@@ -7,7 +7,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Loading } from "@/ui";
 import { MotionDiv } from "@/ui/Motion";
 import { SmartImage } from "@/ui/SmartImage";
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
 import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { toSlug } from "@/lib/utils/slugify";

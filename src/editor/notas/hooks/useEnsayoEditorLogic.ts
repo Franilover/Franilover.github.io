@@ -26,7 +26,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { useAuth } from "@/providers/AuthProvider";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";

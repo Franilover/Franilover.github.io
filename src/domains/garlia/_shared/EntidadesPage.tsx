@@ -30,7 +30,7 @@ import { useNotas } from "@/editor/notas/useNotas";
 import { type Nota } from "@/domains/garlia/_shared/types";
 import { useEntidadesMagicas } from "@/domains/garlia/magia/useEntidadesMagicas";
 import { EditorGrupo, GRUPO_TIPO_CONFIG, useGrupos, type GrupoTipo } from "@/domains/garlia/grupos/EditorGrupo";
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";

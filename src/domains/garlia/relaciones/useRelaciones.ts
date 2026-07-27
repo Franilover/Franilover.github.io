@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { enqueueOperation, isReallyOnline } from "@/hooks/data/useOfflineSync";
+import { enqueueOperation, isReallyOnline } from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 

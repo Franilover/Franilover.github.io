@@ -17,7 +17,7 @@ import React, { useEffect, useState } from "react";
 import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";
-import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
+import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 
 import { FormularioCiudad } from "./FormularioCiudad";
 import { type Ciudad } from "../model";

@@ -29,8 +29,8 @@ import {
   type MapTile,
 } from "@/domains/garlia/_shared/UnifiedTileCanvas";
 import { ModalDetalle } from "@/domains/garlia/perfil-jugador/PersonalComponents";
-import { useIsAdmin } from "@/hooks/auth/useIsAdmin";
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useIsAdmin } from "@/domains/plataforma/auth/useIsAdmin";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 

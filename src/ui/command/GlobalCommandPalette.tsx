@@ -43,7 +43,7 @@ import { useRouter, usePathname } from "next/navigation";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 
 import { MotionDiv } from "@/ui/Motion";
-import { isReallyOnline } from "@/hooks/data/useOfflineSync";
+import { isReallyOnline } from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { useGlobalSearch } from "@/lib/api/queries/search";

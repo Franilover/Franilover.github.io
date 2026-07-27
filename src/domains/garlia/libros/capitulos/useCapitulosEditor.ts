@@ -20,7 +20,7 @@ import {
   capGuardarVersion,
   capListarVersiones,
 } from "@/editor/lexical/types";
-import { isReallyOnline } from "@/hooks/data/useOfflineSync";
+import { isReallyOnline } from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 

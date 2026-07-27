@@ -17,7 +17,7 @@
 import { useMemo } from "react";
 
 import { CONFIG, type EntidadMagica, type Modo } from "@/domains/garlia/magia/types";
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 export function useEntidadesMagicas(modo: Modo) {
   const tabla = CONFIG[modo].tabla;

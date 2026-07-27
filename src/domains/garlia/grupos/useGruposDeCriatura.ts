@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { isReallyOnline } from "@/hooks/data/useOfflineSync";
+import { isReallyOnline } from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 

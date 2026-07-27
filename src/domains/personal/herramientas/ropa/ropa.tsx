@@ -11,7 +11,7 @@ import React, { useState, useMemo } from "react";
 
 import { MotionDiv, MotionButton } from "@/ui/Motion";
 import SimpleImagePicker from "@/ui/SimpleImagePicker";
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { cn } from "@/lib/utils/index";
 
 type Temporada = "Primavera" | "Verano" | "Otoño" | "Invierno";

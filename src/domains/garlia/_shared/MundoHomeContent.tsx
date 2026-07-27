@@ -30,7 +30,7 @@
 import { Mountain, Star, Users } from "lucide-react";
 import React, { useMemo } from "react";
 
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 import { useFavoritos } from "@/domains/garlia/_shared/useFavoritosStore";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";

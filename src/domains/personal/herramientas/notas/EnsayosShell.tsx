@@ -18,7 +18,7 @@ import { LibrosDashboard } from "@/domains/personal/herramientas/notas/LibrosDas
 import { useEscritorioNavigation } from "@/editor/notas/hooks/useEscritorioNavigationStore";
 import { useZotero } from "@/editor/notas/hooks/useZotero";
 
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { useToast } from "@/hooks/ui/useToast";
 import { eventosQueries } from "@/lib/api/queries/personal/eventos";
 import { useAuth } from "@/providers/AuthProvider";

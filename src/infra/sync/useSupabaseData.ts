@@ -5,7 +5,7 @@ import {
   enqueueOperation,
   isReallyOnline,
   onSyncDone,
-} from "@/hooks/data/useOfflineSync";
+} from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { cancionesQueries } from "@/domains/garlia/canciones/queries";

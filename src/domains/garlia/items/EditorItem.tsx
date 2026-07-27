@@ -40,7 +40,7 @@ import { PickerImagenItemBtn } from "@/domains/garlia/items/PickerImagenItemBtn"
 import { SelectorGrupoUnico } from "@/domains/garlia/items/SelectorGrupoUnico";
 import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCatalogo";
 import { useItemCatalogosUbicacion } from "@/domains/garlia/_shared/useItemCatalogosUbicacion";
-import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
+import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";

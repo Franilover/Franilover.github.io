@@ -17,7 +17,7 @@ import {
 import React, { useState, useMemo, useRef, useEffect } from "react";
 
 import { Loading } from "@/ui";
-import { useSupabaseData } from "@/hooks/data/useSupabaseData";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import type { Ingrediente } from "@/lib/types/queries";
 
 // ─── tipos ────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import { useOfflineSync } from "@/hooks/data/useOfflineSync";
+import { useOfflineSync } from "@/infra/sync/useOfflineSync";
 
 export function OfflineSyncActivator() {
   useOfflineSync();

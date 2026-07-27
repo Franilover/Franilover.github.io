@@ -42,7 +42,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { onSyncDone } from "@/hooks/data/useOfflineSync";
+import { onSyncDone } from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import type { EraMundo} from "@/lib/utils/calendario";

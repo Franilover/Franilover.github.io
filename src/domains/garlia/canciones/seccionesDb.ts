@@ -1,4 +1,4 @@
-import { enqueueOperation } from "@/hooks/data/useOfflineSync";
+import { enqueueOperation } from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { cancionesQueries } from "@/domains/garlia/canciones/queries";
 
