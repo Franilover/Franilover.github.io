@@ -97,6 +97,7 @@ import {
 } from "./richTextSerializer";
 import { SlashCommandPlugin, type SlashMatch } from "./plugins/SlashCommandPlugin";
 import { TABLE_NODES, TablePlugin, insertTable } from "./plugins/TablePlugin";
+import { TableControlsPlugin } from "./plugins/TableControlsPlugin";
 import { TocPanel } from "./plugins/TocPlugin";
 import { WikilinkMenuPanel, type WikiEntity } from "./WikilinkMenuPanel";
 import { WikilinkPlugin, type WikilinkMatch } from "./plugins/WikilinkPlugin";
@@ -1656,6 +1657,7 @@ export function RichEditor({
                 onMatch={handleWikilinkMatch}
               />
               <TablePlugin />
+              <TableControlsPlugin />
               <ListPlugin />
               <InsertTablePlugin insertTableRef={insertTableRef} />
               <FormatCommandPlugin formatCommandRef={formatCommandRef} />
