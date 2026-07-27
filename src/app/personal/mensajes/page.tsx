@@ -1,4 +1,4 @@
-import BibliotecaMensajes from '@/domains/garlia/_legacy-public/views/bibliotecaMensajes';
+import BibliotecaMensajes from '@/domains/personal/mensajes/bibliotecaMensajes';
 
 export default function Page() {
   return <BibliotecaMensajes />;

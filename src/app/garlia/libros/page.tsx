@@ -1,4 +1,4 @@
-import Biblioteca from '@/domains/garlia/_legacy-public/views/bibliotecaLibros';
+import Biblioteca from '@/domains/garlia/libros/public/bibliotecaLibros';
 export default function Page() {
   return <Biblioteca />;
 }

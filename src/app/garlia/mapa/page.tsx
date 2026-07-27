@@ -1,4 +1,4 @@
-import MapaInteractivo from '@/domains/garlia/_legacy-public/views/mapaGarlia';
+import MapaInteractivo from '@/domains/garlia/reinos/public/mapaGarlia';
 
 export default function Page() {
   return <MapaInteractivo/>; 

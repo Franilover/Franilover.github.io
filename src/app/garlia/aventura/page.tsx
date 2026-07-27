@@ -1,4 +1,4 @@
-import Aventura from "@/domains/garlia/_legacy-public/views/aventura";
+import Aventura from "@/domains/garlia/aventuras/public/aventura";
 
 export default function Page() {
   return <Aventura />;
