@@ -1,5 +1,5 @@
 import { AdminOnly } from "@/components/forms/AdminOnly";
-import { PanelActualizacionApk } from "@/features/actualizaciones/PanelActualizacionApk";
+import { PanelActualizacionApk } from "@/domains/plataforma/actualizaciones/PanelActualizacionApk";
 
 export default function ActualizacionesPage() {
   return (

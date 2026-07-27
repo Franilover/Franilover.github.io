@@ -38,11 +38,7 @@
       "@personal/*": ["./src/domains/personal/*"],
       "@plataforma/*": ["./src/domains/plataforma/*"],
       "@/editor/*": ["./src/editor/*"],
-      "@/infra/*": ["./src/infra/*"],
-
-      // ⚠️ Legacy — features/ ya no existe (migrado a domains/*/_legacy).
-      // Dejar hasta confirmar que nada lo referencia más, después borrar.
-      "@/features/*": ["./src/features/*"]
+      "@/infra/*": ["./src/infra/*"]
     }
   },
   "include": [
