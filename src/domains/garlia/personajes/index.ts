@@ -11,4 +11,4 @@ export { PersonajeLineaDeTiempo } from "./PersonajeLineaDeTiempo";
 export { BloqueDones } from "./BloqueDones";
 export { PickerImagen, PickerCaraBtn } from "./PersonajeImagePickers";
 export { usePersonajeForm } from "./usePersonajeForm";
-export type { Personaje } from "./model";
+export type { Personaje } from "./types";

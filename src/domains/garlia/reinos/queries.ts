@@ -1,6 +1,6 @@
 import { supabase } from "@/infra/supabase/supabase";
 
-import { type Reino, type ReinoMin } from "./model";
+import { type Reino, type ReinoMin } from "./types";
 
 // Todas las queries de supabase.from("reinos") / tablas de relación propias
 // de reinos, extraídas de:

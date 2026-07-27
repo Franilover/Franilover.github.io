@@ -1,6 +1,6 @@
 // Extraído de src/domains/garlia/_legacy/hooks/types.ts (el cajón de sastre
 // que mezclaba Personaje, Criatura, Item, Reino, Ciudad... en un solo archivo).
-// Mismo patrón que domains/garlia/reinos/model.ts.
+// Mismo patrón que domains/garlia/reinos/types.ts.
 //
 // Nota: reinos/model.ts (ReinoDetalle) ya documentaba que el "detalle" real
 // de un reino es en la práctica una Ciudad, con reino_id apuntando al reino.

@@ -36,7 +36,7 @@ import { supabase } from "@/infra/supabase/supabase";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 
-import { type Reino } from "../model";
+import { type Reino } from "../types";
 import { reinosQueries } from "../queries";
 
 // ─── Tipo Personaje (local) ───────────────────────────────────────────────────

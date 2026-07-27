@@ -16,7 +16,7 @@ import { dexieDelete, dexiePut } from "@/lib/utils/dexieHelpers";
 
 import { type SaveStatus } from "@/ui/saveStatus";
 
-import { type Personaje } from "./model";
+import { type Personaje } from "./types";
 
 export function usePersonajeForm(
   item: Personaje,

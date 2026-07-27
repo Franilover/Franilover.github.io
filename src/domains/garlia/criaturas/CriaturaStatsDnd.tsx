@@ -22,7 +22,7 @@ import {
   type CriaturaStatsDnd,
   type CriaturaVelocidad,
   type StatKeyDnd,
-} from "@/domains/garlia/criaturas/model";
+} from "@/domains/garlia/criaturas/types";
 
 export const STATS_CRIATURA: { key: StatKeyDnd; label: string }[] = [
   { key: "fuerza", label: "FUE" },

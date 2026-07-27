@@ -4,7 +4,7 @@ import { db } from "@/infra/supabase/db";
 import { SESSION_CACHE_TTL_MS } from "@/lib/sessionCache";
 
 import { personajesQueries } from "./queries";
-import { type Personaje } from "./model";
+import { type Personaje } from "./types";
 
 export function usePersonajesDelReino(reinoNombre: string | null | undefined) {
   const [personajes, setPersonajes] = useState<Personaje[]>([]);

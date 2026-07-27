@@ -55,7 +55,7 @@ import {
   invalidarCacheEras,
   type CalCache,
 } from "@/domains/garlia/calendario/useCalendario";
-import { type Reino } from "@/domains/garlia/reinos/model";
+import { type Reino } from "@/domains/garlia/reinos/types";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";
 
 // ════════════════════════════════════════════════════════════════════════════

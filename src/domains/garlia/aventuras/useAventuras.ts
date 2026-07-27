@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
-import type { CriaturaStatsDnd } from "@/domains/garlia/criaturas/model";
+import type { CriaturaStatsDnd } from "@/domains/garlia/criaturas/types";
 
 export interface Aventura {
   id: string;

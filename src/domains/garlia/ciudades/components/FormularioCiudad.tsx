@@ -39,7 +39,7 @@ import {
   type CriaturaMin,
   type ItemMin,
 } from "../useCiudadCatalogos";
-import { type Ciudad } from "../model";
+import { type Ciudad } from "../types";
 import { ciudadesQueries } from "../queries";
 
 // ─── Tipos de ciudad predefinidos ──────────────────────────────────────────────

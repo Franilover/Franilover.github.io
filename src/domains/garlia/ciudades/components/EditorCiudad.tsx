@@ -20,7 +20,7 @@ import { type SaveStatus } from "@/domains/garlia/_shared/types";
 import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 
 import { FormularioCiudad } from "./FormularioCiudad";
-import { type Ciudad } from "../model";
+import { type Ciudad } from "../types";
 import { ciudadesQueries } from "../queries";
 
 // ─── EditorCiudad ──────────────────────────────────────────────────────────────

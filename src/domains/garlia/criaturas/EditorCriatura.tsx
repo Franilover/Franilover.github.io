@@ -71,7 +71,7 @@ import { useMembresiaGruposCriatura } from "@/domains/garlia/grupos/useMembresia
 import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete } from "@/lib/utils/dexieHelpers";
 
-import { type Criatura } from "@/domains/garlia/criaturas/model";
+import { type Criatura } from "@/domains/garlia/criaturas/types";
 import { type SaveStatus } from "@/ui/saveStatus";
 
 // ─── EditorCriatura ───────────────────────────────────────────────────────────

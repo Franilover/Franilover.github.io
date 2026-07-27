@@ -1,6 +1,6 @@
 import { supabase } from "@/infra/supabase/supabase";
 
-import { type Ciudad, type CiudadMin } from "./model";
+import { type Ciudad, type CiudadMin } from "./types";
 
 // Todas las queries de supabase.from("ciudades") / relaciones propias de
 // ciudades, extraídas de:

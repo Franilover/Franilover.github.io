@@ -31,7 +31,7 @@ import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 import { loadCiudadesPorReino } from "@/infra/sync/syncEngine";
 
-import { type Reino } from "../model";
+import { type Reino } from "../types";
 import { reinosQueries } from "../queries";
 import { LoreTab } from "./LoreTab";
 import { ReinoTileCanvas } from "./ReinoTileCanvas";

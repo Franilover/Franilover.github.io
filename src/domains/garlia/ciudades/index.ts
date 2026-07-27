@@ -19,4 +19,4 @@ export {
 export { EditorCiudad } from "./components/EditorCiudad";
 export { CiudadEditor } from "./components/CiudadEditor";
 export { FormularioCiudad } from "./components/FormularioCiudad";
-export type { Ciudad, CiudadMin } from "./model";
+export type { Ciudad, CiudadMin } from "./types";

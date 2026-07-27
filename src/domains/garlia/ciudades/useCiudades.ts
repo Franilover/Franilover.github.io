@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { isReallyOnline } from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 
-import { type CiudadMin } from "./model";
+import { type CiudadMin } from "./types";
 import { ciudadesQueries } from "./queries";
 
 export function useCiudades(): CiudadMin[] {

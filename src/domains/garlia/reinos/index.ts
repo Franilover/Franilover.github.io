@@ -12,4 +12,4 @@ export { useReinosMin } from "./useReinosMin";
 export { ReinoEditor } from "./components/ReinoEditor";
 export { EditorReino } from "./components/EditorReino";
 export { ReinoTileCanvas, useReinoTiles, type ReinoTile } from "./components/ReinoTileCanvas";
-export type { Reino, ReinoMin } from "./model";
+export type { Reino, ReinoMin } from "./types";

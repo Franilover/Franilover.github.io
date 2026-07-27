@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { isReallyOnline } from "@/infra/sync/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 
-import { type ReinoMin } from "./model";
+import { type ReinoMin } from "./types";
 import { reinosQueries } from "./queries";
 
 export function useReinosMin(): ReinoMin[] {

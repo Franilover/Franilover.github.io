@@ -1,6 +1,6 @@
 // Extraído de src/domains/garlia/_legacy/hooks/types.ts (el cajón de sastre
 // que mezclaba Personaje, Criatura, Item, Reino... en un solo archivo).
-// Mismo patrón que domains/garlia/personajes/model.ts.
+// Mismo patrón que domains/garlia/personajes/types.ts.
 
 export type Reino = {
   id: string;

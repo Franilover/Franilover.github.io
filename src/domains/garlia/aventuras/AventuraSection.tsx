@@ -62,7 +62,7 @@ import { useTableroEscala, CARD_SCALE_MIN, CARD_SCALE_MAX } from "@/domains/garl
 import { FichaDetalle } from "@/domains/garlia/aventuras/public/fichaComponents";
 import type { FichaDnd } from "@/domains/garlia/aventuras/public/useFichasDnd";
 import { CriaturaStatsDndEditor } from "@/domains/garlia/criaturas/CriaturaStatsDnd";
-import type { CriaturaStatsDnd } from "@/domains/garlia/criaturas/model";
+import type { CriaturaStatsDnd } from "@/domains/garlia/criaturas/types";
 import { supabase } from "@/infra/supabase/supabase";
 
 const AdminDescubrimientos = lazy(() => import("@/domains/garlia/relaciones/editorRelaciones"));
