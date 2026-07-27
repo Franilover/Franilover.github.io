@@ -33,7 +33,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 
-import { useCommandPalette } from "@/components/command";
+import { useCommandPalette } from "@/ui/command";
 import { MotionDiv } from "@/ui/Motion";
 import {
   useMundoNavigation,

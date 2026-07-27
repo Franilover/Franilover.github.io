@@ -29,7 +29,7 @@ import { Bug, Package, Save, Trash2 } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
-import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
+import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
 import { ComboSelector } from "@/ui/ComboSelector";
 import { useConfirm } from "@/ui/ConfirmModal";

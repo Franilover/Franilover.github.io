@@ -1,66 +1,49 @@
 #!/bin/bash
 set -e
 
-# ============================================================
-# aplicar_migracion.sh — Ronda: Route groups en app/ (Fase 4)
-# ============================================================
-# Agrupa app/garlia, app/personal, app/myself dentro de
-# (public), (personal), (admin) respectivamente. NO cambia URLs
-# (los route groups de Next.js no aparecen en la ruta).
-#
-# Uso:
-#   1. Poné este script y migracion_route_groups.tar.gz
-#      en la raíz del repo (junto a src/)
-#   2. Corré: bash aplicar_migracion.sh
-#   3. Confirmá: npm run build
-# ============================================================
-
-TARBALL="migracion_route_groups.tar.gz"
 FECHA=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="backup_pre_migracion_${FECHA}"
-
-if [ ! -f "$TARBALL" ]; then
-  echo "ERROR: no se encontró $TARBALL en el directorio actual."
-  exit 1
-fi
+BACKUP="backup_pre_migracion_${FECHA}"
+TARBALL="cambios_ronda.tar.gz"
 
 if [ ! -d "src" ]; then
   echo "ERROR: no se encontró la carpeta src/ en el directorio actual."
-  echo "Corré este script desde la raíz del repo."
+  echo "Corré este script desde la raíz del repo (junto a src/)."
   exit 1
 fi
 
-echo "== 1. Backup completo de src/ en $BACKUP_DIR =="
-mkdir -p "$BACKUP_DIR"
-cp -r src "$BACKUP_DIR/src"
-echo "Backup listo: $BACKUP_DIR/src"
+if [ ! -f "$TARBALL" ]; then
+  echo "ERROR: no se encontró $TARBALL junto a este script."
+  exit 1
+fi
 
-echo "== 2. Extrayendo $TARBALL a carpeta temporal =="
-TMP_DIR=$(mktemp -d)
-tar -xzf "$TARBALL" -C "$TMP_DIR"
+echo "== 1. Backup completo de src/ en $BACKUP =="
+mkdir -p "$BACKUP"
+cp -r src "$BACKUP/src"
 
-echo "== 3. Copiando las carpetas de route groups nuevas sobre src/app/ =="
-cp -r "$TMP_DIR"/. src/
+echo "== 2. Eliminando árbol viejo duplicado =="
+# Rutas de app/ sin route group, reemplazadas por app/(public|personal|admin)/...
+rm -rf src/app/garlia
+rm -rf src/app/personal
+rm -rf src/app/myself
+rm -rf src/app/auth
 
-echo "== 4. Eliminando carpetas obsoletas (movidas dentro de los route groups) =="
-for old in "src/app/garlia" "src/app/personal" "src/app/myself"; do
-  if [ -d "$old" ]; then
-    rm -rf "$old"
-    echo "  - eliminada: $old"
-  else
-    echo "  - $old ya no existe, nada que borrar"
-  fi
-done
+# components/ completo: lo vivo (modal, command, forms/AdminOnly, forms/Markdown)
+# se movió a ui/ y viene en el tar; el resto (ui/, layout/, forms/lexical-editor/)
+# eran copias duplicadas de src/ui, src/layout, src/editor/lexical.
+rm -rf src/components
 
-echo "== 5. Limpieza de temporales =="
-rm -rf "$TMP_DIR"
+# features/: fork viejo de domains/plataforma/{auth,actualizaciones}
+rm -rf src/features
 
-echo ""
-echo "=========================================="
-echo " Migración aplicada con éxito."
-echo " Las URLs no cambian (/garlia, /personal, /myself siguen igual)."
-echo " Ahora corré: npm run build"
-echo ""
-echo " Si algo sale mal y querés deshacer todo:"
-echo "   rm -rf src && mv \"$BACKUP_DIR/src\" src"
-echo "=========================================="
+echo "== 3. Aplicando cambios de esta ronda ($TARBALL) =="
+TMPDIR=$(mktemp -d)
+tar -xzf "$TARBALL" -C "$TMPDIR"
+cp -r "$TMPDIR"/. src/
+rm -rf "$TMPDIR"
+
+echo "== Listo =="
+echo "Backup guardado en: $BACKUP"
+echo "Para deshacer todo:"
+echo "  rm -rf src && cp -r $BACKUP/src src"
+echo
+echo "Ahora corré: npm run build"

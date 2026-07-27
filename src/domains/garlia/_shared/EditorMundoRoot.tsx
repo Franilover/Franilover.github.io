@@ -32,7 +32,7 @@
 import { Loader2, WifiOff } from "lucide-react";
 import React, { lazy, Suspense } from "react";
 
-import { AdminOnly } from "@/components/forms/AdminOnly";
+import { AdminOnly } from "@/ui/AdminOnly";
 import { WikilinkProvider } from "@/domains/garlia/_shared/WikilinkContext";
 
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";

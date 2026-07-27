@@ -44,7 +44,7 @@ import {
   useRegisterMobileAside,
 } from "@/hooks/ui/useMobileAsidePanel";
 
-import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
+import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { SeccionEntidad } from "@/ui/SeccionEntidad";

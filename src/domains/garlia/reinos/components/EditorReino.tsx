@@ -20,7 +20,7 @@ import {
   useRegisterMobileAside,
 } from "@/hooks/ui/useMobileAsidePanel";
 
-import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
+import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";

@@ -23,7 +23,7 @@ import {
 import Image from "next/image";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 
-import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
+import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { SeccionEntidad } from "@/ui/SeccionEntidad";

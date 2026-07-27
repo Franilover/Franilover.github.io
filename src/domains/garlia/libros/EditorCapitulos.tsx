@@ -67,10 +67,10 @@ import {
 import type {
   CommandItem as MdCommandItem,
   SnippetAction,
-} from "@/components/forms/Markdown/commandItems";
+} from "@/ui/Markdown/commandItems";
 import {
   PROSE_STYLES,
-} from "@/components/forms/Markdown/proseStyles";
+} from "@/ui/Markdown/proseStyles";
 import {
   BannerOffline,
   ModalBase,

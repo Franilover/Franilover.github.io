@@ -49,7 +49,7 @@
 
 import React, { createContext, useContext, useCallback } from "react";
 
-import type { SnippetAction } from "@/components/forms/Markdown/commandItems";
+import type { SnippetAction } from "@/ui/Markdown/commandItems";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface WikilinkContextValue {

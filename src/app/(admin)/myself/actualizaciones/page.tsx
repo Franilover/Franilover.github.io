@@ -1,4 +1,4 @@
-import { AdminOnly } from "@/components/forms/AdminOnly";
+import { AdminOnly } from "@/ui/AdminOnly";
 import { PanelActualizacionApk } from "@/domains/plataforma/actualizaciones/PanelActualizacionApk";
 
 export default function ActualizacionesPage() {

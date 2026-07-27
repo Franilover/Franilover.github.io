@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, PenTool, Search, X, Plus, FileText, Trash2, List, BookOpen, Hash } from "lucide-react";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
-import { AdminOnly } from "@/components/forms/AdminOnly";
+import { AdminOnly } from "@/ui/AdminOnly";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { ToastContainer } from "@/ui/ToastContainer";
 import Editor from "@/editor/notas/components/EditorEnsayo";

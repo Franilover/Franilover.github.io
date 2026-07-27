@@ -18,7 +18,7 @@ import { MapPin, Save, Trash2, Users, Bug, Package, Mountain, ScrollText } from 
 import Image from "next/image";
 import React, { useState } from "react";
 
-import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
+import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
 import { ComboSelector } from "@/ui/ComboSelector";
 import { SeccionEntidad } from "@/ui/SeccionEntidad";
