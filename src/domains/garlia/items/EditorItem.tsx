@@ -31,8 +31,8 @@ import React, { useEffect, useState } from "react";
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
-import { ComboSelector } from "@/components/ui/ComboSelector";
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { ComboSelector } from "@/ui/ComboSelector";
+import { useConfirm } from "@/ui/ConfirmModal";
 import { PanelCiudades } from "@/domains/garlia/items/PanelCiudades";
 import { PanelReglasDnd } from "@/domains/garlia/items/PanelReglasDnd";
 import { PanelTerritorio } from "@/domains/garlia/items/PanelTerritorio";
@@ -46,7 +46,7 @@ import { supabase } from "@/infra/supabase/supabase";
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { type Item } from "@garlia/items";
-import { type SaveStatus } from "@/components/ui/saveStatus";
+import { type SaveStatus } from "@/ui/saveStatus";
 
 export function EditorItem({
   item,

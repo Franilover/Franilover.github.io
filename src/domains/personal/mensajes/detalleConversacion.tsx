@@ -4,8 +4,8 @@ import { ArrowLeft, Check, CheckCheck, Paperclip, Phone, Send, SmilePlus, Trash2
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 
-import { Loading } from "@/components/ui";
-import { SmartImage } from "@/components/ui/SmartImage";
+import { Loading } from "@/ui";
+import { SmartImage } from "@/ui/SmartImage";
 import { useLlamadaStore } from "@/infra/realtime/useLlamadaStore";
 import { useEstaEnLinea } from "@/infra/realtime/useEnLinea";
 import {

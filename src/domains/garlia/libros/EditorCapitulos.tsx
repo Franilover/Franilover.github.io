@@ -77,10 +77,10 @@ import {
   SaveIndicator,
   CampoInput,
   BotonSubmit,
-} from "@/components/layout/EstudioTemplates";
-import { type ComboItem } from "@/components/ui/ComboSelector";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { MotionDiv } from "@/components/ui/Motion";
+} from "@/layout/EstudioTemplates";
+import { type ComboItem } from "@/ui/ComboSelector";
+import { useConfirm } from "@/ui/ConfirmModal";
+import { MotionDiv } from "@/ui/Motion";
 import {
   EstadisticasEscritura,
   VisibilidadCapPicker,

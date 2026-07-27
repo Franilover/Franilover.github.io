@@ -32,8 +32,8 @@ import {
   useMobileAsidePanel,
   useRegisterMobileAside,
 } from "@/hooks/ui/useMobileAsidePanel";
-import { ComboSelector } from "@/components/ui/ComboSelector";
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { ComboSelector } from "@/ui/ComboSelector";
+import { useConfirm } from "@/ui/ConfirmModal";
 import {
   BloqueDones,
   PersonajeLineaDeTiempo,
@@ -43,7 +43,7 @@ import {
   usePersonajeForm,
   type Personaje,
 } from "@garlia/personajes";
-import { type SaveStatus } from "@/components/ui/saveStatus";
+import { type SaveStatus } from "@/ui/saveStatus";
 import { useCiudades } from "@garlia/ciudades";
 import { useGruposDeCriatura } from "@/domains/garlia/grupos/useGruposDeCriatura";
 import { useReinosMin } from "@garlia/reinos";

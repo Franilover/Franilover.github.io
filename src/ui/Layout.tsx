@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import React from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
-import { Text } from "@/components/ui/Tipografia";
+import { MotionDiv } from "@/ui/Motion";
+import { Text } from "@/ui/Tipografia";
 
 interface ModalProps {
   open:      boolean;

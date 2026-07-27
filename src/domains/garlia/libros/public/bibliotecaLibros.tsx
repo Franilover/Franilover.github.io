@@ -6,9 +6,9 @@ import Link from "next/link";
 import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 
-import { Loading } from "@/components/ui";
-import { MotionDiv } from "@/components/ui/Motion";
-import { SmartImage } from "@/components/ui/SmartImage";
+import { Loading } from "@/ui";
+import { MotionDiv } from "@/ui/Motion";
+import { SmartImage } from "@/ui/SmartImage";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { toSlug } from "@/lib/utils/slugify";

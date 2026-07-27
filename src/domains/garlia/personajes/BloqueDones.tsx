@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 
-import { ComboSelector } from "@/components/ui/ComboSelector";
+import { ComboSelector } from "@/ui/ComboSelector";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 

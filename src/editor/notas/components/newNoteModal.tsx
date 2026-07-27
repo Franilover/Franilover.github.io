@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 
 interface NewNoteModalProps {
   /** Pre-fill the title input (used when creating a tag-page or following a [[link]]). */

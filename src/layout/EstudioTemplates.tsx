@@ -3,7 +3,7 @@
 import { AlertCircle, CheckCircle2, Loader2, WifiOff } from "lucide-react";
 import React, { useEffect } from "react";
 
-import { TEXT_VARIANTS } from "@/components/ui/Tipografia";
+import { TEXT_VARIANTS } from "@/ui/Tipografia";
 import { cn } from "@/lib/utils/index"
 
 export function normalize(s: string): string {

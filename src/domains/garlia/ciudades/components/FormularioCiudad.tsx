@@ -20,8 +20,8 @@ import React, { useState } from "react";
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
-import { ComboSelector } from "@/components/ui/ComboSelector";
-import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
+import { ComboSelector } from "@/ui/ComboSelector";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";

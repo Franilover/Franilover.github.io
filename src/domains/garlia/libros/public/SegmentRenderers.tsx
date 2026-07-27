@@ -33,10 +33,10 @@ import {
 import Image from "next/image";
 import React, { useState, useEffect, useRef } from "react";
 
-import { BtnIcon } from "@/components/ui";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { MotionDiv, MotionSpan, MotionButton } from "@/components/ui/Motion";
-import { ToastContainer } from "@/components/ui/ToastContainer";
+import { BtnIcon } from "@/ui";
+import { useConfirm } from "@/ui/ConfirmModal";
+import { MotionDiv, MotionSpan, MotionButton } from "@/ui/Motion";
+import { ToastContainer } from "@/ui/ToastContainer";
 import { useToast } from "@/hooks/ui/useToast";
 import { supabase } from "@/infra/supabase/supabase";
 import { cn } from "@/lib/utils/index";

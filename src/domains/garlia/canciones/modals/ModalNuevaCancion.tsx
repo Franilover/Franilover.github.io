@@ -3,7 +3,7 @@
 import { Music, X, Loader2, Plus } from "lucide-react";
 import React, { useState } from "react";
 
-import { ModalBase, CampoInput, BotonSubmit } from "@/components/layout/EstudioTemplates";
+import { ModalBase, CampoInput, BotonSubmit } from "@/layout/EstudioTemplates";
 import { ESTADOS } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { SelectPersonaje, SelectIdioma } from "@/hooks/useEditorShared";

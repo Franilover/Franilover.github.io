@@ -21,8 +21,8 @@ import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
-import { ComboSelector } from "@/components/ui/ComboSelector";
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { ComboSelector } from "@/ui/ComboSelector";
+import { useConfirm } from "@/ui/ConfirmModal";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCatalogo";

@@ -3,7 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import React, { useState, useCallback } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 
 interface ConfirmOptions {
   title?: string;

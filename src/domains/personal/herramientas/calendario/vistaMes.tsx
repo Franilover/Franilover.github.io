@@ -2,8 +2,8 @@
 import { ChevronLeft, ChevronRight, BookOpen, Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import React, { useState, useMemo } from "react";
 
-import { BtnIcon } from "@/components/ui";
-import { MotionDiv, MotionButton } from "@/components/ui/Motion";
+import { BtnIcon } from "@/ui";
+import { MotionDiv, MotionButton } from "@/ui/Motion";
 import { cn } from "@/lib/utils/index";
 
 

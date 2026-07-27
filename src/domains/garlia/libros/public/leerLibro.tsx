@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 
-import { Btn } from "@/components/ui";
+import { Btn } from "@/ui";
 import type {
   CapituloLista,
   CapituloScrollItem,

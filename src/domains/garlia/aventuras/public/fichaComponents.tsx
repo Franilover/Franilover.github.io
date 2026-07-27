@@ -25,7 +25,7 @@ import {
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 
 import {
   buscarCriaturas,

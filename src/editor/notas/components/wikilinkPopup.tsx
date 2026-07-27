@@ -3,7 +3,7 @@
 import { FileText, Plus } from "lucide-react";
 import React from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 
 interface WikilinkPopupProps {
   ensayos: any[];

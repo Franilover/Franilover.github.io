@@ -3,7 +3,7 @@
 import { Pencil, X, Eye, EyeOff, Loader2, Check } from "lucide-react";
 import React, { useState } from "react";
 
-import { ModalBase, CampoInput } from "@/components/layout/EstudioTemplates";
+import { ModalBase, CampoInput } from "@/layout/EstudioTemplates";
 import { ESTADOS } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { SelectPersonaje, SelectIdioma } from "@/hooks/useEditorShared";

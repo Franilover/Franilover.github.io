@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import React, { useState, useCallback, useEffect } from "react";
 
-import { BannerOffline } from "@/components/layout/EstudioTemplates";
+import { BannerOffline } from "@/layout/EstudioTemplates";
 import {
   IDIOMAS,
   ESTADO_COLOR,

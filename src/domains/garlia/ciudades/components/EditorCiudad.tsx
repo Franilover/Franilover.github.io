@@ -15,7 +15,7 @@
 import React, { useEffect, useState } from "react";
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useConfirm } from "@/ui/ConfirmModal";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";
 import { dexiePut, dexieDelete } from "@/hooks/data/useOfflineSync";
 

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronUp, ChevronDown, CheckSquare, Circle } from "lucide-react";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 
 const PRESETS = [
   { label: "5m",   min: 5,  h: 0 },

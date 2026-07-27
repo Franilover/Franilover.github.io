@@ -21,7 +21,7 @@ import {
 } from "@/hooks/ui/useMobileAsidePanel";
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useConfirm } from "@/ui/ConfirmModal";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";
 import { type Ciudad } from "@/domains/garlia/ciudades";
@@ -66,7 +66,7 @@ function ImagePickerModal({
   const [SimpleImagePicker, setComponent] =
     useState<React.ComponentType<any> | null>(null);
   useEffect(() => {
-    void import("@/components/ui/SimpleImagePicker").then(
+    void import("@/ui/SimpleImagePicker").then(
       (m) => setComponent(() => m.default),
     );
   }, []);

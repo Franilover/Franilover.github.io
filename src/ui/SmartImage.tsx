@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { ImageOff } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 
 const SESSION_TS = Date.now();
 

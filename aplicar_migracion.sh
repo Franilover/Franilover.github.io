@@ -2,16 +2,16 @@
 set -e
 
 # ============================================================
-# aplicar_migracion.sh — Ronda: src/editor (Lexical)
+# aplicar_migracion.sh — Ronda: src/ui + src/layout (design system)
 # ============================================================
 # Uso:
-#   1. Poné este script y migracion_editor_lexical.tar.gz
+#   1. Poné este script y migracion_ui_layout.tar.gz
 #      en la raíz del repo (junto a src/)
 #   2. Corré: bash aplicar_migracion.sh
 #   3. Confirmá: npm run build
 # ============================================================
 
-TARBALL="migracion_editor_lexical.tar.gz"
+TARBALL="migracion_ui_layout.tar.gz"
 FECHA=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="backup_pre_migracion_${FECHA}"
 
@@ -39,11 +39,17 @@ echo "== 3. Copiando archivos nuevos/modificados sobre src/ =="
 cp -r "$TMP_DIR"/. src/
 
 echo "== 4. Eliminando carpetas obsoletas de esta ronda =="
-if [ -d "src/components/forms/lexical-editor" ]; then
-  rm -rf "src/components/forms/lexical-editor"
-  echo "  - eliminada: src/components/forms/lexical-editor (movida a src/editor/lexical/)"
+if [ -d "src/components/ui" ]; then
+  rm -rf "src/components/ui"
+  echo "  - eliminada: src/components/ui (movida a src/ui/)"
 else
-  echo "  - src/components/forms/lexical-editor ya no existe, nada que borrar"
+  echo "  - src/components/ui ya no existe, nada que borrar"
+fi
+if [ -d "src/components/layout" ]; then
+  rm -rf "src/components/layout"
+  echo "  - eliminada: src/components/layout (movida a src/layout/)"
+else
+  echo "  - src/components/layout ya no existe, nada que borrar"
 fi
 
 echo "== 5. Limpieza de temporales =="

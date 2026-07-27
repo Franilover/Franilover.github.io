@@ -21,7 +21,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
-import { MotionDiv, MotionButton } from "@/components/ui/Motion";
+import { MotionDiv, MotionButton } from "@/ui/Motion";
 import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { ReinoTileCanvas } from "@garlia/reinos";
 import {

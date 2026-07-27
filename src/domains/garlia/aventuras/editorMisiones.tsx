@@ -28,8 +28,8 @@ import {
 import Image from "next/image";
 import React, { useCallback, useEffect, useState } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
-import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
+import { MotionDiv } from "@/ui/Motion";
+import SimpleImagePicker from "@/ui/SimpleImagePicker";
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 import { loadMisionesAdmin } from "@/infra/sync/syncEngine";

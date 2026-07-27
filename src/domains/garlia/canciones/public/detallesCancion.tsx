@@ -3,9 +3,9 @@ import { AlertCircle, Music, ExternalLink, ChevronLeft, Info } from "lucide-reac
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
-import { Btn, Loading } from "@/components/ui";
-import { MotionDiv } from "@/components/ui/Motion";
-import { SmartImage } from "@/components/ui/SmartImage";
+import { Btn, Loading } from "@/ui";
+import { MotionDiv } from "@/ui/Motion";
+import { SmartImage } from "@/ui/SmartImage";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";

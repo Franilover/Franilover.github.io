@@ -29,7 +29,7 @@
 import { Layers, Plus, Save, Search, Trash2, X, Loader2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useConfirm } from "@/ui/ConfirmModal";
 import { SelectorMiembros } from "@/domains/garlia/grupos/SelectorMiembros";
 import { SelectorTipoGrupo } from "@/domains/garlia/grupos/SelectorTipoGrupo";
 import { SubtipoInput } from "@/domains/garlia/grupos/SubtipoInput";

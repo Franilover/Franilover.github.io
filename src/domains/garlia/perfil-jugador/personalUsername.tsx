@@ -19,7 +19,7 @@ import Link from "next/link";
 import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import React, { useEffect, useState } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import {
   ModalDetalle,
   EntidadCard,

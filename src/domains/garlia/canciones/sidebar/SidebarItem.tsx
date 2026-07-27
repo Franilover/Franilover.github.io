@@ -3,7 +3,7 @@
 import { Eye, EyeOff, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useConfirm } from "@/ui/ConfirmModal";
 import { ESTADO_COLOR } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { supabase } from "@/infra/supabase/supabase";

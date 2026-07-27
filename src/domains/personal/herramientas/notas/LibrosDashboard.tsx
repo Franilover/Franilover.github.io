@@ -5,8 +5,8 @@ import {
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
-import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
+import { MotionDiv } from "@/ui/Motion";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 
 interface LibrosDashboardProps {
   ensayos: any[];

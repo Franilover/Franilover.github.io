@@ -9,7 +9,7 @@ import { MessageCircle, Palette, Star } from "lucide-react";
 
 
 
-import MenuBase from "@/components/layout/MenuBase";
+import MenuBase from "@/layout/MenuBase";
 
 
 

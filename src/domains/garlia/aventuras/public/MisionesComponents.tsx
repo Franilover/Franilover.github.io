@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import React from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import { supabase } from "@/infra/supabase/supabase";
 
 

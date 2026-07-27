@@ -2,8 +2,8 @@
 import type { LucideProps } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
-import { MenuCard } from "@/components/layout/MenuCard";
-import { MotionDiv } from '@/components/ui/Motion';
+import { MenuCard } from "@/layout/MenuCard";
+import { MotionDiv } from '@/ui/Motion';
 import { supabase } from "@/infra/supabase/supabase";
 
 export interface MenuBaseItem {

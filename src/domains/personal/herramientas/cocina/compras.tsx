@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 
-import { Loading } from "@/components/ui";
+import { Loading } from "@/ui";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
 import type { Ingrediente } from "@/lib/types/queries";
 

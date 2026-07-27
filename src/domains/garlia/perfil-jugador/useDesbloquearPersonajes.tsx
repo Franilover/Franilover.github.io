@@ -3,7 +3,7 @@ import { X, Sword } from "lucide-react";
 import Image from "next/image";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import { supabase } from "@/infra/supabase/supabase";
 
 export function useDesbloquearPersonajes(

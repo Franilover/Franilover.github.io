@@ -17,7 +17,7 @@ import {
 import Image from "next/image";
 import React, { useEffect, useState, useCallback } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import { supabase } from "@/infra/supabase/supabase";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────

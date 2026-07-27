@@ -17,7 +17,7 @@ import { AnimatePresence } from "framer-motion";
 import { ChevronDown, Loader2, Search, Swords } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import type { CampoFichaValor, FichaDnd } from "@/domains/garlia/aventuras/public/useFichasDnd";
 import { FichaStatsPanel } from "@/domains/garlia/aventuras/public/misiones";
 import { supabase } from "@/infra/supabase/supabase";

@@ -21,8 +21,8 @@ import React, {
   useCallback,
 } from "react";
 
-import { Btn, BtnIcon, Badge, Loading, EmptyState } from "@/components/ui";
-import { MotionDiv } from "@/components/ui/Motion";
+import { Btn, BtnIcon, Badge, Loading, EmptyState } from "@/ui";
+import { MotionDiv } from "@/ui/Motion";
 import {
   rutinasQueries,
   ejerciciosQueries,

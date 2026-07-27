@@ -13,7 +13,7 @@
 import { Camera, X } from "lucide-react";
 import { useState } from "react";
 
-import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
+import SimpleImagePicker from "@/ui/SimpleImagePicker";
 
 export function PickerImagenCriaturaBtn({
   value: _value,

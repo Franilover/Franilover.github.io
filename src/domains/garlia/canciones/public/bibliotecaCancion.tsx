@@ -4,9 +4,9 @@ import { User, ChevronRight, Music2 } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useMemo, useEffect } from "react";
 
-import { Loading } from "@/components/ui";
-import { MotionDiv } from "@/components/ui/Motion";
-import { SmartImage } from "@/components/ui/SmartImage";
+import { Loading } from "@/ui";
+import { MotionDiv } from "@/ui/Motion";
+import { SmartImage } from "@/ui/SmartImage";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
 import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";

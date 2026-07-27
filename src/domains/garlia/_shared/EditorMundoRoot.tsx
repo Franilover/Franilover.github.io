@@ -16,7 +16,7 @@
  *      editar un personaje.
  *
  * Navegación: vive por completo en la navbar global
- * (components/layout/navbar.tsx, submenú admin), que lee y escribe
+ * (layout/navbar.tsx, submenú admin), que lee y escribe
  * useMundoNavigation directamente. Este shell solo renderiza la sección
  * activa — no dibuja ninguna barra de navegación propia.
  *

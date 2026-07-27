@@ -13,7 +13,7 @@ import {
 import React, { useState, useEffect, useRef, useCallback } from "react";
 
 import { RichEditor } from "@/editor/lexical";
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useConfirm } from "@/ui/ConfirmModal";
 
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";

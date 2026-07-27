@@ -14,8 +14,8 @@ import { useParams, useRouter } from "next/navigation";
 import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import React, { useEffect, useState, useRef } from "react";
 
-import { Loading, BackBtn } from "@/components/ui";
-import { SmartImage } from "@/components/ui/SmartImage";
+import { Loading, BackBtn } from "@/ui";
+import { SmartImage } from "@/ui/SmartImage";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import {

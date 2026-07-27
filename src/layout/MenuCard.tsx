@@ -3,7 +3,7 @@ import type { LucideProps } from "lucide-react";
 import Link from "next/link";
 import React from "react";
 
-import { MotionDiv } from '@/components/ui/Motion';
+import { MotionDiv } from '@/ui/Motion';
 import { useTheme } from "@/providers/ThemeProvider";
 
 interface MenuCardProps {

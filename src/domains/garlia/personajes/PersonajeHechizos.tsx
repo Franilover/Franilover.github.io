@@ -14,7 +14,7 @@
 
 import { Sparkles } from "lucide-react";
 
-import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import { useHechizosDelPersonaje } from "./useHechizosDelPersonaje";
 
 // ─── Componente ───────────────────────────────────────────────────────────────

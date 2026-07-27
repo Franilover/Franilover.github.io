@@ -13,7 +13,7 @@ import {
   RichEditor,
   type RichEditorFormatCommand,
 } from "@/editor/lexical";
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
 
 import { CitePopup } from "./citePopup";

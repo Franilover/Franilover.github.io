@@ -7,7 +7,7 @@
  * una vez que el usuario elige una.
  *
  * El botón de "volver" ya NO vive acá — se movió a la navbar global (ver
- * components/layout/navbar.tsx), que lee useMundoNavigation directamente
+ * layout/navbar.tsx), que lee useMundoNavigation directamente
  * y muestra ←/✕ contextual arriba de la página, consistente con el resto
  * del sitio. Este header ahora es solo buscador + botón de crear.
  */

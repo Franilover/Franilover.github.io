@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useConfirm } from "@/ui/ConfirmModal";
 import {
   TIPO_ESCENA_LABEL,
   TIPO_ESCENA_COLOR,

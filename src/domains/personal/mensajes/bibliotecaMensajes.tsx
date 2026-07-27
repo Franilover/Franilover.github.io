@@ -4,8 +4,8 @@ import { MessageCircle, Search, X } from "lucide-react";
 import Link from "next/link";
 import React, { useEffect, useState, useRef } from "react";
 
-import { Loading } from "@/components/ui";
-import { SmartImage } from "@/components/ui/SmartImage";
+import { Loading } from "@/ui";
+import { SmartImage } from "@/ui/SmartImage";
 import { useUsuariosEnLinea } from "@/infra/realtime/useEnLinea";
 import {
   listarConversaciones,

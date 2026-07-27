@@ -10,8 +10,8 @@ import React, { useState } from "react";
 
 
 
-import { MotionA, MotionDiv, MotionH1, MotionMain, MotionSection } from '@/components/ui/Motion';
-import { ToastContainer } from "@/components/ui/ToastContainer";
+import { MotionA, MotionDiv, MotionH1, MotionMain, MotionSection } from '@/ui/Motion';
+import { ToastContainer } from "@/ui/ToastContainer";
 import { useToast } from "@/hooks/ui/useToast";
 
 

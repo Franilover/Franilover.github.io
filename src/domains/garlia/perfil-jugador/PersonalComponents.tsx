@@ -16,7 +16,7 @@ import Image from "next/image";
 import Link from "next/link";
 import React from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 
 export interface Descubrimiento {

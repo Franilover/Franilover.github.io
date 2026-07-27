@@ -17,7 +17,7 @@ import React from "react";
 
 
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import type { ToastType } from "@/hooks/ui/useToast";
 
 interface Toast {

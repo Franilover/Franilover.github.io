@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useConfirm } from "@/ui/ConfirmModal";
 import type {
   Seccion,
   IdiomaKey,

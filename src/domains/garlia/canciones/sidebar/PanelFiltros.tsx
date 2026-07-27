@@ -3,7 +3,7 @@
 import { ChevronDown, Eye, EyeOff } from "lucide-react";
 import React from "react";
 
-import { Chip } from "@/components/ui/Chip";
+import { Chip } from "@/ui/Chip";
 import {
   ESTADOS,
   FILTROS_VACIOS,

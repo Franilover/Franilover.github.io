@@ -27,9 +27,9 @@ import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useMemo, useEffect } from "react";
 
-import { Btn, BtnIcon, Loading } from "@/components/ui";
-import { MotionDiv } from "@/components/ui/Motion";
-import { ToastContainer } from "@/components/ui/ToastContainer";
+import { Btn, BtnIcon, Loading } from "@/ui";
+import { MotionDiv } from "@/ui/Motion";
+import { ToastContainer } from "@/ui/ToastContainer";
 import {
   SectionTitle,
   FieldInput,

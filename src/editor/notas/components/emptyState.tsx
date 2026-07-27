@@ -2,7 +2,7 @@
 import { PenTool, Plus } from "lucide-react";
 import React from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 
 interface EmptyStateProps {
   onCrearEnsayo?: () => void;

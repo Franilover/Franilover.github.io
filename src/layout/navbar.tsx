@@ -34,7 +34,7 @@ import { usePathname, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 
 import { useCommandPalette } from "@/components/command";
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import {
   useMundoNavigation,
   type SectionKey,

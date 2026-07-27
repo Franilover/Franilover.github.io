@@ -3,8 +3,8 @@ import { Save, X, Loader2, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
 import React, { useState } from "react";
 
-import { ChipGroup } from "@/components/ui/Chip";
-import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
+import { ChipGroup } from "@/ui/Chip";
+import SimpleImagePicker from "@/ui/SimpleImagePicker";
 import { cn } from "@/lib/utils/index";
 
 export type Categoria = "Superior" | "Inferior" | "Calzado" | "Accesorios" | "Outfit";

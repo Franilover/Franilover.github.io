@@ -14,7 +14,7 @@ import {
 import Image from "next/image";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
+import SimpleImagePicker from "@/ui/SimpleImagePicker";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { useAuth } from "@/providers/AuthProvider";

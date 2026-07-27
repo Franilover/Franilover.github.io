@@ -4,8 +4,8 @@ import { Loader2, PenTool, Search, X, Plus, FileText, Trash2, List, BookOpen, Ha
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 import { AdminOnly } from "@/components/forms/AdminOnly";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { ToastContainer } from "@/components/ui/ToastContainer";
+import { useConfirm } from "@/ui/ConfirmModal";
+import { ToastContainer } from "@/ui/ToastContainer";
 import Editor from "@/editor/notas/components/EditorEnsayo";
 import { GrafoEnsayos } from "@/editor/notas/components/GrafoEnsayos";
 import NewNoteModal from "@/editor/notas/components/newNoteModal";

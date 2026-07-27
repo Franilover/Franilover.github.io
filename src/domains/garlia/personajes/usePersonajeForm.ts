@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 import { dexieDelete, dexiePut } from "@/lib/utils/dexieHelpers";
 
-import { type SaveStatus } from "@/components/ui/saveStatus";
+import { type SaveStatus } from "@/ui/saveStatus";
 
 import { type Personaje } from "./model";
 

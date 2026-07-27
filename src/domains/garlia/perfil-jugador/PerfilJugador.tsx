@@ -21,7 +21,7 @@ import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import { supabase } from "@/infra/supabase/supabase";
 import {
   invalidateSessionCache,

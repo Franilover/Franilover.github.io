@@ -46,8 +46,8 @@ import {
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
+import { useConfirm } from "@/ui/ConfirmModal";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import {
   BloqueGrupoCategoria,
   type GrupoMinExt,
@@ -72,7 +72,7 @@ import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete } from "@/lib/utils/dexieHelpers";
 
 import { type Criatura } from "@/domains/garlia/criaturas/model";
-import { type SaveStatus } from "@/components/ui/saveStatus";
+import { type SaveStatus } from "@/ui/saveStatus";
 
 // ─── EditorCriatura ───────────────────────────────────────────────────────────
 export function EditorCriatura({

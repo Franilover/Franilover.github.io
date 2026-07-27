@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
 
 interface CitePopupProps {

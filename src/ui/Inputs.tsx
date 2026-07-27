@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-import { FieldWrapper } from "@/components/ui/Tipografia";
+import { FieldWrapper } from "@/ui/Tipografia";
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;

@@ -42,7 +42,7 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
+import { MotionDiv } from "@/ui/Motion";
 import { isReallyOnline } from "@/hooks/data/useOfflineSync";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";

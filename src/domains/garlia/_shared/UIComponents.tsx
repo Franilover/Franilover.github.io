@@ -7,8 +7,8 @@ import Image from "next/image";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 
 import { RichEditor } from "@/editor/lexical";
-import { normalize } from "@/components/layout/EstudioTemplates";
-import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
+import { normalize } from "@/layout/EstudioTemplates";
+import SimpleImagePicker from "@/ui/SimpleImagePicker";
 
 import { useWikilink } from "./WikilinkContext";
 import { INPUT_CLS, type SaveStatus } from "@/domains/garlia/_shared/types";

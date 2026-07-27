@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
-import { ComboSelector, type ComboItem } from "@/components/ui/ComboSelector";
+import { ComboSelector, type ComboItem } from "@/ui/ComboSelector";
 import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
 import { ESTADOS } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";

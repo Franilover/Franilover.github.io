@@ -9,8 +9,8 @@ import {
 import Image from "next/image";
 import React, { useState, useMemo } from "react";
 
-import { MotionDiv, MotionButton } from "@/components/ui/Motion";
-import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
+import { MotionDiv, MotionButton } from "@/ui/Motion";
+import SimpleImagePicker from "@/ui/SimpleImagePicker";
 import { useSupabaseData } from "@/hooks/data/useSupabaseData";
 import { cn } from "@/lib/utils/index";
 

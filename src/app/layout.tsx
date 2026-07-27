@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Montserrat, Geist, Pixelify_Sans, Caveat, Lora, Literata } from 'next/font/google';
 
 import { GlobalCommandPalette } from "@/components/command";
-import Navbar from "@/components/layout/navbar";
+import Navbar from "@/layout/navbar";
 import LlamadaGlobal from "@/domains/personal/mensajes/LlamadaGlobal";
 import { LightboxProvider } from "@/components/modal/lightbox/";
 import { cn } from "@/lib/utils/index";

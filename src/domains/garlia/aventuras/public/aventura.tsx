@@ -14,8 +14,8 @@ import { AnimatePresence } from "framer-motion";
 import { ArrowLeft, BedDouble, Check, Loader2, Maximize2, MoreVertical, Plus, Sparkles, Swords, Trash2, X } from "lucide-react";
 import React, { useState } from "react";
 
-import { MotionDiv } from "@/components/ui/Motion";
-import { Text } from "@/components/ui/Tipografia";
+import { MotionDiv } from "@/ui/Motion";
+import { Text } from "@/ui/Tipografia";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { supabase } from "@/infra/supabase/supabase";

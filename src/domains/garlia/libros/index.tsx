@@ -38,12 +38,12 @@ import {
   readingTime,
   capUpdateMeta,
 } from "@/editor/lexical/types";
-import { ComboSelector } from "@/components/ui/ComboSelector";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
+import { ComboSelector } from "@/ui/ComboSelector";
+import { useConfirm } from "@/ui/ConfirmModal";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
 import { useCalendario } from "@/domains/garlia/calendario/useCalendario";
-import SimpleImagePicker from "@/components/ui/SimpleImagePicker";
+import SimpleImagePicker from "@/ui/SimpleImagePicker";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { diasPorAnio as calcDiasPorAnio } from "@/lib/utils/calendario";

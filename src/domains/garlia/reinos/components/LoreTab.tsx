@@ -25,8 +25,8 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 
 import type { WikiEntity } from "@/components/forms/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { SeccionEntidad } from "@/components/ui/SeccionEntidad";
+import { useConfirm } from "@/ui/ConfirmModal";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import { INPUT_CLS, type SaveStatus } from "@/domains/garlia/_shared/types";
 import { type Ciudad } from "@/domains/garlia/ciudades";
 import { PanelHistoriaMundo } from "@/domains/garlia/libros/EditorLineaTiempo";

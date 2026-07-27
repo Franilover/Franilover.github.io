@@ -3,7 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 
-import { MotionDiv, MotionP } from "@/components/ui/Motion";
+import { MotionDiv, MotionP } from "@/ui/Motion";
 import { supabase } from "@/infra/supabase/supabase";
 
 export default function LoginPage() {
