@@ -63,15 +63,14 @@ function Toast({
   }, [onClose]);
   return (
     <div
-      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-300 flex items-center gap-3 px-5 py-3 shadow-lg text-micro font-bold uppercase tracking-widest"
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-300 flex items-center gap-2 px-3.5 py-2 rounded-lg shadow-lg text-micro font-bold uppercase tracking-[0.15em]"
       style={{
         background: ok ? "rgba(5,150,105,0.95)" : "rgba(185,28,28,0.95)",
         color: "#fff",
         border: `1px solid ${ok ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"}`,
-        borderRadius: "1px",
       }}
     >
-      {ok ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+      {ok ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
       {msg}
     </div>
   );
@@ -210,7 +209,7 @@ function ModalNuevoTile({
           ].map(([lbl, val, setter]: any) => (
             <div key={lbl as string} className="flex flex-col gap-1">
               <label
-                className="text-micro font-bold uppercase tracking-widest"
+                className="text-micro font-bold uppercase tracking-[0.15em]"
                 style={{
                   color:
                     "color-mix(in srgb, var(--foreground) 50%, transparent)",
@@ -219,7 +218,7 @@ function ModalNuevoTile({
                 {lbl as string}
               </label>
               <input
-                className="input-brand text-center font-black text-lg py-2"
+                className="input-brand text-center font-black text-sm py-1.5"
                 min={0}
                 style={{ borderRadius: "1px" }}
                 type="number"
@@ -268,11 +267,11 @@ function ImagePickerModal({
       onClick={onClose}
     >
       <div
-        className="bg-white-custom rounded-2xl shadow-2xl border border-primary/15 w-full max-w-lg p-5"
+        className="bg-white-custom rounded-xl shadow-2xl border border-primary/15 w-full max-w-lg p-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-micro font-black uppercase tracking-[0.3em] text-primary/50 flex items-center gap-2">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-micro font-black uppercase tracking-[0.15em] text-primary/50 flex items-center gap-2">
             <ImageIcon size={11} /> {title ?? "Imagen del tile"}
           </h3>
           <button

@@ -345,7 +345,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
     return (
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4 gap-3">
         <input
-          className="w-full bg-transparent text-lg font-black text-primary outline-none placeholder:text-primary/25"
+          className="w-full bg-transparent text-base font-black text-primary outline-none placeholder:text-primary/25"
           placeholder="Título de la nota…"
           value={selectedNota.titulo}
           onChange={(e) => actualizarNota({ ...selectedNota, titulo: e.target.value })}
@@ -359,7 +359,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
         <button
           type="button"
           onClick={() => eliminarNota(selectedNota.id)}
-          className="self-start text-micro font-bold uppercase tracking-widest text-red-400/60 hover:text-red-400 transition-colors"
+          className="self-start text-micro font-bold uppercase tracking-[0.15em] text-red-400/60 hover:text-red-400 transition-colors"
         >
           Eliminar nota
         </button>

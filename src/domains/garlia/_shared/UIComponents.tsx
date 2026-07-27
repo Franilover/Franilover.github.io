@@ -11,7 +11,13 @@ import { normalize } from "@/layout/EstudioTemplates";
 import SimpleImagePicker from "@/ui/SimpleImagePicker";
 
 import { useWikilink } from "./WikilinkContext";
-import { INPUT_CLS, type SaveStatus } from "@/domains/garlia/_shared/types";
+import {
+  INPUT_CLS,
+  LABEL_CLS,
+  BTN_PRIMARY_CLS,
+  BTN_DANGER_CLS,
+  type SaveStatus,
+} from "@/domains/garlia/_shared/types";
 
 export function SaveIndicator({ status }: { status: SaveStatus }) {
   if (status === "idle") return null;
@@ -21,7 +27,7 @@ export function SaveIndicator({ status }: { status: SaveStatus }) {
     error:  { icon: <AlertCircle  size={11} />,                     text: "Error",      cls: "text-red-400" },
   }[status];
   return (
-    <span className={`flex items-center gap-1 text-micro font-black uppercase tracking-widest ${map.cls}`}>
+    <span className={`flex items-center gap-1 text-micro font-black uppercase tracking-[0.15em] ${map.cls}`}>
       {map.icon} {map.text}
     </span>
   );
@@ -34,7 +40,7 @@ export function Campo({ label, value, onChange, placeholder }: {
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">{label}</label>
+      <label className={LABEL_CLS}>{label}</label>
       <input className={INPUT_CLS} placeholder={placeholder} value={value} onChange={onChange} />
     </div>
   );
@@ -51,7 +57,7 @@ export function CampoArea({ label, value, onChange, placeholder, rows = 4 }: {
   };
   return (
     <div className="space-y-1.5">
-      <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">{label}</label>
+      <label className={LABEL_CLS}>{label}</label>
       <RichEditor minHeight={`${rows * 1.6}rem`} mode="split" placeholder={placeholder} value={value} onChange={handleChange} onWikilinkNavigate={onWikilink} />
     </div>
   );
@@ -62,18 +68,16 @@ export function BarraAcciones({ status, onSave, onDelete }: {
 }) {
   return (
     <div
-      className="shrink-0 sticky bottom-0 z-10 px-4 py-3 flex items-center justify-between gap-3 border-t border-primary/8"
+      className="shrink-0 sticky bottom-0 z-10 px-3 py-2 flex items-center justify-between gap-3 border-t border-primary/8"
       style={{ background: "color-mix(in srgb, var(--bg-main) 95%, transparent)", backdropFilter: "blur(8px)" }}
     >
       <SaveIndicator status={status} />
       <div className="flex items-center gap-2 ml-auto">
-        <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-micro font-black uppercase tracking-widest border border-red-500/20 text-red-400/60 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all min-h-[36px]"
-          onClick={onDelete}>
-          <Trash2 size={11} /> <span className="hidden xs:inline">Eliminar</span>
+        <button className={BTN_DANGER_CLS} onClick={onDelete}>
+          <Trash2 size={12} /> <span className="hidden xs:inline">Eliminar</span>
         </button>
-        <button className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 min-h-[36px]"
-          onClick={onSave}>
-          <Save size={11} /> Guardar
+        <button className={BTN_PRIMARY_CLS} onClick={onSave}>
+          <Save size={12} /> Guardar
         </button>
       </div>
     </div>
@@ -96,7 +100,7 @@ export function SelectorImagen({ label, value, onChange, aspect, placeholder }: 
 
   return (
     <div className={`flex flex-col gap-1.5 ${aspect === "full" ? "h-full" : ""}`}>
-      {label && <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35 shrink-0">{label}</label>}
+      {label && <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 shrink-0">{label}</label>}
 
       <div
         className={`relative ${aspectCls} ${aspect === "full" ? "flex-1" : ""} rounded-none overflow-hidden border-0 bg-primary/4 cursor-pointer group`}
@@ -107,7 +111,7 @@ export function SelectorImagen({ label, value, onChange, aspect, placeholder }: 
             <Image alt={label} className={`w-full h-full ${fitCls} transition-transform duration-300 group-hover:scale-105`} src={value} />
             <div className="absolute inset-0 bg-black/40 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5">
               <ImageIcon className="text-white" size={18} />
-              <span className="text-micro font-black uppercase text-white tracking-widest">Cambiar</span>
+              <span className="text-micro font-black uppercase text-white tracking-[0.15em]">Cambiar</span>
             </div>
             <button
               className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 hover:bg-red-500/80 flex items-center justify-center opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all"
@@ -119,7 +123,7 @@ export function SelectorImagen({ label, value, onChange, aspect, placeholder }: 
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-primary/20 hover:text-primary/40 transition-colors">
             {placeholder ?? <ImageIcon size={24} />}
-            <span className="text-micro font-black uppercase tracking-widest">Elegir imagen</span>
+            <span className="text-micro font-black uppercase tracking-[0.15em]">Elegir imagen</span>
           </div>
         )}
       </div>
@@ -130,11 +134,11 @@ export function SelectorImagen({ label, value, onChange, aspect, placeholder }: 
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-white-custom rounded-t-2xl sm:rounded-2xl shadow-2xl border border-primary/15 w-full sm:max-w-lg p-5 max-h-[85vh] overflow-y-auto"
+            className="bg-white-custom rounded-t-xl sm:rounded-xl shadow-2xl border border-primary/15 w-full sm:max-w-lg p-4 max-h-[85vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-micro font-black uppercase tracking-[0.3em] text-primary/50 flex items-center gap-2">
+              <h3 className="text-micro font-black uppercase tracking-[0.15em] text-primary/50 flex items-center gap-2">
                 <ImageIcon size={11} /> {label}
               </h3>
               <button className="text-primary/30 hover:text-primary transition-colors" onClick={() => setOpen(false)}>
@@ -198,7 +202,7 @@ export function SelectorTexto({ label, value, onChange, opciones, placeholder, o
 
   return (
     <div ref={ref} className="space-y-1">
-      <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">{label}</label>
+      <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35">{label}</label>
 
       {editing ? (
         /* ── Modo edición: input + dropdown ── */

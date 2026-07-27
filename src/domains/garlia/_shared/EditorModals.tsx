@@ -176,7 +176,7 @@ export function ModalAcontecimiento({
   }, [onClose]);
 
   const INPUT =
-    "w-full px-3 py-2 rounded-xl text-xs font-medium text-primary bg-transparent border transition-all outline-none placeholder:text-primary/25 focus:border-primary/40 focus:bg-primary/3";
+    "w-full px-3 py-2 rounded-lg text-xs font-medium text-primary bg-transparent border transition-all outline-none placeholder:text-primary/25 focus:border-primary/40 focus:bg-primary/3";
   const borderNorm = "border-primary/15";
 
   return (
@@ -186,7 +186,7 @@ export function ModalAcontecimiento({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl"
+        className="w-full max-w-sm rounded-xl overflow-hidden shadow-2xl"
         style={{
           background: "var(--bg-main)",
           border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
@@ -205,7 +205,7 @@ export function ModalAcontecimiento({
             <Clock className="text-primary/50" size={12} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-micro font-black uppercase tracking-[0.3em] text-primary/40">Añadir acontecimiento</p>
+            <p className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">Añadir acontecimiento</p>
           </div>
           <button className="text-primary/25 hover:text-primary transition-colors" onClick={onClose}>
             <X size={15} />
@@ -214,12 +214,12 @@ export function ModalAcontecimiento({
 
         <div className="p-4 space-y-3">
           <div className="space-y-1.5">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">Ámbito</label>
+            <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35">Ámbito</label>
             <div className="flex gap-1.5">
               {(["global", "reino"] as const).map((s) => (
                 <button
                   key={s}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-micro font-black uppercase tracking-widest border transition-all"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-micro font-black uppercase tracking-[0.15em] border transition-all"
                   style={
                     scope === s
                       ? { background: "color-mix(in srgb, var(--primary) 10%, transparent)", borderColor: "color-mix(in srgb, var(--primary) 30%, transparent)", color: "var(--primary)" }
@@ -236,7 +236,7 @@ export function ModalAcontecimiento({
 
           {scope === "reino" && (
             <div className="space-y-1.5">
-              <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">Reino</label>
+              <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35">Reino</label>
               {loadingR ? (
                 <div className="flex items-center gap-2 px-3 py-2">
                   <Loader2 className="animate-spin text-primary/20" size={11} />
@@ -259,7 +259,7 @@ export function ModalAcontecimiento({
           )}
 
           <div className="space-y-1.5">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
+            <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35">
               Año / Era{" "}
               <span className="text-primary/20 normal-case tracking-normal font-medium">(opcional)</span>
             </label>
@@ -272,7 +272,7 @@ export function ModalAcontecimiento({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">Título</label>
+            <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35">Título</label>
             <input
               className={`${INPUT} ${borderNorm}`}
               placeholder="La Gran Batalla, Fundación del Imperio…"
@@ -283,7 +283,7 @@ export function ModalAcontecimiento({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
+            <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35">
               Qué ocurrió{" "}
               <span className="text-primary/20 normal-case tracking-normal font-medium">(opcional)</span>
             </label>
@@ -304,13 +304,13 @@ export function ModalAcontecimiento({
           style={{ borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)", background: "color-mix(in srgb, var(--primary) 2%, transparent)" }}
         >
           <button
-            className="px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary hover:bg-primary/6 transition-all border border-transparent hover:border-primary/10"
+            className="px-4 py-2 rounded-lg text-micro font-black uppercase tracking-[0.15em] text-primary/40 hover:text-primary hover:bg-primary/6 transition-all border border-transparent hover:border-primary/10"
             onClick={onClose}
           >
             Cancelar
           </button>
           <button
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest transition-all disabled:opacity-40"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-micro font-black uppercase tracking-[0.15em] transition-all disabled:opacity-40"
             disabled={!canSave || saving}
             style={{
               background: saved ? "color-mix(in srgb, #22c55e 80%, transparent)" : "var(--primary)",
@@ -416,7 +416,7 @@ export function ModalNuevoGrupo({
   };
 
   const INPUT =
-    "w-full px-3 py-2 rounded-xl text-xs font-medium text-primary bg-transparent border transition-all outline-none placeholder:text-primary/25 focus:border-primary/40 focus:bg-primary/3";
+    "w-full px-3 py-2 rounded-lg text-xs font-medium text-primary bg-transparent border transition-all outline-none placeholder:text-primary/25 focus:border-primary/40 focus:bg-primary/3";
 
   return (
     <div
@@ -425,7 +425,7 @@ export function ModalNuevoGrupo({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl"
+        className="w-full max-w-sm rounded-xl overflow-hidden shadow-2xl"
         style={{
           background: "var(--bg-main)",
           border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
@@ -448,7 +448,7 @@ export function ModalNuevoGrupo({
             {cfg ? <cfg.Icon size={12} style={{ color: cfg.color }} /> : <Layers className="text-primary/40" size={12} />}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-micro font-black uppercase tracking-[0.3em] text-primary/40">
+            <p className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
               {cfg ? `Nuevo grupo · ${cfg.labelPlural}` : "Nuevo grupo"}
             </p>
           </div>
@@ -459,7 +459,7 @@ export function ModalNuevoGrupo({
 
         <div className="p-4 space-y-4">
           <div className="space-y-2">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">Tipo de miembros</label>
+            <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35">Tipo de miembros</label>
             <div className="grid grid-cols-3 gap-1.5">
               {(Object.entries(GRUPO_MODAL_CONFIG) as [GrupoTipoLocal, typeof GRUPO_MODAL_CONFIG[GrupoTipoLocal]][]).map(([key, c]) => {
                 const isSelected = tipo === key;
@@ -492,7 +492,7 @@ export function ModalNuevoGrupo({
                       style={{ color: isSelected ? c.color : `color-mix(in srgb, ${c.color} 55%, transparent)` }}
                     />
                     <span
-                      className="text-micro font-black uppercase tracking-widest leading-tight text-center"
+                      className="text-micro font-black uppercase tracking-[0.15em] leading-tight text-center"
                       style={{ color: isSelected ? "var(--primary)" : "color-mix(in srgb, var(--primary) 45%, transparent)" }}
                     >
                       {c.labelPlural}
@@ -506,7 +506,7 @@ export function ModalNuevoGrupo({
 
           {tipo && (
             <div className="space-y-1.5">
-              <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">Nombre del grupo</label>
+              <label className="text-micro font-black uppercase tracking-[0.15em] text-primary/35">Nombre del grupo</label>
               <input
                 ref={inputRef}
                 className={`${INPUT} border-primary/15`}
@@ -526,13 +526,13 @@ export function ModalNuevoGrupo({
           style={{ borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)", background: "color-mix(in srgb, var(--primary) 2%, transparent)" }}
         >
           <button
-            className="px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary hover:bg-primary/6 transition-all border border-transparent hover:border-primary/10"
+            className="px-4 py-2 rounded-lg text-micro font-black uppercase tracking-[0.15em] text-primary/40 hover:text-primary hover:bg-primary/6 transition-all border border-transparent hover:border-primary/10"
             onClick={onClose}
           >
             Cancelar
           </button>
           <button
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest transition-all disabled:opacity-40"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-micro font-black uppercase tracking-[0.15em] transition-all disabled:opacity-40"
             disabled={!canSave || saving}
             style={{
               background: saved

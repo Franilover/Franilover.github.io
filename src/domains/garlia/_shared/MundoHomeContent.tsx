@@ -36,6 +36,7 @@ import { useFavoritos } from "@/domains/garlia/_shared/useFavoritosStore";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { EnsayoGosScreen } from "@/domains/plataforma/puentes/EnsayoGosScreen";
 import { EnsayosGosWidget } from "@/domains/plataforma/puentes/EnsayosGosWidget";
+import { PAGE_TITLE_CLS } from "@/domains/garlia/_shared/types";
 
 /** Tablas/section de Entidades que tienen updated_at (ver migración SQL). */
 const ENTIDADES_ICONS: Record<string, React.ElementType> = {
@@ -73,7 +74,7 @@ function ResumenWidget() {
 
   return (
     <div className="mb-8">
-      <h2 className="text-micro font-black uppercase tracking-widest text-primary/30 mb-3">
+      <h2 className="text-micro font-black uppercase tracking-[0.15em] text-primary/30 mb-2.5">
         Resumen
       </h2>
       <div className="flex flex-wrap gap-2">
@@ -118,7 +119,7 @@ function ChipListWidget({
 }) {
   return (
     <div>
-      <h2 className="text-micro font-black uppercase tracking-widest text-primary/30 mb-3">
+      <h2 className="text-micro font-black uppercase tracking-[0.15em] text-primary/30 mb-2.5">
         {title}
       </h2>
       {loading && chips.length === 0 ? (
@@ -222,15 +223,15 @@ export function MundoHomeContent() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="px-8 py-10">
-        <header className="mb-8">
-          <h1 className="text-2xl font-black text-primary">Editor de Mundo</h1>
-          <p className="text-sm text-primary/40 mt-1">Resumen general del mundo.</p>
+      <div className="px-4 py-5">
+        <header className="mb-4">
+          <h1 className={PAGE_TITLE_CLS}>Editor de Mundo</h1>
+          <p className="text-xs text-primary/40 mt-0.5">Resumen general del mundo.</p>
         </header>
 
         <ResumenWidget />
         <FavoritosYRecientes />
-        <div className="mt-6">
+        <div className="mt-4">
           <EnsayosGosWidget onOpen={setEnsayoAbiertoId} />
         </div>
       </div>
