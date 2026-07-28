@@ -18,6 +18,7 @@ pub fn run() {
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_opener::init())
+    .plugin(tauri_plugin_os::init())
     // Sirve el build estático (frontendDist) aplicando los mismos
     // rewrites que vercel.json usa en la web, para que las rutas
     // dinámicas ([id], [username], etc.) funcionen igual en la app

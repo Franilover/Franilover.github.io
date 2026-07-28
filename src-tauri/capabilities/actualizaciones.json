@@ -1,19 +1,25 @@
 {
-  "$schema": "../gen/schemas/mobile-schema.json",
+  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "actualizaciones",
-  "description": "Permisos para chequear, descargar e instalar actualizaciones del APK (solo Android).",
+  "description": "Permisos para chequear, descargar e instalar actualizaciones (Android descarga+instala el APK; Linux solo abre el link de descarga del navegador).",
   "windows": ["main"],
-  "platforms": ["android"],
+  "platforms": ["android", "linux"],
   "permissions": [
     "http:default",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://*.supabase.co/*" }]
+      "allow": [
+        { "url": "https://*.supabase.co/*" },
+        { "url": "https://api.github.com/*" },
+        { "url": "https://github.com/*" },
+        { "url": "https://*.githubusercontent.com/*" }
+      ]
     },
     "fs:default",
     "fs:allow-app-write",
     "fs:allow-app-write-recursive",
     "fs:scope-app-recursive",
-    "opener:default"
+    "opener:default",
+    "os:default"
   ]
 }
