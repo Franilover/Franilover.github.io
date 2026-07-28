@@ -9,9 +9,8 @@ import {
   BookOpen,
   User,
 } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
-import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import React, { useEffect, useState, useRef } from "react";
 
 import { Loading, BackBtn } from "@/ui";
@@ -292,25 +291,8 @@ function ModalTriggerWarning({
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function LibroDetalle() {
-  const params = useParams();
-  const paramFromNext = params?.id as string;
-  // En output:"export" + rewrite de Vercel a /placeholder, useParams()
-  // devuelve el valor horneado en build ("placeholder"), no el slug real
-  // de la URL. Si detectamos ese caso, leemos el segmento real desde
-  // window.location, que sí refleja la URL que ve el usuario.
-  const [slugParam, setSlugParam] = useState<string>(paramFromNext);
-
-  useEffect(() => {
-    if (paramFromNext !== "placeholder") {
-      setSlugParam(paramFromNext);
-      return;
-    }
-    if (typeof window === "undefined") return;
-    const partes = window.location.pathname.split("/").filter(Boolean);
-    // /garlia/libros/:slug
-    const real = partes[partes.length - 1];
-    if (real) setSlugParam(real);
-  }, [paramFromNext]);
+  const searchParams = useSearchParams();
+  const slugParam = searchParams.get("slug") ?? "";
 
   const router = useRouter();
 
@@ -437,7 +419,7 @@ export default function LibroDetalle() {
           return;
         }
         const slug = toSlug(libroData.titulo);
-        if (slug) navegarRutaDinamica(`/garlia/libros/${slug}`, () => router.replace(`/garlia/libros/${slug}`));
+        if (slug) router.replace(`/garlia/libros/detalle?slug=${slug}`);
       } else {
         libroData = await resolverLibroPorSlug(slugParam);
         if (!libroData) {
@@ -545,7 +527,7 @@ export default function LibroDetalle() {
       pendingRouteRef.current = ruta;
       setMostrarModalTW(true);
     } else {
-      navegarRutaDinamica(ruta, () => router.push(ruta));
+      router.push(ruta);
     }
   };
 
@@ -555,7 +537,7 @@ export default function LibroDetalle() {
       capitulos.find((c) => c.id === targetId) ??
       capitulos.find((c) => c.id === primerCapId);
     const orden = cap?.orden ?? 1;
-    return `/garlia/libros/${slugParam}/leer/${orden}`;
+    return `/garlia/libros/leer?slug=${slugParam}&orden=${orden}`;
   };
 
   // ── Fila de personajes ──────────────────────────────────────────────────────
@@ -728,7 +710,7 @@ export default function LibroDetalle() {
           if (pendingRouteRef.current) {
             const ruta = pendingRouteRef.current;
             pendingRouteRef.current = null;
-            navegarRutaDinamica(ruta, () => router.push(ruta));
+            router.push(ruta);
           }
         }}
         onRechazar={() => {
