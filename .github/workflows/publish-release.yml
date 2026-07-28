@@ -27,6 +27,11 @@ jobs:
     # seguir: ni siquiera llegó a subir su asset al draft.
     if: github.event.workflow_run.conclusion == 'success'
     steps:
+      - name: Checkout del repo
+        # Necesario para que `gh` (run list / release edit) sepa a qué repo
+        # apuntar — sin esto tira "not a git repository".
+        uses: actions/checkout@v4
+
       - name: Chequear que todos los builds del tag ya terminaron
         id: check
         env:
