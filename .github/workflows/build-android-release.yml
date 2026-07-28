@@ -66,6 +66,14 @@ jobs:
       - name: Instalar dependencias de npm
         run: npm ci
 
+      - name: Quitar rutas dinámicas web-only (no compatibles con output:export)
+        # /garlia/libros/[slug] usa SSR + generateMetadata y solo tiene sentido
+        # en el deploy de Vercel. En el build de Tauri (output:"export") ni
+        # siquiera debe existir el archivo: el APK usa la ruta estática
+        # /garlia/libros/detalle?slug=... en su lugar (ver ese page.tsx).
+        run: rm -rf "src/app/(public)/garlia/libros/[slug]"
+
+
       - name: Instalar Tauri CLI
         run: npm install -g @tauri-apps/cli@latest
 
