@@ -1,4 +1,4 @@
-name: Build y publicar APK de Android
+name: build-android
 
 # Se dispara al pushear un tag con formato vX.Y.Z, ej.:
 #   git tag v0.2.0 && git push --tags
@@ -291,9 +291,15 @@ jobs:
           echo "APK encontrado: $APK_PATH ($(du -h "$APK_PATH" | cut -f1))"
           echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
 
-      - name: Crear el Release y subir el APK
+      - name: Crear el Release (draft) y subir el APK
+        # draft: true — este release queda oculto hasta que el workflow
+        # publish-release.yml lo publique, una vez que build-android Y
+        # build-linux hayan terminado los dos. Si el release ya existe como
+        # draft (porque el otro workflow corrió primero), softprops lo
+        # actualiza agregando este asset en vez de pisarlo.
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.apk.outputs.path }}
           name: ${{ github.ref_name }}
           generate_release_notes: true
+          draft: true

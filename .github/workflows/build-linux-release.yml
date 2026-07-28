@@ -1,0 +1,139 @@
+name: build-linux
+
+# Se dispara al pushear un tag con formato vX.Y.Z, ej.:
+#   git tag v0.2.0 && git push --tags
+#
+# Igual que build-android-release.yml pero para escritorio Linux:
+#   1. Instala dependencias (Node, Rust, libs de sistema que pide Tauri)
+#   2. Buildea el frontend (Next export) y el bundle de Linux (.AppImage y .deb)
+#   3. Crea (o reusa) el GitHub Release del tag
+#   4. Sube el .AppImage y el .deb como assets del release
+#
+# No necesita keystore ni secrets de firma: en Linux, `tauri build` no firma
+# el AppImage por defecto (a diferencia de Android/Windows/macOS), así que
+# este workflow es más simple que el de Android.
+#
+# Usa los mismos secrets de build del frontend que build-android-release.yml
+# (Settings → Secrets and variables → Actions), si es que el proyecto los usa:
+#   NEXT_PUBLIC_SUPABASE_URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   NEXT_PUBLIC_FORMSPREE_ID
+#   NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write # necesario para crear el Release y subir los assets
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    # Se usa ubuntu-22.04 (no ubuntu-latest) a propósito: el AppImage se
+    # linkea contra la libc/libwebkit2gtk del runner donde se compila, y
+    # 22.04 da mejor compatibilidad "hacia atrás" con distros de usuarios
+    # finales que 24.04 (que usa una libc más nueva). Es la misma
+    # recomendación que da la doc oficial de Tauri para builds de Linux.
+    steps:
+      - name: Checkout del repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache de Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Instalar dependencias de sistema (GTK/WebKit/AppIndicator)
+        # Paquetes que pide Tauri v2 para compilar y empaquetar en Linux.
+        # libappindicator3-1 solo hace falta si la app usa system tray, pero
+        # no molesta tenerlo igual. Ver https://v2.tauri.app/start/prerequisites/#linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file
+
+      - name: Instalar dependencias de npm
+        run: npm ci
+
+      - name: Quitar rutas dinámicas web-only (no compatibles con output:export)
+        # Mismo motivo que en build-android-release.yml: /garlia/libros/[slug]
+        # (con su subruta anidada [slug]/leer/[orden]) usa SSR + generateMetadata
+        # y solo tiene sentido en el deploy de Vercel. En el build de Tauri
+        # (output:"export") ni siquiera deben existir los archivos.
+        run: rm -rf "src/app/(public)/garlia/libros/[slug]"
+
+      - name: Quitar ruta dinámica web-only de perfiles (no compatible con output:export)
+        run: rm -rf "src/app/(public)/garlia/personal/[username]"
+
+      - name: Quitar ruta dinámica web-only de canciones (no compatible con output:export)
+        run: rm -rf "src/app/(public)/garlia/canciones/[slug]"
+
+      - name: Instalar Tauri CLI
+        run: npm install -g @tauri-apps/cli@latest
+
+      - name: Build del AppImage y .deb (release)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_FORMSPREE_ID: ${{ secrets.NEXT_PUBLIC_FORMSPREE_ID }}
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          # Igual que en Android: activa output:"export" en next.config.mjs
+          # y las rutas estáticas en vez de las [slug] dinámicas.
+          NEXT_PUBLIC_BUILD_TARGET: tauri
+        # Sin --bundles se generan todos los targets que soporte el runner
+        # (según tauri.conf.json bundle.targets: "all"); en Linux eso es
+        # AppImage + deb. Se deja explícito para no depender de que alguien
+        # cambie ese "all" en el futuro y rompa este workflow en silencio.
+        run: npx tauri build --bundles appimage,deb
+
+      - name: Ubicar los artefactos generados
+        id: artefactos
+        run: |
+          APPIMAGE_PATH=$(find src-tauri/target/release/bundle/appimage -iname "*.AppImage" | head -n 1)
+          DEB_PATH=$(find src-tauri/target/release/bundle/deb -iname "*.deb" | head -n 1)
+
+          if [ -z "$APPIMAGE_PATH" ]; then
+            echo "No se encontró ningún .AppImage. Archivos disponibles:" >&2
+            find src-tauri/target/release/bundle -type f >&2
+            exit 1
+          fi
+          if [ -z "$DEB_PATH" ]; then
+            echo "No se encontró ningún .deb. Archivos disponibles:" >&2
+            find src-tauri/target/release/bundle -type f >&2
+            exit 1
+          fi
+
+          echo "AppImage encontrado: $APPIMAGE_PATH ($(du -h "$APPIMAGE_PATH" | cut -f1))"
+          echo "deb encontrado: $DEB_PATH ($(du -h "$DEB_PATH" | cut -f1))"
+          echo "appimage=$APPIMAGE_PATH" >> "$GITHUB_OUTPUT"
+          echo "deb=$DEB_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Crear el Release (draft) y subir los artefactos
+        # draft: true — igual que en build-android: queda oculto hasta que
+        # publish-release.yml lo publique cuando ambos builds terminaron.
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.artefactos.outputs.appimage }}
+            ${{ steps.artefactos.outputs.deb }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: true

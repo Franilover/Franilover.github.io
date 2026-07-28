@@ -1,0 +1,74 @@
+name: publish-release
+
+# Se dispara automáticamente cada vez que termina build-android o
+# build-linux (los dos corren en paralelo por el mismo tag vX.Y.Z).
+# Cada vez que uno de los dos termina, este workflow chequea si EL OTRO
+# también ya terminó con éxito para el mismo tag — si es así, publica el
+# Release (que hasta ahora estaba en draft). Si el otro todavía no terminó,
+# no hace nada y espera a que lo dispare el próximo que termine.
+#
+# No hace falta tocar nada de este archivo cuando agregues más plataformas
+# en el futuro (ej. Windows/macOS): solo hay que sumar su nombre a la lista
+# WORKFLOWS_REQUERIDOS de abajo y agregarlo también a workflow_run.workflows.
+
+on:
+  workflow_run:
+    workflows: ["build-android", "build-linux"]
+    types:
+      - completed
+
+permissions:
+  contents: write # necesario para publicar el Release
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Si el workflow que nos disparó falló o fue cancelado, no tiene sentido
+    # seguir: ni siquiera llegó a subir su asset al draft.
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Chequear que todos los builds del tag ya terminaron
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          # WORKFLOWS_REQUERIDOS = todos los builds que tienen que estar en
+          # verde antes de publicar. Agregar acá el nombre ("name:") de
+          # cualquier workflow nuevo que suba assets al mismo release.
+          WORKFLOWS_REQUERIDOS=("build-android" "build-linux")
+
+          echo "Tag: $TAG"
+          TODOS_OK=true
+
+          for WF in "${WORKFLOWS_REQUERIDOS[@]}"; do
+            # Busca la corrida más reciente de ese workflow para este tag
+            # exacto (head_branch en workflow_run es el nombre del tag).
+            CONCLUSION=$(gh run list \
+              --workflow "$WF" \
+              --branch "$TAG" \
+              --limit 1 \
+              --json conclusion \
+              --jq '.[0].conclusion // "pendiente"')
+
+            echo "  - $WF: $CONCLUSION"
+
+            if [ "$CONCLUSION" != "success" ]; then
+              TODOS_OK=false
+            fi
+          done
+
+          echo "todos_ok=$TODOS_OK" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar el Release
+        if: steps.check.outputs.todos_ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          echo "Todos los builds terminaron OK — publicando release de $TAG"
+          gh release edit "$TAG" --draft=false
+
+      - name: Esperar al resto
+        if: steps.check.outputs.todos_ok != 'true'
+        run: echo "Todavía falta algún build por terminar — no se publica el release aún. Este job se va a volver a disparar cuando termine el que falta."
