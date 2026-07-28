@@ -67,10 +67,13 @@ jobs:
         run: npm ci
 
       - name: Quitar rutas dinámicas web-only (no compatibles con output:export)
-        # /garlia/libros/[slug] usa SSR + generateMetadata y solo tiene sentido
-        # en el deploy de Vercel. En el build de Tauri (output:"export") ni
-        # siquiera debe existir el archivo: el APK usa la ruta estática
-        # /garlia/libros/detalle?slug=... en su lugar (ver ese page.tsx).
+        # /garlia/libros/[slug] (y su subruta anidada [slug]/leer/[orden]) usan
+        # SSR + generateMetadata y solo tienen sentido en el deploy de Vercel.
+        # En el build de Tauri (output:"export") ni siquiera deben existir los
+        # archivos: el APK usa las rutas estáticas /garlia/libros/detalle?slug=...
+        # y /garlia/libros/leer?slug=&orden= en su lugar (ver esos page.tsx).
+        # Borrar la carpeta [slug] completa alcanza: leer/[orden] vive anidada
+        # adentro, así que se va con el mismo rm -rf.
         run: rm -rf "src/app/(public)/garlia/libros/[slug]"
 
 

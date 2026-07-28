@@ -48,6 +48,7 @@ import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { useGlobalSearch } from "@/lib/api/queries/search";
 import { toSlug } from "@/lib/utils/slugify";
+import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/public/leerLibro";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -1484,7 +1485,7 @@ export function GlobalCommandPalette() {
             : (l.estado ?? "Libro"),
           icon: BookText,
           avatar: l.portada_url ?? null,
-          action: () => go(`/garlia/libros/${toSlug(l.titulo)}`),
+          action: () => go(rutaLibro(toSlug(l.titulo))),
           group: "Libros",
         })),
         ...cancionesPublicas.map((c) => ({
@@ -1499,7 +1500,7 @@ export function GlobalCommandPalette() {
         ...capitulosPublicos.map((c) => {
           const libroSlug = toSlug(c.libro_titulo ?? "");
           const destino = libroSlug
-            ? `/garlia/libros/${libroSlug}/leer/${c.orden}`
+            ? rutaLeer(libroSlug, c.orden)
             : `/garlia/libros`;
           return {
             id: `cap-pub-${c.id}`,
@@ -1673,7 +1674,7 @@ export function GlobalCommandPalette() {
             icon: BookText,
             avatar: l.portada_url ?? null,
             keywords: ["libro", "leer", l.titulo],
-            action: () => go(`/garlia/libros/${toSlug(l.titulo)}`),
+            action: () => go(rutaLibro(toSlug(l.titulo))),
             group: "Descubrir · Libros",
           })),
           ...browseCanciones.map((c) => ({

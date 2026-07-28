@@ -9,15 +9,15 @@ import React, {
   useMemo,
 } from "react";
 
-import {
-  RichEditor,
-  type RichEditorFormatCommand,
-} from "@/editor/lexical";
 import { AddLayoutBoxButton } from "@/editor/layout-boxes/AddLayoutBoxButton";
-import { LayoutCanvas, type LayoutCanvasHandle } from "@/editor/layout-boxes/LayoutCanvas";
+import {
+  LayoutCanvas,
+  type LayoutCanvasHandle,
+} from "@/editor/layout-boxes/LayoutCanvas";
 import { parseLayoutBoxes, type LayoutBox } from "@/editor/layout-boxes/types";
-import { MotionDiv } from "@/ui/Motion";
+import { RichEditor, type RichEditorFormatCommand } from "@/editor/lexical";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
+import { MotionDiv } from "@/ui/Motion";
 
 import { CitePopup } from "./citePopup";
 import { LibroPanel } from "./LibroPanel";
@@ -354,10 +354,12 @@ export function Editor({
       }}
     >
       <RichEditor
-        extraToolbarAction={
-          <AddLayoutBoxButton onClick={() => layoutCanvasRef.current?.addBox()} />
-        }
         exportFileName={localTitulo || ensayo.titulo}
+        extraToolbarAction={
+          <AddLayoutBoxButton
+            onClick={() => layoutCanvasRef.current?.addBox()}
+          />
+        }
         formatCommandRef={formatCommandRef}
         mode={richMode}
         placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"

@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, List, ChevronRight } from "lucide-react";
 import Image from "next/image";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 
 import { Btn } from "@/ui";
@@ -18,7 +18,6 @@ import {
 import { Vignette } from "@/domains/garlia/libros/public/LectorUI";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
-import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 // ⚠️ Ajustar esta ruta si syncEngine.ts vive en otra carpeta del proyecto.
 import {
   collectIds,
@@ -27,6 +26,25 @@ import {
   loadReinosMap,
 } from "@/infra/sync/syncEngine";
 import { toSlug, esUUID } from "@/lib/utils/slugify";
+import { IS_TAURI_BUILD } from "@/lib/config/buildTarget";
+
+// Arma la URL al índice de capítulos de un libro, condicional según build.
+// Acepta tanto slug canónico como UUID legacy (leerLibro/detallesLibro
+// resuelven el UUID a slug real en un efecto posterior y canonicalizan la URL).
+export function rutaLibro(slug: string): string {
+  return IS_TAURI_BUILD
+    ? `/garlia/libros/detalle?slug=${slug}`
+    : `/garlia/libros/${slug}`;
+}
+
+// Arma la URL al lector de un capítulo puntual, condicional según build.
+// `orden` acepta tanto el número de orden canónico como un UUID de capítulo
+// legacy (el componente Lector resuelve ambos casos vía esUUID()).
+export function rutaLeer(slug: string, orden: number | string): string {
+  return IS_TAURI_BUILD
+    ? `/garlia/libros/leer?slug=${slug}&orden=${orden}`
+    : `/garlia/libros/${slug}/leer/${orden}`;
+}
 
 /* ─────────────────────────────────────────────
    Tipos
@@ -595,32 +613,17 @@ function PanelLateral({
 /* ─────────────────────────────────────────────
    Componente principal del lector
    ───────────────────────────────────────────── */
-export default function Lector() {
-  const params = useParams();
-  const idFromNext = params?.id as string;
-  const capIdFromNext = params?.capId as string;
-  // En output:"export" + rewrite de Vercel a /placeholder/leer/placeholder,
-  // useParams() devuelve los valores horneados en build, no los reales de
-  // la URL. Si detectamos ese caso, leemos ambos segmentos reales desde
-  // window.location, que sí refleja la URL que ve el usuario.
-  const [slugParam, setSlugParam] = useState<string>(idFromNext);
-  const [ordenParam, setOrdenParam] = useState<string>(capIdFromNext);
-
-  useEffect(() => {
-    if (idFromNext !== "placeholder" && capIdFromNext !== "placeholder") {
-      setSlugParam(idFromNext);
-      setOrdenParam(capIdFromNext);
-      return;
-    }
-    if (typeof window === "undefined") return;
-    // /garlia/libros/:id/leer/:capId
-    const partes = window.location.pathname.split("/").filter(Boolean);
-    const leerIdx = partes.indexOf("leer");
-    if (leerIdx > 0 && partes[leerIdx + 1]) {
-      setSlugParam(partes[leerIdx - 1]);
-      setOrdenParam(partes[leerIdx + 1]);
-    }
-  }, [idFromNext, capIdFromNext]);
+export default function Lector({
+  slug,
+  orden,
+}: { slug?: string; orden?: string } = {}) {
+  const searchParams = useSearchParams();
+  // En la ruta web (/garlia/libros/[slug]/leer/[orden]) el slug y el orden
+  // llegan por prop desde el server component. En la ruta del APK
+  // (/garlia/libros/leer?slug=...&orden=...) no hay prop, así que se leen
+  // de los query params.
+  const slugParam = slug ?? searchParams.get("slug") ?? "";
+  const ordenParam = orden ?? searchParams.get("orden") ?? "";
 
   const router = useRouter();
 
@@ -793,7 +796,7 @@ export default function Lector() {
         // Canonicalizamos el slug del libro en la URL de inmediato (link
         // legacy con UUID), conservando el segmento de capítulo actual.
         if (!cancelled) {
-          router.replace(`/garlia/libros/${actualSlug}/leer/${ordenParam}`, {
+          router.replace(rutaLeer(actualSlug, ordenParam), {
             scroll: false,
           });
         }
@@ -850,7 +853,7 @@ export default function Lector() {
         // El slug pudo venir con formato distinto al canónico (mayúsculas,
         // acentos, etc.) — lo normalizamos sin tocar el capítulo actual.
         if (actualSlug !== slugParam && !cancelled) {
-          router.replace(`/garlia/libros/${actualSlug}/leer/${ordenParam}`, {
+          router.replace(rutaLeer(actualSlug, ordenParam), {
             scroll: false,
           });
         }
@@ -987,7 +990,7 @@ export default function Lector() {
     // Canonicalizar URL si el parámetro no era el número de orden correcto
     // (link legacy con UUID, o número fuera de rango).
     if (ordenParam !== String(capActivo.orden)) {
-      router.replace(`/garlia/libros/${slugCanonico}/leer/${capActivo.orden}`, {
+      router.replace(rutaLeer(slugCanonico, capActivo.orden), {
         scroll: false,
       });
     }
@@ -1003,7 +1006,7 @@ export default function Lector() {
     (targetCapId: string) => {
       const cap = capitulos.find((c) => c.id === targetCapId);
       if (!cap) return;
-      const url = `/garlia/libros/${slugParam}/leer/${cap.orden}`;
+      const url = rutaLeer(slugParam, cap.orden);
       const el = document.getElementById(`cap-${targetCapId}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1071,7 +1074,7 @@ export default function Lector() {
         <Btn
           size="sm"
           variant="outline"
-          onClick={() => navegarRutaDinamica(`/garlia/libros/${slugParam}`, () => router.push(`/garlia/libros/${slugParam}`))}
+          onClick={() => router.push(rutaLibro(slugParam))}
         >
           Volver al índice
         </Btn>
@@ -1096,7 +1099,7 @@ export default function Lector() {
       >
         <button
           className="flex items-center gap-2 text-primary/40 hover:text-primary transition-colors font-black text-micro uppercase tracking-widest"
-          onClick={() => navegarRutaDinamica(`/garlia/libros/${slugParam}`, () => router.push(`/garlia/libros/${slugParam}`))}
+          onClick={() => router.push(rutaLibro(slugParam))}
         >
           <ChevronLeft size={14} /> Volver
         </button>
@@ -1158,7 +1161,7 @@ export default function Lector() {
                   handleNavigate(id);
                   setShowSidebar(false);
                 }}
-                onVolver={() => navegarRutaDinamica(`/garlia/libros/${slugParam}`, () => router.push(`/garlia/libros/${slugParam}`))}
+                onVolver={() => router.push(rutaLibro(slugParam))}
               />
             </motion.div>
           </>
@@ -1178,7 +1181,7 @@ export default function Lector() {
           personajesMap={personajesMap}
           reinosMap={reinosMap}
           onSelectCap={handleNavigate}
-          onVolver={() => navegarRutaDinamica(`/garlia/libros/${slugParam}`, () => router.push(`/garlia/libros/${slugParam}`))}
+          onVolver={() => router.push(rutaLibro(slugParam))}
         />
       </div>
 
@@ -1259,7 +1262,7 @@ export default function Lector() {
               /* Poemario / extra: solo botón volver al índice, sin anterior/siguiente */
               <button
                 className="flex items-center gap-2 text-primary/40 hover:text-primary font-black text-micro uppercase tracking-widest transition-all"
-                onClick={() => navegarRutaDinamica(`/garlia/libros/${slugParam}`, () => router.push(`/garlia/libros/${slugParam}`))}
+                onClick={() => router.push(rutaLibro(slugParam))}
               >
                 <List size={16} /> Índice
               </button>
@@ -1271,7 +1274,7 @@ export default function Lector() {
                     className="flex items-center gap-2 text-primary/40 hover:text-primary font-black text-micro uppercase tracking-widest transition-all"
                     onClick={() =>
                       router.push(
-                        `/garlia/libros/${slugParam}/leer/${capAnterior.orden}`,
+                        rutaLeer(slugParam, capAnterior.orden),
                       )
                     }
                   >
@@ -1283,7 +1286,7 @@ export default function Lector() {
 
                 <button
                   className="flex items-center gap-2 text-primary/40 hover:text-primary font-black text-micro uppercase tracking-widest transition-all"
-                  onClick={() => navegarRutaDinamica(`/garlia/libros/${slugParam}`, () => router.push(`/garlia/libros/${slugParam}`))}
+                  onClick={() => router.push(rutaLibro(slugParam))}
                 >
                   <List size={16} /> Índice
                 </button>
@@ -1293,7 +1296,7 @@ export default function Lector() {
                     className="flex items-center gap-2 text-primary/40 hover:text-primary font-black text-micro uppercase tracking-widest transition-all"
                     onClick={() =>
                       router.push(
-                        `/garlia/libros/${slugParam}/leer/${capSiguiente.orden}`,
+                        rutaLeer(slugParam, capSiguiente.orden),
                       )
                     }
                   >

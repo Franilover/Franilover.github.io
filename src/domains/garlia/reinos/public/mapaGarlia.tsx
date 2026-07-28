@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { MotionDiv, MotionButton } from "@/ui/Motion";
-import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
+import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/public/leerLibro";
 import { ReinoTileCanvas } from "@garlia/reinos";
 import {
   UnifiedTileCanvas,
@@ -762,9 +762,7 @@ function PanelContenido({
                           cursor: "pointer",
                         }}
                         onClick={() =>
-                          router.push(
-                            `/garlia/libros/${cap.libro_id}/leer/${cap.id}`,
-                          )
+                          router.push(rutaLeer(cap.libro_id, cap.id))
                         }
                       >
                         <BookMarked
@@ -988,9 +986,7 @@ function PanelContenido({
                           cursor: "pointer",
                         }}
                         onClick={() =>
-                          navegarRutaDinamica(`/garlia/libros/${libro.id}`, () =>
-                            router.push(`/garlia/libros/${libro.id}`),
-                          )
+                          router.push(rutaLibro(libro.id))
                         }
                       >
                         {libro.portada_url && (
@@ -1108,9 +1104,7 @@ function PanelContenido({
                               cursor: "pointer",
                             }}
                             onClick={() =>
-                              router.push(
-                                `/garlia/libros/${cap.libro_id}/leer/${cap.id}`,
-                              )
+                              router.push(rutaLeer(cap.libro_id, cap.id))
                             }
                           >
                             <span

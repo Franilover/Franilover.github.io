@@ -546,7 +546,9 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
       capitulos.find((c) => c.id === targetId) ??
       capitulos.find((c) => c.id === primerCapId);
     const orden = cap?.orden ?? 1;
-    return `/garlia/libros/leer?slug=${slugParam}&orden=${orden}`;
+    return IS_TAURI_BUILD
+      ? `/garlia/libros/leer?slug=${slugParam}&orden=${orden}`
+      : `/garlia/libros/${slugParam}/leer/${orden}`;
   };
 
   // ── Fila de personajes ──────────────────────────────────────────────────────
