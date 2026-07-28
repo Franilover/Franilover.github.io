@@ -357,6 +357,7 @@ export function Editor({
         extraToolbarAction={
           <AddLayoutBoxButton onClick={() => layoutCanvasRef.current?.addBox()} />
         }
+        exportFileName={localTitulo || ensayo.titulo}
         formatCommandRef={formatCommandRef}
         mode={richMode}
         placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"

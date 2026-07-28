@@ -1331,6 +1331,7 @@ const PanelEditor = ({
                   <RichEditor
                     key={capId}
                     autoFocus={focusMode}
+                    exportFileName={titulo || cap?.titulo_capitulo}
                     // Bloquea la edición mientras `cap` todavía no cargó datos
                     // reales para este capId. Es la defensa física: sin esto,
                     // el usuario podía escribir en el editor durante el frame

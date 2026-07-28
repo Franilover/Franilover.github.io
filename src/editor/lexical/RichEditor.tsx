@@ -51,7 +51,7 @@ import {
 } from "lexical";
 import { $setBlocksType } from "@lexical/selection";
 import type { EditorState, LexicalEditor, LexicalNode } from "lexical";
-import { Edit3, Eye, Columns2, SpellCheck2 } from "lucide-react";
+import { Edit3, Eye, Columns2, SpellCheck2, Download, FileText, Copy, Check } from "lucide-react";
 import React, {
   useCallback,
   useEffect,
@@ -248,6 +248,13 @@ export interface RichEditorProps {
    * ve exactamente igual que antes.
    */
   extraToolbarAction?: React.ReactNode;
+  /**
+   * Nombre de archivo (sin extensión) usado por el botón de exportar
+   * (.md / .pdf). Si no se pasa, cae a "documento". El botón de exportar
+   * se muestra siempre — usa directamente `value` (markdown crudo), así
+   * que no depende de renderPreview ni de nada más.
+   */
+  exportFileName?: string;
   /**
    * Cómo renderizar el panel de "Preview"/"Split". RichEditor es
    * genérico — no todos los consumidores usan el formato [[kind|...]]
@@ -719,6 +726,232 @@ function FormatCommandPlugin({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Exportar markdown — botón con menú desplegable: descargar .md, descargar
+// PDF (vía ventana de impresión del navegador, sin dependencias externas) o
+// copiar el markdown crudo al portapapeles. Usa directamente `value` (el
+// mismo string raw que maneja onChange), no un snapshot del árbol Lexical —
+// así queda perfectamente sincronizado con lo que ya se está guardando.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function slugifyFileName(name: string): string {
+  return (
+    name
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "documento"
+  );
+}
+
+// Escapado mínimo para que el markdown crudo no rompa el HTML al inyectarlo
+// dentro de un <pre> en la ventana de impresión (export a PDF).
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function downloadTextFile(filename: string, mime: string, content: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportMarkdownAsPdf(title: string, markdown: string) {
+  // Sin librerías de PDF: abrimos una ventana nueva con el markdown crudo
+  // formateado como texto preformateado y disparamos window.print() — el
+  // usuario elige "Guardar como PDF" en el diálogo de impresión del
+  // navegador. Funciona en cualquier navegador moderno, sin deps extra.
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtml(title)}</title>
+<style>
+  @page { margin: 2cm; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #1a1a1a;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 1.2rem; }
+  pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+<h1>${escapeHtml(title)}</h1>
+<pre>${escapeHtml(markdown)}</pre>
+<script>
+  window.onload = function () {
+    window.focus();
+    window.print();
+  };
+</script>
+</body>
+</html>`);
+  win.document.close();
+}
+
+function ExportMenuButton({
+  markdown,
+  fileName,
+}: {
+  markdown: string;
+  fileName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  const slug = slugifyFileName(fileName);
+
+  const handleDownloadMd = () => {
+    downloadTextFile(`${slug}.md`, "text/markdown;charset=utf-8", markdown);
+    setOpen(false);
+  };
+
+  const handleDownloadPdf = () => {
+    exportMarkdownAsPdf(fileName, markdown);
+    setOpen(false);
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Fallback silencioso: si el navegador bloquea la API de portapapeles
+      // (permiso denegado, contexto no seguro), no rompemos nada más.
+    }
+    setOpen(false);
+  };
+
+  const menuItems: {
+    key: string;
+    label: string;
+    Icon: typeof Download;
+    onClick: () => void;
+  }[] = [
+    { key: "md", label: "Descargar Markdown (.md)", Icon: Download, onClick: handleDownloadMd },
+    { key: "pdf", label: "Descargar como PDF", Icon: FileText, onClick: handleDownloadPdf },
+    { key: "copy", label: copied ? "¡Copiado!" : "Copiar Markdown", Icon: copied ? Check : Copy, onClick: handleCopy },
+  ];
+
+  return (
+    <div ref={containerRef} style={{ position: "relative" }}>
+      <button
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 22,
+          height: 20,
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          color: open
+            ? "color-mix(in srgb, var(--foreground) 60%, transparent)"
+            : "color-mix(in srgb, var(--foreground) 18%, transparent)",
+          transition: "color 0.1s",
+        }}
+        title="Exportar documento"
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Download size={11} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: 4,
+            background: "var(--background, #fff)",
+            border: "1px solid color-mix(in srgb, var(--foreground) 12%, transparent)",
+            borderRadius: 8,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            padding: 4,
+            minWidth: 200,
+            zIndex: 50,
+          }}
+        >
+          {menuItems.map(({ key, label, Icon, onClick }) => (
+            <button
+              key={key}
+              role="menuitem"
+              type="button"
+              onClick={onClick}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "6px 8px",
+                background: "transparent",
+                border: "none",
+                borderRadius: 5,
+                cursor: "pointer",
+                fontSize: 12,
+                color: "var(--foreground)",
+                textAlign: "left",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background =
+                  "color-mix(in srgb, var(--foreground) 8%, transparent)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Toggle de modo — icon-only, sin caja ni bordes (igual que el mobile toggle
 // de MarkdownEditor). Sin botones de formato: bold/italic/etc ya se aplican
 // con los shortcuts de markdown (**, *, #...) vía MarkdownShortcutPlugin.
@@ -1064,6 +1297,7 @@ export function RichEditor({
   showSplitMode = true,
   renderPreview,
   extraToolbarAction,
+  exportFileName,
 }: RichEditorProps) {
   const [internalMode, setInternalMode] = useState<ViewMode>("edit");
   const mode = modeProp ?? internalMode;
@@ -1535,6 +1769,10 @@ export function RichEditor({
           >
             <SpellCheck2 size={11} />
           </button>
+          <ExportMenuButton
+            markdown={value}
+            fileName={exportFileName || "documento"}
+          />
           {extraToolbarAction}
           {showSplitMode && (modeProp === undefined || onModeChange) && (
             <ModeTogglePlugin mode={mode} onModeChange={handleModeChange} />
