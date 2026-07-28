@@ -26,6 +26,7 @@ import {
   collectIds,
 } from "@/infra/sync/syncEngine";
 import { toSlug, esUUID } from "@/lib/utils/slugify";
+import { IS_TAURI_BUILD } from "@/lib/config/buildTarget";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -290,9 +291,12 @@ function ModalTriggerWarning({
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export default function LibroDetalle() {
+export default function LibroDetalle({ slug }: { slug?: string } = {}) {
   const searchParams = useSearchParams();
-  const slugParam = searchParams.get("slug") ?? "";
+  // En la ruta web (/garlia/libros/[slug]) el slug llega por prop desde el
+  // server component. En la ruta del APK (/garlia/libros/detalle?slug=...)
+  // no hay prop, así que se lee del query param.
+  const slugParam = slug ?? searchParams.get("slug") ?? "";
 
   const router = useRouter();
 
@@ -419,7 +423,12 @@ export default function LibroDetalle() {
           return;
         }
         const slug = toSlug(libroData.titulo);
-        if (slug) router.replace(`/garlia/libros/detalle?slug=${slug}`);
+        if (slug) {
+          const destino = IS_TAURI_BUILD
+            ? `/garlia/libros/detalle?slug=${slug}`
+            : `/garlia/libros/${slug}`;
+          router.replace(destino);
+        }
       } else {
         libroData = await resolverLibroPorSlug(slugParam);
         if (!libroData) {

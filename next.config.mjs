@@ -16,7 +16,12 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig = {
-  output: "export",
+  // Solo el build empaquetado en el APK necesita export estático puro.
+  // El deploy de Vercel corre con SSR normal, así que sí puede tener rutas
+  // dinámicas [slug] con metadata real por página (título/OG/descripción).
+  // Se activa poniendo NEXT_PUBLIC_BUILD_TARGET=tauri en el script/CI que
+  // arma el bundle para Tauri (src-tauri o el workflow que lo dispare).
+  output: process.env.NEXT_PUBLIC_BUILD_TARGET === "tauri" ? "export" : undefined,
   eslint: {
     ignoreDuringBuilds: true,
   },

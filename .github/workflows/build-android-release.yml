@@ -250,6 +250,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_FORMSPREE_ID: ${{ secrets.NEXT_PUBLIC_FORMSPREE_ID }}
           NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+          # Activa output:"export" en next.config.mjs y las rutas estáticas
+          # (detalle/leer con query params) en vez de las [slug] dinámicas
+          # que solo sirven para el deploy web con SSR en Vercel.
+          NEXT_PUBLIC_BUILD_TARGET: tauri
         run: npx tauri android build --apk
 
       - name: Ubicar el .apk generado
