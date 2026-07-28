@@ -16,9 +16,14 @@ import {
   type PerfilResumen,
 } from "@/infra/call/chatEngine";
 import { supabase } from "@/infra/supabase/supabase";
-import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { useAuth } from "@/providers/AuthProvider";
 import { useRouter } from "next/navigation";
+
+// Ruta única al detalle de una conversación, misma para web y para el APK
+// de Tauri (mensajes es contenido privado, no hay SEO en juego).
+function rutaConversacion(id: string): string {
+  return `/personal/mensajes/detalle?id=${id}`;
+}
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -84,7 +89,7 @@ export default function BibliotecaMensajes() {
     const convId = await obtenerOCrearConversacion1a1(perfil.id);
     setBusqueda("");
     setResultados([]);
-    navegarRutaDinamica(`/personal/mensajes/${convId}`, () => router.push(`/personal/mensajes/${convId}`));
+    router.push(rutaConversacion(convId));
   };
 
   if (!user) {
@@ -180,13 +185,7 @@ export default function BibliotecaMensajes() {
               <Link
                 key={c.id}
                 className="flex items-center gap-3 p-3 rounded-[var(--radius-btn)] transition-all"
-                href={`/personal/mensajes/${c.id}`}
-                onClick={(e) => {
-                  if (estaEnTauri()) {
-                    e.preventDefault();
-                    navegarRutaDinamica(`/personal/mensajes/${c.id}`);
-                  }
-                }}
+                href={rutaConversacion(c.id)}
                 style={{
                   background: "var(--white-custom)",
                   border: "var(--border-width) solid color-mix(in srgb, var(--primary) 8%, transparent)",

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, Check, CheckCheck, Paperclip, Phone, Send, SmilePlus, Trash2, X } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 
 import { Loading } from "@/ui";
@@ -37,24 +37,10 @@ import { supabase } from "@/infra/supabase/supabase";
 import { useAuth } from "@/providers/AuthProvider";
 
 export default function DetalleConversacion() {
-  const params = useParams();
-  const idFromNext = params?.id as string;
-  // En output:"export" + rewrite de Vercel a /placeholder, useParams()
-  // devuelve el valor horneado en build ("placeholder"), no el id real
-  // de la URL. Si detectamos ese caso, leemos el segmento real desde
-  // window.location, que sí refleja la URL que ve el usuario.
-  const [conversacionId, setConversacionId] = useState<string>(idFromNext);
-
-  useEffect(() => {
-    if (idFromNext !== "placeholder") {
-      setConversacionId(idFromNext);
-      return;
-    }
-    if (typeof window === "undefined") return;
-    const partes = window.location.pathname.split("/").filter(Boolean);
-    const real = partes[partes.length - 1];
-    if (real) setConversacionId(real);
-  }, [idFromNext]);
+  const searchParams = useSearchParams();
+  // El id real de la conversación viaja siempre como ?id=..., leído con
+  // useSearchParams (misma ruta estática en web y en el APK de Tauri).
+  const conversacionId = searchParams.get("id") ?? "";
 
   const router = useRouter();
   const { user } = useAuth() as { user: any };
@@ -98,7 +84,7 @@ export default function DetalleConversacion() {
   // Traemos los datos del otro participante para el header y para poder
   // ofrecerle la llamada (nombre/avatar que se muestran en su pantalla).
   useEffect(() => {
-    if (!conversacionId || conversacionId === "placeholder" || !user) return;
+    if (!conversacionId || !user) return;
     let mounted = true;
     (async () => {
       const { data } = await supabase
@@ -146,7 +132,7 @@ export default function DetalleConversacion() {
   };
 
   useEffect(() => {
-    if (!conversacionId || conversacionId === "placeholder") return;
+    if (!conversacionId) return;
     let mounted = true;
     setHayMasAnteriores(true);
 
@@ -202,7 +188,7 @@ export default function DetalleConversacion() {
   // `conversacion_participantes` (ultimo_leido_at del otro participante),
   // sobre el mismo canal compartido de la conversación.
   useEffect(() => {
-    if (!conversacionId || conversacionId === "placeholder" || !otroParticipante) return;
+    if (!conversacionId || !otroParticipante) return;
     let mounted = true;
 
     void obtenerUltimoLeidoDeOtro(conversacionId, otroParticipante.id).then((valor) => {
@@ -231,7 +217,7 @@ export default function DetalleConversacion() {
   // completo como red de seguridad (por si igual se perdió algún evento
   // mientras el canal se estaba reenganchando).
   useEffect(() => {
-    if (!conversacionId || conversacionId === "placeholder") return;
+    if (!conversacionId) return;
 
     const handleVisibilidad = () => {
       if (document.visibilityState !== "visible") return;
@@ -329,7 +315,7 @@ export default function DetalleConversacion() {
 
   // ── Indicador "escribiendo…" del otro participante ──────────────────────
   useEffect(() => {
-    if (!conversacionId || conversacionId === "placeholder" || !user) return;
+    if (!conversacionId || !user) return;
 
     const desuscribirEscribiendo = suscribirseAEscribiendo(conversacionId, (senal) => {
       if (senal.perfilId === user.id) return; // ignorar nuestras propias señales
@@ -357,7 +343,7 @@ export default function DetalleConversacion() {
   // la última tecla. Debounce local, no manda un broadcast por cada letra.
   const handleCambioTexto = (valor: string) => {
     setTexto(valor);
-    if (!conversacionId || conversacionId === "placeholder" || !user) return;
+    if (!conversacionId || !user) return;
 
     if (!escribiendoOffRef.current) {
       void emitirEscribiendo(conversacionId, user.id, true);
