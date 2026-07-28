@@ -17,8 +17,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 import React, { useEffect, useState } from "react";
-import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { IS_TAURI_BUILD } from "@/lib/config/buildTarget";
+import { rutaCancion } from "@/domains/garlia/canciones/public/detallesCancion";
 
 // Arma la URL al perfil público de un usuario, condicional según build.
 function rutaPersonal(username: string): string {
@@ -830,13 +830,7 @@ export default function PersonalUsername({ username }: PersonalUsernameProps) {
                       <Link
                         key={cancion.id ?? i}
                         className="group flex items-center gap-3 px-3 py-3 transition-all"
-                        href={`/garlia/canciones/${cancion.id}`}
-                        onClick={(e) => {
-                          if (estaEnTauri()) {
-                            e.preventDefault();
-                            navegarRutaDinamica(`/garlia/canciones/${cancion.id}`);
-                          }
-                        }}
+                        href={rutaCancion(cancion.id)}
                         style={{
                           background:
                             "color-mix(in srgb, var(--primary) 3%, var(--white-custom))",

@@ -49,6 +49,7 @@ import { supabase } from "@/infra/supabase/supabase";
 import { useGlobalSearch } from "@/lib/api/queries/search";
 import { toSlug } from "@/lib/utils/slugify";
 import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/public/leerLibro";
+import { rutaCancion } from "@/domains/garlia/canciones/public/detallesCancion";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 
@@ -1494,7 +1495,7 @@ export function GlobalCommandPalette() {
           description: c.cantante ?? "Canción",
           icon: Music,
           avatar: c.portada_url ?? null,
-          action: () => go(`/garlia/canciones/${toSlug(c.titulo)}`),
+          action: () => go(rutaCancion(toSlug(c.titulo))),
           group: "Canciones",
         })),
         ...capitulosPublicos.map((c) => {
@@ -1684,7 +1685,7 @@ export function GlobalCommandPalette() {
             icon: Music,
             avatar: c.portada_url ?? null,
             keywords: ["cancion", "música", c.titulo],
-            action: () => go(`/garlia/canciones/${toSlug(c.titulo)}`),
+            action: () => go(rutaCancion(toSlug(c.titulo))),
             group: "Descubrir · Canciones",
           })),
         ]

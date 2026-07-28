@@ -82,6 +82,12 @@ jobs:
         # estática /garlia/personal/detalle?username=... en su lugar.
         run: rm -rf "src/app/(public)/garlia/personal/[username]"
 
+      - name: Quitar ruta dinámica web-only de canciones (no compatible con output:export)
+        # /garlia/canciones/[slug] también usa SSR + generateMetadata y solo
+        # tiene sentido en Vercel. El APK usa la ruta estática
+        # /garlia/canciones/detalle?slug=... en su lugar.
+        run: rm -rf "src/app/(public)/garlia/canciones/[slug]"
+
 
       - name: Instalar Tauri CLI
         run: npm install -g @tauri-apps/cli@latest

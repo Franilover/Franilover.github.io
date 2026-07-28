@@ -1,6 +1,6 @@
 "use client";
 import { AlertCircle, Music, ExternalLink, ChevronLeft, Info } from "lucide-react";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 import { Btn, Loading } from "@/ui";
@@ -8,8 +8,17 @@ import { MotionDiv } from "@/ui/Motion";
 import { SmartImage } from "@/ui/SmartImage";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
-import { navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import { toSlug, esUUID } from "@/lib/utils/slugify";
+import { IS_TAURI_BUILD } from "@/lib/config/buildTarget";
+
+// Arma la URL al detalle de una canción, condicional según build.
+// Acepta tanto slug canónico como UUID legacy (este componente resuelve
+// el UUID a slug real en un efecto posterior y canonicaliza la URL).
+export function rutaCancion(slug: string): string {
+  return IS_TAURI_BUILD
+    ? `/garlia/canciones/detalle?slug=${slug}`
+    : `/garlia/canciones/${slug}`;
+}
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
@@ -218,29 +227,13 @@ function CoverFlip({
   );
 }
 
-export default function CancionDetallesPage() {
-  const params = useParams();
+export default function CancionDetallesPage({ slug }: { slug?: string } = {}) {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const paramFromNext = Array.isArray(params?.id)
-    ? params.id[0]
-    : (params?.id as string);
-  // En output:"export" + rewrite de Vercel a /placeholder, useParams()
-  // devuelve el valor horneado en build ("placeholder"), no el slug real
-  // de la URL. Si detectamos ese caso, leemos el segmento real desde
-  // window.location, que sí refleja la URL que ve el usuario.
-  const [slugParam, setSlugParam] = useState<string>(paramFromNext);
-
-  useEffect(() => {
-    if (paramFromNext !== "placeholder") {
-      setSlugParam(paramFromNext);
-      return;
-    }
-    if (typeof window === "undefined") return;
-    const partes = window.location.pathname.split("/").filter(Boolean);
-    // /garlia/canciones/:slug
-    const real = partes[partes.length - 1];
-    if (real) setSlugParam(real);
-  }, [paramFromNext]);
+  // En la ruta web (/garlia/canciones/[slug]) el slug llega por prop desde
+  // el server component. En la ruta del APK (/garlia/canciones/detalle?slug=...)
+  // no hay prop, así que se lee del query param.
+  const slugParam = slug ?? searchParams.get("slug") ?? "";
 
   // id es el UUID real resuelto a partir del slug
   const [id, setId] = useState<string>("");
@@ -261,9 +254,7 @@ export default function CancionDetallesPage() {
         const { data } = await supabase
           .from("canciones").select("id, titulo").eq("id", slugParam).single();
         if (data) {
-          navegarRutaDinamica(`/garlia/canciones/${toSlug(data.titulo)}`, () =>
-            router.replace(`/garlia/canciones/${toSlug(data.titulo)}`),
-          );
+          router.replace(rutaCancion(toSlug(data.titulo)));
           setId(data.id);
         }
         return;
