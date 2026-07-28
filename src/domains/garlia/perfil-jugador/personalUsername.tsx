@@ -16,8 +16,16 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
-import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
 import React, { useEffect, useState } from "react";
+import { estaEnTauri, navegarRutaDinamica } from "@/lib/utils/navegacionTauri";
+import { IS_TAURI_BUILD } from "@/lib/config/buildTarget";
+
+// Arma la URL al perfil público de un usuario, condicional según build.
+function rutaPersonal(username: string): string {
+  return IS_TAURI_BUILD
+    ? `/garlia/personal/detalle?username=${username}`
+    : `/garlia/personal/${username}`;
+}
 
 import { MotionDiv } from "@/ui/Motion";
 import {
@@ -1448,13 +1456,7 @@ export default function PersonalUsername({ username }: PersonalUsernameProps) {
                   {otrosPerfiles.map((p) => (
                     <Link
                       key={p.id}
-                      href={`/garlia/personal/${p.username}`}
-                      onClick={(e) => {
-                        if (estaEnTauri()) {
-                          e.preventDefault();
-                          navegarRutaDinamica(`/garlia/personal/${p.username}`);
-                        }
-                      }}
+                      href={rutaPersonal(p.username)}
                     >
                       <div
                         className="flex items-center gap-2 px-3 py-2 transition-all hover:opacity-80"
@@ -1950,13 +1952,7 @@ export default function PersonalUsername({ username }: PersonalUsernameProps) {
                   {otrosPerfiles.map((p, idx) => (
                     <Link
                       key={p.id}
-                      href={`/garlia/personal/${p.username}`}
-                      onClick={(e) => {
-                        if (estaEnTauri()) {
-                          e.preventDefault();
-                          navegarRutaDinamica(`/garlia/personal/${p.username}`);
-                        }
-                      }}
+                      href={rutaPersonal(p.username)}
                     >
                       <MotionDiv
                         className="flex items-center gap-2.5 px-3 py-3 cursor-pointer transition-colors"

@@ -76,6 +76,12 @@ jobs:
         # adentro, así que se va con el mismo rm -rf.
         run: rm -rf "src/app/(public)/garlia/libros/[slug]"
 
+      - name: Quitar ruta dinámica web-only de perfiles (no compatible con output:export)
+        # /garlia/personal/[username] también usa SSR + generateMetadata (perfil
+        # público de jugador) y solo tiene sentido en Vercel. El APK usa la ruta
+        # estática /garlia/personal/detalle?username=... en su lugar.
+        run: rm -rf "src/app/(public)/garlia/personal/[username]"
+
 
       - name: Instalar Tauri CLI
         run: npm install -g @tauri-apps/cli@latest
