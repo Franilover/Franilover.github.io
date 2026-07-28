@@ -16,6 +16,17 @@ on:
     workflows: ["build-android", "build-linux"]
     types:
       - completed
+  workflow_dispatch:
+    # Permite correrlo a mano desde la pestaña Actions (botón "Run workflow"),
+    # útil para publicar un release sin esperar un tag nuevo — por ejemplo
+    # cuando build-android y build-linux ya terminaron ANTES de que este
+    # workflow existiera o se corrigiera, y por eso workflow_run nunca los
+    # "vio" terminar.
+    inputs:
+      tag:
+        description: "Tag a publicar (ej. v0.4.27)"
+        required: true
+        type: string
 
 permissions:
   contents: write # necesario para publicar el Release
@@ -23,9 +34,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Si el workflow que nos disparó falló o fue cancelado, no tiene sentido
-    # seguir: ni siquiera llegó a subir su asset al draft.
-    if: github.event.workflow_run.conclusion == 'success'
+    # Corre si: (a) nos disparó un workflow_run exitoso, o (b) lo lanzaste
+    # manualmente con workflow_dispatch (ahí no hay conclusion que chequear).
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout del repo
         # Necesario para que `gh` (run list / release edit) sepa a qué repo
@@ -36,7 +47,7 @@ jobs:
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.workflow_run.head_branch }}
+          TAG: ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
         run: |
           # WORKFLOWS_REQUERIDOS = todos los builds que tienen que estar en
           # verde antes de publicar. Agregar acá el nombre ("name:") de
@@ -69,7 +80,7 @@ jobs:
         if: steps.check.outputs.todos_ok == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.workflow_run.head_branch }}
+          TAG: ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
         run: |
           echo "Todos los builds terminaron OK — publicando release de $TAG"
           gh release edit "$TAG" --draft=false
