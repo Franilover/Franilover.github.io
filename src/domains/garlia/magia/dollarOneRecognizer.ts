@@ -148,8 +148,8 @@ function distanciaConRotacion(
   plantilla: Punto[],
   anguloInicial: number,
 ): number {
-  const desde = -anguloInicial;
-  const hasta = anguloInicial;
+  let desde = -anguloInicial;
+  let hasta = anguloInicial;
   const umbral = 0.1; // grados en radianes
 
   let x1 = PHI * desde + (1 - PHI) * hasta;
