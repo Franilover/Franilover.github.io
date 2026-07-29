@@ -11,6 +11,8 @@
 import { Sparkles, Star, ScrollText } from "lucide-react";
 import type React from "react";
 
+import type { Punto } from "./dollarOneRecognizer";
+
 export type Hechizo = {
   id: string;
   nombre: string;
@@ -19,6 +21,12 @@ export type Hechizo = {
   imagen_url?: string | null;
   criatura_id?: string | null;
   criatura?: { id: string; nombre: string; imagen_url?: string | null } | null;
+  /**
+   * Solo para runas: lista de trazos-ejemplo (cada uno una polilínea de
+   * puntos crudos) que definen cómo se "dibuja" esta runa. Se usan como
+   * plantillas del reconocedor $1 Unistroke. Guardado como jsonb.
+   */
+  patron_trazos?: Punto[][] | null;
 };
 
 export type Don = Hechizo;

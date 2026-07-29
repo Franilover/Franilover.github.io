@@ -31,6 +31,7 @@ import { dexiePut, dexieDelete as dexieDel } from "@/lib/utils/dexieHelpers";
 
 import { PanelGruposAsignados } from "./PanelGruposAsignados";
 import { PickerImagenRunaBtn } from "./PickerImagenRunaBtn";
+import { PanelPatronRuna } from "./PanelPatronRuna";
 import { CONFIG, type EntidadMagica, type GrupoMin, type Modo } from "./types";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -75,6 +76,8 @@ export function FormularioMagico({
       };
       if (modo !== "runas") {
         updatePayload.grupo_ids = form.grupo_ids ?? [];
+      } else {
+        updatePayload.patron_trazos = form.patron_trazos ?? null;
       }
       const { error } = await supabase
         .from(cfg.tabla)
@@ -203,6 +206,15 @@ export function FormularioMagico({
                 modo={modo}
                 onGrupoIdsChange={(ids) =>
                   setForm((f) => ({ ...f, grupo_ids: ids }))
+                }
+              />
+            )}
+            {modo === "runas" && (
+              <PanelPatronRuna
+                color={cfg.color}
+                patronTrazos={(form.patron_trazos as any) ?? []}
+                onChange={(trazos) =>
+                  setForm((f) => ({ ...f, patron_trazos: trazos }))
                 }
               />
             )}

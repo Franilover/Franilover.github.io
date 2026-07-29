@@ -290,6 +290,8 @@ export interface Runa {
   nombre: string;
   explicacion?: string;
   imagen_url?: string | null;
+  /** Trazos de referencia para el reconocedor $1 Unistroke (ver dollarOneRecognizer.ts) */
+  patron_trazos?: { x: number; y: number }[][] | null;
   [key: string]: any;
 }
 

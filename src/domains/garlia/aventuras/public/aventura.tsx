@@ -11,7 +11,8 @@
  */
 
 import { AnimatePresence } from "framer-motion";
-import { ArrowLeft, BedDouble, Check, Loader2, Maximize2, MoreVertical, Plus, Sparkles, Swords, Trash2, X } from "lucide-react";
+import { ArrowLeft, BedDouble, Check, Loader2, Maximize2, MoreVertical, Plus, ScrollText, Sparkles, Swords, Trash2, X } from "lucide-react";
+import Link from "next/link";
 import React, { useState } from "react";
 
 import { MotionDiv } from "@/ui/Motion";
@@ -1127,6 +1128,21 @@ function AventuraFeed({ aventuraId, onVolver }: { aventuraId: string; onVolver: 
             <div className="fixed z-40 shadow-lg bottom-20 left-4 md:bottom-6 md:left-[64px]">
               <TiradaDados />
             </div>
+
+            {/* ── Runas: acceso a la página de dibujo de runas, esquina
+                inferior derecha, simétrico a los dados. ── */}
+            <Link
+              href="/garlia/runas"
+              className="fixed z-40 shadow-lg bottom-20 right-4 md:bottom-6 md:right-6 flex items-center justify-center w-12 h-12 rounded-full border transition-transform hover:scale-105"
+              style={{
+                background: "var(--white-custom)",
+                borderColor: "color-mix(in srgb, var(--primary) 20%, transparent)",
+                color: "var(--primary)",
+              }}
+              title="Dibujar una runa"
+            >
+              <ScrollText size={20} />
+            </Link>
           </>
         )}
       </div>

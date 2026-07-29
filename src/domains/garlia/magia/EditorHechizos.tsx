@@ -85,7 +85,7 @@ export function EditorHechizos({
     const tabla = CONFIG[modo].tabla;
     const selectFields =
       modo === "runas"
-        ? "id, nombre, explicacion, imagen_url, criatura_id"
+        ? "id, nombre, explicacion, imagen_url, criatura_id, patron_trazos"
         : "id, nombre, explicacion, grupo_ids, imagen_url, criatura_id";
 
     supabase
