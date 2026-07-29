@@ -73,6 +73,29 @@ jobs:
       - name: Instalar dependencias de npm
         run: npm ci
 
+      - name: Sincronizar version en tauri.conf.json con el tag
+        # Ver el comentario equivalente en build-android-release.yml — mismo
+        # motivo: sin esto, getVersion() en runtime siempre reportaba la
+        # versión vieja y el chequeo de actualización nunca se apagaba.
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          CONF="src-tauri/tauri.conf.json"
+
+          echo "Seteando version=\"$VERSION\" en $CONF (tag: $TAG)"
+          python3 - "$CONF" "$VERSION" << 'PYEOF'
+          import json, sys
+          path, version = sys.argv[1], sys.argv[2]
+          with open(path) as f:
+              conf = json.load(f)
+          conf["version"] = version
+          with open(path, "w") as f:
+              json.dump(conf, f, indent=2)
+              f.write("\n")
+          PYEOF
+
+          grep -n "\"version\"" "$CONF"
+
       - name: Quitar rutas dinámicas web-only (no compatibles con output:export)
         # Mismo motivo que en build-android-release.yml: /garlia/libros/[slug]
         # (con su subruta anidada [slug]/leer/[orden]) usa SSR + generateMetadata

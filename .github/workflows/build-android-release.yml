@@ -66,6 +66,32 @@ jobs:
       - name: Instalar dependencias de npm
         run: npm ci
 
+      - name: Sincronizar version en tauri.conf.json con el tag
+        # El tag que dispara este workflow (ej. v0.4.28) es la fuente de
+        # verdad de la versión — sin este paso, tauri.conf.json podía
+        # quedar desincronizado (ej. en "0.1.0" para siempre), lo que rompe
+        # el chequeo de "hay actualización disponible" en la app: getVersion()
+        # siempre reportaba una versión vieja y el banner de update nunca
+        # se apagaba, aunque ya tuvieras la última versión instalada.
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"  # quita el prefijo "v" -> "0.4.28"
+          CONF="src-tauri/tauri.conf.json"
+
+          echo "Seteando version=\"$VERSION\" en $CONF (tag: $TAG)"
+          python3 - "$CONF" "$VERSION" << 'PYEOF'
+          import json, sys
+          path, version = sys.argv[1], sys.argv[2]
+          with open(path) as f:
+              conf = json.load(f)
+          conf["version"] = version
+          with open(path, "w") as f:
+              json.dump(conf, f, indent=2)
+              f.write("\n")
+          PYEOF
+
+          grep -n "\"version\"" "$CONF"
+
       - name: Quitar rutas dinámicas web-only (no compatibles con output:export)
         # /garlia/libros/[slug] (y su subruta anidada [slug]/leer/[orden]) usan
         # SSR + generateMetadata y solo tienen sentido en el deploy de Vercel.
