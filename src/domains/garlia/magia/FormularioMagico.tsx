@@ -87,6 +87,33 @@ export function FormularioMagico({
         .update(updatePayload)
         .eq("id", form.id);
       if (error) throw error;
+
+      // grupo_ids (acá) y miembro_ids (en grupos_mundo) son dos lados de la
+      // misma relación N:N guardados por separado — si solo actualizamos
+      // grupo_ids, el grupo se queda pensando que esta entidad sigue siendo
+      // miembro (o que nunca lo fue). Reflejamos el diff en miembro_ids de
+      // cada grupo afectado para que ambos lados queden consistentes.
+      const originalIds = new Set(item.grupo_ids ?? []);
+      const currentIds = new Set(form.grupo_ids ?? []);
+      const agregados = [...currentIds].filter((id) => !originalIds.has(id));
+      const quitados = [...originalIds].filter((id) => !currentIds.has(id));
+
+      await Promise.all(
+        [...agregados, ...quitados].map(async (grupoId) => {
+          const grupo = grupos.find((g) => g.id === grupoId);
+          if (!grupo) return;
+          const nuevosMiembros = agregados.includes(grupoId)
+            ? grupo.miembro_ids.includes(form.id)
+              ? grupo.miembro_ids
+              : [...grupo.miembro_ids, form.id]
+            : grupo.miembro_ids.filter((id) => id !== form.id);
+          await supabase
+            .from("grupos_mundo")
+            .update({ miembro_ids: nuevosMiembros })
+            .eq("id", grupoId);
+        }),
+      );
+
       setStatus("saved");
       onSaved(form);
       void dexiePut(cfg.tabla, form);
