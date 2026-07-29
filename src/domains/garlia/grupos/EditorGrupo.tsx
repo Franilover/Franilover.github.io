@@ -532,14 +532,7 @@ export function EditorGrupoStandalone({
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-2 space-y-2">
-          {grupos.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <Layers className="text-primary/15" size={20} strokeWidth={1} />
-              <p className="text-micro font-black uppercase tracking-widest text-primary/20">
-                Sin grupos aún
-              </p>
-            </div>
-          ) : filtered.length === 0 ? (
+          {search.trim() && filtered.length === 0 ? (
             <p className="text-micro text-primary/20 text-center py-6 italic">
               Sin resultados
             </p>
@@ -550,7 +543,7 @@ export function EditorGrupoStandalone({
                 (typeof GRUPO_TIPO_CONFIG)[GrupoTipo],
               ][]
             )
-              .filter(([tipo]) => gruposPorTipo[tipo]?.length)
+              .filter(([tipo]) => !search.trim() || gruposPorTipo[tipo]?.length)
               .map(([tipo, cfg]) => (
                 <div key={tipo}>
                   <div className="flex items-center gap-1 px-1 py-0.5 mb-0.5">
@@ -561,14 +554,32 @@ export function EditorGrupoStandalone({
                       }}
                     />
                     <span
-                      className="text-micro font-black uppercase tracking-[0.3em]"
+                      className="text-micro font-black uppercase tracking-[0.3em] flex-1"
                       style={{
                         color: `color-mix(in srgb, ${cfg.color} 40%, transparent)`,
                       }}
                     >
                       {cfg.labelPlural}
                     </span>
+                    <button
+                      type="button"
+                      title={`Añadir ${cfg.labelPlural.toLowerCase()}`}
+                      className="p-0.5 rounded-full hover:bg-primary/10 transition-colors"
+                      onClick={() => handleCrear(tipo)}
+                    >
+                      <Plus
+                        size={9}
+                        style={{
+                          color: `color-mix(in srgb, ${cfg.color} 55%, transparent)`,
+                        }}
+                      />
+                    </button>
                   </div>
+                  {!gruposPorTipo[tipo]?.length ? (
+                    <p className="text-micro text-primary/15 italic px-1 py-1">
+                      Sin grupos aún
+                    </p>
+                  ) : (
                   <div className="space-y-0">
                     {gruposPorTipo[tipo]!.map((grupo) => (
                       <button
@@ -607,6 +618,7 @@ export function EditorGrupoStandalone({
                       </button>
                     ))}
                   </div>
+                  )}
                 </div>
               ))
           )}
