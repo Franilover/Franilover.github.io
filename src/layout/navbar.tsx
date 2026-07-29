@@ -28,6 +28,7 @@ import {
   Dumbbell,
   Shirt,
   Upload,
+  Wand2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -714,12 +715,14 @@ const Navbar = () => {
     "items",
     "reinos",
     "ciudades",
-    "hechizos",
-    "dones",
-    "runas",
     "grupos",
     "notas",
   ]);
+
+  // "Magia" agrupa Hechizos/Dones/Runas — antes vivían dentro de
+  // "Entidades", pero al ser tres catálogos con su propio editor
+  // (FormularioMagico) tiene más sentido como sección propia.
+  const MAGIA_SECTIONS = new Set<SectionKey>(["hechizos", "dones", "runas"]);
 
   type AdminSubmenuItem = {
     key: string;
@@ -753,6 +756,16 @@ const Navbar = () => {
         mundoSection !== null &&
         ENTIDADES_SECTIONS.has(mundoSection),
       onSelect: () => mundoSelectSection("personajes"),
+    },
+    {
+      key: "magia",
+      label: "Magia",
+      icon: Wand2,
+      active:
+        isGarliaeditor &&
+        mundoSection !== null &&
+        MAGIA_SECTIONS.has(mundoSection),
+      onSelect: () => mundoSelectSection("hechizos"),
     },
     {
       key: "mapa",

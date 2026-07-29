@@ -386,6 +386,60 @@ export function EntidadesPage({ section, selectedId }: Props) {
     );
   }
 
+  // ── Magia (Hechizos/Dones/Runas) ──────────────────────────────────────
+  // Sección propia de la navbar (antes vivía adentro de Entidades → sub-tab
+  // "Criaturas"). Mismo árbol jerárquico (MagiaJerarquica), pero como
+  // página independiente — sin la sub-barra de Reinos/Criaturas/Canciones/
+  // Organización, que ahora es exclusiva de Entidades.
+  if (section === "hechizos" || section === "dones" || section === "runas") {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        <MagiaJerarquica
+          criaturas={criaturas}
+          dones={dones.items}
+          hechizos={hechizos.items}
+          items={items}
+          loading={loadingC || loadingI || loadingP || hechizos.loading || dones.loading || runas.loading}
+          personajes={personajes}
+          runas={runas.items}
+          onCreateCriatura={async () => {
+            const { data } = await addCriatura({ nombre: "Nueva criatura" });
+            if (data?.id) openEntity("criaturas", data.id);
+          }}
+          onCreateHija={async (tipo, criaturaId) => {
+            if (tipo === "items") {
+              const { data } = await addItem({
+                nombre: "Nuevo objeto",
+                ...(criaturaId ? { criatura_id: criaturaId } : {}),
+              });
+              if (data?.id) openEntity("items", data.id);
+              return;
+            }
+            const categoria = tipo === "hechizos" ? hechizos : tipo === "dones" ? dones : runas;
+            const id = await categoria.create();
+            if (id) {
+              if (criaturaId) {
+                await supabase.from(tipo).update({ criatura_id: criaturaId }).eq("id", id);
+                categoria.setItems((prev) =>
+                  prev.map((i) => (i.id === id ? { ...i, criatura_id: criaturaId } as any : i)),
+                );
+              }
+              openEntity(tipo, id);
+            }
+          }}
+          onCreatePersonaje={async (criatura) => {
+            const { data } = await addPersonaje({
+              nombre: "Nuevo personaje",
+              ...(criatura ? { especie: criatura.nombre } : {}),
+            });
+            if (data?.id) openEntity("personajes", data.id);
+          }}
+          onOpen={(section, id) => openEntity(section, id)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4">
       {/* ── Sub-barra: Reinos / Criaturas / Canciones / Organización ──────── */}
