@@ -12,6 +12,11 @@
  * dibujar una "plantilla fantasma" de fondo (para el modo admin, como
  * guía de ejemplos previos).
  *
+ * Si se pasa `forma`, además dibuja un marco guía (círculo o polígono
+ * regular de N lados) centrado en el canvas, y el trazo del usuario
+ * queda recortado (clampeado) para no poder salir de esa forma — es
+ * un límite duro de dibujo, no afecta el reconocimiento en sí.
+ *
  * Ruta destino:
  *   src/features/editorGarlia/components/magia/CanvasDibujoRuna.tsx
  */
@@ -20,6 +25,7 @@ import { Eraser } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Punto } from "./dollarOneRecognizer";
+import { clampAForma, verticesPoligono, type FormaLimite } from "./formasLimite";
 
 export function CanvasDibujoRuna({
   color = "var(--primary)",
@@ -27,6 +33,7 @@ export function CanvasDibujoRuna({
   onTrazoCompleto,
   height = 260,
   resetSignal,
+  forma,
 }: {
   color?: string;
   /** Trazo ya normalizado que se dibuja tenue de fondo, como referencia */
@@ -35,6 +42,8 @@ export function CanvasDibujoRuna({
   height?: number;
   /** Cambiando este valor desde afuera se limpia el canvas */
   resetSignal?: number;
+  /** Marco guía + límite duro de dibujo. Si no se pasa, no hay restricción. */
+  forma?: FormaLimite | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -55,12 +64,47 @@ export function CanvasDibujoRuna({
     return () => observer.disconnect();
   }, [height]);
 
-  const redibujarFantasma = useCallback(() => {
+  // Centro y radio del marco guía, en coordenadas CSS (no de dispositivo).
+  const centroYRadio = useCallback(() => {
+    const margen = 24;
+    const cx = tamano.w / 2;
+    const cy = tamano.h / 2;
+    const radio = Math.max(20, Math.min(tamano.w, tamano.h) / 2 - margen);
+    return { centro: { x: cx, y: cy }, radio };
+  }, [tamano]);
+
+  const dibujarMarcoForma = useCallback(
+    (ctx: CanvasRenderingContext2D) => {
+      if (!forma) return;
+      const { centro, radio } = centroYRadio();
+      ctx.beginPath();
+      if (forma.tipo === "circulo") {
+        ctx.arc(centro.x, centro.y, radio, 0, Math.PI * 2);
+      } else {
+        const vertices = verticesPoligono(forma.lados, centro, radio);
+        vertices.forEach((p, i) => {
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+        ctx.closePath();
+      }
+      ctx.strokeStyle = "color-mix(in srgb, var(--primary) 30%, transparent)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    },
+    [forma, centroYRadio],
+  );
+
+  const redibujarFondo = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    dibujarMarcoForma(ctx);
 
     if (trazoFantasma && trazoFantasma.length > 1) {
       // El trazo fantasma viene normalizado en un cuadrado de ~250x250
@@ -96,7 +140,7 @@ export function CanvasDibujoRuna({
       ctx.stroke();
       ctx.setLineDash([]);
     }
-  }, [trazoFantasma]);
+  }, [trazoFantasma, dibujarMarcoForma]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -108,20 +152,32 @@ export function CanvasDibujoRuna({
     canvas.style.height = `${tamano.h}px`;
     const ctx = canvas.getContext("2d");
     ctx?.scale(dpr, dpr);
-    redibujarFantasma();
-  }, [tamano, redibujarFantasma]);
+    redibujarFondo();
+  }, [tamano, redibujarFondo]);
 
   useEffect(() => {
     puntosRef.current = [];
     setTieneTrazo(false);
-    redibujarFantasma();
+    redibujarFondo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetSignal]);
+
+  // Si cambia la forma elegida (ej. el jugador pasa de círculo a
+  // triángulo) sin haber dibujado nada, solo hace falta redibujar el
+  // marco — no tiene sentido borrar un trazo que no existe, pero
+  // tampoco dejar el marco viejo dibujado.
+  useEffect(() => {
+    if (!tieneTrazo) redibujarFondo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forma]);
 
   const getPos = (e: React.PointerEvent<HTMLCanvasElement>): Punto => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const raw = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    if (!forma) return raw;
+    const { centro, radio } = centroYRadio();
+    return clampAForma(raw, forma, centro, radio);
   };
 
   const dibujarLinea = (a: Punto, b: Punto) => {
@@ -164,7 +220,7 @@ export function CanvasDibujoRuna({
   const limpiar = () => {
     puntosRef.current = [];
     setTieneTrazo(false);
-    redibujarFantasma();
+    redibujarFondo();
   };
 
   return (

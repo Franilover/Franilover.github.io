@@ -26,7 +26,10 @@ import { supabase } from "@/infra/supabase/supabase";
 
 import { CanvasDibujoRuna } from "../CanvasDibujoRuna";
 import { reconocerRuna, type PatronRuna, type Punto, type ResultadoReconocimiento } from "../dollarOneRecognizer";
+import { FORMA_CIRCULO, type FormaLimite } from "../formasLimite";
 import type { EntidadMagica } from "../types";
+
+import { SelectorFormaLimite } from "./SelectorFormaLimite";
 
 // Por debajo de este score no se considera un match confiable: se anima
 // al usuario a intentar de nuevo en vez de mostrarle un resultado dudoso.
@@ -40,6 +43,7 @@ export default function RunasDibujo() {
   const [resultado, setResultado] = useState<ResultadoReconocimiento[] | null>(null);
   const [resetSignal, setResetSignal] = useState(0);
   const [intentos, setIntentos] = useState(0);
+  const [forma, setForma] = useState<FormaLimite>(FORMA_CIRCULO);
 
   React.useEffect(() => {
     let activo = true;
@@ -134,8 +138,18 @@ export default function RunasDibujo() {
 
       {estado === "listo" && (
         <div className="w-full max-w-md flex flex-col items-center gap-4">
+          <SelectorFormaLimite
+            value={forma}
+            onChange={(f) => {
+              setForma(f);
+              setResultado(null);
+              setResetSignal((s) => s + 1);
+            }}
+          />
+
           <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
             <CanvasDibujoRuna
+              forma={forma}
               height={300}
               resetSignal={resetSignal}
               onTrazoCompleto={onTrazoCompleto}
