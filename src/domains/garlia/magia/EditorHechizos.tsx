@@ -48,8 +48,14 @@ export function EditorHechizos({
   const { items, setItems, loading } = useEntidadesMagicas(modo);
   const { grupos: gruposCriaturas, loading: loadingGruposCriaturas } = useGruposCriaturas();
   const { grupos: gruposRunas, loading: loadingGruposRunas } = useGruposRunas();
-  // Runas se agrupan temáticamente entre sí (grupos_mundo tipo="runas");
-  // hechizos/dones se agrupan por qué criaturas pueden usarlos (tipo="criaturas").
+  // Cada modo se agrupa con su propio tipo de grupos_mundo:
+  //   runas    → tipo="runas"     (se agrupan temáticamente entre sí)
+  //   hechizos → tipo="criaturas" (se agrupan por qué criaturas los usan)
+  //   dones    → tipo="criaturas" (ídem)
+  // OJO: hechizos y dones comparten el mismo pool de grupos "criaturas" a
+  // propósito (ambos son habilidades de criatura). Si en algún momento
+  // dones necesita su propio tipo de grupo, agregar useGruposDones acá y
+  // sumarlo al switch de abajo — no reusar "runas" ni "criaturas" para eso.
   const grupos = modo === "runas" ? gruposRunas : gruposCriaturas;
   const loadingGrupos = modo === "runas" ? loadingGruposRunas : loadingGruposCriaturas;
   const [selectedId, setSelectedId] = useState<string | null>(

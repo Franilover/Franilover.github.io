@@ -26,6 +26,7 @@ import { CONFIG, type EntidadMagica } from "@/domains/garlia/magia/types";
 import { useCanciones } from "@/domains/garlia/canciones/useCanciones";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
+import { useGruposRunas } from "@/domains/garlia/grupos/useGruposRunas";
 import { useNotas } from "@/editor/notas/useNotas";
 import { type Nota } from "@/domains/garlia/_shared/types";
 import { useEntidadesMagicas } from "@/domains/garlia/magia/useEntidadesMagicas";
@@ -148,6 +149,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const dones = useMagiaCategoria("dones");
   const runas = useMagiaCategoria("runas");
   const { grupos: gruposCriaturas, loading: loadingGrupos } = useGruposCriaturas();
+  const { grupos: gruposRunas, loading: loadingGruposRunas } = useGruposRunas();
 
   // ── Organización (Grupos + Notas) ────────────────────────────────────────
   const { grupos, loaded: loadedGrupos, crearGrupo, actualizarGrupo, eliminarGrupo } = useGrupos();
@@ -288,9 +290,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <FormularioMagico
           key={selectedMagia.id}
-          grupos={gruposCriaturas}
+          grupos={section === "runas" ? gruposRunas : gruposCriaturas}
           item={selectedMagia}
-          loadingGrupos={loadingGrupos}
+          loadingGrupos={section === "runas" ? loadingGruposRunas : loadingGrupos}
           modo={section as "hechizos" | "dones" | "runas"}
           todasLasRunas={section === "runas" ? runas.items : undefined}
           onDeleted={(id) => {
