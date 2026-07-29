@@ -78,9 +78,8 @@ export function FormularioMagico({
         imagen_url: (form as any).imagen_url || null,
         criatura_id: (form as any).criatura_id ?? null,
       };
-      if (modo !== "runas") {
-        updatePayload.grupo_ids = form.grupo_ids ?? [];
-      } else {
+      updatePayload.grupo_ids = form.grupo_ids ?? [];
+      if (modo === "runas") {
         updatePayload.patron_trazos = form.patron_trazos ?? null;
       }
       const { error } = await supabase
@@ -183,24 +182,100 @@ export function FormularioMagico({
 
       {/* ── Body ────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col sm:flex-row gap-0 h-full">
-          {/* Columna izquierda: imagen */}
-          <div
-            className="shrink-0 sm:w-64 p-4 sm:border-r flex flex-col gap-3"
-            style={{ borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)" }}
-          >
-            {bloqueImagen}
-            <p
-              className="text-micro font-black uppercase tracking-[0.25em] text-center truncate"
-              style={{ color: `color-mix(in srgb, ${cfg.color} 50%, transparent)` }}
+        {modo === "runas" ? (
+          // Runas: sin imagen — mitad izquierda para dibujar el patrón +
+          // probar el reconocimiento, mitad derecha para el resto
+          // (criatura, explicación, combinaciones).
+          <div className="flex flex-col sm:flex-row gap-0 h-full">
+            <div
+              className="sm:w-1/2 min-w-0 p-4 sm:border-r"
+              style={{ borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)" }}
             >
-              {form.nombre || `${cfg.labelSing} sin nombre`}
-            </p>
-          </div>
+              <PanelPatronRuna
+                color={cfg.color}
+                patronTrazos={(form.patron_trazos as any) ?? []}
+                runaId={form.id}
+                todasLasRunas={todasLasRunas}
+                onChange={(trazos) =>
+                  setForm((f) => ({ ...f, patron_trazos: trazos }))
+                }
+              />
+            </div>
 
-          {/* Columna derecha: grupos (solo hechizos/dones) + explicación */}
-          <div className="flex-1 min-w-0 p-4 space-y-4">
-            {modo !== "runas" && (
+            <div className="sm:w-1/2 min-w-0 p-4 space-y-4">
+              <PanelGruposAsignados
+                color={cfg.color}
+                entidadId={form.id}
+                grupoIds={form.grupo_ids ?? []}
+                grupos={grupos}
+                label="Grupos de runas"
+                labelMiembros="runas"
+                loadingGrupos={loadingGrupos}
+                mensajeVacio="Sin grupos asignados — categorizá esta runa (ej. Naturales, De fuego, Impacto rápido…)"
+                modo={modo}
+                placeholderBusqueda="Buscar grupo de runas…"
+                textoBoton="Agregar grupo de runas"
+                onGrupoIdsChange={(ids) =>
+                  setForm((f) => ({ ...f, grupo_ids: ids }))
+                }
+              />
+              <ComboSelector
+                allowNone
+                icon={<Bug size={11} />}
+                items={allCriaturas.map((c) => ({
+                  id: c.id,
+                  label: c.nombre,
+                  imgUrl: c.imagen_url ?? null,
+                }))}
+                label="Criatura"
+                loading={loadingCriaturas}
+                mode="single"
+                noneLabel="Sin criatura"
+                placeholder={`Vincular a una criatura…`}
+                value={(form as any).criatura_id ?? null}
+                onChange={(id) =>
+                  setForm((f) => ({ ...f, criatura_id: id } as any))
+                }
+                onNavigate={
+                  onNavigateCriatura ? (id) => onNavigateCriatura(id) : undefined
+                }
+              />
+              <div className="space-y-1.5">
+                <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">
+                  Explicación
+                </label>
+                <RichEditor
+                  minHeight="20rem"
+                  mode="edit"
+                  placeholder={cfg.placeholder}
+                  showSplitMode={false}
+                  value={form.explicacion ?? ""}
+                  onChange={(v) => setForm((f) => ({ ...f, explicacion: v }))}
+                  onWikilinkNavigate={onWikilink}
+                />
+              </div>
+              <EditorCombinacionesRunas runas={todasLasRunas ?? []} />
+            </div>
+          </div>
+        ) : (
+          // Hechizos / dones: layout original con columna de imagen.
+          <div className="flex flex-col sm:flex-row gap-0 h-full">
+            {/* Columna izquierda: imagen */}
+            <div
+              className="shrink-0 sm:w-64 p-4 sm:border-r flex flex-col gap-3"
+              style={{ borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)" }}
+            >
+              {bloqueImagen}
+              <p
+                className="text-micro font-black uppercase tracking-[0.25em] text-center truncate"
+                style={{ color: `color-mix(in srgb, ${cfg.color} 50%, transparent)` }}
+              >
+                {form.nombre || `${cfg.labelSing} sin nombre`}
+              </p>
+            </div>
+
+            {/* Columna derecha: grupos + explicación */}
+            <div className="flex-1 min-w-0 p-4 space-y-4">
               <PanelGruposAsignados
                 color={cfg.color}
                 entidadId={form.id}
@@ -212,56 +287,44 @@ export function FormularioMagico({
                   setForm((f) => ({ ...f, grupo_ids: ids }))
                 }
               />
-            )}
-            {modo === "runas" && (
-              <PanelPatronRuna
-                color={cfg.color}
-                patronTrazos={(form.patron_trazos as any) ?? []}
-                onChange={(trazos) =>
-                  setForm((f) => ({ ...f, patron_trazos: trazos }))
+              <ComboSelector
+                allowNone
+                icon={<Bug size={11} />}
+                items={allCriaturas.map((c) => ({
+                  id: c.id,
+                  label: c.nombre,
+                  imgUrl: c.imagen_url ?? null,
+                }))}
+                label="Criatura"
+                loading={loadingCriaturas}
+                mode="single"
+                noneLabel="Sin criatura"
+                placeholder={`Vincular a una criatura…`}
+                value={(form as any).criatura_id ?? null}
+                onChange={(id) =>
+                  setForm((f) => ({ ...f, criatura_id: id } as any))
+                }
+                onNavigate={
+                  onNavigateCriatura ? (id) => onNavigateCriatura(id) : undefined
                 }
               />
-            )}
-            <ComboSelector
-              allowNone
-              icon={<Bug size={11} />}
-              items={allCriaturas.map((c) => ({
-                id: c.id,
-                label: c.nombre,
-                imgUrl: c.imagen_url ?? null,
-              }))}
-              label="Criatura"
-              loading={loadingCriaturas}
-              mode="single"
-              noneLabel="Sin criatura"
-              placeholder={`Vincular a una criatura…`}
-              value={(form as any).criatura_id ?? null}
-              onChange={(id) =>
-                setForm((f) => ({ ...f, criatura_id: id } as any))
-              }
-              onNavigate={
-                onNavigateCriatura ? (id) => onNavigateCriatura(id) : undefined
-              }
-            />
-            <div className="space-y-1.5">
-              <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">
-                Explicación
-              </label>
-              <RichEditor
-                minHeight={modo === "runas" ? "20rem" : "17.5rem"}
-                mode="edit"
-                placeholder={cfg.placeholder}
-                showSplitMode={false}
-                value={form.explicacion ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, explicacion: v }))}
-                onWikilinkNavigate={onWikilink}
-              />
+              <div className="space-y-1.5">
+                <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">
+                  Explicación
+                </label>
+                <RichEditor
+                  minHeight="17.5rem"
+                  mode="edit"
+                  placeholder={cfg.placeholder}
+                  showSplitMode={false}
+                  value={form.explicacion ?? ""}
+                  onChange={(v) => setForm((f) => ({ ...f, explicacion: v }))}
+                  onWikilinkNavigate={onWikilink}
+                />
+              </div>
             </div>
-            {modo === "runas" && (
-              <EditorCombinacionesRunas runas={todasLasRunas ?? []} />
-            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

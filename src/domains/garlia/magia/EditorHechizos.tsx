@@ -22,6 +22,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FormularioMagico } from "@/domains/garlia/magia/FormularioMagico";
 import { CONFIG, type EntidadMagica, type Modo } from "@/domains/garlia/magia/types";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
+import { useGruposRunas } from "@/domains/garlia/grupos/useGruposRunas";
 import { useEntidadesMagicas } from "@/domains/garlia/magia/useEntidadesMagicas";
 import { supabase } from "@/infra/supabase/supabase";
 
@@ -45,7 +46,12 @@ export function EditorHechizos({
 }) {
   const cfg = CONFIG[modo];
   const { items, setItems, loading } = useEntidadesMagicas(modo);
-  const { grupos, loading: loadingGrupos } = useGruposCriaturas();
+  const { grupos: gruposCriaturas, loading: loadingGruposCriaturas } = useGruposCriaturas();
+  const { grupos: gruposRunas, loading: loadingGruposRunas } = useGruposRunas();
+  // Runas se agrupan temáticamente entre sí (grupos_mundo tipo="runas");
+  // hechizos/dones se agrupan por qué criaturas pueden usarlos (tipo="criaturas").
+  const grupos = modo === "runas" ? gruposRunas : gruposCriaturas;
+  const loadingGrupos = modo === "runas" ? loadingGruposRunas : loadingGruposCriaturas;
   const [selectedId, setSelectedId] = useState<string | null>(
     initialSelectedId ?? null,
   );
@@ -85,7 +91,7 @@ export function EditorHechizos({
     const tabla = CONFIG[modo].tabla;
     const selectFields =
       modo === "runas"
-        ? "id, nombre, explicacion, imagen_url, criatura_id, patron_trazos"
+        ? "id, nombre, explicacion, imagen_url, criatura_id, patron_trazos, grupo_ids"
         : "id, nombre, explicacion, grupo_ids, imagen_url, criatura_id";
 
     supabase
@@ -111,11 +117,11 @@ export function EditorHechizos({
     try {
       const insertPayload =
         modo === "runas"
-          ? { nombre: `Nueva ${cfg.labelSing}` }
+          ? { nombre: `Nueva ${cfg.labelSing}`, grupo_ids: [] }
           : { nombre: `Nuevo ${cfg.labelSing}`, grupo_ids: [] };
       const selectFields =
         modo === "runas"
-          ? "id, nombre, explicacion, imagen_url, criatura_id"
+          ? "id, nombre, explicacion, imagen_url, criatura_id, grupo_ids"
           : "id, nombre, explicacion, grupo_ids, criatura_id";
 
       const { data, error } = await supabase

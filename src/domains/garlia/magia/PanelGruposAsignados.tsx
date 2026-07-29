@@ -24,10 +24,13 @@ function FilaGrupo({
   grupo,
   onQuitar,
   color,
+  labelMiembros = "criaturas",
 }: {
   grupo: GrupoMin;
   onQuitar: () => void;
   color: string;
+  /** Texto tras el conteo de miembros, ej. "criaturas" o "runas" */
+  labelMiembros?: string;
 }) {
   return (
     <div
@@ -46,7 +49,7 @@ function FilaGrupo({
             {grupo.nombre}
           </span>
           <span className="text-micro text-primary/30">
-            {grupo.miembro_ids.length} criaturas
+            {grupo.miembro_ids.length} {labelMiembros}
           </span>
         </div>
         <button
@@ -69,12 +72,18 @@ function SelectorAgregarGrupo({
   asignados,
   onAgregar,
   color,
+  textoBoton = "Agregar grupo de criaturas",
+  placeholderBusqueda = "Buscar grupo…",
+  labelMiembros = "criaturas",
 }: {
   grupos: GrupoMin[];
   loadingGrupos: boolean;
   asignados: string[];
   onAgregar: (g: GrupoMin) => void;
   color: string;
+  textoBoton?: string;
+  placeholderBusqueda?: string;
+  labelMiembros?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -121,7 +130,7 @@ function SelectorAgregarGrupo({
           (e.currentTarget as HTMLElement).style.color = `color-mix(in srgb, ${color} 55%, transparent)`;
         }}
       >
-        <Plus size={9} /> Agregar grupo de criaturas
+        <Plus size={9} /> {textoBoton}
       </button>
 
       {open && (
@@ -152,7 +161,7 @@ function SelectorAgregarGrupo({
                 <input
                   autoFocus
                   className="w-full bg-primary/5 border border-primary/10 rounded-lg pl-7 pr-2 py-1.5 text-micro outline-none focus:border-primary/25 text-primary placeholder:text-primary/25"
-                  placeholder="Buscar grupo…"
+                  placeholder={placeholderBusqueda}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -187,7 +196,7 @@ function SelectorAgregarGrupo({
                         {g.nombre}
                       </span>
                       <span className="text-micro text-primary/30">
-                        {g.miembro_ids.length} criaturas
+                        {g.miembro_ids.length} {labelMiembros}
                       </span>
                     </div>
                     <Check className="text-primary/15" size={9} />
@@ -210,6 +219,11 @@ export function PanelGruposAsignados({
   grupos,
   loadingGrupos,
   color,
+  label = "Grupos de criaturas que pueden usarlo",
+  textoBoton = "Agregar grupo de criaturas",
+  placeholderBusqueda = "Buscar grupo…",
+  labelMiembros = "criaturas",
+  mensajeVacio = "Sin grupos asignados — estará disponible para todos (universal)",
 }: {
   entidadId: string;
   modo: string;
@@ -218,6 +232,16 @@ export function PanelGruposAsignados({
   grupos: GrupoMin[];
   loadingGrupos: boolean;
   color: string;
+  /** Título del panel. Por defecto asume el caso hechizos/dones (grupos de criaturas). */
+  label?: string;
+  /** Texto del botón para agregar un grupo. */
+  textoBoton?: string;
+  /** Placeholder del buscador del dropdown. */
+  placeholderBusqueda?: string;
+  /** Sufijo tras el conteo de miembros de cada grupo (ej. "criaturas", "runas"). */
+  labelMiembros?: string;
+  /** Mensaje cuando no hay grupos asignados todavía. */
+  mensajeVacio?: string;
 }) {
   const asignados = useMemo(
     () => grupos.filter((g) => grupoIds.includes(g.id)),
@@ -236,7 +260,7 @@ export function PanelGruposAsignados({
   return (
     <div className="space-y-2">
       <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35 flex items-center gap-1.5">
-        <Layers size={9} /> Grupos de criaturas que pueden usarlo
+        <Layers size={9} /> {label}
       </label>
 
       {loadingGrupos ? (
@@ -247,20 +271,27 @@ export function PanelGruposAsignados({
       ) : (
         <div className="space-y-2">
           {asignados.length === 0 && (
-            <p className="text-micro text-primary/20 italic px-1">
-              Sin grupos asignados — estará disponible para todos (universal)
-            </p>
+            <p className="text-micro text-primary/20 italic px-1">{mensajeVacio}</p>
           )}
 
           {asignados.map((g) => (
-            <FilaGrupo key={g.id} color={color} grupo={g} onQuitar={() => quitar(g.id)} />
+            <FilaGrupo
+              key={g.id}
+              color={color}
+              grupo={g}
+              labelMiembros={labelMiembros}
+              onQuitar={() => quitar(g.id)}
+            />
           ))}
 
           <SelectorAgregarGrupo
             asignados={grupoIds}
             color={color}
             grupos={grupos}
+            labelMiembros={labelMiembros}
             loadingGrupos={loadingGrupos}
+            placeholderBusqueda={placeholderBusqueda}
+            textoBoton={textoBoton}
             onAgregar={agregar}
           />
         </div>
