@@ -31,6 +31,21 @@ export type Hechizo = {
 
 export type Don = Hechizo;
 
+/**
+ * Combinación de runas por celda ("hechizo compuesto"): definida en admin,
+ * asocia un mapa exacto de celda→runa a un resultado especial distinto de
+ * las runas individuales. Ej: celda "s0-a0" (centro) = runa Fuego + celda
+ * "s0-a1" (anillo exterior) = runa Agua → resultado "Vapor".
+ */
+export type CombinacionRuna = {
+  id: string;
+  nombre: string;
+  explicacion?: string | null;
+  imagen_url?: string | null;
+  /** Mapa celdaId → runaId. El match debe ser exacto: mismas celdas, ni de más ni de menos. */
+  celdas: Record<string, string>;
+};
+
 export type EntidadMagica = Hechizo;
 export type Modo = "hechizos" | "dones" | "runas";
 

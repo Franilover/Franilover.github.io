@@ -292,6 +292,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           item={selectedMagia}
           loadingGrupos={loadingGrupos}
           modo={section as "hechizos" | "dones" | "runas"}
+          todasLasRunas={section === "runas" ? runas.items : undefined}
           onDeleted={(id) => {
             activeMagiaCategoria.setItems((prev) => prev.filter((i) => i.id !== id));
           }}

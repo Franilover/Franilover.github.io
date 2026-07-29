@@ -207,6 +207,7 @@ export function EditorHechizos({
             item={selected}
             loadingGrupos={loadingGrupos}
             modo={modo}
+            todasLasRunas={modo === "runas" ? items : undefined}
             onNavigateCriatura={onNavigateCriatura}
             onDeleted={(id) => {
               setItems((prev) => prev.filter((i) => i.id !== id));

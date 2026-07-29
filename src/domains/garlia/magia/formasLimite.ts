@@ -147,3 +147,172 @@ export function labelForma(forma: FormaLimite): string {
   if (forma.lados === 6) return "Hexágono";
   return `Polígono de ${forma.lados} lados`;
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Rejilla: secciones × anillos
+ * ────────────────────────────────────────────────────────────────────────
+ * Divide la forma exterior en celdas combinando:
+ *   - `secciones`: cuántas cuñas radiales iguales (1 = sin dividir)
+ *   - `anillos`: cuántos anillos concéntricos (1 = sin dividir)
+ *
+ * Cada celda es una "cuña de anillo": la intersección entre un rango
+ * angular (sección) y un rango radial (anillo). El jugador dibuja una
+ * runa distinta en cada celda; para simplificar la UX, cada celda usa
+ * su propio mini-canvas independiente en vez de clampear geometrías de
+ * cuña-de-anillo dentro de un único canvas grande (ver RunasDibujo.tsx
+ * y TableroCeldas.tsx).
+ * ──────────────────────────────────────────────────────────────────── */
+
+export const MIN_SECCIONES = 1;
+export const MAX_SECCIONES = 8;
+export const MIN_ANILLOS = 1;
+export const MAX_ANILLOS = 4;
+
+export type Rejilla = {
+  secciones: number;
+  anillos: number;
+};
+
+export const REJILLA_SIMPLE: Rejilla = { secciones: 1, anillos: 1 };
+
+export function esRejillaSimple(r: Rejilla): boolean {
+  return r.secciones <= 1 && r.anillos <= 1;
+}
+
+export type Celda = {
+  /** Id estable, ej. "s0-a1" (sección 0, anillo 1). Independiente del orden visual. */
+  id: string;
+  seccion: number; // índice 0-based
+  anillo: number; // índice 0-based, 0 = más interno
+  /** Ángulo de inicio/fin de la cuña, en radianes, offset -90° (igual que verticesPoligono). */
+  anguloInicio: number;
+  anguloFin: number;
+  /** Radio interior/exterior de este anillo, como fracción del radio total (0..1). */
+  radioInicioFrac: number;
+  radioFinFrac: number;
+};
+
+/** Genera la lista de celdas para una rejilla secciones×anillos, en orden anillo-externo→interno, sección en sentido horario. */
+export function generarCeldas(rejilla: Rejilla): Celda[] {
+  const { secciones, anillos } = rejilla;
+  const celdas: Celda[] = [];
+  const offset = -Math.PI / 2;
+  for (let a = 0; a < anillos; a++) {
+    const radioInicioFrac = a / anillos;
+    const radioFinFrac = (a + 1) / anillos;
+    for (let s = 0; s < secciones; s++) {
+      const anguloInicio = offset + (s * 2 * Math.PI) / secciones;
+      const anguloFin = offset + ((s + 1) * 2 * Math.PI) / secciones;
+      celdas.push({
+        id: `s${s}-a${a}`,
+        seccion: s,
+        anillo: a,
+        anguloInicio,
+        anguloFin,
+        radioInicioFrac,
+        radioFinFrac,
+      });
+    }
+  }
+  return celdas;
+}
+
+/**
+ * Etiqueta legible corta para una celda, útil en UI de admin/tablero.
+ * Ej: "Centro" (única celda, sin rejilla), "Sección 2, Anillo 1".
+ */
+export function labelCelda(celda: Celda, rejilla: Rejilla): string {
+  if (esRejillaSimple(rejilla)) return "Centro";
+  const partes: string[] = [];
+  if (rejilla.secciones > 1) partes.push(`Sección ${celda.seccion + 1}`);
+  if (rejilla.anillos > 1) {
+    partes.push(
+      celda.anillo === 0 && rejilla.anillos > 1
+        ? "Anillo interior"
+        : celda.anillo === rejilla.anillos - 1
+          ? "Anillo exterior"
+          : `Anillo ${celda.anillo + 1}`,
+    );
+  }
+  return partes.join(", ") || "Centro";
+}
+
+/**
+ * Puntos SVG (como string "x,y x,y ...") del contorno de una celda,
+ * dado el centro y radio totales del tablero y la forma exterior elegida.
+ * Para simplificar el trazado con formas poligonales, aproximamos el
+ * arco de cada anillo con puntos interpolados sobre el borde real del
+ * polígono (no un arco circular) para que el anillo exterior coincida
+ * exactamente con el marco guía de la forma elegida.
+ */
+export function pathCelda(
+  celda: Celda,
+  forma: FormaLimite,
+  centro: Punto,
+  radio: number,
+): string {
+  const SEGMENTOS_POR_CELDA = forma.tipo === "circulo" ? 24 : 6;
+  const puntoEnBorde = (angulo: number, radioFrac: number): Punto => {
+    const r = radio * radioFrac;
+    if (forma.tipo === "circulo") {
+      return { x: centro.x + r * Math.cos(angulo), y: centro.y + r * Math.sin(angulo) };
+    }
+    return puntoSobrePoligonoEnAngulo(angulo, forma.lados, centro, r);
+  };
+
+  const arcoExterior: Punto[] = [];
+  const arcoInterior: Punto[] = [];
+  for (let i = 0; i <= SEGMENTOS_POR_CELDA; i++) {
+    const t = i / SEGMENTOS_POR_CELDA;
+    const ang = celda.anguloInicio + t * (celda.anguloFin - celda.anguloInicio);
+    arcoExterior.push(puntoEnBorde(ang, celda.radioFinFrac));
+    if (celda.radioInicioFrac > 0) arcoInterior.push(puntoEnBorde(ang, celda.radioInicioFrac));
+  }
+
+  const contorno: Punto[] =
+    celda.radioInicioFrac > 0 ? [...arcoExterior, ...arcoInterior.reverse()] : [...arcoExterior, centro];
+
+  return contorno.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+}
+
+/** Centro aproximado de una celda (para ubicar su mini-canvas o preview), en coordenadas del tablero. */
+export function centroCelda(
+  celda: Celda,
+  forma: FormaLimite,
+  centro: Punto,
+  radio: number,
+): Punto {
+  const anguloMedio = (celda.anguloInicio + celda.anguloFin) / 2;
+  const radioMedioFrac = (celda.radioInicioFrac + celda.radioFinFrac) / 2;
+  const r = radio * radioMedioFrac;
+  if (forma.tipo === "circulo") {
+    return { x: centro.x + r * Math.cos(anguloMedio), y: centro.y + r * Math.sin(anguloMedio) };
+  }
+  return puntoSobrePoligonoEnAngulo(anguloMedio, forma.lados, centro, r);
+}
+
+/** Punto sobre el borde de un polígono regular, en la dirección angular dada (no necesariamente un vértice). */
+function puntoSobrePoligonoEnAngulo(
+  angulo: number,
+  lados: number,
+  centro: Punto,
+  radio: number,
+): Punto {
+  if (radio <= 0) return { ...centro };
+  // Usamos un radio "de sobra" para el polígono guía y buscamos dónde el
+  // rayo centro→ángulo cruza ese polígono grande, luego interpolamos
+  // linealmente esa distancia por la fracción de radio pedida — como los
+  // polígonos regulares acá son homotecias del mismo centro, esto da el
+  // punto correcto sobre el polígono escalado al radio pedido.
+  const verticesUnitarios = verticesPoligono(lados, centro, radio);
+  const dir = { x: Math.cos(angulo), y: Math.sin(angulo) };
+  for (let i = 0; i < verticesUnitarios.length; i++) {
+    const a = verticesUnitarios[i];
+    const b = verticesUnitarios[(i + 1) % verticesUnitarios.length];
+    const t = interseccionRayoSegmento(centro, dir, a, b);
+    if (t !== null) {
+      return { x: centro.x + dir.x * t, y: centro.y + dir.y * t };
+    }
+  }
+  return { x: centro.x + radio * dir.x, y: centro.y + radio * dir.y };
+}

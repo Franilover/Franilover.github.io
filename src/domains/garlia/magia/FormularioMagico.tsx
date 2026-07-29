@@ -29,6 +29,7 @@ import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCat
 import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete as dexieDel } from "@/lib/utils/dexieHelpers";
 
+import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
 import { PanelGruposAsignados } from "./PanelGruposAsignados";
 import { PickerImagenRunaBtn } from "./PickerImagenRunaBtn";
 import { PanelPatronRuna } from "./PanelPatronRuna";
@@ -44,6 +45,7 @@ export function FormularioMagico({
   onSaved,
   onDeleted,
   onNavigateCriatura,
+  todasLasRunas,
 }: {
   item: EntidadMagica;
   modo: Modo;
@@ -52,6 +54,8 @@ export function FormularioMagico({
   onSaved: (i: EntidadMagica) => void;
   onDeleted: (id: string) => void;
   onNavigateCriatura?: (id: string) => void;
+  /** Catálogo completo de runas, para el editor de combinaciones (solo se usa si modo === "runas"). */
+  todasLasRunas?: EntidadMagica[];
 }) {
   const [form, setForm] = useState<EntidadMagica>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -253,6 +257,9 @@ export function FormularioMagico({
                 onWikilinkNavigate={onWikilink}
               />
             </div>
+            {modo === "runas" && (
+              <EditorCombinacionesRunas runas={todasLasRunas ?? []} />
+            )}
           </div>
         </div>
       </div>

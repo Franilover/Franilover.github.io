@@ -8,9 +8,16 @@
  * usando el algoritmo $1 Unistroke Recognizer contra los patrones que
  * el admin grabó en el editor (PanelPatronRuna).
  *
- * Si el mejor match supera un umbral de confianza, se muestra la runa
- * reconocida (imagen + nombre + explicación). Si no, se invita a
- * intentar de nuevo o se muestran los candidatos más cercanos.
+ * Además del modo simple (un solo dibujo), el jugador puede dividir el
+ * tablero en celdas (secciones × anillos) y dibujar una runa distinta
+ * en cada una — ver TableroCeldas.tsx y SelectorRejilla.tsx. Al terminar,
+ * se evalúan todas las celdas dibujadas: si coinciden exactamente con
+ * una combinación definida en admin (matchCombinacion.ts), se muestra
+ * el resultado compuesto; si no, se muestra la lista de runas
+ * individuales reconocidas por celda.
+ *
+ * Si el mejor match de una celda supera un umbral de confianza, se
+ * cuenta como "reconocida". Si no, se invita a intentar de nuevo.
  *
  * Ruta destino:
  *   src/features/garliaPublic/runas/RunasDibujo.tsx
@@ -26,10 +33,22 @@ import { supabase } from "@/infra/supabase/supabase";
 
 import { CanvasDibujoRuna } from "../CanvasDibujoRuna";
 import { reconocerRuna, type PatronRuna, type Punto, type ResultadoReconocimiento } from "../dollarOneRecognizer";
-import { FORMA_CIRCULO, type FormaLimite } from "../formasLimite";
-import type { EntidadMagica } from "../types";
+import {
+  esRejillaSimple,
+  FORMA_CIRCULO,
+  generarCeldas,
+  labelCelda,
+  REJILLA_SIMPLE,
+  type Celda,
+  type FormaLimite,
+  type Rejilla,
+} from "../formasLimite";
+import { buscarCombinacion } from "../matchCombinacion";
+import type { CombinacionRuna, EntidadMagica } from "../types";
 
 import { SelectorFormaLimite } from "./SelectorFormaLimite";
+import { SelectorRejilla } from "./SelectorRejilla";
+import { TableroCeldas } from "./TableroCeldas";
 
 // Por debajo de este score no se considera un match confiable: se anima
 // al usuario a intentar de nuevo en vez de mostrarle un resultado dudoso.
@@ -37,31 +56,50 @@ const UMBRAL_CONFIANZA = 0.72;
 
 type Estado = "cargando" | "listo" | "sin-runas";
 
+/** Resultado de reconocimiento guardado por celda. */
+type ResultadoCelda = {
+  ranking: ResultadoReconocimiento[];
+  mejorMatch: EntidadMagica | null;
+};
+
 export default function RunasDibujo() {
   const [runas, setRunas] = useState<EntidadMagica[]>([]);
+  const [combinaciones, setCombinaciones] = useState<CombinacionRuna[]>([]);
   const [estado, setEstado] = useState<Estado>("cargando");
-  const [resultado, setResultado] = useState<ResultadoReconocimiento[] | null>(null);
+  const [forma, setForma] = useState<FormaLimite>(FORMA_CIRCULO);
+  const [rejilla, setRejilla] = useState<Rejilla>(REJILLA_SIMPLE);
+
+  // Modo simple (1×1): un solo resultado, igual que antes.
+  const [resultadoSimple, setResultadoSimple] = useState<ResultadoReconocimiento[] | null>(null);
+
+  // Modo rejilla: resultado por celda + cuál está activa para dibujar.
+  const [resultadosPorCelda, setResultadosPorCelda] = useState<Record<string, ResultadoCelda>>({});
+  const [celdaActivaId, setCeldaActivaId] = useState<string | null>(null);
+  const [finalizado, setFinalizado] = useState(false);
+
   const [resetSignal, setResetSignal] = useState(0);
   const [intentos, setIntentos] = useState(0);
-  const [forma, setForma] = useState<FormaLimite>(FORMA_CIRCULO);
 
   React.useEffect(() => {
     let activo = true;
-    supabase
-      .from("runas")
-      .select("id, nombre, explicacion, imagen_url, patron_trazos")
-      .then(({ data, error }) => {
-        if (!activo) return;
-        if (error || !data) {
-          setEstado("sin-runas");
-          return;
-        }
-        const conPatron = (data as unknown as EntidadMagica[]).filter(
-          (r) => r.patron_trazos && r.patron_trazos.length > 0,
-        );
-        setRunas(conPatron);
-        setEstado(conPatron.length > 0 ? "listo" : "sin-runas");
-      });
+    void Promise.all([
+      supabase.from("runas").select("id, nombre, explicacion, imagen_url, patron_trazos"),
+      supabase.from("combinaciones_runas").select("id, nombre, explicacion, imagen_url, celdas"),
+    ]).then(([runasRes, comboRes]) => {
+      if (!activo) return;
+      if (runasRes.error || !runasRes.data) {
+        setEstado("sin-runas");
+        return;
+      }
+      const conPatron = (runasRes.data as unknown as EntidadMagica[]).filter(
+        (r) => r.patron_trazos && r.patron_trazos.length > 0,
+      );
+      setRunas(conPatron);
+      if (!comboRes.error && comboRes.data) {
+        setCombinaciones(comboRes.data as unknown as CombinacionRuna[]);
+      }
+      setEstado(conPatron.length > 0 ? "listo" : "sin-runas");
+    });
     return () => {
       activo = false;
     };
@@ -77,23 +115,94 @@ export default function RunasDibujo() {
     [runas],
   );
 
-  const mejorMatch: EntidadMagica | null = useMemo(() => {
-    if (!resultado || resultado.length === 0) return null;
-    const top = resultado[0];
+  const simple = esRejillaSimple(rejilla);
+  const celdas = useMemo(() => generarCeldas(rejilla), [rejilla]);
+
+  // ── Modo simple ──────────────────────────────────────────────────────
+  const mejorMatchSimple: EntidadMagica | null = useMemo(() => {
+    if (!resultadoSimple || resultadoSimple.length === 0) return null;
+    const top = resultadoSimple[0];
     if (top.score < UMBRAL_CONFIANZA) return null;
     return runas.find((r) => r.id === top.runaId) ?? null;
-  }, [resultado, runas]);
+  }, [resultadoSimple, runas]);
 
-  const onTrazoCompleto = (puntos: Punto[]) => {
+  const onTrazoCompletoSimple = (puntos: Punto[]) => {
     const ranking = reconocerRuna(puntos, patrones);
-    setResultado(ranking);
+    setResultadoSimple(ranking);
     setIntentos((n) => n + 1);
   };
 
-  const reintentar = () => {
-    setResultado(null);
+  const reintentarSimple = () => {
+    setResultadoSimple(null);
     setResetSignal((s) => s + 1);
   };
+
+  // ── Modo rejilla ─────────────────────────────────────────────────────
+  const onTrazoCompletoCelda = (puntos: Punto[]) => {
+    if (!celdaActivaId) return;
+    const ranking = reconocerRuna(puntos, patrones);
+    const top = ranking[0];
+    const mejorMatch = top && top.score >= UMBRAL_CONFIANZA ? runas.find((r) => r.id === top.runaId) ?? null : null;
+    setResultadosPorCelda((prev) => ({
+      ...prev,
+      [celdaActivaId]: { ranking, mejorMatch },
+    }));
+  };
+
+  const seleccionarCelda = (celda: Celda) => {
+    setCeldaActivaId(celda.id);
+    setResetSignal((s) => s + 1);
+  };
+
+  const celdasDibujadas = Object.keys(resultadosPorCelda).filter(
+    (id) => resultadosPorCelda[id].mejorMatch,
+  );
+
+  const mapaCeldaRuna: Record<string, string> = {};
+  for (const id of celdasDibujadas) {
+    mapaCeldaRuna[id] = resultadosPorCelda[id].mejorMatch!.id;
+  }
+
+  const combinacionEncontrada = useMemo(() => {
+    if (!finalizado) return null;
+    return buscarCombinacion(mapaCeldaRuna, combinaciones);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finalizado, resultadosPorCelda, combinaciones]);
+
+  const finalizarRejilla = () => {
+    setFinalizado(true);
+    setIntentos((n) => n + 1);
+  };
+
+  const reintentarRejilla = () => {
+    setResultadosPorCelda({});
+    setCeldaActivaId(null);
+    setFinalizado(false);
+    setResetSignal((s) => s + 1);
+  };
+
+  const cambiarForma = (f: FormaLimite) => {
+    setForma(f);
+    reiniciarTodo();
+  };
+
+  const cambiarRejilla = (r: Rejilla) => {
+    setRejilla(r);
+    reiniciarTodo();
+  };
+
+  function reiniciarTodo() {
+    setResultadoSimple(null);
+    setResultadosPorCelda({});
+    setCeldaActivaId(null);
+    setFinalizado(false);
+    setResetSignal((s) => s + 1);
+  }
+
+  const runaPorCeldaParaTablero: Record<string, EntidadMagica | null | undefined> = {};
+  for (const [id, r] of Object.entries(resultadosPorCelda)) {
+    runaPorCeldaParaTablero[id] = r.mejorMatch;
+  }
 
   return (
     <div
@@ -115,8 +224,9 @@ export default function RunasDibujo() {
           </h1>
         </div>
         <p className="text-sm text-primary/40 max-w-md">
-          Dibujá el símbolo de una runa en el pergamino. El mundo intentará
-          reconocer qué poder invocaste.
+          {simple
+            ? "Dibujá el símbolo de una runa en el pergamino. El mundo intentará reconocer qué poder invocaste."
+            : "Dividí el tablero en celdas y dibujá una runa distinta en cada una. La combinación completa puede formar un hechizo mayor."}
         </p>
       </div>
 
@@ -138,37 +248,89 @@ export default function RunasDibujo() {
 
       {estado === "listo" && (
         <div className="w-full max-w-md flex flex-col items-center gap-4">
-          <SelectorFormaLimite
-            value={forma}
-            onChange={(f) => {
-              setForma(f);
-              setResultado(null);
-              setResetSignal((s) => s + 1);
-            }}
-          />
+          <SelectorFormaLimite value={forma} onChange={cambiarForma} />
+          <SelectorRejilla value={rejilla} onChange={cambiarRejilla} />
 
-          <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
-            <CanvasDibujoRuna
-              forma={forma}
-              height={300}
-              resetSignal={resetSignal}
-              onTrazoCompleto={onTrazoCompleto}
-            />
-          </div>
+          {simple ? (
+            <>
+              <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
+                <CanvasDibujoRuna
+                  forma={forma}
+                  height={300}
+                  resetSignal={resetSignal}
+                  onTrazoCompleto={onTrazoCompletoSimple}
+                />
+              </div>
 
-          {resultado && (
-            <ResultadoCard
-              key={intentos}
-              mejorMatch={mejorMatch}
-              onReintentar={reintentar}
-              resultado={resultado}
-            />
-          )}
+              {resultadoSimple && (
+                <ResultadoCard
+                  key={intentos}
+                  mejorMatch={mejorMatchSimple}
+                  resultado={resultadoSimple}
+                  onReintentar={reintentarSimple}
+                />
+              )}
 
-          {!resultado && (
-            <p className="text-micro text-primary/25 tracking-widest uppercase font-bold">
-              Dibujá con el mouse o el dedo, y soltá al terminar
-            </p>
+              {!resultadoSimple && (
+                <p className="text-micro text-primary/25 tracking-widest uppercase font-bold">
+                  Dibujá con el mouse o el dedo, y soltá al terminar
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <TableroCeldas
+                celdaActivaId={celdaActivaId}
+                forma={forma}
+                rejilla={rejilla}
+                runaPorCelda={runaPorCeldaParaTablero}
+                onSeleccionarCelda={seleccionarCelda}
+              />
+
+              {celdaActivaId && !finalizado && (
+                <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
+                  <CanvasDibujoRuna
+                    height={220}
+                    resetSignal={resetSignal}
+                    onTrazoCompleto={onTrazoCompletoCelda}
+                  />
+                  {resultadosPorCelda[celdaActivaId] && (
+                    <p className="text-micro text-center pt-2 font-bold text-primary/50">
+                      {resultadosPorCelda[celdaActivaId].mejorMatch
+                        ? `Reconocida: ${resultadosPorCelda[celdaActivaId].mejorMatch!.nombre}`
+                        : "No se reconoció ninguna runa en esta celda"}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {!finalizado && (
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-micro text-primary/25 tracking-widest uppercase font-bold text-center">
+                    Tocá una celda del tablero para dibujar ahí
+                  </p>
+                  <button
+                    type="button"
+                    disabled={celdasDibujadas.length === 0}
+                    onClick={finalizarRejilla}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-40"
+                  >
+                    Terminar y ver resultado
+                  </button>
+                </div>
+              )}
+
+              {finalizado && (
+                <ResultadoRejillaCard
+                  key={intentos}
+                  combinacion={combinacionEncontrada}
+                  resultadosPorCelda={resultadosPorCelda}
+                  rejilla={rejilla}
+                  celdas={celdas}
+                  onReintentar={reintentarRejilla}
+                />
+              )}
+            </>
           )}
         </div>
       )}
@@ -228,6 +390,89 @@ function ResultadoCard({
           </p>
         </>
       )}
+      <button
+        type="button"
+        className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
+        onClick={onReintentar}
+      >
+        Intentar de nuevo
+      </button>
+    </div>
+  );
+}
+
+function ResultadoRejillaCard({
+  combinacion,
+  resultadosPorCelda,
+  rejilla,
+  celdas,
+  onReintentar,
+}: {
+  combinacion: CombinacionRuna | null;
+  resultadosPorCelda: Record<string, ResultadoCelda>;
+  rejilla: Rejilla;
+  celdas: Celda[];
+  onReintentar: () => void;
+}) {
+  const celdasConRuna = celdas.filter((c) => resultadosPorCelda[c.id]?.mejorMatch);
+
+  return (
+    <div className="w-full rounded-2xl border border-primary/15 bg-white-custom p-5 shadow-md flex flex-col items-center gap-3 text-center animate-[fadeIn_0.2s_ease]">
+      {combinacion ? (
+        <>
+          <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
+            <Sparkles size={12} /> ¡Hechizo compuesto!
+          </div>
+          {combinacion.imagen_url && (
+            <div className="w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3">
+              <Image
+                alt={combinacion.nombre}
+                className="w-full h-full object-cover"
+                height={96}
+                src={combinacion.imagen_url}
+                width={96}
+              />
+            </div>
+          )}
+          <h2 className="text-lg font-black text-primary">{combinacion.nombre}</h2>
+          {combinacion.explicacion && (
+            <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
+              <RichEditor
+                editable={false}
+                mode="preview"
+                value={combinacion.explicacion}
+                onChange={() => {}}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <Wand2 size={28} className="text-primary/20" />
+          <p className="text-sm font-bold text-primary/50">
+            {celdasConRuna.length === 0
+              ? "No se reconoció ninguna runa en el tablero"
+              : "No hay un hechizo compuesto para esta combinación, pero se reconocieron estas runas:"}
+          </p>
+        </>
+      )}
+
+      {!combinacion && celdasConRuna.length > 0 && (
+        <div className="w-full flex flex-col gap-1.5 text-left">
+          {celdasConRuna.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-primary/5 text-xs"
+            >
+              <span className="text-primary/40 font-bold">{labelCelda(c, rejilla)}</span>
+              <span className="text-primary font-semibold">
+                {resultadosPorCelda[c.id].mejorMatch!.nombre}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <button
         type="button"
         className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
