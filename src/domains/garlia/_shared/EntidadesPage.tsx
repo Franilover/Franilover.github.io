@@ -550,7 +550,24 @@ export function EntidadesPage({ section, selectedId }: Props) {
                   </MundoCard>
                 );
               }
-              if (bloques.length === 0) return null;
+              if (bloques.length === 0) {
+                return (
+                  <MundoCard
+                    key={tipo}
+                    title={cfg.labelPlural}
+                    Icon={cfg.Icon}
+                    fill={false}
+                    onCreate={async () => {
+                      const nuevo = await crearGrupo(tipo);
+                      if (nuevo) openEntity("grupos", nuevo.id);
+                    }}
+                  >
+                    <div className="w-full py-6 text-xs text-primary/25 text-center">
+                      Sin grupos aún
+                    </div>
+                  </MundoCard>
+                );
+              }
 
               return (
                 <MundoCard
