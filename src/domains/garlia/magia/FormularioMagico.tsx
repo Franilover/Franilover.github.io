@@ -45,6 +45,7 @@ export function FormularioMagico({
   onSaved,
   onDeleted,
   onNavigateCriatura,
+  onNavigateGrupo,
   todasLasRunas,
 }: {
   item: EntidadMagica;
@@ -54,6 +55,8 @@ export function FormularioMagico({
   onSaved: (i: EntidadMagica) => void;
   onDeleted: (id: string) => void;
   onNavigateCriatura?: (id: string) => void;
+  /** Si se pasa, el nombre de cada grupo asignado navega a su editor. */
+  onNavigateGrupo?: (id: string) => void;
   /** Catálogo completo de runas, para el editor de combinaciones (solo se usa si modo === "runas"). */
   todasLasRunas?: EntidadMagica[];
 }) {
@@ -245,6 +248,7 @@ export function FormularioMagico({
                 onGrupoIdsChange={(ids) =>
                   setForm((f) => ({ ...f, grupo_ids: ids }))
                 }
+                onNavigateGrupo={onNavigateGrupo}
               />
               <ComboSelector
                 allowNone
@@ -313,6 +317,7 @@ export function FormularioMagico({
                 onGrupoIdsChange={(ids) =>
                   setForm((f) => ({ ...f, grupo_ids: ids }))
                 }
+                onNavigateGrupo={onNavigateGrupo}
               />
               <ComboSelector
                 allowNone

@@ -304,6 +304,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
             );
           }}
           onNavigateCriatura={(id) => openEntity("criaturas", id)}
+          onNavigateGrupo={(id) => openEntity("grupos", id)}
         />
       </div>
     );
