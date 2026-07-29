@@ -32,7 +32,12 @@ import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { CanvasDibujoRuna } from "../CanvasDibujoRuna";
-import { reconocerRuna, type PatronRuna, type Punto, type ResultadoReconocimiento } from "../dollarOneRecognizer";
+import {
+  reconocerRuna,
+  type PatronRuna,
+  type Punto,
+  type ResultadoReconocimiento,
+} from "../dollarOneRecognizer";
 import {
   esRejillaSimple,
   FORMA_CIRCULO,
@@ -70,10 +75,14 @@ export default function RunasDibujo() {
   const [rejilla, setRejilla] = useState<Rejilla>(REJILLA_SIMPLE);
 
   // Modo simple (1×1): un solo resultado, igual que antes.
-  const [resultadoSimple, setResultadoSimple] = useState<ResultadoReconocimiento[] | null>(null);
+  const [resultadoSimple, setResultadoSimple] = useState<
+    ResultadoReconocimiento[] | null
+  >(null);
 
   // Modo rejilla: resultado por celda + cuál está activa para dibujar.
-  const [resultadosPorCelda, setResultadosPorCelda] = useState<Record<string, ResultadoCelda>>({});
+  const [resultadosPorCelda, setResultadosPorCelda] = useState<
+    Record<string, ResultadoCelda>
+  >({});
   const [celdaActivaId, setCeldaActivaId] = useState<string | null>(null);
   const [finalizado, setFinalizado] = useState(false);
 
@@ -83,8 +92,12 @@ export default function RunasDibujo() {
   React.useEffect(() => {
     let activo = true;
     void Promise.all([
-      supabase.from("runas").select("id, nombre, explicacion, imagen_url, patron_trazos"),
-      supabase.from("combinaciones_runas").select("id, nombre, explicacion, imagen_url, celdas"),
+      supabase
+        .from("runas")
+        .select("id, nombre, explicacion, imagen_url, patron_trazos"),
+      supabase
+        .from("combinaciones_runas")
+        .select("id, nombre, explicacion, imagen_url, celdas"),
     ]).then(([runasRes, comboRes]) => {
       if (!activo) return;
       if (runasRes.error || !runasRes.data) {
@@ -142,7 +155,10 @@ export default function RunasDibujo() {
     if (!celdaActivaId) return;
     const ranking = reconocerRuna(puntos, patrones);
     const top = ranking[0];
-    const mejorMatch = top && top.score >= UMBRAL_CONFIANZA ? runas.find((r) => r.id === top.runaId) ?? null : null;
+    const mejorMatch =
+      top && top.score >= UMBRAL_CONFIANZA
+        ? (runas.find((r) => r.id === top.runaId) ?? null)
+        : null;
     setResultadosPorCelda((prev) => ({
       ...prev,
       [celdaActivaId]: { ranking, mejorMatch },
@@ -199,7 +215,10 @@ export default function RunasDibujo() {
     setResetSignal((s) => s + 1);
   }
 
-  const runaPorCeldaParaTablero: Record<string, EntidadMagica | null | undefined> = {};
+  const runaPorCeldaParaTablero: Record<
+    string,
+    EntidadMagica | null | undefined
+  > = {};
   for (const [id, r] of Object.entries(resultadosPorCelda)) {
     runaPorCeldaParaTablero[id] = r.mejorMatch;
   }
@@ -219,15 +238,7 @@ export default function RunasDibujo() {
       <div className="flex flex-col items-center gap-1.5 pt-8 md:pt-2 text-center">
         <div className="flex items-center gap-2">
           <ScrollText size={20} style={{ color: "var(--primary)" }} />
-          <h1 className="text-xl md:text-2xl font-black text-primary tracking-tight">
-            Traza una runa
-          </h1>
         </div>
-        <p className="text-sm text-primary/40 max-w-md">
-          {simple
-            ? "Dibujá el símbolo de una runa en el pergamino. El mundo intentará reconocer qué poder invocaste."
-            : "Dividí el tablero en celdas y dibujá una runa distinta en cada una. La combinación completa puede formar un hechizo mayor."}
-        </p>
       </div>
 
       {estado === "cargando" && (
@@ -240,8 +251,7 @@ export default function RunasDibujo() {
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-4">
           <ScrollText size={40} strokeWidth={1} className="text-primary/15" />
           <p className="text-sm text-primary/40 max-w-sm">
-            Todavía no hay runas con patrón de trazo definido en este mundo.
-            Volvé pronto.
+            Todavía no hay runas con patrón de trazo definido.
           </p>
         </div>
       )}
@@ -269,12 +279,6 @@ export default function RunasDibujo() {
                   resultado={resultadoSimple}
                   onReintentar={reintentarSimple}
                 />
-              )}
-
-              {!resultadoSimple && (
-                <p className="text-micro text-primary/25 tracking-widest uppercase font-bold">
-                  Dibujá con el mouse o el dedo, y soltá al terminar
-                </p>
               )}
             </>
           ) : (
@@ -365,7 +369,9 @@ function ResultadoCard({
               />
             </div>
           )}
-          <h2 className="text-lg font-black text-primary">{mejorMatch.nombre}</h2>
+          <h2 className="text-lg font-black text-primary">
+            {mejorMatch.nombre}
+          </h2>
           {mejorMatch.explicacion && (
             <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
               <RichEditor
@@ -414,7 +420,9 @@ function ResultadoRejillaCard({
   celdas: Celda[];
   onReintentar: () => void;
 }) {
-  const celdasConRuna = celdas.filter((c) => resultadosPorCelda[c.id]?.mejorMatch);
+  const celdasConRuna = celdas.filter(
+    (c) => resultadosPorCelda[c.id]?.mejorMatch,
+  );
 
   return (
     <div className="w-full rounded-2xl border border-primary/15 bg-white-custom p-5 shadow-md flex flex-col items-center gap-3 text-center animate-[fadeIn_0.2s_ease]">
@@ -434,7 +442,9 @@ function ResultadoRejillaCard({
               />
             </div>
           )}
-          <h2 className="text-lg font-black text-primary">{combinacion.nombre}</h2>
+          <h2 className="text-lg font-black text-primary">
+            {combinacion.nombre}
+          </h2>
           {combinacion.explicacion && (
             <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
               <RichEditor
@@ -464,7 +474,9 @@ function ResultadoRejillaCard({
               key={c.id}
               className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-primary/5 text-xs"
             >
-              <span className="text-primary/40 font-bold">{labelCelda(c, rejilla)}</span>
+              <span className="text-primary/40 font-bold">
+                {labelCelda(c, rejilla)}
+              </span>
               <span className="text-primary font-semibold">
                 {resultadosPorCelda[c.id].mejorMatch!.nombre}
               </span>

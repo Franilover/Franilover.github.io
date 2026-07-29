@@ -27,11 +27,22 @@
  *   src/features/editorGarlia/components/magia/PanelPatronRuna.tsx
  */
 
-import { ChevronLeft, ChevronRight, PenTool, Plus, Trash2, Undo2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  PenTool,
+  Plus,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import React, { useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
-import { normalizarTrazo, suavizarTrazo, type Punto } from "./dollarOneRecognizer";
+import {
+  normalizarTrazo,
+  suavizarTrazo,
+  type Punto,
+} from "./dollarOneRecognizer";
 import { PanelTestReconocimiento } from "./PanelTestReconocimiento";
 import { trazoAPathSvg, TRAZO_THUMBNAIL_VIEWBOX } from "./trazoThumbnail";
 import type { EntidadMagica } from "./types";
@@ -53,7 +64,10 @@ export function PanelPatronRuna({
 }) {
   const [resetSignal, setResetSignal] = useState(0);
   const [seleccionado, setSeleccionado] = useState<number | null>(null);
-  const [ultimoBorrado, setUltimoBorrado] = useState<{ trazo: Punto[]; idx: number } | null>(null);
+  const [ultimoBorrado, setUltimoBorrado] = useState<{
+    trazo: Punto[];
+    idx: number;
+  } | null>(null);
 
   const idxFantasma = seleccionado ?? patronTrazos.length - 1;
   const trazoFantasma = patronTrazos[idxFantasma] ?? null;
@@ -70,7 +84,8 @@ export function PanelPatronRuna({
     setUltimoBorrado({ trazo: patronTrazos[idx], idx });
     onChange(patronTrazos.filter((_, i) => i !== idx));
     if (seleccionado === idx) setSeleccionado(null);
-    else if (seleccionado !== null && seleccionado > idx) setSeleccionado(seleccionado - 1);
+    else if (seleccionado !== null && seleccionado > idx)
+      setSeleccionado(seleccionado - 1);
   };
 
   const deshacerBorrado = () => {
@@ -98,11 +113,6 @@ export function PanelPatronRuna({
           <PenTool size={11} /> Patrón de trazo ({patronTrazos.length} ejemplo
           {patronTrazos.length === 1 ? "" : "s"})
         </label>
-        <p className="text-micro text-primary/30 leading-relaxed">
-          Dibujá cómo se traza esta runa. Podés grabar varios ejemplos (distintas
-          formas válidas de dibujarla) para que el reconocimiento sea más flexible.
-          {trazoFantasma ? " La guía tenue de fondo es el ejemplo seleccionado abajo." : ""}
-        </p>
 
         <CanvasDibujoRuna
           color={color}
@@ -118,7 +128,10 @@ export function PanelPatronRuna({
             {patronTrazos.map((trazo, idx) => {
               const activo = idxFantasma === idx;
               return (
-                <div key={idx} className="group relative flex flex-col items-center gap-1">
+                <div
+                  key={idx}
+                  className="group relative flex flex-col items-center gap-1"
+                >
                   <button
                     type="button"
                     className="w-14 h-14 rounded-lg border overflow-hidden transition-all"
@@ -199,7 +212,8 @@ export function PanelPatronRuna({
               className="flex items-center gap-1 font-black uppercase tracking-widest hover:text-primary transition-colors"
               onClick={deshacerBorrado}
             >
-              <Undo2 size={10} /> Deshacer borrado del ejemplo {ultimoBorrado.idx + 1}
+              <Undo2 size={10} /> Deshacer borrado del ejemplo{" "}
+              {ultimoBorrado.idx + 1}
             </button>
           </div>
         )}
