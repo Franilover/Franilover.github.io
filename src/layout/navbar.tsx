@@ -731,8 +731,9 @@ const Navbar = () => {
     active: boolean;
     onSelect: () => void;
   };
+  type AdminSubmenuEntry = AdminSubmenuItem | { key: string; divider: true };
 
-  const adminSubmenuItems: AdminSubmenuItem[] = [
+  const adminSubmenuItems: AdminSubmenuEntry[] = [
     {
       key: "inicio",
       label: "Inicio",
@@ -741,12 +742,20 @@ const Navbar = () => {
       onSelect: () => mundoGoToMenu(),
     },
     {
-      key: "aventura",
-      label: "Aventura",
-      icon: Compass,
-      active: isGarliaeditor && mundoSection === "aventura",
-      onSelect: () => mundoSelectSection("aventura"),
+      key: "mapa",
+      label: "Mapa",
+      icon: Mountain,
+      active: isGarliaeditor && mundoSection === "mapa",
+      onSelect: () => mundoSelectSection("mapa"),
     },
+    {
+      key: "linea-tiempo",
+      label: "Línea de tiempo",
+      icon: Clock,
+      active: isGarliaeditor && mundoSection === "linea-tiempo",
+      onSelect: () => mundoSelectSection("linea-tiempo"),
+    },
+    { key: "div-1", divider: true },
     {
       key: "entidades",
       label: "Entidades",
@@ -767,13 +776,7 @@ const Navbar = () => {
         MAGIA_SECTIONS.has(mundoSection),
       onSelect: () => mundoSelectSection("hechizos"),
     },
-    {
-      key: "mapa",
-      label: "Mapa",
-      icon: Mountain,
-      active: isGarliaeditor && mundoSection === "mapa",
-      onSelect: () => mundoSelectSection("mapa"),
-    },
+    { key: "div-2", divider: true },
     {
       key: "capitulos",
       label: "Capítulos",
@@ -788,12 +791,13 @@ const Navbar = () => {
       active: isGarliaeditor && mundoSection === "letras",
       onSelect: () => mundoSelectSection("letras"),
     },
+    { key: "div-3", divider: true },
     {
-      key: "linea-tiempo",
-      label: "Línea de tiempo",
-      icon: Clock,
-      active: isGarliaeditor && mundoSection === "linea-tiempo",
-      onSelect: () => mundoSelectSection("linea-tiempo"),
+      key: "aventura",
+      label: "Aventura",
+      icon: Compass,
+      active: isGarliaeditor && mundoSection === "aventura",
+      onSelect: () => mundoSelectSection("aventura"),
     },
   ];
 
@@ -1058,19 +1062,23 @@ const Navbar = () => {
                 }}
               />
               <NavDivider />
-              {adminSubmenuItems.map(({ key, label, icon, active, onSelect }) => (
-                <SideNavItem
-                  key={key}
-                  active={active}
-                  href="/myself/garlia"
-                  icon={icon}
-                  label={label}
-                  onClose={() => {
-                    onSelect();
-                    closeAll();
-                  }}
-                />
-              ))}
+              {adminSubmenuItems.map((entry) =>
+                "divider" in entry ? (
+                  <NavDivider key={entry.key} />
+                ) : (
+                  <SideNavItem
+                    key={entry.key}
+                    active={entry.active}
+                    href="/myself/garlia"
+                    icon={entry.icon}
+                    label={entry.label}
+                    onClose={() => {
+                      entry.onSelect();
+                      closeAll();
+                    }}
+                  />
+                ),
+              )}
             </>
           ) : isAdmin && escritorioSubmenuOpen ? (
             <>
@@ -1282,18 +1290,22 @@ const Navbar = () => {
                   }}
                 />
                 <NavVerticalDivider />
-                {adminSubmenuItems.map(({ key, label, icon, active, onSelect }) => (
-                  <MobileFlatButton
-                    key={key}
-                    active={active}
-                    icon={icon}
-                    label={label}
-                    onClick={() => {
-                      onSelect();
-                      closeAll();
-                    }}
-                  />
-                ))}
+                {adminSubmenuItems.map((entry) =>
+                  "divider" in entry ? (
+                    <NavVerticalDivider key={entry.key} />
+                  ) : (
+                    <MobileFlatButton
+                      key={entry.key}
+                      active={entry.active}
+                      icon={entry.icon}
+                      label={entry.label}
+                      onClick={() => {
+                        entry.onSelect();
+                        closeAll();
+                      }}
+                    />
+                  ),
+                )}
               </>
             ) : isAdmin && escritorioSubmenuOpen ? (
               // Mismo patrón para Escritorio.
