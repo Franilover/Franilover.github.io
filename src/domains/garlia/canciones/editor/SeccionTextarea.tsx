@@ -70,6 +70,10 @@ export function SyllableColumn({
     <div
       aria-hidden
       className="flex flex-col shrink-0 select-none"
+      // El padding-top y el line-height deben calzar exactamente con el
+      // RichEditor (fontSize 11px, lineHeight 1.7, padding "4px 8px 8px")
+      // para que cada número quede alineado con su línea real de texto.
+      style={{ paddingTop: 4 }}
     >
       {lineas.map((linea, idx) => {
         const miN  = contar(linea, countMode);
@@ -91,8 +95,8 @@ export function SyllableColumn({
         return (
           <div
             key={idx}
-            className={`flex items-center ${justify} gap-0.5 leading-[1.6] ${color}`}
-            style={{ fontSize: FONT_SIZE_PX }}
+            className={`flex items-center ${justify} gap-0.5 ${color}`}
+            style={{ fontSize: FONT_SIZE_PX, lineHeight: 1.7, height: `${FONT_SIZE_PX * 1.7}px` }}
           >
             {!vacia && (
               <>
