@@ -1,8 +1,8 @@
 /**
  * types.ts
  * ──────────
- * Tipos y configuración compartida entre la view EditorHechizos
- * y los componentes/hooks de components/magia/.
+ * Tipos y configuración compartida entre los componentes/hooks de
+ * components/magia/.
  *
  * Ruta destino:
  *   src/features/editorGarlia/components/magia/types.ts
@@ -19,8 +19,6 @@ export type Hechizo = {
   explicacion?: string;
   grupo_ids?: string[];
   imagen_url?: string | null;
-  criatura_id?: string | null;
-  criatura?: { id: string; nombre: string; imagen_url?: string | null } | null;
   /**
    * Solo para runas: lista de trazos-ejemplo (cada uno una polilínea de
    * puntos crudos) que definen cómo se "dibuja" esta runa. Se usan como

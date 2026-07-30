@@ -3,17 +3,19 @@
 /**
  * BloqueEntidadesDeCriatura.tsx
  * ───────────────────────────────
- * Agrupador visual "Criatura → Dones / Runas / Items / Hechizos".
- * Muestra, dentro del editor de Criatura, las entidades que tienen a esta
- * criatura como origen directo (columna `criatura_id`) — de solo lectura +
- * navegación, ya que la edición del vínculo vive en el selector "Criatura"
- * (ComboSelector) de cada entidad hija.
+ * Agrupador visual "Criatura → Items". Muestra, dentro del editor de
+ * Criatura, los ítems que tienen a esta criatura como origen directo
+ * (columna `criatura_id`) — de solo lectura + navegación, ya que la edición
+ * del vínculo vive en el selector "Criatura" del editor de cada ítem.
+ *
+ * Nota: Dones/Runas/Hechizos ya no se vinculan a criaturas — esa relación
+ * fue eliminada.
  *
  * Ruta destino:
  *   src/features/editorGarlia/components/criaturas/BloqueEntidadesDeCriatura.tsx
  */
 
-import { Loader2, Package, ScrollText, Sparkles, Star } from "lucide-react";
+import { Loader2, Package } from "lucide-react";
 import Image from "next/image";
 import React from "react";
 
@@ -22,23 +24,13 @@ import {
   type EntidadDeCriaturaMin,
 } from "@/domains/garlia/criaturas/useEntidadesDeCriatura";
 
-const GRUPOS_CFG = [
-  { key: "dones" as const, label: "Dones", Icon: Star },
-  { key: "runas" as const, label: "Runas", Icon: ScrollText },
-  { key: "items" as const, label: "Ítems", Icon: Package },
-  { key: "hechizos" as const, label: "Hechizos", Icon: Sparkles },
-];
-
 export function BloqueEntidadesDeCriatura({
   criaturaId,
   onNavigate,
 }: {
   criaturaId: string;
-  /** Navega al editor de la entidad hija (don/runa/item/hechizo) */
-  onNavigate?: (
-    tipo: "dones" | "runas" | "items" | "hechizos",
-    id: string,
-  ) => void;
+  /** Navega al editor del ítem */
+  onNavigate?: (tipo: "items", id: string) => void;
 }) {
   const { grupos, total, loading } = useEntidadesDeCriatura(criaturaId);
 
@@ -61,83 +53,67 @@ export function BloqueEntidadesDeCriatura({
         Vinculados a esta criatura
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {GRUPOS_CFG.map(({ key, label, Icon }) => {
-          const lista = grupos[key];
-          if (lista.length === 0) return null;
-          return (
-            <div
-              key={key}
-              className="rounded-xl overflow-hidden"
-              style={{
-                border:
-                  "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
-                background: "color-mix(in srgb, var(--primary) 2%, transparent)",
-              }}
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            border: "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 2%, transparent)",
+          }}
+        >
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1.5"
+            style={{
+              borderBottom: "1px solid color-mix(in srgb, var(--primary) 6%, transparent)",
+            }}
+          >
+            <Package
+              size={10}
+              style={{ color: "color-mix(in srgb, var(--primary) 40%, transparent)" }}
+            />
+            <span
+              className="text-micro font-black uppercase tracking-widest"
+              style={{ color: "color-mix(in srgb, var(--primary) 40%, transparent)" }}
             >
-              <div
-                className="flex items-center gap-1.5 px-2.5 py-1.5"
-                style={{
-                  borderBottom:
-                    "1px solid color-mix(in srgb, var(--primary) 6%, transparent)",
-                }}
+              Ítems
+            </span>
+            <span
+              className="ml-auto text-micro font-black tabular-nums"
+              style={{ color: "var(--primary)" }}
+            >
+              {grupos.items.length}
+            </span>
+          </div>
+          <div className="p-1.5 space-y-1 max-h-40 overflow-y-auto">
+            {grupos.items.map((e: EntidadDeCriaturaMin) => (
+              <button
+                key={e.id}
+                className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded-lg text-left transition-all hover:bg-primary/5"
+                type="button"
+                onClick={() => onNavigate?.("items", e.id)}
               >
-                <Icon
-                  size={10}
-                  style={{
-                    color: "color-mix(in srgb, var(--primary) 40%, transparent)",
-                  }}
-                />
+                <div className="shrink-0 w-4 h-4 rounded-full overflow-hidden border border-primary/10 bg-primary/5 flex items-center justify-center">
+                  {e.imagen_url ? (
+                    <Image
+                      alt={e.nombre}
+                      className="w-full h-full object-cover"
+                      height={16}
+                      src={e.imagen_url}
+                      width={16}
+                    />
+                  ) : (
+                    <Package className="text-primary/20" size={8} />
+                  )}
+                </div>
                 <span
-                  className="text-micro font-black uppercase tracking-widest"
-                  style={{
-                    color: "color-mix(in srgb, var(--primary) 40%, transparent)",
-                  }}
+                  className="flex-1 min-w-0 text-micro font-bold truncate"
+                  style={{ color: "color-mix(in srgb, var(--primary) 65%, transparent)" }}
                 >
-                  {label}
+                  {e.nombre}
                 </span>
-                <span
-                  className="ml-auto text-micro font-black tabular-nums"
-                  style={{ color: "var(--primary)" }}
-                >
-                  {lista.length}
-                </span>
-              </div>
-              <div className="p-1.5 space-y-1 max-h-40 overflow-y-auto">
-                {lista.map((e: EntidadDeCriaturaMin) => (
-                  <button
-                    key={e.id}
-                    className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded-lg text-left transition-all hover:bg-primary/5"
-                    type="button"
-                    onClick={() => onNavigate?.(key, e.id)}
-                  >
-                    <div className="shrink-0 w-4 h-4 rounded-full overflow-hidden border border-primary/10 bg-primary/5 flex items-center justify-center">
-                      {e.imagen_url ? (
-                        <Image
-                          alt={e.nombre}
-                          className="w-full h-full object-cover"
-                          height={16}
-                          src={e.imagen_url}
-                          width={16}
-                        />
-                      ) : (
-                        <Icon className="text-primary/20" size={8} />
-                      )}
-                    </div>
-                    <span
-                      className="flex-1 min-w-0 text-micro font-bold truncate"
-                      style={{
-                        color:
-                          "color-mix(in srgb, var(--primary) 65%, transparent)",
-                      }}
-                    >
-                      {e.nombre}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

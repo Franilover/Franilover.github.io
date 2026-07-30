@@ -42,6 +42,7 @@ import { CiudadEditor } from "@garlia/ciudades";
 import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GeografiaJerarquica } from "@/domains/garlia/_shared/GeografiaJerarquica";
 import { MagiaJerarquica } from "@/domains/garlia/magia/MagiaJerarquica";
+import { MagiaPorTipo } from "@/domains/garlia/magia/MagiaPorTipo";
 import { TABLA_TO_SECTION } from "@/domains/garlia/_shared/useExternalCommandBridge";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
@@ -97,8 +98,8 @@ function useMagiaCategoria(modo: "hechizos" | "dones" | "runas") {
           : { nombre: `Nuevo ${cfg.labelSing}`, grupo_ids: [] };
       const selectFields =
         modo === "runas"
-          ? "id, nombre, explicacion, imagen_url, criatura_id"
-          : "id, nombre, explicacion, grupo_ids, criatura_id";
+          ? "id, nombre, explicacion, imagen_url"
+          : "id, nombre, explicacion, grupo_ids";
 
       const { data, error } = await supabase
         .from(cfg.tabla)
@@ -303,7 +304,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
               prev.map((i) => (i.id === updated.id ? updated : i)),
             );
           }}
-          onNavigateCriatura={(id) => openEntity("criaturas", id)}
           onNavigateGrupo={(id) => openEntity("grupos", id)}
         />
       </div>
@@ -387,52 +387,21 @@ export function EntidadesPage({ section, selectedId }: Props) {
   }
 
   // ── Magia (Hechizos/Dones/Runas) ──────────────────────────────────────
-  // Sección propia de la navbar (antes vivía adentro de Entidades → sub-tab
-  // "Criaturas"). Mismo árbol jerárquico (MagiaJerarquica), pero como
-  // página independiente — sin la sub-barra de Reinos/Criaturas/Canciones/
-  // Organización, que ahora es exclusiva de Entidades.
+  // Sección propia de la navbar: tres bloques planos (MagiaPorTipo), sin
+  // agrupar por criatura — esa relación fue eliminada.
   if (section === "hechizos" || section === "dones" || section === "runas") {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <MagiaJerarquica
-          criaturas={criaturas}
+        <MagiaPorTipo
           dones={dones.items}
           hechizos={hechizos.items}
-          items={items}
-          loading={loadingC || loadingI || loadingP || hechizos.loading || dones.loading || runas.loading}
-          personajes={personajes}
           runas={runas.items}
-          onCreateCriatura={async () => {
-            const { data } = await addCriatura({ nombre: "Nueva criatura" });
-            if (data?.id) openEntity("criaturas", data.id);
-          }}
-          onCreateHija={async (tipo, criaturaId) => {
-            if (tipo === "items") {
-              const { data } = await addItem({
-                nombre: "Nuevo objeto",
-                ...(criaturaId ? { criatura_id: criaturaId } : {}),
-              });
-              if (data?.id) openEntity("items", data.id);
-              return;
-            }
+          loading={hechizos.loading || dones.loading || runas.loading}
+          creating={hechizos.creating || dones.creating || runas.creating}
+          onCreate={async (tipo) => {
             const categoria = tipo === "hechizos" ? hechizos : tipo === "dones" ? dones : runas;
             const id = await categoria.create();
-            if (id) {
-              if (criaturaId) {
-                await supabase.from(tipo).update({ criatura_id: criaturaId }).eq("id", id);
-                categoria.setItems((prev) =>
-                  prev.map((i) => (i.id === id ? { ...i, criatura_id: criaturaId } as any : i)),
-                );
-              }
-              openEntity(tipo, id);
-            }
-          }}
-          onCreatePersonaje={async (criatura) => {
-            const { data } = await addPersonaje({
-              nombre: "Nuevo personaje",
-              ...(criatura ? { especie: criatura.nombre } : {}),
-            });
-            if (data?.id) openEntity("personajes", data.id);
+            if (id) openEntity(tipo, id);
           }}
           onOpen={(section, id) => openEntity(section, id)}
         />
@@ -495,36 +464,19 @@ export function EntidadesPage({ section, selectedId }: Props) {
       {subTab === "criaturas" && (
         <MagiaJerarquica
           criaturas={criaturas}
-          dones={dones.items}
-          hechizos={hechizos.items}
           items={items}
-          loading={loadingC || loadingI || loadingP || hechizos.loading || dones.loading || runas.loading}
           personajes={personajes}
-          runas={runas.items}
+          loading={loadingC || loadingI || loadingP}
           onCreateCriatura={async () => {
             const { data } = await addCriatura({ nombre: "Nueva criatura" });
             if (data?.id) openEntity("criaturas", data.id);
           }}
-          onCreateHija={async (tipo, criaturaId) => {
-            if (tipo === "items") {
-              const { data } = await addItem({
-                nombre: "Nuevo objeto",
-                ...(criaturaId ? { criatura_id: criaturaId } : {}),
-              });
-              if (data?.id) openEntity("items", data.id);
-              return;
-            }
-            const categoria = tipo === "hechizos" ? hechizos : tipo === "dones" ? dones : runas;
-            const id = await categoria.create();
-            if (id) {
-              if (criaturaId) {
-                await supabase.from(tipo).update({ criatura_id: criaturaId }).eq("id", id);
-                categoria.setItems((prev) =>
-                  prev.map((i) => (i.id === id ? { ...i, criatura_id: criaturaId } as any : i)),
-                );
-              }
-              openEntity(tipo, id);
-            }
+          onCreateHija={async (_tipo, criaturaId) => {
+            const { data } = await addItem({
+              nombre: "Nuevo objeto",
+              ...(criaturaId ? { criatura_id: criaturaId } : {}),
+            });
+            if (data?.id) openEntity("items", data.id);
           }}
           onCreatePersonaje={async (criatura) => {
             const { data } = await addPersonaje({

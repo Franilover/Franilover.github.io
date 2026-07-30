@@ -3,28 +3,30 @@
 /**
  * MagiaJerarquica
  * ───────────────────────────────────────────────────────────────────────────
- * Vista de "Entidades" agrupada por criatura de origen, análoga a
- * GeografiaJerarquica pero de un solo nivel:
+ * Vista del sub-tab "Criaturas" de Entidades, agrupada por criatura de
+ * origen, análoga a GeografiaJerarquica pero de un solo nivel:
  *
  *   [Criatura 1]
- *   Dones      Runas      Items      Hechizos      Personajes
- *   [D1][D2]   [R1]       [I1][I2]   [H1]           [P1][P2]
+ *   Items         Personajes
+ *   [I1][I2]      [P1][P2]
  *
  *   [Criatura 2]
  *   ...
  *
  * Cada nodo "Criatura" es un chip temático que abre su editor completo
- * (openEntity("criaturas", id)). Las 5 categorías se muestran como columnas
- * internas; cada tarjeta abre el editor de esa entidad puntual.
+ * (openEntity("criaturas", id)).
  *
  * Relaciones usadas:
- *  - Don/Runa/Item/Hechizo.criatura_id → agrupa bajo su criatura de origen.
+ *  - Item.criatura_id → agrupa bajo su criatura de origen.
  *  - Personaje.especie (nombre de la criatura, no FK) → agrupa personajes
  *    bajo la criatura cuyo nombre coincide con su especie.
  * Las entidades sin vínculo caen en el bloque final global "Sin criatura".
+ *
+ * Nota: Hechizos/Dones/Runas ya no se agrupan por criatura — viven en su
+ * propia sección de navbar (ver MagiaPorTipo) sin relación a criaturas.
  */
 
-import { Plus, ScrollText, Sparkles, Star, Package, Bug, Users } from "lucide-react";
+import { Plus, Package, Bug, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -50,28 +52,15 @@ interface Personaje {
 
 interface Props {
   criaturas: Criatura[];
-  dones: EntidadHija[];
-  runas: EntidadHija[];
   items: EntidadHija[];
-  hechizos: EntidadHija[];
   personajes: Personaje[];
   loading?: boolean;
   onOpen: (section: SectionKey, id: string) => void;
   onCreateCriatura?: () => void;
-  onCreateHija?: (
-    tipo: "dones" | "runas" | "items" | "hechizos",
-    criaturaId: string | null,
-  ) => void;
+  onCreateHija?: (tipo: "items", criaturaId: string | null) => void;
   onCreatePersonaje?: (criatura: Criatura | null) => void;
   creatingCriatura?: boolean;
 }
-
-const CATEGORIAS = [
-  { key: "dones" as const, label: "Dones", Icon: Star, section: "dones" as SectionKey },
-  { key: "runas" as const, label: "Runas", Icon: ScrollText, section: "runas" as SectionKey },
-  { key: "items" as const, label: "Items", Icon: Package, section: "items" as SectionKey },
-  { key: "hechizos" as const, label: "Hechizos", Icon: Sparkles, section: "hechizos" as SectionKey },
-];
 
 function NodoCriatura({
   label,
@@ -82,7 +71,6 @@ function NodoCriatura({
   label: string;
   onClick: () => void;
   onCreate?: () => void;
-  /** Si es true, el chip ocupa el 100% del ancho de su contenedor (uso en grid dinámico) */
   fill?: boolean;
 }) {
   return (
@@ -126,8 +114,6 @@ function Columna({
   entidades: EntidadHija[];
   onOpen: (section: SectionKey, id: string) => void;
   onCreate?: () => void;
-  /** Ancho máximo disponible (px) para esta categoría; limita cuántas
-   * columnas internas puede tener el grid para no desbordar la card. */
   maxWidthPx?: number;
 }) {
   const vacia = entidades.length === 0;
@@ -185,10 +171,7 @@ function Columna({
 
 export function MagiaJerarquica({
   criaturas,
-  dones,
-  runas,
   items,
-  hechizos,
   personajes,
   loading,
   onOpen,
@@ -215,37 +198,19 @@ export function MagiaJerarquica({
     return <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>;
   }
 
-  const donesDe = (criaturaId: string) => dones.filter((d) => d.criatura_id === criaturaId);
-  const runasDe = (criaturaId: string) => runas.filter((r) => r.criatura_id === criaturaId);
   const itemsDe = (criaturaId: string) => items.filter((i) => i.criatura_id === criaturaId);
-  const hechizosDe = (criaturaId: string) => hechizos.filter((h) => h.criatura_id === criaturaId);
-  // Personajes se agrupan por `especie` (nombre de la criatura, no FK) —
-  // se normalizan a la forma EntidadHija (img_url → imagen_url) para
-  // reutilizar el mismo componente Columna que el resto de categorías.
   const personajesDe = (criaturaNombre: string): EntidadHija[] =>
     personajes
       .filter((p) => p.especie === criaturaNombre)
       .map((p) => ({ id: p.id, nombre: p.nombre, imagen_url: p.img_url }));
 
   const totalDe = (criatura: Criatura) =>
-    donesDe(criatura.id).length +
-    runasDe(criatura.id).length +
-    itemsDe(criatura.id).length +
-    hechizosDe(criatura.id).length +
-    personajesDe(criatura.nombre).length;
+    itemsDe(criatura.id).length + personajesDe(criatura.nombre).length;
 
   const criaturasOrdenadas = [...criaturas].sort((a, b) => totalDe(b) - totalDe(a));
   const criaturasConVinculosBase = criaturasOrdenadas.filter((c) => totalDe(c) > 0);
   const criaturasVacias = criaturasOrdenadas.filter((c) => totalDe(c) === 0);
 
-  // ── Layout masonry (columnas de igual ancho) ──────────────────────────────
-  // Una criatura como "Humano" puede tener docenas de personajes y ser mucho
-  // más alta que el resto; un simple flex-wrap por filas la trata como si
-  // ocupara toda la fila y desperdicia el espacio horizontal sobrante a su
-  // derecha. En vez de eso, repartimos las criaturas en N columnas de ancho
-  // fijo y cada una se asigna a la columna con menor altura acumulada
-  // (masonry greedy estándar, tipo Pinterest), estimando la altura de cada
-  // card sin necesidad de medir el DOM.
   const GAP = 24;
   const ANCHO_MIN_COLUMNA = 300;
   const anchoDisponible = containerWidth || 1100;
@@ -257,40 +222,29 @@ export function MagiaJerarquica({
 
   const itemSize = 52;
   const gapPx = 4;
-  const disponibleColumna = anchoColumnaMasonry - 32; // p-4 a ambos lados
+  const disponibleColumna = anchoColumnaMasonry - 32;
   const maxColsPorAncho = Math.max(1, Math.floor((disponibleColumna + gapPx) / (itemSize + gapPx)));
   const anchoColumnaCategoria = (entidadesCount: number) => {
-    if (entidadesCount === 0) return 0; // columna vacía no se renderiza
+    if (entidadesCount === 0) return 0;
     const cols = Math.min(Math.max(entidadesCount, 1), 6, maxColsPorAncho);
     return Math.max(cols * itemSize + (cols - 1) * gapPx, 90);
   };
-  // Altura de una columna-categoría (título + grid de EntityCard, que hace
-  // wrap interno cada `cols` items). El tope de columnas coincide con el
-  // que usa <Columna> al renderizar, para que la estimación no se quede
-  // corta y termine desbordando (y recortándose) el ancho real de la card.
   const altoColumnaCategoria = (entidadesCount: number) => {
     if (entidadesCount === 0) return 0;
     const cols = Math.min(Math.max(entidadesCount, 1), 6, maxColsPorAncho);
     const filas = Math.ceil(entidadesCount / cols);
     const alturaTitulo = 18;
-    const margenSuperior = 8; // mt-2
+    const margenSuperior = 8;
     return alturaTitulo + margenSuperior + filas * itemSize + (filas - 1) * gapPx;
   };
   const categoriasDe = (criatura: Criatura) =>
-    [
-      donesDe(criatura.id).length,
-      runasDe(criatura.id).length,
-      itemsDe(criatura.id).length,
-      hechizosDe(criatura.id).length,
-      personajesDe(criatura.nombre).length,
-    ].filter((count) => count > 0);
+    [itemsDe(criatura.id).length, personajesDe(criatura.nombre).length].filter(
+      (count) => count > 0,
+    );
 
-  // Simula el `flex-wrap gap-6` real del contenido de la card (grid de cada
-  // categoría) dentro del ancho fijo de columna, para saber cuántas filas
-  // internas necesita y así estimar la altura total de la card.
   const altoCriatura = (criatura: Criatura) => {
     const counts = categoriasDe(criatura);
-    const disponible = anchoColumnaMasonry - 32; // p-4 a ambos lados
+    const disponible = anchoColumnaMasonry - 32;
     const gapInterno = 24;
     const filas: number[][] = [];
     let filaActual: number[] = [];
@@ -309,8 +263,8 @@ export function MagiaJerarquica({
     }
     if (filaActual.length > 0) filas.push(filaActual);
 
-    const alturaBarraTitulo = 38; // px-4 py-2 + borde
-    const paddingContenido = 32; // p-4 arriba + abajo
+    const alturaBarraTitulo = 38;
+    const paddingContenido = 32;
     const alturaFilas = filas.reduce(
       (sum, fila) => sum + Math.max(...fila.map(altoColumnaCategoria)),
       0,
@@ -319,9 +273,6 @@ export function MagiaJerarquica({
     return alturaBarraTitulo + paddingContenido + alturaFilas + gapEntreFilas;
   };
 
-  // Reparte las criaturas (ya vienen ordenadas de mayor a menor contenido) en
-  // `numColumnas` columnas, asignando cada una a la columna con menor altura
-  // acumulada hasta el momento.
   function distribuirEnColumnas(list: Criatura[]): Criatura[][] {
     const columnas: Criatura[][] = Array.from({ length: numColumnas }, () => []);
     const alturas = new Array(numColumnas).fill(0);
@@ -339,27 +290,13 @@ export function MagiaJerarquica({
 
   const sinCriaturaIds = new Set(criaturas.map((c) => c.id));
   const criaturasNombres = new Set(criaturas.map((c) => c.nombre));
-  const donesSinCriatura = dones.filter(
-    (d) => !d.criatura_id || !sinCriaturaIds.has(d.criatura_id),
-  );
-  const runasSinCriatura = runas.filter(
-    (r) => !r.criatura_id || !sinCriaturaIds.has(r.criatura_id),
-  );
   const itemsSinCriatura = items.filter(
     (i) => !i.criatura_id || !sinCriaturaIds.has(i.criatura_id),
-  );
-  const hechizosSinCriatura = hechizos.filter(
-    (h) => !h.criatura_id || !sinCriaturaIds.has(h.criatura_id),
   );
   const personajesSinCriatura: EntidadHija[] = personajes
     .filter((p) => !p.especie || !criaturasNombres.has(p.especie))
     .map((p) => ({ id: p.id, nombre: p.nombre, imagen_url: p.img_url }));
-  const totalSinCriatura =
-    donesSinCriatura.length +
-    runasSinCriatura.length +
-    itemsSinCriatura.length +
-    hechizosSinCriatura.length +
-    personajesSinCriatura.length;
+  const totalSinCriatura = itemsSinCriatura.length + personajesSinCriatura.length;
 
   return (
     <div className="mb-8 last:mb-0">
@@ -405,35 +342,19 @@ export function MagiaJerarquica({
                     <span />
                   </div>
                   <div className="p-4 flex flex-wrap gap-6">
-                    {CATEGORIAS.map(({ key, label, Icon, section }) => {
-                      const entidadesDe =
-                        key === "dones"
-                          ? donesDe(criatura.id)
-                          : key === "runas"
-                            ? runasDe(criatura.id)
-                            : key === "items"
-                              ? itemsDe(criatura.id)
-                              : hechizosDe(criatura.id);
-                      // Solo mostramos columnas con contenido para no saturar el
-                      // card (una criatura sin dones, por ejemplo, no necesita
-                      // mostrar "Sin dones" si tampoco tiene runas/items/hechizos
-                      // vacíos a la vista).
-                      if (entidadesDe.length === 0) return null;
-                      return (
-                        <Columna
-                          key={key}
-                          Icon={Icon}
-                          entidades={entidadesDe}
-                          label={label}
-                          section={section}
-                          onCreate={
-                            onCreateHija ? () => onCreateHija(key, criatura.id) : undefined
-                          }
-                          onOpen={onOpen}
-                          maxWidthPx={disponibleColumna}
-                        />
-                      );
-                    })}
+                    {itemsDe(criatura.id).length > 0 && (
+                      <Columna
+                        Icon={Package}
+                        entidades={itemsDe(criatura.id)}
+                        label="Items"
+                        section="items"
+                        onCreate={
+                          onCreateHija ? () => onCreateHija("items", criatura.id) : undefined
+                        }
+                        onOpen={onOpen}
+                        maxWidthPx={disponibleColumna}
+                      />
+                    )}
                     {personajesDe(criatura.nombre).length > 0 && (
                       <Columna
                         Icon={Users}
@@ -467,24 +388,16 @@ export function MagiaJerarquica({
               <span />
             </div>
             <div className="p-4 flex flex-wrap gap-6">
-              {[
-                { key: "dones" as const, label: "Dones", Icon: Star, section: "dones" as SectionKey, entidades: donesSinCriatura },
-                { key: "runas" as const, label: "Runas", Icon: ScrollText, section: "runas" as SectionKey, entidades: runasSinCriatura },
-                { key: "items" as const, label: "Items", Icon: Package, section: "items" as SectionKey, entidades: itemsSinCriatura },
-                { key: "hechizos" as const, label: "Hechizos", Icon: Sparkles, section: "hechizos" as SectionKey, entidades: hechizosSinCriatura },
-              ]
-                .filter((c) => c.entidades.length > 0)
-                .map((c) => (
-                  <Columna
-                    key={c.key}
-                    Icon={c.Icon}
-                    entidades={c.entidades}
-                    label={c.label}
-                    section={c.section}
-                    onCreate={onCreateHija ? () => onCreateHija(c.key, null) : undefined}
-                    onOpen={onOpen}
-                  />
-                ))}
+              {itemsSinCriatura.length > 0 && (
+                <Columna
+                  Icon={Package}
+                  entidades={itemsSinCriatura}
+                  label="Items"
+                  section="items"
+                  onCreate={onCreateHija ? () => onCreateHija("items", null) : undefined}
+                  onOpen={onOpen}
+                />
+              )}
               {personajesSinCriatura.length > 0 && (
                 <Columna
                   Icon={Users}
@@ -504,7 +417,7 @@ export function MagiaJerarquica({
             <div className="flex items-center gap-3 mb-3 px-1">
               <div className="h-px flex-1 bg-primary/10" />
               <span className="text-micro font-black uppercase tracking-[0.25em] text-primary/40 shrink-0">
-                Sin dones, runas, items ni hechizos
+                Sin items ni personajes
               </span>
               <div className="h-px flex-1 bg-primary/10" />
             </div>
@@ -521,7 +434,7 @@ export function MagiaJerarquica({
                   label={criatura.nombre}
                   onClick={() => onOpen("criaturas", criatura.id)}
                   onCreate={
-                    onCreateHija ? () => onCreateHija("dones", criatura.id) : undefined
+                    onCreateHija ? () => onCreateHija("items", criatura.id) : undefined
                   }
                 />
               ))}

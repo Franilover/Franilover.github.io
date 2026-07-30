@@ -16,16 +16,14 @@
  */
 
 
-import { Bug, Save, Trash2 } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
-import { ComboSelector } from "@/ui/ComboSelector";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
-import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCatalogo";
 import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete as dexieDel } from "@/lib/utils/dexieHelpers";
 
@@ -44,7 +42,6 @@ export function FormularioMagico({
   loadingGrupos,
   onSaved,
   onDeleted,
-  onNavigateCriatura,
   onNavigateGrupo,
   todasLasRunas,
 }: {
@@ -54,7 +51,6 @@ export function FormularioMagico({
   loadingGrupos: boolean;
   onSaved: (i: EntidadMagica) => void;
   onDeleted: (id: string) => void;
-  onNavigateCriatura?: (id: string) => void;
   /** Si se pasa, el nombre de cada grupo asignado navega a su editor. */
   onNavigateGrupo?: (id: string) => void;
   /** Catálogo completo de runas, para el editor de combinaciones (solo se usa si modo === "runas"). */
@@ -64,7 +60,6 @@ export function FormularioMagico({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const { confirm, ConfirmModal } = useConfirm();
   const { onWikilink } = useWikilink();
-  const { criaturas: allCriaturas, loading: loadingCriaturas } = useCriaturasCatalogo();
   const cfg = CONFIG[modo];
 
   useEffect(() => {
@@ -79,7 +74,6 @@ export function FormularioMagico({
         nombre: form.nombre,
         explicacion: form.explicacion || null,
         imagen_url: (form as any).imagen_url || null,
-        criatura_id: (form as any).criatura_id ?? null,
       };
       updatePayload.grupo_ids = form.grupo_ids ?? [];
       if (modo === "runas") {
@@ -250,27 +244,6 @@ export function FormularioMagico({
                 }
                 onNavigateGrupo={onNavigateGrupo}
               />
-              <ComboSelector
-                allowNone
-                icon={<Bug size={11} />}
-                items={allCriaturas.map((c) => ({
-                  id: c.id,
-                  label: c.nombre,
-                  imgUrl: c.imagen_url ?? null,
-                }))}
-                label="Criatura"
-                loading={loadingCriaturas}
-                mode="single"
-                noneLabel="Sin criatura"
-                placeholder={`Vincular a una criatura…`}
-                value={(form as any).criatura_id ?? null}
-                onChange={(id) =>
-                  setForm((f) => ({ ...f, criatura_id: id } as any))
-                }
-                onNavigate={
-                  onNavigateCriatura ? (id) => onNavigateCriatura(id) : undefined
-                }
-              />
               <div className="space-y-1.5">
                 <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">
                   Explicación
@@ -318,27 +291,6 @@ export function FormularioMagico({
                   setForm((f) => ({ ...f, grupo_ids: ids }))
                 }
                 onNavigateGrupo={onNavigateGrupo}
-              />
-              <ComboSelector
-                allowNone
-                icon={<Bug size={11} />}
-                items={allCriaturas.map((c) => ({
-                  id: c.id,
-                  label: c.nombre,
-                  imgUrl: c.imagen_url ?? null,
-                }))}
-                label="Criatura"
-                loading={loadingCriaturas}
-                mode="single"
-                noneLabel="Sin criatura"
-                placeholder={`Vincular a una criatura…`}
-                value={(form as any).criatura_id ?? null}
-                onChange={(id) =>
-                  setForm((f) => ({ ...f, criatura_id: id } as any))
-                }
-                onNavigate={
-                  onNavigateCriatura ? (id) => onNavigateCriatura(id) : undefined
-                }
               />
               <div className="space-y-1.5">
                 <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">

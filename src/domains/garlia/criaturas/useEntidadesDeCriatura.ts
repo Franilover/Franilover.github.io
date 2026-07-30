@@ -3,14 +3,17 @@
 /**
  * useEntidadesDeCriatura.ts
  * ───────────────────────────
- * Trae los Dones, Runas, Ítems y Hechizos vinculados DIRECTAMENTE a una
- * criatura mediante la columna `criatura_id` (relación de origen/pertenencia,
- * 1 criatura → N entidades). Distinto de las relaciones many-to-many que ya
- * existen (item_crafteres, personaje_hechizos, etc.) — acá la criatura es el
- * "dueño"/origen de la entidad, no una simple asignación.
+ * Trae los Ítems vinculados DIRECTAMENTE a una criatura mediante la columna
+ * `criatura_id` (relación de origen/pertenencia, 1 criatura → N items).
+ * Distinto de las relaciones many-to-many que ya existen (item_crafteres,
+ * personaje_hechizos, etc.) — acá la criatura es el "dueño"/origen del item,
+ * no una simple asignación.
  *
- * Se usa para armar el agrupador visual "Criatura → Dones / Runas / Items /
- * Hechizos" dentro del editor de Criatura.
+ * Nota: Dones/Runas/Hechizos ya no tienen `criatura_id` — esa relación fue
+ * eliminada (ver MagiaPorTipo).
+ *
+ * Se usa para armar el agrupador visual "Criatura → Items" dentro del editor
+ * de Criatura.
  *
  * Ruta destino:
  *   src/features/editorGarlia/hooks/criaturas/useEntidadesDeCriatura.ts
@@ -27,13 +30,10 @@ export type EntidadDeCriaturaMin = {
 };
 
 type Grupos = {
-  dones: EntidadDeCriaturaMin[];
-  runas: EntidadDeCriaturaMin[];
   items: EntidadDeCriaturaMin[];
-  hechizos: EntidadDeCriaturaMin[];
 };
 
-const EMPTY: Grupos = { dones: [], runas: [], items: [], hechizos: [] };
+const EMPTY: Grupos = { items: [] };
 
 export function useEntidadesDeCriatura(criaturaId: string) {
   const [grupos, setGrupos] = useState<Grupos>(EMPTY);
@@ -47,34 +47,13 @@ export function useEntidadesDeCriatura(criaturaId: string) {
     }
     setLoading(true);
     try {
-      const [{ data: dones }, { data: runas }, { data: items }, { data: hechizos }] =
-        await Promise.all([
-          supabase
-            .from("dones")
-            .select("id, nombre, imagen_url")
-            .eq("criatura_id", criaturaId)
-            .order("nombre"),
-          supabase
-            .from("runas")
-            .select("id, nombre, imagen_url")
-            .eq("criatura_id", criaturaId)
-            .order("nombre"),
-          supabase
-            .from("items")
-            .select("id, nombre, imagen_url")
-            .eq("criatura_id", criaturaId)
-            .order("nombre"),
-          supabase
-            .from("hechizos")
-            .select("id, nombre, imagen_url")
-            .eq("criatura_id", criaturaId)
-            .order("nombre"),
-        ]);
+      const { data: items } = await supabase
+        .from("items")
+        .select("id, nombre, imagen_url")
+        .eq("criatura_id", criaturaId)
+        .order("nombre");
       setGrupos({
-        dones: (dones ?? []) as EntidadDeCriaturaMin[],
-        runas: (runas ?? []) as EntidadDeCriaturaMin[],
         items: (items ?? []) as EntidadDeCriaturaMin[],
-        hechizos: (hechizos ?? []) as EntidadDeCriaturaMin[],
       });
     } finally {
       setLoading(false);
@@ -85,11 +64,7 @@ export function useEntidadesDeCriatura(criaturaId: string) {
     void load();
   }, [load]);
 
-  const total =
-    grupos.dones.length +
-    grupos.runas.length +
-    grupos.items.length +
-    grupos.hechizos.length;
+  const total = grupos.items.length;
 
   return { grupos, total, loading, reload: load };
 }
