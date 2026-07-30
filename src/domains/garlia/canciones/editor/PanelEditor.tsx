@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import {
   Music,
   Film,
@@ -8,15 +7,11 @@ import {
   RefreshCw,
   FileText,
   Columns2,
-  Plus,
-  Check,
-  X,
-  Layers,
   Globe,
   Mic2,
   PanelRight,
 } from "lucide-react";
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 
 import { BannerOffline } from "@/layout/EstudioTemplates";
 import {
@@ -24,12 +19,7 @@ import {
   ESTADO_COLOR,
 } from "@/domains/garlia/canciones/constants";
 import { useCancionEditor } from "@/domains/garlia/canciones/useCancionEditor";
-import {
-  secUpdate,
-  secCreate,
-  secDelete,
-  secReorder,
-} from "@/domains/garlia/canciones/seccionesDb";
+import { secUpdate, secCreate } from "@/domains/garlia/canciones/seccionesDb";
 import type {
   Seccion,
   IdiomaKey,
@@ -37,7 +27,7 @@ import type {
 } from "@/domains/garlia/canciones/types";
 
 import { IdiomaTab } from "./IdiomaTab";
-import { SeccionEditor } from "./SeccionEditor";
+import { SeccionTextarea } from "./SeccionTextarea";
 import { ModalLectorLetras } from "../modals/ModalLectorLetras";
 import { PanelGuionMV } from "../panels/PanelGuionMV";
 import { PanelInfoSidebar } from "../panels/PanelInfoSidebar";
@@ -75,10 +65,9 @@ export const PanelEditor = ({
   const [countMode, setCountMode] = useState<"silabas" | "vocales">("silabas");
 
   // Estados de Modales/Edición
-  const [addingOpen, setAddingOpen] = useState(false);
-  const [addingName, setAddingName] = useState("");
   const [showLector, setShowLector] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [creandoBloque, setCreandoBloque] = useState(false);
 
   // Responsive Split Mode
   useEffect(() => {
@@ -104,83 +93,28 @@ export const PanelEditor = ({
     [setCancion],
   );
 
-  const handleSaveNombre = useCallback(
-    async (id: string, nombre: string) => {
-      await secUpdate(id, { nombre_seccion: nombre });
-      setCancion((prev) =>
-        prev
-          ? {
-              ...prev,
-              secciones: prev.secciones?.map((s) =>
-                s.id === id ? { ...s, nombre_seccion: nombre } : s,
-              ),
-            }
-          : prev,
-      );
-    },
-    [setCancion],
-  );
+  // El bloque único de letra de la canción (a lo sumo 1 elemento).
+  const bloque: Seccion | undefined = cancion?.secciones?.[0];
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      await secDelete(id);
-      setCancion((prev) =>
-        prev
-          ? { ...prev, secciones: prev.secciones?.filter((s) => s.id !== id) }
-          : prev,
-      );
-    },
-    [setCancion],
-  );
-
-  const handleAdd = async () => {
-    if (!addingName.trim()) return;
-    const secciones = cancion?.secciones || [];
-    const nueva = await secCreate({
+  // Si la canción todavía no tiene su bloque único, lo creamos automáticamente
+  // apenas el editor carga (canciones nuevas, o migradas sin fila previa).
+  useEffect(() => {
+    if (!cancion || loading || bloque || creandoBloque) return;
+    setCreandoBloque(true);
+    secCreate({
       cancion_id: cancionId,
-      nombre_seccion: addingName.trim().toUpperCase(),
+      nombre_seccion: "",
       letra_es: "",
-      orden: secciones.length,
-    });
-    setCancion((prev) =>
-      prev ? { ...prev, secciones: [...(prev.secciones || []), nueva] } : prev,
-    );
-    setAddingName("");
-    setAddingOpen(false);
-  };
-
-  const handleDuplicate = useCallback(
-    async (sec: Seccion) => {
-      const secciones = cancion?.secciones || [];
-      const idx = secciones.findIndex((s) => s.id === sec.id);
-      const insertAt = idx + 1;
-      const tmpSecs = [...secciones];
-      const nueva = await secCreate({
-        cancion_id: cancionId,
-        nombre_seccion: sec.nombre_seccion + " (2)",
-        letra_es: sec.letra_es || "",
-        letra_en: sec.letra_en,
-        letra_jp: sec.letra_jp,
-        letra_romaji: sec.letra_romaji,
-        orden: insertAt,
-      });
-      tmpSecs.splice(insertAt, 0, nueva);
-      const reordenadas = tmpSecs.map((s, i) => ({ ...s, orden: i }));
-      setCancion((prev) => (prev ? { ...prev, secciones: reordenadas } : prev));
-      await secReorder(reordenadas.map((s) => ({ id: s.id, orden: s.orden })));
-    },
-    [cancion, cancionId, setCancion],
-  );
-
-  const handleMove = async (index: number, dir: "up" | "down") => {
-    const secs = [...(cancion?.secciones || [])];
-    const target = dir === "up" ? index - 1 : index + 1;
-    if (target < 0 || target >= secs.length) return;
-    [secs[index], secs[target]] = [secs[target], secs[index]];
-    const reordenadas = secs.map((s, i) => ({ ...s, orden: i }));
-    setCancion((prev) => (prev ? { ...prev, secciones: reordenadas } : prev));
-    await secReorder(reordenadas.map((s) => ({ id: s.id, orden: s.orden })));
-  };
+      orden: 0,
+    })
+      .then((nueva) => {
+        setCancion((prev) =>
+          prev ? { ...prev, secciones: [nueva] } : prev,
+        );
+      })
+      .finally(() => setCreandoBloque(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cancion, loading, bloque, cancionId]);
 
   const changeIdiomaA = (v: IdiomaKey) => {
     setIdiomaA(v);
@@ -193,14 +127,10 @@ export const PanelEditor = ({
   };
 
   // --- Helpers de Cálculo ---
-  const secciones = cancion?.secciones || [];
+  const secciones = useMemo(() => (bloque ? [bloque] : []), [bloque]);
   const campoA = IDIOMAS.find((i) => i.id === idiomaA)!.campo;
-  const conLetra = secciones.filter(
-    (s) => !!(s[campoA] as string)?.trim(),
-  ).length;
-  const pct = secciones.length
-    ? Math.round((conLetra / secciones.length) * 100)
-    : 0;
+  const tieneLetra = !!(bloque?.[campoA] as string)?.trim();
+  const pct = bloque ? (tieneLetra ? 100 : 0) : 0;
 
   const TABS = [
     { id: "letras", label: "Letras", icon: <Music size={12} /> },
@@ -399,7 +329,7 @@ export const PanelEditor = ({
                   ))}
                 </div>
                 <span className="text-micro font-black text-primary/20 uppercase tracking-widest hidden sm:block">
-                  Secciones: {conLetra}/{secciones.length}
+                  {tieneLetra ? "Con letra" : "Sin letra"}
                 </span>
               </div>
             </div>
@@ -430,73 +360,37 @@ export const PanelEditor = ({
         <main className="flex-1 overflow-y-auto">
           {activeTab === "letras" && (
             <div className="px-2 sm:px-3 py-6 space-y-4 w-full">
-              {secciones.length > 0 ? (
-                <div className="bg-bg-main/50 divide-y divide-primary/8">
-                  {secciones.map((sec, i) => (
-                    <SeccionEditor
-                      key={sec.id}
-                      countMode={countMode}
-                      idiomaA={idiomaA}
-                      idiomaB={idiomaB}
-                      isFirst={i === 0}
-                      isLast={i === secciones.length - 1}
-                      sec={sec}
-                      splitMode={splitMode}
-                      onDelete={handleDelete}
-                      onDuplicate={handleDuplicate}
-                      onMoveDown={() => handleMove(i, "down")}
-                      onMoveUp={() => handleMove(i, "up")}
-                      onSaveField={handleSaveField}
-                      onSaveNombre={handleSaveNombre}
-                    />
-                  ))}
+              {bloque ? (
+                <div
+                  className={`px-2 pb-2 ${splitMode ? "flex gap-3" : ""}`}
+                >
+                  <SeccionTextarea
+                    countMode={countMode}
+                    idioma={idiomaA}
+                    refIdioma={splitMode ? idiomaB : undefined}
+                    sec={bloque}
+                    onSave={handleSaveField}
+                  />
+                  {splitMode && (
+                    <>
+                      <div className="w-px bg-primary/10 shrink-0 self-stretch" />
+                      <SeccionTextarea
+                        countMode={countMode}
+                        idioma={idiomaB}
+                        refIdioma={idiomaA}
+                        sec={bloque}
+                        onSave={handleSaveField}
+                      />
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 py-20 text-primary/20">
-                  <Layers size={48} strokeWidth={1} />
+                  <Loader2 className="animate-spin" size={28} strokeWidth={1} />
                   <p className="text-micro font-black uppercase tracking-[0.2em]">
-                    Sin secciones aún
+                    Preparando editor…
                   </p>
                 </div>
-              )}
-
-              {addingOpen ? (
-                <motion.div
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex gap-2"
-                  initial={{ opacity: 0, y: 10 }}
-                >
-                  <input
-                    autoFocus
-                    className="flex-1 bg-bg-main border border-primary/20 rounded-xl px-4 py-3 text-xs font-black uppercase text-primary outline-none focus:border-primary/50 tracking-widest"
-                    placeholder="NOMBRE DE LA SECCIÓN..."
-                    value={addingName}
-                    onChange={(e) => setAddingName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void handleAdd();
-                      if (e.key === "Escape") setAddingOpen(false);
-                    }}
-                  />
-                  <button
-                    className="bg-primary text-bg-main px-6 rounded-xl font-black transition-transform active:scale-95"
-                    onClick={handleAdd}
-                  >
-                    <Check size={18} />
-                  </button>
-                  <button
-                    className="p-4 rounded-xl border border-primary/10 text-primary/30 hover:text-primary transition-all"
-                    onClick={() => setAddingOpen(false)}
-                  >
-                    <X size={18} />
-                  </button>
-                </motion.div>
-              ) : (
-                <button
-                  className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border border-dashed border-primary/10 text-micro font-black uppercase text-primary/30 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all tracking-[0.3em]"
-                  onClick={() => setAddingOpen(true)}
-                >
-                  <Plus size={14} /> Añadir Sección
-                </button>
               )}
 
               <PanelLinks
