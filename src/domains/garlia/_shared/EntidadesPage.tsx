@@ -186,7 +186,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
   const [showNuevaCancion, setShowNuevaCancion] = useState(false);
 
-  /** Agrupa canciones por Idioma → Compositor → Cantante, en ese orden.
+  /** Agrupa canciones por Idioma → Cantante → Compositor, en ese orden.
    *  Los valores vacíos caen en un balde "Sin …" que siempre queda al final. */
   const cancionesAgrupadas = useMemo(() => {
     const SIN = new Set(["Sin idioma", "Sin compositor", "Sin cantante"]);
@@ -204,26 +204,26 @@ export function EntidadesPage({ section, selectedId }: Props) {
       const cantante = c.cantante?.trim() || "Sin cantante";
 
       if (!porIdioma.has(idioma)) porIdioma.set(idioma, new Map());
-      const porCompositor = porIdioma.get(idioma)!;
+      const porCantante = porIdioma.get(idioma)!;
 
-      if (!porCompositor.has(compositor)) porCompositor.set(compositor, new Map());
-      const porCantante = porCompositor.get(compositor)!;
+      if (!porCantante.has(cantante)) porCantante.set(cantante, new Map());
+      const porCompositor = porCantante.get(cantante)!;
 
-      if (!porCantante.has(cantante)) porCantante.set(cantante, []);
-      porCantante.get(cantante)!.push(c);
+      if (!porCompositor.has(compositor)) porCompositor.set(compositor, []);
+      porCompositor.get(compositor)!.push(c);
     }
 
     return sortKeys(Array.from(porIdioma.keys())).map((idioma) => {
-      const porCompositor = porIdioma.get(idioma)!;
+      const porCantante = porIdioma.get(idioma)!;
       return {
         idioma,
-        compositores: sortKeys(Array.from(porCompositor.keys())).map((compositor) => {
-          const porCantante = porCompositor.get(compositor)!;
+        cantantes: sortKeys(Array.from(porCantante.keys())).map((cantante) => {
+          const porCompositor = porCantante.get(cantante)!;
           return {
-            compositor,
-            cantantes: sortKeys(Array.from(porCantante.keys())).map((cantante) => ({
-              cantante,
-              canciones: porCantante.get(cantante)!,
+            cantante,
+            compositores: sortKeys(Array.from(porCompositor.keys())).map((compositor) => ({
+              compositor,
+              canciones: porCompositor.get(compositor)!,
             })),
           };
         }),
@@ -401,7 +401,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
 
   // ── Letras (Canciones) ─────────────────────────────────────────────────
   // Sección propia de la navbar (antes vivía adentro de Entidades → sub-tab
-  // "Canciones"). Mismo agrupamiento Idioma → Compositor → Cantante, pero
+  // "Canciones"). Mismo agrupamiento Idioma → Cantante → Compositor, pero
   // como página independiente.
   if (section === "letras") {
     return (
@@ -423,18 +423,18 @@ export function EntidadesPage({ section, selectedId }: Props) {
         ) : canciones.length === 0 ? (
           <div className="py-6 text-xs text-primary/25 text-center">Sin canciones todavía</div>
         ) : (
-          cancionesAgrupadas.map(({ idioma, compositores }) => (
+          cancionesAgrupadas.map(({ idioma, cantantes }) => (
             <MundoCard key={idioma} title={idioma} Icon={Music}>
-              {compositores.map(({ compositor, cantantes }) => (
-                <div key={compositor} className="flex-none w-fit max-w-full">
+              {cantantes.map(({ cantante, compositores }) => (
+                <div key={cantante} className="flex-none w-fit max-w-full">
                   <h4 className="text-micro font-semibold text-primary/35 mb-1.5 px-1">
-                    {compositor}
+                    {cantante}
                   </h4>
                   <div className="flex flex-row flex-wrap gap-4 items-start">
-                    {cantantes.map(({ cantante, canciones: cancionesGrupo }) => (
-                      <div key={cantante} className="flex-none w-fit max-w-full">
+                    {compositores.map(({ compositor, canciones: cancionesGrupo }) => (
+                      <div key={compositor} className="flex-none w-fit max-w-full">
                         <EntityCardGrid
-                          title={cantante}
+                          title={compositor}
                           variant="chips"
                           items={cancionesGrupo.map((c: Cancion) => ({ id: c.id, nombre: c.titulo }))}
                           onItemClick={(id) => openEntity("letras", id)}
