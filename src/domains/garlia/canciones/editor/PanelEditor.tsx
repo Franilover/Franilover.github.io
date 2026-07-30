@@ -23,7 +23,7 @@ import type {
 } from "@/domains/garlia/canciones/types";
 
 import { IdiomaTab } from "./IdiomaTab";
-import { SeccionTextarea } from "./SeccionTextarea";
+import { SeccionTextarea, SyllableColumn } from "./SeccionTextarea";
 import { ModalLectorLetras } from "../modals/ModalLectorLetras";
 import { PanelGuionMV } from "../panels/PanelGuionMV";
 import { PanelInfoSidebar } from "../panels/PanelInfoSidebar";
@@ -72,6 +72,11 @@ export const PanelEditor = ({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [creandoBloque, setCreandoBloque] = useState(false);
 
+  // Texto en vivo de cada columna en split mode (para el indicador central
+  // de sílabas/vocales, que compara ambos idiomas mientras se tipea).
+  const [textoA, setTextoA] = useState("");
+  const [textoB, setTextoB] = useState("");
+
   // Responsive Split Mode
   useEffect(() => {
     const wide = window.innerWidth >= 768;
@@ -113,6 +118,13 @@ export const PanelEditor = ({
 
   // El bloque único de letra de la canción (a lo sumo 1 elemento).
   const bloque: Seccion | undefined = cancion?.secciones?.[0];
+
+  // Al cambiar de canción/bloque, limpiar los textos en vivo del split mode
+  // para que el indicador central no arrastre valores de otra canción.
+  useEffect(() => {
+    setTextoA("");
+    setTextoB("");
+  }, [bloque?.id]);
 
   // Si la canción todavía no tiene su bloque único, lo creamos automáticamente
   // apenas el editor carga (canciones nuevas, o migradas sin fila previa).
@@ -370,24 +382,40 @@ export const PanelEditor = ({
             <div className="px-2 sm:px-3 py-6 space-y-4 w-full">
               {bloque ? (
                 <div
-                  className={`px-2 pb-2 ${splitMode ? "flex gap-3" : ""}`}
+                  className={`px-2 pb-2 ${splitMode ? "flex gap-2" : ""}`}
                 >
                   <SeccionTextarea
                     countMode={countMode}
                     idioma={idiomaA}
-                    refIdioma={splitMode ? idiomaB : undefined}
                     sec={bloque}
+                    showSyllableColumn={!splitMode}
                     onSave={handleSaveField}
+                    onTextoChange={splitMode ? setTextoA : undefined}
                   />
                   {splitMode && (
                     <>
-                      <div className="w-px bg-primary/10 shrink-0 self-stretch" />
+                      {/* ── Indicador central: sílabas del bloque izquierdo (hacia la izq) y del derecho (hacia la der) ── */}
+                      <div className="flex shrink-0 self-stretch divide-x divide-primary/10 border-x border-primary/10">
+                        <SyllableColumn
+                          align="end"
+                          countMode={countMode}
+                          refLineas={null}
+                          texto={textoA}
+                        />
+                        <SyllableColumn
+                          align="start"
+                          countMode={countMode}
+                          refLineas={null}
+                          texto={textoB}
+                        />
+                      </div>
                       <SeccionTextarea
                         countMode={countMode}
                         idioma={idiomaB}
-                        refIdioma={idiomaA}
                         sec={bloque}
+                        showSyllableColumn={false}
                         onSave={handleSaveField}
+                        onTextoChange={setTextoB}
                       />
                     </>
                   )}

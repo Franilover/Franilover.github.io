@@ -52,21 +52,24 @@ const FONT_SIZE_PX = 11;
  * concepto de "línea de altura fija" que un textarea sí tiene, así que ya
  * no se puede alinear pixel-perfect con el texto real.
  */
-function SyllableColumn({
+export function SyllableColumn({
   texto,
   refLineas,
   countMode,
+  align = "end",
 }: {
   texto:     string;
   refLineas: string[] | null;
   countMode: CountMode;
+  align?: "start" | "end";
 }) {
   const lineas = texto.split("\n");
+  const justify = align === "start" ? "justify-start" : "justify-end";
 
   return (
     <div
       aria-hidden
-      className="flex flex-col shrink-0 select-none border-l border-primary/8 pl-2"
+      className="flex flex-col shrink-0 select-none"
     >
       {lineas.map((linea, idx) => {
         const miN  = contar(linea, countMode);
@@ -88,7 +91,7 @@ function SyllableColumn({
         return (
           <div
             key={idx}
-            className={`flex items-center justify-end gap-0.5 leading-[1.6] ${color}`}
+            className={`flex items-center ${justify} gap-0.5 leading-[1.6] ${color}`}
             style={{ fontSize: FONT_SIZE_PX }}
           >
             {!vacia && (
@@ -117,6 +120,7 @@ function SyllableColumn({
 
 export const SeccionTextarea = ({
   sec, idioma, refIdioma, onSave, nombreSeccion: _nombreSeccion, countMode,
+  showSyllableColumn = true, onTextoChange,
 }: {
   sec:           Seccion;
   idioma:        IdiomaKey;
@@ -124,6 +128,8 @@ export const SeccionTextarea = ({
   onSave:        (id: string, updates: Partial<Seccion>) => Promise<void>;
   nombreSeccion?: string;
   countMode:     "silabas" | "vocales";
+  showSyllableColumn?: boolean;
+  onTextoChange?: (texto: string) => void;
 }) => {
   const campo     = IDIOMAS.find(i => i.id === idioma)!.campo;
   const serverVal = (sec[campo] as string) || "";
@@ -144,17 +150,21 @@ export const SeccionTextarea = ({
         const localVal = local?.[campo] as string | undefined;
         if (local?.status === "pending" && localVal !== undefined && localVal !== serverVal) {
           setTexto(localVal);
+          onTextoChange?.(localVal);
           setSt({ ...IDLE_STATE, dirty: true, mode: "pending", msg: "Pendiente de sincronizar" });
         } else {
           setTexto(serverVal);
+          onTextoChange?.(serverVal);
           setSt(IDLE_STATE);
         }
       } catch {
         setTexto(serverVal);
+        onTextoChange?.(serverVal);
         setSt(IDLE_STATE);
       }
     };
     void loadLocal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idioma, sec.id]);
 
   const doSave = useCallback(async (val: string) => {
@@ -177,11 +187,12 @@ export const SeccionTextarea = ({
 
   const onChange = useCallback((val: string) => {
     setTexto(val);
+    onTextoChange?.(val);
     draft.save(val);
     setSt(s => ({ ...s, dirty: true, saved: false, mode: s.mode === "error" ? "idle" : s.mode, msg: null }));
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => doSave(val), 1500);
-  }, [doSave, draft]);
+  }, [doSave, draft, onTextoChange]);
 
   // ── Texto de referencia (columna opuesta en split mode) ─────────────────
   const refCampo  = refIdioma ? IDIOMAS.find(i => i.id === refIdioma)?.campo : null;
@@ -239,7 +250,13 @@ export const SeccionTextarea = ({
             onChange={onChange}
           />
         </div>
-        <SyllableColumn countMode={countMode} refLineas={refLineas} texto={texto} />
+        {showSyllableColumn && (
+          <SyllableColumn
+            countMode={countMode}
+            refLineas={refLineas}
+            texto={texto}
+          />
+        )}
       </div>
 
       {/* ── Mensaje de error ── */}
