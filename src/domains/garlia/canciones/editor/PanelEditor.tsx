@@ -7,19 +7,15 @@ import {
   RefreshCw,
   FileText,
   Columns2,
-  Globe,
-  Mic2,
   PanelRight,
 } from "lucide-react";
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 
 import { BannerOffline } from "@/layout/EstudioTemplates";
-import {
-  IDIOMAS,
-  ESTADO_COLOR,
-} from "@/domains/garlia/canciones/constants";
+import { IDIOMAS } from "@/domains/garlia/canciones/constants";
 import { useCancionEditor } from "@/domains/garlia/canciones/useCancionEditor";
 import { secUpdate, secCreate } from "@/domains/garlia/canciones/seccionesDb";
+import { supabase } from "@/infra/supabase/supabase";
 import type {
   Seccion,
   IdiomaKey,
@@ -63,6 +59,13 @@ export const PanelEditor = ({
   const [splitMode, setSplitMode] = useState(false);
   const [activeTab, setActiveTab] = useState<EditorTab>("letras");
   const [countMode, setCountMode] = useState<"silabas" | "vocales">("silabas");
+  const [tituloInput, setTituloInput] = useState(cancion?.titulo || "");
+
+  // Mantener el input de título sincronizado si cambia desde afuera
+  // (ej. recarga de datos, edición concurrente).
+  useEffect(() => {
+    setTituloInput(cancion?.titulo || "");
+  }, [cancion?.titulo]);
 
   // Estados de Modales/Edición
   const [showLector, setShowLector] = useState(false);
@@ -91,6 +94,21 @@ export const PanelEditor = ({
       );
     },
     [setCancion],
+  );
+
+  const handleSaveTitulo = useCallback(
+    async (titulo: string) => {
+      setCancion((prev) => (prev ? { ...prev, titulo } : prev));
+      try {
+        await supabase
+          .from("canciones")
+          .update({ titulo: titulo || null })
+          .eq("id", cancionId);
+      } catch (e) {
+        console.error("Error al guardar título:", e);
+      }
+    },
+    [cancionId, setCancion],
   );
 
   // El bloque único de letra de la canción (a lo sumo 1 elemento).
@@ -186,29 +204,19 @@ export const PanelEditor = ({
         <header className="shrink-0 border-b border-primary/10 bg-bg-main">
           <div className="px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4">
             {/* Identidad de Canción */}
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-sm sm:text-base font-black uppercase italic tracking-tight text-primary truncate">
-                    {cancion.titulo}
-                  </h1>
-                  <span
-                    className="text-micro font-bold px-1.5 py-0.5 rounded border leading-none shrink-0"
-                    style={ESTADO_COLOR[cancion.estado]}
-                  >
-                    {cancion.estado}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-micro font-medium text-primary/30 uppercase tracking-wider truncate">
-                  <span className="flex items-center gap-1">
-                    <Mic2 size={10} /> {cancion.cantante || "Artista"}
-                  </span>
-                  <span className="opacity-20">•</span>
-                  <span className="flex items-center gap-1">
-                    <Globe size={10} /> {cancion.idioma}
-                  </span>
-                </div>
-              </div>
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <input
+                className="flex-1 min-w-0 bg-transparent text-sm sm:text-base font-black uppercase italic tracking-tight text-primary truncate outline-none hover:bg-primary/5 focus:bg-primary/8 rounded-lg px-1.5 py-0.5 -mx-1.5 transition-colors placeholder:text-primary/20"
+                placeholder="Nombre de la canción…"
+                value={tituloInput}
+                onBlur={() => {
+                  if (tituloInput !== cancion.titulo) handleSaveTitulo(tituloInput);
+                }}
+                onChange={(e) => setTituloInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+              />
             </div>
 
             {/* Navegación (Tabs) */}

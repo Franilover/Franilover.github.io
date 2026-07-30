@@ -5,7 +5,6 @@ import {
   Loader2,
   CheckCircle2,
   Mic2,
-  Music,
   PenLine,
   Globe,
   Beaker,
@@ -548,16 +547,6 @@ export const PanelInfoSidebar = ({
           </button>
         </div>
       </div>
-
-      {/* Título */}
-      <CampoTexto
-        icon={<Music size={9} />}
-        label="Título"
-        placeholder="Nombre de la canción…"
-        suggestions={[]}
-        value={localData.titulo}
-        onChange={(v) => handleChange("titulo", v)}
-      />
 
       {/* Cantante / Compositor */}
       <div className="grid grid-cols-2 gap-1.5">
