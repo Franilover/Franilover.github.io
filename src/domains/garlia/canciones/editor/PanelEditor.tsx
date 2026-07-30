@@ -413,7 +413,7 @@ export const PanelEditor = ({
                   {splitMode && (
                     <>
                       {/* ── Indicador central: sílabas del bloque izquierdo (hacia la izq) y del derecho (hacia la der) ── */}
-                      <div className="flex shrink-0 self-stretch divide-x divide-primary/10 border-x border-primary/10">
+                      <div className="flex shrink-0 self-stretch gap-2">
                         <SyllableColumn
                           align="end"
                           countMode={countMode}
