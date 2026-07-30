@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, CheckCircle2, AlertCircle, WifiOff } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, WifiOff, Circle } from "lucide-react";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -205,11 +205,12 @@ export const SeccionTextarea = ({
 
   // ── Border según estado ──────────────────────────────────────────────────
   // RichEditor usa su propio borde; lo sobreescribimos vía className
-  // en el div contenedor para indicar estado de guardado.
+  // en el div contenedor para indicar estado de guardado. El estado
+  // "dirty" (cambios sin guardar aún) ya no se muestra como anillo
+  // amarillo — en su lugar hay un ícono sutil junto al tick de guardado.
   const statusRingClass =
     st.mode === "pending" ? "ring-1 ring-blue-500/40"  :
     st.mode === "error"   ? "ring-1 ring-red-500/40"   :
-    st.dirty              ? "ring-1 ring-amber-500/30" :
                             "";
 
   return (
@@ -230,11 +231,12 @@ export const SeccionTextarea = ({
       )}
 
       {/* ── Indicadores de estado — solo si hay algo que mostrar ── */}
-      {(st.saving || st.saved || st.mode === "pending" || st.mode === "error") && (
+      {(st.saving || st.saved || st.dirty || st.mode === "pending" || st.mode === "error") && (
         <div className="flex justify-end mb-0.5">
           <span className="flex items-center gap-1.5 pr-1">
             {st.saving                           && <Loader2      className="animate-spin text-primary/30" size={11} />}
             {st.saved                            && <CheckCircle2 className="text-emerald-400" size={11} />}
+            {st.dirty && !st.saving              && <Circle       className="text-amber-400 fill-amber-400" size={7} />}
             {st.mode === "pending" && !st.saving && <span className="w-2 h-2 rounded-full bg-blue-400" />}
             {st.mode === "error"                 && <AlertCircle  className="text-red-400" size={11} />}
           </span>
