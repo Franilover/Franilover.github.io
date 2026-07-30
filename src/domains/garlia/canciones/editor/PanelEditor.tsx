@@ -4,7 +4,6 @@ import {
   Music,
   Film,
   Loader2,
-  RefreshCw,
   FileText,
   Columns2,
   PanelRight,
@@ -50,7 +49,6 @@ export const PanelEditor = ({
     setCancion,
     loading,
     isOffline: editorOffline,
-    reload,
   } = useCancionEditor(cancionId);
 
   // Estados de UI
@@ -176,9 +174,6 @@ export const PanelEditor = ({
 
   // --- Helpers de Cálculo ---
   const secciones = useMemo(() => (bloque ? [bloque] : []), [bloque]);
-  const campoA = IDIOMAS.find((i) => i.id === idiomaA)!.campo;
-  const tieneLetra = !!(bloque?.[campoA] as string)?.trim();
-  const pct = bloque ? (tieneLetra ? 100 : 0) : 0;
 
   const TABS = [
     { id: "letras", label: "Letras", icon: <Music size={12} /> },
@@ -268,14 +263,6 @@ export const PanelEditor = ({
 
             {/* Acciones e Indicadores */}
             <div className="flex items-center gap-2">
-              <div className="hidden sm:flex flex-col items-end mr-2">
-                <span className="text-micro font-black text-primary/40 leading-none">
-                  {pct}%
-                </span>
-                <span className="text-micro font-bold text-primary/20 uppercase tracking-tighter">
-                  Completado
-                </span>
-              </div>
               <button
                 className="p-2 rounded-lg transition-all"
                 style={{
@@ -299,12 +286,6 @@ export const PanelEditor = ({
                 <FileText size={16} />
               </button>
               <button
-                className="p-2 rounded-lg hover:bg-primary/5 text-primary/30"
-                onClick={reload as any}
-              >
-                <RefreshCw size={14} />
-              </button>
-              <button
                 className="lg:hidden p-2 rounded-lg hover:bg-primary/5 text-primary/30"
                 title="Ficha técnica"
                 onClick={() => setMobileSidebarOpen(true)}
@@ -316,7 +297,7 @@ export const PanelEditor = ({
 
           {/* Toolbar Contextual para Letras */}
           {activeTab === "letras" && (
-            <div className="px-4 sm:px-6 py-2 border-t border-primary/5 bg-primary/[0.01] flex items-center justify-between overflow-x-auto no-scrollbar">
+            <div className="px-4 sm:px-6 py-2 bg-primary/[0.01] flex items-center justify-between overflow-x-auto no-scrollbar">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1 bg-bg-main border border-primary/10 p-0.5 rounded-lg shrink-0">
                   <IdiomaTab
@@ -366,15 +347,12 @@ export const PanelEditor = ({
                     </button>
                   ))}
                 </div>
-                <span className="text-micro font-black text-primary/20 uppercase tracking-widest hidden sm:block">
-                  {tieneLetra ? "Con letra" : "Sin letra"}
-                </span>
               </div>
             </div>
           )}
 
           {/* Tabs Mobile (Solo se ven en pantallas pequeñas) */}
-          <div className="md:hidden flex border-t border-primary/5 p-1">
+          <div className="md:hidden flex p-1">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
