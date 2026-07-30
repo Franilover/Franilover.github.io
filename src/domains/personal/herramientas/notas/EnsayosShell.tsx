@@ -40,6 +40,7 @@ function setSaveIndicator(el: HTMLElement | null, status: SaveStatus) {
 
 const LS_ACTIVE = "ensayos-active-id";
 const LS_HOME   = "ensayos-at-home";
+const LS_TABS   = "ensayos-open-tabs";
 
 function EnsayosInner() {
   const { user } = useAuth() as { user: any };
@@ -111,6 +112,32 @@ function EnsayosInner() {
     return localStorage.getItem(LS_ACTIVE);
   });
 
+  // ── Pestañas de notas abiertas (barra horizontal arriba del editor) ──────
+  const [openTabIds, setOpenTabIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(LS_TABS);
+      const ids = raw ? (JSON.parse(raw) as string[]) : [];
+      return Array.isArray(ids) ? ids : [];
+    } catch {
+      return [];
+    }
+  });
+
+  /** Agrega (si no está ya) una nota a la lista de pestañas abiertas. */
+  const registerOpenTab = useCallback((id: string) => {
+    setOpenTabIds((prev) => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      try {
+        localStorage.setItem(LS_TABS, JSON.stringify(next));
+      } catch {
+        /* localStorage puede fallar en modo privado; no es crítico */
+      }
+      return next;
+    });
+  }, []);
+
   const [searchTerm, setSearchTerm] = useState("");
 
   const pendingUpdatesRef  = useRef<Record<string, Record<string, any>>>({});
@@ -136,10 +163,11 @@ function EnsayosInner() {
       setEnsayoActivoId(id);
       localStorage.setItem(LS_ACTIVE, id);
       localStorage.removeItem(LS_HOME);
+      registerOpenTab(id);
     };
     window.addEventListener("ensayos-open", handler);
     return () => window.removeEventListener("ensayos-open", handler);
-  }, []);
+  }, [registerOpenTab]);
 
   // ── Escuchar evento del CommandPalette para crear un ensayo (nota) en blanco ──
   useEffect(() => {
@@ -167,6 +195,7 @@ function EnsayosInner() {
     if (id) {
       localStorage.setItem(LS_ACTIVE, id);
       localStorage.removeItem(LS_HOME);
+      registerOpenTab(id);
       // Abrir una nota nos saca de cualquier sección (cocina/ropa/etc.)
       // para volver a mostrar el editor.
       selectEscritorioSection("inicio");
@@ -174,7 +203,35 @@ function EnsayosInner() {
       localStorage.removeItem(LS_ACTIVE);
       localStorage.setItem(LS_HOME, "1");
     }
-  }, [selectEscritorioSection]);
+  }, [selectEscritorioSection, registerOpenTab]);
+
+  /** Cierra una pestaña de nota. Si era la activa, activa la vecina (o vuelve a la lista). */
+  const closeTab = useCallback((id: string) => {
+    setOpenTabIds((prev) => {
+      const idx = prev.indexOf(id);
+      if (idx === -1) return prev;
+      const next = prev.filter((tabId) => tabId !== id);
+      try {
+        localStorage.setItem(LS_TABS, JSON.stringify(next));
+      } catch {
+        /* no-op */
+      }
+      return next;
+    });
+    setEnsayoActivoId((prevActive) => {
+      if (prevActive !== id) return prevActive;
+      const idx = openTabIds.indexOf(id);
+      const neighborId = openTabIds[idx - 1] ?? openTabIds[idx + 1] ?? null;
+      if (neighborId) {
+        localStorage.setItem(LS_ACTIVE, neighborId);
+        localStorage.removeItem(LS_HOME);
+      } else {
+        localStorage.removeItem(LS_ACTIVE);
+        localStorage.setItem(LS_HOME, "1");
+      }
+      return neighborId;
+    });
+  }, [openTabIds]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -473,7 +530,10 @@ function EnsayosInner() {
 
     await deleteRow(id);
     setEnsayos((prev: any[]) => prev.filter((e: any) => e.id !== id));
-    if (ensayoActivoId === id) setEnsayoActivo(null);
+    // closeTab ya se encarga de: quitarla de openTabIds, y si era la activa,
+    // activar la vecina (o volver a la lista si no quedan más pestañas).
+    if (openTabIds.includes(id)) closeTab(id);
+    else if (ensayoActivoId === id) setEnsayoActivo(null);
   };
 
   // --- AÑADE ESTOS HANDLERS ---
@@ -879,6 +939,54 @@ function EnsayosInner() {
             />
           </div>
         </div>
+
+        {/* ── Pestañas de notas abiertas ── */}
+        {openTabIds.length > 0 && (
+          <div
+            className="shrink-0 flex items-center gap-1 px-2 py-1.5 overflow-x-auto"
+            style={{ borderBottom: "1px solid color-mix(in srgb, var(--foreground) 8%, transparent)" }}
+            role="tablist"
+            aria-label="Notas abiertas"
+          >
+            {openTabIds.map((id) => {
+              const ensayo = (ensayos as any[]).find((e) => e.id === id);
+              const titulo = ensayo?.titulo ?? "Sin título";
+              const active = ensayoActivoId === id;
+              return (
+                <div
+                  key={id}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setEnsayoActivo(id)}
+                  title={titulo}
+                  className="group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-lg cursor-pointer select-none shrink-0 max-w-[180px]"
+                  style={{
+                    background: active
+                      ? "color-mix(in srgb, var(--foreground) 8%, transparent)"
+                      : "transparent",
+                    color: active
+                      ? "var(--foreground)"
+                      : "color-mix(in srgb, var(--foreground) 45%, transparent)",
+                  }}
+                >
+                  <FileText size={11} className="shrink-0" />
+                  <span className="text-xs font-semibold truncate">{titulo}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); closeTab(id); }}
+                    title="Cerrar pestaña"
+                    className="shrink-0 p-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ background: "transparent" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "color-mix(in srgb, var(--foreground) 12%, transparent)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* ── Contenido principal ── */}
         <main className="flex-1 flex flex-col min-w-0 bg-background overflow-y-auto">

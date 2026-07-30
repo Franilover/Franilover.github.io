@@ -1,0 +1,63 @@
+"use client";
+
+/**
+ * useEntityTabLabel
+ * ───────────────────────────────────────────────────────────────────────────
+ * Resuelve el nombre visible (para el título de una pestaña) de una entidad
+ * dada su sección + id. Reutiliza useSupabaseData("tabla") — el cache es
+ * global y compartido (useDataCache), así que llamarlo acá no dispara un
+ * fetch duplicado si la tabla ya está cargada en otro lado (p.ej. dentro de
+ * EntidadesPage).
+ *
+ * "grupos" y "notas" no tienen su propio useSupabaseData directo (usan
+ * useGrupos/useNotas, que envuelven lógica extra), así que para esos dos
+ * casos consultamos su tabla base igual, solo para el nombre — el resto de
+ * la lógica de edición sigue viviendo en sus hooks dedicados.
+ */
+
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
+
+import type { SectionKey } from "./useMundoNavigationStore";
+
+interface EntityRow {
+  id: string;
+  nombre?: string;
+  titulo?: string;
+}
+
+const SECTION_TABLE: Record<SectionKey, string | null> = {
+  personajes: "personajes",
+  criaturas: "criaturas",
+  items: "items",
+  reinos: "reinos",
+  ciudades: "ciudades",
+  grupos: "grupos_mundo",
+  hechizos: "hechizos",
+  dones: "dones",
+  runas: "runas",
+  capitulos: null, // capítulos no participan de las tabs de entidad
+  letras: "canciones",
+  notas: "notas",
+  mapa: null,
+  "linea-tiempo": null,
+  aventura: null,
+};
+
+/**
+ * Resuelve el nombre visible de una entidad (runa/personaje/reino/etc).
+ *
+ * Nota: en la práctica esta función solo se invoca para secciones que SÍ
+ * abren pestañas de entidad (personajes/criaturas/.../notas/letras), nunca
+ * para "mapa"/"capitulos"/"linea-tiempo"/"aventura" (esas no generan tabs).
+ * Igual usamos un nombre de tabla existente como fallback defensivo para no
+ * violar las reglas de hooks ni pegarle a una tabla inventada.
+ */
+export function useEntityTabLabel(section: SectionKey, id: string): string {
+  const tabla = SECTION_TABLE[section] ?? "personajes";
+  const { data } = useSupabaseData<EntityRow>(tabla);
+
+  if (!SECTION_TABLE[section]) return "…";
+  const row = data.find((r) => r.id === id);
+  if (!row) return "…";
+  return row.nombre ?? row.titulo ?? "Sin título";
+}

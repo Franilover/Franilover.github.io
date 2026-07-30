@@ -40,6 +40,7 @@ import { useExternalCommandBridge } from "@/domains/garlia/_shared/useExternalCo
 import { MundoHomeContent } from "@/domains/garlia/_shared/MundoHomeContent";
 import { useCreateEntity } from "@/domains/garlia/_shared/useCreateEntity";
 import { useWikilinkNavigate } from "@/domains/garlia/_shared/useWikilinkNavigate";
+import { EntityTabBar } from "@/domains/garlia/_shared/EntityTabBar";
 
 // ─── Code-splitting por página combinada ──────────────────────────────────
 // Personajes/Criaturas/Items/Reinos/Ciudades/Hechizos/Dones/Runas/Grupos/
@@ -135,6 +136,7 @@ function EditorMundoInner() {
           <WifiOff size={10} /> Sin conexión · algunos datos pueden estar desactualizados
         </div>
       )}
+      <EntityTabBar />
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <WikilinkProvider onWikilink={handleWikilinkNavigate}>
           <Suspense fallback={<SectionFallback />}>
