@@ -20,6 +20,10 @@
     "fs:allow-app-write-recursive",
     "fs:scope-app-recursive",
     "opener:default",
-    "os:default"
+    "os:default",
+    "android-installer:allow-install-apk",
+    "android-installer:allow-start-download",
+    "android-installer:allow-query-download",
+    "android-installer:allow-cancel-download"
   ]
 }

@@ -18,20 +18,23 @@
  *     corresponde a la plataforma actual (.apk en Android, .AppImage en
  *     Linux) y muestra un pill chiquito flotante ofreciendo actualizar.
  *  3. Al tocar "Actualizar":
- *     - Android: descarga el .apk LEYENDO EL STREAM de a chunks (para poder
- *       calcular % real contra el header Content-Length), guarda el archivo
- *       con tauri-plugin-fs, y llama al plugin nativo `android-installer`
- *       para abrir la pantalla de instalación. Durante todo esto, el
- *       usuario puede seguir usando la app con normalidad: la descarga NO
- *       bloquea nada — se ve como una barra fina de progreso pegada arriba
- *       de la navbar (z-index por encima de todo lo demás), no un modal.
+ *     - Android: encola la descarga en el DownloadManager NATIVO del
+ *       sistema (plugin `android-installer|start_download`) y pollea su
+ *       progreso cada 800ms (`query_download`). A diferencia de leer el
+ *       stream a mano desde JS, DownloadManager corre en un servicio del
+ *       propio Android — sigue bajando el archivo aunque el usuario
+ *       minimice la app, apague la pantalla, o el WebView se suspenda.
+ *       El downloadId se guarda en localStorage para poder retomar el
+ *       polling si el usuario vuelve a abrir la app (incluso después de
+ *       que el proceso haya sido matado del todo). Al terminar, llama al
+ *       plugin nativo para abrir la pantalla de instalación.
  *     - Linux: abre la URL de descarga con el plugin `opener` (navegador o
  *       gestor de descargas del sistema) — no hay un instalador único en
  *       Linux, así que no tiene sentido tratar de automatizar más.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { esVersionMasNueva } from "@/lib/utils/semver";
 
@@ -90,80 +93,89 @@ function elegirAsset(
   return null;
 }
 
-/**
- * Descarga `url` leyendo el body como stream y escribe cada chunk
- * DIRECTO A DISCO (en `rutaRelativa`, dentro de BaseDirectory.AppData) a
- * medida que llega, reportando progreso 0-100 vía `onProgress`.
- *
- * IMPORTANTE: antes esta función acumulaba todos los chunks en un array de
- * JS y al final los concatenaba en un único `Uint8Array` del tamaño total
- * del archivo (`new Uint8Array(recibido)`). Eso duplicaba en memoria el
- * peso completo del APK justo al llegar al 100%, y en el WebView de
- * Android (heap de JS bastante más chico que un browser de escritorio)
- * eso puede tirar un `RangeError: Invalid typed array length` / "Array too
- * large" en dispositivos con poca RAM o APKs grandes. Escribiendo cada
- * chunk directo a disco evitamos tener el archivo entero en memoria de JS
- * en ningún momento — el uso de memoria queda acotado al tamaño de un
- * chunk, no al tamaño del archivo completo.
- *
- * Usamos `tauriFetch` (de @tauri-apps/plugin-http) en vez del fetch nativo
- * del WebView porque necesitamos evitar CORS/CSP en Android, pero su
- * Response implementa el mismo ReadableStream estándar así que el patrón
- * de lectura por chunks funciona igual.
- */
-async function descargarConProgreso(
-  url: string,
-  rutaRelativa: string,
-  onProgress: (porcentaje: number) => void
-): Promise<void> {
-  const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
-  const { BaseDirectory, open } = await import("@tauri-apps/plugin-fs");
+const LS_KEY_DESCARGA = "garlia:actualizacion-descarga-en-curso";
 
-  const respuesta = await tauriFetch(url, { method: "GET" });
-  if (!respuesta.ok) {
-    throw new Error(`Descarga falló (HTTP ${respuesta.status})`);
-  }
+interface DescargaPersistida {
+  downloadId: number;
+  version: string;
+}
 
-  const totalHeader = respuesta.headers.get("content-length");
-  const total = totalHeader ? parseInt(totalHeader, 10) : 0;
+interface EstadoDescargaNativo {
+  status: "pending" | "running" | "paused" | "successful" | "failed" | "unknown";
+  bytesDownloaded: number;
+  bytesTotal: number;
+  localUri: string | null;
+  reason: number;
+}
 
-  const archivo = await open(rutaRelativa, {
-    write: true,
-    create: true,
-    truncate: true,
-    baseDir: BaseDirectory.AppData,
-  });
-
+function guardarDescargaPendiente(d: DescargaPersistida | null) {
   try {
-    if (!respuesta.body) {
-      // Algún entorno sin soporte de streaming — fallback sin progreso
-      // real. Sigue sin acumular en un array intermedio propio, pero acá
-      // sí dependemos de que arrayBuffer() lo maneje internamente.
-      const buffer = new Uint8Array(await respuesta.arrayBuffer());
-      await archivo.write(buffer);
-      onProgress(100);
-      return;
-    }
-
-    const lector = respuesta.body.getReader();
-    let recibido = 0;
-
-    while (true) {
-      const { done, value } = await lector.read();
-      if (done) break;
-      if (value) {
-        await archivo.write(value);
-        recibido += value.length;
-        if (total > 0) {
-          onProgress(Math.min(99, Math.round((recibido / total) * 100)));
-        }
-      }
-    }
-
-    onProgress(100);
-  } finally {
-    await archivo.close();
+    if (d) localStorage.setItem(LS_KEY_DESCARGA, JSON.stringify(d));
+    else localStorage.removeItem(LS_KEY_DESCARGA);
+  } catch {
+    // localStorage puede no estar disponible en algún contexto raro — no
+    // es crítico, en el peor caso no se retoma el polling tras un reinicio.
   }
+}
+
+function leerDescargaPendiente(): DescargaPersistida | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY_DESCARGA);
+    return raw ? (JSON.parse(raw) as DescargaPersistida) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pollea `query_download` cada `intervaloMs` hasta que la descarga termine
+ * (bien o mal) o se llame a `cancelar()`. Devuelve una función para cancelar
+ * el polling desde afuera (ej. si el componente se desmonta).
+ */
+function pollearDescarga(
+  downloadId: number,
+  onProgreso: (porcentaje: number) => void,
+  onTerminada: (resultado: EstadoDescargaNativo) => void,
+  onError: (mensaje: string) => void,
+  intervaloMs = 800
+): () => void {
+  let detenido = false;
+
+  (async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+
+    while (!detenido) {
+      try {
+        const estado = await invoke<EstadoDescargaNativo>(
+          "plugin:android-installer|query_download",
+          { downloadId }
+        );
+
+        if (estado.bytesTotal > 0) {
+          onProgreso(
+            Math.min(
+              99,
+              Math.round((estado.bytesDownloaded / estado.bytesTotal) * 100)
+            )
+          );
+        }
+
+        if (estado.status === "successful" || estado.status === "failed") {
+          onTerminada(estado);
+          return;
+        }
+      } catch (e) {
+        onError(e instanceof Error ? e.message : "Error consultando la descarga.");
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, intervaloMs));
+    }
+  })();
+
+  return () => {
+    detenido = true;
+  };
 }
 
 export function ActualizacionDisponible() {
@@ -173,6 +185,23 @@ export function ActualizacionDisponible() {
   const [estado, setEstado] = useState<Estado>("idle");
   const [progreso, setProgreso] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const detenerPollingRef = useRef<(() => void) | null>(null);
+
+  async function finalizarInstalacion(localUri: string) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    // DownloadManager devuelve el localUri como "file:///..." — el plugin
+    // de instalación espera un path de filesystem plano.
+    const path = localUri.startsWith("file://")
+      ? decodeURIComponent(localUri.slice("file://".length))
+      : localUri;
+
+    setEstado("instalando");
+    await invoke("plugin:android-installer|install_apk", { path });
+
+    guardarDescargaPendiente(null);
+    setVisible(false);
+    setEstado("idle");
+  }
 
   useEffect(() => {
     if (!estaEnTauri()) return;
@@ -226,40 +255,118 @@ export function ActualizacionDisponible() {
     };
   }, []);
 
+  // Si había una descarga en curso cuando se cerró la app (o se mató el
+  // proceso), la retomamos: DownloadManager la siguió bajando nativamente
+  // mientras tanto, así que solo hace falta volver a pollear su estado.
+  useEffect(() => {
+    if (!estaEnTauri()) return;
+
+    const pendiente = leerDescargaPendiente();
+    if (!pendiente) return;
+
+    setPlataforma("android");
+    setEstado("descargando");
+    setProgreso(0);
+    setVisible(true);
+    setRemota((actual) =>
+      actual ?? {
+        version: pendiente.version,
+        notas: null,
+        url: "",
+        nombreArchivo: "",
+      }
+    );
+
+    detenerPollingRef.current = pollearDescarga(
+      pendiente.downloadId,
+      setProgreso,
+      async (resultado) => {
+        if (resultado.status === "failed" || !resultado.localUri) {
+          guardarDescargaPendiente(null);
+          setEstado("error");
+          setError(
+            resultado.status === "failed"
+              ? `La descarga falló (código ${resultado.reason}).`
+              : "La descarga terminó pero no se encontró el archivo."
+          );
+          return;
+        }
+        try {
+          await finalizarInstalacion(resultado.localUri);
+        } catch (e) {
+          setEstado("error");
+          setError(
+            e instanceof Error ? e.message : "Error abriendo el instalador."
+          );
+        }
+      },
+      (mensaje) => {
+        setEstado("error");
+        setError(mensaje);
+      }
+    );
+
+    return () => {
+      detenerPollingRef.current?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function manejarActualizarAndroid() {
     if (!remota) return;
 
     setEstado("descargando");
     setProgreso(0);
 
-    const { BaseDirectory, mkdir } = await import("@tauri-apps/plugin-fs");
-    const rutaRelativa = `updates/${remota.nombreArchivo}`;
-
-    await mkdir("updates", {
-      baseDir: BaseDirectory.AppData,
-      recursive: true,
-    });
-
-    await descargarConProgreso(remota.url, rutaRelativa, setProgreso);
-
-    const { appDataDir, join } = await import("@tauri-apps/api/path");
-    const dirDatos = await appDataDir();
-    const rutaAbsoluta = await join(dirDatos, rutaRelativa);
-
-    setEstado("instalando");
-
     const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("plugin:android-installer|install_apk", {
-      path: rutaAbsoluta,
-    });
+    const downloadId = await invoke<number>(
+      "plugin:android-installer|start_download",
+      { url: remota.url, fileName: remota.nombreArchivo }
+    );
 
-    // Se abrió la pantalla nativa de instalación — no hay forma de saber
-    // desde JS si el usuario efectivamente instaló, así que cerramos el
-    // pill. La próxima vez que abra la app, si sigue en la versión vieja,
-    // se le va a volver a ofrecer.
-    setVisible(false);
-    setEstado("idle");
+    // Se guarda ANTES de esperar el resultado — si el usuario cierra la
+    // app en el medio, al reabrirla el efecto de más abajo retoma el
+    // polling con este mismo id. La descarga en sí sigue corriendo en el
+    // DownloadManager del sistema, no depende de que JS esté vivo.
+    guardarDescargaPendiente({ downloadId, version: remota.version });
+
+    detenerPollingRef.current = pollearDescarga(
+      downloadId,
+      setProgreso,
+      async (resultado) => {
+        if (resultado.status === "failed") {
+          guardarDescargaPendiente(null);
+          setEstado("error");
+          setError(`La descarga falló (código ${resultado.reason}).`);
+          return;
+        }
+        if (!resultado.localUri) {
+          guardarDescargaPendiente(null);
+          setEstado("error");
+          setError("La descarga terminó pero no se encontró el archivo.");
+          return;
+        }
+        try {
+          await finalizarInstalacion(resultado.localUri);
+        } catch (e) {
+          setEstado("error");
+          setError(
+            e instanceof Error ? e.message : "Error abriendo el instalador."
+          );
+        }
+      },
+      (mensaje) => {
+        setEstado("error");
+        setError(mensaje);
+      }
+    );
   }
+
+  useEffect(() => {
+    return () => {
+      detenerPollingRef.current?.();
+    };
+  }, []);
 
   async function manejarActualizarLinux() {
     if (!remota) return;
