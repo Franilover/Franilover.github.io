@@ -28,6 +28,7 @@ import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMun
 import { CancionGrupos } from "@/domains/garlia/canciones/CancionGrupos";
 import { ESTADOS } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";
+import { useGruposCancionesPorSubtipo } from "@/domains/garlia/grupos/useGruposCancionesPorSubtipo";
 import { supabase } from "@/infra/supabase/supabase";
 
 // Mapa de etiquetas legibles por estado
@@ -43,17 +44,9 @@ const ESTADO_DOT: Record<string, string> = {
   TERMINADA: "bg-emerald-400",
 };
 
-// Emociones disponibles (ahora en selector, no en botonera)
-const EMOCIONES = [
-  "Alegría",
-  "Melancolía",
-  "Nostalgia",
-  "Amor",
-  "Angustia",
-  "Esperanza",
-  "Soledad",
-  "Euforia",
-];
+// Emociones y temas ahora vienen de grupos_mundo (tipo="canciones",
+// subtipo="Emoción" / subtipo="Tema") vía useGruposCancionesPorSubtipo,
+// en vez de una lista fija en código o texto libre.
 
 // Formatea segundos → mm:ss
 function formatDuracion(segundos: number): string {
@@ -247,6 +240,15 @@ export const PanelInfoSidebar = ({
     {},
   );
   const [saving, setSaving] = useState(false);
+
+  // Grupos de canciones con subtipo "Emoción" / "Tema" — las opciones de
+  // esos selectores y la sincronización de pertenencia al grupo.
+  const {
+    grupos: gruposEmocion,
+    sincronizarMiembro: sincronizarEmocion,
+  } = useGruposCancionesPorSubtipo("Emoción");
+  const { grupos: gruposTema, sincronizarMiembro: sincronizarTema } =
+    useGruposCancionesPorSubtipo("Tema");
   const [saved, setSaved] = useState(false);
   const [_dirty, setDirty] = useState(false);
   const [personajes, setPersonajes] = useState<ComboItem[]>([]);
@@ -369,6 +371,25 @@ export const PanelInfoSidebar = ({
     setSaved(false);
     clearTimeout(timer.current);
     void doSave(newData);
+
+    const grupo = emocion
+      ? gruposEmocion.find((g) => g.nombre === emocion) ?? null
+      : null;
+    void sincronizarEmocion(cancionId, grupo?.id ?? null);
+  };
+
+  const handleTemaChange = (tema: string) => {
+    const newData = { ...localData, tema };
+    setLocalData(newData);
+    setDirty(true);
+    setSaved(false);
+    clearTimeout(timer.current);
+    void doSave(newData);
+
+    const grupo = tema
+      ? gruposTema.find((g) => g.nombre === tema) ?? null
+      : null;
+    void sincronizarTema(cancionId, grupo?.id ?? null);
   };
 
   const handleDuracionBlur = () => {
@@ -540,24 +561,32 @@ export const PanelInfoSidebar = ({
         />
       </div>
 
-      {/* Emoción / Tema */}
+      {/* Emoción / Tema — opciones desde grupos_mundo (subtipo Emoción/Tema) */}
       <div className="grid grid-cols-2 gap-1.5">
         <SelectorNativo
           allowEmpty
           emptyLabel="Sin emoción"
           icon={<Heart size={9} />}
           label="Emoción"
-          options={EMOCIONES.map((e) => ({ value: e, label: e }))}
+          options={gruposEmocion.map((g) => ({
+            value: g.nombre,
+            label: g.nombre,
+          }))}
           value={localData.emocion}
           onChange={handleEmocionChange}
         />
-        <CampoTexto
+        <SelectorNativo
+          allowEmpty
+          emptyLabel="Sin tema"
           icon={<Tag size={9} />}
           label="Tema"
-          placeholder="Amor, soledad…"
-          suggestions={suggestions.tema || []}
+          options={gruposTema.map((g) => ({
+            value: g.nombre,
+            label: g.nombre,
+          }))}
           value={localData.tema}
-          onChange={(v) => handleChange("tema", v)}
+          onChange={handleTemaChange}
+        />
         />
       </div>
 
