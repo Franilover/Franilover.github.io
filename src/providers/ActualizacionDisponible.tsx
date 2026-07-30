@@ -91,9 +91,20 @@ function elegirAsset(
 }
 
 /**
- * Descarga `url` leyendo el body como stream, reportando progreso 0-100 vía
- * `onProgress` a medida que van llegando chunks. Devuelve el archivo
- * completo como Uint8Array al terminar.
+ * Descarga `url` leyendo el body como stream y escribe cada chunk
+ * DIRECTO A DISCO (en `rutaRelativa`, dentro de BaseDirectory.AppData) a
+ * medida que llega, reportando progreso 0-100 vía `onProgress`.
+ *
+ * IMPORTANTE: antes esta función acumulaba todos los chunks en un array de
+ * JS y al final los concatenaba en un único `Uint8Array` del tamaño total
+ * del archivo (`new Uint8Array(recibido)`). Eso duplicaba en memoria el
+ * peso completo del APK justo al llegar al 100%, y en el WebView de
+ * Android (heap de JS bastante más chico que un browser de escritorio)
+ * eso puede tirar un `RangeError: Invalid typed array length` / "Array too
+ * large" en dispositivos con poca RAM o APKs grandes. Escribiendo cada
+ * chunk directo a disco evitamos tener el archivo entero en memoria de JS
+ * en ningún momento — el uso de memoria queda acotado al tamaño de un
+ * chunk, no al tamaño del archivo completo.
  *
  * Usamos `tauriFetch` (de @tauri-apps/plugin-http) en vez del fetch nativo
  * del WebView porque necesitamos evitar CORS/CSP en Android, pero su
@@ -102,9 +113,11 @@ function elegirAsset(
  */
 async function descargarConProgreso(
   url: string,
+  rutaRelativa: string,
   onProgress: (porcentaje: number) => void
-): Promise<Uint8Array> {
+): Promise<void> {
   const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
+  const { BaseDirectory, open } = await import("@tauri-apps/plugin-fs");
 
   const respuesta = await tauriFetch(url, { method: "GET" });
   if (!respuesta.ok) {
@@ -114,39 +127,43 @@ async function descargarConProgreso(
   const totalHeader = respuesta.headers.get("content-length");
   const total = totalHeader ? parseInt(totalHeader, 10) : 0;
 
-  if (!respuesta.body) {
-    // Algún entorno sin soporte de streaming — fallback sin progreso real,
-    // igual funciona, solo no anima el %.
-    const buffer = new Uint8Array(await respuesta.arrayBuffer());
-    onProgress(100);
-    return buffer;
-  }
+  const archivo = await open(rutaRelativa, {
+    write: true,
+    create: true,
+    truncate: true,
+    baseDir: BaseDirectory.AppData,
+  });
 
-  const lector = respuesta.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let recibido = 0;
+  try {
+    if (!respuesta.body) {
+      // Algún entorno sin soporte de streaming — fallback sin progreso
+      // real. Sigue sin acumular en un array intermedio propio, pero acá
+      // sí dependemos de que arrayBuffer() lo maneje internamente.
+      const buffer = new Uint8Array(await respuesta.arrayBuffer());
+      await archivo.write(buffer);
+      onProgress(100);
+      return;
+    }
 
-  while (true) {
-    const { done, value } = await lector.read();
-    if (done) break;
-    if (value) {
-      chunks.push(value);
-      recibido += value.length;
-      if (total > 0) {
-        onProgress(Math.min(99, Math.round((recibido / total) * 100)));
+    const lector = respuesta.body.getReader();
+    let recibido = 0;
+
+    while (true) {
+      const { done, value } = await lector.read();
+      if (done) break;
+      if (value) {
+        await archivo.write(value);
+        recibido += value.length;
+        if (total > 0) {
+          onProgress(Math.min(99, Math.round((recibido / total) * 100)));
+        }
       }
     }
-  }
 
-  onProgress(100);
-
-  const resultado = new Uint8Array(recibido);
-  let offset = 0;
-  for (const chunk of chunks) {
-    resultado.set(chunk, offset);
-    offset += chunk.length;
+    onProgress(100);
+  } finally {
+    await archivo.close();
   }
-  return resultado;
 }
 
 export function ActualizacionDisponible() {
@@ -215,18 +232,15 @@ export function ActualizacionDisponible() {
     setEstado("descargando");
     setProgreso(0);
 
-    const buffer = await descargarConProgreso(remota.url, setProgreso);
-
-    const { BaseDirectory, mkdir, writeFile } = await import(
-      "@tauri-apps/plugin-fs"
-    );
+    const { BaseDirectory, mkdir } = await import("@tauri-apps/plugin-fs");
     const rutaRelativa = `updates/${remota.nombreArchivo}`;
 
     await mkdir("updates", {
       baseDir: BaseDirectory.AppData,
       recursive: true,
     });
-    await writeFile(rutaRelativa, buffer, { baseDir: BaseDirectory.AppData });
+
+    await descargarConProgreso(remota.url, rutaRelativa, setProgreso);
 
     const { appDataDir, join } = await import("@tauri-apps/api/path");
     const dirDatos = await appDataDir();
