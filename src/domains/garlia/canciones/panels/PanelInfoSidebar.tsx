@@ -621,7 +621,6 @@ export const PanelInfoSidebar = ({
               : undefined
           }
         />
-        />
       </div>
 
       {/* Idioma / Duración */}
