@@ -48,6 +48,7 @@ export const PanelEditor = ({
   onNavigatePersonaje,
   onNavigateReino,
   onNavigateCiudad,
+  onNavigateGrupo,
 }: {
   cancionId: string;
   // Navegación cruzada opcional (ver PanelInfoSidebar): se propagan tal
@@ -56,6 +57,7 @@ export const PanelEditor = ({
   onNavigatePersonaje?: (id: string) => void;
   onNavigateReino?: (id: string) => void;
   onNavigateCiudad?: (id: string) => void;
+  onNavigateGrupo?: (id: string) => void;
 }) => {
   const {
     cancion,
@@ -537,6 +539,7 @@ export const PanelEditor = ({
         onNavigateCiudad={onNavigateCiudad}
         onNavigatePersonaje={onNavigatePersonaje}
         onNavigateReino={onNavigateReino}
+        onNavigateGrupo={onNavigateGrupo}
       />
     </div>
   );

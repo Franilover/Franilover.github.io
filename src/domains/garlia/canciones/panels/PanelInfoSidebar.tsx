@@ -19,6 +19,7 @@ import {
   Users,
   MapPin,
   Crown,
+  ExternalLink,
   X,
 } from "lucide-react";
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -143,6 +144,7 @@ const SelectorNativo = ({
   options,
   allowEmpty,
   emptyLabel = "Sin definir",
+  onNavigate,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -151,28 +153,44 @@ const SelectorNativo = ({
   options: { value: string; label: string }[];
   allowEmpty?: boolean;
   emptyLabel?: string;
+  // Si se pasa, y hay un valor elegido, muestra un botón para abrir el
+  // grupo correspondiente (ej. navegar al grupo "Melancolía" del subtipo
+  // Emoción) en vez de solo elegirlo.
+  onNavigate?: (value: string) => void;
 }) => (
   <div className="space-y-0.5">
     <label className="text-micro font-black text-primary/25 uppercase tracking-[0.12em] flex items-center gap-1">
       {icon} {label}
     </label>
-    <div className="relative">
-      <select
-        className="w-full appearance-none bg-primary/[0.03] border border-primary/10 rounded-lg pl-2 pr-5 py-1 text-micro font-black uppercase tracking-wider text-primary outline-none focus:border-primary/30 transition-all cursor-pointer"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {allowEmpty && <option value="">{emptyLabel}</option>}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-primary/30"
-        size={10}
-      />
+    <div className="relative flex items-center gap-1">
+      <div className="relative flex-1 min-w-0">
+        <select
+          className="w-full appearance-none bg-primary/[0.03] border border-primary/10 rounded-lg pl-2 pr-5 py-1 text-micro font-black uppercase tracking-wider text-primary outline-none focus:border-primary/30 transition-all cursor-pointer"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {allowEmpty && <option value="">{emptyLabel}</option>}
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-primary/30"
+          size={10}
+        />
+      </div>
+      {onNavigate && value && (
+        <button
+          className="shrink-0 p-1 rounded-lg text-primary/30 hover:text-primary hover:bg-primary/8 transition-all"
+          title={`Abrir grupo "${value}"`}
+          type="button"
+          onClick={() => onNavigate(value)}
+        >
+          <ExternalLink size={10} />
+        </button>
+      )}
     </div>
   </div>
 );
@@ -574,6 +592,14 @@ export const PanelInfoSidebar = ({
           }))}
           value={localData.emocion}
           onChange={handleEmocionChange}
+          onNavigate={
+            onNavigateGrupo
+              ? (nombre) => {
+                  const g = gruposEmocion.find((x) => x.nombre === nombre);
+                  if (g) onNavigateGrupo(g.id);
+                }
+              : undefined
+          }
         />
         <SelectorNativo
           allowEmpty
@@ -586,6 +612,14 @@ export const PanelInfoSidebar = ({
           }))}
           value={localData.tema}
           onChange={handleTemaChange}
+          onNavigate={
+            onNavigateGrupo
+              ? (nombre) => {
+                  const g = gruposTema.find((x) => x.nombre === nombre);
+                  if (g) onNavigateGrupo(g.id);
+                }
+              : undefined
+          }
         />
         />
       </div>

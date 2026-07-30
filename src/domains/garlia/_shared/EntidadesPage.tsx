@@ -27,6 +27,7 @@ import { FormularioMagico } from "@/domains/garlia/magia/FormularioMagico";
 import { CONFIG, type EntidadMagica } from "@/domains/garlia/magia/types";
 import { useCanciones } from "@/domains/garlia/canciones/useCanciones";
 import type { Cancion } from "@/domains/garlia/canciones/types";
+import { Chip } from "@/ui/Chip";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
 import { useGruposRunas } from "@/domains/garlia/grupos/useGruposRunas";
 import { useNotas } from "@/editor/notas/useNotas";
@@ -186,6 +187,37 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
   const [showNuevaCancion, setShowNuevaCancion] = useState(false);
 
+  // Filtros por Emoción / Tema (chips, selección única por campo — igual
+  // que los selectores del sidebar de edición). Los valores disponibles
+  // salen de las propias canciones cargadas, no de una lista fija.
+  const [filtroEmocion, setFiltroEmocion] = useState<string>("");
+  const [filtroTema, setFiltroTema] = useState<string>("");
+
+  const emocionesDisponibles = useMemo(
+    () =>
+      Array.from(
+        new Set(canciones.map((c) => c.emocion?.trim()).filter(Boolean)),
+      ).sort((a, b) => a!.localeCompare(b!, "es")) as string[],
+    [canciones],
+  );
+  const temasDisponibles = useMemo(
+    () =>
+      Array.from(
+        new Set(canciones.map((c) => c.tema?.trim()).filter(Boolean)),
+      ).sort((a, b) => a!.localeCompare(b!, "es")) as string[],
+    [canciones],
+  );
+
+  const cancionesFiltradas = useMemo(
+    () =>
+      canciones.filter((c) => {
+        if (filtroEmocion && c.emocion?.trim() !== filtroEmocion) return false;
+        if (filtroTema && c.tema?.trim() !== filtroTema) return false;
+        return true;
+      }),
+    [canciones, filtroEmocion, filtroTema],
+  );
+
   /** Agrupa canciones por Idioma → Cantante → Compositor, en ese orden.
    *  Los valores vacíos caen en un balde "Sin …" que siempre queda al final. */
   const cancionesAgrupadas = useMemo(() => {
@@ -198,7 +230,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
       });
 
     const porIdioma = new Map<string, Map<string, Map<string, Cancion[]>>>();
-    for (const c of canciones) {
+    for (const c of cancionesFiltradas) {
       const idioma = c.idioma?.trim() || "Sin idioma";
       const compositor = c.compositor?.trim() || "Sin compositor";
       const cantante = c.cantante?.trim() || "Sin cantante";
@@ -229,7 +261,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
         }),
       };
     });
-  }, [canciones]);
+  }, [cancionesFiltradas]);
 
   const openEntity = useMundoNavigation((s) => s.openEntity);
 
@@ -328,6 +360,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           key={selectedCancion.id}
           cancionId={selectedCancion.id}
           onNavigateCiudad={(id) => openEntity("ciudades", id)}
+          onNavigateGrupo={(id) => openEntity("grupos", id)}
           onNavigatePersonaje={(id) => openEntity("personajes", id)}
           onNavigateReino={(id) => openEntity("reinos", id)}
         />
@@ -418,10 +451,65 @@ export function EntidadesPage({ section, selectedId }: Props) {
           </button>
         </div>
 
+        {(emocionesDisponibles.length > 0 || temasDisponibles.length > 0) && (
+          <div className="flex flex-wrap items-start gap-x-5 gap-y-2 mb-4 px-1">
+            {emocionesDisponibles.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-micro font-black uppercase tracking-widest text-primary/30">
+                  Emoción
+                </span>
+                {emocionesDisponibles.map((e) => (
+                  <Chip
+                    key={e}
+                    active={filtroEmocion === e}
+                    onClick={() =>
+                      setFiltroEmocion((prev) => (prev === e ? "" : e))
+                    }
+                  >
+                    {e}
+                  </Chip>
+                ))}
+              </div>
+            )}
+            {temasDisponibles.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-micro font-black uppercase tracking-widest text-primary/30">
+                  Tema
+                </span>
+                {temasDisponibles.map((t) => (
+                  <Chip
+                    key={t}
+                    active={filtroTema === t}
+                    onClick={() => setFiltroTema((prev) => (prev === t ? "" : t))}
+                  >
+                    {t}
+                  </Chip>
+                ))}
+              </div>
+            )}
+            {(filtroEmocion || filtroTema) && (
+              <button
+                type="button"
+                className="text-micro font-black uppercase tracking-widest text-primary/30 hover:text-primary/60 transition-colors"
+                onClick={() => {
+                  setFiltroEmocion("");
+                  setFiltroTema("");
+                }}
+              >
+                ✕ Limpiar
+              </button>
+            )}
+          </div>
+        )}
+
         {loadingCanciones && canciones.length === 0 ? (
           <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
         ) : canciones.length === 0 ? (
           <div className="py-6 text-xs text-primary/25 text-center">Sin canciones todavía</div>
+        ) : cancionesFiltradas.length === 0 ? (
+          <div className="py-6 text-xs text-primary/25 text-center">
+            Sin canciones con estos filtros
+          </div>
         ) : (
           cancionesAgrupadas.map(({ idioma, cantantes }) => (
             <MundoCard key={idioma} title={idioma} Icon={Music}>

@@ -37,6 +37,8 @@ export type Cancion = {
   cantante?: string;
   compositor?: string;
   idioma?: string;
+  emocion?: string;
+  tema?: string;
   estado: "BORRADOR" | "EN PROCESO" | "TERMINADA";
   visible: boolean;
   portada_url?: string;
