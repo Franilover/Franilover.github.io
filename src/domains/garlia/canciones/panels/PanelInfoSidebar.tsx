@@ -25,6 +25,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import { ComboSelector, type ComboItem } from "@/ui/ComboSelector";
 import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
+import { CancionGrupos } from "@/domains/garlia/canciones/CancionGrupos";
 import { ESTADOS } from "@/domains/garlia/canciones/constants";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { supabase } from "@/infra/supabase/supabase";
@@ -205,6 +206,7 @@ export const PanelInfoSidebar = ({
   onNavigatePersonaje?: (id: string) => void;
   onNavigateReino?: (id: string) => void;
   onNavigateCiudad?: (id: string) => void;
+  onNavigateGrupo?: (id: string) => void;
 }) => {
   const [localData, setLocalData] = useState({
     titulo: cancion.titulo || "",
@@ -665,6 +667,9 @@ export const PanelInfoSidebar = ({
           />
         </div>
       </div>
+
+      {/* Grupos (álbumes, playlists, etc.) */}
+      <CancionGrupos cancionId={cancionId} onOpenGrupo={onNavigateGrupo} />
 
       {/* Notas / contexto */}
       <div className="space-y-1">

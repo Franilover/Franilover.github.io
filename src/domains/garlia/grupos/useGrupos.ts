@@ -29,6 +29,8 @@ import {
   Wand2,
   Gem,
   Feather,
+  Music,
+  Disc3,
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -50,7 +52,8 @@ export type GrupoTipo =
   | "hechizos"
   | "dones"
   | "runas"
-  | "libros";
+  | "libros"
+  | "canciones";
 
 export type Grupo = {
   id: string;
@@ -261,6 +264,25 @@ export const GRUPO_TIPO_CONFIG: Record<
       "Precuela",
     ],
   },
+  canciones: {
+    label: "Canción",
+    labelPlural: "Canciones",
+    Icon: Music,
+    IconAlt: Disc3,
+    color: "color-mix(in srgb, var(--primary) 60%, #f472b6)",
+    tabla: "canciones",
+    ejemplo: "Álbum, banda sonora, playlist…",
+    sugerenciasDefault: [
+      "Álbum",
+      "Banda sonora",
+      "Playlist",
+      "EP",
+      "Single",
+      "Colaboración",
+      "Cover",
+      "Medley",
+    ],
+  },
 };
 
 // ─── Hook: cargar entidades de una tabla ──────────────────────────────────────
@@ -274,8 +296,9 @@ export function useEntidades(tabla: string) {
     const run = async () => {
       setLoading(true);
       let local = await dexieReadAll<EntidadMin>(tabla);
-      // libros usa "titulo" en DB — normalizar si el caché tiene el campo crudo
-      if (tabla === "libros") {
+      // libros/canciones usan "titulo" en DB — normalizar si el caché
+      // tiene el campo crudo
+      if (tabla === "libros" || tabla === "canciones") {
         local = local.map((r: any) =>
           r.nombre ? r : { ...r, nombre: r.titulo ?? "" },
         );
@@ -340,6 +363,17 @@ export function useEntidades(tabla: string) {
           nombre: r.titulo,
           imagen_url: r.portada_url ?? undefined,
           categoria: r.categoria ?? undefined,
+        }));
+      } else if (tabla === "canciones") {
+        const { data } = await supabase
+          .from("canciones")
+          .select("id, titulo, portada_url, cantante")
+          .order("titulo");
+        result = (data ?? []).map((r: any) => ({
+          id: r.id,
+          nombre: r.titulo,
+          imagen_url: r.portada_url ?? undefined,
+          categoria: r.cantante ?? undefined,
         }));
       } else {
         const { data } = await (supabase.from(tabla as any) as any)
