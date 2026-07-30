@@ -43,9 +43,10 @@ import { useWikilinkNavigate } from "@/domains/garlia/_shared/useWikilinkNavigat
 
 // ─── Code-splitting por página combinada ──────────────────────────────────
 // Personajes/Criaturas/Items/Reinos/Ciudades/Hechizos/Dones/Runas/Grupos/
-// Notas/Letras viven TODOS juntos en EntidadesPage (una sola grilla grande
-// de tarjetas, con los bloques de Organización — Grupos + Notas — y
-// Canciones al fondo).
+// Notas/Letras viven TODOS en EntidadesPage (una sola grilla grande de
+// tarjetas). Hechizos/Dones/Runas y Letras se muestran como páginas
+// independientes (sin la sub-barra de Reinos/Criaturas/Organización, que es
+// exclusiva de la sección "Entidades").
 const EntidadesPage = lazy(() =>
   import("./EntidadesPage").then((m) => ({ default: m.EntidadesPage })),
 );
