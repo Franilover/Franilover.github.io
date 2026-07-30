@@ -37,7 +37,9 @@ export function SelectorMiembros({
   const { entidades, loading } = useEntidades(cfg.tabla);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -47,6 +49,21 @@ export function SelectorMiembros({
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  // Decide hacia dónde abrir el dropdown según el espacio disponible en
+  // viewport. DROPDOWN_ESTIMATE_PX es una estimación generosa de su alto
+  // (buscador + lista con max-h-52 + paddings/bordes); si no entra abajo
+  // pero sí arriba, se abre hacia arriba.
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const DROPDOWN_ESTIMATE_PX = 260;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const espacioAbajo = window.innerHeight - rect.bottom;
+    const espacioArriba = rect.top;
+    setDropUp(
+      espacioAbajo < DROPDOWN_ESTIMATE_PX && espacioArriba > espacioAbajo,
+    );
   }, [open]);
 
   const miembros = useMemo(
@@ -146,6 +163,7 @@ export function SelectorMiembros({
 
       <div ref={ref} className="relative">
         <button
+          ref={triggerRef}
           className="w-full flex items-center justify-center gap-1 py-1 rounded-lg border border-dashed text-micro font-black uppercase tracking-widest transition-all"
           style={{
             borderColor: `color-mix(in srgb, ${cfg.color} 20%, transparent)`,
@@ -164,7 +182,9 @@ export function SelectorMiembros({
               onClick={() => setOpen(false)}
             />
             <div
-              className="absolute z-50 bottom-full left-0 right-0 mb-1.5 rounded-xl border shadow-xl overflow-hidden"
+              className={`absolute z-50 left-0 right-0 rounded-xl border shadow-xl overflow-hidden ${
+                dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
+              }`}
               style={{
                 background: "var(--bg-main)",
                 borderColor:

@@ -28,6 +28,7 @@ export function SubtipoInput({
 }) {
   const cfg = GRUPO_TIPO_CONFIG[tipo];
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -56,6 +57,19 @@ export function SubtipoInput({
     return () => document.removeEventListener("mousedown", h);
   }, [open]);
 
+  // Igual que en SelectorMiembros: decide hacia dónde abrir según espacio
+  // disponible en viewport (lista max-h-44 + header + bordes).
+  useEffect(() => {
+    if (!open || !inputRef.current) return;
+    const DROPDOWN_ESTIMATE_PX = 220;
+    const rect = inputRef.current.getBoundingClientRect();
+    const espacioAbajo = window.innerHeight - rect.bottom;
+    const espacioArriba = rect.top;
+    setDropUp(
+      espacioAbajo < DROPDOWN_ESTIMATE_PX && espacioArriba > espacioAbajo,
+    );
+  }, [open]);
+
   const select = (s: string) => {
     onChange(s);
     setOpen(false);
@@ -79,7 +93,9 @@ export function SubtipoInput({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl border shadow-xl overflow-hidden"
+            className={`absolute z-50 left-0 right-0 rounded-xl border shadow-xl overflow-hidden ${
+              dropUp ? "bottom-full mb-1" : "top-full mt-1"
+            }`}
             style={{
               background: "var(--bg-main)",
               borderColor:
