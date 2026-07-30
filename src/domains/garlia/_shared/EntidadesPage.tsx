@@ -3,14 +3,13 @@
 /**
  * EntidadesPage
  * ───────────────────────────────────────────────────────────────────────────
- * Combina TODAS las páginas de "grid de tarjetas" en una sola:
- * Personajes + Criaturas + Items (Entidades), Reinos + Ciudades (Geografía),
- * Hechizos + Dones + Runas (Magia) y Letras/Canciones. Cada tipo sigue
- * siendo un bloque con título propio y su grid de tarjetas — solo que ahora
- * viven todos juntos, scrolleables, sin buscador ni columna de lista
- * lateral. Magia y Letras tienen además su propia sección en la navbar
- * (fuera de las sub-tabs de Entidades), pero reutilizan este mismo
- * componente para su renderizado.
+ * Combina varias páginas de "grid de tarjetas" que comparten datos/hooks:
+ * Personajes + Reinos + Ciudades (Entidades/Geografía), Criaturas (Items +
+ * Personajes agrupados por criatura de origen), Hechizos + Dones + Runas
+ * (Magia), Letras/Canciones, y Grupos + Notas (Organización). Cada una es
+ * ahora su propia sección en la navbar (sin sub-tabs internas) — pero
+ * reutilizan este mismo componente para su renderizado, ya que comparten
+ * hooks de datos (useSupabaseData, useGrupos, useNotas, etc.).
  *
  * Al clickear una tarjeta se abre el editor de esa entidad a pantalla
  * completa (mismo store global: openEntity(section, id)); "Volver" en la
@@ -121,18 +120,7 @@ function useMagiaCategoria(modo: "hechizos" | "dones" | "runas") {
   return { items, setItems, loading, creating, create, cfg };
 }
 
-const SUB_TABS: { key: "reinos" | "criaturas" | "organizacion"; label: string }[] = [
-  { key: "reinos", label: "Reinos" },
-  { key: "criaturas", label: "Criaturas" },
-  { key: "organizacion", label: "Organización" },
-];
-
 export function EntidadesPage({ section, selectedId }: Props) {
-  // ── Sub-navegación: Reinos / Criaturas / Organización ────────────────────
-  const [subTab, setSubTab] = useState<"reinos" | "criaturas" | "organizacion">(
-    "reinos",
-  );
-
   // ── Entidades ──────────────────────────────────────────────────────────
   const { data: personajes, loading: loadingP, addRow: addPersonaje } =
     useSupabaseData<Personaje>("personajes");
@@ -473,59 +461,12 @@ export function EntidadesPage({ section, selectedId }: Props) {
     );
   }
 
-  return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4">
-      {/* ── Sub-barra: Reinos / Criaturas / Organización ──────────────────── */}
-      <div className="flex items-center gap-1 mb-6 px-1 pb-2 border-b border-primary/[0.06]">
-        {SUB_TABS.map((tab) => {
-          const active = subTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setSubTab(tab.key)}
-              className={`flex-1 flex items-center justify-center px-3 py-1 rounded-md text-micro font-bold uppercase tracking-[0.1em] transition-colors ${
-                active
-                  ? "bg-primary/[0.06] text-primary/80"
-                  : "text-primary/35 hover:bg-primary/[0.03] hover:text-primary/60"
-              }`}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {subTab === "reinos" && (
-        <div className="flex flex-col gap-6">
-          <div className="flex-1 min-w-0">
-            <GeografiaJerarquica
-              reinos={reinos}
-              ciudades={ciudades}
-              personajes={personajes}
-              loading={loadingR || loadingCd || loadingP}
-              onOpen={(section, id) => openEntity(section, id)}
-              onCreateReino={async () => {
-                const { data } = await addReino({ nombre: "Nuevo reino" });
-                if (data?.id) openEntity("reinos", data.id);
-              }}
-              onCreateCiudad={async (reinoId) => {
-                const { data } = await addCiudad({ nombre: "Nueva ciudad", reino_id: reinoId });
-                if (data?.id) openEntity("ciudades", data.id);
-              }}
-              onCreatePersonaje={async (ciudadId) => {
-                const { data } = await addPersonaje({
-                  nombre: "Nuevo personaje",
-                  ciudad_id: ciudadId,
-                });
-                if (data?.id) openEntity("personajes", data.id);
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {subTab === "criaturas" && (
+  // ── Criaturas ────────────────────────────────────────────────────────
+  // Sección propia de la navbar (antes vivía adentro de Entidades → sub-tab
+  // "Criaturas"). Agrupa Items + Personajes por criatura de origen.
+  if (section === "criaturas") {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <MagiaJerarquica
           criaturas={criaturas}
           items={items}
@@ -551,11 +492,16 @@ export function EntidadesPage({ section, selectedId }: Props) {
           }}
           onOpen={(section, id) => openEntity(section, id)}
         />
-      )}
+      </div>
+    );
+  }
 
-      {/* ── Organización (Grupos + Notas) ──────────────────────────────── */}
-      {subTab === "organizacion" && (
-      <div>
+  // ── Organización (Grupos + Notas) ────────────────────────────────────
+  // Sección propia de la navbar (antes vivía adentro de Entidades → sub-tab
+  // "Organización").
+  if (section === "grupos" || section === "notas") {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="flex flex-row flex-wrap gap-6 items-start">
           {(Object.entries(GRUPO_TIPO_CONFIG) as [GrupoTipo, (typeof GRUPO_TIPO_CONFIG)[GrupoTipo]][]).map(
             ([tipo, cfg]) => {
@@ -649,8 +595,37 @@ export function EntidadesPage({ section, selectedId }: Props) {
           )}
         </MundoCard>
       </div>
-      )}
+    );
+  }
 
+  // ── Entidades (Personajes/Items + Geografía) ─────────────────────────
+  // Sin sub-tabs: Criaturas y Organización ahora son secciones propias de
+  // la navbar (ver arriba), así que acá solo queda Geografía (Reinos +
+  // Ciudades + Personajes).
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto p-4">
+      <GeografiaJerarquica
+        reinos={reinos}
+        ciudades={ciudades}
+        personajes={personajes}
+        loading={loadingR || loadingCd || loadingP}
+        onOpen={(section, id) => openEntity(section, id)}
+        onCreateReino={async () => {
+          const { data } = await addReino({ nombre: "Nuevo reino" });
+          if (data?.id) openEntity("reinos", data.id);
+        }}
+        onCreateCiudad={async (reinoId) => {
+          const { data } = await addCiudad({ nombre: "Nueva ciudad", reino_id: reinoId });
+          if (data?.id) openEntity("ciudades", data.id);
+        }}
+        onCreatePersonaje={async (ciudadId) => {
+          const { data } = await addPersonaje({
+            nombre: "Nuevo personaje",
+            ciudad_id: ciudadId,
+          });
+          if (data?.id) openEntity("personajes", data.id);
+        }}
+      />
     </div>
   );
 }
