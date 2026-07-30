@@ -9,7 +9,7 @@ import {
   Columns2,
   PanelRight,
 } from "lucide-react";
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 
 import { BannerOffline } from "@/layout/EstudioTemplates";
 import { IDIOMAS } from "@/domains/garlia/canciones/constants";
@@ -116,8 +116,13 @@ export const PanelEditor = ({
     [cancionId, setCancion],
   );
 
-  // El bloque único de letra de la canción (a lo sumo 1 elemento).
-  const bloque: Seccion | undefined = cancion?.secciones?.[0];
+  // El bloque único de letra de la canción (a lo sumo 1 elemento esperado).
+  // Defensivo: si por algún motivo hubiera más de una fila, preferimos la
+  // que tenga contenido antes que la primera por orden arbitrario.
+  const bloque: Seccion | undefined =
+    cancion?.secciones?.find((s) =>
+      IDIOMAS.some((i) => !!(s[i.campo] as string)?.trim()),
+    ) ?? cancion?.secciones?.[0];
 
   // Al cambiar de canción/bloque, limpiar los textos en vivo del split mode
   // para que el indicador central no arrastre valores de otra canción.
@@ -128,8 +133,16 @@ export const PanelEditor = ({
 
   // Si la canción todavía no tiene su bloque único, lo creamos automáticamente
   // apenas el editor carga (canciones nuevas, o migradas sin fila previa).
+  // Usamos un ref (no un state) como guard: el state se actualiza de forma
+  // asíncrona, así que si el efecto se disparaba dos veces seguidas (doble
+  // render de React, cambios rápidos de cancionId) ambas ejecuciones podían
+  // pasar el chequeo antes de que el primer setCreandoBloque(true) surtiera
+  // efecto, generando dos filas de bloque único para la misma canción.
+  const creandoBloqueParaRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!cancion || loading || bloque || creandoBloque) return;
+    if (!cancion || loading || bloque) return;
+    if (creandoBloqueParaRef.current === cancionId) return;
+    creandoBloqueParaRef.current = cancionId;
     setCreandoBloque(true);
     secCreate({
       cancion_id: cancionId,
@@ -139,10 +152,15 @@ export const PanelEditor = ({
     })
       .then((nueva) => {
         setCancion((prev) =>
-          prev ? { ...prev, secciones: [nueva] } : prev,
+          prev && !prev.secciones?.length
+            ? { ...prev, secciones: [nueva] }
+            : prev,
         );
       })
-      .finally(() => setCreandoBloque(false));
+      .finally(() => {
+        setCreandoBloque(false);
+        creandoBloqueParaRef.current = null;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cancion, loading, bloque, cancionId]);
 
