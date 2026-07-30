@@ -193,6 +193,7 @@ export const PanelInfoSidebar = ({
   onNavigatePersonaje,
   onNavigateReino,
   onNavigateCiudad,
+  onNavigateGrupo,
 }: {
   cancionId: string;
   cancion: any;
