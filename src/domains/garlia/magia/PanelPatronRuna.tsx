@@ -109,6 +109,7 @@ export function PanelPatronRuna({
         <CanvasDibujoRuna
           color={color}
           height={220}
+          mostrarHerramientas
           resetSignal={resetSignal}
           trazoFantasma={trazoFantasma ? normalizarTrazo(trazoFantasma) : null}
           onTrazoCompleto={agregarTrazo}

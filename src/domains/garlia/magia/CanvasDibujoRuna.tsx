@@ -21,11 +21,23 @@
  *   src/features/editorGarlia/components/magia/CanvasDibujoRuna.tsx
  */
 
-import { Eraser } from "lucide-react";
+import { Eraser, Minus, PenTool, Redo2 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Punto } from "./dollarOneRecognizer";
 import { clampAForma, verticesPoligono, type FormaLimite } from "./formasLimite";
+
+type Herramienta = "libre" | "recta";
+
+/** Ángulo de snap más cercano, en incrementos de 45° (0°, 45°, 90°…). */
+function snapAngulo(dx: number, dy: number): { x: number; y: number } {
+  const dist = Math.hypot(dx, dy);
+  if (dist === 0) return { x: 0, y: 0 };
+  const anguloRad = Math.atan2(dy, dx);
+  const pasoRad = Math.PI / 4; // 45°
+  const anguloSnap = Math.round(anguloRad / pasoRad) * pasoRad;
+  return { x: Math.cos(anguloSnap) * dist, y: Math.sin(anguloSnap) * dist };
+}
 
 export function CanvasDibujoRuna({
   color = "var(--primary)",
@@ -34,6 +46,7 @@ export function CanvasDibujoRuna({
   height = 260,
   resetSignal,
   forma,
+  mostrarHerramientas = false,
 }: {
   color?: string;
   /** Trazo ya normalizado que se dibuja tenue de fondo, como referencia */
@@ -44,13 +57,23 @@ export function CanvasDibujoRuna({
   resetSignal?: number;
   /** Marco guía + límite duro de dibujo. Si no se pasa, no hay restricción. */
   forma?: FormaLimite | null;
+  /** Muestra el selector de herramienta (mano alzada / línea recta) —
+   *  pensado para el editor admin, donde interesa precisión al grabar
+   *  el patrón. Los demás usos (probador, público) quedan en mano alzada. */
+  mostrarHerramientas?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dibujando = useRef(false);
   const puntosRef = useRef<Punto[]>([]);
   const [tieneTrazo, setTieneTrazo] = useState(false);
+  const [numPuntos, setNumPuntos] = useState(0);
   const [tamano, setTamano] = useState({ w: 320, h: height });
+  const [herramienta, setHerramienta] = useState<Herramienta>("libre");
+  // Punto inicial del segmento recto en curso (mientras se arrastra).
+  const inicioRectaRef = useRef<Punto | null>(null);
+  const [previewRecta, setPreviewRecta] = useState<{ a: Punto; b: Punto } | null>(null);
+  const snapDesactivadoRef = useRef(false);
 
   // Ajustar tamaño del canvas al contenedor (responsive)
   useEffect(() => {
@@ -158,6 +181,7 @@ export function CanvasDibujoRuna({
   useEffect(() => {
     puntosRef.current = [];
     setTieneTrazo(false);
+    setNumPuntos(0);
     redibujarFondo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetSignal]);
@@ -193,23 +217,48 @@ export function CanvasDibujoRuna({
     ctx.stroke();
   };
 
-  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const dibujarTrazoConfirmado = useCallback(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    const puntos = puntosRef.current;
+    if (puntos.length < 2) return;
+    ctx.beginPath();
+    puntos.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = color.startsWith("var") ? "currentColor" : color;
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+  }, [color]);
+
+  const redibujarTodo = useCallback(() => {
+    redibujarFondo();
+    dibujarTrazoConfirmado();
+  }, [redibujarFondo, dibujarTrazoConfirmado]);
+
+  // ── Modo mano alzada (comportamiento original) ─────────────────────────
+  const onPointerDownLibre = (e: React.PointerEvent<HTMLCanvasElement>) => {
     (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
     dibujando.current = true;
     const p = getPos(e);
     puntosRef.current = [p];
     setTieneTrazo(true);
+    setNumPuntos(1);
   };
 
-  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerMoveLibre = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!dibujando.current) return;
     const p = getPos(e);
     const anterior = puntosRef.current[puntosRef.current.length - 1];
     if (anterior) dibujarLinea(anterior, p);
     puntosRef.current.push(p);
+    setNumPuntos(puntosRef.current.length);
   };
 
-  const finalizarTrazo = () => {
+  const finalizarTrazoLibre = () => {
     if (!dibujando.current) return;
     dibujando.current = false;
     if (puntosRef.current.length > 1) {
@@ -217,14 +266,161 @@ export function CanvasDibujoRuna({
     }
   };
 
+  // ── Modo línea recta: cada gesto agrega un segmento recto (con snap a
+  // 0°/45°/90°…) encadenado al punto final del segmento anterior — así se
+  // puede armar una runa poligonal (ej. un rayo, una "Z", una cruz) con
+  // varios trazos rectos consecutivos sin perder precisión a mano alzada.
+  // Mantener Shift apretado desactiva el snap para ese segmento.
+  const onPointerDownRecta = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    dibujando.current = true;
+    snapDesactivadoRef.current = e.shiftKey;
+    const origen =
+      puntosRef.current.length > 0
+        ? puntosRef.current[puntosRef.current.length - 1]
+        : getPos(e);
+    inicioRectaRef.current = origen;
+    if (puntosRef.current.length === 0) {
+      puntosRef.current = [origen];
+      setNumPuntos(1);
+    }
+    setTieneTrazo(true);
+    setPreviewRecta({ a: origen, b: origen });
+  };
+
+  const onPointerMoveRecta = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dibujando.current || !inicioRectaRef.current) return;
+    snapDesactivadoRef.current = e.shiftKey;
+    const actual = getPos(e);
+    const inicio = inicioRectaRef.current;
+    let destino = actual;
+    if (!snapDesactivadoRef.current) {
+      const ajustado = snapAngulo(actual.x - inicio.x, actual.y - inicio.y);
+      destino = { x: inicio.x + ajustado.x, y: inicio.y + ajustado.y };
+    }
+    setPreviewRecta({ a: inicio, b: destino });
+  };
+
+  const finalizarTrazoRecta = () => {
+    if (!dibujando.current || !inicioRectaRef.current || !previewRecta) {
+      dibujando.current = false;
+      return;
+    }
+    dibujando.current = false;
+    const { a, b } = previewRecta;
+    // Segmento demasiado corto (click sin arrastre): lo ignoramos.
+    if (Math.hypot(b.x - a.x, b.y - a.y) < 2) {
+      setPreviewRecta(null);
+      inicioRectaRef.current = null;
+      return;
+    }
+    if (puntosRef.current.length === 0) puntosRef.current = [a];
+    puntosRef.current.push(b);
+    setNumPuntos(puntosRef.current.length);
+    redibujarTodo();
+    setPreviewRecta(null);
+    inicioRectaRef.current = null;
+  };
+
+  // Redibuja fondo + trazo confirmado + segmento en preview mientras se
+  // arrastra una línea recta.
+  useEffect(() => {
+    if (herramienta !== "recta") return;
+    redibujarFondo();
+    dibujarTrazoConfirmado();
+    if (previewRecta) dibujarLinea(previewRecta.a, previewRecta.b);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewRecta]);
+
+  const onPointerDown =
+    herramienta === "recta" ? onPointerDownRecta : onPointerDownLibre;
+  const onPointerMove =
+    herramienta === "recta" ? onPointerMoveRecta : onPointerMoveLibre;
+  const finalizarTrazo =
+    herramienta === "recta" ? finalizarTrazoRecta : finalizarTrazoLibre;
+
+  const confirmarTrazoRecta = () => {
+    if (puntosRef.current.length < 2) return;
+    onTrazoCompleto([...puntosRef.current]);
+  };
+
+  const deshacerUltimoSegmento = () => {
+    if (puntosRef.current.length <= 1) {
+      limpiar();
+      return;
+    }
+    puntosRef.current = puntosRef.current.slice(0, -1);
+    setNumPuntos(puntosRef.current.length);
+    redibujarTodo();
+  };
+
+  const cambiarHerramienta = (h: Herramienta) => {
+    setHerramienta(h);
+    dibujando.current = false;
+    inicioRectaRef.current = null;
+    setPreviewRecta(null);
+  };
+
   const limpiar = () => {
     puntosRef.current = [];
     setTieneTrazo(false);
+    setNumPuntos(0);
+    setPreviewRecta(null);
+    inicioRectaRef.current = null;
     redibujarFondo();
   };
 
   return (
     <div ref={containerRef} className="w-full relative" style={{ color }}>
+      {mostrarHerramientas && (
+        <div className="flex items-center gap-1 mb-2">
+          <button
+            type="button"
+            title="Mano alzada"
+            onClick={() => cambiarHerramienta("libre")}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border transition-all"
+            style={{
+              borderColor:
+                herramienta === "libre"
+                  ? "color-mix(in srgb, var(--primary) 40%, transparent)"
+                  : "color-mix(in srgb, var(--primary) 12%, transparent)",
+              background:
+                herramienta === "libre"
+                  ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                  : "transparent",
+              color:
+                herramienta === "libre"
+                  ? "var(--primary)"
+                  : "color-mix(in srgb, var(--primary) 50%, transparent)",
+            }}
+          >
+            <PenTool size={11} /> Mano alzada
+          </button>
+          <button
+            type="button"
+            title="Línea recta (con snap a 0°/45°/90°… — mantené Shift para dibujar libre)"
+            onClick={() => cambiarHerramienta("recta")}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border transition-all"
+            style={{
+              borderColor:
+                herramienta === "recta"
+                  ? "color-mix(in srgb, var(--primary) 40%, transparent)"
+                  : "color-mix(in srgb, var(--primary) 12%, transparent)",
+              background:
+                herramienta === "recta"
+                  ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                  : "transparent",
+              color:
+                herramienta === "recta"
+                  ? "var(--primary)"
+                  : "color-mix(in srgb, var(--primary) 50%, transparent)",
+            }}
+          >
+            <Minus size={11} /> Línea recta
+          </button>
+        </div>
+      )}
+
       <canvas
         ref={canvasRef}
         className="w-full rounded-xl border-2 border-dashed touch-none cursor-crosshair bg-primary/3"
@@ -238,13 +434,44 @@ export function CanvasDibujoRuna({
         onPointerMove={onPointerMove}
         onPointerUp={finalizarTrazo}
       />
-      {tieneTrazo && (
+
+      {herramienta === "recta" && mostrarHerramientas && tieneTrazo && (
+        <p className="text-micro text-primary/30 mt-1.5 leading-relaxed">
+          Arrastrá para trazar cada segmento — se encadena al anterior.
+          Mantené Shift para desactivar el ajuste a ángulos. Confirmá cuando
+          termines.
+        </p>
+      )}
+
+      <div className="absolute top-2 right-2 flex items-center gap-1">
+        {herramienta === "recta" && mostrarHerramientas && tieneTrazo && numPuntos > 1 && (
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-bg-main/90 border border-primary/20 text-primary/50 hover:text-primary transition-all"
+            onClick={deshacerUltimoSegmento}
+            title="Deshacer último segmento"
+          >
+            <Redo2 size={11} className="scale-x-[-1]" /> Deshacer
+          </button>
+        )}
+        {tieneTrazo && (
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-bg-main/90 border border-primary/20 text-primary/50 hover:text-primary transition-all"
+            onClick={limpiar}
+          >
+            <Eraser size={11} /> Borrar
+          </button>
+        )}
+      </div>
+
+      {herramienta === "recta" && mostrarHerramientas && tieneTrazo && numPuntos > 1 && (
         <button
           type="button"
-          className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-bg-main/90 border border-primary/20 text-primary/50 hover:text-primary transition-all"
-          onClick={limpiar}
+          className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all"
+          onClick={confirmarTrazoRecta}
         >
-          <Eraser size={11} /> Borrar
+          Confirmar trazo
         </button>
       )}
     </div>
