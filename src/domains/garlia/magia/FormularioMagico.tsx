@@ -74,12 +74,13 @@ export function FormularioMagico({
       const updatePayload: any = {
         nombre: form.nombre,
         explicacion: form.explicacion || null,
-        imagen_url: (form as any).imagen_url || null,
       };
-      updatePayload.grupo_ids = form.grupo_ids ?? [];
       if (modo === "runas") {
         updatePayload.patron_trazos = form.patron_trazos ?? null;
+      } else {
+        updatePayload.imagen_url = (form as any).imagen_url || null;
       }
+      updatePayload.grupo_ids = form.grupo_ids ?? [];
       const { error } = await supabase
         .from(cfg.tabla)
         .update(updatePayload)

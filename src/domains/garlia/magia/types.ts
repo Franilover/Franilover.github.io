@@ -18,11 +18,15 @@ export type Hechizo = {
   nombre: string;
   explicacion?: string;
   grupo_ids?: string[];
+  /** Solo para hechizos/dones — las runas ya no usan imagen, se visualizan
+   *  con su patron_trazos (ver RunaThumbnail). */
   imagen_url?: string | null;
   /**
    * Solo para runas: lista de trazos-ejemplo (cada uno una polilínea de
    * puntos crudos) que definen cómo se "dibuja" esta runa. Se usan como
-   * plantillas del reconocedor $1 Unistroke. Guardado como jsonb.
+   * plantillas del reconocedor $1 Unistroke y también para el preview
+   * visual de la runa (RunaThumbnail), en reemplazo de una imagen.
+   * Guardado como jsonb.
    */
   patron_trazos?: Punto[][] | null;
 };

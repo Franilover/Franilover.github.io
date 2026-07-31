@@ -40,3 +40,37 @@ export function trazoAPathSvg(puntos: Punto[]): string {
 }
 
 export const TRAZO_THUMBNAIL_VIEWBOX = VIEWBOX;
+
+/**
+ * Igual que trazoAPathSvg pero para varios trazos a la vez (una runa puede
+ * tener más de un ejemplo/trazo guardado). Normaliza todos juntos al mismo
+ * viewBox, tomando el bounding box combinado, y devuelve un `d` por trazo
+ * para poder dibujar cada uno como su propio <path>.
+ */
+export function trazosAPathsSvg(trazos: Punto[][]): string[] {
+  const puntosValidos = trazos.filter((t) => t.length >= 2);
+  if (puntosValidos.length === 0) return [];
+
+  const xs = puntosValidos.flatMap((t) => t.map((p) => p.x));
+  const ys = puntosValidos.flatMap((t) => t.map((p) => p.y));
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const w = maxX - minX || 1;
+  const h = maxY - minY || 1;
+  const disponible = VIEWBOX - MARGEN * 2;
+  const escala = Math.min(disponible / w, disponible / h);
+  const offX = (VIEWBOX - w * escala) / 2;
+  const offY = (VIEWBOX - h * escala) / 2;
+
+  return puntosValidos.map((puntos) =>
+    puntos
+      .map((p, i) => {
+        const x = (p.x - minX) * escala + offX;
+        const y = (p.y - minY) * escala + offY;
+        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" "),
+  );
+}

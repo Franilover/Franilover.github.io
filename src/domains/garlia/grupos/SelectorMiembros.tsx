@@ -15,6 +15,8 @@ import { Loader2, Plus, Search, X } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import { RunaThumbnail } from "@/domains/garlia/magia/RunaThumbnail";
+
 import {
   useEntidades,
   GRUPO_TIPO_CONFIG,
@@ -135,7 +137,9 @@ export function SelectorMiembros({
                     onClick={() => onClickMiembro?.(e.id, cfg.tabla)}
                   >
                     <div className="w-full aspect-square rounded-md overflow-hidden border border-primary/10 bg-primary/5 flex items-center justify-center">
-                      {img ? (
+                      {tipo === "runas" ? (
+                        <RunaThumbnail patronTrazos={(e as any).patron_trazos} />
+                      ) : img ? (
                         <Image
                           alt={e.nombre}
                           className="w-full h-full object-cover"
@@ -241,7 +245,9 @@ export function SelectorMiembros({
                         }}
                       >
                         <div className="shrink-0 w-6 h-6 rounded-lg overflow-hidden border border-primary/10 bg-primary/5 flex items-center justify-center">
-                          {img ? (
+                          {tipo === "runas" ? (
+                            <RunaThumbnail patronTrazos={(e as any).patron_trazos} />
+                          ) : img ? (
                             <Image
                               alt={e.nombre}
                               className="w-full h-full object-cover"

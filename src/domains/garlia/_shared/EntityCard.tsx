@@ -23,6 +23,9 @@ interface Props {
   subtitle?: string | null;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  /** Contenido custom para la miniatura, reemplaza imagen/ícono por defecto
+   *  (ej. preview de trazos de una runa). Si no se pasa, usa imageUrl/Icon. */
+  visual?: React.ReactNode;
 }
 
 export function EntityCard({
@@ -33,6 +36,7 @@ export function EntityCard({
   subtitle,
   isFavorite,
   onToggleFavorite,
+  visual,
 }: Props) {
   return (
     <div className="group/card relative flex flex-col items-center gap-1 p-1 rounded-lg transition-colors hover:bg-primary/5 text-center">
@@ -58,7 +62,9 @@ export function EntityCard({
       )}
       <button type="button" onClick={onClick} className="flex flex-col items-center gap-1 w-full">
         <div className="w-full aspect-square rounded-xl overflow-hidden bg-primary/5 border border-primary/10 flex items-center justify-center group-hover/card:border-primary/25 transition-colors">
-          {imageUrl ? (
+          {visual ? (
+            visual
+          ) : imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={imageUrl} alt={nombre} className="w-full h-full object-cover" />
           ) : (

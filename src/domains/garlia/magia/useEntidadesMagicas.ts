@@ -23,7 +23,7 @@ export function useEntidadesMagicas(modo: Modo) {
   const tabla = CONFIG[modo].tabla;
   const selectFields =
     modo === "runas"
-      ? "id, nombre, explicacion, imagen_url, patron_trazos, grupo_ids"
+      ? "id, nombre, explicacion, patron_trazos, grupo_ids"
       : "id, nombre, explicacion, grupo_ids, imagen_url";
 
   const { data, setData, loading } = useSupabaseData<EntidadMagica>(tabla, {

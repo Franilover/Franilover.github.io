@@ -18,13 +18,16 @@ import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic"
 
 import { SubBloqueProbador } from "./BloqueHerramientasRunas";
 import { BloqueSubsistemasMagia } from "./BloqueSubsistemasMagia";
+import type { Punto } from "./dollarOneRecognizer";
 import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
+import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica } from "./types";
 
 interface EntidadMagicaMin {
   id: string;
   nombre: string;
   imagen_url?: string | null;
+  patron_trazos?: Punto[][] | null;
 }
 
 interface Props {
@@ -58,6 +61,7 @@ function Bloque({
   onOpen,
   onCreate,
   creating,
+  esRunas,
 }: {
   label: string;
   Icon: React.ElementType;
@@ -66,6 +70,7 @@ function Bloque({
   onOpen: (section: SectionKey, id: string) => void;
   onCreate?: () => void;
   creating?: boolean;
+  esRunas?: boolean;
 }) {
   return (
     <div className="rounded-lg border border-primary/10 overflow-hidden mb-6 last:mb-0">
@@ -102,8 +107,9 @@ function Bloque({
               <EntityCard
                 key={e.id}
                 nombre={e.nombre}
-                imageUrl={e.imagen_url}
+                imageUrl={esRunas ? null : e.imagen_url}
                 Icon={Icon}
+                visual={esRunas ? <RunaThumbnail patronTrazos={e.patron_trazos} /> : undefined}
                 onClick={() => onOpen(section, e.id)}
               />
             ))}
@@ -198,6 +204,7 @@ export function MagiaPorTipo({
             key={key}
             Icon={Icon}
             entidades={datos[key]}
+            esRunas={key === "runas"}
             label={label}
             section={section}
             creating={creating}
@@ -219,6 +226,7 @@ export function MagiaPorTipo({
             key={key}
             Icon={Icon}
             entidades={datos[key]}
+            esRunas={key === "runas"}
             label={label}
             section={section}
             creating={creating}

@@ -49,6 +49,7 @@ import {
   type Rejilla,
 } from "../formasLimite";
 import { buscarCombinacion } from "../matchCombinacion";
+import { RunaThumbnail } from "../RunaThumbnail";
 import type { CombinacionRuna, EntidadMagica } from "../types";
 
 import { SelectorFormaLimite } from "./SelectorFormaLimite";
@@ -94,7 +95,7 @@ export default function RunasDibujo() {
     void Promise.all([
       supabase
         .from("runas")
-        .select("id, nombre, explicacion, imagen_url, patron_trazos"),
+        .select("id, nombre, explicacion, patron_trazos"),
       supabase
         .from("combinaciones_runas")
         .select("id, nombre, explicacion, imagen_url, celdas"),
@@ -358,17 +359,9 @@ function ResultadoCard({
           <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
             <Sparkles size={12} /> Runa reconocida
           </div>
-          {mejorMatch.imagen_url && (
-            <div className="w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3">
-              <Image
-                alt={mejorMatch.nombre}
-                className="w-full h-full object-cover"
-                height={96}
-                src={mejorMatch.imagen_url}
-                width={96}
-              />
-            </div>
-          )}
+          <div className="w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3 flex items-center justify-center">
+            <RunaThumbnail patronTrazos={mejorMatch.patron_trazos} />
+          </div>
           <h2 className="text-lg font-black text-primary">
             {mejorMatch.nombre}
           </h2>

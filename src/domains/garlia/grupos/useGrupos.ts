@@ -91,6 +91,8 @@ export type EntidadMin = {
   reino?: string;
   habitat?: string;
   categoria?: string;
+  /** Solo para runas: patrón de trazos, usado para el preview en vez de imagen. */
+  patron_trazos?: unknown[] | null;
 };
 
 // ─── Config de tipos de grupo ─────────────────────────────────────────────────
@@ -374,6 +376,16 @@ export function useEntidades(tabla: string) {
           nombre: r.titulo,
           imagen_url: r.portada_url ?? undefined,
           categoria: r.cantante ?? undefined,
+        }));
+      } else if (tabla === "runas") {
+        const { data } = await supabase
+          .from("runas")
+          .select("id, nombre, patron_trazos")
+          .order("nombre");
+        result = (data ?? []).map((r: any) => ({
+          id: r.id,
+          nombre: r.nombre,
+          patron_trazos: r.patron_trazos ?? undefined,
         }));
       } else {
         const { data } = await (supabase.from(tabla as any) as any)
