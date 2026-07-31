@@ -48,6 +48,8 @@ import { supabase } from "@/infra/supabase/supabase";
 import type { EraMundo} from "@/lib/utils/calendario";
 import { diaAbsolutoAFecha, eraEnAnio } from "@/lib/utils/calendario";
 
+import { RichEditor } from "@/editor/lexical";
+
 import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import {
@@ -1640,7 +1642,7 @@ function EventoDetallePanel({
 
   return (
     <div
-      className="rounded-xl p-3 flex flex-col gap-2"
+      className="rounded-xl p-4 flex flex-col gap-3"
       style={{
         background: eraColor
           ? `${eraColor}08`
@@ -1769,23 +1771,19 @@ function EventoDetallePanel({
         }}
       />
 
-      {/* Descripción — a todo el ancho del panel */}
+      {/* Descripción — a todo el ancho del panel, editor Lexical completo */}
       {editable ? (
-        <textarea
-          className="text-micro leading-relaxed bg-transparent outline-none w-full rounded resize-y flex-1 px-0.5 -mx-0.5"
-          placeholder="Sin descripción…"
-          rows={5}
-          style={{
-            color: "color-mix(in srgb, var(--primary) 65%, transparent)",
-            minHeight: 90,
-          }}
-          value={descripcion}
-          onBlur={(e) => onFieldChange?.(evt.id, "descripcion", e.target.value)}
-          onChange={(e) => {
-            setDescripcion(e.target.value);
-            scheduleSave("descripcion", e.target.value);
-          }}
-        />
+        <div className="flex-1 min-h-0">
+          <RichEditor
+            minHeight={160}
+            placeholder="Sin descripción…"
+            value={descripcion}
+            onChange={(v) => {
+              setDescripcion(v);
+              scheduleSave("descripcion", v);
+            }}
+          />
+        </div>
       ) : evt.description ? (
         <p
           className="text-micro leading-relaxed"
@@ -2300,17 +2298,23 @@ function EventoDetalleFlotante({
     }
     const update = () => {
       const r = anchorEl.getBoundingClientRect();
-      const w = Math.min(Math.max(r.width, 280), 360);
+      // Panel más grande: da espacio real al editor Lexical en vez de un
+      // recuadro chico. Se limita al viewport (con margen de 16px) para
+      // que siga cabiendo en pantallas angostas.
+      const w = Math.min(
+        Math.max(r.width, 420),
+        window.innerWidth - 16,
+      );
       let left = r.left;
       if (left + w > window.innerWidth - 8) {
         left = Math.max(8, window.innerWidth - w - 8);
       }
-      const estimatedH = 320;
+      const estimatedH = Math.min(560, window.innerHeight - 32);
       const spaceBelow = window.innerHeight - r.bottom;
       const top =
         spaceBelow < estimatedH && r.top > estimatedH
           ? Math.max(8, r.top - estimatedH - 6)
-          : r.bottom + 6;
+          : Math.min(r.bottom + 6, window.innerHeight - estimatedH - 8);
       setPos({ top, left, width: w });
     };
     update();
@@ -2353,7 +2357,7 @@ function EventoDetalleFlotante({
         top: pos.top,
         left: pos.left,
         width: pos.width,
-        maxHeight: "70vh",
+        maxHeight: "85vh",
         overflowY: "auto",
         background: "var(--bg-main)",
       }}
