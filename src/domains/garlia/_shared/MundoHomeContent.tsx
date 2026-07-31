@@ -11,6 +11,11 @@
  *   Favoritos / Editado recientemente
  *   Ensayos con tag "GOS" (ver EnsayosGosWidget)
  *
+ * Excepción: "Organización" (Grupos + Notas) se sacó de la subnavbar de
+ * secciones hermanas dentro de Entidades (ver mundoMenuGroups.ts) y ahora
+ * vive como un botón propio acá, junto al título — es una sección de
+ * "gestión del mundo" en vez de una entidad más del universo.
+ *
  * Cuando se clickea un ensayo GOS, este componente muda a mostrar
  * <EnsayoGosScreen /> a pantalla completa (estado local ensayoAbiertoId, NO
  * toca useMundoNavigation) — "Volver" limpia ese estado y regresa acá.
@@ -27,7 +32,7 @@
  * fill-accent), igual que el resto de acentos de la app, no un color fijo.
  */
 
-import { Mountain, Star, Users } from "lucide-react";
+import { Layers, Mountain, Star, Users } from "lucide-react";
 import React, { useMemo } from "react";
 
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
@@ -215,13 +220,24 @@ function FavoritosYRecientes() {
 
 export function MundoHomeContent() {
   const openEntity = useMundoNavigation((s) => s.openEntity);
+  const selectSection = useMundoNavigation((s) => s.selectSection);
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="px-4 py-5">
-        <header className="mb-4">
-          <h1 className={PAGE_TITLE_CLS}>Editor de Mundo</h1>
-          <p className="text-xs text-primary/40 mt-0.5">Resumen general del mundo.</p>
+        <header className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h1 className={PAGE_TITLE_CLS}>Editor de Mundo</h1>
+            <p className="text-xs text-primary/40 mt-0.5">Resumen general del mundo.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => selectSection("grupos")}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25 transition-colors text-xs font-semibold text-primary/80"
+          >
+            <Layers size={13} className="text-primary/40" />
+            Organización
+          </button>
         </header>
 
         <ResumenWidget />

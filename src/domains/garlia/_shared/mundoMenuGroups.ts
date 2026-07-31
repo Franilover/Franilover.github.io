@@ -10,12 +10,15 @@
  *
  * Mapa se incluye en Geografía como un ítem más (aunque no tiene columna de
  * lista propia — es un canvas) para poder saltar a él desde Reinos/Ciudades.
+ *
+ * "Organización" (Grupos + Notas) ya NO vive acá — se movió a un botón
+ * propio en el Home del editor de mundo (ver MundoHomeContent), en vez de
+ * ser una sección más dentro de Entidades.
  */
 
 import {
   Bug,
   Clock,
-  Layers,
   Map,
   Mountain,
   MapPinned,
@@ -24,7 +27,6 @@ import {
   ScrollText,
   Sparkles,
   Star,
-  StickyNote,
   Users,
 } from "lucide-react";
 import React from "react";
@@ -65,13 +67,6 @@ export const MUNDO_MENU_GROUPS: MenuGroup[] = [
       { key: "capitulos", label: "Capítulos", Icon: ScrollText },
       { key: "letras", label: "Letras", Icon: Music },
       { key: "linea-tiempo", label: "Línea de Tiempo", Icon: Clock },
-    ],
-  },
-  {
-    title: "Organización",
-    items: [
-      { key: "grupos", label: "Grupos", Icon: Layers },
-      { key: "notas", label: "Notas", Icon: StickyNote },
     ],
   },
   {

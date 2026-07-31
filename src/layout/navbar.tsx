@@ -7,7 +7,6 @@ import {
   Clock,
   Flower2,
   PenTool,
-  Layers,
   Moon,
   Sun,
   Star,
@@ -710,9 +709,12 @@ const Navbar = () => {
   // ── Submenú admin (desktop) ──────────────────────────────────────────────
   // Reemplaza a <MundoTabs /> (que vivía arriba del editor): toda la
   // navegación entre secciones de /myself/garlia pasa a vivir acá.
-  // "Criaturas", "Items" y "Organización" (Grupos/Notas) salieron de "Entidades" y
-  // tienen su propio estado activo, igual que ya pasaba con "letras"
-  // (Canciones) y "hechizos"/"dones"/"runas" (Magia).
+  // "Criaturas" e "Items" salieron de "Entidades" y tienen su propio estado
+  // activo, igual que ya pasaba con "letras" (Canciones) y
+  // "hechizos"/"dones"/"runas" (Magia). "Organización" (Grupos/Notas) ya NO
+  // vive acá — se sacó del submenú y ahora es un botón propio en el Home
+  // del editor de mundo (ver MundoHomeContent), en vez de una sección más
+  // de navegación global.
   const ENTIDADES_SECTIONS = new Set<SectionKey>([
     "personajes",
     "reinos",
@@ -722,8 +724,6 @@ const Navbar = () => {
   const ITEMS_SECTIONS = new Set<SectionKey>(["items"]);
 
   const CRIATURAS_SECTIONS = new Set<SectionKey>(["criaturas"]);
-
-  const ORGANIZACION_SECTIONS = new Set<SectionKey>(["grupos", "notas"]);
 
   // "Magia" agrupa Hechizos/Dones/Runas — antes vivían dentro de
   // "Entidades", pero al ser tres catálogos con su propio editor
@@ -746,16 +746,6 @@ const Navbar = () => {
       icon: Home,
       active: isGarliaeditor && mundoSection === null,
       onSelect: () => mundoGoToMenu(),
-    },
-    {
-      key: "organizacion",
-      label: "Organización",
-      icon: Layers,
-      active:
-        isGarliaeditor &&
-        mundoSection !== null &&
-        ORGANIZACION_SECTIONS.has(mundoSection),
-      onSelect: () => mundoSelectSection("grupos"),
     },
     {
       key: "mapa",
