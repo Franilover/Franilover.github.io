@@ -661,13 +661,27 @@ export function EntidadesPage({ section, selectedId }: Props) {
                 >
                   {bloques.map((bloque, i) => (
                     <div key={bloque.subtipo ?? `__sin-subtipo-${i}`} className="flex-none w-fit max-w-full">
-                      <EntityCardGrid
-                        title={bloque.subtipo ?? "Sin subtipo"}
-                        variant="chips"
-                        loading={!loadedGrupos}
-                        items={bloque.items.map((g) => ({ id: g.id, nombre: g.nombre }))}
-                        onItemClick={(id) => openEntity("grupos", id)}
-                      />
+                      <div className="flex items-center gap-1 max-w-full">
+                        <span
+                          title={bloque.subtipo ?? "Sin subtipo"}
+                          className="px-2.5 py-0.5 rounded-full text-micro font-bold tracking-wide truncate bg-accent/10 text-accent/80 border border-accent/15"
+                        >
+                          {bloque.subtipo ?? "Sin subtipo"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {bloque.items.map((g) => (
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => openEntity("grupos", g.id)}
+                            title={g.nombre}
+                            className="px-2.5 py-1.5 rounded-lg border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-xs font-semibold text-primary/80 text-left truncate max-w-[220px]"
+                          >
+                            {g.nombre}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </MundoCard>
@@ -741,10 +755,11 @@ export function EntidadesPage({ section, selectedId }: Props) {
  * MundoCard
  * ───────────────────────────────────────────────────────────────────────────
  * Card "de mundo" reutilizable — mismo lenguaje visual que usan las cards de
- * Reino (GeografiaJerarquica) y Criatura (MagiaJerarquica): borde redondeado,
- * barra de título centrada con fondo tenue, y contenido libre debajo.
- * Sirve para unificar cualquier nivel de agrupación de la página (Idioma,
- * Compositor, Tipo de grupo, etc.) bajo un mismo estilo.
+ * Reino (GeografiaJerarquica) y Criatura (MagiaJerarquica): borde redondeado
+ * sutil, título centrado y en negrita sobre el borde superior (sin barra de
+ * fondo), y contenido libre debajo. Sirve para unificar cualquier nivel de
+ * agrupación de la página (Idioma, Compositor, Tipo de grupo, etc.) bajo un
+ * mismo estilo.
  */
 function MundoCard({
   title,
@@ -765,11 +780,11 @@ function MundoCard({
 }) {
   return (
     <div
-      className={`rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden ${
+      className={`rounded-lg border border-primary/10 overflow-hidden ${
         fill ? "w-full mb-6 last:mb-0" : "flex-none w-fit max-w-full"
       }`}
     >
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-3">
         <span />
         <div className="flex items-center gap-1.5 justify-self-center max-w-[280px]">
           {Icon && <Icon size={9} className="text-primary/70 shrink-0" />}
@@ -791,7 +806,7 @@ function MundoCard({
           )}
         </div>
       </div>
-      <div className="p-4 flex flex-row flex-wrap gap-6 items-start">{children}</div>
+      <div className="px-3 pb-3 flex flex-row flex-wrap gap-6 items-start">{children}</div>
     </div>
   );
 }
