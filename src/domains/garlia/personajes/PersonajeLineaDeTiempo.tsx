@@ -48,8 +48,6 @@
 import {
   CalendarPlus,
   Check,
-  ChevronDown,
-  ChevronRight,
   Clock,
   Loader2,
   Pencil,
@@ -506,10 +504,6 @@ export function PersonajeLineaDeTiempo({
 
   const [cumpleQuickEdit, setCumpleQuickEdit] = useState(false);
 
-  const [erasColapsadas, setErasColapsadas] = useState<Set<string>>(
-    new Set(),
-  );
-
   const [selId, setSelId] = useState<string | null>(null);
   const selEra = eras.find((e) => e.id === selId) ?? null;
 
@@ -555,15 +549,6 @@ export function PersonajeLineaDeTiempo({
       setNewMomento(String(fechaNacimiento));
     }
     setAddingNew(true);
-  };
-
-  const toggleEraColapsada = (id: string) => {
-    setErasColapsadas((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   };
 
   const fechaInvalida =
@@ -791,79 +776,65 @@ export function PersonajeLineaDeTiempo({
             )}
 
             {puedeAgruparPorGranEra ? (
-              gruposPorGranEra.map(({ granEra, subEras }) => {
-                const colapsada = erasColapsadas.has(granEra.id);
-                return (
-                  <div
-                    key={granEra.id}
-                    className="rounded-xl border p-2 space-y-1.5"
-                    style={{ borderColor: LINE_COLOR }}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        className="flex items-center gap-1 shrink-0 min-w-0"
-                        type="button"
-                        onClick={() => toggleEraColapsada(granEra.id)}
-                      >
-                        {colapsada ? (
-                          <ChevronRight className="text-primary/30 shrink-0" size={11} />
-                        ) : (
-                          <ChevronDown className="text-primary/30 shrink-0" size={11} />
-                        )}
-                        <span
-                          className="text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded truncate"
-                          style={{
-                            color: "color-mix(in srgb, var(--primary) 55%, transparent)",
-                            background: FIELD_BG,
-                          }}
-                        >
-                          {granEraLabelConRango(granEra)}
-                        </span>
-                        {subEras.length > 0 && (
-                          <span className="text-micro text-primary/30 tabular-nums shrink-0">
-                            {subEras.length}
-                          </span>
-                        )}
-                      </button>
-                      <div className="flex-1" />
-                      <button
-                        className="flex items-center gap-0.5 text-micro font-bold text-primary/35 hover:text-accent transition-colors shrink-0"
-                        type="button"
-                        onClick={() => abrirFormularioEnGranEra(granEra)}
-                      >
-                        <Plus size={10} />
-                      </button>
-                    </div>
-
-                    {!colapsada &&
-                      (subEras.length === 0 ? (
-                        <p className="text-micro text-primary/25 py-0.5">
-                          Sin sub-eras todavía
-                        </p>
-                      ) : (
-                        <div className="flex flex-col gap-1">
-                          {subEras.map((era) => (
-                            <SubEraItem
-                              key={era.id}
-                              edad={calcularEdad(
-                                era.momento,
-                                fechaNacimiento,
-                                diasPorAnio,
-                              )}
-                              era={era}
-                              isSel={era.id === selId}
-                              onClick={() =>
-                                setSelId((prev) =>
-                                  prev === era.id ? null : era.id,
-                                )
-                              }
-                            />
-                          ))}
-                        </div>
-                      ))}
+              gruposPorGranEra.map(({ granEra, subEras }, idx) => (
+                <div
+                  key={granEra.id}
+                  className="flex flex-col gap-1.5 py-2"
+                  style={{
+                    borderTop: idx === 0 ? undefined : `1px solid ${LINE_COLOR}`,
+                  }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="text-micro font-black uppercase tracking-wide truncate"
+                      style={{
+                        color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+                      }}
+                    >
+                      {granEraLabelConRango(granEra)}
+                    </span>
+                    {subEras.length > 0 && (
+                      <span className="text-micro text-primary/30 tabular-nums shrink-0">
+                        {subEras.length}
+                      </span>
+                    )}
+                    <div className="flex-1" />
+                    <button
+                      className="flex items-center gap-0.5 text-micro font-bold text-primary/35 hover:text-accent transition-colors shrink-0"
+                      type="button"
+                      onClick={() => abrirFormularioEnGranEra(granEra)}
+                    >
+                      <Plus size={10} />
+                    </button>
                   </div>
-                );
-              })
+
+                  {subEras.length === 0 ? (
+                    <p className="text-micro text-primary/25 py-0.5">
+                      Sin sub-eras todavía
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {subEras.map((era) => (
+                        <SubEraItem
+                          key={era.id}
+                          edad={calcularEdad(
+                            era.momento,
+                            fechaNacimiento,
+                            diasPorAnio,
+                          )}
+                          era={era}
+                          isSel={era.id === selId}
+                          onClick={() =>
+                            setSelId((prev) =>
+                              prev === era.id ? null : era.id,
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
             ) : eras.length === 0 ? (
               <p className="text-micro text-primary/25 py-1">
                 {fechaNacimiento != null
