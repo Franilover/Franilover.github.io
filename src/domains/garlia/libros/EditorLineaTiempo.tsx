@@ -2309,15 +2309,15 @@ function ListaEventosConMinimapa({
   );
 }
 
-// ── Wrapper que posiciona EventoDetallePanel como flotante (portal) ─────────
-// Se ancla al elemento de la tarjeta clickeada (`anchorEl`) en vez de a un
-// trigger fijo. Si la tarjeta seleccionada cambia de posición (porque el
-// usuario scrollea la lista, o la ventana cambia de tamaño), recalcula.
-// Si el evento seleccionado deja de existir en el DOM (ej. se borró, o la
-// lista se re-renderizó y el ref todavía no está listo), simplemente no
-// se muestra — no rompe nada, solo no hay panel hasta el próximo click.
+// ── Wrapper que muestra EventoDetallePanel como modal centrado (portal) ─────
+// Antes este panel se anclaba a la tarjeta clickeada y recalculaba posición
+// en cada scroll/resize (mismo patrón que EraDropdown). Se cambió a un
+// modal centrado y fijo: no se mueve con el scroll de la página, y usa
+// buena parte del ancho de la pantalla — más cómodo para escribir en el
+// editor Lexical de la descripción sin que el panel esté anclado (y a
+// veces cortado) contra el borde de una tarjeta angosta.
 function EventoDetalleFlotante({
-  anchorEl,
+  anchorEl: _anchorEl,
   evt,
   era,
   eraColor,
@@ -2340,97 +2340,50 @@ function EventoDetalleFlotante({
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{
-    top: number;
-    left: number;
-    width: number;
-  } | null>(null);
 
-  // Posición del panel — igual que EraDropdown: calcula contra el ancla,
-  // decide si abrir hacia abajo o hacia arriba según el espacio disponible,
-  // y recalcula si el usuario scrollea o cambia el tamaño de la ventana
-  // (así el panel "sigue" a la tarjeta en vez de quedar flotando en el
-  // aire cuando la lista se mueve debajo).
+  // Cerrar con Escape. El click afuera lo maneja el overlay directamente
+  // (más simple y confiable que comparar contains() contra un anchorEl que
+  // ya no es relevante para la posición del modal).
   useEffect(() => {
-    if (!anchorEl) {
-      setPos(null);
-      return;
-    }
-    const update = () => {
-      const r = anchorEl.getBoundingClientRect();
-      // Panel más grande: da espacio real al editor Lexical en vez de un
-      // recuadro chico. Se limita al viewport (con margen de 16px) para
-      // que siga cabiendo en pantallas angostas.
-      const w = Math.min(
-        Math.max(r.width, 420),
-        window.innerWidth - 16,
-      );
-      let left = r.left;
-      if (left + w > window.innerWidth - 8) {
-        left = Math.max(8, window.innerWidth - w - 8);
-      }
-      const estimatedH = Math.min(560, window.innerHeight - 32);
-      const spaceBelow = window.innerHeight - r.bottom;
-      const top =
-        spaceBelow < estimatedH && r.top > estimatedH
-          ? Math.max(8, r.top - estimatedH - 6)
-          : Math.min(r.bottom + 6, window.innerHeight - estimatedH - 8);
-      setPos({ top, left, width: w });
-    };
-    update();
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [anchorEl, evt.id]);
-
-  // Cerrar al click afuera o con Escape — el click adentro de la tarjeta
-  // de origen NO cuenta como "afuera" porque ese click ya lo maneja el
-  // propio botón de la tarjeta (des-selecciona o selecciona otro evento).
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (panelRef.current?.contains(target)) return;
-      if (anchorEl?.contains(target)) return;
-      onClose();
-    };
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    document.addEventListener("mousedown", handleClick);
     document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [anchorEl, onClose]);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
 
-  if (!pos || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <div
-      ref={panelRef}
-      className="fixed z-[9999] rounded-xl shadow-lg"
-      style={{
-        top: pos.top,
-        left: pos.left,
-        width: pos.width,
-        maxHeight: "85vh",
-        overflowY: "auto",
-        background: "var(--bg-main)",
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 45%, transparent)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
       }}
     >
-      <EventoDetallePanel
-        diasAnioLista={diasAnioLista}
-        era={era}
-        eraColor={eraColor}
-        evt={evt}
-        onClose={onClose}
-        onDiaChange={onDiaChange}
-        onFieldChange={onFieldChange}
-      />
+      <div
+        ref={panelRef}
+        className="rounded-xl shadow-lg w-full"
+        style={{
+          maxWidth: 760,
+          maxHeight: "85vh",
+          overflowY: "auto",
+          background: "var(--bg-main)",
+          border:
+            "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+        }}
+      >
+        <EventoDetallePanel
+          diasAnioLista={diasAnioLista}
+          era={era}
+          eraColor={eraColor}
+          evt={evt}
+          onClose={onClose}
+          onDiaChange={onDiaChange}
+          onFieldChange={onFieldChange}
+        />
+      </div>
     </div>,
     document.body,
   );
