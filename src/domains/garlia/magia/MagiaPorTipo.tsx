@@ -8,7 +8,7 @@
  * relación fue eliminada; ahora hechizos/dones/runas no tienen `criatura_id`).
  */
 
-import { FileText, Plus, ScrollText, Sparkles, Star } from "lucide-react";
+import { Plus, ScrollText, Sparkles, Star } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -151,33 +151,23 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
     });
   }, [loading, ensayoEnergias, crearNotaPendiente]);
 
+  if (loading || creando || !ensayoEnergias) {
+    return (
+      <div className="w-full py-6 text-xs text-primary/30 text-center mb-6">
+        {creando ? "Creando ensayo…" : "Cargando…"}
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden mb-6 last:mb-0">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
-        <span />
-        <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 flex items-center gap-1">
-          <FileText size={9} className="shrink-0" />
-          Ensayo · GOS + Magia
-        </span>
-        <span />
-      </div>
-      <div className="p-3">
-        {loading || creando || !ensayoEnergias ? (
-          <div className="w-full py-6 text-xs text-primary/30 text-center">
-            {creando ? "Creando ensayo…" : "Cargando…"}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-primary/10 bg-primary/[0.02] px-4 py-3">
-            <RichEditor
-              key={ensayoEnergias.id}
-              value={ensayoEnergias.contenido || ""}
-              onChange={(value) => actualizarLocal(ensayoEnergias.id, "contenido", value)}
-              placeholder="Escribe aquí…"
-              minHeight={220}
-            />
-          </div>
-        )}
-      </div>
+    <div className="mb-6">
+      <RichEditor
+        key={ensayoEnergias.id}
+        value={ensayoEnergias.contenido || ""}
+        onChange={(value) => actualizarLocal(ensayoEnergias.id, "contenido", value)}
+        placeholder="Escribe aquí…"
+        minHeight={220}
+      />
     </div>
   );
 }

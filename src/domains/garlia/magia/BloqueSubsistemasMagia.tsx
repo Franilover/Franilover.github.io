@@ -288,64 +288,59 @@ export function BloqueSubsistemasMagia() {
   };
 
   return (
-    <div className="rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
-        <span />
-        <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 flex items-center gap-1">
+    <div className="mb-6">
+      <div className="flex items-center justify-between gap-1.5 mb-2">
+        <span className="text-micro font-bold uppercase tracking-[0.12em] text-primary/50 flex items-center gap-1">
           <Sparkle size={9} className="shrink-0" />
           Subsistemas de Magia
         </span>
-        <div className="justify-self-end">
+        <button
+          type="button"
+          onClick={() => setCreandoAbierto((o) => !o)}
+          title="Añadir subsistema"
+          className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+        >
+          <Plus size={9} className="text-primary/60" />
+        </button>
+      </div>
+
+      {creandoAbierto && (
+        <div className="flex items-center gap-1.5 mb-3">
+          <input
+            autoFocus
+            className="flex-1 min-w-0 bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/80 outline-none placeholder:text-primary/30 focus:border-primary/25"
+            placeholder="Nombre del subsistema (ej. Luminia)…"
+            value={nombreNuevo}
+            onChange={(e) => setNombreNuevo(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleCrear();
+              if (e.key === "Escape") setCreandoAbierto(false);
+            }}
+          />
           <button
             type="button"
-            onClick={() => setCreandoAbierto((o) => !o)}
-            title="Añadir subsistema"
-            className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+            disabled={!nombreNuevo.trim() || creating}
+            onClick={() => void handleCrear()}
+            className="shrink-0 text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity disabled:opacity-40"
           >
-            <Plus size={9} className="text-primary/60" />
+            Crear
           </button>
         </div>
-      </div>
+      )}
 
-      <div className="p-4">
-        {creandoAbierto && (
-          <div className="flex items-center gap-1.5 mb-3">
-            <input
-              autoFocus
-              className="flex-1 min-w-0 bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/80 outline-none placeholder:text-primary/30 focus:border-primary/25"
-              placeholder="Nombre del subsistema (ej. Luminia)…"
-              value={nombreNuevo}
-              onChange={(e) => setNombreNuevo(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCrear();
-                if (e.key === "Escape") setCreandoAbierto(false);
-              }}
-            />
-            <button
-              type="button"
-              disabled={!nombreNuevo.trim() || creating}
-              onClick={() => void handleCrear()}
-              className="shrink-0 text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity disabled:opacity-40"
-            >
-              Crear
-            </button>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="w-full py-6 text-xs text-primary/30 text-center">Cargando…</div>
-        ) : subsistemas.length === 0 ? (
-          <div className="w-full py-6 text-xs text-primary/25 text-center">
-            Sin subsistemas todavía
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {subsistemas.map((s) => (
-              <ChipSubsistema key={s.id} subsistema={s} onClick={() => setEditandoId(s.id)} />
-            ))}
-          </div>
-        )}
-      </div>
+      {loading ? (
+        <div className="w-full py-6 text-xs text-primary/30 text-center">Cargando…</div>
+      ) : subsistemas.length === 0 ? (
+        <div className="w-full py-6 text-xs text-primary/25 text-center">
+          Sin subsistemas todavía
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {subsistemas.map((s) => (
+            <ChipSubsistema key={s.id} subsistema={s} onClick={() => setEditandoId(s.id)} />
+          ))}
+        </div>
+      )}
 
       {subsistemaEditando && (
         <ModalEditorSubsistema
