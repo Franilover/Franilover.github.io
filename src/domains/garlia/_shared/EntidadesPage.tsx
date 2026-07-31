@@ -18,7 +18,7 @@
  * muestra sin lógica extra acá.
  */
 
-import { Music, Plus, StickyNote } from "lucide-react";
+import { Music, Plus, StickyNote, Users } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
@@ -34,6 +34,7 @@ import { useNotas } from "@/editor/notas/useNotas";
 import { type Nota } from "@/domains/garlia/_shared/types";
 import { useEntidadesMagicas } from "@/domains/garlia/magia/useEntidadesMagicas";
 import { EditorGrupo, GRUPO_TIPO_CONFIG, useGrupos, type GrupoTipo } from "@/domains/garlia/grupos/EditorGrupo";
+import type { Grupo } from "@/domains/garlia/grupos/useGrupos";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
 
@@ -42,6 +43,7 @@ import { ItemEditor } from "@/domains/garlia/items/ItemEditor";
 import { PersonajeEditor } from "@garlia/personajes";
 import { ReinoEditor } from "@garlia/reinos";
 import { CiudadEditor } from "@garlia/ciudades";
+import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GeografiaJerarquica } from "@/domains/garlia/_shared/GeografiaJerarquica";
 import { MagiaJerarquica } from "@/domains/garlia/magia/MagiaJerarquica";
@@ -182,6 +184,34 @@ export function EntidadesPage({ section, selectedId }: Props) {
     }
     return map;
   }, [gruposPorTipo]);
+
+  /** Resuelve los miembros de un grupo a { id, nombre, imageUrl } cruzando
+   *  miembro_ids contra los catálogos ya cargados (personajes/criaturas/
+   *  items). Para tipos sin catálogo local (hechizos, dones, runas, reinos,
+   *  canciones, libros) devuelve solo lo que se puede resolver — hoy vacío,
+   *  el grupo cae en el fallback de "sin miembros resueltos". */
+  const miembrosDeGrupo = useMemo(() => {
+    return (g: Grupo): { id: string; nombre: string; imageUrl: string | null }[] => {
+      const ids = new Set(g.miembro_ids);
+      if (ids.size === 0) return [];
+      switch (g.tipo) {
+        case "personajes":
+          return personajes
+            .filter((p) => ids.has(p.id))
+            .map((p) => ({ id: p.id, nombre: p.nombre, imageUrl: p.img_url ?? null }));
+        case "criaturas":
+          return criaturas
+            .filter((c) => ids.has(c.id))
+            .map((c) => ({ id: c.id, nombre: c.nombre, imageUrl: c.imagen_url ?? null }));
+        case "items":
+          return items
+            .filter((it) => ids.has(it.id))
+            .map((it) => ({ id: it.id, nombre: it.nombre, imageUrl: it.imagen_url ?? null }));
+        default:
+          return [];
+      }
+    };
+  }, [personajes, criaturas, items]);
 
   // ── Canciones ─────────────────────────────────────────────────────────
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
@@ -669,18 +699,49 @@ export function EntidadesPage({ section, selectedId }: Props) {
                           {bloque.subtipo ?? "Sin subtipo"}
                         </span>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {bloque.items.map((g) => (
-                          <button
-                            key={g.id}
-                            type="button"
-                            onClick={() => openEntity("grupos", g.id)}
-                            title={g.nombre}
-                            className="px-2.5 py-1.5 rounded-lg border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-xs font-semibold text-primary/80 text-left truncate max-w-[220px]"
-                          >
-                            {g.nombre}
-                          </button>
-                        ))}
+                      <div className="mt-2 flex flex-row flex-wrap gap-3 items-start">
+                        {bloque.items.map((g) => {
+                          const miembros = miembrosDeGrupo(g);
+                          const itemSize = 52;
+                          const gapPx = 4;
+                          const cols = Math.min(Math.max(miembros.length, 1), 6);
+                          const anchoPx = Math.max(cols * itemSize + (cols - 1) * gapPx, 90);
+                          return (
+                            <div key={g.id} className="shrink-0" style={{ width: anchoPx }}>
+                              <button
+                                type="button"
+                                onClick={() => openEntity("grupos", g.id)}
+                                title={g.nombre}
+                                style={{ maxWidth: anchoPx }}
+                                className="px-2.5 py-1 rounded-lg border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-xs font-semibold text-primary/80 text-left truncate block w-full"
+                              >
+                                {g.nombre}
+                              </button>
+                              {miembros.length > 0 ? (
+                                <div
+                                  className="mt-1.5 grid gap-1"
+                                  style={{ gridTemplateColumns: `repeat(${cols}, ${itemSize}px)` }}
+                                >
+                                  {miembros.map((m) => (
+                                    <EntityCard
+                                      key={m.id}
+                                      nombre={m.nombre}
+                                      imageUrl={m.imageUrl}
+                                      Icon={Users}
+                                      onClick={() => openEntity(g.tipo as SectionKey, m.id)}
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                g.miembro_ids.length > 0 && (
+                                  <div className="mt-1 text-micro text-primary/30">
+                                    {g.miembro_ids.length} miembro{g.miembro_ids.length === 1 ? "" : "s"}
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
