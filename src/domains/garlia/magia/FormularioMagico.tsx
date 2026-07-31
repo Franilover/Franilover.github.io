@@ -27,7 +27,6 @@ import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete as dexieDel } from "@/lib/utils/dexieHelpers";
 
-import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
 import { PanelGruposAsignados } from "./PanelGruposAsignados";
 import { PickerImagenRunaBtn } from "./PickerImagenRunaBtn";
 import { PanelPatronRuna } from "./PanelPatronRuna";
@@ -53,7 +52,9 @@ export function FormularioMagico({
   onDeleted: (id: string) => void;
   /** Si se pasa, el nombre de cada grupo asignado navega a su editor. */
   onNavigateGrupo?: (id: string) => void;
-  /** Catálogo completo de runas, para el editor de combinaciones (solo se usa si modo === "runas"). */
+  /** Catálogo completo de runas. Ya no se usa acá directamente — el
+   *  probador de reconocimiento y el editor de combinaciones se movieron
+   *  a la página de Magia — se mantiene por compatibilidad con llamadores. */
   todasLasRunas?: EntidadMagica[];
 }) {
   const [form, setForm] = useState<EntidadMagica>(item);
@@ -207,9 +208,11 @@ export function FormularioMagico({
       {/* ── Body ────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {modo === "runas" ? (
-          // Runas: sin imagen — mitad izquierda para dibujar el patrón +
-          // probar el reconocimiento, mitad derecha para el resto
-          // (criatura, explicación, combinaciones).
+          // Runas: sin imagen — mitad izquierda para dibujar el patrón,
+          // mitad derecha para el resto (grupos, explicación). El probador
+          // de reconocimiento y el editor de combinaciones viven ahora en
+          // la página de Magia (son herramientas globales, no de una runa
+          // en particular).
           <div className="flex flex-col sm:flex-row gap-0 h-full">
             <div
               className="sm:w-1/2 min-w-0 p-4 sm:border-r"
@@ -218,8 +221,6 @@ export function FormularioMagico({
               <PanelPatronRuna
                 color={cfg.color}
                 patronTrazos={(form.patron_trazos as any) ?? []}
-                runaId={form.id}
-                todasLasRunas={todasLasRunas}
                 onChange={(trazos) =>
                   setForm((f) => ({ ...f, patron_trazos: trazos }))
                 }
@@ -258,7 +259,6 @@ export function FormularioMagico({
                   onWikilinkNavigate={onWikilink}
                 />
               </div>
-              <EditorCombinacionesRunas runas={todasLasRunas ?? []} />
             </div>
           </div>
         ) : (

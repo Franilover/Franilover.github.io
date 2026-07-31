@@ -43,24 +43,16 @@ import {
   suavizarTrazo,
   type Punto,
 } from "./dollarOneRecognizer";
-import { PanelTestReconocimiento } from "./PanelTestReconocimiento";
 import { trazoAPathSvg, TRAZO_THUMBNAIL_VIEWBOX } from "./trazoThumbnail";
-import type { EntidadMagica } from "./types";
 
 export function PanelPatronRuna({
   patronTrazos,
   onChange,
   color = "var(--primary)",
-  runaId,
-  todasLasRunas,
 }: {
   patronTrazos: Punto[][];
   onChange: (trazos: Punto[][]) => void;
   color?: string;
-  /** id de la runa actual, para marcarla en el panel de prueba de reconocimiento */
-  runaId?: string;
-  /** catálogo completo, para el panel de prueba de reconocimiento */
-  todasLasRunas?: EntidadMagica[];
 }) {
   const [resetSignal, setResetSignal] = useState(0);
   const [seleccionado, setSeleccionado] = useState<number | null>(null);
@@ -218,14 +210,6 @@ export function PanelPatronRuna({
           </div>
         )}
       </div>
-
-      {/* ── Auto-test de reconocimiento ──────────────────────────────── */}
-      <PanelTestReconocimiento
-        color={color}
-        runaActualId={runaId}
-        runas={todasLasRunas ?? []}
-        trazosActuales={patronTrazos}
-      />
     </div>
   );
 }

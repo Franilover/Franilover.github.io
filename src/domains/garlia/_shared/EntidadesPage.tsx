@@ -428,6 +428,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           }}
           onOpen={(section, id) => openEntity(section, id)}
           onOpenEnsayo={(id) => openEntity("notas-gos", id)}
+          todasLasRunas={runas.items}
         />
       </div>
     );
