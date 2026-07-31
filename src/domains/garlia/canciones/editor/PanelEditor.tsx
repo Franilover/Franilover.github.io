@@ -67,9 +67,12 @@ export const PanelEditor = ({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [creandoBloque, setCreandoBloque] = useState(false);
 
-  // Texto en vivo de la columna activa (para el indicador lateral de
-  // sílabas/vocales, que se actualiza mientras se tipea).
+  // Texto en vivo de cada columna (para el indicador lateral de
+  // sílabas/vocales, que se actualiza mientras se tipea). `texto` es
+  // siempre la columna izquierda (Español); `textoDerecha` es la columna
+  // del idioma de la canción, cuando existe (no-Español).
   const [texto, setTexto] = useState("");
+  const [textoDerecha, setTextoDerecha] = useState("");
 
   // ── Idioma a mostrar: se define en la barra lateral (cancion.idioma),
   // no acá. Único caso con selector propio: Japonés tiene dos formas de
@@ -127,6 +130,7 @@ export const PanelEditor = ({
   // indicador lateral no arrastre valores de otra canción.
   useEffect(() => {
     setTexto("");
+    setTextoDerecha("");
   }, [bloque?.id]);
 
   // Si la canción todavía no tiene su bloque único, lo creamos automáticamente
@@ -361,15 +365,31 @@ export const PanelEditor = ({
                   </p>
                 </div>
               ) : bloque ? (
-                <div className="px-2 pb-2 flex gap-2">
+                <div className="px-2 pb-2 flex gap-4">
+                  {/* Columna izquierda: Español, siempre fija (para la traducción) */}
                   <SeccionTextarea
                     countMode={countMode}
-                    idioma={idioma}
+                    idioma="es"
+                    refIdioma={idioma !== "es" ? idioma : undefined}
                     sec={bloque}
                     showSyllableColumn
                     onSave={handleSaveField}
                     onTextoChange={setTexto}
                   />
+
+                  {/* Columna derecha: idioma de la canción (sidebar), solo si
+                      no es Español — evita duplicar la misma columna. */}
+                  {idioma !== "es" && (
+                    <SeccionTextarea
+                      countMode={countMode}
+                      idioma={idioma}
+                      refIdioma="es"
+                      sec={bloque}
+                      showSyllableColumn
+                      onSave={handleSaveField}
+                      onTextoChange={setTextoDerecha}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 py-20 text-primary/20">
