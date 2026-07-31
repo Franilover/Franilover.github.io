@@ -16,6 +16,8 @@ import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStor
 import NewNoteModal from "@/editor/notas/components/newNoteModal";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
+import { BloqueSubsistemasMagia } from "./BloqueSubsistemasMagia";
+
 interface EntidadMagicaMin {
   id: string;
   nombre: string;
@@ -235,6 +237,7 @@ export function MagiaPorTipo({
       </div>
       <div className="flex-1 min-w-0">
         <BloqueEnsayosMagia onOpenEnsayo={onOpenEnsayo} />
+        <BloqueSubsistemasMagia />
       </div>
     </div>
   );
