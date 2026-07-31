@@ -221,25 +221,29 @@ export function MagiaPorTipo({
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
-        {BLOQUES.map(({ key, label, Icon, section }) => (
-          <Bloque
-            key={key}
-            Icon={Icon}
-            entidades={datos[key]}
-            esRunas={key === "runas"}
-            label={label}
-            section={section}
-            creating={creating}
-            onCreate={onCreate ? () => onCreate(key) : undefined}
-            onOpen={onOpen}
-          />
-        ))}
         <BloqueSubsistemasMagia />
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+          {BLOQUES.map(({ key, label, Icon, section }) => (
+            <Bloque
+              key={key}
+              Icon={Icon}
+              entidades={datos[key]}
+              esRunas={key === "runas"}
+              label={label}
+              section={section}
+              creating={creating}
+              onCreate={onCreate ? () => onCreate(key) : undefined}
+              onOpen={onOpen}
+            />
+          ))}
+        </div>
+
         {todasLasRunas && (
-          <SubBloqueProbador runas={todasLasRunas} />
-        )}
-        {todasLasRunas && (
-          <EditorCombinacionesRunas runas={todasLasRunas} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            <SubBloqueProbador runas={todasLasRunas} />
+            <EditorCombinacionesRunas runas={todasLasRunas} />
+          </div>
         )}
       </div>
       <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
