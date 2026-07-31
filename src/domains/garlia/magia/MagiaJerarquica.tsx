@@ -222,7 +222,7 @@ export function MagiaJerarquica({
 
   const itemSize = 52;
   const gapPx = 4;
-  const disponibleColumna = anchoColumnaMasonry - 32;
+  const disponibleColumna = anchoColumnaMasonry - 24; // px-3 a ambos lados = 24px total
   const maxColsPorAncho = Math.max(1, Math.floor((disponibleColumna + gapPx) / (itemSize + gapPx)));
   const anchoColumnaCategoria = (entidadesCount: number) => {
     if (entidadesCount === 0) return 0;
@@ -244,7 +244,7 @@ export function MagiaJerarquica({
 
   const altoCriatura = (criatura: Criatura) => {
     const counts = categoriasDe(criatura);
-    const disponible = anchoColumnaMasonry - 32;
+    const disponible = anchoColumnaMasonry - 24; // px-3 a ambos lados = 24px total
     const gapInterno = 24;
     const filas: number[][] = [];
     let filaActual: number[] = [];
@@ -263,8 +263,8 @@ export function MagiaJerarquica({
     }
     if (filaActual.length > 0) filas.push(filaActual);
 
-    const alturaBarraTitulo = 38;
-    const paddingContenido = 32;
+    const alturaBarraTitulo = 24; // py-3 compacto = ~24px
+    const paddingContenido = 24; // px-3 pb-3 = 24px total vertical
     const alturaFilas = filas.reduce(
       (sum, fila) => sum + Math.max(...fila.map(altoColumnaCategoria)),
       0,
@@ -326,22 +326,20 @@ export function MagiaJerarquica({
               {columna.map((criatura) => (
                 <div
                   key={criatura.id}
-                  className="w-full rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden"
+                  className="w-full rounded-lg border border-primary/10 overflow-hidden"
                 >
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
-                    <span />
+                  <div className="px-3 py-3 flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => onOpen("criaturas", criatura.id)}
                       title={criatura.nombre}
-                      className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors flex items-center gap-1"
+                      className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors flex items-center gap-1"
                     >
                       <Bug size={9} className="shrink-0" />
                       {criatura.nombre}
                     </button>
-                    <span />
                   </div>
-                  <div className="p-4 flex flex-wrap gap-6">
+                  <div className="px-3 pb-3 flex flex-wrap gap-6">
                     {itemsDe(criatura.id).length > 0 && (
                       <Columna
                         Icon={Package}
@@ -378,16 +376,14 @@ export function MagiaJerarquica({
         {totalSinCriatura > 0 && (
           <div>
             <div className="h-px mb-3 bg-primary/10" />
-            <div className="w-full rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
-              <span />
-              <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 flex items-center gap-1">
+            <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+            <div className="px-3 py-3 flex items-center gap-2">
+              <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 flex items-center gap-1">
                 <Bug size={9} className="shrink-0" />
                 Sin criatura
               </span>
-              <span />
             </div>
-            <div className="p-4 flex flex-wrap gap-6">
+            <div className="px-3 pb-3 flex flex-wrap gap-6">
               {itemsSinCriatura.length > 0 && (
                 <Columna
                   Icon={Package}

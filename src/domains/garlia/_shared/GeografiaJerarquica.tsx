@@ -196,7 +196,7 @@ export function GeografiaJerarquica({
 
   const itemSize = 52;
   const gapPx = 4;
-  const disponibleColumna = anchoColumnaMasonry - 32; // p-4 a ambos lados
+  const disponibleColumna = anchoColumnaMasonry - 24; // px-3 a ambos lados = 24px total
   const maxColsPorAncho = Math.max(1, Math.floor((disponibleColumna + gapPx) / (itemSize + gapPx)));
   const anchoCiudad = (habitantesCount: number) => {
     if (habitantesCount === 0) return 90; // chip "Sin personajes"
@@ -208,8 +208,8 @@ export function GeografiaJerarquica({
   // usa renderColumna al pintar, para que la estimación no se quede corta y
   // termine desbordando (y recortándose) el ancho real de la card.
   const altoCiudad = (habitantesCount: number) => {
-    const alturaTitulo = 24; // chip tipo pill (py-1)
-    const margenSuperior = 8; // mt-1.5/mt-2
+    const alturaTitulo = 20; // chip título compacto (py-0.5 = 4px)
+    const margenSuperior = 6; // mt-1.5
     if (habitantesCount === 0) return alturaTitulo + margenSuperior + 16; // "Sin personajes"
     const cols = Math.min(Math.max(habitantesCount, 1), 6, maxColsPorAncho);
     const filas = Math.ceil(habitantesCount / cols);
@@ -398,32 +398,29 @@ export function GeografiaJerarquica({
               {columna.map((reino) => (
                 <div
                   key={reino.id}
-                  className="w-full rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden"
+                  className="w-full rounded-lg border border-primary/10 overflow-hidden"
                 >
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
-                    <span />
+                  <div className="px-3 py-3 flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => onOpen("reinos", reino.id)}
                       title={reino.nombre}
-                      className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
+                      className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors text-left"
                     >
                       {reino.nombre}
                     </button>
-                    <div className="justify-self-end">
-                      {onCreateCiudad && (
-                        <button
-                          type="button"
-                          onClick={() => onCreateCiudad(reino.id)}
-                          title="Añadir ciudad"
-                          className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-                        >
-                          <Plus size={9} className="text-primary/60" />
-                        </button>
-                      )}
-                    </div>
+                    {onCreateCiudad && (
+                      <button
+                        type="button"
+                        onClick={() => onCreateCiudad(reino.id)}
+                        title="Añadir ciudad"
+                        className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
+                      >
+                        <Plus size={9} className="text-primary/60" />
+                      </button>
+                    )}
                   </div>
-                  <div className="p-4 flex flex-wrap gap-6">
+                  <div className="px-3 pb-3 flex flex-wrap gap-6">
                     {[
                       ...ciudadesDe(reino.id).map((c) => ({
                         tipo: "ciudad" as const,
@@ -457,27 +454,24 @@ export function GeografiaJerarquica({
         {personajesSinCiudad.length > 0 && (
           <div>
             <div className="h-px mb-3 bg-primary/10" />
-            <div className="w-full rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
-              <span />
-              <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+            <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+            <div className="px-3 py-3 flex items-center gap-2">
+              <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
                 Sin ciudad
               </span>
-              <div className="justify-self-end">
-                {onCreatePersonaje && (
-                  <button
-                    type="button"
-                    onClick={() => onCreatePersonaje(null)}
-                    title="Añadir personaje"
-                    className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-                  >
-                    <Plus size={9} className="text-primary/60" />
-                  </button>
-                )}
-              </div>
+              {onCreatePersonaje && (
+                <button
+                  type="button"
+                  onClick={() => onCreatePersonaje(null)}
+                  title="Añadir personaje"
+                  className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
+                >
+                  <Plus size={9} className="text-primary/60" />
+                </button>
+              )}
             </div>
             <div
-              className="p-4 grid gap-1"
+              className="px-3 pb-3 grid gap-1"
               style={{
                 gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))",
               }}
