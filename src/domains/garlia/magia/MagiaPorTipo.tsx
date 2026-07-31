@@ -15,7 +15,9 @@ import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
+import { BloqueHerramientasRunas } from "./BloqueHerramientasRunas";
 import { BloqueSubsistemasMagia } from "./BloqueSubsistemasMagia";
+import type { EntidadMagica } from "./types";
 
 interface EntidadMagicaMin {
   id: string;
@@ -34,6 +36,10 @@ interface Props {
   // Abre un ensayo (tab "notas-gos") — mismo patrón que EnsayosGosWidget
   // en el home. Si no se pasa, el bloque de ensayos no se muestra.
   onOpenEnsayo?: (ensayoId: string) => void;
+  // Catálogo completo de runas — para el bloque de herramientas de runas
+  // (probador + editor de combinaciones), movido acá desde el editor
+  // interno de una runa individual.
+  todasLasRunas?: EntidadMagica[];
 }
 
 const BLOQUES = [
@@ -192,6 +198,7 @@ export function MagiaPorTipo({
   onCreate,
   creating,
   onOpenEnsayo,
+  todasLasRunas,
 }: Props) {
   const datos = { hechizos, dones, runas };
 
@@ -240,6 +247,9 @@ export function MagiaPorTipo({
       <div className="flex-1 min-w-0">
         <BloqueEnsayoEnergias onOpenEnsayo={onOpenEnsayo} />
         <BloqueSubsistemasMagia />
+        {todasLasRunas && (
+          <BloqueHerramientasRunas runas={todasLasRunas} />
+        )}
       </div>
     </div>
   );
