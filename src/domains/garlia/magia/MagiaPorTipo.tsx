@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { RichEditor } from "@/editor/lexical";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
 import { BloqueHerramientasRunas } from "./BloqueHerramientasRunas";
@@ -119,8 +120,8 @@ function Bloque({
 // todavía se crea automáticamente la primera vez que se abre Magia.
 const TITULO_ENSAYO_ENERGIAS = "Energias";
 
-function BloqueEnsayoEnergias({ onOpenEnsayo }: { onOpenEnsayo: (id: string) => void }) {
-  const { ensayos, loading, crearNotaPendiente } = useEnsayoEditorLogic(null);
+function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
+  const { ensayos, loading, crearNotaPendiente, actualizarLocal } = useEnsayoEditorLogic(null);
   const creandoRef = useRef(false);
   const [creando, setCreando] = useState(false);
 
@@ -160,29 +161,21 @@ function BloqueEnsayoEnergias({ onOpenEnsayo }: { onOpenEnsayo: (id: string) => 
         </span>
         <span />
       </div>
-      <div className="p-4">
+      <div className="p-3">
         {loading || creando || !ensayoEnergias ? (
           <div className="w-full py-6 text-xs text-primary/30 text-center">
             {creando ? "Creando ensayo…" : "Cargando…"}
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => onOpenEnsayo(ensayoEnergias.id)}
-            className="w-full flex items-center gap-3 px-4 py-5 rounded-xl border border-primary/10 bg-primary/[0.02] hover:bg-primary/6 hover:border-accent/30 transition-colors text-left"
-          >
-            <div className="shrink-0 w-10 h-10 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
-              <FileText size={18} className="text-accent/70" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-black uppercase italic tracking-tight text-primary truncate">
-                {ensayoEnergias.titulo || TITULO_ENSAYO_ENERGIAS}
-              </div>
-              <div className="text-micro font-bold uppercase tracking-widest text-primary/35 mt-0.5">
-                GOS · Magia
-              </div>
-            </div>
-          </button>
+          <div className="rounded-xl border border-primary/10 bg-primary/[0.02] px-4 py-3">
+            <RichEditor
+              key={ensayoEnergias.id}
+              value={ensayoEnergias.contenido || ""}
+              onChange={(value) => actualizarLocal(ensayoEnergias.id, "contenido", value)}
+              placeholder="Escribe aquí…"
+              minHeight={220}
+            />
+          </div>
         )}
       </div>
     </div>
@@ -245,7 +238,7 @@ export function MagiaPorTipo({
         ))}
       </div>
       <div className="flex-1 min-w-0">
-        <BloqueEnsayoEnergias onOpenEnsayo={onOpenEnsayo} />
+        <BloqueEnsayoEnergias />
         <BloqueSubsistemasMagia />
         {todasLasRunas && (
           <BloqueHerramientasRunas runas={todasLasRunas} />
