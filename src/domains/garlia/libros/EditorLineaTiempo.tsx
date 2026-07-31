@@ -31,6 +31,7 @@ import {
   Music,
   Plus,
   Trash2,
+  User,
   X,
 } from "lucide-react";
 import React, {
@@ -52,6 +53,7 @@ import { RichEditor } from "@/editor/lexical";
 
 import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
+import { useErasDelPersonaje } from "@/domains/garlia/personajes/useErasDelPersonaje";
 import {
   useCalendario,
   invalidarCacheEras,
@@ -78,7 +80,7 @@ type TimelineEvent = {
 };
 
 type MundoTimelineEvent = TimelineEvent & {
-  source: "mundo" | "reino" | "capitulo" | "cancion" | "cumpleanos";
+  source: "mundo" | "reino" | "capitulo" | "cancion" | "cumpleanos" | "era_personaje";
   reinoNombre?: string;
   reinoId?: string;
   yearNum: number; // dia_absoluto — para ordenar
@@ -97,6 +99,13 @@ type MundoTimelineEvent = TimelineEvent & {
     img_url: string | null;
     reino: string | null;
     fecha_nacimiento: number;
+  };
+  eraPersonajeData?: {
+    id: string;
+    personajeId: string;
+    personajeNombre: string;
+    rasgos: string[];
+    notas: string;
   };
 };
 
@@ -876,6 +885,7 @@ type CapTimeline = {
   dia_absoluto?: number; // nuevo campo del calendario
   libroTitulo?: string;
   reinos_ids?: string[];
+  personajes_ids?: string[];
 };
 
 // ── Carga reinos con historia completa (query dedicada, no el hook genérico) ──
@@ -1784,6 +1794,54 @@ function EventoDetallePanel({
             }}
           />
         </div>
+      ) : evt.source === "era_personaje" && evt.eraPersonajeData ? (
+        <div className="flex flex-col gap-2">
+          {evt.eraPersonajeData.rasgos.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {evt.eraPersonajeData.rasgos.map((r) => (
+                <span
+                  key={r}
+                  className="px-1.5 py-0.5 rounded-full text-micro font-bold"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--primary) 6%, transparent)",
+                    color:
+                      "color-mix(in srgb, var(--primary) 55%, transparent)",
+                  }}
+                >
+                  {r}
+                </span>
+              ))}
+            </div>
+          )}
+          {evt.eraPersonajeData.notas ? (
+            <p
+              className="text-micro leading-relaxed"
+              style={{
+                color: "color-mix(in srgb, var(--primary) 65%, transparent)",
+              }}
+            >
+              {evt.eraPersonajeData.notas}
+            </p>
+          ) : (
+            <p
+              className="text-micro italic"
+              style={{
+                color: "color-mix(in srgb, var(--primary) 20%, transparent)",
+              }}
+            >
+              Sin notas.
+            </p>
+          )}
+          <p
+            className="text-micro italic"
+            style={{
+              color: "color-mix(in srgb, var(--primary) 25%, transparent)",
+            }}
+          >
+            Editable desde la ficha de {evt.eraPersonajeData.personajeNombre}.
+          </p>
+        </div>
       ) : evt.description ? (
         <p
           className="text-micro leading-relaxed"
@@ -1817,6 +1875,8 @@ function iconoPorSource(source: MundoTimelineEvent["source"]) {
       return Music;
     case "cumpleanos":
       return CalendarDays;
+    case "era_personaje":
+      return User;
     default:
       return Clock;
   }
@@ -2585,6 +2645,239 @@ function EraDropdown({
   );
 }
 
+// ─── PersonajeFilterDropdown ─────────────────────────────────────────────────
+// Selector de personaje para la línea de tiempo: mismo patrón visual que
+// EraDropdown (trigger + panel portal), con búsqueda porque la lista de
+// personajes puede ser larga. Al elegir un personaje, el panel muestra
+// además sus eras internas (personaje_eras) y acota capítulos/canciones/
+// cumpleaños a los vinculados a ese personaje — ver allEvents en
+// PanelHistoriaMundo.
+function PersonajeFilterDropdown({
+  personajes,
+  value,
+  onChange,
+}: {
+  personajes: { id: string; nombre: string; img_url: string | null }[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+
+  const activo = personajes.find((p) => p.id === value) ?? null;
+
+  const filtrados = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return personajes;
+    return personajes.filter((p) => p.nombre.toLowerCase().includes(q));
+  }, [personajes, query]);
+
+  // Cerrar al click fuera
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Posicionar contra el trigger — mismo patrón que EraDropdown.
+  useEffect(() => {
+    if (!open || !triggerRef.current) {
+      setPos(null);
+      return;
+    }
+    const update = () => {
+      if (!triggerRef.current) return;
+      const r = triggerRef.current.getBoundingClientRect();
+      const w = Math.max(r.width, 220);
+      let left = r.left;
+      if (left + w > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - w - 8);
+      }
+      setPos({ top: r.bottom + 4, left, width: w });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, personajes.length]);
+
+  return (
+    <div className="relative">
+      {/* Trigger */}
+      <button
+        ref={triggerRef}
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest transition-all max-w-[140px]"
+        style={{
+          background:
+            open || value
+              ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+              : "color-mix(in srgb, var(--primary) 4%, transparent)",
+          border: `1px solid color-mix(in srgb, var(--primary) ${open || value ? "20" : "8"}%, transparent)`,
+          color:
+            open || value
+              ? "var(--primary)"
+              : "color-mix(in srgb, var(--primary) 40%, transparent)",
+        }}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <User size={8} className="shrink-0" />
+        <span className="truncate">{activo ? activo.nombre : "Personaje"}</span>
+        <ChevronDown
+          className="shrink-0"
+          size={7}
+          style={{
+            transform: open ? "rotate(180deg)" : undefined,
+            transition: "transform 0.15s",
+          }}
+        />
+      </button>
+
+      {/* Panel — portal para no quedar cortado */}
+      {open &&
+        pos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[9999] rounded-xl border shadow-lg overflow-hidden flex flex-col"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              minWidth: pos.width,
+              maxHeight: 320,
+              background: "var(--bg-main)",
+              borderColor:
+                "color-mix(in srgb, var(--primary) 12%, transparent)",
+            }}
+          >
+            {/* Buscador */}
+            <div
+              className="px-2 py-1.5 border-b"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 8%, transparent)",
+              }}
+            >
+              <input
+                autoFocus
+                className="w-full bg-transparent outline-none text-micro px-1 py-1"
+                placeholder="Buscar personaje…"
+                style={{ color: "var(--primary)" }}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="overflow-y-auto py-1">
+              {/* Opción "Todos" */}
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
+                style={{
+                  color:
+                    value === null
+                      ? "var(--primary)"
+                      : "color-mix(in srgb, var(--primary) 45%, transparent)",
+                  background:
+                    value === null
+                      ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                      : "transparent",
+                  fontSize: "8px",
+                  fontWeight: 900,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                }}
+                type="button"
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                  setQuery("");
+                }}
+              >
+                {value === null && <Check className="shrink-0" size={8} />}
+                <span className={value === null ? "" : "pl-4"}>
+                  Todos los personajes
+                </span>
+              </button>
+
+              <div
+                style={{
+                  height: 1,
+                  margin: "2px 8px",
+                  background:
+                    "color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+              />
+
+              {filtrados.length === 0 ? (
+                <p className="px-3 py-2 text-micro text-primary/25">
+                  Sin resultados
+                </p>
+              ) : (
+                filtrados.map((p) => {
+                  const activoOpt = value === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
+                      style={{
+                        color: activoOpt
+                          ? "var(--primary)"
+                          : "color-mix(in srgb, var(--primary) 45%, transparent)",
+                        background: activoOpt
+                          ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                          : "transparent",
+                        fontSize: "8px",
+                        fontWeight: 900,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                      }}
+                      type="button"
+                      onClick={() => {
+                        onChange(activoOpt ? null : p.id);
+                        setOpen(false);
+                        setQuery("");
+                      }}
+                    >
+                      {activoOpt ? (
+                        <Check className="shrink-0" size={8} />
+                      ) : (
+                        <span
+                          style={{
+                            width: 8,
+                            display: "inline-block",
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <span className="truncate">{p.nombre}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
 // ── Panel principal — vista y edición unificadas, ambas pistas editables ──────
 export function PanelHistoriaMundo({
   texto: _texto,
@@ -2640,6 +2933,7 @@ export function PanelHistoriaMundo({
       reinoNombre?: string | null;
       dia_absoluto?: number;
       orden_linea_tiempo?: number;
+      personajeId?: string | null;
     }[]
   >([]);
 
@@ -2756,6 +3050,7 @@ export function PanelHistoriaMundo({
                 reinoId: c.reino_id ?? null,
                 reinoNombre: c.reino_id ? (reinoMap[c.reino_id] ?? null) : null,
                 dia_absoluto: c.dia_absoluto,
+                personajeId: c.personaje_id ?? null,
               })),
             );
           }
@@ -2767,7 +3062,7 @@ export function PanelHistoriaMundo({
         const { data } = await supabase
           .from("canciones")
           .select(
-            "id, titulo, cantante, dia_absoluto, reino_id, reinos!reino_id(nombre)",
+            "id, titulo, cantante, dia_absoluto, reino_id, personaje_id, reinos!reino_id(nombre)",
           )
           .not("dia_absoluto", "is", null);
         if (!data?.length || cancelled) return;
@@ -2782,6 +3077,7 @@ export function PanelHistoriaMundo({
               reinoNombre: reino?.nombre ?? null,
               dia_absoluto: c.dia_absoluto ?? undefined,
               orden_linea_tiempo: c.orden_linea_tiempo ?? undefined,
+              personajeId: c.personaje_id ?? null,
             };
           }),
         );
@@ -2827,6 +3123,7 @@ export function PanelHistoriaMundo({
                 dia_absoluto: c.dia_absoluto,
                 libroTitulo: libroMapLocal[c.libro_id] ?? "",
                 reinos_ids: c.reinos_ids ?? [],
+                personajes_ids: c.personajes_ids ?? [],
               })),
             );
           }
@@ -2849,7 +3146,7 @@ export function PanelHistoriaMundo({
           supabase
             .from("capitulos")
             .select(
-              "id, libro_id, titulo_capitulo, dia_absoluto, orden_linea_tiempo, reinos_ids",
+              "id, libro_id, titulo_capitulo, dia_absoluto, orden_linea_tiempo, reinos_ids, personajes_ids",
             )
             .not("dia_absoluto", "is", null),
           supabase
@@ -2917,6 +3214,7 @@ export function PanelHistoriaMundo({
                 dia_absoluto: c.dia_absoluto,
                 libroTitulo: libroMap[c.libro_id] ?? "",
                 reinos_ids: c.reinos_ids ?? [],
+                personajes_ids: c.personajes_ids ?? [],
               })),
             );
             // Persistir capítulos en Dexie para la próxima carga offline
@@ -3018,6 +3316,19 @@ export function PanelHistoriaMundo({
     reinoFijo ?? initialFilterReino ?? null,
   );
   const [filterEra, setFilterEra] = useState<string | null>(null);
+  // Personaje seleccionado en el filtro — al elegirlo se muestran también
+  // sus eras internas (personaje_eras) mezcladas en la línea de tiempo,
+  // y el resto de eventos (capítulos, canciones, cumpleaños) se acota a
+  // los que están vinculados a ese personaje.
+  const [filterPersonaje, setFilterPersonaje] = useState<string | null>(null);
+  const personajeSeleccionado = useMemo(
+    () => personajesCumple.find((p) => p.id === filterPersonaje) ?? null,
+    [personajesCumple, filterPersonaje],
+  );
+  const { eras: erasPersonaje } = useErasDelPersonaje(
+    filterPersonaje ?? "",
+    personajeSeleccionado?.fecha_nacimiento ?? null,
+  );
 
   // Si reinoFijo cambia en tiempo de ejecución (cambio de reino sin desmontar),
   // sincronizamos el filtro.
@@ -3192,6 +3503,11 @@ export function PanelHistoriaMundo({
       for (const cap of capsTimeline) {
         if (filterReino && !(cap.reinos_ids ?? []).includes(filterReino))
           continue;
+        if (
+          filterPersonaje &&
+          !(cap.personajes_ids ?? []).includes(filterPersonaje)
+        )
+          continue;
         const dia = diaOverrides[cap.id] ?? cap.dia_absoluto;
         if (dia == null) continue; // sin fecha del calendario → no aparece
         if (filterEra && cal) {
@@ -3213,7 +3529,7 @@ export function PanelHistoriaMundo({
       }
     }
     // Eventos de mundo/reino — tabla eventos_mundo (sistema nuevo)
-    if (showEventos) {
+    if (showEventos && !filterPersonaje) {
       for (const e of eventosMundo) {
         if (filterReino && e.reinoId !== filterReino) continue;
         const dia = e.dia_absoluto;
@@ -3241,6 +3557,7 @@ export function PanelHistoriaMundo({
     if (showCanciones) {
       for (const c of cancionesTimeline) {
         if (filterReino && c.reinoId !== filterReino) continue;
+        if (filterPersonaje && c.personajeId !== filterPersonaje) continue;
         const dia = diaOverrides[c.id] ?? c.dia_absoluto;
         if (dia == null) continue; // sin fecha del calendario → no aparece
         if (filterEra && cal) {
@@ -3275,6 +3592,7 @@ export function PanelHistoriaMundo({
           p.reino !== reinos.find((r) => r.id === filterReino)?.nombre
         )
           continue;
+        if (filterPersonaje && p.id !== filterPersonaje) continue;
         const dia = p.fecha_nacimiento;
         if (filterEra && cal) {
           const fechaCumple = diaAbsolutoAFecha(
@@ -3298,6 +3616,31 @@ export function PanelHistoriaMundo({
         });
       }
     }
+    // Eras internas del personaje seleccionado — solo aparecen cuando hay
+    // un filtro de personaje activo (no tiene sentido mezclarlas con la
+    // línea de tiempo general del mundo, son momentos de la vida de UN
+    // personaje, no del mundo entero).
+    if (filterPersonaje && personajeSeleccionado) {
+      for (const era of erasPersonaje) {
+        list.push({
+          id: `era_personaje:${era.id}`,
+          year: String(era.momento),
+          title: era.label || `Era de ${personajeSeleccionado.nombre}`,
+          description: era.notas,
+          source: "era_personaje",
+          reinoNombre: personajeSeleccionado.nombre,
+          yearNum: era.momento,
+          dia_absoluto: era.momento,
+          eraPersonajeData: {
+            id: era.id,
+            personajeId: filterPersonaje,
+            personajeNombre: personajeSeleccionado.nombre,
+            rasgos: era.rasgos,
+            notas: era.notas,
+          },
+        });
+      }
+    }
     return list.sort((a, b) => {
       const diff = a.yearNum - b.yearNum;
       if (diff !== 0) return diff;
@@ -3307,12 +3650,16 @@ export function PanelHistoriaMundo({
         cancion: 2,
         capitulo: 3,
         cumpleanos: 4,
+        era_personaje: 5,
       };
       return (order[a.source] ?? 1) - (order[b.source] ?? 1);
     });
   }, [
     filterReino,
     filterEra,
+    filterPersonaje,
+    personajeSeleccionado,
+    erasPersonaje,
     cal,
     capsTimeline,
     cancionesTimeline,
@@ -3485,6 +3832,15 @@ export function PanelHistoriaMundo({
                 />
               );
             })()}
+
+          {/* ── Filtro por personaje ── */}
+          {personajesCumple.length > 0 && (
+            <PersonajeFilterDropdown
+              personajes={personajesCumple}
+              value={filterPersonaje}
+              onChange={setFilterPersonaje}
+            />
+          )}
 
           {/* ── Acciones (derecha) ── */}
           <div className="ml-auto flex items-center gap-1.5">
