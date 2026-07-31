@@ -22,7 +22,7 @@
  *   src/features/editorGarlia/components/magia/EditorCombinacionesRunas.tsx
  */
 
-import { ChevronDown, Layers, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
@@ -76,18 +76,19 @@ export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) 
   const editando = combinaciones.find((c) => c.id === editandoId) ?? null;
 
   return (
-    <div className="rounded-xl border border-primary/10 overflow-hidden">
+    <div className="rounded-lg border border-primary/10 overflow-hidden mb-6 last:mb-0">
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2.5 bg-primary/5 hover:bg-primary/8 transition-colors"
+        className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-3"
       >
-        <span className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.25em] text-primary/50">
-          <Layers size={12} /> Combinaciones (hechizos compuestos)
+        <span />
+        <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+          Combinaciones
         </span>
         <ChevronDown
           size={14}
-          className={`text-primary/30 transition-transform ${abierto ? "rotate-180" : ""}`}
+          className={`justify-self-end text-primary/30 transition-transform ${abierto ? "rotate-180" : ""}`}
         />
       </button>
 

@@ -16,8 +16,9 @@ import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStor
 import { RichEditor } from "@/editor/lexical";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
-import { BloqueHerramientasRunas } from "./BloqueHerramientasRunas";
+import { SubBloqueProbador } from "./BloqueHerramientasRunas";
 import { BloqueSubsistemasMagia } from "./BloqueSubsistemasMagia";
+import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
 import type { EntidadMagica } from "./types";
 
 interface EntidadMagicaMin {
@@ -68,21 +69,23 @@ function Bloque({
 }) {
   return (
     <div className="rounded-lg border border-primary/10 overflow-hidden mb-6 last:mb-0">
-      <div className="px-3 py-3 flex items-center gap-2">
-        <Icon size={9} className="shrink-0 text-primary/70" />
-        <span className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-3">
+        <span />
+        <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
           {label}
         </span>
-        {onCreate && (
+        {onCreate ? (
           <button
             type="button"
             onClick={onCreate}
             disabled={creating}
             title={`Añadir ${label.toLowerCase()}`}
-            className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50 shrink-0"
+            className="justify-self-end p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50 shrink-0"
           >
             <Plus size={9} className="text-primary/60" />
           </button>
+        ) : (
+          <span />
         )}
       </div>
       <div className="px-3 pb-3">
@@ -223,12 +226,15 @@ export function MagiaPorTipo({
             onOpen={onOpen}
           />
         ))}
+        {todasLasRunas && (
+          <EditorCombinacionesRunas runas={todasLasRunas} />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <BloqueEnsayoEnergias />
         <BloqueSubsistemasMagia />
         {todasLasRunas && (
-          <BloqueHerramientasRunas runas={todasLasRunas} />
+          <SubBloqueProbador runas={todasLasRunas} />
         )}
       </div>
     </div>

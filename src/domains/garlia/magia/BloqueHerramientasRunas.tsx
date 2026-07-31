@@ -21,7 +21,6 @@
  * que no se pasa runaActualId ni trazosActuales en memoria).
  */
 
-import { FlaskConical } from "lucide-react";
 import React from "react";
 
 import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
@@ -29,19 +28,20 @@ import { PanelTestReconocimiento } from "./PanelTestReconocimiento";
 import type { EntidadMagica } from "./types";
 
 // ─── Sub-bloque: probador de reconocimiento ────────────────────────────────
+// Mismo estilo que los bloques de Hechizos/Dones/Runas: sin icono, título
+// centrado.
 
-function SubBloqueProbador({ runas }: { runas: EntidadMagica[] }) {
+export function SubBloqueProbador({ runas }: { runas: EntidadMagica[] }) {
   return (
-    <div className="rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden mb-6 last:mb-0">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
+    <div className="rounded-lg border border-primary/10 overflow-hidden mb-6 last:mb-0">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-3">
         <span />
-        <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 flex items-center gap-1">
-          <FlaskConical size={9} className="shrink-0" />
+        <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
           Probador de Runas
         </span>
         <span />
       </div>
-      <div className="p-4">
+      <div className="px-3 pb-3">
         <PanelTestReconocimiento runas={runas} trazosActuales={[]} />
       </div>
     </div>
