@@ -255,73 +255,82 @@ export function MagiaJerarquica({
           ))}
         </div>
 
-        {totalSinCriatura > 0 && (
+        {(totalSinCriatura > 0 || criaturasVacias.length > 0) && (
           <div>
             <div className="h-px mb-3 bg-primary/10" />
-            <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
-            <div className="px-3 py-3 flex items-center gap-2">
-              <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
-                Sin criatura
-              </span>
-            </div>
-            <div className="px-3 pb-3">
-              {personajesSinCriatura.length === 0 ? (
-                <div className="text-micro text-primary/25">Sin personajes</div>
-              ) : (
-                <div
-                  className="grid gap-1"
-                  style={{
-                    gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))",
-                  }}
-                >
-                  {personajesSinCriatura.map((p) => (
-                    <EntityCard
-                      key={p.id}
-                      nombre={p.nombre}
-                      imageUrl={p.img_url}
-                      Icon={Users}
-                      onClick={() => onOpen("personajes", p.id)}
-                    />
-                  ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {/* Columna izquierda: Personajes sin criatura */}
+              {totalSinCriatura > 0 ? (
+                <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+                  <div className="px-3 py-3 flex items-center gap-2">
+                    <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+                      Sin criatura
+                    </span>
+                  </div>
+                  <div className="px-3 pb-3">
+                    {personajesSinCriatura.length === 0 ? (
+                      <div className="text-micro text-primary/25">Sin personajes</div>
+                    ) : (
+                      <div
+                        className="grid gap-1"
+                        style={{
+                          gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))",
+                        }}
+                      >
+                        {personajesSinCriatura.map((p) => (
+                          <EntityCard
+                            key={p.id}
+                            nombre={p.nombre}
+                            imageUrl={p.img_url}
+                            Icon={Users}
+                            onClick={() => onOpen("personajes", p.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {onCreatePersonaje && (
+                      <button
+                        type="button"
+                        onClick={() => onCreatePersonaje(null)}
+                        title="Añadir personaje"
+                        className="mt-2 p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors text-primary/60"
+                      >
+                        <Plus size={9} />
+                      </button>
+                    )}
+                  </div>
                 </div>
+              ) : (
+                <div />
               )}
-              {onCreatePersonaje && (
-                <button
-                  type="button"
-                  onClick={() => onCreatePersonaje(null)}
-                  title="Añadir personaje"
-                  className="mt-2 p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors text-primary/60"
-                >
-                  <Plus size={9} />
-                </button>
+
+              {/* Columna derecha: Criaturas sin personajes */}
+              {criaturasVacias.length > 0 ? (
+                <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+                  <div className="px-3 py-3 flex items-center gap-2">
+                    <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+                      Sin personajes asignados
+                    </span>
+                  </div>
+                  <div
+                    className="px-3 pb-3 grid gap-2"
+                    style={{
+                      gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                    }}
+                  >
+                    {criaturasVacias.map((criatura) => (
+                      <NodoCriatura
+                        key={criatura.id}
+                        fill
+                        label={criatura.nombre}
+                        onClick={() => onOpen("criaturas", criatura.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div />
               )}
-            </div>
-            </div>
-          </div>
-        )}
-        {criaturasVacias.length > 0 && (
-          <div>
-            <div className="flex items-center gap-3 mb-3 px-1">
-              <div className="h-px flex-1 bg-primary/10" />
-              <span className="text-micro font-black uppercase tracking-[0.25em] text-primary/40 shrink-0">
-                Sin personajes asignados
-              </span>
-              <div className="h-px flex-1 bg-primary/10" />
-            </div>
-            <div
-              className="grid gap-2"
-              style={{
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-              }}
-            >
-              {criaturasVacias.map((criatura) => (
-                <NodoCriatura
-                  key={criatura.id}
-                  fill
-                  label={criatura.nombre}
-                  onClick={() => onOpen("criaturas", criatura.id)}
-                />
-              ))}
             </div>
           </div>
         )}
