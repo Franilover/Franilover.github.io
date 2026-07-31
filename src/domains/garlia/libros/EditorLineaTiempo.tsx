@@ -1614,6 +1614,7 @@ function EventoDetallePanel({
   onDiaChange,
   onDiaChangeCancion,
   onDiaChangeCumpleanos,
+  onDiaChangeCapitulo,
   onClose,
   onLabelChangeEraPersonaje,
   onNotasChangeEraPersonaje,
@@ -1640,6 +1641,8 @@ function EventoDetallePanel({
   onDiaChangeCancion?: (id: string, dia: number) => void;
   /** Cambia la fecha de nacimiento de un personaje — tabla `personajes`. */
   onDiaChangeCumpleanos?: (id: string, dia: number) => void;
+  /** Cambia la fecha (dia_absoluto) de un capítulo — tabla `capitulos`. */
+  onDiaChangeCapitulo?: (id: string, dia: number) => void;
   onClose?: () => void;
   onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
   onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
@@ -1714,6 +1717,8 @@ function EventoDetallePanel({
       await onDiaChangeCancion?.(evt.cancionData.id, dia);
     } else if (evt.source === "cumpleanos" && evt.cumpleanosData) {
       await onDiaChangeCumpleanos?.(evt.cumpleanosData.id, dia);
+    } else if (evt.source === "capitulo" && evt.capData) {
+      await onDiaChangeCapitulo?.(evt.capData.id, dia);
     } else {
       await onDiaChange?.(evt.id, dia);
     }
@@ -1721,13 +1726,14 @@ function EventoDetallePanel({
   };
 
   // Fecha editable: eventos "mundo"/"reino", eras de personaje, y también
-  // canciones/cumpleaños (antes solo lectura) — ahora se pueden reprogramar
-  // desde este mismo panel flotante.
+  // canciones/cumpleaños/capítulos (antes solo lectura) — ahora se pueden
+  // reprogramar desde este mismo panel flotante.
   const fechaEditable =
     editable ||
     editableEraPersonaje ||
     evt.source === "cancion" ||
-    evt.source === "cumpleanos";
+    evt.source === "cumpleanos" ||
+    evt.source === "capitulo";
 
   // Handler de "Ir al…" — capítulo/libro, canción o cumpleaños (personaje).
   // Nunca se dispara solo, requiere click explícito en el botón.
@@ -1896,6 +1902,11 @@ function EventoDetallePanel({
               />
             )}
             <SelectorFechaMundo
+              autoOpen={
+                evt.source === "capitulo" ||
+                evt.source === "cancion" ||
+                evt.source === "cumpleanos"
+              }
               placeholder="Sin fecha…"
               value={evt.dia_absoluto ?? null}
               onChange={commitDia}
@@ -2083,6 +2094,7 @@ function ListaEventosConMinimapa({
   onDiaChange,
   onDiaChangeCancion,
   onDiaChangeCumpleanos,
+  onDiaChangeCapitulo,
   onSelectPersonaje,
   onSelectCapitulo,
   onSelectCancion,
@@ -2109,6 +2121,7 @@ function ListaEventosConMinimapa({
   onDiaChange?: (id: string, dia: number) => void;
   onDiaChangeCancion?: (id: string, dia: number) => void;
   onDiaChangeCumpleanos?: (id: string, dia: number) => void;
+  onDiaChangeCapitulo?: (id: string, dia: number) => void;
   onSelectPersonaje?: (id: string) => void;
   onSelectCapitulo?: (capituloId: string, libroId: string) => void;
   onSelectCancion?: (cancionId: string) => void;
@@ -2504,6 +2517,7 @@ function ListaEventosConMinimapa({
           onDiaChange={onDiaChange}
           onDiaChangeCancion={onDiaChangeCancion}
           onDiaChangeCumpleanos={onDiaChangeCumpleanos}
+          onDiaChangeCapitulo={onDiaChangeCapitulo}
           onFieldChange={onFieldChange}
           onLabelChangeEraPersonaje={onLabelChangeEraPersonaje}
           onMomentoChangeEraPersonaje={onMomentoChangeEraPersonaje}
@@ -2536,6 +2550,7 @@ function EventoDetalleFlotante({
   onDiaChange,
   onDiaChangeCancion,
   onDiaChangeCumpleanos,
+  onDiaChangeCapitulo,
   onClose,
   onLabelChangeEraPersonaje,
   onNotasChangeEraPersonaje,
@@ -2563,6 +2578,7 @@ function EventoDetalleFlotante({
   onDiaChange?: (id: string, dia: number) => void;
   onDiaChangeCancion?: (id: string, dia: number) => void;
   onDiaChangeCumpleanos?: (id: string, dia: number) => void;
+  onDiaChangeCapitulo?: (id: string, dia: number) => void;
   onClose: () => void;
   onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
   onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
@@ -2621,6 +2637,7 @@ function EventoDetalleFlotante({
           onDiaChange={onDiaChange}
           onDiaChangeCancion={onDiaChangeCancion}
           onDiaChangeCumpleanos={onDiaChangeCumpleanos}
+          onDiaChangeCapitulo={onDiaChangeCapitulo}
           onFieldChange={onFieldChange}
           onLabelChangeEraPersonaje={onLabelChangeEraPersonaje}
           onMomentoChangeEraPersonaje={onMomentoChangeEraPersonaje}
@@ -3212,6 +3229,7 @@ function SidebarItemDetalleFlotante({
             />
           )}
           <SelectorFechaMundo
+            autoOpen
             placeholder="Sin fecha…"
             value={dia}
             onChange={commitDia}
@@ -3310,7 +3328,7 @@ function SidebarCumpleanosCanciones({
             {cumpleanos.map((p) => (
               <button
                 key={p.id}
-                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-all"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-lg text-center transition-all"
                 style={{
                   background:
                     "color-mix(in srgb, var(--primary) 2%, transparent)",
@@ -3322,7 +3340,7 @@ function SidebarCumpleanosCanciones({
                 onClick={() => setSeleccionado({ tipo: "cumpleanos", id: p.id })}
               >
                 <span
-                  className="text-micro font-bold truncate flex-1"
+                  className="text-micro font-bold truncate w-full"
                   style={{
                     color: "color-mix(in srgb, var(--primary) 65%, transparent)",
                   }}
@@ -3330,7 +3348,7 @@ function SidebarCumpleanosCanciones({
                   {p.nombre}
                 </span>
                 <span
-                  className="text-micro font-black tabular-nums shrink-0"
+                  className="text-micro font-black tabular-nums"
                   style={{
                     color: "color-mix(in srgb, var(--primary) 30%, transparent)",
                   }}
@@ -3357,7 +3375,7 @@ function SidebarCumpleanosCanciones({
             {canciones.map((c) => (
               <button
                 key={c.id}
-                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-all"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-lg text-center transition-all"
                 style={{
                   background:
                     "color-mix(in srgb, var(--primary) 2%, transparent)",
@@ -3369,7 +3387,7 @@ function SidebarCumpleanosCanciones({
                 onClick={() => setSeleccionado({ tipo: "cancion", id: c.id })}
               >
                 <span
-                  className="text-micro font-bold truncate flex-1"
+                  className="text-micro font-bold truncate w-full"
                   style={{
                     color: "color-mix(in srgb, var(--primary) 65%, transparent)",
                   }}
@@ -3378,7 +3396,7 @@ function SidebarCumpleanosCanciones({
                 </span>
                 {c.dia_absoluto != null && (
                   <span
-                    className="text-micro font-black tabular-nums shrink-0"
+                    className="text-micro font-black tabular-nums"
                     style={{
                       color:
                         "color-mix(in srgb, var(--primary) 30%, transparent)",
@@ -3461,7 +3479,6 @@ export function PanelHistoriaMundo({
     reinos,
     setReinos: _setReinos,
     loading: loadingReinos,
-    recargar,
   } = useReinosConHistoria();
 
   // ── Capítulos con posición en línea de tiempo ─────────────────────────────
@@ -4046,6 +4063,33 @@ export function PanelHistoriaMundo({
     [],
   );
 
+  // Cambia la fecha (dia_absoluto) de un capítulo — tabla `capitulos`.
+  // Usado desde el panel flotante de detalle para reprogramar un capítulo
+  // sin tener que entrar al libro.
+  const handleCapituloDiaChange = useCallback(
+    async (id: string, dia: number) => {
+      setCapsTimeline((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, dia_absoluto: dia } : c)),
+      );
+      try {
+        await supabase
+          .from("capitulos")
+          .update({ dia_absoluto: dia } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).capitulos) {
+          const existing = await (db as any).capitulos.get(id);
+          await (db as any).capitulos.put({
+            ...(existing ?? { id }),
+            dia_absoluto: dia,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
   const handleEventoMundoFieldChange = useCallback(
     async (id: string, field: "titulo" | "descripcion", value: string) => {
       setEventosMundo((prev) =>
@@ -4543,41 +4587,6 @@ export function PanelHistoriaMundo({
               <Plus size={9} /> Evento
             </button>
 
-            {/* Recargar */}
-            <button
-              className="flex items-center justify-center transition-all rounded-lg"
-              style={{
-                width: 24,
-                height: 24,
-                border:
-                  "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
-                color: "color-mix(in srgb, var(--primary) 30%, transparent)",
-                background: "transparent",
-              }}
-              title="Recargar"
-              type="button"
-              onClick={() => recargar()}
-            >
-              {loadingReinos ? (
-                <Loader2 className="animate-spin" size={9} />
-              ) : (
-                <svg
-                  fill="none"
-                  height="9"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.5"
-                  viewBox="0 0 24 24"
-                  width="9"
-                >
-                  <path d="M21 2v6h-6" />
-                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-                  <path d="M3 22v-6h6" />
-                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-                </svg>
-              )}
-            </button>
           </div>
         </div>
       </div>
@@ -4655,6 +4664,7 @@ export function PanelHistoriaMundo({
               onDiaChange={handleEventoMundoDiaChange}
               onDiaChangeCancion={handleCancionDiaChange}
               onDiaChangeCumpleanos={handleCumpleanosDiaChange}
+              onDiaChangeCapitulo={handleCapituloDiaChange}
               onFieldChange={handleEventoMundoFieldChange}
               onLabelChangeEraPersonaje={changeLabelEraPersonaje}
               onMomentoChangeEraPersonaje={changeMomentoEraPersonaje}
