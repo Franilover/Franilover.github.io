@@ -34,7 +34,6 @@ import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 import { useFavoritos } from "@/domains/garlia/_shared/useFavoritosStore";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
-import { EnsayoGosScreen } from "@/domains/plataforma/puentes/EnsayoGosScreen";
 import { EnsayosGosWidget } from "@/domains/plataforma/puentes/EnsayosGosWidget";
 import { PAGE_TITLE_CLS } from "@/domains/garlia/_shared/types";
 
@@ -215,11 +214,7 @@ function FavoritosYRecientes() {
 }
 
 export function MundoHomeContent() {
-  const [ensayoAbiertoId, setEnsayoAbiertoId] = React.useState<string | null>(null);
-
-  if (ensayoAbiertoId) {
-    return <EnsayoGosScreen ensayoId={ensayoAbiertoId} onClose={() => setEnsayoAbiertoId(null)} />;
-  }
+  const openEntity = useMundoNavigation((s) => s.openEntity);
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -232,7 +227,7 @@ export function MundoHomeContent() {
         <ResumenWidget />
         <FavoritosYRecientes />
         <div className="mt-4">
-          <EnsayosGosWidget onOpen={setEnsayoAbiertoId} />
+          <EnsayosGosWidget onOpen={(id) => openEntity("notas-gos", id)} />
         </div>
       </div>
     </div>
