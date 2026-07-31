@@ -34,7 +34,10 @@ import { Plus, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "./EntityCard";
+import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "./GrupoFiltroDropdown";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
+
+export type GrupoPersonajeSubtipo = GrupoFiltroSubtipo;
 
 interface Reino {
   id: string;
@@ -63,6 +66,9 @@ interface Props {
   onCreateCiudad?: (reinoId: string | null) => void;
   onCreatePersonaje?: (ciudadId: string | null) => void;
   creatingReino?: boolean;
+  gruposPersonajesPorSubtipo?: GrupoPersonajeSubtipo[];
+  grupoSeleccionadoId?: string | null;
+  onSeleccionarGrupo?: (grupoId: string | null) => void;
 }
 
 function NodoTitulo({
@@ -126,6 +132,9 @@ export function GeografiaJerarquica({
   onCreateCiudad,
   onCreatePersonaje,
   creatingReino,
+  gruposPersonajesPorSubtipo,
+  grupoSeleccionadoId,
+  onSeleccionarGrupo,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -147,21 +156,31 @@ export function GeografiaJerarquica({
     );
   }
 
+  // Si hay un grupo de personajes seleccionado, se filtra la lista de
+  // personajes a solo sus miembros — el resto de la jerarquía (reinos,
+  // ciudades) se calcula normalmente sobre este subconjunto.
+  const grupoSeleccionado = grupoSeleccionadoId
+    ? gruposPersonajesPorSubtipo?.flatMap((b) => b.grupos).find((g) => g.id === grupoSeleccionadoId)
+    : null;
+  const personajesBase = grupoSeleccionado
+    ? personajes.filter((p) => grupoSeleccionado.miembro_ids.includes(p.id))
+    : personajes;
+
   const ciudadesDe = (reinoId: string) =>
     ciudades
       .filter((c) => c.reino_id === reinoId)
       .sort((a, b) => personajesDe(b.id).length - personajesDe(a.id).length);
   const personajesDe = (ciudadId: string) =>
-    personajes.filter((p) => p.ciudad_id === ciudadId);
+    personajesBase.filter((p) => p.ciudad_id === ciudadId);
 
   // Personajes sin ciudad_id, pero con un reino asignado directamente
   // (por nombre) se agrupan dentro de ese reino, bajo un slot "Sin Ciudad".
   const personajesSinCiudadDeReino = (reinoNombre: string) =>
-    personajes.filter((p) => !p.ciudad_id && p.reino === reinoNombre);
+    personajesBase.filter((p) => !p.ciudad_id && p.reino === reinoNombre);
 
   // Solo quedan huérfanos globales los que no tienen ni ciudad ni un reino
   // válido asociado.
-  const personajesSinCiudad = personajes.filter(
+  const personajesSinCiudad = personajesBase.filter(
     (p) => !p.ciudad_id && !reinos.some((r) => r.nombre === p.reino)
   );
 
@@ -373,7 +392,11 @@ export function GeografiaJerarquica({
   return (
     <div className="mb-8 last:mb-0">
       <div className="flex items-center gap-2 mb-4 px-1">
-        <div className="flex-1" />
+        <GrupoFiltroBarra
+          bloques={gruposPersonajesPorSubtipo}
+          grupoSeleccionadoId={grupoSeleccionadoId}
+          onSeleccionarGrupo={onSeleccionarGrupo}
+        />
         {onCreateReino && (
           <button
             type="button"

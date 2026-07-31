@@ -43,7 +43,8 @@ import { PersonajeEditor } from "@garlia/personajes";
 import { ReinoEditor } from "@garlia/reinos";
 import { CiudadEditor } from "@garlia/ciudades";
 import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
-import { GeografiaJerarquica } from "@/domains/garlia/_shared/GeografiaJerarquica";
+import { GeografiaJerarquica, type GrupoPersonajeSubtipo } from "@/domains/garlia/_shared/GeografiaJerarquica";
+import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import { MagiaJerarquica } from "@/domains/garlia/magia/MagiaJerarquica";
 import { MagiaPorTipo } from "@/domains/garlia/magia/MagiaPorTipo";
 import { TABLA_TO_SECTION } from "@/domains/garlia/_shared/useExternalCommandBridge";
@@ -182,6 +183,55 @@ export function EntidadesPage({ section, selectedId }: Props) {
     }
     return map;
   }, [gruposPorTipo]);
+
+  /** Agrupa los grupos de un tipo dado por subtipo — helper reusado para
+   *  los dropdowns de la barra superior de Personajes (Reinos), Criaturas
+   *  e Items. Los grupos sin subtipo caen en un bloque "Sin subtipo" al
+   *  final, igual que en Organización. */
+  const agruparPorSubtipo = (tipo: GrupoTipo): GrupoFiltroSubtipo[] => {
+    const lista = gruposPorTipo[tipo] ?? [];
+    const porSubtipo = new Map<string, typeof lista>();
+    const sinSubtipo: typeof lista = [];
+    for (const g of lista) {
+      if (g.subtipo && g.subtipo.trim()) {
+        const key = g.subtipo.trim();
+        if (!porSubtipo.has(key)) porSubtipo.set(key, []);
+        porSubtipo.get(key)!.push(g);
+      } else {
+        sinSubtipo.push(g);
+      }
+    }
+    const bloques: GrupoFiltroSubtipo[] = Array.from(porSubtipo.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([subtipo, items]) => ({
+        subtipo,
+        grupos: items.map((g) => ({ id: g.id, nombre: g.nombre, miembro_ids: g.miembro_ids })),
+      }));
+    if (sinSubtipo.length) {
+      bloques.push({
+        subtipo: null,
+        grupos: sinSubtipo.map((g) => ({ id: g.id, nombre: g.nombre, miembro_ids: g.miembro_ids })),
+      });
+    }
+    return bloques;
+  };
+
+  const gruposPersonajesPorSubtipo: GrupoPersonajeSubtipo[] = useMemo(
+    () => agruparPorSubtipo("personajes"),
+    [gruposPorTipo],
+  );
+  const gruposCriaturasPorSubtipo: GrupoFiltroSubtipo[] = useMemo(
+    () => agruparPorSubtipo("criaturas"),
+    [gruposPorTipo],
+  );
+  const gruposItemsPorSubtipo: GrupoFiltroSubtipo[] = useMemo(
+    () => agruparPorSubtipo("items"),
+    [gruposPorTipo],
+  );
+
+  const [grupoPersonajeSeleccionadoId, setGrupoPersonajeSeleccionadoId] = useState<string | null>(null);
+  const [grupoCriaturaSeleccionadoId, setGrupoCriaturaSeleccionadoId] = useState<string | null>(null);
+  const [grupoItemSeleccionadoId, setGrupoItemSeleccionadoId] = useState<string | null>(null);
 
   // ── Canciones ─────────────────────────────────────────────────────────
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
@@ -561,6 +611,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
           criaturas={criaturas}
           personajes={personajes}
           loading={loadingC || loadingP}
+          gruposCriaturasPorSubtipo={gruposCriaturasPorSubtipo}
+          grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
+          onSeleccionarGrupo={setGrupoCriaturaSeleccionadoId}
           onCreateCriatura={async () => {
             const { data } = await addCriatura({ nombre: "Nueva criatura" });
             if (data?.id) openEntity("criaturas", data.id);
@@ -580,15 +633,29 @@ export function EntidadesPage({ section, selectedId }: Props) {
 
   // ── Items ────────────────────────────────────────────────────────
   // Sección propia de la navbar (antes vivía adentro de Criaturas).
-  // Grid simple de items sin agrupación.
+  // Grid simple de items sin agrupación, con dropdowns de filtro por grupo.
   if (section === "items") {
+    const grupoItemSeleccionado = grupoItemSeleccionadoId
+      ? gruposItemsPorSubtipo.flatMap((b) => b.grupos).find((g) => g.id === grupoItemSeleccionadoId)
+      : null;
+    const itemsFiltrados = grupoItemSeleccionado
+      ? items.filter((i) => grupoItemSeleccionado.miembro_ids.includes(i.id))
+      : items;
+
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        <div className="flex items-center gap-2 mb-3 px-1">
+          <GrupoFiltroBarra
+            bloques={gruposItemsPorSubtipo}
+            grupoSeleccionadoId={grupoItemSeleccionadoId}
+            onSeleccionarGrupo={setGrupoItemSeleccionadoId}
+          />
+        </div>
         <EntityCardGrid
           title="Items"
           variant="grid"
           loading={loadingI}
-          items={items.map((i) => ({
+          items={itemsFiltrados.map((i) => ({
             id: i.id,
             nombre: i.nombre,
             imageUrl: i.imagen_url || undefined,
@@ -734,6 +801,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
         personajes={personajes}
         loading={loadingR || loadingCd || loadingP}
         onOpen={(section, id) => openEntity(section, id)}
+        gruposPersonajesPorSubtipo={gruposPersonajesPorSubtipo}
+        grupoSeleccionadoId={grupoPersonajeSeleccionadoId}
+        onSeleccionarGrupo={setGrupoPersonajeSeleccionadoId}
         onCreateReino={async () => {
           const { data } = await addReino({ nombre: "Nuevo reino" });
           if (data?.id) openEntity("reinos", data.id);

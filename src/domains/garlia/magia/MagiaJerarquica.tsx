@@ -30,6 +30,7 @@ import { Plus, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
+import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 interface Criatura {
@@ -52,6 +53,11 @@ interface Props {
   onCreateCriatura?: () => void;
   onCreatePersonaje?: (criatura: Criatura | null) => void;
   creatingCriatura?: boolean;
+  /** Grupos de tipo "criaturas" agrupados por subtipo, para los dropdowns
+   *  de la barra superior — filtran qué criaturas se muestran. */
+  gruposCriaturasPorSubtipo?: GrupoFiltroSubtipo[];
+  grupoSeleccionadoId?: string | null;
+  onSeleccionarGrupo?: (grupoId: string | null) => void;
 }
 
 function NodoCriatura({
@@ -99,6 +105,9 @@ export function MagiaJerarquica({
   onCreateCriatura,
   onCreatePersonaje,
   creatingCriatura,
+  gruposCriaturasPorSubtipo,
+  grupoSeleccionadoId,
+  onSeleccionarGrupo,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -118,13 +127,23 @@ export function MagiaJerarquica({
     return <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>;
   }
 
+  // Si hay un grupo de criaturas seleccionado, se filtra la lista de
+  // criaturas a solo sus miembros — personajes y el resto de la jerarquía
+  // se calculan normalmente sobre ese subconjunto.
+  const grupoSeleccionado = grupoSeleccionadoId
+    ? gruposCriaturasPorSubtipo?.flatMap((b) => b.grupos).find((g) => g.id === grupoSeleccionadoId)
+    : null;
+  const criaturasBase = grupoSeleccionado
+    ? criaturas.filter((c) => grupoSeleccionado.miembro_ids.includes(c.id))
+    : criaturas;
+
   const personajesDe = (criaturaNombre: string) =>
     personajes.filter((p) => p.especie === criaturaNombre);
 
   const totalDe = (criatura: Criatura) =>
     personajesDe(criatura.nombre).length;
 
-  const criaturasOrdenadas = [...criaturas].sort((a, b) => totalDe(b) - totalDe(a));
+  const criaturasOrdenadas = [...criaturasBase].sort((a, b) => totalDe(b) - totalDe(a));
   const criaturasConVinculosBase = criaturasOrdenadas.filter((c) => totalDe(c) > 0);
   const criaturasVacias = criaturasOrdenadas.filter((c) => totalDe(c) === 0);
 
@@ -171,7 +190,7 @@ export function MagiaJerarquica({
   }
   const columnasCriaturas = distribuirEnColumnas(criaturasConVinculosBase);
 
-  const criaturasNombres = new Set(criaturas.map((c) => c.nombre));
+  const criaturasNombres = new Set(criaturasBase.map((c) => c.nombre));
   const personajesSinCriatura = personajes.filter(
     (p) => !p.especie || !criaturasNombres.has(p.especie)
   );
@@ -180,7 +199,11 @@ export function MagiaJerarquica({
   return (
     <div className="mb-8 last:mb-0">
       <div className="flex items-center gap-2 mb-4 px-1">
-        <div className="flex-1" />
+        <GrupoFiltroBarra
+          bloques={gruposCriaturasPorSubtipo}
+          grupoSeleccionadoId={grupoSeleccionadoId}
+          onSeleccionarGrupo={onSeleccionarGrupo}
+        />
         {onCreateCriatura && (
           <button
             type="button"
