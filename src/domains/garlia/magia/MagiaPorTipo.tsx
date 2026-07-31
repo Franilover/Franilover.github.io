@@ -67,28 +67,25 @@ function Bloque({
   creating?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden mb-6 last:mb-0">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-1.5 bg-primary/10 border-b border-primary/10">
-        <span />
-        <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 flex items-center gap-1">
-          <Icon size={9} className="shrink-0" />
+    <div className="rounded-lg border border-primary/10 overflow-hidden mb-6 last:mb-0">
+      <div className="px-3 py-3 flex items-center gap-2">
+        <Icon size={9} className="shrink-0 text-primary/70" />
+        <span className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
           {label}
         </span>
-        <div className="justify-self-end">
-          {onCreate && (
-            <button
-              type="button"
-              onClick={onCreate}
-              disabled={creating}
-              title={`Añadir ${label.toLowerCase()}`}
-              className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50"
-            >
-              <Plus size={9} className="text-primary/60" />
-            </button>
-          )}
-        </div>
+        {onCreate && (
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={creating}
+            title={`Añadir ${label.toLowerCase()}`}
+            className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50 shrink-0"
+          >
+            <Plus size={9} className="text-primary/60" />
+          </button>
+        )}
       </div>
-      <div className="p-4">
+      <div className="px-3 pb-3">
         {entidades.length === 0 ? (
           <div className="w-full py-6 text-xs text-primary/25 text-center">
             Sin {label.toLowerCase()} todavía
