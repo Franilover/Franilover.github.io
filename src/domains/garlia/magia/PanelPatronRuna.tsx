@@ -38,11 +38,7 @@ import {
 import React, { useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
-import {
-  normalizarTrazo,
-  suavizarTrazo,
-  type Punto,
-} from "./dollarOneRecognizer";
+import { suavizarTrazo, type Punto } from "./dollarOneRecognizer";
 import { trazoAPathSvg, TRAZO_THUMBNAIL_VIEWBOX } from "./trazoThumbnail";
 
 export function PanelPatronRuna({
@@ -111,7 +107,7 @@ export function PanelPatronRuna({
           height={220}
           mostrarHerramientas
           resetSignal={resetSignal}
-          trazoFantasma={trazoFantasma ? normalizarTrazo(trazoFantasma) : null}
+          trazoFantasma={trazoFantasma ?? null}
           onTrazoCompleto={agregarTrazo}
         />
 
