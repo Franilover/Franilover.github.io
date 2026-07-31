@@ -18,7 +18,6 @@
  *   src/features/editorGarlia/components/magia/PanelTestReconocimiento.tsx
  */
 
-import { FlaskConical } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
@@ -67,14 +66,6 @@ export function PanelTestReconocimiento({
 
   return (
     <div className="space-y-2">
-      <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35 flex items-center gap-1.5">
-        <FlaskConical size={11} /> Probar reconocimiento
-      </label>
-      <p className="text-micro text-primary/30 leading-relaxed">
-        Dibujá acá para ver contra qué runa matchea el reconocedor — útil
-        para detectar confusiones entre runas parecidas antes de guardar.
-      </p>
-
       {patrones.length === 0 ? (
         <p className="text-micro text-primary/25 py-3 text-center">
           Todavía no hay ningún patrón guardado para comparar.

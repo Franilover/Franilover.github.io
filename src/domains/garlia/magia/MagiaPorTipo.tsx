@@ -234,15 +234,15 @@ export function MagiaPorTipo({
             onOpen={onOpen}
           />
         ))}
+        <BloqueSubsistemasMagia />
         {todasLasRunas && (
-          <EditorCombinacionesRunas runas={todasLasRunas} />
+          <SubBloqueProbador runas={todasLasRunas} />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <BloqueEnsayoEnergias />
-        <BloqueSubsistemasMagia />
         {todasLasRunas && (
-          <SubBloqueProbador runas={todasLasRunas} />
+          <EditorCombinacionesRunas runas={todasLasRunas} />
         )}
       </div>
     </div>

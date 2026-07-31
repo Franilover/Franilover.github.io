@@ -94,12 +94,6 @@ export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) 
 
       {abierto && (
         <div className="p-3 border-t border-primary/10 space-y-3">
-          <p className="text-micro text-primary/30 leading-relaxed">
-            Definí qué combinación exacta de runas por celda del tablero
-            produce un resultado especial. Independiente de esta runa en
-            particular — cualquier runa puede formar parte de una combinación.
-          </p>
-
           {loading && (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="animate-spin text-primary/20" size={18} />
