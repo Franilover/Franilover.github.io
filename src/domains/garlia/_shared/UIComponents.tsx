@@ -58,7 +58,7 @@ export function CampoArea({ label, value, onChange, placeholder, rows = 4 }: {
   return (
     <div className="space-y-1.5">
       <label className={LABEL_CLS}>{label}</label>
-      <RichEditor minHeight={`${rows * 1.6}rem`} mode="split" placeholder={placeholder} value={value} onChange={handleChange} onWikilinkNavigate={onWikilink} />
+      <RichEditor minHeight={`${rows * 1.6}rem`} placeholder={placeholder} value={value} onChange={handleChange} onWikilinkNavigate={onWikilink} />
     </div>
   );
 }

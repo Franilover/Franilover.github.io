@@ -632,17 +632,6 @@ const PanelEditor = ({
     setPalette((prev) => (prev ? null : prev));
   }, []);
 
-  // Preview de RichEditor: usa ContenidoInteractivo, el MISMO componente
-  // que el lector real (CapituloScrollBlock), para que "Preview"/"Split"
-  // muestre [[drop|...]], [[choice|...]], etc. ya resueltos en vez del
-  // raw literal (antes usaba renderMarkdown, que no entiende ese formato).
-  // onNavigate es no-op: dentro del editor no tiene sentido saltar de
-  // capítulo/sección al hacer click en un choice/use del preview.
-  const renderChapterPreview = useCallback(
-    (raw: string) => <ContenidoInteractivo texto={raw} onNavigate={() => {}} />,
-    [],
-  );
-
   // Helper: convierte payload de un nodo editado → raw [[kind|...]]
   // para pasárselo a SnippetCommandPalette como initialRaw
   const snippetPayloadToRaw = useCallback(
@@ -1350,9 +1339,7 @@ const PanelEditor = ({
                     formatCommandRef={formatCommandRef}
                     insertRef={mdInsertRef}
                     minHeight={focusMode ? "30rem" : "20rem"}
-                    mode={focusMode ? "split" : "edit"}
                     placeholder="Empieza a escribir…"
-                    renderPreview={renderChapterPreview}
                     value={contenido}
                     onChange={onChange}
                     onClosePalette={handleClosePalette}

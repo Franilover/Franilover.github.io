@@ -251,9 +251,7 @@ export function FormularioMagico({
                 </label>
                 <RichEditor
                   minHeight="20rem"
-                  mode="edit"
                   placeholder={cfg.placeholder}
-                  showSplitMode={false}
                   value={form.explicacion ?? ""}
                   onChange={(v) => setForm((f) => ({ ...f, explicacion: v }))}
                   onWikilinkNavigate={onWikilink}
@@ -298,9 +296,7 @@ export function FormularioMagico({
                 </label>
                 <RichEditor
                   minHeight="17.5rem"
-                  mode="edit"
                   placeholder={cfg.placeholder}
-                  showSplitMode={false}
                   value={form.explicacion ?? ""}
                   onChange={(v) => setForm((f) => ({ ...f, explicacion: v }))}
                   onWikilinkNavigate={onWikilink}

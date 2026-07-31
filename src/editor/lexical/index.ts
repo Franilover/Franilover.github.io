@@ -9,9 +9,10 @@
 export { RichEditor } from "./RichEditor";
 export type {
   RichEditorProps,
-  ViewMode,
   RichEditorFormatCommand,
 } from "./RichEditor";
+export { PlainMarkdownPreview } from "./PlainMarkdownPreview";
+export type { PlainMarkdownPreviewProps } from "./PlainMarkdownPreview";
 
 // Nodos (útiles si necesitas crear/inspeccionar nodos fuera del editor)
 export {

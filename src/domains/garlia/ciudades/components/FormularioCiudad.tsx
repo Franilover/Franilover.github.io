@@ -287,9 +287,7 @@ export function FormularioCiudad({
                 </label>
                 <RichEditor
                   minHeight="8rem"
-                  mode="edit"
                   placeholder="Aspecto, atmósfera, primeras impresiones…"
-                  showSplitMode={false}
                   value={form.descripcion ?? ""}
                   wikiEntities={entities}
                   onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
@@ -307,9 +305,7 @@ export function FormularioCiudad({
               </label>
               <RichEditor
                 minHeight="10rem"
-                mode="edit"
                 placeholder="Origen, eventos importantes, eras pasadas…"
-                showSplitMode={false}
                 value={form.historia ?? ""}
                 wikiEntities={entities}
                 onChange={(v) => setForm((f) => ({ ...f, historia: v }))}
@@ -322,9 +318,7 @@ export function FormularioCiudad({
               </label>
               <RichEditor
                 minHeight="10rem"
-                mode="edit"
                 placeholder="Lo que pocos saben, pasajes ocultos, maldiciones…"
-                showSplitMode={false}
                 value={form.secretos ?? ""}
                 wikiEntities={entities}
                 onChange={(v) => setForm((f) => ({ ...f, secretos: v }))}

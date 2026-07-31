@@ -347,9 +347,7 @@ export function EditorCriatura({
               </label>
               <RichEditor
                 minHeight="8rem"
-                mode="edit"
                 placeholder="Aspecto físico general…"
-                showSplitMode={false}
                 value={form.descripcion ?? ""}
                 wikiEntities={entities}
                 onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}

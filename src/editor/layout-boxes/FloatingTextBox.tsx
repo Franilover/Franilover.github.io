@@ -252,9 +252,7 @@ export function FloatingTextBox({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <RichEditor
-          mode="edit"
           placeholder="escribí acá..."
-          showSplitMode={false}
           value={box.content}
           onChange={(value) => onChange({ content: value })}
         />

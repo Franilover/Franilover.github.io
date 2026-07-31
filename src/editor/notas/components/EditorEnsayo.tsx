@@ -317,16 +317,6 @@ export function Editor({
     />
   );
 
-  // ── RichEditor: modo inicial + wikiEntities ────────────────────────────────
-  // RichEditor no tiene "defaultMode" (no controlado) como el MarkdownEditor
-  // viejo — solo "mode" controlado. Replicamos el mismo comportamiento
-  // (arranca en edit/preview según editMode, pero el usuario puede
-  // cambiarlo libremente después) con un estado propio inicializado una
-  // sola vez.
-  const [richMode, setRichMode] = useState<"edit" | "preview" | "split">(
-    editMode ? "edit" : "preview",
-  );
-
   // Entidades para autocompletar [[Nota]] — mismo criterio que antes
   // (todos los otros ensayos, excluyendo el actual).
   const wikiEntities = useMemo(
@@ -336,13 +326,6 @@ export function Editor({
         .map((e: any) => ({ name: e.titulo as string, type: "nota" })),
     [ensayos, ensayo.id],
   );
-
-  // No pasamos renderPreview: sin esa prop, RichEditor cae a su fallback
-  // de renderMarkdown (markdown normal — headers, tablas, negrita, etc.)
-  // y YA resuelve el click en [[Nota]] vía onWikilinkNavigate. Es
-  // exactamente lo que necesita este editor de notas — nada de
-  // ContenidoInteractivo, que es solo para lectura de libro
-  // (drop/choice/gate).
 
   // ── Bloque del editor markdown reutilizable ───────────────────────────────
   const markdownBlock = (
@@ -361,13 +344,10 @@ export function Editor({
           />
         }
         formatCommandRef={formatCommandRef}
-        mode={richMode}
         placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"
-        showSplitMode={false}
         value={localContenido}
         wikiEntities={wikiEntities}
         onChange={handleContenidoChange}
-        onModeChange={setRichMode}
         onWikilinkNavigate={onNavigateToPage}
       />
       <AnimatePresence>

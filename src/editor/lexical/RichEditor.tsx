@@ -11,11 +11,10 @@
  *   - Mismo formato de guardado: [[drop|...]], [[sound|...]], etc.
  *     → parseContenido(), ContenidoInteractivo, SegmentRenderers: sin cambios
  *   - Markdown shortcuts preservados (**, *, #, ##, etc.)
- *   - Modo preview genérico vía prop `renderPreview` — cada consumidor
- *     decide cómo renderizar. EditorCapitulos pasa ContenidoInteractivo
- *     (mismo componente del lector real) para resolver [[drop|...]] y
- *     similares; sin esa prop, cae a un fallback local de markdown
- *     plano (sin dependencia de features/ ni de markdownRenderer.ts).
+ *   - Sin modo preview/split interno: RichEditor es solo edición. Para
+ *     mostrar texto ya escrito de solo lectura, usar PlainMarkdownPreview
+ *     (editor/lexical/PlainMarkdownPreview.tsx) o, si necesita resolver
+ *     snippets [[drop|...]] etc., ContenidoInteractivo directamente.
  *   - SnippetCommandPalette existente conectado sin cambios
  *
  * Props compatibles con las del MarkdownEditor anterior para simplificar
@@ -51,7 +50,7 @@ import {
 } from "lexical";
 import { $setBlocksType } from "@lexical/selection";
 import type { EditorState, LexicalEditor, LexicalNode } from "lexical";
-import { Edit3, Eye, Columns2, SpellCheck2, Download, FileText, Copy, Check } from "lucide-react";
+import { SpellCheck2, Download, FileText, Copy, Check } from "lucide-react";
 import React, {
   useCallback,
   useEffect,
@@ -107,8 +106,6 @@ import { WikilinkPlugin, type WikilinkMatch } from "./plugins/WikilinkPlugin";
 // Tipos
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ViewMode = "edit" | "preview" | "split";
-
 /**
  * Comandos de formato aplicables desde afuera del editor vía
  * formatCommandRef (ver RichEditorProps). Dos familias:
@@ -153,18 +150,6 @@ export interface RichEditorProps {
   placeholder?: string;
   minHeight?: number | string;
   maxHeight?: number | string;
-  /**
-   * Si se pasa `mode` SIN `onModeChange`, el toggle interno de RichEditor
-   * (Editar/Split/Preview) NO se renderiza — el padre controla el modo
-   * por su cuenta (ej. EditorCapitulos usa el botón "Modo foco" para
-   * alternar edit/split) y sin esto el toggle quedaba montado pero sin
-   * efecto real: clickearlo solo actualizaba un estado interno invisible,
-   * porque `mode` (prop) siempre ganaba sobre el estado interno.
-   * Si además pasás `onModeChange`, el toggle sí se muestra y queda
-   * sincronizado con tu estado externo (ver EditorEnsayo.tsx).
-   */
-  mode?: ViewMode;
-  onModeChange?: (mode: ViewMode) => void;
   autoFocus?: boolean;
   /**
    * false deshabilita la edición (ContentEditable no editable) sin ocultar
@@ -230,16 +215,6 @@ export interface RichEditorProps {
    */
   onWikilinkNavigate?: (target: string) => void;
   /**
-   * false oculta TODO el toggle de modo (Editar/Split/Vista previa) —
-   * pensado para editores de notas/ensayos donde el markdown ya se ve
-   * formateado en modo edición (bold, listas, headers reales, no texto
-   * crudo con asteriscos), así que ni Split ni Preview aportan nada
-   * distinto de Edit. Default true porque EditorCapitulos (con
-   * ContenidoInteractivo) sí lo necesita: preview ahí resuelve
-   * drop/choice/gate, visualmente muy distinto del raw.
-   */
-  showSplitMode?: boolean;
-  /**
    * Nodo extra para renderizar en la toolbar interna, justo a la derecha
    * del toggle de corrector ortográfico. Pensado para acciones del padre
    * que necesitan vivir visualmente "dentro" del editor en vez de en una
@@ -251,32 +226,9 @@ export interface RichEditorProps {
   /**
    * Nombre de archivo (sin extensión) usado por el botón de exportar
    * (.md / .pdf). Si no se pasa, cae a "documento". El botón de exportar
-   * se muestra siempre — usa directamente `value` (markdown crudo), así
-   * que no depende de renderPreview ni de nada más.
+   * se muestra siempre — usa directamente `value` (markdown crudo).
    */
   exportFileName?: string;
-  /**
-   * Cómo renderizar el panel de "Preview"/"Split". RichEditor es
-   * genérico — no todos los consumidores usan el formato [[kind|...]]
-   * de snippets (drop/choice/gate/etc). Por defecto usa un fallback
-   * local de markdown plano (bold/italic/code/wikilinks + soft-break
-   * vs blank-line), sin dependencias de features/.
-   *
-   * EditorCapitulos debe pasar una función que use ContenidoInteractivo
-   * (el mismo componente del lector real) para que el preview resuelva
-   * [[drop|...]], [[choice|...]], etc. correctamente — con el fallback
-   * genérico esos snippets se muestran como texto raw literal, porque
-   * ese fallback solo entiende markdown normal y wikilinks simples.
-   *
-   *   // En EditorCapitulos.tsx:
-   *   renderPreview={(raw) => (
-   *     <ContenidoInteractivo texto={raw} onNavigate={() => {}} />
-   *   )}
-   *
-   * Otros editores que solo necesiten markdown normal no pasan nada y
-   * siguen funcionando igual que siempre.
-   */
-  renderPreview?: (raw: string) => React.ReactNode;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -952,326 +904,6 @@ function ExportMenuButton({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Toggle de modo — icon-only, sin caja ni bordes (igual que el mobile toggle
-// de MarkdownEditor). Sin botones de formato: bold/italic/etc ya se aplican
-// con los shortcuts de markdown (**, *, #...) vía MarkdownShortcutPlugin.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ModeTogglePlugin({
-  mode,
-  onModeChange,
-}: {
-  mode: ViewMode;
-  onModeChange: (m: ViewMode) => void;
-}) {
-  const items: { m: ViewMode; Icon: typeof Edit3; title: string }[] = [
-    { m: "edit", Icon: Edit3, title: "Editar" },
-    { m: "split", Icon: Columns2, title: "Split" },
-    { m: "preview", Icon: Eye, title: "Vista previa" },
-  ];
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "flex-end",
-        alignItems: "center",
-        gap: 2,
-        padding: "3px 6px",
-        flexShrink: 0,
-      }}
-    >
-      {items.map(({ m, Icon, title }) => {
-        const isActive = mode === m;
-        return (
-          <button
-            key={m}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 22,
-              height: 20,
-              background: "transparent",
-              color: isActive
-                ? "color-mix(in srgb, var(--foreground) 60%, transparent)"
-                : "color-mix(in srgb, var(--foreground) 18%, transparent)",
-              border: "none",
-              cursor: "pointer",
-              transition: "color 0.1s",
-            }}
-            title={title}
-            type="button"
-            onClick={() => onModeChange(m)}
-          >
-            <Icon size={9} />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Fallback de preview genérico (sin dominio, sin features/)
-// ─────────────────────────────────────────────────────────────────────────────
-// RichEditor es UI genérica (editor/lexical/) y no debe
-// importar de features/ (mismo principio que ya documentaba MarkdownEditor.tsx:
-// "no debe conocer features/"). Por eso este fallback es local y chico, en vez
-// de reusar ContenidoInteractivo (que vive en features/garlia/).
-//
-// Mismo criterio que el resto del sistema (editor Lexical y
-// ContenidoInteractivo/TextoMarkdown): una línea en blanco separa párrafos
-// reales; un solo "\n" dentro de un bloque es un salto de línea suave (<br/>),
-// no un párrafo nuevo.
-function applyInlinePlainMarkdown(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(
-      /\[\[([^\]|#]+?)(?:\|([^\]]+))?\]\]/g,
-      (_, target: string, alias?: string) => {
-        const label = (alias?.trim() || target.trim()).replace(/"/g, "&quot;");
-        const safeTarget = target.trim().replace(/"/g, "&quot;");
-        return `<a class="wikilink" data-wikilink="${safeTarget}" href="javascript:void(0)" title="Ir a: ${safeTarget}">${label}</a>`;
-      },
-    )
-    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/~~(.+?)~~/g, "<del>$1</del>")
-    .replace(/==(.+?)==/g, '<mark class="md-mark">$1</mark>');
-}
-
-// Detecta "# ".."#### " al inicio de un bloque (1 a 4 "#", con espacio) —
-// mismo límite de niveles que expone MarkdownCommandPalette (H1-H4).
-// "#####"/"######" (h5/h6) caen al párrafo normal, igual que antes.
-const HEADING_LINE_RE = /^(#{1,4})\s+(.*)$/;
-
-const ACCENT = "var(--color-primary, #7c6af7)";
-
-// Cada nivel de heading tiene su propio lenguaje visual — no un único
-// patrón escalado por tamaño — para que la jerarquía se lea de un
-// vistazo. Replica en HTML/inline-styles exactamente lo que hace
-// theme.heading en initialConfig (más abajo en este archivo) para que
-// un heading se vea IGUAL en modo edición y en este fallback de preview.
-// No podemos compartir las clases Tailwind del theme de Lexical porque
-// ese objeto vive en otro componente (RichEditor no lo exporta), así que
-// se replica acá — cambiar un nivel implica tocar ambos lugares.
-function renderHeadingBlock(
-  level: 1 | 2 | 3 | 4,
-  text: string,
-  key: number,
-  prevLevel: 1 | 2 | 3 | 4 | null,
-) {
-  const html = applyInlinePlainMarkdown(text);
-
-  // H1 — "portada de sección": centrado, ancho acotado a 500px (mx-auto)
-  // para que títulos largos hagan wrap sin desalinear las líneas
-  // laterales; las líneas van a los costados vía posicionamiento
-  // absoluto dentro de un wrapper relative. Cada costado tiene DOS líneas
-  // (una principal + una fina debajo vía boxShadow) — replica en inline
-  // styles lo mismo que el theme.heading.h1 de Lexical hace con
-  // ::before/::after + box-shadow arbitrario de Tailwind.
-  if (level === 1) {
-    return (
-      <div
-        key={key}
-        style={{
-          position: "relative",
-          maxWidth: 500,
-          margin: "32px auto 24px",
-          padding: "0 20px",
-          textAlign: "center",
-        }}
-      >
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: 0,
-            width: 12,
-            height: 1,
-            transform: "translateY(-50%)",
-            background: "color-mix(in srgb, " + ACCENT + " 40%, transparent)",
-            boxShadow:
-              "0 4px 0 -0.5px color-mix(in srgb, " +
-              ACCENT +
-              " 25%, transparent)",
-          }}
-        />
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: "50%",
-            right: 0,
-            width: 12,
-            height: 1,
-            transform: "translateY(-50%)",
-            background: "color-mix(in srgb, " + ACCENT + " 40%, transparent)",
-            boxShadow:
-              "0 4px 0 -0.5px color-mix(in srgb, " +
-              ACCENT +
-              " 25%, transparent)",
-          }}
-        />
-        <span
-          style={{
-            fontSize: "1.75rem",
-            fontWeight: 700,
-            letterSpacing: "-0.02em",
-            lineHeight: 1.25,
-            display: "inline",
-          }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </div>
-    );
-  }
-
-  // H2 — línea horizontal completa debajo del título.
-  if (level === 2) {
-    return (
-      <div
-        key={key}
-        style={{
-          margin: "24px 0 16px",
-          paddingBottom: 8,
-          borderBottom:
-            "1px solid color-mix(in srgb, " + ACCENT + " 25%, transparent)",
-        }}
-      >
-        <span
-          style={{
-            fontSize: "1.25rem",
-            fontWeight: 600,
-            lineHeight: 1.3,
-            display: "block",
-          }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </div>
-    );
-  }
-
-  // H3 — barra vertical de acento corta al costado del texto.
-  // Si viene inmediatamente después de un H2 (prevLevel === 2), quitamos
-  // el margen superior — mismo criterio que "[h2+&]:mt-0" en el theme de
-  // Lexical — para que la barra vertical del H3 quede pegada al borde
-  // inferior del H2 de arriba, como un solo trazo en L.
-  if (level === 3) {
-    return (
-      <div
-        key={key}
-        style={{
-          position: "relative",
-          paddingLeft: 12,
-          margin: prevLevel === 2 ? "0 0 8px" : "20px 0 8px",
-          borderLeft:
-            "2px solid color-mix(in srgb, " + ACCENT + " 50%, transparent)",
-        }}
-      >
-        <span
-          style={{
-            fontSize: "1.1rem",
-            fontWeight: 600,
-            lineHeight: 1.3,
-            display: "block",
-          }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </div>
-    );
-  }
-
-  // H4 — "drop-cap invertido": primera letra grande y de color, resto
-  // del texto en tamaño normal. Se separa el primer carácter del resto
-  // manualmente (en vez de CSS ::first-letter) porque acá el contenido
-  // ya pasó por applyInlinePlainMarkdown y puede empezar con una etiqueta
-  // HTML (ej. un wikilink) — ::first-letter tomaría la primera letra del
-  // markup, no del texto visible. Tomamos el primer carácter del texto
-  // PLANO (antes de convertir a HTML) y renderizamos el resto aparte.
-  const firstChar = text.charAt(0);
-  const rest = text.slice(1);
-  return (
-    <div
-      key={key}
-      style={{ margin: prevLevel === 4 ? "6px 0 6px" : "16px 0 6px" }}
-    >
-      <span
-        style={{
-          fontSize: "1.1rem",
-          fontWeight: 700,
-          color: "color-mix(in srgb, " + ACCENT + " 70%, transparent)",
-          lineHeight: 0.8,
-          marginRight: 1,
-        }}
-      >
-        {firstChar}
-      </span>
-      <span
-        style={{ fontSize: "0.95rem", fontWeight: 600 }}
-        dangerouslySetInnerHTML={{ __html: applyInlinePlainMarkdown(rest) }}
-      />
-    </div>
-  );
-}
-
-function PlainMarkdownFallback({ value }: { value: string }) {
-  const bloques = value.split(/\n{2,}/);
-  // Rastrea el nivel del ÚLTIMO heading renderizado (bloques vacíos o de
-  // texto normal no lo tocan) para que renderHeadingBlock pueda achicar el
-  // margen cuando dos headings de niveles específicos quedan adyacentes
-  // (H2→H3, H4→H4) — ver comentarios dentro de renderHeadingBlock.
-  let prevHeadingLevel: 1 | 2 | 3 | 4 | null = null;
-  return (
-    <>
-      {bloques.map((bloque, bi) => {
-        if (bloque.trim() === "") {
-          return (
-            <p key={bi} aria-hidden style={{ margin: 0, minHeight: "1em" }} />
-          );
-        }
-
-        const headingMatch = HEADING_LINE_RE.exec(bloque);
-        if (headingMatch) {
-          const level = Math.min(4, headingMatch[1].length) as 1 | 2 | 3 | 4;
-          const block = renderHeadingBlock(
-            level,
-            headingMatch[2],
-            bi,
-            prevHeadingLevel,
-          );
-          prevHeadingLevel = level;
-          return block;
-        }
-        prevHeadingLevel = null;
-
-        const lineas = bloque.split("\n");
-        return (
-          <p key={bi} style={{ margin: "0 0 0.6em 0" }}>
-            {lineas.map((linea, li) => (
-              <React.Fragment key={li}>
-                {li > 0 && <br />}
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: applyInlinePlainMarkdown(linea),
-                  }}
-                />
-              </React.Fragment>
-            ))}
-          </p>
-        );
-      })}
-    </>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // RichEditor
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1281,8 +913,6 @@ export function RichEditor({
   placeholder = "Escribe aquí…",
   minHeight = "12rem",
   maxHeight,
-  mode: modeProp,
-  onModeChange,
   autoFocus = false,
   editable = true,
   insertRef,
@@ -1294,14 +924,9 @@ export function RichEditor({
   closePaletteRef,
   wikiEntities,
   onWikilinkNavigate,
-  showSplitMode = true,
-  renderPreview,
   extraToolbarAction,
   exportFileName,
 }: RichEditorProps) {
-  const [internalMode, setInternalMode] = useState<ViewMode>("edit");
-  const mode = modeProp ?? internalMode;
-  const handleModeChange = onModeChange ?? setInternalMode;
   const [hasSections, setHasSections] = useState(false);
   // Toggle de corrector ortográfico nativo del navegador (spellCheck de
   // ContentEditable). Persistido en localStorage porque es una preferencia
@@ -1774,21 +1399,18 @@ export function RichEditor({
             fileName={exportFileName || "documento"}
           />
           {extraToolbarAction}
-          {showSplitMode && (modeProp === undefined || onModeChange) && (
-            <ModeTogglePlugin mode={mode} onModeChange={handleModeChange} />
-          )}
         </div>
 
         <div
           style={{
             display: "flex",
             flex: 1,
-            flexDirection: mode === "split" ? "row" : "column",
+            flexDirection: "column",
             position: "relative",
           }}
         >
           {/* Panel de edición */}
-          {mode !== "preview" && (
+          {(
             <div
               style={{
                 flex: 1,
@@ -1941,51 +1563,6 @@ export function RichEditor({
               )}
             </div>
           )}
-
-          {/* Panel de preview — usa renderPreview del padre si lo pasa
-              (p. ej. EditorCapitulos con ContenidoInteractivo para
-              resolver [[drop|...]] etc.), si no cae al markdown plano
-              estándar de siempre. */}
-          {mode !== "edit" &&
-            (renderPreview ? (
-              <div
-                className="prose-mundo"
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  overflowY: "auto",
-                  fontSize: "clamp(0.9rem, 2vw, 1rem)",
-                  lineHeight: 1.8,
-                }}
-              >
-                {renderPreview(value)}
-              </div>
-            ) : (
-              <div
-                className="prose-mundo"
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  overflowY: "auto",
-                  fontSize: "clamp(0.9rem, 2vw, 1rem)",
-                  lineHeight: 1.8,
-                }}
-                onClick={(e) => {
-                  // Mismo mecanismo que antes: los wikilinks se marcan con
-                  // data-wikilink, acá solo conectamos el click a
-                  // onWikilinkNavigate.
-                  const a = (e.target as HTMLElement).closest(
-                    "a[data-wikilink]",
-                  );
-                  if (!a) return;
-                  e.preventDefault();
-                  const target = a.getAttribute("data-wikilink");
-                  if (target) onWikilinkNavigate?.(target);
-                }}
-              >
-                <PlainMarkdownFallback value={value} />
-              </div>
-            ))}
         </div>
       </LexicalComposer>
     </div>

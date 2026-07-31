@@ -221,9 +221,7 @@ export function EditorNota({
       <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5">
         <RichEditor
           minHeight="30rem"
-          mode="edit"
           placeholder="Escribe tu nota aquí… Ideas, referencias, fragmentos, recordatorios…"
-          showSplitMode={false}
           value={form.contenido ?? ""}
           onChange={(v) => setForm((f) => ({ ...f, contenido: v }))}
           onWikilinkNavigate={onWikilink}

@@ -332,9 +332,7 @@ export function EditorItem({
                 </label>
                 <RichEditor
                   minHeight="12.5rem"
-                  mode="edit"
                   placeholder="Qué es, qué hace, su historia…"
-                  showSplitMode={false}
                   value={form.descripcion ?? ""}
                   wikiEntities={entities}
                   onChange={(v) => setForm((f: Item) => ({ ...f, descripcion: v }))}

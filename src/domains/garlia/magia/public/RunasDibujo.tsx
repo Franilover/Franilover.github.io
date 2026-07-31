@@ -28,7 +28,7 @@ import Image from "next/image";
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
 
-import { RichEditor } from "@/editor/lexical";
+import { PlainMarkdownPreview } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { CanvasDibujoRuna } from "../CanvasDibujoRuna";
@@ -374,12 +374,7 @@ function ResultadoCard({
           </h2>
           {mejorMatch.explicacion && (
             <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
-              <RichEditor
-                editable={false}
-                mode="preview"
-                value={mejorMatch.explicacion}
-                onChange={() => {}}
-              />
+              <PlainMarkdownPreview value={mejorMatch.explicacion} />
             </div>
           )}
         </>
@@ -447,12 +442,7 @@ function ResultadoRejillaCard({
           </h2>
           {combinacion.explicacion && (
             <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
-              <RichEditor
-                editable={false}
-                mode="preview"
-                value={combinacion.explicacion}
-                onChange={() => {}}
-              />
+              <PlainMarkdownPreview value={combinacion.explicacion} />
             </div>
           )}
         </>

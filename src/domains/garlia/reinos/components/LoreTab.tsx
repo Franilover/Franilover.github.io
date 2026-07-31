@@ -230,9 +230,7 @@ function DetalleEditor({
             </label>
             <RichEditor
               minHeight="6rem"
-              mode="edit"
               placeholder="Describe esta ciudad…"
-              showSplitMode={false}
               value={form.descripcion ?? ""}
               wikiEntities={entities}
               onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
@@ -393,9 +391,7 @@ function MapaNuevo({
             <RichEditor
               key="geografia"
               minHeight="25rem"
-              mode="edit"
               placeholder="Paisajes, clima, fronteras, ciudades principales…"
-              showSplitMode={false}
               value={(form as any).geografia ?? ""}
               onChange={(v) => setForm((f) => ({ ...f, geografia: v }))}
               onWikilinkNavigate={onWikilinkNavigate}
@@ -937,9 +933,7 @@ export function LoreTab({
                     <RichEditor
                       key="cultura"
                       minHeight="22.5rem"
-                      mode="edit"
                       placeholder="Tradiciones, religión, idioma, costumbres, arte…"
-                      showSplitMode={false}
                       value={(form as any).cultura ?? ""}
                       wikiEntities={entities}
                       onChange={(v) => setForm((f) => ({ ...f, cultura: v }))}
@@ -953,9 +947,7 @@ export function LoreTab({
                     <RichEditor
                       key="politica"
                       minHeight="22.5rem"
-                      mode="edit"
                       placeholder="Sistema de gobierno, facciones, líderes, leyes…"
-                      showSplitMode={false}
                       value={(form as any).politica ?? ""}
                       wikiEntities={entities}
                       onChange={(v) => setForm((f) => ({ ...f, politica: v }))}
@@ -969,9 +961,7 @@ export function LoreTab({
                     <RichEditor
                       key="economia"
                       minHeight="22.5rem"
-                      mode="edit"
                       placeholder="Recursos, comercio, moneda, riqueza…"
-                      showSplitMode={false}
                       value={(form as any).economia ?? ""}
                       wikiEntities={entities}
                       onChange={(v) => setForm((f) => ({ ...f, economia: v }))}

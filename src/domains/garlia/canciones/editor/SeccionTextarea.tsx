@@ -249,9 +249,7 @@ export const SeccionTextarea = ({
           <RichEditor
             editable
             minHeight="4rem"
-            mode="edit"
             placeholder={`Letra en ${IDIOMAS.find(i => i.id === idioma)?.nombre}…`}
-            showSplitMode={false}
             value={texto}
             onChange={onChange}
           />
