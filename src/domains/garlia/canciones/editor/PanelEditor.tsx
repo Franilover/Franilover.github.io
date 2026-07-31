@@ -1,14 +1,13 @@
 "use client";
 
-import {
-  Music,
-  Film,
-  Loader2,
-  FileText,
-  Columns2,
-  PanelRight,
-} from "lucide-react";
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { Music, Film, Loader2, FileText, PanelRight } from "lucide-react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 
 import { BannerOffline } from "@/layout/EstudioTemplates";
 import { IDIOMAS } from "@/domains/garlia/canciones/constants";
@@ -54,7 +53,6 @@ export const PanelEditor = ({
   // Estados de UI
   const [idiomaA, setIdiomaA] = useState<IdiomaKey>("es");
   const [idiomaB, setIdiomaB] = useState<IdiomaKey>("en");
-  const [splitMode, setSplitMode] = useState(false);
   const [activeTab, setActiveTab] = useState<EditorTab>("letras");
   const [countMode, setCountMode] = useState<"silabas" | "vocales">("silabas");
   const [tituloInput, setTituloInput] = useState(cancion?.titulo || "");
@@ -74,12 +72,6 @@ export const PanelEditor = ({
   // de sílabas/vocales, que compara ambos idiomas mientras se tipea).
   const [textoA, setTextoA] = useState("");
   const [textoB, setTextoB] = useState("");
-
-  // Responsive Split Mode
-  useEffect(() => {
-    const wide = window.innerWidth >= 768;
-    setSplitMode(wide);
-  }, []);
 
   // --- Handlers de Datos (Mantenidos del original) ---
   const handleSaveField = useCallback(
@@ -164,8 +156,7 @@ export const PanelEditor = ({
 
   const changeIdiomaA = (v: IdiomaKey) => {
     setIdiomaA(v);
-    if (splitMode && v === idiomaB)
-      setIdiomaB(IDIOMAS.find((i) => i.id !== v)!.id);
+    if (v === idiomaB) setIdiomaB(IDIOMAS.find((i) => i.id !== v)!.id);
   };
   const changeIdiomaB = (v: IdiomaKey) => {
     setIdiomaB(v);
@@ -235,7 +226,8 @@ export const PanelEditor = ({
                 placeholder="Nombre de la canción…"
                 value={tituloInput}
                 onBlur={() => {
-                  if (tituloInput !== cancion.titulo) handleSaveTitulo(tituloInput);
+                  if (tituloInput !== cancion.titulo)
+                    handleSaveTitulo(tituloInput);
                 }}
                 onChange={(e) => setTituloInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -301,34 +293,17 @@ export const PanelEditor = ({
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1 bg-bg-main border border-primary/10 p-0.5 rounded-lg shrink-0">
                   <IdiomaTab
-                    exclude={splitMode ? idiomaB : undefined}
+                    exclude={idiomaB}
                     value={idiomaA}
                     onChange={changeIdiomaA}
                   />
-                  {splitMode && (
-                    <>
-                      <div className="w-[1px] h-3 bg-primary/10 mx-1" />
-                      <IdiomaTab
-                        exclude={idiomaA}
-                        value={idiomaB}
-                        onChange={changeIdiomaB}
-                      />
-                    </>
-                  )}
+                  <div className="w-[1px] h-3 bg-primary/10 mx-1" />
+                  <IdiomaTab
+                    exclude={idiomaA}
+                    value={idiomaB}
+                    onChange={changeIdiomaB}
+                  />
                 </div>
-                <button
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-micro font-black uppercase border transition-all shrink-0 ${
-                    splitMode
-                      ? "bg-primary text-bg-main border-primary"
-                      : "border-primary/10 text-primary/40 hover:border-primary/30"
-                  }`}
-                  onClick={() => setSplitMode((m) => !m)}
-                >
-                  <Columns2 size={12} />
-                  <span className="hidden sm:inline">
-                    {splitMode ? "Simple" : "Split View"}
-                  </span>
-                </button>
               </div>
 
               <div className="flex items-center gap-4 shrink-0">
@@ -377,44 +352,38 @@ export const PanelEditor = ({
           {activeTab === "letras" && (
             <div className="px-2 sm:px-3 py-6 space-y-4 w-full">
               {bloque ? (
-                <div
-                  className={`px-2 pb-2 ${splitMode ? "flex gap-2" : ""}`}
-                >
+                <div className="px-2 pb-2 flex gap-2">
                   <SeccionTextarea
                     countMode={countMode}
                     idioma={idiomaA}
                     sec={bloque}
-                    showSyllableColumn={!splitMode}
+                    showSyllableColumn={false}
                     onSave={handleSaveField}
-                    onTextoChange={splitMode ? setTextoA : undefined}
+                    onTextoChange={setTextoA}
                   />
-                  {splitMode && (
-                    <>
-                      {/* ── Indicador central: sílabas del bloque izquierdo (hacia la izq) y del derecho (hacia la der) ── */}
-                      <div className="flex shrink-0 self-stretch gap-2">
-                        <SyllableColumn
-                          align="end"
-                          countMode={countMode}
-                          refLineas={null}
-                          texto={textoA}
-                        />
-                        <SyllableColumn
-                          align="start"
-                          countMode={countMode}
-                          refLineas={null}
-                          texto={textoB}
-                        />
-                      </div>
-                      <SeccionTextarea
-                        countMode={countMode}
-                        idioma={idiomaB}
-                        sec={bloque}
-                        showSyllableColumn={false}
-                        onSave={handleSaveField}
-                        onTextoChange={setTextoB}
-                      />
-                    </>
-                  )}
+                  {/* ── Indicador central: sílabas del bloque izquierdo (hacia la izq) y del derecho (hacia la der) ── */}
+                  <div className="flex shrink-0 self-stretch gap-2">
+                    <SyllableColumn
+                      align="end"
+                      countMode={countMode}
+                      refLineas={null}
+                      texto={textoA}
+                    />
+                    <SyllableColumn
+                      align="start"
+                      countMode={countMode}
+                      refLineas={null}
+                      texto={textoB}
+                    />
+                  </div>
+                  <SeccionTextarea
+                    countMode={countMode}
+                    idioma={idiomaB}
+                    sec={bloque}
+                    showSyllableColumn={false}
+                    onSave={handleSaveField}
+                    onTextoChange={setTextoB}
+                  />
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3 py-20 text-primary/20">
