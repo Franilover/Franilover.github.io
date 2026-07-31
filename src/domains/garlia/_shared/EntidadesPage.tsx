@@ -553,25 +553,17 @@ export function EntidadesPage({ section, selectedId }: Props) {
 
   // ── Criaturas ────────────────────────────────────────────────────────
   // Sección propia de la navbar (antes vivía adentro de Entidades → sub-tab
-  // "Criaturas"). Agrupa Items + Personajes por criatura de origen.
+  // "Criaturas"). Agrupa Personajes por criatura de origen.
   if (section === "criaturas") {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <MagiaJerarquica
           criaturas={criaturas}
-          items={items}
           personajes={personajes}
-          loading={loadingC || loadingI || loadingP}
+          loading={loadingC || loadingP}
           onCreateCriatura={async () => {
             const { data } = await addCriatura({ nombre: "Nueva criatura" });
             if (data?.id) openEntity("criaturas", data.id);
-          }}
-          onCreateHija={async (_tipo, criaturaId) => {
-            const { data } = await addItem({
-              nombre: "Nuevo objeto",
-              ...(criaturaId ? { criatura_id: criaturaId } : {}),
-            });
-            if (data?.id) openEntity("items", data.id);
           }}
           onCreatePersonaje={async (criatura) => {
             const { data } = await addPersonaje({
@@ -581,6 +573,31 @@ export function EntidadesPage({ section, selectedId }: Props) {
             if (data?.id) openEntity("personajes", data.id);
           }}
           onOpen={(section, id) => openEntity(section, id)}
+        />
+      </div>
+    );
+  }
+
+  // ── Items ────────────────────────────────────────────────────────
+  // Sección propia de la navbar (antes vivía adentro de Criaturas).
+  // Grid simple de items sin agrupación.
+  if (section === "items") {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        <EntityCardGrid
+          title="Items"
+          variant="cards"
+          loading={loadingI}
+          items={items.map((i) => ({
+            id: i.id,
+            nombre: i.nombre,
+            imageUrl: i.imagen_url || undefined,
+          }))}
+          onItemClick={(id) => openEntity("items", id)}
+          onCreate={async () => {
+            const { data } = await addItem({ nombre: "Nuevo objeto" });
+            if (data?.id) openEntity("items", data.id);
+          }}
         />
       </div>
     );
