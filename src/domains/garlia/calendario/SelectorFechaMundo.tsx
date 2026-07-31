@@ -76,6 +76,7 @@ export function SelectorFechaMundo({
   autoOpen = false,
   hideTrigger = false,
   compact = false,
+  borderless = false,
   onOpenChange,
 }: {
   value: number | null;
@@ -93,6 +94,11 @@ export function SelectorFechaMundo({
   // todo el ancho del contenedor — para meterlo al lado de otros datos
   // (ej. junto a la edad de un personaje) en vez de en su propia fila.
   compact?: boolean;
+  // Si es true, el trigger no-compact se muestra sin borde (solo el fondo
+  // sutil al abrirse) — para contextos donde el borde propio del selector
+  // desentona con campos vecinos también sin borde. No afecta al trigger
+  // compact ni al hideTrigger.
+  borderless?: boolean;
   // Notifica cuando el panel se abre/cierra — para que un elemento externo
   // que montó este selector "a demanda" (con autoOpen) sepa cuándo
   // desmontarlo tras cerrarse.
@@ -240,14 +246,18 @@ export function SelectorFechaMundo({
       ) : (
         <button
           ref={triggerRef}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-all"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-all"
           style={{
             background: open
               ? "color-mix(in srgb, var(--primary) 5%, transparent)"
               : "transparent",
-            borderColor: open
-              ? "color-mix(in srgb, var(--primary) 22%, transparent)"
-              : "color-mix(in srgb, var(--primary) 12%, transparent)",
+            border: borderless
+              ? "1px solid transparent"
+              : `1px solid ${
+                  open
+                    ? "color-mix(in srgb, var(--primary) 22%, transparent)"
+                    : "color-mix(in srgb, var(--primary) 12%, transparent)"
+                }`,
           }}
           type="button"
           onClick={() => setOpenNotify(!open)}

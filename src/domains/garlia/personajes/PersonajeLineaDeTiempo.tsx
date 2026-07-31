@@ -246,12 +246,11 @@ function EraDetallePanel({
       <div className="flex items-start justify-between gap-2">
         <input
           key={era.id}
-          className="flex-1 min-w-0 rounded-md border px-2 py-1.5 text-sm font-bold outline-none transition-colors placeholder:font-normal placeholder:text-primary/25"
+          className="flex-1 min-w-0 rounded-md px-2 py-1.5 text-sm font-bold outline-none transition-colors placeholder:font-normal placeholder:text-primary/25"
           maxLength={60}
           placeholder="Nombre del período…"
           style={{
             background: "transparent",
-            borderColor: LINE_COLOR,
             color: "var(--primary)",
           }}
           type="text"
@@ -270,6 +269,7 @@ function EraDetallePanel({
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0">
           <SelectorFechaMundo
+            borderless
             placeholder="Fecha…"
             value={era.momento}
             onChange={(dia) => {
@@ -280,7 +280,7 @@ function EraDetallePanel({
         {puedeEditarEdad && (
           <div className="flex items-center gap-1 shrink-0">
             <input
-              className="w-14 rounded-md px-1.5 py-0.5 text-micro font-black tabular-nums text-center outline-none transition-colors"
+              className="w-14 rounded-md px-1.5 py-0.5 text-micro font-black tabular-nums text-center outline-none transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               key={`edad-${era.id}`}
               min={0}
               style={{
@@ -319,12 +319,11 @@ function EraDetallePanel({
       <div className="space-y-1.5">
         <div className="flex items-center gap-1">
           <input
-            className="flex-1 min-w-0 rounded-md border px-2 py-1.5 text-micro outline-none transition-colors placeholder:text-primary/25"
+            className="flex-1 min-w-0 rounded-md px-2 py-1.5 text-micro outline-none transition-colors placeholder:text-primary/25"
             maxLength={40}
             placeholder="Añadir rasgo…"
             style={{
               background: "transparent",
-              borderColor: LINE_COLOR,
               color: "var(--primary)",
             }}
             type="text"
