@@ -31,6 +31,7 @@ import {
   Shirt,
   Upload,
   Wand2,
+  Package,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -709,15 +710,16 @@ const Navbar = () => {
   // ── Submenú admin (desktop) ──────────────────────────────────────────────
   // Reemplaza a <MundoTabs /> (que vivía arriba del editor): toda la
   // navegación entre secciones de /myself/garlia pasa a vivir acá.
-  // "Criaturas" y "Organización" (Grupos/Notas) salieron de "Entidades" y
+  // "Criaturas", "Items" y "Organización" (Grupos/Notas) salieron de "Entidades" y
   // tienen su propio estado activo, igual que ya pasaba con "letras"
   // (Canciones) y "hechizos"/"dones"/"runas" (Magia).
   const ENTIDADES_SECTIONS = new Set<SectionKey>([
     "personajes",
-    "items",
     "reinos",
     "ciudades",
   ]);
+
+  const ITEMS_SECTIONS = new Set<SectionKey>(["items"]);
 
   const CRIATURAS_SECTIONS = new Set<SectionKey>(["criaturas"]);
 
@@ -799,6 +801,16 @@ const Navbar = () => {
         mundoSection !== null &&
         MAGIA_SECTIONS.has(mundoSection),
       onSelect: () => mundoSelectSection("hechizos"),
+    },
+    {
+      key: "items",
+      label: "Items",
+      icon: Package,
+      active:
+        isGarliaeditor &&
+        mundoSection !== null &&
+        ITEMS_SECTIONS.has(mundoSection),
+      onSelect: () => mundoSelectSection("items"),
     },
     { key: "div-2", divider: true },
     {
