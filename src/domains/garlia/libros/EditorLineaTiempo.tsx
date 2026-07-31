@@ -53,7 +53,7 @@ import { RichEditor } from "@/editor/lexical";
 
 import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
-import { useErasDelPersonaje } from "@/domains/garlia/personajes/useErasDelPersonaje";
+import { useErasDelPersonaje, type Era } from "@/domains/garlia/personajes/useErasDelPersonaje";
 import {
   useCalendario,
   invalidarCacheEras,
@@ -1597,21 +1597,32 @@ function ToggleTipoBtn({
 
 // ── Panel de detalle de evento (click en la lista) ───────────────────────────
 // Editable para eventos "mundo"/"reino" (tabla eventos_mundo): título,
-// descripción y fecha. Capítulos/canciones/cumpleaños se muestran solo
-// lectura porque no tienen un campo de descripción propio aquí y editar su
-// título cambiaría la entidad real (capítulo, canción o personaje).
+// descripción y fecha. También editable para "era_personaje" (personaje_eras
+// del personaje filtrado): label, fecha, rasgos y notas — usa los mismos
+// handlers que PersonajeLineaDeTiempo (useErasDelPersonaje). Capítulos/
+// canciones/cumpleaños se muestran solo lectura porque no tienen un campo
+// de descripción propio aquí y editar su título cambiaría la entidad real
+// (capítulo, canción o personaje).
 function EventoDetallePanel({
   evt,
   era,
   eraColor,
+  eraPersonaje,
   diasAnioLista,
   onFieldChange,
   onDiaChange,
   onClose,
+  onLabelChangeEraPersonaje,
+  onNotasChangeEraPersonaje,
+  onMomentoChangeEraPersonaje,
+  onAddRasgoEraPersonaje,
+  onRemoveRasgoEraPersonaje,
+  onDeleteEraPersonaje,
 }: {
   evt: MundoTimelineEvent;
   era: EraMundo | null;
   eraColor: string | null;
+  eraPersonaje?: Era | null;
   diasAnioLista: number;
   onFieldChange?: (
     id: string,
@@ -1620,19 +1631,41 @@ function EventoDetallePanel({
   ) => void;
   onDiaChange?: (id: string, dia: number) => void;
   onClose?: () => void;
+  onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
+  onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
+  onMomentoChangeEraPersonaje?: (era: Era, nuevoMomento: number) => Promise<void>;
+  onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onDeleteEraPersonaje?: (id: string) => void;
 }) {
   const editable = evt.source === "mundo" || evt.source === "reino";
+  const editableEraPersonaje =
+    evt.source === "era_personaje" && eraPersonaje != null;
 
   const [titulo, setTitulo] = useState(evt.title);
   const [descripcion, setDescripcion] = useState(evt.description);
   const [savingFecha, setSavingFecha] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Estado local para el título/notas de la era del personaje — mismo
+  // patrón de debounce que titulo/descripcion, pero llama a los handlers
+  // de useErasDelPersonaje en vez de onFieldChange.
+  const [labelEra, setLabelEra] = useState(eraPersonaje?.label ?? "");
+  const [notasEra, setNotasEra] = useState(eraPersonaje?.notas ?? "");
+  const [nuevoRasgo, setNuevoRasgo] = useState("");
+  const labelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notasDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Resincronizar campos locales al cambiar de evento seleccionado
   useEffect(() => {
     setTitulo(evt.title);
     setDescripcion(evt.description);
   }, [evt.id, evt.title, evt.description]);
+
+  useEffect(() => {
+    setLabelEra(eraPersonaje?.label ?? "");
+    setNotasEra(eraPersonaje?.notas ?? "");
+  }, [eraPersonaje?.id, eraPersonaje?.label, eraPersonaje?.notas]);
 
   const scheduleSave = (field: "titulo" | "descripcion", value: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -1641,11 +1674,38 @@ function EventoDetallePanel({
     }, 600);
   };
 
+  const scheduleLabelEra = (value: string) => {
+    if (!eraPersonaje) return;
+    if (labelDebounceRef.current) clearTimeout(labelDebounceRef.current);
+    labelDebounceRef.current = setTimeout(() => {
+      onLabelChangeEraPersonaje?.(eraPersonaje, value);
+    }, 600);
+  };
+
+  const scheduleNotasEra = (value: string) => {
+    if (!eraPersonaje) return;
+    if (notasDebounceRef.current) clearTimeout(notasDebounceRef.current);
+    notasDebounceRef.current = setTimeout(() => {
+      onNotasChangeEraPersonaje?.(eraPersonaje, value);
+    }, 600);
+  };
+
   const commitDia = async (dia: number | null) => {
     if (dia == null) return;
     setSavingFecha(true);
-    await onDiaChange?.(evt.id, dia);
+    if (editableEraPersonaje && eraPersonaje) {
+      await onMomentoChangeEraPersonaje?.(eraPersonaje, dia);
+    } else {
+      await onDiaChange?.(evt.id, dia);
+    }
     setSavingFecha(false);
+  };
+
+  const agregarRasgo = () => {
+    const val = nuevoRasgo.trim();
+    if (!val || !eraPersonaje) return;
+    onAddRasgoEraPersonaje?.(eraPersonaje, val);
+    setNuevoRasgo("");
   };
 
   const Icon = iconoPorSource(evt.source);
@@ -1689,6 +1749,23 @@ function EventoDetallePanel({
           <Icon size={7} />
           {evt.source}
         </span>
+        {editableEraPersonaje && eraPersonaje && onDeleteEraPersonaje && (
+          <button
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-black uppercase tracking-widest transition-all hover:opacity-100"
+            style={{
+              color: "color-mix(in srgb, #ef4444 60%, transparent)",
+              opacity: 0.7,
+            }}
+            title="Eliminar esta era"
+            type="button"
+            onClick={() => {
+              onDeleteEraPersonaje(eraPersonaje.id);
+              onClose?.();
+            }}
+          >
+            <Trash2 size={9} />
+          </button>
+        )}
         {onClose && (
           <button
             className="ml-auto shrink-0 flex items-center justify-center rounded-full transition-all hover:opacity-100"
@@ -1720,6 +1797,20 @@ function EventoDetallePanel({
             scheduleSave("titulo", e.target.value);
           }}
         />
+      ) : editableEraPersonaje ? (
+        <input
+          className="text-sm font-black uppercase leading-tight bg-transparent outline-none w-full rounded px-0.5 -mx-0.5"
+          placeholder="Nombre del período…"
+          style={{ color: "var(--primary)" }}
+          value={labelEra}
+          onBlur={(e) => {
+            if (eraPersonaje) onLabelChangeEraPersonaje?.(eraPersonaje, e.target.value);
+          }}
+          onChange={(e) => {
+            setLabelEra(e.target.value);
+            scheduleLabelEra(e.target.value);
+          }}
+        />
       ) : (
         <p
           className="text-sm font-black uppercase leading-tight"
@@ -1729,9 +1820,9 @@ function EventoDetallePanel({
         </p>
       )}
 
-      {/* Fecha + reino — misma fila cuando hay espacio */}
+      {/* Fecha + reino/personaje — misma fila cuando hay espacio */}
       <div className="flex items-center gap-2">
-        {editable ? (
+        {editable || editableEraPersonaje ? (
           <div className="relative flex-1 min-w-0">
             {savingFecha && (
               <Loader2
@@ -1781,7 +1872,68 @@ function EventoDetallePanel({
         }}
       />
 
-      {/* Descripción — a todo el ancho del panel, editor Lexical completo */}
+      {/* Rasgos — solo para era_personaje editable, chips con quitar + agregar */}
+      {editableEraPersonaje && eraPersonaje && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap gap-1">
+            {eraPersonaje.rasgos.map((r) => (
+              <span
+                key={r}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-micro font-bold"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--primary) 6%, transparent)",
+                  color: "color-mix(in srgb, var(--primary) 55%, transparent)",
+                }}
+              >
+                {r}
+                <button
+                  className="opacity-50 hover:opacity-100 transition-opacity"
+                  title="Quitar rasgo"
+                  type="button"
+                  onClick={() => onRemoveRasgoEraPersonaje?.(eraPersonaje, r)}
+                >
+                  <X size={8} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              className="flex-1 min-w-0 rounded-md px-2 py-1 text-micro outline-none"
+              placeholder="Nuevo rasgo…"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+                color: "var(--primary)",
+              }}
+              value={nuevoRasgo}
+              onChange={(e) => setNuevoRasgo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  agregarRasgo();
+                }
+              }}
+            />
+            <button
+              className="shrink-0 flex items-center justify-center rounded-md transition-all"
+              style={{
+                width: 24,
+                height: 24,
+                background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+                color: "var(--accent)",
+              }}
+              title="Agregar rasgo"
+              type="button"
+              onClick={agregarRasgo}
+            >
+              <Plus size={10} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Descripción / notas — a todo el ancho del panel, editor Lexical completo */}
       {editable ? (
         <div className="flex-1 min-h-0">
           <RichEditor
@@ -1794,53 +1946,17 @@ function EventoDetallePanel({
             }}
           />
         </div>
-      ) : evt.source === "era_personaje" && evt.eraPersonajeData ? (
-        <div className="flex flex-col gap-2">
-          {evt.eraPersonajeData.rasgos.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {evt.eraPersonajeData.rasgos.map((r) => (
-                <span
-                  key={r}
-                  className="px-1.5 py-0.5 rounded-full text-micro font-bold"
-                  style={{
-                    background:
-                      "color-mix(in srgb, var(--primary) 6%, transparent)",
-                    color:
-                      "color-mix(in srgb, var(--primary) 55%, transparent)",
-                  }}
-                >
-                  {r}
-                </span>
-              ))}
-            </div>
-          )}
-          {evt.eraPersonajeData.notas ? (
-            <p
-              className="text-micro leading-relaxed"
-              style={{
-                color: "color-mix(in srgb, var(--primary) 65%, transparent)",
-              }}
-            >
-              {evt.eraPersonajeData.notas}
-            </p>
-          ) : (
-            <p
-              className="text-micro italic"
-              style={{
-                color: "color-mix(in srgb, var(--primary) 20%, transparent)",
-              }}
-            >
-              Sin notas.
-            </p>
-          )}
-          <p
-            className="text-micro italic"
-            style={{
-              color: "color-mix(in srgb, var(--primary) 25%, transparent)",
+      ) : editableEraPersonaje ? (
+        <div className="flex-1 min-h-0">
+          <RichEditor
+            minHeight={160}
+            placeholder="Sin notas…"
+            value={notasEra}
+            onChange={(v) => {
+              setNotasEra(v);
+              scheduleNotasEra(v);
             }}
-          >
-            Editable desde la ficha de {evt.eraPersonajeData.personajeNombre}.
-          </p>
+          />
         </div>
       ) : evt.description ? (
         <p
@@ -1895,6 +2011,7 @@ function iconoPorSource(source: MundoTimelineEvent["source"]) {
 function ListaEventosConMinimapa({
   allEvents,
   cal,
+  erasPersonaje,
   evtSeleccionado,
   setEvtSeleccionado,
   onFieldChange,
@@ -1902,9 +2019,19 @@ function ListaEventosConMinimapa({
   onSelectPersonaje,
   onSelectCapitulo,
   onSelectCancion,
+  onLabelChangeEraPersonaje,
+  onNotasChangeEraPersonaje,
+  onMomentoChangeEraPersonaje,
+  onAddRasgoEraPersonaje,
+  onRemoveRasgoEraPersonaje,
+  onDeleteEraPersonaje,
 }: {
   allEvents: MundoTimelineEvent[];
   cal: CalCache | null;
+  /** Eras internas del personaje actualmente filtrado — se usan para
+   * resolver el objeto Era completo (no solo su id) que necesitan los
+   * handlers de edición al abrir el panel de detalle. */
+  erasPersonaje?: Era[];
   evtSeleccionado: string | null;
   setEvtSeleccionado: (id: string | null) => void;
   onFieldChange?: (
@@ -1916,6 +2043,15 @@ function ListaEventosConMinimapa({
   onSelectPersonaje?: (id: string) => void;
   onSelectCapitulo?: (capituloId: string, libroId: string) => void;
   onSelectCancion?: (cancionId: string) => void;
+  /** Handlers de edición de eras internas del personaje (personaje_eras) —
+   * ver useErasDelPersonaje en PanelHistoriaMundo. Solo se usan cuando el
+   * evento seleccionado es de tipo "era_personaje". */
+  onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
+  onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
+  onMomentoChangeEraPersonaje?: (era: Era, nuevoMomento: number) => Promise<void>;
+  onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onDeleteEraPersonaje?: (id: string) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -1939,6 +2075,14 @@ function ListaEventosConMinimapa({
   const selEvt = allEvents.find((e) => e.id === evtSeleccionado) ?? null;
   const selEra = selEvt ? getEraEvt(selEvt.dia_absoluto) : null;
   const selEraColor = selEra?.color ?? null;
+  // Objeto Era completo (personaje_eras) correspondiente al evento
+  // seleccionado, cuando ese evento es de tipo "era_personaje" — lo
+  // necesitan los handlers de edición que vienen de useErasDelPersonaje.
+  const selEraPersonaje =
+    selEvt?.source === "era_personaje" && selEvt.eraPersonajeData
+      ? (erasPersonaje?.find((e) => e.id === selEvt.eraPersonajeData!.id) ??
+        null)
+      : null;
 
   // ── Minimapa horizontal ─────────────────────────────────────────────────
   // Franja compacta arriba de la lista: un punto por evento, coloreado por
@@ -2285,24 +2429,27 @@ function ListaEventosConMinimapa({
         </div>
       </div>
 
-      {/* ── Panel de detalle flotante (editable para mundo/reino) ── ────────
-          Antes este panel era un sibling en flex que empujaba la lista
-          (achicaba las tarjetas y ganaba ancho a su costa). Ahora flota
-          en un portal, anclado justo debajo/al lado de la tarjeta en la
-          que se hizo click, sin mover ni una tarjeta del lugar — igual
-          que el patrón que ya usa `EraDropdown` más abajo en este mismo
-          archivo (fixed + reposición en scroll/resize + cerrar al click
-          afuera o con Escape). */}
+      {/* ── Panel de detalle flotante (modal centrado) ── ────────────────────
+          Editable para eventos "mundo"/"reino" (título/descripción/fecha) y
+          para "era_personaje" (label/notas/rasgos/fecha de la era interna
+          del personaje filtrado) — ver EventoDetallePanel más abajo. */}
       {selEvt && (
         <EventoDetalleFlotante
           anchorEl={itemRefs.current.get(selEvt.id) ?? null}
           diasAnioLista={diasAnioLista}
           era={selEra}
           eraColor={selEraColor}
+          eraPersonaje={selEraPersonaje}
           evt={selEvt}
+          onAddRasgoEraPersonaje={onAddRasgoEraPersonaje}
           onClose={() => setEvtSeleccionado(null)}
+          onDeleteEraPersonaje={onDeleteEraPersonaje}
           onDiaChange={onDiaChange}
           onFieldChange={onFieldChange}
+          onLabelChangeEraPersonaje={onLabelChangeEraPersonaje}
+          onMomentoChangeEraPersonaje={onMomentoChangeEraPersonaje}
+          onNotasChangeEraPersonaje={onNotasChangeEraPersonaje}
+          onRemoveRasgoEraPersonaje={onRemoveRasgoEraPersonaje}
         />
       )}
     </div>
@@ -2321,15 +2468,25 @@ function EventoDetalleFlotante({
   evt,
   era,
   eraColor,
+  eraPersonaje,
   diasAnioLista,
   onFieldChange,
   onDiaChange,
   onClose,
+  onLabelChangeEraPersonaje,
+  onNotasChangeEraPersonaje,
+  onMomentoChangeEraPersonaje,
+  onAddRasgoEraPersonaje,
+  onRemoveRasgoEraPersonaje,
+  onDeleteEraPersonaje,
 }: {
   anchorEl: HTMLElement | null;
   evt: MundoTimelineEvent;
   era: EraMundo | null;
   eraColor: string | null;
+  /** Objeto Era (personaje_eras) completo cuando evt.source es
+   * "era_personaje" — habilita la edición completa dentro del panel. */
+  eraPersonaje?: Era | null;
   diasAnioLista: number;
   onFieldChange?: (
     id: string,
@@ -2338,6 +2495,12 @@ function EventoDetalleFlotante({
   ) => void;
   onDiaChange?: (id: string, dia: number) => void;
   onClose: () => void;
+  onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
+  onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
+  onMomentoChangeEraPersonaje?: (era: Era, nuevoMomento: number) => Promise<void>;
+  onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onDeleteEraPersonaje?: (id: string) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -2378,10 +2541,17 @@ function EventoDetalleFlotante({
           diasAnioLista={diasAnioLista}
           era={era}
           eraColor={eraColor}
+          eraPersonaje={eraPersonaje}
           evt={evt}
+          onAddRasgoEraPersonaje={onAddRasgoEraPersonaje}
           onClose={onClose}
+          onDeleteEraPersonaje={onDeleteEraPersonaje}
           onDiaChange={onDiaChange}
           onFieldChange={onFieldChange}
+          onLabelChangeEraPersonaje={onLabelChangeEraPersonaje}
+          onMomentoChangeEraPersonaje={onMomentoChangeEraPersonaje}
+          onNotasChangeEraPersonaje={onNotasChangeEraPersonaje}
+          onRemoveRasgoEraPersonaje={onRemoveRasgoEraPersonaje}
         />
       </div>
     </div>,
@@ -3278,7 +3448,15 @@ export function PanelHistoriaMundo({
     () => personajesCumple.find((p) => p.id === filterPersonaje) ?? null,
     [personajesCumple, filterPersonaje],
   );
-  const { eras: erasPersonaje } = useErasDelPersonaje(
+  const {
+    eras: erasPersonaje,
+    changeLabel: changeLabelEraPersonaje,
+    changeNotas: changeNotasEraPersonaje,
+    changeMomento: changeMomentoEraPersonaje,
+    addRasgo: addRasgoEraPersonaje,
+    removeRasgo: removeRasgoEraPersonaje,
+    deleteEra: deleteEraPersonaje,
+  } = useErasDelPersonaje(
     filterPersonaje ?? "",
     personajeSeleccionado?.fecha_nacimiento ?? null,
   );
@@ -3960,10 +4138,17 @@ export function PanelHistoriaMundo({
           <ListaEventosConMinimapa
             allEvents={allEvents}
             cal={cal}
+            erasPersonaje={erasPersonaje}
             evtSeleccionado={evtSeleccionado}
             setEvtSeleccionado={setEvtSeleccionado}
+            onAddRasgoEraPersonaje={addRasgoEraPersonaje}
+            onDeleteEraPersonaje={deleteEraPersonaje}
             onDiaChange={handleEventoMundoDiaChange}
             onFieldChange={handleEventoMundoFieldChange}
+            onLabelChangeEraPersonaje={changeLabelEraPersonaje}
+            onMomentoChangeEraPersonaje={changeMomentoEraPersonaje}
+            onNotasChangeEraPersonaje={changeNotasEraPersonaje}
+            onRemoveRasgoEraPersonaje={removeRasgoEraPersonaje}
             onSelectCancion={onSelectCancion}
             onSelectCapitulo={onSelectCapitulo}
             onSelectPersonaje={onSelectPersonaje}
