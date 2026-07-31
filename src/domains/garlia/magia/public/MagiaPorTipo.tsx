@@ -9,11 +9,10 @@
  */
 
 import { FileText, Plus, ScrollText, Sparkles, Star } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
-import NewNoteModal from "@/editor/notas/components/newNoteModal";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
 import { BloqueSubsistemasMagia } from "./BloqueSubsistemasMagia";
@@ -108,21 +107,42 @@ function Bloque({
   );
 }
 
-// ─── Bloque de ensayos (tag GOS + tag Magia) ───────────────────────────────
-// Mismo patrón que EnsayosGosWidget (home), pero filtrando también por la
-// tag "Magia" además de "GOS" — ambas deben estar presentes.
-function BloqueEnsayosMagia({ onOpenEnsayo }: { onOpenEnsayo: (id: string) => void }) {
-  const { ensayos, loading, crearNotaPendiente } = useEnsayoEditorLogic(null);
-  const [showModal, setShowModal] = useState(false);
+// ─── Bloque de ensayo "Energias" (tag GOS + tag Magia) ─────────────────────
+// Antes listaba todos los ensayos con ambas tags; ahora apunta a un ensayo
+// único y fijo llamado "Energias" — se busca por título+tags, y si no existe
+// todavía se crea automáticamente la primera vez que se abre Magia.
+const TITULO_ENSAYO_ENERGIAS = "Energias";
 
-  const ensayosMagia = useMemo(
+function BloqueEnsayoEnergias({ onOpenEnsayo }: { onOpenEnsayo: (id: string) => void }) {
+  const { ensayos, loading, crearNotaPendiente } = useEnsayoEditorLogic(null);
+  const creandoRef = useRef(false);
+  const [creando, setCreando] = useState(false);
+
+  const ensayoEnergias = useMemo(
     () =>
-      ensayos.filter((e: any) => {
+      ensayos.find((e: any) => {
         const tags = (e.tags ?? []).map((t: string) => t.trim().toLowerCase());
-        return tags.includes("gos") && tags.includes("magia");
+        return (
+          (e.titulo ?? "").trim().toLowerCase() === TITULO_ENSAYO_ENERGIAS.toLowerCase() &&
+          tags.includes("gos") &&
+          tags.includes("magia")
+        );
       }),
     [ensayos],
   );
+
+  // Auto-creación: solo una vez que terminó de cargar y confirmamos que no
+  // existe. El ref evita que un doble-render dispare dos creaciones antes
+  // de que el primer resultado llegue al estado.
+  useEffect(() => {
+    if (loading || ensayoEnergias || creandoRef.current) return;
+    creandoRef.current = true;
+    setCreando(true);
+    void crearNotaPendiente(TITULO_ENSAYO_ENERGIAS, ["gos", "magia"]).finally(() => {
+      setCreando(false);
+      creandoRef.current = false;
+    });
+  }, [loading, ensayoEnergias, crearNotaPendiente]);
 
   return (
     <div className="rounded-xl border border-primary/10 bg-primary/[0.03] overflow-hidden mb-6 last:mb-0">
@@ -130,53 +150,35 @@ function BloqueEnsayosMagia({ onOpenEnsayo }: { onOpenEnsayo: (id: string) => vo
         <span />
         <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 flex items-center gap-1">
           <FileText size={9} className="shrink-0" />
-          Ensayos · GOS + Magia
+          Ensayo · GOS + Magia
         </span>
-        <div className="justify-self-end">
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            title="Nuevo ensayo"
-            className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-          >
-            <Plus size={9} className="text-primary/60" />
-          </button>
-        </div>
+        <span />
       </div>
       <div className="p-4">
-        {loading ? (
-          <div className="w-full py-6 text-xs text-primary/30 text-center">Cargando…</div>
-        ) : ensayosMagia.length === 0 ? (
-          <div className="w-full py-6 text-xs text-primary/25 text-center">
-            Sin ensayos con tag GOS + Magia todavía
+        {loading || creando || !ensayoEnergias ? (
+          <div className="w-full py-6 text-xs text-primary/30 text-center">
+            {creando ? "Creando ensayo…" : "Cargando…"}
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {ensayosMagia.map((e: any) => (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => onOpenEnsayo(e.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25 transition-colors text-xs font-semibold text-primary/80"
-              >
-                <FileText size={12} className="text-primary/40 shrink-0" />
-                {e.titulo || "Sin título"}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => onOpenEnsayo(ensayoEnergias.id)}
+            className="w-full flex items-center gap-3 px-4 py-5 rounded-xl border border-primary/10 bg-primary/[0.02] hover:bg-primary/6 hover:border-accent/30 transition-colors text-left"
+          >
+            <div className="shrink-0 w-10 h-10 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
+              <FileText size={18} className="text-accent/70" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-black uppercase italic tracking-tight text-primary truncate">
+                {ensayoEnergias.titulo || TITULO_ENSAYO_ENERGIAS}
+              </div>
+              <div className="text-micro font-bold uppercase tracking-widest text-primary/35 mt-0.5">
+                GOS · Magia
+              </div>
+            </div>
+          </button>
         )}
       </div>
-
-      {showModal && (
-        <NewNoteModal
-          onClose={() => setShowModal(false)}
-          onConfirm={async (titulo) => {
-            const id = await crearNotaPendiente(titulo, ["gos", "magia"]);
-            setShowModal(false);
-            if (id) onOpenEnsayo(id);
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -236,7 +238,7 @@ export function MagiaPorTipo({
         ))}
       </div>
       <div className="flex-1 min-w-0">
-        <BloqueEnsayosMagia onOpenEnsayo={onOpenEnsayo} />
+        <BloqueEnsayoEnergias onOpenEnsayo={onOpenEnsayo} />
         <BloqueSubsistemasMagia />
       </div>
     </div>
