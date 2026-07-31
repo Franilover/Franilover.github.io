@@ -1,13 +1,14 @@
 "use client";
 
-import { Music, Film, Loader2, FileText, PanelRight } from "lucide-react";
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import {
+  Music,
+  Film,
+  Loader2,
+  FileText,
+  PanelRight,
+  Globe,
+} from "lucide-react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 
 import { BannerOffline } from "@/layout/EstudioTemplates";
 import { IDIOMAS } from "@/domains/garlia/canciones/constants";
@@ -20,8 +21,7 @@ import type {
   EditorTab,
 } from "@/domains/garlia/canciones/types";
 
-import { IdiomaTab } from "./IdiomaTab";
-import { SeccionTextarea, SyllableColumn } from "./SeccionTextarea";
+import { SeccionTextarea } from "./SeccionTextarea";
 import { ModalLectorLetras } from "../modals/ModalLectorLetras";
 import { PanelGuionMV } from "../panels/PanelGuionMV";
 import { PanelInfoSidebar } from "../panels/PanelInfoSidebar";
@@ -51,8 +51,7 @@ export const PanelEditor = ({
   } = useCancionEditor(cancionId);
 
   // Estados de UI
-  const [idiomaA, setIdiomaA] = useState<IdiomaKey>("es");
-  const [idiomaB, setIdiomaB] = useState<IdiomaKey>("en");
+  const [modoJapones, setModoJapones] = useState<"romaji" | "jp">("romaji");
   const [activeTab, setActiveTab] = useState<EditorTab>("letras");
   const [countMode, setCountMode] = useState<"silabas" | "vocales">("silabas");
   const [tituloInput, setTituloInput] = useState(cancion?.titulo || "");
@@ -68,10 +67,20 @@ export const PanelEditor = ({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [creandoBloque, setCreandoBloque] = useState(false);
 
-  // Texto en vivo de cada columna en split mode (para el indicador central
-  // de sílabas/vocales, que compara ambos idiomas mientras se tipea).
-  const [textoA, setTextoA] = useState("");
-  const [textoB, setTextoB] = useState("");
+  // Texto en vivo de la columna activa (para el indicador lateral de
+  // sílabas/vocales, que se actualiza mientras se tipea).
+  const [texto, setTexto] = useState("");
+
+  // ── Idioma a mostrar: se define en la barra lateral (cancion.idioma),
+  // no acá. Único caso con selector propio: Japonés tiene dos formas de
+  // escritura (romaji/kanji) que no son "idiomas" distintos en la sidebar,
+  // así que ese matiz sí necesita un botón chico en el editor.
+  const idiomaSidebar = cancion?.idioma?.trim() || "";
+  const idioma: IdiomaKey | null =
+    idiomaSidebar === "Español" ? "es" :
+    idiomaSidebar === "Inglés"  ? "en" :
+    idiomaSidebar === "Japonés" ? modoJapones :
+    null;
 
   // --- Handlers de Datos (Mantenidos del original) ---
   const handleSaveField = useCallback(
@@ -114,11 +123,10 @@ export const PanelEditor = ({
       IDIOMAS.some((i) => !!(s[i.campo] as string)?.trim()),
     ) ?? cancion?.secciones?.[0];
 
-  // Al cambiar de canción/bloque, limpiar los textos en vivo del split mode
-  // para que el indicador central no arrastre valores de otra canción.
+  // Al cambiar de canción/bloque, limpiar el texto en vivo para que el
+  // indicador lateral no arrastre valores de otra canción.
   useEffect(() => {
-    setTextoA("");
-    setTextoB("");
+    setTexto("");
   }, [bloque?.id]);
 
   // Si la canción todavía no tiene su bloque único, lo creamos automáticamente
@@ -153,15 +161,6 @@ export const PanelEditor = ({
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cancion, loading, bloque, cancionId]);
-
-  const changeIdiomaA = (v: IdiomaKey) => {
-    setIdiomaA(v);
-    if (v === idiomaB) setIdiomaB(IDIOMAS.find((i) => i.id !== v)!.id);
-  };
-  const changeIdiomaB = (v: IdiomaKey) => {
-    setIdiomaB(v);
-    if (v === idiomaA) setIdiomaA(IDIOMAS.find((i) => i.id !== v)!.id);
-  };
 
   // --- Helpers de Cálculo ---
   const secciones = useMemo(() => (bloque ? [bloque] : []), [bloque]);
@@ -226,8 +225,7 @@ export const PanelEditor = ({
                 placeholder="Nombre de la canción…"
                 value={tituloInput}
                 onBlur={() => {
-                  if (tituloInput !== cancion.titulo)
-                    handleSaveTitulo(tituloInput);
+                  if (tituloInput !== cancion.titulo) handleSaveTitulo(tituloInput);
                 }}
                 onChange={(e) => setTituloInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -291,19 +289,23 @@ export const PanelEditor = ({
           {activeTab === "letras" && (
             <div className="px-4 sm:px-6 py-2 bg-primary/[0.01] flex items-center justify-between overflow-x-auto no-scrollbar">
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 bg-bg-main border border-primary/10 p-0.5 rounded-lg shrink-0">
-                  <IdiomaTab
-                    exclude={idiomaB}
-                    value={idiomaA}
-                    onChange={changeIdiomaA}
-                  />
-                  <div className="w-[1px] h-3 bg-primary/10 mx-1" />
-                  <IdiomaTab
-                    exclude={idiomaA}
-                    value={idiomaB}
-                    onChange={changeIdiomaB}
-                  />
-                </div>
+                {idioma === "romaji" || idioma === "jp" ? (
+                  <div className="flex items-center gap-1 bg-bg-main border border-primary/10 p-0.5 rounded-lg shrink-0">
+                    {(["romaji", "jp"] as const).map((m) => (
+                      <button
+                        key={m}
+                        className={`px-3 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest transition-all ${
+                          modoJapones === m
+                            ? "bg-primary text-bg-main"
+                            : "text-primary/40 hover:text-primary"
+                        }`}
+                        onClick={() => setModoJapones(m)}
+                      >
+                        {m === "romaji" ? "Romaji" : "Kanji"}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex items-center gap-4 shrink-0">
@@ -351,38 +353,22 @@ export const PanelEditor = ({
         <main className="flex-1 overflow-y-auto">
           {activeTab === "letras" && (
             <div className="px-2 sm:px-3 py-6 space-y-4 w-full">
-              {bloque ? (
+              {!idioma ? (
+                <div className="flex flex-col items-center gap-2 py-20 text-primary/25">
+                  <Globe size={24} strokeWidth={1.5} />
+                  <p className="text-micro font-black uppercase tracking-[0.15em] text-center max-w-[220px]">
+                    Elegí un idioma en la barra lateral para empezar a escribir
+                  </p>
+                </div>
+              ) : bloque ? (
                 <div className="px-2 pb-2 flex gap-2">
                   <SeccionTextarea
                     countMode={countMode}
-                    idioma={idiomaA}
+                    idioma={idioma}
                     sec={bloque}
-                    showSyllableColumn={false}
+                    showSyllableColumn
                     onSave={handleSaveField}
-                    onTextoChange={setTextoA}
-                  />
-                  {/* ── Indicador central: sílabas del bloque izquierdo (hacia la izq) y del derecho (hacia la der) ── */}
-                  <div className="flex shrink-0 self-stretch gap-2">
-                    <SyllableColumn
-                      align="end"
-                      countMode={countMode}
-                      refLineas={null}
-                      texto={textoA}
-                    />
-                    <SyllableColumn
-                      align="start"
-                      countMode={countMode}
-                      refLineas={null}
-                      texto={textoB}
-                    />
-                  </div>
-                  <SeccionTextarea
-                    countMode={countMode}
-                    idioma={idiomaB}
-                    sec={bloque}
-                    showSyllableColumn={false}
-                    onSave={handleSaveField}
-                    onTextoChange={setTextoB}
+                    onTextoChange={setTexto}
                   />
                 </div>
               ) : (
@@ -411,7 +397,7 @@ export const PanelEditor = ({
               <PanelGuionMV
                 cancionId={cancionId}
                 guionInicial={cancion.guion_mv}
-                idiomaActivo={idiomaA}
+                idiomaActivo={idioma ?? "es"}
                 secciones={secciones}
                 onGuionChange={(g) =>
                   setCancion((prev) => (prev ? { ...prev, guion_mv: g } : prev))
