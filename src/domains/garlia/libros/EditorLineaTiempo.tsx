@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Clock,
   Crown,
+  ExternalLink,
   Loader2,
   Music,
   Plus,
@@ -1611,6 +1612,8 @@ function EventoDetallePanel({
   diasAnioLista,
   onFieldChange,
   onDiaChange,
+  onDiaChangeCancion,
+  onDiaChangeCumpleanos,
   onClose,
   onLabelChangeEraPersonaje,
   onNotasChangeEraPersonaje,
@@ -1618,6 +1621,9 @@ function EventoDetallePanel({
   onAddRasgoEraPersonaje,
   onRemoveRasgoEraPersonaje,
   onDeleteEraPersonaje,
+  onSelectCapitulo,
+  onSelectCancion,
+  onSelectPersonaje,
 }: {
   evt: MundoTimelineEvent;
   era: EraMundo | null;
@@ -1630,6 +1636,10 @@ function EventoDetallePanel({
     value: string,
   ) => void;
   onDiaChange?: (id: string, dia: number) => void;
+  /** Cambia la fecha (dia_absoluto) de una canción — tabla `canciones`. */
+  onDiaChangeCancion?: (id: string, dia: number) => void;
+  /** Cambia la fecha de nacimiento de un personaje — tabla `personajes`. */
+  onDiaChangeCumpleanos?: (id: string, dia: number) => void;
   onClose?: () => void;
   onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
   onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
@@ -1637,6 +1647,11 @@ function EventoDetallePanel({
   onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onDeleteEraPersonaje?: (id: string) => void;
+  /** Navega al capítulo/libro — se dispara solo con este botón, nunca con
+   * el click que abre el panel. */
+  onSelectCapitulo?: (capituloId: string, libroId: string) => void;
+  onSelectCancion?: (cancionId: string) => void;
+  onSelectPersonaje?: (personajeId: string) => void;
 }) {
   const editable = evt.source === "mundo" || evt.source === "reino";
   const editableEraPersonaje =
@@ -1695,11 +1710,44 @@ function EventoDetallePanel({
     setSavingFecha(true);
     if (editableEraPersonaje && eraPersonaje) {
       await onMomentoChangeEraPersonaje?.(eraPersonaje, dia);
+    } else if (evt.source === "cancion" && evt.cancionData) {
+      await onDiaChangeCancion?.(evt.cancionData.id, dia);
+    } else if (evt.source === "cumpleanos" && evt.cumpleanosData) {
+      await onDiaChangeCumpleanos?.(evt.cumpleanosData.id, dia);
     } else {
       await onDiaChange?.(evt.id, dia);
     }
     setSavingFecha(false);
   };
+
+  // Fecha editable: eventos "mundo"/"reino", eras de personaje, y también
+  // canciones/cumpleaños (antes solo lectura) — ahora se pueden reprogramar
+  // desde este mismo panel flotante.
+  const fechaEditable =
+    editable ||
+    editableEraPersonaje ||
+    evt.source === "cancion" ||
+    evt.source === "cumpleanos";
+
+  // Handler de "Ir al…" — capítulo/libro, canción o cumpleaños (personaje).
+  // Nunca se dispara solo, requiere click explícito en el botón.
+  const irADestino = () => {
+    if (evt.source === "capitulo" && evt.capData) {
+      onSelectCapitulo?.(evt.capData.id, evt.capData.libro_id);
+    } else if (evt.source === "cancion" && evt.cancionData) {
+      onSelectCancion?.(evt.cancionData.id);
+    } else if (evt.source === "cumpleanos" && evt.cumpleanosData) {
+      onSelectPersonaje?.(evt.cumpleanosData.id);
+    }
+  };
+  const etiquetaDestino =
+    evt.source === "capitulo"
+      ? "Ir al libro"
+      : evt.source === "cancion"
+        ? "Ir a la canción"
+        : evt.source === "cumpleanos"
+          ? "Ir al personaje"
+          : null;
 
   const agregarRasgo = () => {
     const val = nuevoRasgo.trim();
@@ -1766,9 +1814,26 @@ function EventoDetallePanel({
             <Trash2 size={9} />
           </button>
         )}
+        {etiquetaDestino && (
+          <button
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-black uppercase tracking-widest transition-all"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+              color: "var(--accent)",
+              border:
+                "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+            }}
+            title={etiquetaDestino}
+            type="button"
+            onClick={irADestino}
+          >
+            <ExternalLink size={9} />
+            {etiquetaDestino}
+          </button>
+        )}
         {onClose && (
           <button
-            className="ml-auto shrink-0 flex items-center justify-center rounded-full transition-all hover:opacity-100"
+            className={`shrink-0 flex items-center justify-center rounded-full transition-all hover:opacity-100 ${etiquetaDestino ? "" : "ml-auto"}`}
             style={{
               width: 18,
               height: 18,
@@ -1822,7 +1887,7 @@ function EventoDetallePanel({
 
       {/* Fecha + reino/personaje — misma fila cuando hay espacio */}
       <div className="flex items-center gap-2">
-        {editable || editableEraPersonaje ? (
+        {fechaEditable ? (
           <div className="relative flex-1 min-w-0">
             {savingFecha && (
               <Loader2
@@ -2016,6 +2081,8 @@ function ListaEventosConMinimapa({
   setEvtSeleccionado,
   onFieldChange,
   onDiaChange,
+  onDiaChangeCancion,
+  onDiaChangeCumpleanos,
   onSelectPersonaje,
   onSelectCapitulo,
   onSelectCancion,
@@ -2040,6 +2107,8 @@ function ListaEventosConMinimapa({
     value: string,
   ) => void;
   onDiaChange?: (id: string, dia: number) => void;
+  onDiaChangeCancion?: (id: string, dia: number) => void;
+  onDiaChangeCumpleanos?: (id: string, dia: number) => void;
   onSelectPersonaje?: (id: string) => void;
   onSelectCapitulo?: (capituloId: string, libroId: string) => void;
   onSelectCancion?: (cancionId: string) => void;
@@ -2358,25 +2427,13 @@ function ListaEventosConMinimapa({
                                 }}
                                 type="button"
                                 onClick={() => {
-                                  const willSelect = !isSel;
-                                  setEvtSeleccionado(willSelect ? evt.id : null);
-                                  if (!willSelect) return;
-                                  if (evt.source === "capitulo" && evt.capData) {
-                                    onSelectCapitulo?.(
-                                      evt.capData.id,
-                                      evt.capData.libro_id,
-                                    );
-                                  } else if (
-                                    evt.source === "cancion" &&
-                                    evt.cancionData
-                                  ) {
-                                    onSelectCancion?.(evt.cancionData.id);
-                                  } else if (
-                                    evt.source === "cumpleanos" &&
-                                    evt.cumpleanosData
-                                  ) {
-                                    onSelectPersonaje?.(evt.cumpleanosData.id);
-                                  }
+                                  // El primer click solo abre el panel flotante
+                                  // de detalle (EventoDetalleFlotante); nunca
+                                  // navega directo al libro/canción/personaje.
+                                  // La navegación queda detrás de un botón
+                                  // explícito ("Ir al libro…") dentro de ese
+                                  // panel — ver EventoDetallePanel.
+                                  setEvtSeleccionado(isSel ? null : evt.id);
                                 }}
                               >
                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -2445,11 +2502,16 @@ function ListaEventosConMinimapa({
           onClose={() => setEvtSeleccionado(null)}
           onDeleteEraPersonaje={onDeleteEraPersonaje}
           onDiaChange={onDiaChange}
+          onDiaChangeCancion={onDiaChangeCancion}
+          onDiaChangeCumpleanos={onDiaChangeCumpleanos}
           onFieldChange={onFieldChange}
           onLabelChangeEraPersonaje={onLabelChangeEraPersonaje}
           onMomentoChangeEraPersonaje={onMomentoChangeEraPersonaje}
           onNotasChangeEraPersonaje={onNotasChangeEraPersonaje}
           onRemoveRasgoEraPersonaje={onRemoveRasgoEraPersonaje}
+          onSelectCapitulo={onSelectCapitulo}
+          onSelectCancion={onSelectCancion}
+          onSelectPersonaje={onSelectPersonaje}
         />
       )}
     </div>
@@ -2472,6 +2534,8 @@ function EventoDetalleFlotante({
   diasAnioLista,
   onFieldChange,
   onDiaChange,
+  onDiaChangeCancion,
+  onDiaChangeCumpleanos,
   onClose,
   onLabelChangeEraPersonaje,
   onNotasChangeEraPersonaje,
@@ -2479,6 +2543,9 @@ function EventoDetalleFlotante({
   onAddRasgoEraPersonaje,
   onRemoveRasgoEraPersonaje,
   onDeleteEraPersonaje,
+  onSelectCapitulo,
+  onSelectCancion,
+  onSelectPersonaje,
 }: {
   anchorEl: HTMLElement | null;
   evt: MundoTimelineEvent;
@@ -2494,6 +2561,8 @@ function EventoDetalleFlotante({
     value: string,
   ) => void;
   onDiaChange?: (id: string, dia: number) => void;
+  onDiaChangeCancion?: (id: string, dia: number) => void;
+  onDiaChangeCumpleanos?: (id: string, dia: number) => void;
   onClose: () => void;
   onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
   onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
@@ -2501,6 +2570,9 @@ function EventoDetalleFlotante({
   onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onDeleteEraPersonaje?: (id: string) => void;
+  onSelectCapitulo?: (capituloId: string, libroId: string) => void;
+  onSelectCancion?: (cancionId: string) => void;
+  onSelectPersonaje?: (personajeId: string) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -2547,11 +2619,16 @@ function EventoDetalleFlotante({
           onClose={onClose}
           onDeleteEraPersonaje={onDeleteEraPersonaje}
           onDiaChange={onDiaChange}
+          onDiaChangeCancion={onDiaChangeCancion}
+          onDiaChangeCumpleanos={onDiaChangeCumpleanos}
           onFieldChange={onFieldChange}
           onLabelChangeEraPersonaje={onLabelChangeEraPersonaje}
           onMomentoChangeEraPersonaje={onMomentoChangeEraPersonaje}
           onNotasChangeEraPersonaje={onNotasChangeEraPersonaje}
           onRemoveRasgoEraPersonaje={onRemoveRasgoEraPersonaje}
+          onSelectCapitulo={onSelectCapitulo}
+          onSelectCancion={onSelectCancion}
+          onSelectPersonaje={onSelectPersonaje}
         />
       </div>
     </div>,
@@ -3001,13 +3078,168 @@ function PersonajeFilterDropdown({
   );
 }
 
+// ── Menú flotante de cumpleaños/canción en la barra lateral ─────────────────
+// Se abre al hacer click en un ítem del sidebar (en vez de navegar/filtrar
+// directo). Permite cambiar la fecha (dia_absoluto / fecha_nacimiento) desde
+// un selector, y tiene un botón explícito de "Viajar" al lado para recién
+// ahí navegar al personaje o a la canción — el click que abre el menú nunca
+// viaja por sí solo.
+function SidebarItemDetalleFlotante({
+  tipo,
+  titulo,
+  subtitulo,
+  dia,
+  diasAnioLista,
+  onClose,
+  onDiaChange,
+  onViajar,
+}: {
+  tipo: "cumpleanos" | "cancion";
+  titulo: string;
+  subtitulo?: string | null;
+  dia: number;
+  diasAnioLista: number;
+  onClose: () => void;
+  onDiaChange: (dia: number) => void | Promise<void>;
+  onViajar: () => void;
+}) {
+  const [savingFecha, setSavingFecha] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  const commitDia = async (nuevoDia: number | null) => {
+    if (nuevoDia == null) return;
+    setSavingFecha(true);
+    await onDiaChange(nuevoDia);
+    setSavingFecha(false);
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 45%, transparent)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="rounded-xl shadow-lg w-full flex flex-col gap-3 p-4"
+        style={{
+          maxWidth: 360,
+          background: "var(--bg-main)",
+          border:
+            "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <span
+            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest px-1.5 py-0.5 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 5%, transparent)",
+              color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+              border:
+                "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+            }}
+          >
+            {tipo === "cumpleanos" ? (
+              <CalendarDays size={7} />
+            ) : (
+              <Music size={7} />
+            )}
+            {tipo === "cumpleanos" ? "Cumpleaños" : "Canción"}
+          </span>
+          <button
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-black uppercase tracking-widest transition-all"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+              color: "var(--accent)",
+              border:
+                "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+            }}
+            title={tipo === "cumpleanos" ? "Ir al personaje" : "Ir a la canción"}
+            type="button"
+            onClick={onViajar}
+          >
+            <ExternalLink size={9} />
+            Viajar
+          </button>
+          <button
+            className="shrink-0 flex items-center justify-center rounded-full transition-all hover:opacity-100"
+            style={{
+              width: 18,
+              height: 18,
+              color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+              opacity: 0.7,
+            }}
+            title="Cerrar"
+            type="button"
+            onClick={onClose}
+          >
+            <X size={11} />
+          </button>
+        </div>
+
+        <p
+          className="text-sm font-black uppercase leading-tight"
+          style={{ color: "var(--primary)" }}
+        >
+          {titulo}
+        </p>
+        {subtitulo && (
+          <p
+            className="text-micro font-bold -mt-2"
+            style={{
+              color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+            }}
+          >
+            {subtitulo}
+          </p>
+        )}
+
+        <div className="relative">
+          {savingFecha && (
+            <Loader2
+              className="animate-spin absolute right-2 top-1.5 z-10 text-primary/30"
+              size={9}
+            />
+          )}
+          <SelectorFechaMundo
+            placeholder="Sin fecha…"
+            value={dia}
+            onChange={commitDia}
+          />
+        </div>
+        <p
+          className="text-micro"
+          style={{
+            color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+          }}
+        >
+          Año {Math.floor(dia / diasAnioLista)}
+        </p>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ─── SidebarCumpleanosCanciones ──────────────────────────────────────────────
 // Barra lateral derecha con cumpleaños y canciones de TODOS los personajes,
 // ordenados por año. Reemplaza el comportamiento anterior de mezclarlos
 // siempre en la pista principal — ahí solo aparecen cuando hay un personaje
-// filtrado (ver allEvents en PanelHistoriaMundo). Clic en un cumpleaños
-// activa el filtro de ese personaje (mismo efecto que elegirlo en el
-// selector); clic en una canción navega directo a su editor.
+// filtrado (ver allEvents en PanelHistoriaMundo). El primer click en un
+// ítem NUNCA navega/filtra directo: abre un menú flotante
+// (SidebarItemDetalleFlotante) con la fecha editable y un botón "Viajar"
+// explícito — recién ese botón activa el filtro de personaje o abre el
+// editor de la canción.
 function SidebarCumpleanosCanciones({
   cumpleanos,
   canciones,
@@ -3016,6 +3248,8 @@ function SidebarCumpleanosCanciones({
   showCanciones,
   onSelectPersonaje,
   onSelectCancion,
+  onDiaChangeCumpleanos,
+  onDiaChangeCancion,
 }: {
   cumpleanos: {
     id: string;
@@ -3036,9 +3270,24 @@ function SidebarCumpleanosCanciones({
   showCanciones: boolean;
   onSelectPersonaje?: (id: string) => void;
   onSelectCancion?: (id: string) => void;
+  onDiaChangeCumpleanos?: (id: string, dia: number) => void | Promise<void>;
+  onDiaChangeCancion?: (id: string, dia: number) => void | Promise<void>;
 }) {
+  const [seleccionado, setSeleccionado] = useState<
+    { tipo: "cumpleanos" | "cancion"; id: string } | null
+  >(null);
+
   if (!showCumpleanos && !showCanciones) return null;
   if (cumpleanos.length === 0 && canciones.length === 0) return null;
+
+  const cumpleSel =
+    seleccionado?.tipo === "cumpleanos"
+      ? cumpleanos.find((p) => p.id === seleccionado.id)
+      : null;
+  const cancionSel =
+    seleccionado?.tipo === "cancion"
+      ? canciones.find((c) => c.id === seleccionado.id)
+      : null;
 
   return (
     <div
@@ -3068,9 +3317,9 @@ function SidebarCumpleanosCanciones({
                   border:
                     "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
                 }}
-                title={`Filtrar por ${p.nombre}`}
+                title={`Ver ${p.nombre}`}
                 type="button"
-                onClick={() => onSelectPersonaje?.(p.id)}
+                onClick={() => setSeleccionado({ tipo: "cumpleanos", id: p.id })}
               >
                 <span
                   className="text-micro font-bold truncate flex-1"
@@ -3115,9 +3364,9 @@ function SidebarCumpleanosCanciones({
                   border:
                     "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
                 }}
-                title={`Abrir ${c.titulo}`}
+                title={`Ver ${c.titulo}`}
                 type="button"
-                onClick={() => onSelectCancion?.(c.id)}
+                onClick={() => setSeleccionado({ tipo: "cancion", id: c.id })}
               >
                 <span
                   className="text-micro font-bold truncate flex-1"
@@ -3142,6 +3391,37 @@ function SidebarCumpleanosCanciones({
             ))}
           </div>
         </div>
+      )}
+
+      {cumpleSel && (
+        <SidebarItemDetalleFlotante
+          diasAnioLista={diasAnioLista}
+          dia={cumpleSel.fecha_nacimiento}
+          onClose={() => setSeleccionado(null)}
+          onDiaChange={(dia) => onDiaChangeCumpleanos?.(cumpleSel.id, dia)}
+          onViajar={() => {
+            onSelectPersonaje?.(cumpleSel.id);
+            setSeleccionado(null);
+          }}
+          subtitulo={cumpleSel.reino}
+          tipo="cumpleanos"
+          titulo={cumpleSel.nombre}
+        />
+      )}
+      {cancionSel && cancionSel.dia_absoluto != null && (
+        <SidebarItemDetalleFlotante
+          diasAnioLista={diasAnioLista}
+          dia={cancionSel.dia_absoluto}
+          onClose={() => setSeleccionado(null)}
+          onDiaChange={(dia) => onDiaChangeCancion?.(cancionSel.id, dia)}
+          onViajar={() => {
+            onSelectCancion?.(cancionSel.id);
+            setSeleccionado(null);
+          }}
+          subtitulo={cancionSel.cantante ?? cancionSel.reinoNombre}
+          tipo="cancion"
+          titulo={cancionSel.titulo}
+        />
       )}
     </div>
   );
@@ -3613,10 +3893,17 @@ export function PanelHistoriaMundo({
     if (reinoFijo !== undefined) setFilterReino(reinoFijo ?? null);
   }, [reinoFijo]);
   const [showCapitulos, setShowCapitulos] = useState(true);
-  const [showCanciones, setShowCanciones] = useState(true);
+  // Antes eran togglees en la cabecera (mostrar/ocultar canciones y
+  // cumpleaños en la pista principal). Se quitaron esos botones porque
+  // canciones/cumpleaños ahora viven siempre en el panel lateral derecho
+  // (SidebarCumpleanosCanciones); se dejan fijas en `true` para no romper
+  // el filtro de allEvents cuando hay un personaje seleccionado (ahí sí
+  // siguen apareciendo en la pista principal, el cumpleaños/canciones de
+  // ESE personaje).
+  const showCanciones = true;
+  const showCumpleanos = true;
   const [showEventos, setShowEventos] = useState(true);
   const [evtSeleccionado, setEvtSeleccionado] = useState<string | null>(null);
-  const [showCumpleanos, setShowCumpleanos] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [diaOverrides, setDiaOverrides] = useState<Record<string, number>>({});
   const [showNuevoEvento, setShowNuevoEvento] = useState(false);
@@ -3699,6 +3986,59 @@ export function PanelHistoriaMundo({
           await (db as any).eventos_mundo.put({
             ...(existing ?? { id }),
             dia_absoluto: dia,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  // Cambia la fecha (dia_absoluto) de una canción — tabla `canciones`.
+  // Usado desde el panel flotante de detalle al reprogramar una canción
+  // (antes solo se podía navegar directo a su editor).
+  const handleCancionDiaChange = useCallback(
+    async (id: string, dia: number) => {
+      setCancionesTimeline((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, dia_absoluto: dia } : c)),
+      );
+      try {
+        await supabase
+          .from("canciones")
+          .update({ dia_absoluto: dia } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).canciones) {
+          const existing = await (db as any).canciones.get(id);
+          await (db as any).canciones.put({
+            ...(existing ?? { id }),
+            dia_absoluto: dia,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  // Cambia la fecha de nacimiento de un personaje — tabla `personajes`.
+  // Usado desde el panel flotante de detalle al reprogramar un cumpleaños.
+  const handleCumpleanosDiaChange = useCallback(
+    async (id: string, dia: number) => {
+      setPersonajesCumple((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, fecha_nacimiento: dia } : p)),
+      );
+      try {
+        await supabase
+          .from("personajes")
+          .update({ fecha_nacimiento: dia } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).personajes) {
+          const existing = await (db as any).personajes.get(id);
+          await (db as any).personajes.put({
+            ...(existing ?? { id }),
+            fecha_nacimiento: dia,
           });
         }
       } catch {}
@@ -4046,45 +4386,18 @@ export function PanelHistoriaMundo({
               onClick={() => setShowCapitulos((v) => !v)}
             />
             <ToggleTipoBtn
-              active={showCanciones}
-              icon={<Music size={9} />}
-              label="Canciones"
-              onClick={() => setShowCanciones((v) => !v)}
-            />
-            <ToggleTipoBtn
               active={showEventos}
               icon={<CalendarDays size={9} />}
               label="Eventos"
               onClick={() => setShowEventos((v) => !v)}
             />
-            <ToggleTipoBtn
-              active={showCumpleanos}
-              icon={
-                <svg
-                  fill="none"
-                  height="9"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  width="9"
-                >
-                  <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" />
-                  <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2 1 2 1" />
-                  <path d="M2 21h20" />
-                  <path d="M7 8v2" />
-                  <path d="M12 8v2" />
-                  <path d="M17 8v2" />
-                  <path d="M7 4h.01" />
-                  <path d="M12 4h.01" />
-                  <path d="M17 4h.01" />
-                </svg>
-              }
-              label="Cumpleaños"
-              onClick={() => setShowCumpleanos((v) => !v)}
-            />
           </div>
+          {/* Los toggles de "Canciones" y "Cumpleaños" se quitaron: ya no
+              se muestran mezclados en la pista principal, sino siempre en
+              el panel lateral derecho (SidebarCumpleanosCanciones). Las
+              variables showCanciones/showCumpleanos se mantienen fijas en
+              true (ver más abajo) para no romper el filtro que usa
+              allEvents cuando hay un personaje seleccionado. */}
 
           {/* ── Filtro por reino ── (oculto cuando hay un reinoFijo) */}
           {reinoFijo == null && reinosConEventos.length > 0 && (
@@ -4340,6 +4653,8 @@ export function PanelHistoriaMundo({
               onAddRasgoEraPersonaje={addRasgoEraPersonaje}
               onDeleteEraPersonaje={deleteEraPersonaje}
               onDiaChange={handleEventoMundoDiaChange}
+              onDiaChangeCancion={handleCancionDiaChange}
+              onDiaChangeCumpleanos={handleCumpleanosDiaChange}
               onFieldChange={handleEventoMundoFieldChange}
               onLabelChangeEraPersonaje={changeLabelEraPersonaje}
               onMomentoChangeEraPersonaje={changeMomentoEraPersonaje}
@@ -4362,6 +4677,8 @@ export function PanelHistoriaMundo({
             diasAnioLista={diasAnioBarra}
             showCanciones={showCanciones}
             showCumpleanos={showCumpleanos}
+            onDiaChangeCancion={handleCancionDiaChange}
+            onDiaChangeCumpleanos={handleCumpleanosDiaChange}
             onSelectCancion={onSelectCancion}
             onSelectPersonaje={(id) => {
               setFilterPersonaje(id);
