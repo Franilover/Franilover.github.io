@@ -3001,6 +3001,152 @@ function PersonajeFilterDropdown({
   );
 }
 
+// ─── SidebarCumpleanosCanciones ──────────────────────────────────────────────
+// Barra lateral derecha con cumpleaños y canciones de TODOS los personajes,
+// ordenados por año. Reemplaza el comportamiento anterior de mezclarlos
+// siempre en la pista principal — ahí solo aparecen cuando hay un personaje
+// filtrado (ver allEvents en PanelHistoriaMundo). Clic en un cumpleaños
+// activa el filtro de ese personaje (mismo efecto que elegirlo en el
+// selector); clic en una canción navega directo a su editor.
+function SidebarCumpleanosCanciones({
+  cumpleanos,
+  canciones,
+  diasAnioLista,
+  showCumpleanos,
+  showCanciones,
+  onSelectPersonaje,
+  onSelectCancion,
+}: {
+  cumpleanos: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    reino: string | null;
+    fecha_nacimiento: number;
+  }[];
+  canciones: {
+    id: string;
+    titulo: string;
+    cantante?: string | null;
+    reinoNombre?: string | null;
+    dia_absoluto?: number;
+  }[];
+  diasAnioLista: number;
+  showCumpleanos: boolean;
+  showCanciones: boolean;
+  onSelectPersonaje?: (id: string) => void;
+  onSelectCancion?: (id: string) => void;
+}) {
+  if (!showCumpleanos && !showCanciones) return null;
+  if (cumpleanos.length === 0 && canciones.length === 0) return null;
+
+  return (
+    <div
+      className="shrink-0 w-[220px] border-l overflow-y-auto flex flex-col gap-4 px-3 py-3"
+      style={{
+        borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+      }}
+    >
+      {showCumpleanos && cumpleanos.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span
+            className="text-micro font-black uppercase tracking-widest px-0.5"
+            style={{
+              color: "color-mix(in srgb, var(--primary) 35%, transparent)",
+            }}
+          >
+            Cumpleaños
+          </span>
+          <div className="flex flex-col gap-1">
+            {cumpleanos.map((p) => (
+              <button
+                key={p.id}
+                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-all"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--primary) 2%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+                title={`Filtrar por ${p.nombre}`}
+                type="button"
+                onClick={() => onSelectPersonaje?.(p.id)}
+              >
+                <span
+                  className="text-micro font-bold truncate flex-1"
+                  style={{
+                    color: "color-mix(in srgb, var(--primary) 65%, transparent)",
+                  }}
+                >
+                  {p.nombre}
+                </span>
+                <span
+                  className="text-micro font-black tabular-nums shrink-0"
+                  style={{
+                    color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+                  }}
+                >
+                  Año {Math.floor(p.fecha_nacimiento / diasAnioLista)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showCanciones && canciones.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span
+            className="text-micro font-black uppercase tracking-widest px-0.5"
+            style={{
+              color: "color-mix(in srgb, var(--primary) 35%, transparent)",
+            }}
+          >
+            Canciones
+          </span>
+          <div className="flex flex-col gap-1">
+            {canciones.map((c) => (
+              <button
+                key={c.id}
+                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-all"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--primary) 2%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+                title={`Abrir ${c.titulo}`}
+                type="button"
+                onClick={() => onSelectCancion?.(c.id)}
+              >
+                <span
+                  className="text-micro font-bold truncate flex-1"
+                  style={{
+                    color: "color-mix(in srgb, var(--primary) 65%, transparent)",
+                  }}
+                >
+                  {c.titulo}
+                </span>
+                {c.dia_absoluto != null && (
+                  <span
+                    className="text-micro font-black tabular-nums shrink-0"
+                    style={{
+                      color:
+                        "color-mix(in srgb, var(--primary) 30%, transparent)",
+                    }}
+                  >
+                    Año {Math.floor(c.dia_absoluto / diasAnioLista)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Panel principal — vista y edición unificadas, ambas pistas editables ──────
 export function PanelHistoriaMundo({
   texto: _texto,
@@ -3684,8 +3830,10 @@ export function PanelHistoriaMundo({
         });
       }
     }
-    // Canciones — solo las que tienen dia_absoluto
-    if (showCanciones) {
+    // Canciones — solo las que tienen dia_absoluto. Solo aparecen en la
+    // pista principal cuando hay un personaje filtrado (si no, van en la
+    // barra lateral de "Cumpleaños y canciones" — ver cancionesSidebar).
+    if (showCanciones && filterPersonaje) {
       for (const c of cancionesTimeline) {
         if (filterReino && c.reinoId !== filterReino) continue;
         if (filterPersonaje && c.personajeId !== filterPersonaje) continue;
@@ -3715,8 +3863,11 @@ export function PanelHistoriaMundo({
         });
       }
     }
-    // Cumpleaños — personajes con fecha_nacimiento
-    if (showCumpleanos) {
+    // Cumpleaños — personajes con fecha_nacimiento. Igual que canciones:
+    // solo aparecen en la pista principal cuando hay un personaje
+    // filtrado (muestra el cumpleaños de ESE personaje). Sin filtro,
+    // los cumpleaños de todos se ven en la barra lateral.
+    if (showCumpleanos && filterPersonaje) {
       for (const p of personajesCumple) {
         if (
           filterReino &&
@@ -3820,6 +3971,50 @@ export function PanelHistoriaMundo({
         return tieneCaps || tieneEventos || tieneCanciones;
       }),
     [reinos, capsReinosIds, eventosMundo, cancionesTimeline],
+  );
+
+  // Días por año del calendario actual — usado para mostrar "Año N" en la
+  // barra lateral, mismo cálculo que diasAnioLista dentro de
+  // ListaEventosConMinimapa.
+  const diasAnioBarra =
+    cal?.estaciones?.reduce(
+      (s: number, e: any) => s + (e.duracion_dias ?? 0),
+      0,
+    ) || 365;
+
+  // ── Barra lateral: cumpleaños y canciones de TODOS los personajes ────────
+  // Antes vivían mezclados en la pista principal siempre. Ahora solo entran
+  // a la pista principal cuando hay un personaje filtrado (ver allEvents);
+  // sin filtro, se listan acá aparte, ordenados por año, para no saturar
+  // la línea de tiempo del mundo con cumpleaños/canciones de decenas de
+  // personajes.
+  const cumpleanosSidebar = useMemo(
+    () =>
+      personajesCumple
+        .filter((p) => {
+          if (
+            filterReino &&
+            p.reino !== reinos.find((r) => r.id === filterReino)?.nombre
+          )
+            return false;
+          return true;
+        })
+        .slice()
+        .sort((a, b) => a.fecha_nacimiento - b.fecha_nacimiento),
+    [personajesCumple, filterReino, reinos],
+  );
+
+  const cancionesSidebar = useMemo(
+    () =>
+      cancionesTimeline
+        .filter((c) => {
+          if (c.dia_absoluto == null) return false;
+          if (filterReino && c.reinoId !== filterReino) return false;
+          return true;
+        })
+        .slice()
+        .sort((a, b) => (a.dia_absoluto ?? 0) - (b.dia_absoluto ?? 0)),
+    [cancionesTimeline, filterReino],
   );
 
   // (Eliminados: selectedEvt, handleUpdateSelected — panel de edición de eventos "mundo"/"reino")
@@ -4127,31 +4322,51 @@ export function PanelHistoriaMundo({
         />
       )}
 
-      {/* ── Pista única: acontecimientos + capítulos en un solo scroll ──────── */}
-      <div className="px-3 py-3 flex-1 min-h-0 overflow-y-auto">
-        {loadingReinos ? (
-          <div className="flex justify-center py-4">
-            <Loader2 className="animate-spin text-primary/20" size={14} />
-          </div>
-        ) : (
-          /* ── MODO LISTA VERTICAL (solo en modo compacto) ─────────────────── */
-          <ListaEventosConMinimapa
-            allEvents={allEvents}
-            cal={cal}
-            erasPersonaje={erasPersonaje}
-            evtSeleccionado={evtSeleccionado}
-            setEvtSeleccionado={setEvtSeleccionado}
-            onAddRasgoEraPersonaje={addRasgoEraPersonaje}
-            onDeleteEraPersonaje={deleteEraPersonaje}
-            onDiaChange={handleEventoMundoDiaChange}
-            onFieldChange={handleEventoMundoFieldChange}
-            onLabelChangeEraPersonaje={changeLabelEraPersonaje}
-            onMomentoChangeEraPersonaje={changeMomentoEraPersonaje}
-            onNotasChangeEraPersonaje={changeNotasEraPersonaje}
-            onRemoveRasgoEraPersonaje={removeRasgoEraPersonaje}
+      {/* ── Pista principal + barra lateral de cumpleaños/canciones ─────────── */}
+      <div className="flex flex-1 min-h-0">
+        <div className="px-3 py-3 flex-1 min-h-0 overflow-y-auto">
+          {loadingReinos ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="animate-spin text-primary/20" size={14} />
+            </div>
+          ) : (
+            /* ── MODO LISTA VERTICAL (solo en modo compacto) ─────────────── */
+            <ListaEventosConMinimapa
+              allEvents={allEvents}
+              cal={cal}
+              erasPersonaje={erasPersonaje}
+              evtSeleccionado={evtSeleccionado}
+              setEvtSeleccionado={setEvtSeleccionado}
+              onAddRasgoEraPersonaje={addRasgoEraPersonaje}
+              onDeleteEraPersonaje={deleteEraPersonaje}
+              onDiaChange={handleEventoMundoDiaChange}
+              onFieldChange={handleEventoMundoFieldChange}
+              onLabelChangeEraPersonaje={changeLabelEraPersonaje}
+              onMomentoChangeEraPersonaje={changeMomentoEraPersonaje}
+              onNotasChangeEraPersonaje={changeNotasEraPersonaje}
+              onRemoveRasgoEraPersonaje={removeRasgoEraPersonaje}
+              onSelectCancion={onSelectCancion}
+              onSelectCapitulo={onSelectCapitulo}
+              onSelectPersonaje={onSelectPersonaje}
+            />
+          )}
+        </div>
+
+        {/* Barra lateral: solo tiene sentido sin un personaje filtrado —
+            con un personaje seleccionado, su cumpleaños y canciones ya
+            aparecen en la pista principal (ver allEvents). */}
+        {!filterPersonaje && (
+          <SidebarCumpleanosCanciones
+            cumpleanos={cumpleanosSidebar}
+            canciones={cancionesSidebar}
+            diasAnioLista={diasAnioBarra}
+            showCanciones={showCanciones}
+            showCumpleanos={showCumpleanos}
             onSelectCancion={onSelectCancion}
-            onSelectCapitulo={onSelectCapitulo}
-            onSelectPersonaje={onSelectPersonaje}
+            onSelectPersonaje={(id) => {
+              setFilterPersonaje(id);
+              onSelectPersonaje?.(id);
+            }}
           />
         )}
       </div>
