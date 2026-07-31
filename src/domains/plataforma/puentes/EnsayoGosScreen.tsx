@@ -12,9 +12,13 @@
  * en /myself/escritorio — así el comportamiento es idéntico en ambos lugares
  * sin duplicar esa lógica dos veces.
  *
- * "Volver" no toca el store de navegación de Garlia (useMundoNavigation):
- * el ensayo abierto es estado 100% local a este componente, controlado por
- * el padre (MundoHomeContent) vía la prop onClose.
+ * Se usa en dos lugares:
+ *   1. EditorMundoRoot, sección "notas-gos" — participa del sistema de tabs
+ *      de Mundo (useMundoNavigation): "Volver" llama a closeTab, que cierra
+ *      esta pestaña y activa la vecina (o vuelve a Inicio si no queda
+ *      ninguna).
+ *   2. Cualquier otro lugar que la use standalone, pasando ensayoId/onClose
+ *      directo, sin depender de useMundoNavigation.
  */
 
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -62,7 +66,7 @@ export function EnsayoGosScreen({ ensayoId, onClose }: Props) {
           onClick={onClose}
           className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/50 hover:text-primary transition-colors"
         >
-          <ArrowLeft size={11} /> Inicio
+          <ArrowLeft size={11} /> Volver
         </button>
         <div className="w-px h-3.5 bg-primary/15" />
         <span className="text-micro font-black uppercase tracking-widest text-primary/70 truncate">

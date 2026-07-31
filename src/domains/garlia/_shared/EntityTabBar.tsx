@@ -47,6 +47,7 @@ const SECTION_ICON: Partial<Record<SectionKey, React.ElementType>> = {
   runas: Compass,
   letras: Music,
   notas: StickyNote,
+  "notas-gos": StickyNote,
 };
 
 function EntityTab({

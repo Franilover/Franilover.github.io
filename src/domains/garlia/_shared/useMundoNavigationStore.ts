@@ -37,6 +37,7 @@ export type SectionKey =
   | "capitulos"
   | "letras"
   | "notas"
+  | "notas-gos"
   | "mapa"
   | "linea-tiempo"
   | "aventura";

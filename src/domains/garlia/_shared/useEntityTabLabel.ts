@@ -38,6 +38,7 @@ const SECTION_TABLE: Record<SectionKey, string | null> = {
   capitulos: null, // capítulos no participan de las tabs de entidad
   letras: "canciones",
   notas: "notas",
+  "notas-gos": "ensayos",
   mapa: null,
   "linea-tiempo": null,
   aventura: null,

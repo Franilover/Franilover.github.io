@@ -41,6 +41,7 @@ import { MundoHomeContent } from "@/domains/garlia/_shared/MundoHomeContent";
 import { useCreateEntity } from "@/domains/garlia/_shared/useCreateEntity";
 import { useWikilinkNavigate } from "@/domains/garlia/_shared/useWikilinkNavigate";
 import { EntityTabBar } from "@/domains/garlia/_shared/EntityTabBar";
+import { EnsayoGosScreen } from "@/domains/plataforma/puentes/EnsayoGosScreen";
 
 // ─── Code-splitting por página combinada ──────────────────────────────────
 // Personajes/Criaturas/Items/Reinos/Ciudades/Hechizos/Dones/Runas/Grupos/
@@ -75,6 +76,7 @@ function SectionFallback() {
 function ActiveSection() {
   const section = useMundoNavigation((s) => s.section);
   const selectedId = useMundoNavigation((s) => s.selectedId);
+  const closeTab = useMundoNavigation((s) => s.closeTab);
 
   switch (section) {
     case null:
@@ -91,6 +93,16 @@ function ActiveSection() {
     case "notas":
     case "letras":
       return <EntidadesPage section={section} selectedId={selectedId} />;
+    case "notas-gos":
+      // Reusa el mismo editor de ensayos que EnsayosShell (/myself/escritorio),
+      // pero ahora como pestaña más dentro de Mundo — igual que runas/personajes.
+      return selectedId ? (
+        <EnsayoGosScreen
+          key={selectedId}
+          ensayoId={selectedId}
+          onClose={() => closeTab("notas-gos", selectedId)}
+        />
+      ) : null;
     case "capitulos":
       return <CapitulosSection />;
     case "mapa":
