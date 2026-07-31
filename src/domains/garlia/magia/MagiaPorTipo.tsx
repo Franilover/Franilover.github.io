@@ -238,12 +238,12 @@ export function MagiaPorTipo({
         {todasLasRunas && (
           <SubBloqueProbador runas={todasLasRunas} />
         )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <BloqueEnsayoEnergias />
         {todasLasRunas && (
           <EditorCombinacionesRunas runas={todasLasRunas} />
         )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <BloqueEnsayoEnergias />
       </div>
     </div>
   );
