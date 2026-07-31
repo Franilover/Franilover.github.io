@@ -18,7 +18,7 @@
  * muestra sin lógica extra acá.
  */
 
-import { Music, Plus, StickyNote, Users } from "lucide-react";
+import { Music, Plus, StickyNote } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
@@ -34,7 +34,6 @@ import { useNotas } from "@/editor/notas/useNotas";
 import { type Nota } from "@/domains/garlia/_shared/types";
 import { useEntidadesMagicas } from "@/domains/garlia/magia/useEntidadesMagicas";
 import { EditorGrupo, GRUPO_TIPO_CONFIG, useGrupos, type GrupoTipo } from "@/domains/garlia/grupos/EditorGrupo";
-import type { Grupo } from "@/domains/garlia/grupos/useGrupos";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
 
@@ -43,7 +42,6 @@ import { ItemEditor } from "@/domains/garlia/items/ItemEditor";
 import { PersonajeEditor } from "@garlia/personajes";
 import { ReinoEditor } from "@garlia/reinos";
 import { CiudadEditor } from "@garlia/ciudades";
-import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GeografiaJerarquica } from "@/domains/garlia/_shared/GeografiaJerarquica";
 import { MagiaJerarquica } from "@/domains/garlia/magia/MagiaJerarquica";
@@ -184,34 +182,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
     }
     return map;
   }, [gruposPorTipo]);
-
-  /** Resuelve los miembros de un grupo a { id, nombre, imageUrl } cruzando
-   *  miembro_ids contra los catálogos ya cargados (personajes/criaturas/
-   *  items). Para tipos sin catálogo local (hechizos, dones, runas, reinos,
-   *  canciones, libros) devuelve solo lo que se puede resolver — hoy vacío,
-   *  el grupo cae en el fallback de "sin miembros resueltos". */
-  const miembrosDeGrupo = useMemo(() => {
-    return (g: Grupo): { id: string; nombre: string; imageUrl: string | null }[] => {
-      const ids = new Set(g.miembro_ids);
-      if (ids.size === 0) return [];
-      switch (g.tipo) {
-        case "personajes":
-          return personajes
-            .filter((p) => ids.has(p.id))
-            .map((p) => ({ id: p.id, nombre: p.nombre, imageUrl: p.img_url ?? null }));
-        case "criaturas":
-          return criaturas
-            .filter((c) => ids.has(c.id))
-            .map((c) => ({ id: c.id, nombre: c.nombre, imageUrl: c.imagen_url ?? null }));
-        case "items":
-          return items
-            .filter((it) => ids.has(it.id))
-            .map((it) => ({ id: it.id, nombre: it.nombre, imageUrl: it.imagen_url ?? null }));
-        default:
-          return [];
-      }
-    };
-  }, [personajes, criaturas, items]);
 
   // ── Canciones ─────────────────────────────────────────────────────────
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
@@ -639,7 +609,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
   if (section === "grupos" || section === "notas") {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <div className="flex flex-row flex-wrap gap-6 items-start">
+        <div
+          className="grid gap-6 items-start"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}
+        >
           {(Object.entries(GRUPO_TIPO_CONFIG) as [GrupoTipo, (typeof GRUPO_TIPO_CONFIG)[GrupoTipo]][]).map(
             ([tipo, cfg]) => {
               const bloques = subtiposPorTipo[tipo] ?? [];
@@ -649,7 +622,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
                     key={tipo}
                     title={cfg.labelPlural}
                     Icon={cfg.Icon}
-                    fill={false}
+                    className="w-full"
                     onCreate={async () => {
                       const nuevo = await crearGrupo(tipo);
                       if (nuevo) openEntity("grupos", nuevo.id);
@@ -665,7 +638,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
                     key={tipo}
                     title={cfg.labelPlural}
                     Icon={cfg.Icon}
-                    fill={false}
+                    className="w-full"
                     onCreate={async () => {
                       const nuevo = await crearGrupo(tipo);
                       if (nuevo) openEntity("grupos", nuevo.id);
@@ -683,7 +656,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
                   key={tipo}
                   title={cfg.labelPlural}
                   Icon={cfg.Icon}
-                  fill={false}
+                  className="w-full"
                   onCreate={async () => {
                     const nuevo = await crearGrupo(tipo);
                     if (nuevo) openEntity("grupos", nuevo.id);
@@ -699,49 +672,18 @@ export function EntidadesPage({ section, selectedId }: Props) {
                           {bloque.subtipo ?? "Sin subtipo"}
                         </span>
                       </div>
-                      <div className="mt-2 flex flex-row flex-wrap gap-3 items-start">
-                        {bloque.items.map((g) => {
-                          const miembros = miembrosDeGrupo(g);
-                          const itemSize = 52;
-                          const gapPx = 4;
-                          const cols = Math.min(Math.max(miembros.length, 1), 6);
-                          const anchoPx = Math.max(cols * itemSize + (cols - 1) * gapPx, 90);
-                          return (
-                            <div key={g.id} className="shrink-0" style={{ width: anchoPx }}>
-                              <button
-                                type="button"
-                                onClick={() => openEntity("grupos", g.id)}
-                                title={g.nombre}
-                                style={{ maxWidth: anchoPx }}
-                                className="px-2.5 py-1 rounded-lg border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-xs font-semibold text-primary/80 text-left truncate block w-full"
-                              >
-                                {g.nombre}
-                              </button>
-                              {miembros.length > 0 ? (
-                                <div
-                                  className="mt-1.5 grid gap-1"
-                                  style={{ gridTemplateColumns: `repeat(${cols}, ${itemSize}px)` }}
-                                >
-                                  {miembros.map((m) => (
-                                    <EntityCard
-                                      key={m.id}
-                                      nombre={m.nombre}
-                                      imageUrl={m.imageUrl}
-                                      Icon={Users}
-                                      onClick={() => openEntity(g.tipo as SectionKey, m.id)}
-                                    />
-                                  ))}
-                                </div>
-                              ) : (
-                                g.miembro_ids.length > 0 && (
-                                  <div className="mt-1 text-micro text-primary/30">
-                                    {g.miembro_ids.length} miembro{g.miembro_ids.length === 1 ? "" : "s"}
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          );
-                        })}
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {bloque.items.map((g) => (
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => openEntity("grupos", g.id)}
+                            title={g.nombre}
+                            className="px-2.5 py-1.5 rounded-lg border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-xs font-semibold text-primary/80 text-left truncate max-w-[220px]"
+                          >
+                            {g.nombre}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -828,6 +770,7 @@ function MundoCard({
   onCreate,
   creating,
   fill = true,
+  className,
   children,
 }: {
   title: string;
@@ -837,12 +780,16 @@ function MundoCard({
   /** Si es false, la card mide según su contenido en vez de ocupar todo el
    *  ancho — para usarla lado a lado con otras cards (como Reino/Criatura). */
   fill?: boolean;
+  /** Clases extra para sobrescribir el ancho por defecto — p.ej. forzar
+   *  "w-full" cuando la card vive dentro de una celda de grid (auto-fill),
+   *  sin afectar los demás usos de MundoCard con fill=false. */
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
     <div
       className={`rounded-lg border border-primary/10 overflow-hidden ${
-        fill ? "w-full mb-6 last:mb-0" : "flex-none w-fit max-w-full"
+        className ?? (fill ? "w-full mb-6 last:mb-0" : "flex-none w-fit max-w-full")
       }`}
     >
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-3">
