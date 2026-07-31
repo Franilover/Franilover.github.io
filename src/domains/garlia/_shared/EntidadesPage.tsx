@@ -586,7 +586,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <EntityCardGrid
           title="Items"
-          variant="cards"
+          variant="grid"
           loading={loadingI}
           items={items.map((i) => ({
             id: i.id,
