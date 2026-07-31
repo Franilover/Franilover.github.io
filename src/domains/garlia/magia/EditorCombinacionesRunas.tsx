@@ -76,11 +76,11 @@ export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) 
   const editando = combinaciones.find((c) => c.id === editandoId) ?? null;
 
   return (
-    <div className="rounded-lg border border-primary/10 overflow-hidden mb-6 last:mb-0">
+    <div className="h-full flex flex-col">
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
-        className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-3"
+        className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-2 py-2"
       >
         <span />
         <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
@@ -93,7 +93,7 @@ export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) 
       </button>
 
       {abierto && (
-        <div className="p-3 border-t border-primary/10 space-y-3">
+        <div className="p-2 border-t border-primary/10 space-y-3">
           {loading && (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="animate-spin text-primary/20" size={18} />

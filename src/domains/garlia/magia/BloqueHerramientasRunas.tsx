@@ -33,15 +33,15 @@ import type { EntidadMagica } from "./types";
 
 export function SubBloqueProbador({ runas }: { runas: EntidadMagica[] }) {
   return (
-    <div className="rounded-lg border border-primary/10 overflow-hidden mb-6 last:mb-0">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-3 py-3">
+    <div className="h-full flex flex-col">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-2 py-2">
         <span />
         <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
           Probador de Runas
         </span>
         <span />
       </div>
-      <div className="px-3 pb-3">
+      <div className="px-2 pb-2 flex-1">
         <PanelTestReconocimiento runas={runas} trazosActuales={[]} />
       </div>
     </div>
