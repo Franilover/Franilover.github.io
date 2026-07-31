@@ -3,29 +3,34 @@
 /**
  * PersonajeLineaDeTiempo.tsx
  * ──────────────────────────
- * UI de la línea de tiempo de eras de un personaje.
- *   - Por defecto (si hay cumpleaños + calendario) las eras se agrupan
- *     primero por ETAPA DE VIDA (Bebé, Infancia, Niñez, Adolescencia,
- *     Adultez, Vejez — ver ETAPAS_VIDA) según la edad calculada de cada
- *     era. Cada etapa se muestra siempre, aunque esté vacía, con su
- *     propio botón "+ Era" para crear una directamente dentro de ella.
- *   - Dentro de cada etapa, las eras se agrupan en "carriles" por año,
- *     siguiendo el mismo patrón visual que `ListaEventosConMinimapa` en
- *     EditorLineaTiempo.tsx: el año como encabezado arriba, y debajo sus
- *     eras como botones compactos dispuestos en fila horizontal; los
- *     carriles se disponen lado a lado hasta el borde del contenedor y
- *     continúan en la siguiente línea (wrap).
- *   - Sin cumpleaños o sin calendario no se puede calcular edad, así
- *     que se cae a un listado plano de carriles por año (comportamiento
- *     previo) sin agrupar por etapas.
+ * UI de la línea de tiempo de eras de un personaje, en formato BARRA LATERAL
+ * + PANEL DE DETALLE (layout de 2 columnas):
+ *
+ *   - Columna izquierda (barra lateral, angosta): el bloque "Nacimiento"
+ *     arriba de todo, y debajo las 6 GRANDES ERAS (= las ETAPAS_VIDA: Bebé,
+ *     Infancia, Niñez, Adolescencia, Adultez, Vejez). Cada Gran Era es
+ *     siempre visible (aunque esté vacía) y se puede expandir/colapsar.
+ *     Dentro de cada una, sus SUB-ERAS particulares del personaje se listan
+ *     verticalmente (ej. dentro de "Infancia": "Infancia previa al
+ *     accidente", "Infancia posterior al accidente"). Cada Gran Era tiene
+ *     su propio "+ Sub-era" para crear una directamente dentro de ella.
+ *   - Columna derecha (panel de detalle, FIJO — ya no flotante/portal): al
+ *     hacer click en una sub-era se abre acá, con — en este orden de
+ *     arriba hacia abajo — el nombre de la era particular, los selectores
+ *     de fecha/edad, los rasgos, y por último el editor de texto enriquecido
+ *     (Lexical) para las notas de esa sub-era.
+ *   - Sin cumpleaños o sin calendario no se puede calcular edad; en ese caso
+ *     las sub-eras se listan igual pero sin Grandes Eras como agrupador (no
+ *     se puede saber a qué Gran Era pertenecen sin poder calcular la edad)
+ *     — ver rama `!puedeAgruparPorGranEra` más abajo.
  *   - El bloque "Nacimiento" es clickeable: abre el mismo selector para
  *     editar la fecha de nacimiento ya asignada (no solo para asignarla
  *     por primera vez).
- *   - Al hacer click en una era se abre un panel de detalle FLOTANTE
- *     (portal, anclado al botón clickeado) con la edición completa:
- *     fecha, edad, título, rasgos y notas. El panel no empuja el layout.
  *
- * Toda la lógica de datos vive en useErasDelPersonaje.
+ * Toda la lógica de datos vive en useErasDelPersonaje. El campo `notas` de
+ * cada era pasó de texto plano a markdown enriquecido (sigue siendo un
+ * `string` en la base — RichEditor serializa/deserializa internamente — así
+ * que no hace falta ninguna migración de esquema).
  *
  * NOTA DE ARQUITECTURA: este componente depende de FechaMundoBadge,
  * SelectorFechaMundo y useCalendario, que hoy viven en
@@ -52,9 +57,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
 
+import { RichEditor } from "@/editor/lexical";
 import {
   FechaMundoBadge,
   SelectorFechaMundo,
@@ -77,10 +82,6 @@ function calcularEdad(
   return Math.floor((diaAbsolutoEra - diaAbsolutoNacimiento) / diasPorAnio);
 }
 
-// Dada una nueva edad deseada, calcula el nuevo día absoluto manteniendo
-// el mismo desfase dentro del año (mismo día/estación) que la era ya
-// tenía — solo se "mueve" el año. Es lo que permite que editar la edad
-// recalcule la fecha bajando (o subiendo) los años correctamente.
 function momentoParaEdad(
   edad: number,
   diaAbsolutoNacimiento: number,
@@ -93,17 +94,11 @@ function momentoParaEdad(
 const LINE_COLOR = "color-mix(in srgb, var(--primary) 10%, transparent)";
 const FIELD_BG = "color-mix(in srgb, var(--primary) 3%, transparent)";
 
-// Ancho fijo de cada botón de era en el carril horizontal.
-const ANCHO_ERA_BTN = 150;
+const SIDEBAR_WIDTH = 240;
 
-// ─── Etapas de vida ───────────────────────────────────────────────────────────
-// Agrupación por defecto de la línea de tiempo: en vez de un único listado
-// de carriles por año, las eras se organizan primero por etapa de vida
-// (según la edad calculada de cada era) y, dentro de cada etapa, por año
-// (mismos carriles de siempre). `max: null` = sin tope superior.
-type EtapaVida = { id: string; label: string; min: number; max: number | null };
+type GranEra = { id: string; label: string; min: number; max: number | null };
 
-const ETAPAS_VIDA: EtapaVida[] = [
+const GRANDES_ERAS: GranEra[] = [
   { id: "bebe", label: "Bebé", min: 0, max: 1 },
   { id: "infancia", label: "Infancia", min: 2, max: 6 },
   { id: "ninez", label: "Niñez", min: 7, max: 12 },
@@ -112,42 +107,34 @@ const ETAPAS_VIDA: EtapaVida[] = [
   { id: "vejez", label: "Vejez", min: 65, max: null },
 ];
 
-function etapaLabelConRango(etapa: EtapaVida): string {
-  return etapa.max == null
-    ? `${etapa.label} (${etapa.min}+)`
-    : `${etapa.label} (${etapa.min}-${etapa.max})`;
+function granEraLabelConRango(era: GranEra): string {
+  return era.max == null
+    ? `${era.label} (${era.min}+)`
+    : `${era.label} (${era.min}-${era.max})`;
 }
 
-function etapaParaEdad(edad: number): EtapaVida {
+function granEraParaEdad(edad: number): GranEra {
   return (
-    ETAPAS_VIDA.find((e) => edad >= e.min && (e.max == null || edad <= e.max)) ??
-    ETAPAS_VIDA[ETAPAS_VIDA.length - 1]
+    GRANDES_ERAS.find((e) => edad >= e.min && (e.max == null || edad <= e.max)) ??
+    GRANDES_ERAS[GRANDES_ERAS.length - 1]
   );
 }
 
-// ─── EraBoton ─────────────────────────────────────────────────────────────────
-// Botón compacto: lo que se ve en el carril horizontal. Sin edición inline —
-// toda la edición vive en el panel flotante que se abre al hacer click.
-
-function EraBoton({
+function SubEraItem({
   era,
   edad,
   isSel,
   onClick,
-  btnRef,
 }: {
   era: Era;
   edad: number | null;
   isSel: boolean;
   onClick: () => void;
-  btnRef: (el: HTMLButtonElement | null) => void;
 }) {
   return (
     <button
-      ref={btnRef}
-      className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg text-left transition-all min-w-0 shrink-0"
+      className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg text-left transition-all w-full min-w-0"
       style={{
-        width: ANCHO_ERA_BTN,
         background: isSel
           ? "color-mix(in srgb, var(--accent) 10%, transparent)"
           : "color-mix(in srgb, var(--primary) 2%, transparent)",
@@ -201,12 +188,7 @@ function EraBoton({
   );
 }
 
-// ─── EraDetalleFlotante ───────────────────────────────────────────────────────
-// Panel de edición completo, anclado (portal) al botón de era clickeado.
-// Mismo mecanismo que EventoDetalleFlotante en EditorLineaTiempo.tsx.
-
-function EraDetalleFlotante({
-  anchorEl,
+function EraDetallePanel({
   era,
   edad,
   fechaNacimiento,
@@ -219,7 +201,6 @@ function EraDetalleFlotante({
   onLabelChange,
   onMomentoChange,
 }: {
-  anchorEl: HTMLElement | null;
   era: Era;
   edad: number | null;
   fechaNacimiento: number | null;
@@ -232,22 +213,11 @@ function EraDetalleFlotante({
   onLabelChange: (v: string) => void;
   onMomentoChange: (nuevoMomento: number) => void;
 }) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{
-    top: number;
-    left: number;
-    width: number;
-  } | null>(null);
-
   const [nuevoRasgo, setNuevoRasgo] = useState("");
   const [edadStr, setEdadStr] = useState(edad != null ? String(edad) : "");
   const [edadFocused, setEdadFocused] = useState(false);
 
   const puedeEditarEdad = fechaNacimiento != null && diasPorAnio > 0;
-
-  useEffect(() => {
-    if (!edadFocused) setEdadStr(edad != null ? String(edad) : "");
-  }, [edad, edadFocused]);
 
   const commitEdad = () => {
     if (!puedeEditarEdad) return;
@@ -267,74 +237,40 @@ function EraDetalleFlotante({
     );
   };
 
-  // Posicionamiento contra el ancla — igual patrón que EventoDetalleFlotante.
-  useEffect(() => {
-    if (!anchorEl) {
-      setPos(null);
-      return;
-    }
-    const update = () => {
-      const r = anchorEl.getBoundingClientRect();
-      const w = Math.min(Math.max(r.width, 280), 340);
-      let left = r.left;
-      if (left + w > window.innerWidth - 8) {
-        left = Math.max(8, window.innerWidth - w - 8);
-      }
-      const estimatedH = 360;
-      const spaceBelow = window.innerHeight - r.bottom;
-      const top =
-        spaceBelow < estimatedH && r.top > estimatedH
-          ? Math.max(8, r.top - estimatedH - 6)
-          : r.bottom + 6;
-      setPos({ top, left, width: w });
-    };
-    update();
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [anchorEl, era.id]);
-
-  // Cerrar al click afuera o Escape.
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (panelRef.current?.contains(target)) return;
-      if (anchorEl?.contains(target)) return;
-      onClose();
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [anchorEl, onClose]);
-
-  if (!pos || typeof document === "undefined") return null;
-
-  return createPortal(
+  return (
     <div
-      ref={panelRef}
-      className="fixed z-[9999] rounded-xl border shadow-lg p-3 space-y-2.5"
+      className="rounded-xl border p-3 space-y-3 h-full overflow-y-auto"
       style={{
-        top: pos.top,
-        left: pos.left,
-        width: pos.width,
-        maxHeight: "70vh",
-        overflowY: "auto",
         background: "var(--bg-main)",
         borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
       }}
     >
-      {/* Cabecera: fecha + edad + cerrar */}
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 space-y-1.5 flex-1">
+        <input
+          key={era.id}
+          className="flex-1 min-w-0 rounded-md border px-2 py-1.5 text-sm font-bold outline-none transition-colors placeholder:font-normal placeholder:text-primary/25"
+          maxLength={60}
+          placeholder="Nombre del período…"
+          style={{
+            background: "transparent",
+            borderColor: LINE_COLOR,
+            color: "var(--primary)",
+          }}
+          type="text"
+          value={era.label}
+          onChange={(e) => onLabelChange(e.target.value)}
+        />
+        <button
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md text-primary/25 hover:text-primary transition-colors"
+          type="button"
+          onClick={onClose}
+        >
+          <X size={13} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
           <SelectorFechaMundo
             placeholder="Fecha…"
             value={era.momento}
@@ -342,65 +278,46 @@ function EraDetalleFlotante({
               if (dia != null) onMomentoChange(dia);
             }}
           />
-          {puedeEditarEdad && (
-            <div className="flex items-center gap-1">
-              <input
-                className="w-14 rounded-md px-1.5 py-0.5 text-micro font-black tabular-nums text-center outline-none transition-colors"
-                min={0}
-                style={{
-                  background: FIELD_BG,
-                  color: "color-mix(in srgb, var(--accent) 80%, transparent)",
-                }}
-                type="number"
-                value={edadStr}
-                onChange={(e) => setEdadStr(e.target.value)}
-                onFocus={() => setEdadFocused(true)}
-                onBlur={() => {
-                  setEdadFocused(false);
-                  commitEdad();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                  if (e.key === "Escape")
-                    setEdadStr(edad != null ? String(edad) : "");
-                }}
-              />
-              <span
-                className="text-micro font-bold"
-                style={{
-                  color: "color-mix(in srgb, var(--accent) 60%, transparent)",
-                }}
-              >
-                {edad === 1 ? "año" : "años"}
-              </span>
-            </div>
-          )}
         </div>
-        <button
-          className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-primary/25 hover:text-primary transition-colors"
-          type="button"
-          onClick={onClose}
-        >
-          <X size={12} />
-        </button>
+        {puedeEditarEdad && (
+          <div className="flex items-center gap-1 shrink-0">
+            <input
+              className="w-14 rounded-md px-1.5 py-0.5 text-micro font-black tabular-nums text-center outline-none transition-colors"
+              key={`edad-${era.id}`}
+              min={0}
+              style={{
+                background: FIELD_BG,
+                color: "color-mix(in srgb, var(--accent) 80%, transparent)",
+              }}
+              type="number"
+              value={edadFocused ? edadStr : edad != null ? String(edad) : ""}
+              onChange={(e) => setEdadStr(e.target.value)}
+              onFocus={() => {
+                setEdadFocused(true);
+                setEdadStr(edad != null ? String(edad) : "");
+              }}
+              onBlur={() => {
+                setEdadFocused(false);
+                commitEdad();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape")
+                  setEdadStr(edad != null ? String(edad) : "");
+              }}
+            />
+            <span
+              className="text-micro font-bold"
+              style={{
+                color: "color-mix(in srgb, var(--accent) 60%, transparent)",
+              }}
+            >
+              {edad === 1 ? "año" : "años"}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Título */}
-      <input
-        className="w-full rounded-md border px-2 py-1.5 text-micro font-bold outline-none transition-colors placeholder:font-normal placeholder:text-primary/25"
-        maxLength={60}
-        placeholder="Nombre del período…"
-        style={{
-          background: "transparent",
-          borderColor: LINE_COLOR,
-          color: "var(--primary)",
-        }}
-        type="text"
-        value={era.label}
-        onChange={(e) => onLabelChange(e.target.value)}
-      />
-
-      {/* Rasgos */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-1">
           <input
@@ -467,21 +384,17 @@ function EraDetalleFlotante({
         )}
       </div>
 
-      {/* Notas */}
-      <textarea
-        className="w-full rounded-md border px-2 py-1.5 text-micro leading-relaxed outline-none transition-colors resize-none placeholder:text-primary/20"
-        placeholder="Notas sobre este momento…"
-        rows={3}
-        style={{
-          background: "transparent",
-          borderColor: LINE_COLOR,
-          color: "var(--primary)",
-        }}
-        value={era.notas}
-        onChange={(e) => onNotasChange(e.target.value)}
-      />
+      <div>
+        <RichEditor
+          key={era.id}
+          editable
+          minHeight="10rem"
+          placeholder="Notas sobre este momento…"
+          value={era.notas}
+          onChange={onNotasChange}
+        />
+      </div>
 
-      {/* Eliminar */}
       <div className="flex justify-end pt-0.5">
         <button
           className="flex items-center gap-1 px-1.5 py-1 rounded-md text-micro text-primary/30 hover:text-accent transition-colors"
@@ -491,12 +404,9 @@ function EraDetalleFlotante({
           <Trash2 size={11} /> Eliminar era
         </button>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
-
-// ─── Selector de cumpleaños inline ────────────────────────────────────────────
 
 function SelectorCumple({
   draft,
@@ -550,8 +460,6 @@ function SelectorCumple({
   );
 }
 
-// ─── PersonajeLineaDeTiempo ───────────────────────────────────────────────────
-
 export function PersonajeLineaDeTiempo({
   personajeId,
   fechaNacimiento,
@@ -591,26 +499,19 @@ export function PersonajeLineaDeTiempo({
   const [addingNew, setAddingNew] = useState(false);
   const [newMomento, setNewMomento] = useState("");
   const [newLabel, setNewLabel] = useState("");
-  // Etapa desde la que se abrió el formulario "+ Era" (null = botón global
-  // de la cabecera). Solo se usa para prefijar la fecha sugerida y mostrar
-  // un rótulo con contexto en el formulario.
-  const [addingEtapa, setAddingEtapa] = useState<EtapaVida | null>(null);
+  const [addingGranEra, setAddingGranEra] = useState<GranEra | null>(null);
 
   const [cumpleSelectorOpen, setCumpleSelectorOpen] = useState(false);
   const [cumpleDraft, setCumpleDraft] = useState<number | null>(null);
 
-  // Edición rápida del cumpleaños desde el lápiz del bloque "Nacimiento":
-  // va directo al selector de fecha (sin la fila de Cancelar/Guardar, que
-  // no tiene sentido cuando el único campo a editar es la fecha).
   const [cumpleQuickEdit, setCumpleQuickEdit] = useState(false);
 
-  // Etapas colapsadas manualmente por el usuario (por defecto todas abiertas).
-  const [etapasColapsadas, setEtapasColapsadas] = useState<Set<string>>(
+  const [erasColapsadas, setErasColapsadas] = useState<Set<string>>(
     new Set(),
   );
 
   const [selId, setSelId] = useState<string | null>(null);
-  const btnRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const selEra = eras.find((e) => e.id === selId) ?? null;
 
   const handleAddEra = async () => {
     const num = parseInt(newMomento.trim(), 10);
@@ -619,7 +520,7 @@ export function PersonajeLineaDeTiempo({
     setNewMomento("");
     setNewLabel("");
     setAddingNew(false);
-    setAddingEtapa(null);
+    setAddingGranEra(null);
   };
 
   const handleGuardarCumple = async () => {
@@ -635,9 +536,6 @@ export function PersonajeLineaDeTiempo({
     }
   };
 
-  // El selector de edición rápida confirma solo (ver v3 de
-  // SelectorFechaMundo: clickear un día ya es la acción final), así que acá
-  // simplemente guardamos apenas llega el nuevo valor y cerramos.
   const handleGuardarCumpleRapido = async (dia: number | null) => {
     if (dia != null) {
       const fechaAnterior = fechaNacimiento;
@@ -649,21 +547,18 @@ export function PersonajeLineaDeTiempo({
     setCumpleQuickEdit(false);
   };
 
-  // Abre el formulario "+ Era" sugiriendo una fecha dentro de la etapa
-  // indicada (el primer día de su edad mínima) para que crear una era
-  // "dentro" de una sección quede lo más directo posible.
-  const abrirFormularioEnEtapa = (etapa: EtapaVida | null) => {
-    setAddingEtapa(etapa);
-    if (etapa && fechaNacimiento != null && diasPorAnio > 0) {
-      setNewMomento(String(fechaNacimiento + etapa.min * diasPorAnio));
+  const abrirFormularioEnGranEra = (granEra: GranEra | null) => {
+    setAddingGranEra(granEra);
+    if (granEra && fechaNacimiento != null && diasPorAnio > 0) {
+      setNewMomento(String(fechaNacimiento + granEra.min * diasPorAnio));
     } else if (fechaNacimiento != null) {
       setNewMomento(String(fechaNacimiento));
     }
     setAddingNew(true);
   };
 
-  const toggleEtapaColapsada = (id: string) => {
-    setEtapasColapsadas((prev) => {
+  const toggleEraColapsada = (id: string) => {
+    setErasColapsadas((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -676,95 +571,70 @@ export function PersonajeLineaDeTiempo({
     !!newMomento &&
     parseInt(newMomento, 10) <= fechaNacimiento;
 
-  // ── Agrupar eras en carriles por año ──────────────────────────────────────
-  // Mismo criterio que ListaEventosConMinimapa: eras consecutivas (la lista
-  // ya viene ordenada por `momento`) del mismo año comparten carril; el año
-  // se muestra una vez como encabezado y sus eras van en fila horizontal.
-  type Carril = { anio: number | null; eras: Era[] };
-  const carriles = useMemo<Carril[]>(() => {
-    if (diasPorAnio <= 0 || fechaNacimiento == null) {
-      // Sin calendario o sin cumpleaños no podemos calcular año — un único
-      // carril "sin año" con todas las eras en fila.
-      return eras.length ? [{ anio: null, eras }] : [];
-    }
-    const out: Carril[] = [];
+  const puedeAgruparPorGranEra = fechaNacimiento != null && diasPorAnio > 0;
+  type GrupoGranEra = { granEra: GranEra; subEras: Era[] };
+  const gruposPorGranEra = useMemo<GrupoGranEra[]>(() => {
+    if (!puedeAgruparPorGranEra) return [];
+    const porGranEra = new Map<string, Era[]>();
     for (const era of eras) {
-      const anio = Math.floor((era.momento - fechaNacimiento) / diasPorAnio);
-      const last = out[out.length - 1];
-      if (last && last.anio === anio) {
-        last.eras.push(era);
-      } else {
-        out.push({ anio, eras: [era] });
-      }
+      const edad = calcularEdad(
+        era.momento,
+        fechaNacimiento as number,
+        diasPorAnio,
+      );
+      const granEra = granEraParaEdad(edad);
+      const list = porGranEra.get(granEra.id) ?? [];
+      list.push(era);
+      porGranEra.set(granEra.id, list);
     }
-    return out;
-  }, [eras, diasPorAnio, fechaNacimiento]);
-
-  // ── Agrupar carriles por etapa de vida (edad) ──────────────────────────────
-  // Solo es posible con cumpleaños + calendario asignados (necesitamos poder
-  // calcular la edad de cada era). Cada etapa siempre aparece — aunque no
-  // tenga eras — para poder crearlas directamente "dentro" de ella.
-  const puedeAgruparPorEtapa = fechaNacimiento != null && diasPorAnio > 0;
-  type GrupoEtapa = { etapa: EtapaVida; carriles: Carril[] };
-  const gruposPorEtapa = useMemo<GrupoEtapa[]>(() => {
-    if (!puedeAgruparPorEtapa) return [];
-    const porEtapa = new Map<string, Carril[]>();
-    for (const carril of carriles) {
-      if (carril.anio == null) continue;
-      const etapa = etapaParaEdad(carril.anio);
-      const list = porEtapa.get(etapa.id) ?? [];
-      list.push(carril);
-      porEtapa.set(etapa.id, list);
-    }
-    return ETAPAS_VIDA.map((etapa) => ({
-      etapa,
-      carriles: porEtapa.get(etapa.id) ?? [],
+    return GRANDES_ERAS.map((granEra) => ({
+      granEra,
+      subEras: porGranEra.get(granEra.id) ?? [],
     }));
-  }, [carriles, puedeAgruparPorEtapa]);
+  }, [eras, fechaNacimiento, diasPorAnio, puedeAgruparPorGranEra]);
 
-  const selEra = eras.find((e) => e.id === selId) ?? null;
+  const edadSelEra =
+    selEra != null && fechaNacimiento != null && diasPorAnio > 0
+      ? calcularEdad(selEra.momento, fechaNacimiento, diasPorAnio)
+      : null;
 
   return (
-    <div>
-      {/* Cabecera */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-micro font-bold uppercase tracking-wider text-primary/35">
+    <div className="flex flex-col">
+      <div className="flex items-center gap-2 mb-3">
+        <span
+          className="text-micro font-black uppercase tracking-widest"
+          style={{ color: "color-mix(in srgb, var(--primary) 45%, transparent)" }}
+        >
           Línea de tiempo
         </span>
-        <span className="flex-1" />
+        <div className="flex-1 h-px" style={{ background: LINE_COLOR }} />
         <button
-          className="flex items-center gap-1 text-micro font-bold transition-colors"
-          style={{
-            color: addingNew
-              ? "var(--accent)"
-              : "color-mix(in srgb, var(--primary) 40%, transparent)",
-          }}
+          className="flex items-center gap-1 text-micro font-bold text-primary/40 hover:text-accent transition-colors shrink-0"
           type="button"
           onClick={() => {
             if (addingNew) {
               setAddingNew(false);
-              setAddingEtapa(null);
+              setAddingGranEra(null);
             } else {
-              abrirFormularioEnEtapa(null);
+              abrirFormularioEnGranEra(null);
             }
           }}
         >
-          {addingNew ? <X size={11} /> : <Plus size={11} />} Era
+          {addingNew ? <X size={11} /> : <Plus size={11} />} Sub-era
         </button>
       </div>
 
-      {/* Formulario de nueva era */}
       {addingNew && (
         <div
           className="mb-3 p-2.5 rounded-xl space-y-2"
           style={{ background: FIELD_BG }}
         >
-          {addingEtapa && (
+          {addingGranEra && (
             <p
               className="text-micro font-bold"
               style={{ color: "color-mix(in srgb, var(--accent) 70%, transparent)" }}
             >
-              Nueva era en {etapaLabelConRango(addingEtapa)}
+              Nueva sub-era en {granEraLabelConRango(addingGranEra)}
             </p>
           )}
           <div className="flex items-center gap-1.5">
@@ -805,7 +675,7 @@ export function PersonajeLineaDeTiempo({
               type="button"
               onClick={() => {
                 setAddingNew(false);
-                setAddingEtapa(null);
+                setAddingGranEra(null);
               }}
             >
               Cancelar
@@ -831,7 +701,6 @@ export function PersonajeLineaDeTiempo({
         </div>
       )}
 
-      {/* Cumpleaños: sin fecha asignada, o editable con un click si ya la tiene */}
       {fechaNacimiento == null ? (
         <div className="mb-3">
           {!cumpleSelectorOpen ? (
@@ -874,292 +743,178 @@ export function PersonajeLineaDeTiempo({
         </div>
       ) : null}
 
-      {/* Contenido: por defecto agrupado en etapas de vida (Bebé, Infancia…);
-          si no hay cumpleaños/calendario para calcular edades, cae al listado
-          plano de carriles por año de siempre. */}
       {loading ? (
         <div className="flex justify-center py-4">
           <Loader2 className="animate-spin text-primary/20" size={14} />
         </div>
-      ) : puedeAgruparPorEtapa ? (
-        <div className="space-y-3">
-          {/* Nacimiento — clickeable para editar la fecha existente, directo
-              al selector de fecha (sin la fila de Cancelar/Guardar). */}
-          <div className="relative" style={{ width: ANCHO_ERA_BTN }}>
-            <button
-              className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg text-left transition-colors w-full"
-              style={{
-                background: "color-mix(in srgb, var(--accent) 6%, transparent)",
-                border: `1px solid color-mix(in srgb, var(--accent) 18%, transparent)`,
-              }}
-              type="button"
-              onClick={() => setCumpleQuickEdit(true)}
-            >
-              <span className="flex items-center gap-1 text-micro font-bold" style={{ color: "var(--accent)" }}>
-                Nacimiento
-                <Pencil className="opacity-40" size={9} />
-              </span>
-              <span className="text-micro text-primary/40">
-                <FechaMundoBadge diaAbsoluto={fechaNacimiento} />
-              </span>
-            </button>
-            {cumpleQuickEdit && (
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="pointer-events-auto">
-                  <SelectorFechaMundo
-                    autoOpen
-                    hideTrigger
-                    value={fechaNacimiento}
-                    onChange={handleGuardarCumpleRapido}
-                    onOpenChange={(o) => {
-                      if (!o) setCumpleQuickEdit(false);
-                    }}
+      ) : (
+        <div className="flex flex-row items-start gap-3">
+          <div
+            className="flex flex-col gap-2 shrink-0"
+            style={{ width: SIDEBAR_WIDTH }}
+          >
+            {fechaNacimiento != null && (
+              <div className="relative">
+                <button
+                  className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg text-left transition-colors w-full"
+                  style={{
+                    background: "color-mix(in srgb, var(--accent) 6%, transparent)",
+                    border: `1px solid color-mix(in srgb, var(--accent) 18%, transparent)`,
+                  }}
+                  type="button"
+                  onClick={() => setCumpleQuickEdit(true)}
+                >
+                  <span className="flex items-center gap-1 text-micro font-bold" style={{ color: "var(--accent)" }}>
+                    Nacimiento
+                    <Pencil className="opacity-40" size={9} />
+                  </span>
+                  <span className="text-micro text-primary/40">
+                    <FechaMundoBadge diaAbsoluto={fechaNacimiento} />
+                  </span>
+                </button>
+                {cumpleQuickEdit && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="pointer-events-auto">
+                      <SelectorFechaMundo
+                        autoOpen
+                        hideTrigger
+                        value={fechaNacimiento}
+                        onChange={handleGuardarCumpleRapido}
+                        onOpenChange={(o) => {
+                          if (!o) setCumpleQuickEdit(false);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {puedeAgruparPorGranEra ? (
+              gruposPorGranEra.map(({ granEra, subEras }) => {
+                const colapsada = erasColapsadas.has(granEra.id);
+                return (
+                  <div
+                    key={granEra.id}
+                    className="rounded-xl border p-2 space-y-1.5"
+                    style={{ borderColor: LINE_COLOR }}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        className="flex items-center gap-1 shrink-0 min-w-0"
+                        type="button"
+                        onClick={() => toggleEraColapsada(granEra.id)}
+                      >
+                        {colapsada ? (
+                          <ChevronRight className="text-primary/30 shrink-0" size={11} />
+                        ) : (
+                          <ChevronDown className="text-primary/30 shrink-0" size={11} />
+                        )}
+                        <span
+                          className="text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded truncate"
+                          style={{
+                            color: "color-mix(in srgb, var(--primary) 55%, transparent)",
+                            background: FIELD_BG,
+                          }}
+                        >
+                          {granEraLabelConRango(granEra)}
+                        </span>
+                        {subEras.length > 0 && (
+                          <span className="text-micro text-primary/30 tabular-nums shrink-0">
+                            {subEras.length}
+                          </span>
+                        )}
+                      </button>
+                      <div className="flex-1" />
+                      <button
+                        className="flex items-center gap-0.5 text-micro font-bold text-primary/35 hover:text-accent transition-colors shrink-0"
+                        type="button"
+                        onClick={() => abrirFormularioEnGranEra(granEra)}
+                      >
+                        <Plus size={10} />
+                      </button>
+                    </div>
+
+                    {!colapsada &&
+                      (subEras.length === 0 ? (
+                        <p className="text-micro text-primary/25 py-0.5">
+                          Sin sub-eras todavía
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-1">
+                          {subEras.map((era) => (
+                            <SubEraItem
+                              key={era.id}
+                              edad={calcularEdad(
+                                era.momento,
+                                fechaNacimiento,
+                                diasPorAnio,
+                              )}
+                              era={era}
+                              isSel={era.id === selId}
+                              onClick={() =>
+                                setSelId((prev) =>
+                                  prev === era.id ? null : era.id,
+                                )
+                              }
+                            />
+                          ))}
+                        </div>
+                      ))}
+                  </div>
+                );
+              })
+            ) : eras.length === 0 ? (
+              <p className="text-micro text-primary/25 py-1">
+                {fechaNacimiento != null
+                  ? "Agrega una sub-era para continuar la historia"
+                  : "Asigna un cumpleaños y agrega sub-eras para construir la historia"}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {eras.map((era) => (
+                  <SubEraItem
+                    key={era.id}
+                    edad={null}
+                    era={era}
+                    isSel={era.id === selId}
+                    onClick={() =>
+                      setSelId((prev) => (prev === era.id ? null : era.id))
+                    }
                   />
-                </div>
+                ))}
               </div>
             )}
           </div>
 
-          <div className="flex flex-row flex-wrap items-start gap-3">
-            {gruposPorEtapa.map(({ etapa, carriles: carrilesEtapa }) => {
-              const totalEras = carrilesEtapa.reduce(
-                (n, c) => n + c.eras.length,
-                0,
-              );
-              const colapsada = etapasColapsadas.has(etapa.id);
-              return (
-                <div
-                  key={etapa.id}
-                  className="rounded-xl border p-2 space-y-1.5"
-                  style={{
-                    borderColor: LINE_COLOR,
-                    minWidth: ANCHO_ERA_BTN + 24,
-                  }}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      className="flex items-center gap-1 shrink-0"
-                      type="button"
-                      onClick={() => toggleEtapaColapsada(etapa.id)}
-                    >
-                      {colapsada ? (
-                        <ChevronRight className="text-primary/30" size={11} />
-                      ) : (
-                        <ChevronDown className="text-primary/30" size={11} />
-                      )}
-                      <span
-                        className="text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded"
-                        style={{
-                          color: "color-mix(in srgb, var(--primary) 55%, transparent)",
-                          background: FIELD_BG,
-                        }}
-                      >
-                        {etapaLabelConRango(etapa)}
-                      </span>
-                      {totalEras > 0 && (
-                        <span className="text-micro text-primary/30 tabular-nums">
-                          {totalEras}
-                        </span>
-                      )}
-                    </button>
-                    <div className="flex-1 h-px" style={{ background: LINE_COLOR }} />
-                    <button
-                      className="flex items-center gap-0.5 text-micro font-bold text-primary/35 hover:text-accent transition-colors shrink-0"
-                      type="button"
-                      onClick={() => abrirFormularioEnEtapa(etapa)}
-                    >
-                      <Plus size={10} /> Era
-                    </button>
-                  </div>
-
-                  {!colapsada &&
-                    (totalEras === 0 ? (
-                      <p className="text-micro text-primary/25 pb-1">
-                        Sin eras en esta etapa todavía
-                      </p>
-                    ) : (
-                      <div className="flex flex-row items-start gap-3 overflow-x-auto pb-1">
-                        {carrilesEtapa.map((carril, ci) => (
-                          <div
-                            key={`carril-${etapa.id}-${carril.anio ?? "sf"}-${ci}`}
-                            className="flex flex-col gap-1 shrink-0"
-                            style={{
-                              width:
-                                ANCHO_ERA_BTN * carril.eras.length +
-                                6 * (carril.eras.length - 1),
-                            }}
-                          >
-                            <span
-                              className="text-micro font-bold tabular-nums text-primary/30"
-                            >
-                              Año {carril.anio}
-                            </span>
-                            <div className="flex flex-row gap-1.5">
-                              {carril.eras.map((era) => (
-                                <EraBoton
-                                  key={era.id}
-                                  btnRef={(el) => {
-                                    if (el) btnRefs.current.set(era.id, el);
-                                    else btnRefs.current.delete(era.id);
-                                  }}
-                                  edad={calcularEdad(
-                                    era.momento,
-                                    fechaNacimiento,
-                                    diasPorAnio,
-                                  )}
-                                  era={era}
-                                  isSel={era.id === selId}
-                                  onClick={() =>
-                                    setSelId((prev) =>
-                                      prev === era.id ? null : era.id,
-                                    )
-                                  }
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                </div>
-              );
-            })}
+          <div className="flex-1 min-w-0" style={{ minHeight: 200 }}>
+            {selEra ? (
+              <EraDetallePanel
+                diasPorAnio={diasPorAnio}
+                edad={edadSelEra}
+                era={selEra}
+                fechaNacimiento={fechaNacimiento ?? null}
+                onAddRasgo={(r) => addRasgo(selEra, r)}
+                onClose={() => setSelId(null)}
+                onDelete={() => {
+                  deleteEra(selEra.id);
+                  setSelId(null);
+                }}
+                onLabelChange={(v) => changeLabel(selEra, v)}
+                onMomentoChange={(m) => changeMomento(selEra, m)}
+                onNotasChange={(v) => changeNotas(selEra, v)}
+                onRemoveRasgo={(r) => removeRasgo(selEra, r)}
+              />
+            ) : (
+              <div
+                className="flex items-center justify-center h-full rounded-xl border border-dashed text-micro text-primary/25 py-10"
+                style={{ borderColor: LINE_COLOR }}
+              >
+                Selecciona una sub-era para ver y editar su detalle
+              </div>
+            )}
           </div>
         </div>
-      ) : carriles.length === 0 ? (
-        <p className="text-micro text-primary/25 py-1">
-          {fechaNacimiento != null
-            ? "Agrega una era para continuar la historia"
-            : "Asigna un cumpleaños y agrega eras para construir la historia"}
-        </p>
-      ) : (
-        // Sin cumpleaños o sin calendario no se puede calcular edad, así que
-        // no hay etapas: se muestra el listado plano de carriles por año.
-        <div className="flex flex-row flex-wrap items-start gap-3">
-          {fechaNacimiento != null && (
-            <div className="flex flex-col gap-1" style={{ width: ANCHO_ERA_BTN }}>
-              <div className="flex items-center gap-1.5 w-full">
-                <span
-                  className="text-micro font-black tabular-nums px-1.5 py-0.5 rounded shrink-0"
-                  style={{
-                    color: "var(--accent)",
-                    background: "color-mix(in srgb, var(--accent) 10%, transparent)",
-                  }}
-                >
-                  Año 0
-                </span>
-                <div className="flex-1 h-px" style={{ background: LINE_COLOR }} />
-              </div>
-              <div className="flex flex-row gap-1.5">
-                <div className="relative" style={{ width: ANCHO_ERA_BTN }}>
-                  <button
-                    className="flex flex-col gap-0.5 px-2 py-1.5 rounded-lg text-left transition-colors w-full"
-                    style={{
-                      background: "color-mix(in srgb, var(--accent) 6%, transparent)",
-                      border: `1px solid color-mix(in srgb, var(--accent) 18%, transparent)`,
-                    }}
-                    type="button"
-                    onClick={() => setCumpleQuickEdit(true)}
-                  >
-                    <span className="flex items-center gap-1 text-micro font-bold" style={{ color: "var(--accent)" }}>
-                      Nacimiento
-                      <Pencil className="opacity-40" size={9} />
-                    </span>
-                    <span className="text-micro text-primary/40">
-                      <FechaMundoBadge diaAbsoluto={fechaNacimiento} />
-                    </span>
-                  </button>
-                  {cumpleQuickEdit && (
-                    <div className="absolute inset-0 pointer-events-none">
-                      <div className="pointer-events-auto">
-                        <SelectorFechaMundo
-                          autoOpen
-                          hideTrigger
-                          value={fechaNacimiento}
-                          onChange={handleGuardarCumpleRapido}
-                          onOpenChange={(o) => {
-                            if (!o) setCumpleQuickEdit(false);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {carriles.map((carril, ci) => {
-            const anchoCarril =
-              ANCHO_ERA_BTN * carril.eras.length + 6 * (carril.eras.length - 1);
-            return (
-              <div
-                key={`carril-${carril.anio ?? "sf"}-${ci}`}
-                className="flex flex-col gap-1"
-                style={{ width: anchoCarril }}
-              >
-                <div className="flex items-center gap-1.5 w-full">
-                  <span
-                    className="text-micro font-black tabular-nums px-1.5 py-0.5 rounded shrink-0"
-                    style={{
-                      color: "color-mix(in srgb, var(--primary) 45%, transparent)",
-                      background: FIELD_BG,
-                    }}
-                  >
-                    {carril.anio != null ? `Año ${carril.anio}` : "Sin año"}
-                  </span>
-                  <div className="flex-1 h-px" style={{ background: LINE_COLOR }} />
-                </div>
-                <div className="flex flex-row gap-1.5">
-                  {carril.eras.map((era) => (
-                    <EraBoton
-                      key={era.id}
-                      btnRef={(el) => {
-                        if (el) btnRefs.current.set(era.id, el);
-                        else btnRefs.current.delete(era.id);
-                      }}
-                      edad={
-                        fechaNacimiento != null && diasPorAnio > 0
-                          ? calcularEdad(era.momento, fechaNacimiento, diasPorAnio)
-                          : null
-                      }
-                      era={era}
-                      isSel={era.id === selId}
-                      onClick={() =>
-                        setSelId((prev) => (prev === era.id ? null : era.id))
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Panel de detalle flotante */}
-      {selEra && (
-        <EraDetalleFlotante
-          anchorEl={btnRefs.current.get(selEra.id) ?? null}
-          diasPorAnio={diasPorAnio}
-          edad={
-            fechaNacimiento != null && diasPorAnio > 0
-              ? calcularEdad(selEra.momento, fechaNacimiento, diasPorAnio)
-              : null
-          }
-          era={selEra}
-          fechaNacimiento={fechaNacimiento ?? null}
-          onAddRasgo={(r) => addRasgo(selEra, r)}
-          onClose={() => setSelId(null)}
-          onDelete={() => {
-            deleteEra(selEra.id);
-            setSelId(null);
-          }}
-          onLabelChange={(v) => changeLabel(selEra, v)}
-          onMomentoChange={(m) => changeMomento(selEra, m)}
-          onNotasChange={(v) => changeNotas(selEra, v)}
-          onRemoveRasgo={(r) => removeRasgo(selEra, r)}
-        />
       )}
     </div>
   );
