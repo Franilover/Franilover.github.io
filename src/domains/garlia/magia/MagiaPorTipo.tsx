@@ -242,7 +242,7 @@ export function MagiaPorTipo({
           <EditorCombinacionesRunas runas={todasLasRunas} />
         )}
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
         <BloqueEnsayoEnergias />
       </div>
     </div>
