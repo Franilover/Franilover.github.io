@@ -12,7 +12,7 @@
  * cualquiera sea su subtipo).
  */
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 export interface GrupoFiltroItem {
@@ -31,11 +31,16 @@ export function GrupoFiltroDropdown({
   grupos,
   selectedId,
   onSelect,
+  onOpenGrupo,
 }: {
   subtipo: string | null;
   grupos: GrupoFiltroItem[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Si se pasa, cada grupo listado muestra un botón a la derecha que abre
+   *  su editor completo (openEntity("grupos", id)) sin cerrar el dropdown
+   *  vía selección — el click no afecta el filtro activo. */
+  onOpenGrupo?: (grupoId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -82,19 +87,37 @@ export function GrupoFiltroDropdown({
             Todos
           </button>
           {grupos.map((g) => (
-            <button
+            <div
               key={g.id}
-              type="button"
-              onClick={() => {
-                onSelect(g.id);
-                setOpen(false);
-              }}
-              className={`w-full text-left px-3 py-1.5 text-micro font-semibold truncate transition-colors ${
+              className={`w-full flex items-center gap-1 pr-1.5 transition-colors ${
                 selectedId === g.id ? "text-accent bg-accent/10" : "text-primary/70 hover:bg-primary/5"
               }`}
             >
-              {g.nombre}
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(g.id);
+                  setOpen(false);
+                }}
+                className="flex-1 min-w-0 text-left pl-3 py-1.5 text-micro font-semibold truncate"
+              >
+                {g.nombre}
+              </button>
+              {onOpenGrupo && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onOpenGrupo(g.id);
+                  }}
+                  title="Abrir grupo"
+                  className="shrink-0 p-1 rounded hover:bg-primary/15 text-primary/40 hover:text-primary/80 transition-colors"
+                >
+                  <ExternalLink size={10} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -108,14 +131,16 @@ export function GrupoFiltroBarra({
   bloques,
   grupoSeleccionadoId,
   onSeleccionarGrupo,
+  onOpenGrupo,
 }: {
   bloques: GrupoFiltroSubtipo[] | undefined;
   grupoSeleccionadoId: string | null | undefined;
   onSeleccionarGrupo: ((grupoId: string | null) => void) | undefined;
+  onOpenGrupo?: (grupoId: string) => void;
 }) {
-  if (!bloques || bloques.length === 0) return <div className="flex-1" />;
+  if (!bloques || bloques.length === 0) return null;
   return (
-    <div className="flex-1 flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-2 flex-wrap">
       {bloques.map((bloque) => (
         <GrupoFiltroDropdown
           key={bloque.subtipo ?? "__sin-subtipo"}
@@ -127,6 +152,7 @@ export function GrupoFiltroBarra({
               : null
           }
           onSelect={(id) => onSeleccionarGrupo?.(id)}
+          onOpenGrupo={onOpenGrupo}
         />
       ))}
     </div>

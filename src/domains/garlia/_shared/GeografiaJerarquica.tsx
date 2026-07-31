@@ -69,6 +69,15 @@ interface Props {
   gruposPersonajesPorSubtipo?: GrupoPersonajeSubtipo[];
   grupoSeleccionadoId?: string | null;
   onSeleccionarGrupo?: (grupoId: string | null) => void;
+  /** Grupos de tipo "reinos" agrupados por subtipo — mismos dropdowns que
+   *  los de personajes, separados por un divisor, a la izquierda de
+   *  "Añadir reino". Filtran qué reinos se muestran. */
+  gruposReinosPorSubtipo?: GrupoFiltroSubtipo[];
+  grupoReinoSeleccionadoId?: string | null;
+  onSeleccionarGrupoReino?: (grupoId: string | null) => void;
+  /** Abre el editor completo de un grupo (openEntity("grupos", id)) — se
+   *  muestra como botón a la derecha de cada opción en los dropdowns. */
+  onOpenGrupo?: (grupoId: string) => void;
 }
 
 function NodoTitulo({
@@ -135,6 +144,10 @@ export function GeografiaJerarquica({
   gruposPersonajesPorSubtipo,
   grupoSeleccionadoId,
   onSeleccionarGrupo,
+  gruposReinosPorSubtipo,
+  grupoReinoSeleccionadoId,
+  onSeleccionarGrupoReino,
+  onOpenGrupo,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -166,6 +179,15 @@ export function GeografiaJerarquica({
     ? personajes.filter((p) => grupoSeleccionado.miembro_ids.includes(p.id))
     : personajes;
 
+  // Si hay un grupo de reinos seleccionado, se filtra la lista de reinos a
+  // solo sus miembros — el resto de la jerarquía se calcula sobre ellos.
+  const grupoReinoSeleccionado = grupoReinoSeleccionadoId
+    ? gruposReinosPorSubtipo?.flatMap((b) => b.grupos).find((g) => g.id === grupoReinoSeleccionadoId)
+    : null;
+  const reinosBase = grupoReinoSeleccionado
+    ? reinos.filter((r) => grupoReinoSeleccionado.miembro_ids.includes(r.id))
+    : reinos;
+
   const ciudadesDe = (reinoId: string) =>
     ciudades
       .filter((c) => c.reino_id === reinoId)
@@ -181,10 +203,10 @@ export function GeografiaJerarquica({
   // Solo quedan huérfanos globales los que no tienen ni ciudad ni un reino
   // válido asociado.
   const personajesSinCiudad = personajesBase.filter(
-    (p) => !p.ciudad_id && !reinos.some((r) => r.nombre === p.reino)
+    (p) => !p.ciudad_id && !reinosBase.some((r) => r.nombre === p.reino)
   );
 
-  const reinosOrdenados = [...reinos].sort(
+  const reinosOrdenados = [...reinosBase].sort(
     (a, b) =>
       ciudadesDe(b.id).length +
       personajesSinCiudadDeReino(b.nombre).length -
@@ -392,11 +414,23 @@ export function GeografiaJerarquica({
   return (
     <div className="mb-8 last:mb-0">
       <div className="flex items-center gap-2 mb-4 px-1">
-        <GrupoFiltroBarra
-          bloques={gruposPersonajesPorSubtipo}
-          grupoSeleccionadoId={grupoSeleccionadoId}
-          onSeleccionarGrupo={onSeleccionarGrupo}
-        />
+        <div className="flex-1 flex items-center gap-2 flex-wrap">
+          <GrupoFiltroBarra
+            bloques={gruposPersonajesPorSubtipo}
+            grupoSeleccionadoId={grupoSeleccionadoId}
+            onSeleccionarGrupo={onSeleccionarGrupo}
+            onOpenGrupo={onOpenGrupo}
+          />
+          {!!gruposPersonajesPorSubtipo?.length && !!gruposReinosPorSubtipo?.length && (
+            <div className="w-px h-4 bg-primary/15 shrink-0" />
+          )}
+          <GrupoFiltroBarra
+            bloques={gruposReinosPorSubtipo}
+            grupoSeleccionadoId={grupoReinoSeleccionadoId}
+            onSeleccionarGrupo={onSeleccionarGrupoReino}
+            onOpenGrupo={onOpenGrupo}
+          />
+        </div>
         {onCreateReino && (
           <button
             type="button"

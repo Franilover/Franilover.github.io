@@ -58,6 +58,9 @@ interface Props {
   gruposCriaturasPorSubtipo?: GrupoFiltroSubtipo[];
   grupoSeleccionadoId?: string | null;
   onSeleccionarGrupo?: (grupoId: string | null) => void;
+  /** Abre el editor completo de un grupo — botón a la derecha de cada
+   *  opción en los dropdowns de filtro. */
+  onOpenGrupo?: (grupoId: string) => void;
 }
 
 function NodoCriatura({
@@ -108,6 +111,7 @@ export function MagiaJerarquica({
   gruposCriaturasPorSubtipo,
   grupoSeleccionadoId,
   onSeleccionarGrupo,
+  onOpenGrupo,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -199,11 +203,14 @@ export function MagiaJerarquica({
   return (
     <div className="mb-8 last:mb-0">
       <div className="flex items-center gap-2 mb-4 px-1">
-        <GrupoFiltroBarra
-          bloques={gruposCriaturasPorSubtipo}
-          grupoSeleccionadoId={grupoSeleccionadoId}
-          onSeleccionarGrupo={onSeleccionarGrupo}
-        />
+        <div className="flex-1">
+          <GrupoFiltroBarra
+            bloques={gruposCriaturasPorSubtipo}
+            grupoSeleccionadoId={grupoSeleccionadoId}
+            onSeleccionarGrupo={onSeleccionarGrupo}
+            onOpenGrupo={onOpenGrupo}
+          />
+        </div>
         {onCreateCriatura && (
           <button
             type="button"

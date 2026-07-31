@@ -228,10 +228,15 @@ export function EntidadesPage({ section, selectedId }: Props) {
     () => agruparPorSubtipo("items"),
     [gruposPorTipo],
   );
+  const gruposReinosPorSubtipo: GrupoFiltroSubtipo[] = useMemo(
+    () => agruparPorSubtipo("reinos"),
+    [gruposPorTipo],
+  );
 
   const [grupoPersonajeSeleccionadoId, setGrupoPersonajeSeleccionadoId] = useState<string | null>(null);
   const [grupoCriaturaSeleccionadoId, setGrupoCriaturaSeleccionadoId] = useState<string | null>(null);
   const [grupoItemSeleccionadoId, setGrupoItemSeleccionadoId] = useState<string | null>(null);
+  const [grupoReinoSeleccionadoId, setGrupoReinoSeleccionadoId] = useState<string | null>(null);
 
   // ── Canciones ─────────────────────────────────────────────────────────
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
@@ -614,6 +619,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           gruposCriaturasPorSubtipo={gruposCriaturasPorSubtipo}
           grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
           onSeleccionarGrupo={setGrupoCriaturaSeleccionadoId}
+          onOpenGrupo={(id) => openEntity("grupos", id)}
           onCreateCriatura={async () => {
             const { data } = await addCriatura({ nombre: "Nueva criatura" });
             if (data?.id) openEntity("criaturas", data.id);
@@ -649,6 +655,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
             bloques={gruposItemsPorSubtipo}
             grupoSeleccionadoId={grupoItemSeleccionadoId}
             onSeleccionarGrupo={setGrupoItemSeleccionadoId}
+            onOpenGrupo={(id) => openEntity("grupos", id)}
           />
         </div>
         <EntityCardGrid
@@ -804,6 +811,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
         gruposPersonajesPorSubtipo={gruposPersonajesPorSubtipo}
         grupoSeleccionadoId={grupoPersonajeSeleccionadoId}
         onSeleccionarGrupo={setGrupoPersonajeSeleccionadoId}
+        gruposReinosPorSubtipo={gruposReinosPorSubtipo}
+        grupoReinoSeleccionadoId={grupoReinoSeleccionadoId}
+        onSeleccionarGrupoReino={setGrupoReinoSeleccionadoId}
+        onOpenGrupo={(id) => openEntity("grupos", id)}
         onCreateReino={async () => {
           const { data } = await addReino({ nombre: "Nuevo reino" });
           if (data?.id) openEntity("reinos", data.id);
