@@ -3520,6 +3520,7 @@ function SidebarItemDetalleFlotante({
           )}
           <SelectorFechaMundo
             autoOpen
+            inline
             placeholder="Sin fecha…"
             value={dia}
             onChange={commitDia}
