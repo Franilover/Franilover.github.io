@@ -78,6 +78,7 @@ export function SelectorFechaMundo({
   compact = false,
   borderless = false,
   onOpenChange,
+  inline = false,
 }: {
   value: number | null;
   onChange: (diaAbsoluto: number | null) => void;
@@ -103,6 +104,14 @@ export function SelectorFechaMundo({
   // que montó este selector "a demanda" (con autoOpen) sepa cuándo
   // desmontarlo tras cerrarse.
   onOpenChange?: (open: boolean) => void;
+  // Si es true, el calendario (FechaMundoEditor) se renderiza EMPOTRADO en
+  // el flujo normal del documento, justo debajo del trigger — sin portal,
+  // sin position:fixed y sin cálculo de posición. Pensado para paneles que
+  // YA son flotantes (ej. el detalle de un evento/cumpleaños/canción en un
+  // modal): evita el efecto de "panel flotante dentro de otro panel
+  // flotante". `hideTrigger`/`autoOpen` se siguen respetando: si además se
+  // usa hideTrigger, el editor queda directamente inline sin trigger visible.
+  inline?: boolean;
 }) {
   const { cal, loading } = useCalendario();
   const [open, setOpen] = useState(autoOpen);
@@ -140,7 +149,7 @@ export function SelectorFechaMundo({
   // de día × partes de estación en paralelo (ej. "Florial 1 / Florial 2") —
   // y se acota solo por el viewport.
   useEffect(() => {
-    if (!open) return;
+    if (!open || inline) return;
     const update = () => {
       const r = triggerRef.current?.getBoundingClientRect();
       if (!r || !cal) return;
@@ -279,10 +288,46 @@ export function SelectorFechaMundo({
         </button>
       )}
 
-      {/* Dropdown — renderizado en portal para no quedar cortado por contenedores con overflow */}
+      {/* Dropdown — dos modos de render:
+          - inline: empotrado en el flujo normal, justo debajo del trigger,
+            sin portal ni position:fixed. Pensado para paneles que YA son
+            flotantes (el detalle de un evento en un modal), para no tener
+            un panel flotante dentro de otro.
+          - normal (default): en portal con position:fixed, para no quedar
+            cortado por contenedores con overflow. */}
+      {open && cal && inline && (
+        <div
+          ref={dropdownRef}
+          className="mt-1.5 rounded-xl border shadow-sm overflow-hidden"
+          style={{
+            background: "color-mix(in srgb, var(--primary) 2%, transparent)",
+            borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+          }}
+        >
+          <FechaMundoEditor
+            config={cal.config}
+            eras={cal.eras}
+            estaciones={cal.estaciones}
+            value={value}
+            onChange={(dia) => {
+              onChange(dia);
+              setOpenNotify(false);
+            }}
+            onClear={
+              value != null
+                ? () => {
+                    onChange(null);
+                    setOpenNotify(false);
+                  }
+                : undefined
+            }
+          />
+        </div>
+      )}
       {open &&
         cal &&
         pos &&
+        !inline &&
         typeof document !== "undefined" &&
         createPortal(
           <div

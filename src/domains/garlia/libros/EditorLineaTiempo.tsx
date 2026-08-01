@@ -1907,6 +1907,11 @@ function EventoDetallePanel({
                 evt.source === "cancion" ||
                 evt.source === "cumpleanos"
               }
+              inline={
+                evt.source === "capitulo" ||
+                evt.source === "cancion" ||
+                evt.source === "cumpleanos"
+              }
               placeholder="Sin fecha…"
               value={evt.dia_absoluto ?? null}
               onChange={commitDia}
