@@ -21,13 +21,57 @@ object PuenteFcm {
     @Volatile
     var tokenFcmPendiente: String? = null
 
+    // Cuántas veces reintentar entregar el token pendiente y cada cuánto.
+    // Existe porque WebView se crea muy temprano en el arranque nativo,
+    // pero window.onFcmToken recién existe una vez que React montó
+    // PushActivator — un solo intento inmediato casi siempre pierde esa
+    // carrera y el token se pierde en silencio (era el bug real: el token
+    // JAMÁS llegaba a guardarse en Supabase). Reintentar unos segundos
+    // cubre ese hueco sin necesitar un mecanismo más complejo (comando
+    // Tauri, JS interface, etc.).
+    private const val REINTENTOS = 15
+    private const val INTERVALO_MS = 500L
+
     fun registrarWebView(webView: WebView) {
         webViewRef = WeakReference(webView)
-        // Si un token había llegado antes de que el WebView existiera,
-        // se lo entregamos ahora que ya está disponible.
-        tokenFcmPendiente?.let { token ->
-            val js = "window.onFcmToken && window.onFcmToken(${org.json.JSONObject.quote(token)});"
-            webView.post { webView.evaluateJavascript(js, null) }
+        tokenFcmPendiente?.let { entregarToken(it) }
+    }
+
+    /**
+     * Intenta entregar el token al WebView actual (si hay uno registrado),
+     * con reintentos cortos por si window.onFcmToken todavía no existe
+     * (React puede no haber montado PushActivator todavía). Se llama tanto
+     * desde onNewToken() del servicio de FCM como desde
+     * MainActivity.pedirTokenFcm() en cada apertura de la app — cubre
+     * "token nuevo" y "token ya existente" por igual.
+     */
+    fun entregarToken(token: String) {
+        tokenFcmPendiente = token
+        val webView = webViewRef?.get() ?: return
+        intentarEntregarConReintentos(webView, token, REINTENTOS)
+    }
+
+    private fun intentarEntregarConReintentos(webView: WebView, token: String, intentosRestantes: Int) {
+        val js = """
+            (function() {
+                if (window.onFcmToken) {
+                    window.onFcmToken(${org.json.JSONObject.quote(token)});
+                    return true;
+                }
+                return false;
+            })();
+        """.trimIndent()
+
+        webView.post {
+            webView.evaluateJavascript(js) { resultado ->
+                val entregado = resultado == "true"
+                if (!entregado && intentosRestantes > 0) {
+                    webView.postDelayed(
+                        { intentarEntregarConReintentos(webView, token, intentosRestantes - 1) },
+                        INTERVALO_MS,
+                    )
+                }
+            }
         }
     }
 

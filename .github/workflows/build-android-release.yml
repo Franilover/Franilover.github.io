@@ -255,11 +255,14 @@ jobs:
 
           if "firebase-messaging" not in app:
               # El bloque dependencies { ... } ya existe (Tauri agrega las
-              # suyas ahí). Insertamos el BoM de Firebase + firebase-messaging
-              # justo después de la línea "dependencies {".
+              # suyas ahí). Insertamos el BoM de Firebase + firebase-messaging,
+              # más androidx.core (ActivityCompat/ContextCompat, usados en
+              # MainActivity.kt para pedir el permiso POST_NOTIFICATIONS en
+              # runtime) justo después de la línea "dependencies {".
               firebase_deps = (
                   '    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))\n'
                   '    implementation("com.google.firebase:firebase-messaging")\n'
+                  '    implementation("androidx.core:core-ktx:1.13.1")\n'
               )
               patron_deps = re.compile(r'(dependencies\s*\{\n)')
               app, n = patron_deps.subn(r'\1' + firebase_deps, app, count=1)
@@ -421,10 +424,18 @@ jobs:
         #   class MainActivity : TauriActivity()
         # (confirmado con un paso de DEBUG en una corrida anterior — no hay
         # ningún método para "buscar y modificar", así que reescribimos el
-        # archivo completo con el override de onWebViewCreate agregado.
-        # TauriActivity sí expone ese hook (confirmado contra ejemplos
-        # oficiales de plugins de Tauri) — ahí registramos el WebView en
-        # PuenteFcm para que el servicio de FCM pueda llamarle JS.
+        # archivo completo con dos agregados:
+        #   1. override de onWebViewCreate: registra el WebView en
+        #      PuenteFcm para que el servicio de FCM pueda llamarle JS
+        #      (TauriActivity expone ese hook, confirmado contra ejemplos
+        #      oficiales de plugins de Tauri).
+        #   2. pedido del permiso POST_NOTIFICATIONS en runtime dentro de
+        #      onCreate: en Android 13+ (API 33+) declararlo en el
+        #      AndroidManifest.xml no alcanza — el sistema no muestra
+        #      NINGUNA notificación hasta que la app lo pide con este
+        #      popup y el usuario lo acepta. Sin este paso, todo el resto
+        #      del pipeline de FCM podía estar perfecto y aun así no
+        #      llegar nunca ninguna notificación visible.
         run: |
           MAIN_ACTIVITY=$(find src-tauri/gen/android/app/src/main/java -name "MainActivity.kt")
           if [ -z "$MAIN_ACTIVITY" ]; then
@@ -438,9 +449,56 @@ jobs:
           cat > "$MAIN_ACTIVITY" << 'KOTLIN_EOF'
           package com.frani.garlia
 
+          import android.Manifest
+          import android.content.pm.PackageManager
+          import android.os.Build
+          import android.os.Bundle
           import android.webkit.WebView
+          import androidx.core.app.ActivityCompat
+          import androidx.core.content.ContextCompat
 
           class MainActivity : TauriActivity() {
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  pedirPermisoDeNotificaciones()
+                  pedirTokenFcm()
+              }
+
+              private fun pedirTokenFcm() {
+                  // FirebaseMessagingService.onNewToken() solo dispara cuando
+                  // el token es nuevo o rotó — en una app que ya tenía el
+                  // token de un run anterior, puede no volver a llamarse
+                  // nunca. Pedirlo acá, en cada apertura de la Activity, es
+                  // lo que garantiza que siempre terminemos con el token
+                  // actual sin depender de ese evento, y lo entregamos ya
+                  // mismo al WebView (con reintentos, por si React todavía
+                  // no montó window.onFcmToken en este instante).
+                  com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                      .addOnSuccessListener { token ->
+                          PuenteFcm.entregarToken(token)
+                      }
+              }
+
+              private fun pedirPermisoDeNotificaciones() {
+                  // El permiso solo existe (y solo hace falta pedirlo) desde
+                  // Android 13 / API 33. En versiones anteriores las
+                  // notificaciones se muestran sin pedir nada.
+                  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+                  val yaConcedido = ContextCompat.checkSelfPermission(
+                      this,
+                      Manifest.permission.POST_NOTIFICATIONS,
+                  ) == PackageManager.PERMISSION_GRANTED
+
+                  if (!yaConcedido) {
+                      ActivityCompat.requestPermissions(
+                          this,
+                          arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                          0,
+                      )
+                  }
+              }
+
               override fun onWebViewCreate(webView: WebView) {
                   super.onWebViewCreate(webView)
                   PuenteFcm.registrarWebView(webView)

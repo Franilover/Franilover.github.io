@@ -33,9 +33,7 @@ class GarliaFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        PuenteFcm.tokenFcmPendiente = token
-        val js = "window.onFcmToken && window.onFcmToken(${org.json.JSONObject.quote(token)});"
-        PuenteFcm.evaluarJs(js)
+        PuenteFcm.entregarToken(token)
     }
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
