@@ -1359,8 +1359,15 @@ function ModalEra({
 // Convierte allEvents (ya filtrados/ordenados por dia_absoluto) en un
 // documento markdown vertical, agrupado por Era (H1) → Año (H2) →
 // evento/capítulo/canción/cumpleaños/era-de-personaje (H3 con el reino
-// como sufijo). Pensado para leerse de corrido, no para editarse — se
-// muestra en RichEditor con editable={false}.
+// como sufijo).
+//
+// Solo los eventos "mundo"/"reino" son editables: su H3 lleva un id
+// embebido como texto plano (<!--tl:ID-->) al final del encabezado, que
+// el parser usa para saber qué fila de `eventos_mundo` actualizar. No es
+// invisible (el editor no interpreta HTML dentro de headings, así que el
+// usuario lo verá) pero es reconocible como "no tocar". Capítulos,
+// canciones y cumpleaños se emiten SIN id — son de solo lectura, y
+// cualquier edición sobre esas líneas se ignora al guardar.
 function generarMarkdownHistoriaCompleta(
   allEvents: MundoTimelineEvent[],
   cal: CalCache | null,
@@ -1409,10 +1416,14 @@ function generarMarkdownHistoriaCompleta(
       lineas.push(`## Año ${anio}`);
     }
 
-    // H3 — título del evento, con el reino como sufijo cuando aplica
+    // H3 — título del evento, con el reino como sufijo cuando aplica.
+    // Solo mundo/reino llevan id embebido (editables); el resto queda
+    // sin id, marcado como solo lectura.
     const titulo = evt.title?.trim() || "Sin título";
     const sufijoReino = evt.reinoNombre ? ` — ${evt.reinoNombre}` : "";
-    lineas.push(`### ${titulo}${sufijoReino}`);
+    const esEditable = evt.source === "mundo" || evt.source === "reino";
+    const idTag = esEditable ? ` <!--tl:${evt.id}-->` : " 🔒";
+    lineas.push(`### ${titulo}${sufijoReino}${idTag}`);
 
     // Cuerpo — descripción/notas si las hay, en texto plano debajo del H3
     const cuerpo = (evt.description ?? "").trim();
@@ -1422,24 +1433,245 @@ function generarMarkdownHistoriaCompleta(
   return lineas.join("\n\n");
 }
 
-// ── Modal: "Historia completa" — línea de tiempo como documento de lectura ──
-// Muestra generarMarkdownHistoriaCompleta() en un RichEditor de solo
-// lectura (editable={false}), para leer la historia del mundo de corrido
-// en vez de navegar tarjeta por tarjeta.
+// ── Parser del documento markdown editado ────────────────────────────────
+// Recorre el markdown línea por línea reconstruyendo bloques # Era /
+// ## Año N / ### Título — Reino <!--tl:id--> \n cuerpo. Solo le importan
+// los bloques con id (mundo/reino, editables) — todo lo demás (capítulos,
+// canciones, cumpleaños con 🔒, o sin marcador porque el usuario lo
+// borró) se reporta como "no editable" o "no reconocido" sin bloquear el
+// guardado del resto.
+interface BloqueEditado {
+  id: string;
+  titulo: string;
+  anio: number | null; // año vigente (del último ## Año N visto antes del bloque)
+  descripcion: string;
+}
+
+interface ParseResultado {
+  bloques: BloqueEditado[];
+  avisos: string[]; // líneas/bloques que no se pudieron interpretar o no son editables
+}
+
+function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
+  const bloques: BloqueEditado[] = [];
+  const avisos: string[] = [];
+
+  // Separar en líneas, preservando estructura de párrafos en blanco.
+  const lineasCrudas = markdown.split("\n");
+
+  let anioActual: number | null = null;
+  let bloqueActivo: {
+    id: string | null;
+    tituloCrudo: string;
+    cuerpo: string[];
+    esEditable: boolean;
+  } | null = null;
+
+  const cerrarBloque = () => {
+    if (!bloqueActivo) return;
+    if (bloqueActivo.id) {
+      // Quita el sufijo " — Reino" del título para dejar solo el título
+      // real (el reino no se edita desde aquí, se preserva del original).
+      const tituloSinReino = bloqueActivo.tituloCrudo
+        .replace(/\s+—\s+[^—]+$/, "")
+        .trim();
+      bloques.push({
+        id: bloqueActivo.id,
+        titulo: tituloSinReino,
+        anio: anioActual,
+        descripcion: bloqueActivo.cuerpo.join("\n\n").trim(),
+      });
+    } else if (!bloqueActivo.esEditable) {
+      // Bloque con 🔒 (capítulo/canción/cumpleaños) — solo lectura,
+      // no se avisa como error, es el comportamiento esperado.
+    } else {
+      // Tenía "###" pero no se pudo extraer id ni marcador 🔒 —
+      // probablemente el usuario borró el <!--tl:id--> por accidente.
+      avisos.push(
+        `No se pudo identificar el evento "${bloqueActivo.tituloCrudo.trim() || "(sin título)"}" — puede que se haya borrado su marcador oculto. Este cambio no se guardará.`,
+      );
+    }
+    bloqueActivo = null;
+  };
+
+  for (const lineaCruda of lineasCrudas) {
+    const linea = lineaCruda.trim();
+
+    if (linea.startsWith("# ") && !linea.startsWith("## ")) {
+      // H1 (Era) — cierra el bloque anterior, no aporta datos editables.
+      cerrarBloque();
+      continue;
+    }
+
+    if (linea.startsWith("## ")) {
+      cerrarBloque();
+      const m = linea.match(/^##\s+Año\s+(-?\d+)/i);
+      anioActual = m ? parseInt(m[1], 10) : anioActual;
+      continue;
+    }
+
+    if (linea.startsWith("### ")) {
+      cerrarBloque();
+      const contenido = linea.slice(4);
+      const idMatch = contenido.match(/<!--tl:([a-zA-Z0-9-]+)-->\s*$/);
+      const esLock = /🔒\s*$/.test(contenido);
+      const tituloCrudo = contenido
+        .replace(/<!--tl:[a-zA-Z0-9-]+-->\s*$/, "")
+        .replace(/🔒\s*$/, "")
+        .trim();
+      bloqueActivo = {
+        id: idMatch ? idMatch[1] : null,
+        tituloCrudo,
+        cuerpo: [],
+        esEditable: !esLock, // si no tiene 🔒 pero tampoco id, es un error real
+      };
+      continue;
+    }
+
+    if (linea === "") continue; // línea en blanco, ignorar
+
+    // Texto suelto: si hay un bloque activo, es su cuerpo; si no, es una
+    // línea huérfana fuera de cualquier evento.
+    if (bloqueActivo) {
+      bloqueActivo.cuerpo.push(lineaCruda);
+    } else {
+      avisos.push(
+        `Línea fuera de cualquier evento, se ignorará: "${linea.slice(0, 60)}${linea.length > 60 ? "…" : ""}"`,
+      );
+    }
+  }
+  cerrarBloque();
+
+  return { bloques, avisos };
+}
+
+// ── Modal: "Historia completa" — línea de tiempo como documento editable ──
+// Muestra generarMarkdownHistoriaCompleta() en un RichEditor. Solo los
+// eventos "mundo"/"reino" son editables (título, descripción, año →
+// dia_absoluto); capítulos/canciones/cumpleaños se muestran de corrido
+// pero cualquier edición sobre ellos se descarta al guardar. Autosave
+// con debounce + indicador de estado visible.
 function ModalHistoriaCompleta({
   markdown,
+  allEvents,
+  diasAnioLista,
+  onFieldChange,
+  onDiaChange,
   onClose,
 }: {
   markdown: string;
+  allEvents: MundoTimelineEvent[];
+  diasAnioLista: number;
+  onFieldChange: (
+    id: string,
+    field: "titulo" | "descripcion",
+    value: string,
+  ) => Promise<void>;
+  onDiaChange: (id: string, dia: number) => Promise<void>;
   onClose: () => void;
 }) {
+  const [valor, setValor] = useState(markdown);
+  const [avisos, setAvisos] = useState<string[]>([]);
+  const [estado, setEstado] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const guardandoRef = useRef(false);
+
+  // Snapshot original indexado por id — sirve para diffear solo lo que
+  // realmente cambió (evita updates innecesarios en cada autosave).
+  const indiceOriginal = useMemo(() => {
+    const m = new Map<string, MundoTimelineEvent>();
+    for (const e of allEvents) {
+      if (e.source === "mundo" || e.source === "reino") m.set(e.id, e);
+    }
+    return m;
+  }, [allEvents]);
+
+  const guardar = useCallback(
+    async (texto: string) => {
+      const { bloques, avisos: avisosParse } =
+        parsearMarkdownHistoriaCompleta(texto);
+      setAvisos(avisosParse);
+
+      const cambios: Array<() => Promise<void>> = [];
+
+      for (const b of bloques) {
+        const original = indiceOriginal.get(b.id);
+        if (!original) continue; // id desconocido (evento borrado en otra pestaña, etc.)
+
+        if (b.titulo && b.titulo !== (original.title?.trim() || "")) {
+          cambios.push(() => onFieldChange(b.id, "titulo", b.titulo));
+        }
+        if (b.descripcion !== (original.description ?? "").trim()) {
+          cambios.push(() =>
+            onFieldChange(b.id, "descripcion", b.descripcion),
+          );
+        }
+        if (b.anio != null && original.dia_absoluto != null) {
+          const anioOriginal = Math.floor(
+            original.dia_absoluto / diasAnioLista,
+          );
+          if (b.anio !== anioOriginal) {
+            const nuevoDia = b.anio * diasAnioLista;
+            cambios.push(() => onDiaChange(b.id, nuevoDia));
+          }
+        }
+      }
+
+      if (cambios.length === 0) {
+        setEstado("idle");
+        return;
+      }
+
+      setEstado("saving");
+      try {
+        for (const c of cambios) await c();
+        setEstado("saved");
+        setTimeout(() => setEstado((s) => (s === "saved" ? "idle" : s)), 2000);
+      } catch {
+        setEstado("error");
+      }
+    },
+    [indiceOriginal, diasAnioLista, onFieldChange, onDiaChange],
+  );
+
+  const handleChange = useCallback(
+    (nuevoTexto: string) => {
+      setValor(nuevoTexto);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void guardar(nuevoTexto);
+      }, 1200);
+    },
+    [guardar],
+  );
+
+  // Ctrl+S fuerza guardado inmediato, saltándose el debounce.
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+        }
+        void guardar(valor);
+      }
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+  }, [onClose, guardar, valor]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   if (typeof document === "undefined") return null;
 
@@ -1474,27 +1706,62 @@ function ModalHistoriaCompleta({
             <BookOpen size={11} />
             Historia completa
           </span>
-          <button
-            className="flex items-center justify-center w-6 h-6 rounded-lg border transition-all"
-            style={{
-              borderColor:
-                "color-mix(in srgb, var(--primary) 12%, transparent)",
-              color: "color-mix(in srgb, var(--primary) 40%, transparent)",
-            }}
-            type="button"
-            onClick={onClose}
-          >
-            <X size={10} />
-          </button>
+          <div className="flex items-center gap-2">
+            <SaveIndicator status={estado} />
+            <button
+              className="flex items-center justify-center w-6 h-6 rounded-lg border transition-all"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 12%, transparent)",
+                color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+              }}
+              type="button"
+              onClick={onClose}
+            >
+              <X size={10} />
+            </button>
+          </div>
         </div>
 
-        {/* Documento — RichEditor de solo lectura */}
+        {/* Nota de alcance: qué es editable y qué no */}
+        <div
+          className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b"
+          style={{
+            color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+          }}
+        >
+          Solo los eventos de mundo/reino son editables (título, descripción
+          y año). Capítulos, canciones y cumpleaños (🔒) son de solo
+          lectura. No borres el <code>&lt;!--tl:...--&gt;</code> al final de
+          un título editable — se usa para saber qué evento actualizar.
+        </div>
+
+        {/* Avisos de líneas/bloques no interpretables o no editables */}
+        {avisos.length > 0 && (
+          <div
+            className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b space-y-0.5"
+            style={{
+              color: "#b45309",
+              borderColor:
+                "color-mix(in srgb, var(--primary) 8%, transparent)",
+              background: "color-mix(in srgb, #f59e0b 8%, transparent)",
+            }}
+          >
+            {avisos.map((a, i) => (
+              <div key={i}>⚠ {a}</div>
+            ))}
+          </div>
+        )}
+
+        {/* Documento — RichEditor editable */}
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
           <RichEditor
-            editable={false}
+            editable
             minHeight={200}
-            value={markdown}
-            onChange={() => {}}
+            value={valor}
+            onChange={handleChange}
           />
         </div>
       </div>
@@ -5478,6 +5745,10 @@ export function PanelHistoriaMundo({
       {showHistoriaCompleta && (
         <ModalHistoriaCompleta
           markdown={markdownHistoriaCompleta}
+          allEvents={allEvents}
+          diasAnioLista={diasAnioBarra}
+          onFieldChange={handleEventoMundoFieldChange}
+          onDiaChange={handleEventoMundoDiaChange}
           onClose={() => setShowHistoriaCompleta(false)}
         />
       )}
