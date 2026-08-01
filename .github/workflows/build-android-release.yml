@@ -415,7 +415,20 @@ jobs:
           echo "Archivos copiados a $DESTINO:"
           ls "$DESTINO"
 
+      - name: DEBUG - mostrar MainActivity.kt generado
+        # Temporal: el patrón de Python del paso siguiente asume que existe
+        # un hook "override fun onWebViewCreate(...)" en el MainActivity.kt
+        # que genera esta versión de Tauri, y falló (ver corrida anterior).
+        # Este paso imprime el archivo real en el log para poder ajustar el
+        # patrón al nombre correcto — sacar una vez confirmado.
+        run: |
+          find src-tauri/gen/android/app/src/main/java -name "MainActivity.kt" -exec cat {} \;
+
       - name: Registrar el puente FCM en MainActivity.kt
+        # TEMPORAL: continue-on-error mientras confirmamos el nombre real
+        # del hook de WebView que expone esta versión de Tauri (ver paso de
+        # DEBUG arriba). Sacar continue-on-error una vez ajustado el patrón.
+        continue-on-error: true
         # `tauri android init` genera MainActivity.kt con una referencia al
         # WebView interno de Tauri/WRY. Le agregamos una sola línea en
         # onWebViewCreate (hook que Tauri sí expone) para registrar ese
