@@ -16,6 +16,7 @@ name: build-android
 #   ANDROID_KEYSTORE_PASSWORD
 #   ANDROID_KEY_ALIAS
 #   ANDROID_KEY_PASSWORD
+#   GOOGLE_SERVICES_JSON_BASE64  (google-services.json de Firebase, en base64)
 
 on:
   push:
@@ -178,6 +179,99 @@ jobs:
           mkdir -p src-tauri/gen/android
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/src-tauri/gen/android/upload-keystore.jks"
 
+      - name: Restaurar google-services.json (Firebase / FCM)
+        # google-services.json tiene que vivir en gen/android/app/ (mismo
+        # nivel que el build.gradle.kts del módulo app) para que el plugin
+        # de Gradle de Google Services lo detecte. Como gen/android se borra
+        # y regenera desde cero en cada build (ver paso "Inicializar el
+        # proyecto Android de Tauri" más arriba), este archivo no puede
+        # vivir commiteado en el repo — se restaura acá desde un secret en
+        # cada corrida, igual que el keystore de firma.
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          mkdir -p src-tauri/gen/android/app
+          echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > "$GITHUB_WORKSPACE/src-tauri/gen/android/app/google-services.json"
+          echo "google-services.json restaurado en gen/android/app/"
+
+      - name: Aplicar plugin de Google Services + Firebase Messaging al Gradle
+        # Dos archivos generados por `tauri android init` hay que tocar:
+        #   - gen/android/build.gradle.kts (raíz del proyecto Android):
+        #     agregar el classpath del plugin com.google.gms:google-services.
+        #   - gen/android/app/build.gradle.kts (módulo app):
+        #     aplicar ese plugin + agregar la dependencia de
+        #     firebase-messaging (vía el BoM de Firebase, así no hay que
+        #     fijar versión a mano).
+        # Igual que con el signing, se hace con Python para no depender de
+        # que el archivo generado tenga siempre el mismo formato exacto de
+        # indentación que un sed frágil podría romper.
+        run: |
+          ROOT_GRADLE="src-tauri/gen/android/build.gradle.kts"
+          APP_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
+
+          python3 - "$ROOT_GRADLE" "$APP_GRADLE" << 'PYEOF'
+          import re
+          import sys
+
+          root_path, app_path = sys.argv[1], sys.argv[2]
+
+          # ── build.gradle.kts de raíz: agregar el classpath del plugin ──
+          with open(root_path) as f:
+              root = f.read()
+
+          if "com.google.gms:google-services" not in root:
+              # `tauri android init` genera un bloque buildscript { dependencies { ... } }
+              # con el classpath del Android Gradle Plugin. Insertamos el
+              # nuestro justo después de esa línea.
+              patron = re.compile(r'(classpath\("com\.android\.tools\.build:gradle:[^"]+"\)\n)')
+              nuevo_root, n = patron.subn(
+                  r'\1        classpath("com.google.gms:google-services:4.4.2")\n',
+                  root,
+                  count=1,
+              )
+              assert n == 1, "No se encontró el classpath del AGP en build.gradle.kts de raíz — revisar a mano."
+              with open(root_path, "w") as f:
+                  f.write(nuevo_root)
+              print("Classpath de google-services agregado a build.gradle.kts de raíz.")
+          else:
+              print("build.gradle.kts de raíz ya tiene el plugin de google-services, no se toca.")
+
+          # ── build.gradle.kts de app: aplicar plugin + dependencia ──
+          with open(app_path) as f:
+              app = f.read()
+
+          if "com.google.gms.google-services" not in app:
+              # El bloque plugins { ... } está al principio del archivo.
+              patron_plugins = re.compile(r'(plugins\s*\{\n)')
+              app, n = patron_plugins.subn(
+                  r'\1    id("com.google.gms.google-services")\n',
+                  app,
+                  count=1,
+              )
+              assert n == 1, "No se encontró el bloque plugins { en build.gradle.kts de app — revisar a mano."
+              print("Plugin com.google.gms.google-services aplicado en build.gradle.kts de app.")
+          else:
+              print("build.gradle.kts de app ya aplica el plugin de google-services.")
+
+          if "firebase-messaging" not in app:
+              # El bloque dependencies { ... } ya existe (Tauri agrega las
+              # suyas ahí). Insertamos el BoM de Firebase + firebase-messaging
+              # justo después de la línea "dependencies {".
+              firebase_deps = (
+                  '    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))\n'
+                  '    implementation("com.google.firebase:firebase-messaging")\n'
+              )
+              patron_deps = re.compile(r'(dependencies\s*\{\n)')
+              app, n = patron_deps.subn(r'\1' + firebase_deps, app, count=1)
+              assert n == 1, "No se encontró el bloque dependencies { en build.gradle.kts de app — revisar a mano."
+              print("Dependencia de firebase-messaging agregada en build.gradle.kts de app.")
+          else:
+              print("build.gradle.kts de app ya tiene firebase-messaging.")
+
+          with open(app_path, "w") as f:
+              f.write(app)
+          PYEOF
+
       - name: Forzar compileSdk/targetSdk compatibles con AGP
         # setup-android@v3 instala el SDK más nuevo (API 36), pero la Tauri
         # CLI trae empaquetado AGP 8.5.1, que solo soporta oficialmente hasta
@@ -292,6 +386,22 @@ jobs:
             cat src-tauri/gen/android/app/build.gradle.kts
             exit 1
           }
+
+      - name: Verificar que Firebase/google-services quedó aplicado
+        run: |
+          test -f src-tauri/gen/android/app/google-services.json || {
+            echo "::error::Falta google-services.json en gen/android/app/ — revisar el secret GOOGLE_SERVICES_JSON_BASE64."
+            exit 1
+          }
+          grep -q "com.google.gms.google-services" src-tauri/gen/android/app/build.gradle.kts || {
+            echo "::error::El plugin com.google.gms.google-services no quedó aplicado en build.gradle.kts de app."
+            exit 1
+          }
+          grep -q "firebase-messaging" src-tauri/gen/android/app/build.gradle.kts || {
+            echo "::error::La dependencia firebase-messaging no quedó en build.gradle.kts de app."
+            exit 1
+          }
+          echo "Firebase/google-services OK."
 
       - name: Build del APK universal (release, firmado)
         env:

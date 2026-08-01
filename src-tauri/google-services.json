@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "955052478931",
+    "project_id": "garlia",
+    "storage_bucket": "garlia.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:955052478931:android:93f86cf825775b95909f26",
+        "android_client_info": {
+          "package_name": "com.frani.garlia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABtTl8JIYFeF4DNjtv-UazImemQvEanHs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
