@@ -334,6 +334,18 @@ export default function DetalleConversacion() {
     }
   }, [mensajes.length]);
 
+  // Al aparecer la burbuja de "escribiendo…", la acercamos a la vista con
+  // scroll suave — pero solo si el usuario ya estaba cerca del fondo (si
+  // está leyendo mensajes viejos más arriba, no le interrumpimos la lectura
+  // solo porque el otro empezó a tipear).
+  useEffect(() => {
+    if (!otroEscribiendo || !scrollRef.current) return;
+    const contenedor = scrollRef.current;
+    const distanciaAlFondo = contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight;
+    if (distanciaAlFondo > 150) return;
+    contenedor.scrollTo({ top: contenedor.scrollHeight, behavior: "smooth" });
+  }, [otroEscribiendo]);
+
   // Red de seguridad adicional para el caso más común de layout tardío:
   // avatares y adjuntos de imagen que terminan de cargar después del salto
   // inicial y empujan el contenido, dejando el scroll corto. Mientras seguimos
@@ -780,6 +792,36 @@ export default function DetalleConversacion() {
               </div>
             );
           })
+        )}
+
+        {/* ── Burbuja "escribiendo…" — mismo lugar donde aparecería el
+            próximo mensaje del otro participante, con el mismo estilo de
+            burbuja que sus mensajes normales. Los puntos usan la utilidad
+            `animate-bounce` de Tailwind (incluida por defecto, sin
+            configuración extra) con un delay escalonado por punto para que
+            reboten en cascada en vez de todos juntos. */}
+        {otroEscribiendo && (
+          <div className="flex flex-col items-start">
+            <div
+              className="px-4 py-3 rounded-[var(--radius-btn)] flex items-center gap-1"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+              }}
+            >
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="rounded-full animate-bounce"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    background: "color-mix(in srgb, var(--primary) 50%, transparent)",
+                    animationDelay: `${i * 0.15}s`,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
