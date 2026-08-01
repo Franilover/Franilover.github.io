@@ -26,6 +26,16 @@ export function LineaTiempoSection() {
   const { textos, setTextos, save } = useMundoSecciones();
   const openEntity = useMundoNavigation((s) => s.openEntity);
   const selectedId = useMundoNavigation((s) => s.selectedId);
+  const openTabs = useMundoNavigation((s) => s.openTabs);
+
+  // Si hay una pestaña de un personaje abierta (en cualquier orden, no
+  // necesariamente la activa), la usamos para preseleccionar el filtro de
+  // "Historia completa" y así mostrar de entrada las eras internas de ese
+  // personaje. Si hay varias pestañas de personajes abiertas, se usa la
+  // última abierta (la más reciente en openTabs).
+  const personajeAbiertoId =
+    [...openTabs].reverse().find((t) => t.section === "personajes")?.id ??
+    null;
 
   return (
     <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -38,6 +48,7 @@ export function LineaTiempoSection() {
         onSelectCancion={(id) => openEntity("letras", id)}
         onOpenHistoriaCompleta={() => openEntity("linea-tiempo", "historia")}
         mostrarHistoriaCompleta={selectedId === "historia"}
+        personajePreseleccionado={personajeAbiertoId}
       />
     </div>
   );

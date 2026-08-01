@@ -137,6 +137,15 @@ function CapituloEventoRow({
       .from("capitulos")
       .update({ dia_absoluto: dia } as any)
       .eq("id", cap.id);
+    try {
+      if (db && (db as any).capitulos) {
+        const existing = await (db as any).capitulos.get(cap.id);
+        await (db as any).capitulos.put({
+          ...(existing ?? { id: cap.id }),
+          dia_absoluto: dia,
+        });
+      }
+    } catch {}
     onDiaChange?.(cap.id, dia);
     setSaving(false);
   };
@@ -278,6 +287,15 @@ function CancionMundoRow({
       .from("canciones")
       .update({ dia_absoluto: dia } as any)
       .eq("id", cancion.id);
+    try {
+      if (db && (db as any).canciones) {
+        const existing = await (db as any).canciones.get(cancion.id);
+        await (db as any).canciones.put({
+          ...(existing ?? { id: cancion.id }),
+          dia_absoluto: dia,
+        });
+      }
+    } catch {}
     onDiaChange?.(cancion.id, dia);
     setSaving(false);
   };
@@ -1056,6 +1074,10 @@ function ModalEra({
           .single();
         if (err) throw err;
         invalidarCacheEras();
+        try {
+          if (db && (db as any).eras_mundo)
+            await (db as any).eras_mundo.put(data);
+        } catch {}
         onSaved(data);
       } else {
         const { data, error: err } = await (supabase as any)
@@ -1065,6 +1087,10 @@ function ModalEra({
           .single();
         if (err) throw err;
         invalidarCacheEras();
+        try {
+          if (db && (db as any).eras_mundo)
+            await (db as any).eras_mundo.put(data);
+        } catch {}
         onSaved(data);
       }
     } catch (e: any) {
@@ -1084,6 +1110,10 @@ function ModalEra({
         .eq("id", era.id);
       if (err) throw err;
       invalidarCacheEras();
+      try {
+        if (db && (db as any).eras_mundo)
+          await (db as any).eras_mundo.delete(era.id);
+      } catch {}
       onDeleted?.(era.id);
     } catch (e: any) {
       setError(e?.message ?? "Error al borrar");
@@ -1400,44 +1430,74 @@ function generarMarkdownHistoriaCompleta(
       e.dia_absoluto != null &&
       (e.source === "mundo" || e.source === "reino"),
   );
-  if (conFecha.length === 0) {
+
+  // Eras internas del personaje (personaje_eras), si hay un personaje
+  // filtrado. Se listan aparte, en orden cronológico, como sección de
+  // solo lectura al final del documento — no se mezclan con los bloques
+  // "###" editables de arriba porque su edición vive en otro lugar
+  // (el detalle de era dentro del editor de personaje / la línea de
+  // tiempo normal), no en este documento.
+  const erasPersonaje = allEvents
+    .filter((e) => e.source === "era_personaje")
+    .sort((a, b) => a.yearNum - b.yearNum);
+
+  if (conFecha.length === 0 && erasPersonaje.length === 0) {
     return filtroLabel
       ? `_Sin eventos de mundo/reino con fecha asignada para "${filtroLabel}" todavía._`
       : "_Sin eventos de mundo/reino con fecha asignada todavía._";
   }
 
   const lineas: string[] = [];
-  let eraActualId: string | null | undefined = undefined; // undefined = todavía no se emitió ninguna
-  let anioActual: number | null | undefined = undefined;
 
-  for (const evt of conFecha) {
-    const dia = evt.dia_absoluto as number;
-    const anio = Math.floor(dia / diasAnioLista);
-    const eraEvt = getEraEvt(dia);
-    const eraId = eraEvt?.id ?? null;
+  if (conFecha.length > 0) {
+    let eraActualId: string | null | undefined = undefined; // undefined = todavía no se emitió ninguna
+    let anioActual: number | null | undefined = undefined;
 
-    // H1 — nombre de la era (o "Sin era" si el año no cae en ninguna)
-    if (eraId !== eraActualId) {
-      eraActualId = eraId;
-      anioActual = undefined; // fuerza a reemitir el año al cambiar de era
-      lineas.push(`# ${eraEvt?.nombre ?? "Sin era"}`);
+    for (const evt of conFecha) {
+      const dia = evt.dia_absoluto as number;
+      const anio = Math.floor(dia / diasAnioLista);
+      const eraEvt = getEraEvt(dia);
+      const eraId = eraEvt?.id ?? null;
+
+      // H1 — nombre de la era (o "Sin era" si el año no cae en ninguna)
+      if (eraId !== eraActualId) {
+        eraActualId = eraId;
+        anioActual = undefined; // fuerza a reemitir el año al cambiar de era
+        lineas.push(`# ${eraEvt?.nombre ?? "Sin era"}`);
+      }
+
+      // H2 — año
+      if (anio !== anioActual) {
+        anioActual = anio;
+        lineas.push(`## Año ${anio}`);
+      }
+
+      // H3 — título del evento, con el reino como sufijo cuando aplica,
+      // más el id embebido para el parser.
+      const titulo = evt.title?.trim() || "Sin título";
+      const sufijoReino = evt.reinoNombre ? ` — ${evt.reinoNombre}` : "";
+      lineas.push(`### ${titulo}${sufijoReino} <!--tl:${evt.id}-->`);
+
+      // Cuerpo — descripción/notas si las hay, en texto plano debajo del H3
+      const cuerpo = (evt.description ?? "").trim();
+      if (cuerpo) lineas.push(cuerpo);
     }
+  }
 
-    // H2 — año
-    if (anio !== anioActual) {
-      anioActual = anio;
-      lineas.push(`## Año ${anio}`);
+  // Sección aparte con las eras internas del personaje filtrado, si tiene.
+  if (erasPersonaje.length > 0) {
+    const nombrePersonaje = erasPersonaje[0].eraPersonajeData?.personajeNombre;
+    lineas.push(
+      `# Eras internas${nombrePersonaje ? ` de ${nombrePersonaje}` : ""}`,
+    );
+    for (const evt of erasPersonaje) {
+      const titulo = evt.title?.trim() || "Sin título";
+      lineas.push(`### ${titulo}`);
+      const rasgos = evt.eraPersonajeData?.rasgos ?? [];
+      if (rasgos.length > 0) lineas.push(`_${rasgos.join(" · ")}_`);
+      const cuerpo = (evt.description ?? "").trim();
+      if (cuerpo) lineas.push(cuerpo);
     }
-
-    // H3 — título del evento, con el reino como sufijo cuando aplica,
-    // más el id embebido para el parser.
-    const titulo = evt.title?.trim() || "Sin título";
-    const sufijoReino = evt.reinoNombre ? ` — ${evt.reinoNombre}` : "";
-    lineas.push(`### ${titulo}${sufijoReino} <!--tl:${evt.id}-->`);
-
-    // Cuerpo — descripción/notas si las hay, en texto plano debajo del H3
-    const cuerpo = (evt.description ?? "").trim();
-    if (cuerpo) lineas.push(cuerpo);
   }
 
   return lineas.join("\n\n");
@@ -4455,6 +4515,7 @@ export function PanelHistoriaMundo({
   onSelectCancion,
   onOpenHistoriaCompleta,
   mostrarHistoriaCompleta,
+  personajePreseleccionado,
 }: {
   texto: string;
   onChange: (v: string) => void;
@@ -4485,6 +4546,15 @@ export function PanelHistoriaMundo({
    * (useMundoNavigation: section "linea-tiempo", selectedId "historia").
    */
   mostrarHistoriaCompleta?: boolean;
+  /**
+   * Id de personaje que estaba abierto en otra pestaña al entrar a
+   * "Historia completa". Si se pasa, el filtro de personaje se
+   * preselecciona automáticamente con ese id (si el usuario no eligió
+   * otro manualmente), de forma que sus eras internas (personaje_eras)
+   * aparezcan en el documento generado — ver el useEffect que sincroniza
+   * filterPersonaje más abajo.
+   */
+  personajePreseleccionado?: string | null;
 }) {
   // Sistema antiguo de eventos "mundo"/"reino" (basado en columna historia JSON) eliminado.
 
@@ -4976,6 +5046,25 @@ export function PanelHistoriaMundo({
   // y el resto de eventos (capítulos, canciones, cumpleaños) se acota a
   // los que están vinculados a ese personaje.
   const [filterPersonaje, setFilterPersonaje] = useState<string | null>(null);
+
+  // Al entrar a "Historia completa" con un personaje abierto en otra
+  // pestaña, preseleccionamos su filtro automáticamente (una sola vez por
+  // apertura) para que sus eras internas aparezcan de entrada, sin que el
+  // usuario tenga que volver a elegirlo del dropdown. Si el usuario ya
+  // había elegido otro personaje distinto manualmente, no lo pisamos.
+  const personajePreseleccionadoAplicado = useRef<string | null>(null);
+  useEffect(() => {
+    if (!mostrarHistoriaCompleta) {
+      personajePreseleccionadoAplicado.current = null;
+      return;
+    }
+    if (!personajePreseleccionado) return;
+    if (personajePreseleccionadoAplicado.current === personajePreseleccionado)
+      return;
+    setFilterPersonaje(personajePreseleccionado);
+    personajePreseleccionadoAplicado.current = personajePreseleccionado;
+  }, [mostrarHistoriaCompleta, personajePreseleccionado]);
+
   // Antes se buscaba solo en personajesCumple, así que si el personaje
   // filtrado no tenía fecha de nacimiento, personajeSeleccionado quedaba
   // null y perdía su nombre en el resto del panel. Ahora se arma con el
