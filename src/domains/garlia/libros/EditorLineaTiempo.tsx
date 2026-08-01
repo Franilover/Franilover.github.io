@@ -1608,6 +1608,25 @@ function ToggleTipoBtn({
 // canciones/cumpleaños se muestran solo lectura porque no tienen un campo
 // de descripción propio aquí y editar su título cambiaría la entidad real
 // (capítulo, canción o personaje).
+// ─── edadEnDia ───────────────────────────────────────────────────────────────
+// Calcula la edad (en años del calendario del mundo) que tendría un
+// personaje en un día absoluto dado, a partir de su fecha_nacimiento.
+// Devuelve null si falta cualquiera de los dos datos, o si el evento
+// ocurre antes de que el personaje naciera (edad negativa no tiene
+// sentido mostrarla).
+function edadEnDia(
+  fechaNacimiento: number | null | undefined,
+  diaAbsolutoEvento: number | null | undefined,
+  diasAnioLista: number,
+): number | null {
+  if (fechaNacimiento == null || diaAbsolutoEvento == null) return null;
+  if (!diasAnioLista) return null;
+  const edad = Math.floor(
+    (diaAbsolutoEvento - fechaNacimiento) / diasAnioLista,
+  );
+  return edad >= 0 ? edad : null;
+}
+
 // ─── PersonajesEventoPicker ───────────────────────────────────────────────────
 // Personajes que participan en un evento. Dos modos:
 //   - editable=true (eventos "mundo"/"reino"): permite añadir/quitar
@@ -1622,19 +1641,38 @@ function PersonajesEventoPicker({
   editable,
   onChange,
   onSelectPersonaje,
+  diaAbsolutoEvento,
+  diasAnioLista,
 }: {
   personajesIds: string[];
-  personajesDisponibles: { id: string; nombre: string; img_url: string | null }[];
+  personajesDisponibles: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    fecha_nacimiento?: number | null;
+  }[];
   editable: boolean;
   onChange?: (ids: string[]) => void;
   onSelectPersonaje?: (id: string) => void;
+  /** Día absoluto del evento/era — junto con la fecha de nacimiento de
+   * cada personaje vinculado, permite mostrar la edad que tendría en
+   * ese momento. Si falta, no se muestra ninguna edad. */
+  diaAbsolutoEvento?: number | null;
+  /** Días por año del calendario del mundo — para convertir la
+   * diferencia de días en años. */
+  diasAnioLista?: number;
 }) {
   const [query, setQuery] = useState("");
   const [buscando, setBuscando] = useState(false);
 
   const vinculados = personajesIds
     .map((id) => personajesDisponibles.find((p) => p.id === id))
-    .filter(Boolean) as { id: string; nombre: string; img_url: string | null }[];
+    .filter(Boolean) as {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    fecha_nacimiento?: number | null;
+  }[];
 
   const resultados = useMemo(() => {
     if (!buscando) return [];
@@ -1694,6 +1732,22 @@ function PersonajesEventoPicker({
               >
                 {p.nombre}
               </button>
+              {(() => {
+                const edad = edadEnDia(
+                  p.fecha_nacimiento,
+                  diaAbsolutoEvento,
+                  diasAnioLista ?? 0,
+                );
+                if (edad == null) return null;
+                return (
+                  <span
+                    className="text-micro font-black tabular-nums opacity-60"
+                    title="Edad en este momento"
+                  >
+                    {edad}a
+                  </span>
+                );
+              })()}
               {editable && (
                 <button
                   className="opacity-50 hover:opacity-100 transition-opacity"
@@ -1791,7 +1845,20 @@ function PersonajesEventoPicker({
                       ) : (
                         <User size={9} className="opacity-40" />
                       )}
-                      {p.nombre}
+                      <span className="truncate flex-1">{p.nombre}</span>
+                      {(() => {
+                        const edad = edadEnDia(
+                          p.fecha_nacimiento,
+                          diaAbsolutoEvento,
+                          diasAnioLista ?? 0,
+                        );
+                        if (edad == null) return null;
+                        return (
+                          <span className="text-micro font-black tabular-nums opacity-50 shrink-0">
+                            {edad}a
+                          </span>
+                        );
+                      })()}
                     </button>
                   ))
                 )}
@@ -1879,6 +1946,7 @@ function EventoDetallePanel({
     id: string;
     nombre: string;
     img_url: string | null;
+    fecha_nacimiento?: number | null;
   }[];
   /** Guarda los personajes_ids de un evento mundo/reino — solo aplica
    * cuando evt.source es "mundo" o "reino". */
@@ -2196,6 +2264,8 @@ function EventoDetallePanel({
             editable={editable}
             personajesIds={evt.personajes_ids ?? []}
             personajesDisponibles={personajesDisponibles}
+            diaAbsolutoEvento={evt.dia_absoluto ?? null}
+            diasAnioLista={diasAnioLista}
             onChange={
               editable
                 ? (ids) => onPersonajesChange?.(evt.id, ids)
@@ -2345,6 +2415,7 @@ function ListaEventosConMinimapa({
   allEvents,
   cal,
   erasPersonaje,
+  filterPersonaje,
   evtSeleccionado,
   setEvtSeleccionado,
   onFieldChange,
@@ -2370,6 +2441,11 @@ function ListaEventosConMinimapa({
    * resolver el objeto Era completo (no solo su id) que necesitan los
    * handlers de edición al abrir el panel de detalle. */
   erasPersonaje?: Era[];
+  /** Id del personaje seleccionado en el filtro superior — cuando está
+   * activo, cada tarjeta de evento/era/capítulo donde ese personaje
+   * participa muestra a la derecha del título la edad que tendría en
+   * ese momento (número con el color de la era del mundo). */
+  filterPersonaje?: string | null;
   evtSeleccionado: string | null;
   setEvtSeleccionado: (id: string | null) => void;
   onFieldChange?: (
@@ -2400,6 +2476,7 @@ function ListaEventosConMinimapa({
     id: string;
     nombre: string;
     img_url: string | null;
+    fecha_nacimiento?: number | null;
   }[];
   /** Guarda personajes_ids de un evento mundo/reino. */
   onPersonajesChange?: (id: string, personajesIds: string[]) => void;
@@ -2412,6 +2489,29 @@ function ListaEventosConMinimapa({
       (s: number, e: any) => s + (e.duracion_dias ?? 0),
       0,
     ) || 365;
+
+  // Fecha de nacimiento del personaje filtrado — usada para mostrar la
+  // edad que tendría en cada evento/era/capítulo donde participa.
+  const fechaNacimientoFiltrado = useMemo(
+    () =>
+      filterPersonaje
+        ? (personajesDisponibles?.find((p) => p.id === filterPersonaje)
+            ?.fecha_nacimiento ?? null)
+        : null,
+    [filterPersonaje, personajesDisponibles],
+  );
+
+  // Determina si el personaje filtrado participa de un evento — vía
+  // personajes_ids (mundo/reino/capítulo) o porque el evento ES ese
+  // personaje (cumpleaños/era_personaje, que ya vienen acotados a él).
+  const participaPersonajeFiltrado = (evt: MundoTimelineEvent): boolean => {
+    if (!filterPersonaje) return false;
+    if (evt.source === "cumpleanos")
+      return evt.cumpleanosData?.id === filterPersonaje;
+    if (evt.source === "era_personaje")
+      return evt.eraPersonajeData?.personajeId === filterPersonaje;
+    return (evt.personajes_ids ?? []).includes(filterPersonaje);
+  };
 
   const getEraEvt = (diaAbs: number | null | undefined) =>
     diaAbs != null
@@ -2742,6 +2842,34 @@ function ListaEventosConMinimapa({
                                       </span>
                                     )}
                                   </span>
+                                  {/* Edad del personaje filtrado en este
+                                      momento — número con el color de la
+                                      era del mundo, a la derecha del título. */}
+                                  {participaPersonajeFiltrado(evt) &&
+                                    (() => {
+                                      const edad = edadEnDia(
+                                        fechaNacimientoFiltrado,
+                                        evt.dia_absoluto,
+                                        diasAnioLista,
+                                      );
+                                      if (edad == null) return null;
+                                      return (
+                                        <span
+                                          className="shrink-0 text-micro font-black tabular-nums px-1 py-0.5 rounded"
+                                          style={{
+                                            color:
+                                              eraColor ??
+                                              "var(--accent)",
+                                            background: eraColor
+                                              ? `${eraColor}18`
+                                              : "color-mix(in srgb, var(--accent) 12%, transparent)",
+                                          }}
+                                          title="Edad del personaje en este momento"
+                                        >
+                                          {edad}
+                                        </span>
+                                      );
+                                    })()}
                                 </div>
                                 {evt.reinoNombre && (
                                   <span
@@ -2866,6 +2994,7 @@ function EventoDetalleFlotante({
     id: string;
     nombre: string;
     img_url: string | null;
+    fecha_nacimiento?: number | null;
   }[];
   onPersonajesChange?: (id: string, personajesIds: string[]) => void;
 }) {
@@ -4259,6 +4388,11 @@ export function PanelHistoriaMundo({
   // (Eliminados: handleMundoChange, updateReinoEvent, removeReinoEvent, saveReinoHistory)
 
   // ── Personajes con fecha de nacimiento (cumpleaños) ──────────────────────
+  // Se usa SOLO para la barra lateral de cumpleaños y el evento sintético
+  // "cumpleanos"/"era_personaje" de la pista principal — no para los
+  // selectores de personaje (filtro superior, picker de "añadir personaje"
+  // a un evento), que deben listar a TODOS los personajes, tengan o no
+  // fecha de nacimiento asignada (ver personajesTodos más abajo).
   const [personajesCumple, setPersonajesCumple] = useState<
     {
       id: string;
@@ -4322,6 +4456,74 @@ export function PanelHistoriaMundo({
     };
   }, []);
 
+  // ── TODOS los personajes (con o sin cumpleaños) ───────────────────────────
+  // Fuente para el dropdown de filtro por personaje y para el picker de
+  // "añadir personaje" dentro de un evento — antes ambos usaban
+  // personajesCumple por error, así que solo listaban personajes que ya
+  // tenían fecha de nacimiento asignada.
+  // fecha_nacimiento se incluye (puede ser null) para poder calcular la
+  // edad del personaje en el momento de cada evento/era donde participa —
+  // ver PersonajesEventoPicker y edadEnDia() más abajo.
+  const [personajesTodos, setPersonajesTodos] = useState<
+    {
+      id: string;
+      nombre: string;
+      img_url: string | null;
+      fecha_nacimiento: number | null;
+    }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cargar = async () => {
+      // 1. Dexie
+      try {
+        if (db && (db as any).personajes) {
+          const local: any[] = await (db as any).personajes.toArray();
+          const vivos = local.filter((p: any) => !p.deleted);
+          if (vivos.length && !cancelled) {
+            setPersonajesTodos(
+              vivos
+                .map((p: any) => ({
+                  id: p.id,
+                  nombre: p.nombre ?? "Sin nombre",
+                  img_url: p.img_url ?? null,
+                  fecha_nacimiento: p.fecha_nacimiento ?? null,
+                }))
+                .sort((a: any, b: any) => a.nombre.localeCompare(b.nombre)),
+            );
+          }
+        }
+      } catch {}
+      if (!navigator.onLine || cancelled) return;
+      // 2. Supabase
+      try {
+        const { data } = await supabase
+          .from("personajes")
+          .select("id, nombre, img_url, fecha_nacimiento")
+          .order("nombre", { ascending: true });
+        if (!data || cancelled) return;
+        setPersonajesTodos(
+          data.map((p: any) => ({
+            id: p.id,
+            nombre: p.nombre ?? "Sin nombre",
+            img_url: p.img_url ?? null,
+            fecha_nacimiento: p.fecha_nacimiento ?? null,
+          })),
+        );
+      } catch {}
+    };
+    void cargar();
+    const handleOnline = () => {
+      if (!cancelled) void cargar();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
   const { cal } = useCalendario();
   // reinoFijo tiene prioridad sobre initialFilterReino.
   // Cuando reinoFijo está activo el filtro no puede cambiarse.
@@ -4334,10 +4536,23 @@ export function PanelHistoriaMundo({
   // y el resto de eventos (capítulos, canciones, cumpleaños) se acota a
   // los que están vinculados a ese personaje.
   const [filterPersonaje, setFilterPersonaje] = useState<string | null>(null);
-  const personajeSeleccionado = useMemo(
-    () => personajesCumple.find((p) => p.id === filterPersonaje) ?? null,
-    [personajesCumple, filterPersonaje],
-  );
+  // Antes se buscaba solo en personajesCumple, así que si el personaje
+  // filtrado no tenía fecha de nacimiento, personajeSeleccionado quedaba
+  // null y perdía su nombre en el resto del panel. Ahora se arma con el
+  // catálogo completo (personajesTodos) y se le añade la fecha de
+  // nacimiento si existe (o null si el personaje no tiene cumpleaños).
+  const personajeSeleccionado = useMemo(() => {
+    const base = personajesTodos.find((p) => p.id === filterPersonaje);
+    if (!base) return null;
+    const cumple = personajesCumple.find((p) => p.id === filterPersonaje);
+    return {
+      id: base.id,
+      nombre: base.nombre,
+      img_url: base.img_url,
+      reino: cumple?.reino ?? null,
+      fecha_nacimiento: cumple?.fecha_nacimiento ?? null,
+    };
+  }, [personajesTodos, personajesCumple, filterPersonaje]);
   const {
     eras: erasPersonaje,
     changeLabel: changeLabelEraPersonaje,
@@ -4995,9 +5210,13 @@ export function PanelHistoriaMundo({
             })()}
 
           {/* ── Filtro por personaje ── */}
-          {personajesCumple.length > 0 && (
+          {/* Antes usaba personajesCumple, que solo trae personajes con
+              fecha de nacimiento asignada — por eso el selector solo
+              mostraba a quienes ya tenían cumpleaños. Ahora usa
+              personajesTodos, que trae el catálogo completo. */}
+          {personajesTodos.length > 0 && (
             <PersonajeFilterDropdown
-              personajes={personajesCumple}
+              personajes={personajesTodos}
               value={filterPersonaje}
               onChange={setFilterPersonaje}
             />
@@ -5135,6 +5354,7 @@ export function PanelHistoriaMundo({
               allEvents={allEvents}
               cal={cal}
               erasPersonaje={erasPersonaje}
+              filterPersonaje={filterPersonaje}
               evtSeleccionado={evtSeleccionado}
               setEvtSeleccionado={setEvtSeleccionado}
               onAddRasgoEraPersonaje={addRasgoEraPersonaje}
@@ -5151,7 +5371,7 @@ export function PanelHistoriaMundo({
               onSelectCancion={onSelectCancion}
               onSelectCapitulo={onSelectCapitulo}
               onSelectPersonaje={onSelectPersonaje}
-              personajesDisponibles={personajesCumple}
+              personajesDisponibles={personajesTodos}
               onPersonajesChange={handleEventoMundoPersonajesChange}
             />
           )}
