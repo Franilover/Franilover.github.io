@@ -58,12 +58,29 @@ jobs:
         # Paquetes que pide Tauri v2 para compilar y empaquetar en Linux.
         # libappindicator3-1 solo hace falta si la app usa system tray, pero
         # no molesta tenerlo igual. Ver https://v2.tauri.app/start/prerequisites/#linux
+        #
+        # libegl1-mesa-dev, libgl1-mesa-dev y libgbm-dev se agregan a mano:
+        # sin ellos, linuxdeploy-plugin-gtk (que arma el AppImage escaneando
+        # las libs dinámicas que el binario realmente linkea) no encuentra
+        # libEGL/libGL/libgbm como dependencias explícitas del build y las
+        # deja AFUERA del bundle, aunque sí empaqueta el resto de la stack
+        # GTK/WebKit (wayland-egl, epoxy, etc.). El AppImage termina
+        # cargando esas libs faltantes desde el sistema del usuario en vez
+        # de las propias — y si su Mesa/EGL no es binariamente compatible
+        # con el resto de la stack empaquetada (por ejemplo por venir de una
+        # distro con libc/ICU más nueva, como Arch), WebKit falla al crear
+        # el display con "Could not create default EGL display:
+        # EGL_BAD_PARAMETER. Aborting." — el AppImage arranca en el runner
+        # de CI pero no en la máquina del usuario final.
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
+            libegl1-mesa-dev \
+            libgl1-mesa-dev \
+            libgbm-dev \
             patchelf \
             build-essential \
             curl \
@@ -148,6 +165,36 @@ jobs:
           echo "deb encontrado: $DEB_PATH ($(du -h "$DEB_PATH" | cut -f1))"
           echo "appimage=$APPIMAGE_PATH" >> "$GITHUB_OUTPUT"
           echo "deb=$DEB_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Verificar que el AppImage empaqueta libEGL/libGL/libgbm
+        # Bug real que tuvimos: linuxdeploy-plugin-gtk empaquetaba toda la
+        # stack de GTK/WebKit pero dejaba AFUERA libEGL/libGL/libgbm, así
+        # que WebKit terminaba cargando esas libs del sistema del usuario
+        # final en vez de las propias del bundle — mezcla de versiones que
+        # rompía con "Could not create default EGL display: EGL_BAD_PARAMETER"
+        # en distros con Mesa más nueva que la del runner de build (ej. Arch).
+        # Este chequeo falla el build en CI si eso vuelve a pasar, en vez de
+        # que un usuario lo descubra recién al intentar abrir la app.
+        run: |
+          APPIMAGE_PATH="${{ steps.artefactos.outputs.appimage }}"
+          chmod +x "$APPIMAGE_PATH"
+          "$APPIMAGE_PATH" --appimage-extract >/dev/null
+
+          FALTANTES=""
+          for lib in "libEGL.so*" "libGL.so*" "libgbm.so*"; do
+            if ! find squashfs-root/usr/lib -maxdepth 1 -iname "$lib" | grep -q .; then
+              FALTANTES="$FALTANTES $lib"
+            fi
+          done
+
+          rm -rf squashfs-root
+
+          if [ -n "$FALTANTES" ]; then
+            echo "::error::El AppImage no empaqueta:$FALTANTES — probablemente falten libegl1-mesa-dev/libgl1-mesa-dev/libgbm-dev en el paso de dependencias del sistema."
+            exit 1
+          fi
+
+          echo "OK: libEGL, libGL y libgbm están empaquetadas dentro del AppImage."
 
       - name: Crear el Release (draft) y subir los artefactos
         # draft: true — igual que en build-android: queda oculto hasta que
