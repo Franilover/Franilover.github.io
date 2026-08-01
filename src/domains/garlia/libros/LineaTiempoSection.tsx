@@ -7,6 +7,14 @@
  * "historia" — antes eso lo proveía `useMundoSecciones()` desde el
  * componente raíz (`EditorMundo.tsx`) y bajaba por props. Ahora el hook se
  * usa directo acá, sin pasar por 2 niveles de componentes intermedios.
+ *
+ * "Historia completa" (antes un modal flotante encima de la línea de
+ * tiempo) ahora es una pestaña más, igual que Personajes o Criaturas:
+ * abre con openEntity("linea-tiempo", "historia") y aparece en
+ * EntityTabBar. No hay tabla real detrás de esa pseudo-entidad — el id
+ * "historia" solo se usa como bandera para que PanelHistoriaMundo
+ * renderice HistoriaCompletaPanel en vez de la línea de tiempo normal
+ * (ver useEntityTabLabel, que le da su label fijo "Historia completa").
  */
 
 import { PanelHistoriaMundo } from "@/domains/garlia/libros/EditorLineaTiempo";
@@ -17,6 +25,7 @@ import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationS
 export function LineaTiempoSection() {
   const { textos, setTextos, save } = useMundoSecciones();
   const openEntity = useMundoNavigation((s) => s.openEntity);
+  const selectedId = useMundoNavigation((s) => s.selectedId);
 
   return (
     <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -27,6 +36,8 @@ export function LineaTiempoSection() {
         onSelectPersonaje={(id) => openEntity("personajes", id)}
         onSelectCapitulo={() => openEntity("capitulos", "")}
         onSelectCancion={(id) => openEntity("letras", id)}
+        onOpenHistoriaCompleta={() => openEntity("linea-tiempo", "historia")}
+        mostrarHistoriaCompleta={selectedId === "historia"}
       />
     </div>
   );

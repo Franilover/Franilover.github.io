@@ -57,6 +57,11 @@ export function useEntityTabLabel(section: SectionKey, id: string): string {
   const tabla = SECTION_TABLE[section] ?? "personajes";
   const { data } = useSupabaseData<EntityRow>(tabla);
 
+  // "linea-tiempo" no tiene tabla propia — solo abre pestaña para la
+  // pseudo-entidad "historia" (documento de Historia completa). No hay
+  // fila que buscar, el label es fijo.
+  if (section === "linea-tiempo") return "Historia completa";
+
   if (!SECTION_TABLE[section]) return "…";
   const row = data.find((r) => r.id === id);
   if (!row) return "…";

@@ -1545,19 +1545,22 @@ function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
   return { bloques, avisos };
 }
 
-// ── Modal: "Historia completa" — línea de tiempo como documento editable ──
+// ── Panel: "Historia completa" — línea de tiempo como documento editable ──
 // Muestra generarMarkdownHistoriaCompleta() en un RichEditor. Solo los
 // eventos "mundo"/"reino" son editables (título, descripción, año →
 // dia_absoluto); capítulos/canciones/cumpleaños se muestran de corrido
 // pero cualquier edición sobre ellos se descarta al guardar. Autosave
 // con debounce + indicador de estado visible.
-function ModalHistoriaCompleta({
+//
+// Vive como contenido normal de sección (no modal/portal): se abre como
+// una pestaña más de la barra de entidades, igual que Personajes o
+// Criaturas — ver LineaTiempoSection.tsx.
+export function HistoriaCompletaPanel({
   markdown,
   allEvents,
   diasAnioLista,
   onFieldChange,
   onDiaChange,
-  onClose,
 }: {
   markdown: string;
   allEvents: MundoTimelineEvent[];
@@ -1568,7 +1571,6 @@ function ModalHistoriaCompleta({
     value: string,
   ) => Promise<void>;
   onDiaChange: (id: string, dia: number) => Promise<void>;
-  onClose: () => void;
 }) {
   const [valor, setValor] = useState(markdown);
   const [avisos, setAvisos] = useState<string[]>([]);
@@ -1576,7 +1578,18 @@ function ModalHistoriaCompleta({
     "idle",
   );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const guardandoRef = useRef(false);
+
+  // Si el documento generado cambia por fuera (se abrió con datos nuevos
+  // tras recargar), resincroniza el valor local — solo la primera vez
+  // que llega markdown no vacío, para no pisar lo que el usuario está
+  // escribiendo en cada render.
+  const markdownInicialRef = useRef(markdown);
+  useEffect(() => {
+    if (markdownInicialRef.current === "" && markdown !== "") {
+      markdownInicialRef.current = markdown;
+      setValor(markdown);
+    }
+  }, [markdown]);
 
   // Snapshot original indexado por id — sirve para diffear solo lo que
   // realmente cambió (evita updates innecesarios en cada autosave).
@@ -1650,10 +1663,6 @@ function ModalHistoriaCompleta({
   // Ctrl+S fuerza guardado inmediato, saltándose el debounce.
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         if (debounceRef.current) {
@@ -1665,7 +1674,7 @@ function ModalHistoriaCompleta({
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose, guardar, valor]);
+  }, [guardar, valor]);
 
   useEffect(() => {
     return () => {
@@ -1673,100 +1682,67 @@ function ModalHistoriaCompleta({
     };
   }, []);
 
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      style={{ background: "color-mix(in srgb, black 55%, transparent)" }}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+  return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* Header */}
       <div
-        className="rounded-2xl border shadow-2xl w-full flex flex-col"
+        className="shrink-0 flex items-center justify-between px-4 py-3 border-b"
         style={{
-          maxWidth: 720,
-          maxHeight: "88vh",
-          background: "var(--bg-main)",
-          borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
         }}
       >
-        {/* Header */}
-        <div
-          className="shrink-0 flex items-center justify-between px-4 py-3 border-b"
-          style={{
-            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
-          }}
+        <span
+          className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em]"
+          style={{ color: "var(--primary)" }}
         >
-          <span
-            className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em]"
-            style={{ color: "var(--primary)" }}
-          >
-            <BookOpen size={11} />
-            Historia completa
-          </span>
-          <div className="flex items-center gap-2">
-            <SaveIndicator status={estado} />
-            <button
-              className="flex items-center justify-center w-6 h-6 rounded-lg border transition-all"
-              style={{
-                borderColor:
-                  "color-mix(in srgb, var(--primary) 12%, transparent)",
-                color: "color-mix(in srgb, var(--primary) 40%, transparent)",
-              }}
-              type="button"
-              onClick={onClose}
-            >
-              <X size={10} />
-            </button>
-          </div>
-        </div>
-
-        {/* Nota de alcance: qué es editable y qué no */}
-        <div
-          className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b"
-          style={{
-            color: "color-mix(in srgb, var(--primary) 45%, transparent)",
-            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
-            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
-          }}
-        >
-          Solo los eventos de mundo/reino son editables (título, descripción
-          y año). Capítulos, canciones y cumpleaños (🔒) son de solo
-          lectura. No borres el <code>&lt;!--tl:...--&gt;</code> al final de
-          un título editable — se usa para saber qué evento actualizar.
-        </div>
-
-        {/* Avisos de líneas/bloques no interpretables o no editables */}
-        {avisos.length > 0 && (
-          <div
-            className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b space-y-0.5"
-            style={{
-              color: "#b45309",
-              borderColor:
-                "color-mix(in srgb, var(--primary) 8%, transparent)",
-              background: "color-mix(in srgb, #f59e0b 8%, transparent)",
-            }}
-          >
-            {avisos.map((a, i) => (
-              <div key={i}>⚠ {a}</div>
-            ))}
-          </div>
-        )}
-
-        {/* Documento — RichEditor editable */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-          <RichEditor
-            editable
-            minHeight={200}
-            value={valor}
-            onChange={handleChange}
-          />
-        </div>
+          <BookOpen size={11} />
+          Historia completa
+        </span>
+        <SaveIndicator status={estado} />
       </div>
-    </div>,
-    document.body,
+
+      {/* Nota de alcance: qué es editable y qué no */}
+      <div
+        className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b"
+        style={{
+          color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+          background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+        }}
+      >
+        Solo los eventos de mundo/reino son editables (título, descripción
+        y año). Capítulos, canciones y cumpleaños (🔒) son de solo
+        lectura. No borres el <code>&lt;!--tl:...--&gt;</code> al final de
+        un título editable — se usa para saber qué evento actualizar.
+      </div>
+
+      {/* Avisos de líneas/bloques no interpretables o no editables */}
+      {avisos.length > 0 && (
+        <div
+          className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b space-y-0.5"
+          style={{
+            color: "#b45309",
+            borderColor:
+              "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, #f59e0b 8%, transparent)",
+          }}
+        >
+          {avisos.map((a, i) => (
+            <div key={i}>⚠ {a}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Documento — RichEditor editable */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <RichEditor
+          editable
+          minHeight={200}
+          value={valor}
+          onChange={handleChange}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -4441,6 +4417,8 @@ export function PanelHistoriaMundo({
   onSelectPersonaje,
   onSelectCapitulo,
   onSelectCancion,
+  onOpenHistoriaCompleta,
+  mostrarHistoriaCompleta,
 }: {
   texto: string;
   onChange: (v: string) => void;
@@ -4458,6 +4436,19 @@ export function PanelHistoriaMundo({
   // renderiza este componente.
   onSelectCapitulo?: (capituloId: string, libroId: string) => void;
   onSelectCancion?: (cancionId: string) => void;
+  /**
+   * Abre "Historia completa" como su propia pestaña (en vez del modal
+   * flotante anterior). Si no se pasa, el botón "Historia" no se
+   * muestra — quien renderiza este panel decide si soporta esa vista.
+   */
+  onOpenHistoriaCompleta?: () => void;
+  /**
+   * Cuando es true, el panel renderiza solo el documento de "Historia
+   * completa" (HistoriaCompletaPanel) en vez de la línea de tiempo
+   * normal — controlado por el padre según la pestaña activa
+   * (useMundoNavigation: section "linea-tiempo", selectedId "historia").
+   */
+  mostrarHistoriaCompleta?: boolean;
 }) {
   // Sistema antiguo de eventos "mundo"/"reino" (basado en columna historia JSON) eliminado.
 
@@ -5003,7 +4994,6 @@ export function PanelHistoriaMundo({
   const [erasLocal, setErasLocal] = useState<any[]>([]);
   const [eraModal, setEraModal] = useState<null | "new" | any>(null);
   const [showGestionEras, setShowGestionEras] = useState(false);
-  const [showHistoriaCompleta, setShowHistoriaCompleta] = useState(false);
 
   // Sincronizar erasLocal con cal.eras cuando el hook carga
   useEffect(() => {
@@ -5464,17 +5454,6 @@ export function PanelHistoriaMundo({
     [reinos, capsReinosIds, eventosMundo, cancionesTimeline],
   );
 
-  // Documento markdown de "Historia completa" — solo se recalcula cuando
-  // el modal está abierto (evita rehacer el join de string en cada
-  // render mientras el usuario solo navega la línea de tiempo normal).
-  const markdownHistoriaCompleta = useMemo(
-    () =>
-      showHistoriaCompleta
-        ? generarMarkdownHistoriaCompleta(allEvents, cal)
-        : "",
-    [showHistoriaCompleta, allEvents, cal],
-  );
-
 
   // Días por año del calendario actual — usado para mostrar "Año N" en la
   // barra lateral, mismo cálculo que diasAnioLista dentro de
@@ -5521,6 +5500,26 @@ export function PanelHistoriaMundo({
   );
 
   // (Eliminados: selectedEvt, handleUpdateSelected — panel de edición de eventos "mundo"/"reino")
+
+  // Vista "Historia completa" — se abre como pestaña propia (ver
+  // LineaTiempoSection), no como modal flotante. El documento solo se
+  // genera cuando esta vista está activa, para no rehacer el join de
+  // string en cada render de la línea de tiempo normal.
+  if (mostrarHistoriaCompleta) {
+    const markdownHistoriaCompleta = generarMarkdownHistoriaCompleta(
+      allEvents,
+      cal,
+    );
+    return (
+      <HistoriaCompletaPanel
+        markdown={markdownHistoriaCompleta}
+        allEvents={allEvents}
+        diasAnioLista={diasAnioBarra}
+        onFieldChange={handleEventoMundoFieldChange}
+        onDiaChange={handleEventoMundoDiaChange}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -5710,21 +5709,23 @@ export function PanelHistoriaMundo({
               <Plus size={9} /> Evento
             </button>
 
-            {/* Historia completa — toda la línea de tiempo como documento
-                de lectura vertical (RichEditor de solo lectura). */}
-            <button
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest transition-all"
-              style={{
-                color: "color-mix(in srgb, var(--primary) 50%, transparent)",
-                border:
-                  "1px solid color-mix(in srgb, var(--primary) 14%, transparent)",
-              }}
-              title="Ver la historia completa como documento"
-              type="button"
-              onClick={() => setShowHistoriaCompleta(true)}
-            >
-              <BookOpen size={9} /> Historia
-            </button>
+            {/* Historia completa — toda la línea de tiempo como documento,
+                ahora como su propia pestaña (ver LineaTiempoSection). */}
+            {onOpenHistoriaCompleta && (
+              <button
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest transition-all"
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 50%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--primary) 14%, transparent)",
+                }}
+                title="Abrir la historia completa como documento"
+                type="button"
+                onClick={onOpenHistoriaCompleta}
+              >
+                <BookOpen size={9} /> Historia
+              </button>
+            )}
 
           </div>
         </div>
@@ -5738,18 +5739,6 @@ export function PanelHistoriaMundo({
           reinos={reinos}
           onClose={() => setShowNuevoEvento(false)}
           onCrear={handleCrearEvento}
-        />
-      )}
-
-      {/* Modal: historia completa como documento de lectura */}
-      {showHistoriaCompleta && (
-        <ModalHistoriaCompleta
-          markdown={markdownHistoriaCompleta}
-          allEvents={allEvents}
-          diasAnioLista={diasAnioBarra}
-          onFieldChange={handleEventoMundoFieldChange}
-          onDiaChange={handleEventoMundoDiaChange}
-          onClose={() => setShowHistoriaCompleta(false)}
         />
       )}
 

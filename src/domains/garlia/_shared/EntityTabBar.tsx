@@ -19,6 +19,7 @@
 
 import {
   Bug,
+  Clock,
   Compass,
   Crown,
   Landmark,
@@ -48,6 +49,7 @@ const SECTION_ICON: Partial<Record<SectionKey, React.ElementType>> = {
   letras: Music,
   notas: StickyNote,
   "notas-gos": StickyNote,
+  "linea-tiempo": Clock,
 };
 
 function EntityTab({
