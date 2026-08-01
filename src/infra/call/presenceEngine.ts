@@ -69,6 +69,25 @@ export function conectarPresencia(perfilId: string): () => void {
  * Suscribe un callback a cambios en quién está en línea. Devuelve una
  * función de limpieza. Requiere que `conectarPresencia` ya se haya llamado
  * (si no, el set siempre viene vacío).
+ *
+ * IMPORTANTE: esta función es solo LECTORA del canal global de presencia —
+ * a diferencia del canal reference-counted por conversación de chatEngine,
+ * el canal de presencia global vive y muere exclusivamente a través de
+ * `conectarPresencia` / su función de limpieza (llamado una sola vez desde
+ * `<PresenciaActivator />` en el layout raíz). Antes, el cleanup de acá
+ * evaluaba `subscriptoresPresencia <= 0` y, si daba true, destruía
+ * `canalPresenciaGlobal` con `supabase.removeChannel` — pero
+ * `subscriptoresPresencia` es el contador de `conectarPresencia`, esta
+ * función nunca lo incrementaba. Como `useUsuariosEnLinea` (que llama a
+ * esta función) se monta y desmonta en cada pantalla que muestra el
+ * indicador "en línea" (lista de mensajes, detalle de conversación, etc.),
+ * cualquiera de esos desmontajes podía terminar destruyendo el canal
+ * global compartido mientras otras pantallas seguían usándolo — y como
+ * `canalPresenciaGlobal` quedaba en `null` sin que nada lo recreara (salvo
+ * que cambie `user?.id`), el estado de "en línea" quedaba muerto para toda
+ * la sesión hasta un refresh completo (F5). Ahora el cleanup solo remueve
+ * los listeners que esta suscripción puntual agregó, y nunca toca el ciclo
+ * de vida del canal en sí.
  */
 export function suscribirseAPresencia(
   onCambio: (idsEnLinea: Set<string>) => void,
@@ -78,25 +97,34 @@ export function suscribirseAPresencia(
     return () => {};
   }
 
+  const canal = canalPresenciaGlobal;
+
+  // RealtimeChannel no expone una forma pública de desregistrar un único
+  // listener puntual (no hay `.off(event, cb)`) — la única API soportada
+  // para "dejar de escuchar" es unsubscribe/removeChannel del canal
+  // entero, que acá NO nos corresponde tocar (ver comentario arriba). Por
+  // eso usamos un flag local: el listener queda colgado del canal para
+  // siempre (mismo costo que tenía antes), pero deja de propagar eventos
+  // en cuanto el componente se desmonta.
+  let activo = true;
+
   const leerEstado = () => {
-    const estado = canalPresenciaGlobal?.presenceState() ?? {};
+    if (!activo) return;
+    const estado = canal.presenceState() ?? {};
     onCambio(new Set(Object.keys(estado)));
   };
 
-  canalPresenciaGlobal.on("presence", { event: "sync" }, leerEstado);
-  canalPresenciaGlobal.on("presence", { event: "join" }, leerEstado);
-  canalPresenciaGlobal.on("presence", { event: "leave" }, leerEstado);
+  canal.on("presence", { event: "sync" }, leerEstado);
+  canal.on("presence", { event: "join" }, leerEstado);
+  canal.on("presence", { event: "leave" }, leerEstado);
 
   // Estado inicial, por si ya había datos al momento de suscribirse.
   leerEstado();
 
   return () => {
-    // Para limpiar listeners en Supabase sin destruir el canal global,
-    // volvemos a evaluar el estado o removemos la suscripción si corresponde.
-    if (canalPresenciaGlobal && subscriptoresPresencia <= 0) {
-      supabase.removeChannel(canalPresenciaGlobal);
-      canalPresenciaGlobal = null;
-    }
+    // Nunca tocamos el canal en sí acá — ver nota arriba y en el docstring
+    // de esta función. Solo dejamos de reenviar eventos a este callback.
+    activo = false;
   };
 }
 
