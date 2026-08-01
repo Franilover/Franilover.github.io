@@ -459,6 +459,19 @@ function FechaMundoEditor({
 
   return (
     <div className="p-2.5 space-y-2">
+      {/* Oculta las flechitas nativas (spinner) del input numérico de año
+          — se ven inconsistentes con el resto del diseño. Selector global
+          porque los inputs type=number no exponen esto vía className. */}
+      <style>{`
+        .selector-fecha-anio-input::-webkit-outer-spin-button,
+        .selector-fecha-anio-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .selector-fecha-anio-input {
+          -moz-appearance: textfield;
+        }
+      `}</style>
       {/* Año + Estación en una sola fila — sin secciones separadas */}
       <div className="flex items-center gap-1.5">
         <button
@@ -477,7 +490,7 @@ function FechaMundoEditor({
           <ChevronLeft size={11} />
         </button>
         <input
-          className="w-14 text-center rounded-md border px-1 py-1 text-micro font-black outline-none shrink-0"
+          className="w-14 text-center rounded-md border px-1 py-1 text-micro font-black outline-none shrink-0 selector-fecha-anio-input"
           style={{
             background: "transparent",
             borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
