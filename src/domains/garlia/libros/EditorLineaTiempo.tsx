@@ -1358,16 +1358,17 @@ function ModalEra({
 // ── Generador del documento markdown de "Historia completa" ─────────────────
 // Convierte allEvents (ya filtrados/ordenados por dia_absoluto) en un
 // documento markdown vertical, agrupado por Era (H1) → Año (H2) →
-// evento/capítulo/canción/cumpleaños/era-de-personaje (H3 con el reino
-// como sufijo).
+// evento de mundo/reino (H3 con el reino como sufijo).
 //
-// Solo los eventos "mundo"/"reino" son editables: su H3 lleva un id
-// embebido como texto plano (<!--tl:ID-->) al final del encabezado, que
-// el parser usa para saber qué fila de `eventos_mundo` actualizar. No es
-// invisible (el editor no interpreta HTML dentro de headings, así que el
-// usuario lo verá) pero es reconocible como "no tocar". Capítulos,
-// canciones y cumpleaños se emiten SIN id — son de solo lectura, y
-// cualquier edición sobre esas líneas se ignora al guardar.
+// Solo incluye eventos "mundo"/"reino" — son los únicos editables desde
+// este documento. Capítulos, canciones y cumpleaños viven en sus propios
+// editores (capítulo, canción, personaje) y no se muestran acá.
+//
+// Cada H3 lleva un id embebido como texto plano (<!--tl:ID-->) al final
+// del encabezado, que el parser usa para saber qué fila de
+// `eventos_mundo` actualizar. No es invisible (el editor no interpreta
+// HTML dentro de headings, así que el usuario lo verá) pero es
+// reconocible como "no tocar".
 function generarMarkdownHistoriaCompleta(
   allEvents: MundoTimelineEvent[],
   cal: CalCache | null,
@@ -1388,9 +1389,13 @@ function generarMarkdownHistoriaCompleta(
         ) ?? null)
       : null;
 
-  const conFecha = allEvents.filter((e) => e.dia_absoluto != null);
+  const conFecha = allEvents.filter(
+    (e) =>
+      e.dia_absoluto != null &&
+      (e.source === "mundo" || e.source === "reino"),
+  );
   if (conFecha.length === 0) {
-    return "_Sin eventos con fecha asignada todavía._";
+    return "_Sin eventos de mundo/reino con fecha asignada todavía._";
   }
 
   const lineas: string[] = [];
@@ -1416,14 +1421,11 @@ function generarMarkdownHistoriaCompleta(
       lineas.push(`## Año ${anio}`);
     }
 
-    // H3 — título del evento, con el reino como sufijo cuando aplica.
-    // Solo mundo/reino llevan id embebido (editables); el resto queda
-    // sin id, marcado como solo lectura.
+    // H3 — título del evento, con el reino como sufijo cuando aplica,
+    // más el id embebido para el parser.
     const titulo = evt.title?.trim() || "Sin título";
     const sufijoReino = evt.reinoNombre ? ` — ${evt.reinoNombre}` : "";
-    const esEditable = evt.source === "mundo" || evt.source === "reino";
-    const idTag = esEditable ? ` <!--tl:${evt.id}-->` : " 🔒";
-    lineas.push(`### ${titulo}${sufijoReino}${idTag}`);
+    lineas.push(`### ${titulo}${sufijoReino} <!--tl:${evt.id}-->`);
 
     // Cuerpo — descripción/notas si las hay, en texto plano debajo del H3
     const cuerpo = (evt.description ?? "").trim();
@@ -1435,11 +1437,11 @@ function generarMarkdownHistoriaCompleta(
 
 // ── Parser del documento markdown editado ────────────────────────────────
 // Recorre el markdown línea por línea reconstruyendo bloques # Era /
-// ## Año N / ### Título — Reino <!--tl:id--> \n cuerpo. Solo le importan
-// los bloques con id (mundo/reino, editables) — todo lo demás (capítulos,
-// canciones, cumpleaños con 🔒, o sin marcador porque el usuario lo
-// borró) se reporta como "no editable" o "no reconocido" sin bloquear el
-// guardado del resto.
+// ## Año N / ### Título — Reino <!--tl:id--> \n cuerpo. El documento solo
+// contiene eventos de mundo/reino (ver generarMarkdownHistoriaCompleta),
+// así que todo "###" debería traer su id — si no lo trae, es porque el
+// usuario lo borró por accidente, y se avisa sin bloquear el guardado
+// del resto.
 interface BloqueEditado {
   id: string;
   titulo: string;
@@ -1449,7 +1451,7 @@ interface BloqueEditado {
 
 interface ParseResultado {
   bloques: BloqueEditado[];
-  avisos: string[]; // líneas/bloques que no se pudieron interpretar o no son editables
+  avisos: string[]; // líneas/bloques que no se pudieron interpretar
 }
 
 function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
@@ -1464,7 +1466,6 @@ function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
     id: string | null;
     tituloCrudo: string;
     cuerpo: string[];
-    esEditable: boolean;
   } | null = null;
 
   const cerrarBloque = () => {
@@ -1481,12 +1482,9 @@ function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
         anio: anioActual,
         descripcion: bloqueActivo.cuerpo.join("\n\n").trim(),
       });
-    } else if (!bloqueActivo.esEditable) {
-      // Bloque con 🔒 (capítulo/canción/cumpleaños) — solo lectura,
-      // no se avisa como error, es el comportamiento esperado.
     } else {
-      // Tenía "###" pero no se pudo extraer id ni marcador 🔒 —
-      // probablemente el usuario borró el <!--tl:id--> por accidente.
+      // "###" sin id — probablemente el usuario borró el <!--tl:id-->
+      // por accidente.
       avisos.push(
         `No se pudo identificar el evento "${bloqueActivo.tituloCrudo.trim() || "(sin título)"}" — puede que se haya borrado su marcador oculto. Este cambio no se guardará.`,
       );
@@ -1514,16 +1512,13 @@ function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
       cerrarBloque();
       const contenido = linea.slice(4);
       const idMatch = contenido.match(/<!--tl:([a-zA-Z0-9-]+)-->\s*$/);
-      const esLock = /🔒\s*$/.test(contenido);
       const tituloCrudo = contenido
         .replace(/<!--tl:[a-zA-Z0-9-]+-->\s*$/, "")
-        .replace(/🔒\s*$/, "")
         .trim();
       bloqueActivo = {
         id: idMatch ? idMatch[1] : null,
         tituloCrudo,
         cuerpo: [],
-        esEditable: !esLock, // si no tiene 🔒 pero tampoco id, es un error real
       };
       continue;
     }
@@ -1710,10 +1705,11 @@ export function HistoriaCompletaPanel({
           background: "color-mix(in srgb, var(--primary) 3%, transparent)",
         }}
       >
-        Solo los eventos de mundo/reino son editables (título, descripción
-        y año). Capítulos, canciones y cumpleaños (🔒) son de solo
-        lectura. No borres el <code>&lt;!--tl:...--&gt;</code> al final de
-        un título editable — se usa para saber qué evento actualizar.
+        Este documento muestra y edita solo los eventos de mundo/reino
+        (título, descripción y año). Capítulos, canciones y cumpleaños se
+        editan desde sus propios lugares y no aparecen acá. No borres el{" "}
+        <code>&lt;!--tl:...--&gt;</code> al final de un título — se usa
+        para saber qué evento actualizar.
       </div>
 
       {/* Avisos de líneas/bloques no interpretables o no editables */}
