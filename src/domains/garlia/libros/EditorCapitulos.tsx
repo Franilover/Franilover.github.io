@@ -1779,8 +1779,22 @@ function BibliotecaPortadas({
     oculto: <Lock size={9} />,
   };
 
+  // Confirmación antes de borrar — este botón borraba directo al primer
+  // click, sin aviso (mismo fix que en SidebarLibros más abajo).
+  const { confirm, ConfirmModal } = useConfirm();
+
+  const confirmarEliminarLibro = async (libro: Libro) => {
+    const ok = await confirm({
+      message: `¿Eliminar permanentemente el libro "${libro.titulo}"? Se eliminarán también todos sus capítulos.`,
+      danger: true,
+      confirmLabel: "Eliminar",
+    });
+    if (ok) onDeleteLibro(libro.id);
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <ConfirmModal />
       {/* Header */}
       <div
         className="shrink-0 flex items-center justify-between px-6 py-3 border-b"
