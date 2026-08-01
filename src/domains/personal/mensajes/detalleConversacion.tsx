@@ -760,7 +760,7 @@ export default function DetalleConversacion() {
   if (loading) return <Loading />;
 
   return (
-    <div className="min-h-screen md:min-h-0 md:h-full bg-bg-main flex flex-col">
+    <div className="h-dvh md:min-h-0 md:h-full flex flex-col overflow-hidden bg-bg-main">
       {/* ── Header ── */}
       <div
         className="flex items-center gap-3 px-4 py-3 sticky top-0 z-10"
