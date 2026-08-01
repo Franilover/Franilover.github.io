@@ -110,6 +110,7 @@ export function CanvasDibujoRuna({
   trazoFantasma,
   trazoInicial,
   onTrazoCompleto,
+  onLimpiar,
   height = 260,
   resetSignal,
   forma,
@@ -125,6 +126,10 @@ export function CanvasDibujoRuna({
    *  abrir otra runa), no en cada render. */
   trazoInicial?: Punto[] | null;
   onTrazoCompleto: (puntos: Punto[]) => void;
+  /** Se dispara cuando se borra todo el trazo desde el propio canvas
+   *  (ícono de goma) — para que el padre también limpie lo que tenga
+   *  guardado, sin tener que duplicar un botón de borrar afuera. */
+  onLimpiar?: () => void;
   height?: number;
   /** Cambiando este valor desde afuera se limpia el canvas */
   resetSignal?: number;
@@ -162,6 +167,18 @@ export function CanvasDibujoRuna({
   } | null>(null);
   // Modo editar: índice del vértice confirmado que se está arrastrando.
   const verticeArrastradoRef = useRef<number | null>(null);
+
+  // ── Historial de deshacer/rehacer ───────────────────────────────────
+  // Guarda snapshots de puntosRef.current en cada punto "confirmado"
+  // (fin de trazo libre, cada segmento recto/curvo, cada edición de
+  // vértice) — funciona igual sin importar qué herramienta se usó, así
+  // que un único par de flechas alcanza para todo el editor. Las
+  // funciones que operan sobre este historial (deshacer/rehacer) se
+  // definen más abajo, una vez declaradas sus dependencias de dibujo.
+  const historialRef = useRef<Punto[][]>([]);
+  const historialFuturoRef = useRef<Punto[][]>([]);
+  const [puedeDeshacer, setPuedeDeshacer] = useState(false);
+  const [puedeRehacer, setPuedeRehacer] = useState(false);
 
   // Ajustar tamaño del canvas al contenedor (responsive)
   useEffect(() => {
@@ -419,6 +436,7 @@ export function CanvasDibujoRuna({
   const onPointerDownLibre = (e: React.PointerEvent<HTMLCanvasElement>) => {
     (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
     dibujando.current = true;
+    registrarHistorial();
     const p = getPos(e);
     puntosRef.current = [p];
     setTieneTrazo(true);
@@ -671,6 +689,46 @@ export function CanvasDibujoRuna({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color]);
+
+  const sincronizarBotonesHistorial = () => {
+    setPuedeDeshacer(historialRef.current.length > 0);
+    setPuedeRehacer(historialFuturoRef.current.length > 0);
+  };
+
+  /** Guarda el estado ANTERIOR a un cambio, para poder volver a él.
+   *  Se llama antes de aplicar el cambio en puntosRef. Cualquier acción
+   *  nueva invalida el futuro (lo que se podía "rehacer"). */
+  const registrarHistorial = () => {
+    historialRef.current.push([...puntosRef.current]);
+    historialFuturoRef.current = [];
+    sincronizarBotonesHistorial();
+  };
+
+  const deshacer = () => {
+    if (historialRef.current.length === 0) return;
+    historialFuturoRef.current.push([...puntosRef.current]);
+    const anterior = historialRef.current.pop()!;
+    puntosRef.current = anterior;
+    setTieneTrazo(anterior.length > 0);
+    setNumPuntos(anterior.length);
+    redibujarTodo();
+    if (herramienta === "editar") dibujarVertices();
+    sincronizarBotonesHistorial();
+    if (anterior.length > 1) onTrazoCompleto([...anterior]);
+  };
+
+  const rehacer = () => {
+    if (historialFuturoRef.current.length === 0) return;
+    historialRef.current.push([...puntosRef.current]);
+    const siguiente = historialFuturoRef.current.pop()!;
+    puntosRef.current = siguiente;
+    setTieneTrazo(siguiente.length > 0);
+    setNumPuntos(siguiente.length);
+    redibujarTodo();
+    if (herramienta === "editar") dibujarVertices();
+    sincronizarBotonesHistorial();
+    if (siguiente.length > 1) onTrazoCompleto([...siguiente]);
+  };
 
   const onPointerDown =
     herramienta === "recta"
