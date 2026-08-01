@@ -74,9 +74,41 @@ function puntosArco(a: Punto, control: Punto, b: Punto, n = 24): Punto[] {
 
 const TAMANO_CELDA_GRILLA = 20;
 
+/** Reescala y centra en un canvas de `anchoCanvas`×`altoCanvas` (en
+ *  coordenadas de dispositivo, ya con devicePixelRatio aplicado) un
+ *  trazo normalizado al formato $1 (cuadrado ~250×250 centrado en el
+ *  origen). Se usa tanto para el trazo fantasma como para precargar un
+ *  trazo guardado como punto de partida editable. */
+function reescalarTrazoNormalizado(
+  trazo: Punto[],
+  anchoCanvas: number,
+  altoCanvas: number,
+  margen = 32,
+): Punto[] {
+  const xs = trazo.map((p) => p.x);
+  const ys = trazo.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const w = maxX - minX || 1;
+  const h = maxY - minY || 1;
+  const escala = Math.min(
+    (anchoCanvas - margen * 2) / w,
+    (altoCanvas - margen * 2) / h,
+  );
+  const offX = (anchoCanvas - w * escala) / 2;
+  const offY = (altoCanvas - h * escala) / 2;
+  return trazo.map((p) => ({
+    x: (p.x - minX) * escala + offX,
+    y: (p.y - minY) * escala + offY,
+  }));
+}
+
 export function CanvasDibujoRuna({
   color = "var(--primary)",
   trazoFantasma,
+  trazoInicial,
   onTrazoCompleto,
   height = 260,
   resetSignal,
@@ -86,6 +118,12 @@ export function CanvasDibujoRuna({
   color?: string;
   /** Trazo ya normalizado que se dibuja tenue de fondo, como referencia */
   trazoFantasma?: Punto[] | null;
+  /** Trazo ya normalizado (mismo formato que trazoFantasma) que se
+   *  precarga en el canvas como trazo confirmado y editable — pensado
+   *  para mostrar de entrada el trazo ya guardado de una runa, en vez
+   *  de dejar el canvas vacío. Solo se aplica cuando cambia (ej. al
+   *  abrir otra runa), no en cada render. */
+  trazoInicial?: Punto[] | null;
   onTrazoCompleto: (puntos: Punto[]) => void;
   height?: number;
   /** Cambiando este valor desde afuera se limpia el canvas */
@@ -206,28 +244,15 @@ export function CanvasDibujoRuna({
     if (trazoFantasma && trazoFantasma.length > 1) {
       // El trazo fantasma viene normalizado en un cuadrado de ~250x250
       // centrado en el origen; lo reescalamos y centramos en el canvas.
-      const xs = trazoFantasma.map((p) => p.x);
-      const ys = trazoFantasma.map((p) => p.y);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
-      const w = maxX - minX || 1;
-      const h = maxY - minY || 1;
-      const margen = 32;
-      const escala = Math.min(
-        (canvas.width - margen * 2) / w,
-        (canvas.height - margen * 2) / h,
+      const puntosEscalados = reescalarTrazoNormalizado(
+        trazoFantasma,
+        canvas.width,
+        canvas.height,
       );
-      const offX = (canvas.width - w * escala) / 2;
-      const offY = (canvas.height - h * escala) / 2;
-
       ctx.beginPath();
-      trazoFantasma.forEach((p, i) => {
-        const x = (p.x - minX) * escala + offX;
-        const y = (p.y - minY) * escala + offY;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      puntosEscalados.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
       });
       ctx.strokeStyle = "rgba(150,150,150,0.35)";
       ctx.lineWidth = 6;
@@ -368,6 +393,27 @@ export function CanvasDibujoRuna({
     redibujarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [redibujarFondo]);
+
+  // Precarga de un trazo ya guardado (ej. al abrir una runa existente):
+  // se escala del formato normalizado ($1) a coordenadas de canvas y se
+  // pinta directamente como trazo confirmado — no como fantasma — para
+  // que quede editable de entrada, sin duplicarse visualmente con nada.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !trazoInicial || trazoInicial.length < 2) return;
+    puntosRef.current = reescalarTrazoNormalizado(
+      trazoInicial,
+      canvas.width,
+      canvas.height,
+    );
+    setTieneTrazo(true);
+    setNumPuntos(puntosRef.current.length);
+    redibujarTodo();
+    // Se dispara solo cuando cambia trazoInicial (ej. al cambiar de
+    // runa) — no en cada render, para no pisar lo que el usuario esté
+    // dibujando o editando en el medio.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trazoInicial]);
 
   // ── Modo mano alzada (comportamiento original) ─────────────────────────
   const onPointerDownLibre = (e: React.PointerEvent<HTMLCanvasElement>) => {

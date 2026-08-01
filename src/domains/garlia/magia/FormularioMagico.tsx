@@ -220,6 +220,7 @@ export function FormularioMagico({
               style={{ borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)" }}
             >
               <PanelPatronRuna
+                key={form.id}
                 color={cfg.color}
                 patronTrazos={(form.patron_trazos as any) ?? []}
                 onChange={(trazos) =>

@@ -38,6 +38,15 @@ export function PanelPatronRuna({
 }) {
   const [resetSignal, setResetSignal] = useState(0);
   const [ultimoBorrado, setUltimoBorrado] = useState<Punto[] | null>(null);
+  // El trazo que se le pasa a CanvasDibujoRuna para precargar como
+  // confirmado. Arranca con lo que ya estaba guardado (al montar, o sea
+  // al abrir esta runa) y solo se vuelve a tocar explícitamente en
+  // "deshacer borrado" — nunca en cada trazo que el usuario dibuja,
+  // porque eso pisaría lo que el canvas ya está mostrando con una copia
+  // recalculada del mismo trazo.
+  const [trazoParaPrecargar, setTrazoParaPrecargar] = useState<Punto[] | null>(
+    patronTrazos[0] ?? null,
+  );
 
   const trazoActual = patronTrazos[0] ?? null;
 
@@ -55,6 +64,10 @@ export function PanelPatronRuna({
   const deshacerBorrado = () => {
     if (!ultimoBorrado) return;
     onChange([ultimoBorrado]);
+    // Como CanvasDibujoRuna ya se vació (por el resetSignal de
+    // eliminarTrazo), hay que decirle explícitamente que vuelva a
+    // mostrar este trazo como confirmado.
+    setTrazoParaPrecargar(ultimoBorrado);
     setUltimoBorrado(null);
   };
 
@@ -70,7 +83,7 @@ export function PanelPatronRuna({
           height={220}
           mostrarHerramientas
           resetSignal={resetSignal}
-          trazoFantasma={trazoActual}
+          trazoInicial={trazoParaPrecargar}
           onTrazoCompleto={fijarTrazo}
         />
 
