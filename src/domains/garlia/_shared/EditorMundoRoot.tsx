@@ -55,6 +55,11 @@ const EntidadesPage = lazy(() =>
 const CapitulosSection = lazy(() =>
   import("@/domains/garlia/libros/CapitulosSection").then((m) => ({ default: m.CapitulosSection })),
 );
+const LibroDocumentoSection = lazy(() =>
+  import("@/domains/garlia/libros/LibroDocumentoSection").then((m) => ({
+    default: m.LibroDocumentoSection,
+  })),
+);
 const MapaSection = lazy(() =>
   import("./MapaSection").then((m) => ({ default: m.MapaSection })),
 );
@@ -104,7 +109,12 @@ function ActiveSection() {
         />
       ) : null;
     case "capitulos":
-      return <CapitulosSection />;
+      // selectedId puntual = pestaña de "documento completo" de un libro
+      // (abierta con openEntity("capitulos", libroId) desde el botón junto
+      // al nombre del libro en la sidebar). Pantalla completa, sin el
+      // sidebar de libros/capítulos ni nada del editor alrededor — ver
+      // LibroDocumentoSection. Sin selectedId, vista normal del editor.
+      return selectedId ? <LibroDocumentoSection /> : <CapitulosSection />;
     case "mapa":
       return <MapaSection />;
     case "linea-tiempo":
