@@ -33,7 +33,6 @@ import {
   Plus,
   Trash2,
   User,
-  Users,
   X,
 } from "lucide-react";
 import React, {
@@ -1664,19 +1663,6 @@ function PersonajesEventoPicker({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-1.5">
-        <Users
-          size={9}
-          style={{ color: "color-mix(in srgb, var(--primary) 35%, transparent)" }}
-        />
-        <span
-          className="text-micro font-black uppercase tracking-widest"
-          style={{ color: "color-mix(in srgb, var(--primary) 35%, transparent)" }}
-        >
-          {editable ? "Personajes involucrados" : "Personajes vinculados"}
-        </span>
-      </div>
-
       {/* Chips de personajes ya vinculados */}
       {vinculados.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -2150,6 +2136,11 @@ function EventoDetallePanel({
                 evt.source === "cumpleanos"
               }
               inline={
+                evt.source === "capitulo" ||
+                evt.source === "cancion" ||
+                evt.source === "cumpleanos"
+              }
+              hideTrigger={
                 evt.source === "capitulo" ||
                 evt.source === "cancion" ||
                 evt.source === "cumpleanos"
@@ -3521,6 +3512,7 @@ function SidebarItemDetalleFlotante({
           <SelectorFechaMundo
             autoOpen
             inline
+            hideTrigger
             placeholder="Sin fecha…"
             value={dia}
             onChange={commitDia}

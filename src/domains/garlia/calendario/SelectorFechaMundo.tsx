@@ -129,8 +129,15 @@ export function SelectorFechaMundo({
     onOpenChange?.(v);
   };
 
-  // Cerrar al click fuera (incluye el dropdown en portal)
+  // Cerrar al click fuera (incluye el dropdown en portal). No aplica en
+  // modo `inline`: ahí no hay nada flotante que cerrar (el calendario vive
+  // empotrado en el flujo normal) y este listener global disparaba un
+  // setState espurio en la fase `mousedown` de CUALQUIER click en la
+  // página — incluido el botón "Cerrar" del modal padre — lo que forzaba
+  // un re-render a mitad del ciclo mousedown→click y hacía perder el
+  // primer click (había que hacer doble click para cerrar el modal).
   useEffect(() => {
+    if (inline) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       if (ref.current?.contains(target)) return;
@@ -140,7 +147,7 @@ export function SelectorFechaMundo({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [inline]);
 
   // Calcular posición y ancho del dropdown al abrir y al hacer scroll/resize.
   // El ancho ya NO se limita al ancho del trigger que lo abre (que puede ser
