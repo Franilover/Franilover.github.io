@@ -132,8 +132,15 @@ export function suscribirseASenalesDeLlamada(
   perfilId: string,
   onSenal: (senal: SenalLlamada) => void,
 ): RealtimeChannel {
+  // private: true es lo que hace que Realtime evalúe las policies de RLS
+  // sobre realtime.messages para este canal (ver migración
+  // habilitar_broadcast_senales_llamada). Sin esto, aunque existan las
+  // policies correctas, el canal se trata como público y el broadcast se
+  // descarta en silencio del lado del servidor — que era exactamente lo
+  // que pasaba: quien contestaba se conectaba bien a LiveKit de su lado,
+  // pero la señal nunca le llegaba a quien llamó.
   const canal = supabase.channel(`llamadas:${perfilId}`, {
-    config: { broadcast: { self: false } },
+    config: { broadcast: { self: false }, private: true },
   });
 
   canal
@@ -148,7 +155,7 @@ export function suscribirseASenalesDeLlamada(
 /** Envía una señal de llamada al canal del otro usuario. */
 async function enviarSenal(senal: SenalLlamada): Promise<void> {
   const canal = supabase.channel(`llamadas:${senal.paraId}`, {
-    config: { broadcast: { self: false, ack: true } },
+    config: { broadcast: { self: false, ack: true }, private: true },
   });
   // Un canal recién creado necesita suscribirse antes de poder emitir.
   await new Promise<void>((resolve, reject) => {
