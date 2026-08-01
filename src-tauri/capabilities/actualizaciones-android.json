@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "actualizaciones-android",
+  "description": "Permisos exclusivos de Android para descargar e instalar el APK de actualización. Separado de actualizaciones.json porque los permisos android-installer:* solo existen cuando el plugin nativo está compilado (Android) — declararlos en un capability con \"platforms\" incluyendo \"linux\" hace que el build de Linux falle en tiempo de compilación con 'Permission android-installer:allow-install-apk not found'.",
+  "windows": ["main"],
+  "platforms": ["android"],
+  "permissions": [
+    "android-installer:allow-install-apk",
+    "android-installer:allow-start-download",
+    "android-installer:allow-query-download",
+    "android-installer:allow-cancel-download"
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "actualizaciones",
-  "description": "Permisos para chequear, descargar e instalar actualizaciones (Android descarga+instala el APK; Linux solo abre el link de descarga del navegador).",
+  "description": "Permisos comunes para chequear y descargar actualizaciones en Android y Linux. Los permisos android-installer:* (exclusivos del plugin nativo de Android) viven aparte en actualizaciones-android.json — no pueden estar acá porque este capability tiene \"linux\" en platforms, y el build de Linux no compila el plugin android-installer.",
   "windows": ["main"],
   "platforms": ["android", "linux"],
   "permissions": [
@@ -20,10 +20,6 @@
     "fs:allow-app-write-recursive",
     "fs:scope-app-recursive",
     "opener:default",
-    "os:default",
-    "android-installer:allow-install-apk",
-    "android-installer:allow-start-download",
-    "android-installer:allow-query-download",
-    "android-installer:allow-cancel-download"
+    "os:default"
   ]
 }
