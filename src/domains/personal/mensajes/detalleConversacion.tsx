@@ -533,7 +533,7 @@ export default function DetalleConversacion() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-bg-main flex items-center justify-center">
+      <div className="min-h-screen md:min-h-0 md:h-full bg-bg-main flex items-center justify-center">
         <p className="text-primary/40 font-black uppercase text-xs tracking-widest italic">
           Necesitás iniciar sesión
         </p>
@@ -544,7 +544,7 @@ export default function DetalleConversacion() {
   if (loading) return <Loading />;
 
   return (
-    <div className="min-h-screen bg-bg-main flex flex-col">
+    <div className="min-h-screen md:min-h-0 md:h-full bg-bg-main flex flex-col">
       {/* ── Header ── */}
       <div
         className="flex items-center gap-3 px-4 py-3 sticky top-0 z-10"
@@ -554,7 +554,13 @@ export default function DetalleConversacion() {
           borderBottom: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
         }}
       >
-        <button onClick={() => router.push("/personal/mensajes")} aria-label="Volver">
+        {/* La flecha "volver" solo hace falta en mobile: en desktop la
+            sidebar de conversaciones ya está siempre visible al costado. */}
+        <button
+          className="md:hidden"
+          onClick={() => router.push("/personal/mensajes")}
+          aria-label="Volver"
+        >
           <ArrowLeft className="text-primary/50" size={18} />
         </button>
 
