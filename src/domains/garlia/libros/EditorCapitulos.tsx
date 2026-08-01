@@ -123,6 +123,7 @@ import {
 } from "@/hooks/useEditorShared";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
+import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 // ─── Dialog commands ──────────────────────────────────────────────────────────
 
@@ -3423,12 +3424,17 @@ export function EditorCapitulosPanel() {
   const [focusMode, setFocusMode] = useState(false);
   const [showNuevoCap, setShowNuevoCap] = useState(false);
   const [showNuevoLibro, setShowNuevoLibro] = useState(false);
-  // Libro cuyo "documento completo" (todos los capítulos en markdown, ver
-  // LibroDocumentoPanel) está abierto — reemplaza al editor de capítulo
-  // mientras esté seteado. null = vista normal.
-  const [libroDocumentoId, setLibroDocumentoId] = useState<string | null>(
-    null,
-  );
+  // Documento completo de un libro (todos los capítulos en markdown, ver
+  // LibroDocumentoPanel) — se abre como pestaña propia dentro de la barra
+  // de entidades (EntityTabBar), igual que "Historia completa" en la línea
+  // de tiempo: openEntity("capitulos", libroId). Reemplaza al editor de
+  // capítulo mientras esa pestaña esté activa.
+  const openEntity = useMundoNavigation((s) => s.openEntity);
+  const closeTab = useMundoNavigation((s) => s.closeTab);
+  const navSection = useMundoNavigation((s) => s.section);
+  const navSelectedId = useMundoNavigation((s) => s.selectedId);
+  const libroDocumentoId =
+    navSection === "capitulos" && navSelectedId ? navSelectedId : null;
   const [_capRefreshKey, setCapRefreshKey] = useState(0);
   const handleLibroEditado = (libro: Libro) => {
     setLibros((prev: Libro[]) =>
@@ -3696,12 +3702,14 @@ export function EditorCapitulosPanel() {
             onSelectCap={handleSelectCap}
             onToggleSidebar={() => setSidebarOpen((o) => !o)}
             onOpenDocumento={(libro) => {
-              setLibroDocumentoId(libro.id);
+              openEntity("capitulos", libro.id);
               void cargarCapsLibro(libro.id);
             }}
           />
 
-          {/* Documento completo de un libro (todos los capítulos en markdown) */}
+          {/* Documento completo de un libro (todos los capítulos en markdown) —
+              pestaña propia abierta con openEntity("capitulos", libroId),
+              visible en EntityTabBar arriba de EditorMundoRoot. */}
           {libroDocumentoId ? (
             (() => {
               const libroDoc = libros.find((l) => l.id === libroDocumentoId);
@@ -3711,7 +3719,7 @@ export function EditorCapitulosPanel() {
                   key={libroDoc.id}
                   libro={libroDoc}
                   capitulos={porLibro[libroDoc.id] ?? []}
-                  onClose={() => setLibroDocumentoId(null)}
+                  onClose={() => closeTab("capitulos", libroDoc.id)}
                   onCapChange={(id, fields) => {
                     setPorLibro((prev) => ({
                       ...prev,

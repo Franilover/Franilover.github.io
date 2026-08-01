@@ -19,6 +19,7 @@
 
 import {
   Bug,
+  BookMarked,
   Clock,
   Compass,
   Crown,
@@ -50,6 +51,7 @@ const SECTION_ICON: Partial<Record<SectionKey, React.ElementType>> = {
   notas: StickyNote,
   "notas-gos": StickyNote,
   "linea-tiempo": Clock,
+  capitulos: BookMarked,
 };
 
 function EntityTab({

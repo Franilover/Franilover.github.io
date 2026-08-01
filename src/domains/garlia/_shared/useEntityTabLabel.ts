@@ -35,7 +35,10 @@ const SECTION_TABLE: Record<SectionKey, string | null> = {
   hechizos: "hechizos",
   dones: "dones",
   runas: "runas",
-  capitulos: null, // capítulos no participan de las tabs de entidad
+  // "capitulos" ahora sí abre pestañas — pero de LIBROS (el documento
+  // completo de un libro, ver LibroDocumentoPanel en EditorCapitulos.tsx),
+  // no de capítulos individuales.
+  capitulos: "libros",
   letras: "canciones",
   notas: "notas",
   "notas-gos": "ensayos",
@@ -47,11 +50,9 @@ const SECTION_TABLE: Record<SectionKey, string | null> = {
 /**
  * Resuelve el nombre visible de una entidad (runa/personaje/reino/etc).
  *
- * Nota: en la práctica esta función solo se invoca para secciones que SÍ
- * abren pestañas de entidad (personajes/criaturas/.../notas/letras), nunca
- * para "mapa"/"capitulos"/"linea-tiempo"/"aventura" (esas no generan tabs).
- * Igual usamos un nombre de tabla existente como fallback defensivo para no
- * violar las reglas de hooks ni pegarle a una tabla inventada.
+ * "capitulos" resuelve el TÍTULO DEL LIBRO — la pestaña abierta con
+ * openEntity("capitulos", libroId) es el documento completo de ese libro
+ * (ver LibroDocumentoPanel), no un capítulo individual.
  */
 export function useEntityTabLabel(section: SectionKey, id: string): string {
   const tabla = SECTION_TABLE[section] ?? "personajes";
