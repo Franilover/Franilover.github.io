@@ -15,6 +15,7 @@ import {
   Hash,
   Calendar,
   BookMarked,
+  BookOpen,
   Pencil,
   Lock,
   SlidersHorizontal,
@@ -2708,6 +2709,302 @@ function BarraLibro({
 // capítulos anidados. Reemplaza la antigua vista de "Biblioteca" + sidebar de
 // capítulos de un solo libro — todo vive en una sola pantalla ahora.
 
+// ── Documento completo del libro — todos los capítulos en markdown ──────────
+// Análogo a generarMarkdownHistoriaCompleta()/parsearMarkdownHistoriaCompleta()
+// de EditorLineaTiempo: arma # Título del libro / ## Nombre del capítulo
+// <!--cap:id--> / contenido, en orden, y lo muestra en un RichEditor
+// editable. A diferencia del panel de línea de tiempo, acá SÍ se guarda de
+// vuelta: cada "## Título <!--cap:id-->" es un capítulo real — editar su
+// título o su cuerpo dispara capUpdateMeta/capUpdateContenido para ese id.
+// El id embebido en el heading es lo que permite reordenar/renombrar sin
+// perder el vínculo (el mismo truco que usa la línea de tiempo con
+// <!--tl:id-->).
+function generarMarkdownLibro(libro: Libro, capitulos: Capitulo[]): string {
+  const ordenados = [...capitulos].sort((a, b) => a.orden - b.orden);
+  if (ordenados.length === 0) {
+    return `# ${libro.titulo}\n\n_Este libro todavía no tiene capítulos._`;
+  }
+
+  const lineas: string[] = [`# ${libro.titulo}`];
+  for (const cap of ordenados) {
+    lineas.push(`## ${cap.titulo_capitulo} <!--cap:${cap.id}-->`);
+    const cuerpo = (cap.contenido ?? "").trim();
+    if (cuerpo) lineas.push(cuerpo);
+  }
+  return lineas.join("\n\n");
+}
+
+// ── Parser del documento editado ──────────────────────────────────────────
+// Recorre línea por línea reconstruyendo bloques ## Título <!--cap:id--> \n
+// cuerpo. El "# Título del libro" inicial no aporta datos editables (el
+// título del libro se edita desde BarraLibro, no acá) — se ignora.
+interface BloqueCapEditado {
+  id: string;
+  titulo: string;
+  contenido: string;
+}
+
+interface ParseResultadoLibro {
+  bloques: BloqueCapEditado[];
+  avisos: string[];
+}
+
+function parsearMarkdownLibro(markdown: string): ParseResultadoLibro {
+  const bloques: BloqueCapEditado[] = [];
+  const avisos: string[] = [];
+  const lineasCrudas = markdown.split("\n");
+
+  let bloqueActivo: {
+    id: string | null;
+    tituloCrudo: string;
+    cuerpo: string[];
+  } | null = null;
+
+  const cerrarBloque = () => {
+    if (!bloqueActivo) return;
+    if (bloqueActivo.id) {
+      bloques.push({
+        id: bloqueActivo.id,
+        titulo: bloqueActivo.tituloCrudo.trim(),
+        contenido: bloqueActivo.cuerpo.join("\n\n").trim(),
+      });
+    } else {
+      avisos.push(
+        `No se pudo identificar el capítulo "${bloqueActivo.tituloCrudo.trim() || "(sin título)"}" — puede que se haya borrado su marcador oculto. Este cambio no se guardará.`,
+      );
+    }
+    bloqueActivo = null;
+  };
+
+  for (const lineaCruda of lineasCrudas) {
+    const linea = lineaCruda.trim();
+
+    if (linea.startsWith("# ") && !linea.startsWith("## ")) {
+      // H1 (título del libro) — cierra el bloque anterior, no editable acá.
+      cerrarBloque();
+      continue;
+    }
+
+    if (linea.startsWith("## ")) {
+      cerrarBloque();
+      const contenido = linea.slice(3);
+      const idMatch = contenido.match(/<!--cap:([a-zA-Z0-9-]+)-->\s*$/);
+      const tituloCrudo = contenido
+        .replace(/<!--cap:[a-zA-Z0-9-]+-->\s*$/, "")
+        .trim();
+      bloqueActivo = {
+        id: idMatch ? idMatch[1] : null,
+        tituloCrudo,
+        cuerpo: [],
+      };
+      continue;
+    }
+
+    if (linea === "") continue;
+
+    if (bloqueActivo) {
+      bloqueActivo.cuerpo.push(lineaCruda);
+    } else {
+      avisos.push(
+        `Línea fuera de cualquier capítulo, se ignorará: "${linea.slice(0, 60)}${linea.length > 60 ? "…" : ""}"`,
+      );
+    }
+  }
+  cerrarBloque();
+
+  return { bloques, avisos };
+}
+
+function LibroDocumentoPanel({
+  libro,
+  capitulos,
+  onClose,
+  onCapChange,
+}: {
+  libro: Libro;
+  capitulos: Capitulo[];
+  onClose: () => void;
+  onCapChange: (id: string, fields: Partial<Capitulo>) => void;
+}) {
+  const markdown = useMemo(
+    () => generarMarkdownLibro(libro, capitulos),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [libro.id],
+  );
+  const [valor, setValor] = useState(markdown);
+  const [avisos, setAvisos] = useState<string[]>([]);
+  const [estado, setEstado] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Resincroniza solo la primera vez que llegan capítulos reales (evita
+  // pisar lo que el usuario está escribiendo en cada render).
+  const inicializadoRef = useRef(false);
+  useEffect(() => {
+    if (!inicializadoRef.current && capitulos.length > 0) {
+      inicializadoRef.current = true;
+      setValor(generarMarkdownLibro(libro, capitulos));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capitulos.length]);
+
+  // Snapshot original indexado por id — para diffear solo lo que cambió.
+  const indiceOriginal = useMemo(() => {
+    const m = new Map<string, Capitulo>();
+    for (const c of capitulos) m.set(c.id, c);
+    return m;
+  }, [capitulos]);
+
+  const guardar = useCallback(
+    async (texto: string) => {
+      const { bloques, avisos: avisosParse } = parsearMarkdownLibro(texto);
+      setAvisos(avisosParse);
+
+      const cambios: Array<() => Promise<void>> = [];
+
+      for (const b of bloques) {
+        const original = indiceOriginal.get(b.id);
+        if (!original) continue; // id desconocido (capítulo borrado en otra pestaña, etc.)
+
+        if (b.titulo && b.titulo !== (original.titulo_capitulo?.trim() || "")) {
+          cambios.push(async () => {
+            await capUpdateMeta(b.id, { titulo_capitulo: b.titulo });
+            onCapChange(b.id, { titulo_capitulo: b.titulo });
+          });
+        }
+        if (b.contenido !== (original.contenido ?? "").trim()) {
+          cambios.push(async () => {
+            await capUpdateContenido(b.id, b.contenido);
+            onCapChange(b.id, { contenido: b.contenido });
+          });
+        }
+      }
+
+      if (cambios.length === 0) {
+        setEstado("idle");
+        return;
+      }
+
+      setEstado("saving");
+      try {
+        for (const c of cambios) await c();
+        setEstado("saved");
+        setTimeout(() => setEstado((s) => (s === "saved" ? "idle" : s)), 2000);
+      } catch {
+        setEstado("error");
+      }
+    },
+    [indiceOriginal, onCapChange],
+  );
+
+  const handleChange = useCallback(
+    (nuevoTexto: string) => {
+      setValor(nuevoTexto);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void guardar(nuevoTexto);
+      }, 1200);
+    },
+    [guardar],
+  );
+
+  // Ctrl+S fuerza guardado inmediato, saltándose el debounce.
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+        }
+        void guardar(valor);
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [guardar, valor]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* Header */}
+      <div
+        className="shrink-0 flex items-center justify-between px-4 py-3 border-b"
+        style={{
+          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+        }}
+      >
+        <span
+          className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em]"
+          style={{ color: "var(--primary)" }}
+        >
+          <BookOpen size={11} />
+          {libro.titulo} · documento completo
+        </span>
+        <div className="flex items-center gap-2">
+          <SaveIndicator status={estado} />
+          <button
+            className="p-1 rounded hover:bg-primary/8 text-primary/30 hover:text-primary transition-all"
+            title="Cerrar documento"
+            type="button"
+            onClick={onClose}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      </div>
+
+      {/* Nota de alcance: qué es editable y qué no */}
+      <div
+        className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b"
+        style={{
+          color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+          background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+        }}
+      >
+        Editar el título o el cuerpo de un capítulo acá lo guarda en ese
+        capítulo. No borres el <code>&lt;!--cap:...--&gt;</code> al final de
+        un encabezado — se usa para saber qué capítulo actualizar. Los
+        capítulos se muestran en su orden actual; para reordenarlos usa la
+        barra lateral.
+      </div>
+
+      {/* Avisos de líneas/bloques no interpretables */}
+      {avisos.length > 0 && (
+        <div
+          className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b space-y-0.5"
+          style={{
+            color: "#b45309",
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, #f59e0b 8%, transparent)",
+          }}
+        >
+          {avisos.map((a, i) => (
+            <div key={i}>⚠ {a}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Documento — RichEditor editable, todos los capítulos de corrido */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <RichEditor
+          editable
+          minHeight={200}
+          value={valor}
+          onChange={handleChange}
+        />
+      </div>
+    </div>
+  );
+}
+
 function SidebarLibros({
   libros,
   loadingLibros,
@@ -2724,6 +3021,7 @@ function SidebarLibros({
   onDeleteLibro,
   onToggleSidebar,
   onReorderCaps,
+  onOpenDocumento,
 }: {
   libros: Libro[];
   loadingLibros: boolean;
@@ -2740,6 +3038,7 @@ function SidebarLibros({
   onDeleteLibro: (libroId: string) => void;
   onToggleSidebar: () => void;
   onReorderCaps: (libroId: string, orderedIds: string[]) => void;
+  onOpenDocumento: (libro: Libro) => void;
 }) {
   // ── Drag-and-drop de capítulos (reordenar) ────────────────────────────────
   // Nativo (HTML5 DnD), sin dependencias nuevas. `dragCapId` es el capítulo
@@ -2921,6 +3220,16 @@ function SidebarLibros({
 
                   {/* Acciones hover del libro */}
                   <div className="shrink-0 hidden group-hover:flex items-center gap-0.5">
+                    <button
+                      className="p-0.5 rounded hover:bg-primary/10 text-primary/30 hover:text-primary transition-colors"
+                      title="Ver documento completo del libro"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDocumento(libro);
+                      }}
+                    >
+                      <BookOpen size={9} />
+                    </button>
                     <button
                       className="p-0.5 rounded hover:bg-primary/10 text-primary/30 hover:text-primary transition-colors"
                       title="Nuevo capítulo"
@@ -3114,6 +3423,12 @@ export function EditorCapitulosPanel() {
   const [focusMode, setFocusMode] = useState(false);
   const [showNuevoCap, setShowNuevoCap] = useState(false);
   const [showNuevoLibro, setShowNuevoLibro] = useState(false);
+  // Libro cuyo "documento completo" (todos los capítulos en markdown, ver
+  // LibroDocumentoPanel) está abierto — reemplaza al editor de capítulo
+  // mientras esté seteado. null = vista normal.
+  const [libroDocumentoId, setLibroDocumentoId] = useState<string | null>(
+    null,
+  );
   const [_capRefreshKey, setCapRefreshKey] = useState(0);
   const handleLibroEditado = (libro: Libro) => {
     setLibros((prev: Libro[]) =>
@@ -3380,10 +3695,35 @@ export function EditorCapitulosPanel() {
             onReorderCaps={handleReorderCaps}
             onSelectCap={handleSelectCap}
             onToggleSidebar={() => setSidebarOpen((o) => !o)}
+            onOpenDocumento={(libro) => {
+              setLibroDocumentoId(libro.id);
+              void cargarCapsLibro(libro.id);
+            }}
           />
 
-          {/* Editor del capítulo activo */}
-          {hayCapAbierto ? (
+          {/* Documento completo de un libro (todos los capítulos en markdown) */}
+          {libroDocumentoId ? (
+            (() => {
+              const libroDoc = libros.find((l) => l.id === libroDocumentoId);
+              if (!libroDoc) return null;
+              return (
+                <LibroDocumentoPanel
+                  key={libroDoc.id}
+                  libro={libroDoc}
+                  capitulos={porLibro[libroDoc.id] ?? []}
+                  onClose={() => setLibroDocumentoId(null)}
+                  onCapChange={(id, fields) => {
+                    setPorLibro((prev) => ({
+                      ...prev,
+                      [libroDoc.id]: (prev[libroDoc.id] ?? []).map((c) =>
+                        c.id === id ? { ...c, ...fields } : c,
+                      ),
+                    }));
+                  }}
+                />
+              );
+            })()
+          ) : hayCapAbierto ? (
             <div className="flex-1 min-h-0 flex overflow-hidden">
               <PanelEditor
                 key={selectedCapId}
