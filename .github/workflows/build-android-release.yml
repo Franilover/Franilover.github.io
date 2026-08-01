@@ -415,25 +415,16 @@ jobs:
           echo "Archivos copiados a $DESTINO:"
           ls "$DESTINO"
 
-      - name: DEBUG - mostrar MainActivity.kt generado
-        # Temporal: el patrón de Python del paso siguiente asume que existe
-        # un hook "override fun onWebViewCreate(...)" en el MainActivity.kt
-        # que genera esta versión de Tauri, y falló (ver corrida anterior).
-        # Este paso imprime el archivo real en el log para poder ajustar el
-        # patrón al nombre correcto — sacar una vez confirmado.
-        run: |
-          find src-tauri/gen/android/app/src/main/java -name "MainActivity.kt" -exec cat {} \;
-
       - name: Registrar el puente FCM en MainActivity.kt
-        # TEMPORAL: continue-on-error mientras confirmamos el nombre real
-        # del hook de WebView que expone esta versión de Tauri (ver paso de
-        # DEBUG arriba). Sacar continue-on-error una vez ajustado el patrón.
-        continue-on-error: true
-        # `tauri android init` genera MainActivity.kt con una referencia al
-        # WebView interno de Tauri/WRY. Le agregamos una sola línea en
-        # onWebViewCreate (hook que Tauri sí expone) para registrar ese
-        # WebView en PuenteFcm — así el servicio de FCM puede llamar JS
-        # sobre él sin que nosotros toquemos el resto del archivo generado.
+        # `tauri android init` genera MainActivity.kt como un archivo vacío
+        # de una sola línea de clase:
+        #   class MainActivity : TauriActivity()
+        # (confirmado con un paso de DEBUG en una corrida anterior — no hay
+        # ningún método para "buscar y modificar", así que reescribimos el
+        # archivo completo con el override de onWebViewCreate agregado.
+        # TauriActivity sí expone ese hook (confirmado contra ejemplos
+        # oficiales de plugins de Tauri) — ahí registramos el WebView en
+        # PuenteFcm para que el servicio de FCM pueda llamarle JS.
         run: |
           MAIN_ACTIVITY=$(find src-tauri/gen/android/app/src/main/java -name "MainActivity.kt")
           if [ -z "$MAIN_ACTIVITY" ]; then
@@ -441,38 +432,24 @@ jobs:
             exit 1
           fi
           echo "MainActivity.kt encontrado en: $MAIN_ACTIVITY"
+          echo "Contenido original:"
+          cat "$MAIN_ACTIVITY"
 
-          python3 - "$MAIN_ACTIVITY" << 'PYEOF'
-          import re
-          import sys
+          cat > "$MAIN_ACTIVITY" << 'KOTLIN_EOF'
+          package com.frani.garlia
 
-          path = sys.argv[1]
-          with open(path) as f:
-              contenido = f.read()
+          import android.webkit.WebView
 
-          if "PuenteFcm.registrarWebView" in contenido:
-              print("MainActivity.kt ya tiene el puente FCM registrado, no se toca.")
-              sys.exit(0)
+          class MainActivity : TauriActivity() {
+              override fun onWebViewCreate(webView: WebView) {
+                  super.onWebViewCreate(webView)
+                  PuenteFcm.registrarWebView(webView)
+              }
+          }
+          KOTLIN_EOF
 
-          # Tauri (WRY) expone un hook onWebViewCreate(webView, ...) en la
-          # MainActivity generada. Si existe, enganchamos ahí. Si el nombre
-          # exacto cambiara entre versiones de Tauri, este assert corta el
-          # build con un mensaje claro en vez de dejar el push silenciosamente roto.
-          patron = re.compile(r'(override fun onWebViewCreate\([^)]*\)\s*\{\n)')
-          nuevo_contenido, n = patron.subn(
-              r'\1        com.frani.garlia.PuenteFcm.registrarWebView(webView)\n',
-              contenido,
-              count=1,
-          )
-          assert n == 1, (
-              "No se encontró 'override fun onWebViewCreate(' en MainActivity.kt — "
-              "la API de Tauri pudo haber cambiado. Registrar el puente FCM a mano."
-          )
-
-          with open(path, "w") as f:
-              f.write(nuevo_contenido)
-          print("Puente FCM registrado en MainActivity.kt.")
-          PYEOF
+          echo "Contenido nuevo:"
+          cat "$MAIN_ACTIVITY"
 
       - name: Agregar permiso y servicio de FCM al AndroidManifest.xml
         run: |
