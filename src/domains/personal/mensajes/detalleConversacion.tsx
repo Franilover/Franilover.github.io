@@ -286,7 +286,8 @@ export default function DetalleConversacion() {
         deNombre: user.user_metadata?.username ?? user.email ?? null,
         deAvatar: user.user_metadata?.avatar_url ?? null,
       });
-    } catch {
+    } catch (err) {
+      console.error("handleLlamar:", err);
       setError("No se pudo iniciar la llamada.");
     }
   };
