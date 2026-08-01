@@ -49,13 +49,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
         run: |
-          # WORKFLOWS_REQUERIDOS = todos los builds que tienen que estar en
-          # verde antes de publicar. Agregar acá el nombre ("name:") de
-          # cualquier workflow nuevo que suba assets al mismo release.
+          # WORKFLOWS_REQUERIDOS = todos los builds que tienen que TERMINAR
+          # (con éxito o con error) antes de publicar. Agregar acá el
+          # nombre ("name:") de cualquier workflow nuevo que suba assets
+          # al mismo release.
+          #
+          # Ya no exigimos que TODOS terminen con éxito: si alguno falla,
+          # igual publicamos el release en cuanto sepamos que el resto ya
+          # terminó, para no bloquear el build que sí compiló bien. El que
+          # falló simplemente no va a tener su asset en el release.
           WORKFLOWS_REQUERIDOS=("build-android" "build-linux")
 
           echo "Tag: $TAG"
-          TODOS_OK=true
+          TODOS_TERMINARON=true
+          HUBO_FALLA=false
 
           for WF in "${WORKFLOWS_REQUERIDOS[@]}"; do
             # Busca la corrida más reciente de ese workflow para este tag
@@ -69,22 +76,29 @@ jobs:
 
             echo "  - $WF: $CONCLUSION"
 
-            if [ "$CONCLUSION" != "success" ]; then
-              TODOS_OK=false
+            if [ "$CONCLUSION" == "pendiente" ]; then
+              TODOS_TERMINARON=false
+            elif [ "$CONCLUSION" != "success" ]; then
+              HUBO_FALLA=true
             fi
           done
 
-          echo "todos_ok=$TODOS_OK" >> "$GITHUB_OUTPUT"
+          echo "todos_terminaron=$TODOS_TERMINARON" >> "$GITHUB_OUTPUT"
+          echo "hubo_falla=$HUBO_FALLA" >> "$GITHUB_OUTPUT"
 
       - name: Publicar el Release
-        if: steps.check.outputs.todos_ok == 'true'
+        if: steps.check.outputs.todos_terminaron == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}
         run: |
-          echo "Todos los builds terminaron OK — publicando release de $TAG"
+          if [ "${{ steps.check.outputs.hubo_falla }}" == "true" ]; then
+            echo "⚠️  Algún build falló, pero el resto ya terminó — se publica el release igual con los assets disponibles."
+          else
+            echo "Todos los builds terminaron OK — publicando release de $TAG"
+          fi
           gh release edit "$TAG" --draft=false
 
       - name: Esperar al resto
-        if: steps.check.outputs.todos_ok != 'true'
+        if: steps.check.outputs.todos_terminaron != 'true'
         run: echo "Todavía falta algún build por terminar — no se publica el release aún. Este job se va a volver a disparar cuando termine el que falta."
