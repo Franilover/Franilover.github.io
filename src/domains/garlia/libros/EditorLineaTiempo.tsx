@@ -1369,9 +1369,15 @@ function ModalEra({
 // `eventos_mundo` actualizar. No es invisible (el editor no interpreta
 // HTML dentro de headings, así que el usuario lo verá) pero es
 // reconocible como "no tocar".
+//
+// filtroLabel: nombre del reino/personaje activo en la línea de tiempo
+// (viene ya filtrado desde afuera vía allEvents) — solo se usa para
+// personalizar el mensaje cuando no hay nada que mostrar, así el usuario
+// entiende que es el filtro y no un documento roto.
 function generarMarkdownHistoriaCompleta(
   allEvents: MundoTimelineEvent[],
   cal: CalCache | null,
+  filtroLabel?: string | null,
 ): string {
   const diasAnioLista =
     cal?.estaciones?.reduce(
@@ -1395,7 +1401,9 @@ function generarMarkdownHistoriaCompleta(
       (e.source === "mundo" || e.source === "reino"),
   );
   if (conFecha.length === 0) {
-    return "_Sin eventos de mundo/reino con fecha asignada todavía._";
+    return filtroLabel
+      ? `_Sin eventos de mundo/reino con fecha asignada para "${filtroLabel}" todavía._`
+      : "_Sin eventos de mundo/reino con fecha asignada todavía._";
   }
 
   const lineas: string[] = [];
@@ -1554,12 +1562,18 @@ export function HistoriaCompletaPanel({
   markdown,
   allEvents,
   diasAnioLista,
+  filtroLabel,
   onFieldChange,
   onDiaChange,
 }: {
   markdown: string;
   allEvents: MundoTimelineEvent[];
   diasAnioLista: number;
+  /** Reino y/o personaje activo en el filtro de la línea de tiempo —
+   * cuando está presente, el documento ya viene acotado a ese filtro
+   * (ver PanelHistoriaMundo) y esto solo se usa para mostrarlo en el
+   * header, así se entiende que no es el documento completo. */
+  filtroLabel?: string | null;
   onFieldChange: (
     id: string,
     field: "titulo" | "descripcion",
@@ -1574,17 +1588,28 @@ export function HistoriaCompletaPanel({
   );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Si el documento generado cambia por fuera (se abrió con datos nuevos
-  // tras recargar), resincroniza el valor local — solo la primera vez
-  // que llega markdown no vacío, para no pisar lo que el usuario está
-  // escribiendo en cada render.
+  // Si el documento generado cambia por fuera, resincroniza el valor
+  // local en dos casos:
+  //  1) primera carga real de datos (markdown pasa de "" a no-vacío) —
+  //     evita pisar lo que el usuario esté escribiendo en cada render.
+  //  2) cambia el filtro activo (reino/personaje) — ahí SÍ queremos
+  //     reemplazar el documento entero, porque es un contexto distinto
+  //     (otro conjunto de eventos), no una edición en curso del mismo.
   const markdownInicialRef = useRef(markdown);
+  const filtroPrevioRef = useRef(filtroLabel);
   useEffect(() => {
+    const cambioFiltro = filtroPrevioRef.current !== filtroLabel;
+    if (cambioFiltro) {
+      filtroPrevioRef.current = filtroLabel;
+      markdownInicialRef.current = markdown;
+      setValor(markdown);
+      return;
+    }
     if (markdownInicialRef.current === "" && markdown !== "") {
       markdownInicialRef.current = markdown;
       setValor(markdown);
     }
-  }, [markdown]);
+  }, [markdown, filtroLabel]);
 
   // Snapshot original indexado por id — sirve para diffear solo lo que
   // realmente cambió (evita updates innecesarios en cada autosave).
@@ -1692,6 +1717,14 @@ export function HistoriaCompletaPanel({
         >
           <BookOpen size={11} />
           Historia completa
+          {filtroLabel && (
+            <span
+              className="normal-case font-bold tracking-normal"
+              style={{ color: "color-mix(in srgb, var(--primary) 50%, transparent)" }}
+            >
+              · {filtroLabel}
+            </span>
+          )}
         </span>
         <SaveIndicator status={estado} />
       </div>
@@ -1705,6 +1738,13 @@ export function HistoriaCompletaPanel({
           background: "color-mix(in srgb, var(--primary) 3%, transparent)",
         }}
       >
+        {filtroLabel ? (
+          <>
+            Mostrando solo los eventos de mundo/reino de{" "}
+            <strong>{filtroLabel}</strong> — cambiá o quitá el filtro en la
+            línea de tiempo para ver el resto.{" "}
+          </>
+        ) : null}
         Este documento muestra y edita solo los eventos de mundo/reino
         (título, descripción y año). Capítulos, canciones y cumpleaños se
         editan desde sus propios lugares y no aparecen acá. No borres el{" "}
@@ -5281,10 +5321,20 @@ export function PanelHistoriaMundo({
         });
       }
     }
-    // Eventos de mundo/reino — tabla eventos_mundo (sistema nuevo)
-    if (showEventos && !filterPersonaje) {
+    // Eventos de mundo/reino — tabla eventos_mundo (sistema nuevo).
+    // Con un personaje filtrado, solo entran los eventos donde ESE
+    // personaje participa (personajes_ids) — así el documento "Historia
+    // completa" (que solo lee source mundo/reino, ver
+    // generarMarkdownHistoriaCompleta) tiene algo que mostrar al filtrar
+    // por personaje, en vez de quedar vacío.
+    if (showEventos) {
       for (const e of eventosMundo) {
         if (filterReino && e.reinoId !== filterReino) continue;
+        if (
+          filterPersonaje &&
+          !(e.personajes_ids ?? []).includes(filterPersonaje)
+        )
+          continue;
         const dia = e.dia_absoluto;
         if (dia == null) continue;
         if (filterEra && cal) {
@@ -5501,16 +5551,32 @@ export function PanelHistoriaMundo({
   // LineaTiempoSection), no como modal flotante. El documento solo se
   // genera cuando esta vista está activa, para no rehacer el join de
   // string en cada render de la línea de tiempo normal.
+  //
+  // Respeta los filtros activos de la línea de tiempo (filterReino /
+  // filterPersonaje): allEvents ya viene acotado a ellos (ver el useMemo
+  // de allEvents más arriba), así que el documento generado automáticamente
+  // solo muestra los eventos de mundo/reino del reino o personaje
+  // seleccionado. filtroLabel es solo para el mensaje "sin eventos" y el
+  // encabezado del panel — no vuelve a filtrar nada acá.
   if (mostrarHistoriaCompleta) {
+    const nombreReinoFiltrado = filterReino
+      ? (reinos.find((r) => r.id === filterReino)?.nombre ?? null)
+      : null;
+    const filtroLabel =
+      nombreReinoFiltrado && personajeSeleccionado
+        ? `${nombreReinoFiltrado} · ${personajeSeleccionado.nombre}`
+        : (nombreReinoFiltrado ?? personajeSeleccionado?.nombre ?? null);
     const markdownHistoriaCompleta = generarMarkdownHistoriaCompleta(
       allEvents,
       cal,
+      filtroLabel,
     );
     return (
       <HistoriaCompletaPanel
         markdown={markdownHistoriaCompleta}
         allEvents={allEvents}
         diasAnioLista={diasAnioBarra}
+        filtroLabel={filtroLabel}
         onFieldChange={handleEventoMundoFieldChange}
         onDiaChange={handleEventoMundoDiaChange}
       />
