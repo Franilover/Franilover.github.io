@@ -328,9 +328,19 @@ export default function DetalleConversacion() {
       });
       scrolleoInicialHechoRef.current = true;
     } else {
-      // Mensajes nuevos con el chat ya abierto: scroll suave, sin esperar
-      // frames extra (no hay salto de "recién montado" que compensar).
-      irAlFondo("smooth");
+      // Mensajes nuevos con el chat ya abierto: si el usuario está cerca del
+      // fondo (leyendo la conversación al día), lo seguimos bajando en
+      // automático con scroll suave — como WhatsApp. Si se fue a leer
+      // mensajes viejos más arriba, no le interrumpimos la lectura
+      // saltándole el scroll cada vez que llega algo nuevo del otro.
+      // Excepción: si el mensaje nuevo es propio (uno mismo lo acaba de
+      // enviar), siempre bajamos — no tendría sentido no ver lo que uno
+      // mismo escribió, aunque estuviera leyendo historial más arriba.
+      const contenedor = scrollRef.current;
+      const distanciaAlFondo = contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight;
+      const ultimoMensaje = mensajes[mensajes.length - 1];
+      const esMio = ultimoMensaje?.remitente_id === user?.id;
+      if (esMio || distanciaAlFondo <= 150) irAlFondo("smooth");
     }
   }, [mensajes.length]);
 
