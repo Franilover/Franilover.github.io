@@ -33,6 +33,7 @@ import {
   Plus,
   Trash2,
   User,
+  Users,
   X,
 } from "lucide-react";
 import React, {
@@ -86,6 +87,10 @@ type MundoTimelineEvent = TimelineEvent & {
   reinoId?: string;
   yearNum: number; // dia_absoluto — para ordenar
   dia_absoluto?: number; // el valor real del calendario
+  /** Personajes que participan en este evento — solo aplica a "mundo"/"reino"
+   * (editable) y "capitulo" (solo lectura, ya vinculados desde el editor
+   * del capítulo). Arreglo de ids de la tabla `personajes`. */
+  personajes_ids?: string[];
   capData?: CapTimeline;
   cancionData?: {
     id: string;
@@ -1604,6 +1609,230 @@ function ToggleTipoBtn({
 // canciones/cumpleaños se muestran solo lectura porque no tienen un campo
 // de descripción propio aquí y editar su título cambiaría la entidad real
 // (capítulo, canción o personaje).
+// ─── PersonajesEventoPicker ───────────────────────────────────────────────────
+// Personajes que participan en un evento. Dos modos:
+//   - editable=true (eventos "mundo"/"reino"): permite añadir/quitar
+//     personajes con un buscador empotrado (sin portal — mismo criterio
+//     que el selector de fecha, para no anidar paneles flotantes).
+//   - editable=false (capítulos): solo muestra los personajes YA vinculados
+//     al capítulo (campo personajes_ids editado desde el editor del libro),
+//     con un botón para ir al personaje.
+function PersonajesEventoPicker({
+  personajesIds,
+  personajesDisponibles,
+  editable,
+  onChange,
+  onSelectPersonaje,
+}: {
+  personajesIds: string[];
+  personajesDisponibles: { id: string; nombre: string; img_url: string | null }[];
+  editable: boolean;
+  onChange?: (ids: string[]) => void;
+  onSelectPersonaje?: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [buscando, setBuscando] = useState(false);
+
+  const vinculados = personajesIds
+    .map((id) => personajesDisponibles.find((p) => p.id === id))
+    .filter(Boolean) as { id: string; nombre: string; img_url: string | null }[];
+
+  const resultados = useMemo(() => {
+    if (!buscando) return [];
+    const q = query.trim().toLowerCase();
+    const candidatos = personajesDisponibles.filter(
+      (p) => !personajesIds.includes(p.id),
+    );
+    if (!q) return candidatos.slice(0, 8);
+    return candidatos
+      .filter((p) => p.nombre.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [buscando, query, personajesDisponibles, personajesIds]);
+
+  const agregar = (id: string) => {
+    if (personajesIds.includes(id)) return;
+    onChange?.([...personajesIds, id]);
+    setQuery("");
+    setBuscando(false);
+  };
+
+  const quitar = (id: string) => {
+    onChange?.(personajesIds.filter((pid) => pid !== id));
+  };
+
+  if (!editable && vinculados.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5">
+        <Users
+          size={9}
+          style={{ color: "color-mix(in srgb, var(--primary) 35%, transparent)" }}
+        />
+        <span
+          className="text-micro font-black uppercase tracking-widest"
+          style={{ color: "color-mix(in srgb, var(--primary) 35%, transparent)" }}
+        >
+          {editable ? "Personajes involucrados" : "Personajes vinculados"}
+        </span>
+      </div>
+
+      {/* Chips de personajes ya vinculados */}
+      {vinculados.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {vinculados.map((p) => (
+            <span
+              key={p.id}
+              className="flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full text-micro font-bold transition-all"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+                color: "color-mix(in srgb, var(--primary) 60%, transparent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+              }}
+            >
+              {p.img_url ? (
+                <img
+                  alt=""
+                  className="w-4 h-4 rounded-full object-cover"
+                  src={p.img_url}
+                />
+              ) : (
+                <User size={9} className="opacity-50" />
+              )}
+              <button
+                className="hover:underline"
+                title={onSelectPersonaje ? "Ir al personaje" : undefined}
+                type="button"
+                onClick={() => onSelectPersonaje?.(p.id)}
+              >
+                {p.nombre}
+              </button>
+              {editable && (
+                <button
+                  className="opacity-50 hover:opacity-100 transition-opacity"
+                  title="Quitar"
+                  type="button"
+                  onClick={() => quitar(p.id)}
+                >
+                  <X size={8} />
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Buscador empotrado — solo en modo editable */}
+      {editable && (
+        <div className="flex flex-col gap-1">
+          {!buscando ? (
+            <button
+              className="self-start flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold transition-all"
+              style={{
+                background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+                color: "var(--accent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--accent) 18%, transparent)",
+              }}
+              type="button"
+              onClick={() => setBuscando(true)}
+            >
+              <Plus size={9} />
+              Añadir personaje
+            </button>
+          ) : (
+            <div
+              className="rounded-lg border overflow-hidden"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 2%, transparent)",
+                borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+              }}
+            >
+              <input
+                autoFocus
+                className="w-full px-2 py-1.5 text-micro outline-none bg-transparent"
+                placeholder="Buscar personaje…"
+                style={{ color: "var(--primary)" }}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setBuscando(false);
+                    setQuery("");
+                  }
+                }}
+              />
+              <div
+                className="max-h-40 overflow-y-auto"
+                style={{
+                  borderTop:
+                    "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+              >
+                {resultados.length === 0 ? (
+                  <p
+                    className="px-2 py-1.5 text-micro italic"
+                    style={{
+                      color: "color-mix(in srgb, var(--primary) 25%, transparent)",
+                    }}
+                  >
+                    Sin resultados.
+                  </p>
+                ) : (
+                  resultados.map((p) => (
+                    <button
+                      key={p.id}
+                      className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold transition-colors"
+                      style={{ color: "var(--primary)" }}
+                      type="button"
+                      onClick={() => agregar(p.id)}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.background =
+                          "color-mix(in srgb, var(--primary) 6%, transparent)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background =
+                          "transparent";
+                      }}
+                    >
+                      {p.img_url ? (
+                        <img
+                          alt=""
+                          className="w-4 h-4 rounded-full object-cover"
+                          src={p.img_url}
+                        />
+                      ) : (
+                        <User size={9} className="opacity-40" />
+                      )}
+                      {p.nombre}
+                    </button>
+                  ))
+                )}
+              </div>
+              <button
+                className="w-full text-center py-1 text-micro font-black uppercase tracking-widest transition-colors"
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+                  borderTop:
+                    "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+                type="button"
+                onClick={() => {
+                  setBuscando(false);
+                  setQuery("");
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EventoDetallePanel({
   evt,
   era,
@@ -1625,6 +1854,8 @@ function EventoDetallePanel({
   onSelectCapitulo,
   onSelectCancion,
   onSelectPersonaje,
+  personajesDisponibles,
+  onPersonajesChange,
 }: {
   evt: MundoTimelineEvent;
   era: EraMundo | null;
@@ -1655,6 +1886,17 @@ function EventoDetallePanel({
   onSelectCapitulo?: (capituloId: string, libroId: string) => void;
   onSelectCancion?: (cancionId: string) => void;
   onSelectPersonaje?: (personajeId: string) => void;
+  /** Lista completa de personajes disponibles (para resolver nombre/avatar
+   * de los ya vinculados y para el buscador de "añadir personaje" en
+   * eventos mundo/reino). */
+  personajesDisponibles?: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+  }[];
+  /** Guarda los personajes_ids de un evento mundo/reino — solo aplica
+   * cuando evt.source es "mundo" o "reino". */
+  onPersonajesChange?: (id: string, personajesIds: string[]) => void;
 }) {
   const editable = evt.source === "mundo" || evt.source === "reino";
   const editableEraPersonaje =
@@ -1953,6 +2195,25 @@ function EventoDetallePanel({
         }}
       />
 
+      {/* Personajes involucrados/vinculados — editable en mundo/reino,
+          solo lectura (ya vinculados desde el editor del libro) en
+          capítulos. No aplica a canciones/cumpleaños/eras de personaje. */}
+      {(editable || evt.source === "capitulo") &&
+        personajesDisponibles &&
+        personajesDisponibles.length > 0 && (
+          <PersonajesEventoPicker
+            editable={editable}
+            personajesIds={evt.personajes_ids ?? []}
+            personajesDisponibles={personajesDisponibles}
+            onChange={
+              editable
+                ? (ids) => onPersonajesChange?.(evt.id, ids)
+                : undefined
+            }
+            onSelectPersonaje={onSelectPersonaje}
+          />
+        )}
+
       {/* Rasgos — solo para era_personaje editable, chips con quitar + agregar */}
       {editableEraPersonaje && eraPersonaje && (
         <div className="flex flex-col gap-1.5">
@@ -2109,6 +2370,8 @@ function ListaEventosConMinimapa({
   onAddRasgoEraPersonaje,
   onRemoveRasgoEraPersonaje,
   onDeleteEraPersonaje,
+  personajesDisponibles,
+  onPersonajesChange,
 }: {
   allEvents: MundoTimelineEvent[];
   cal: CalCache | null;
@@ -2139,6 +2402,16 @@ function ListaEventosConMinimapa({
   onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onDeleteEraPersonaje?: (id: string) => void;
+  /** Lista completa de personajes (id/nombre/avatar) — para mostrar los
+   * personajes vinculados a un evento/capítulo y, en eventos mundo/reino,
+   * habilitar el buscador de "añadir personaje". */
+  personajesDisponibles?: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+  }[];
+  /** Guarda personajes_ids de un evento mundo/reino. */
+  onPersonajesChange?: (id: string, personajesIds: string[]) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -2531,6 +2804,8 @@ function ListaEventosConMinimapa({
           onSelectCapitulo={onSelectCapitulo}
           onSelectCancion={onSelectCancion}
           onSelectPersonaje={onSelectPersonaje}
+          personajesDisponibles={personajesDisponibles}
+          onPersonajesChange={onPersonajesChange}
         />
       )}
     </div>
@@ -2566,6 +2841,8 @@ function EventoDetalleFlotante({
   onSelectCapitulo,
   onSelectCancion,
   onSelectPersonaje,
+  personajesDisponibles,
+  onPersonajesChange,
 }: {
   anchorEl: HTMLElement | null;
   evt: MundoTimelineEvent;
@@ -2594,6 +2871,12 @@ function EventoDetalleFlotante({
   onSelectCapitulo?: (capituloId: string, libroId: string) => void;
   onSelectCancion?: (cancionId: string) => void;
   onSelectPersonaje?: (personajeId: string) => void;
+  personajesDisponibles?: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+  }[];
+  onPersonajesChange?: (id: string, personajesIds: string[]) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -2651,6 +2934,8 @@ function EventoDetalleFlotante({
           onSelectCapitulo={onSelectCapitulo}
           onSelectCancion={onSelectCancion}
           onSelectPersonaje={onSelectPersonaje}
+          personajesDisponibles={personajesDisponibles}
+          onPersonajesChange={onPersonajesChange}
         />
       </div>
     </div>,
@@ -3518,6 +3803,7 @@ export function PanelHistoriaMundo({
       reinoId?: string | null;
       reinoNombre?: string | null;
       source: string;
+      personajes_ids?: string[];
     }[]
   >([]);
 
@@ -3547,6 +3833,7 @@ export function PanelHistoriaMundo({
                 reinoId: e.reino_id ?? null,
                 reinoNombre: e.reino_id ? (reinoMap[e.reino_id] ?? null) : null,
                 source: e.source ?? "mundo",
+                personajes_ids: e.personajes_ids ?? [],
               })),
             );
           }
@@ -3558,7 +3845,7 @@ export function PanelHistoriaMundo({
         const { data } = await supabase
           .from("eventos_mundo")
           .select(
-            "id, titulo, descripcion, dia_absoluto, reino_id, source, reinos!reino_id(nombre)",
+            "id, titulo, descripcion, dia_absoluto, reino_id, source, personajes_ids, reinos!reino_id(nombre)",
           );
         if (!data || cancelled) return;
         setEventosMundo(
@@ -3572,6 +3859,7 @@ export function PanelHistoriaMundo({
               reinoId: e.reino_id ?? null,
               reinoNombre: reino?.nombre ?? null,
               source: e.source ?? "mundo",
+              personajes_ids: e.personajes_ids ?? [],
             };
           }),
         );
@@ -4095,6 +4383,35 @@ export function PanelHistoriaMundo({
     [],
   );
 
+  // Cambia los personajes vinculados (personajes_ids) de un evento
+  // mundo/reino — usado desde el panel flotante de detalle para
+  // añadir/quitar personajes que participan en el evento.
+  const handleEventoMundoPersonajesChange = useCallback(
+    async (id: string, personajesIds: string[]) => {
+      setEventosMundo((prev) =>
+        prev.map((e) =>
+          e.id === id ? { ...e, personajes_ids: personajesIds } : e,
+        ),
+      );
+      try {
+        await supabase
+          .from("eventos_mundo")
+          .update({ personajes_ids: personajesIds } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).eventos_mundo) {
+          const existing = await (db as any).eventos_mundo.get(id);
+          await (db as any).eventos_mundo.put({
+            ...(existing ?? { id }),
+            personajes_ids: personajesIds,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
   const handleEventoMundoFieldChange = useCallback(
     async (id: string, field: "titulo" | "descripcion", value: string) => {
       setEventosMundo((prev) =>
@@ -4191,6 +4508,7 @@ export function PanelHistoriaMundo({
           yearNum: dia,
           dia_absoluto: dia,
           capData: cap,
+          personajes_ids: cap.personajes_ids ?? [],
         });
       }
     }
@@ -4216,6 +4534,7 @@ export function PanelHistoriaMundo({
           reinoNombre: e.reinoNombre ?? undefined,
           yearNum: dia,
           dia_absoluto: dia,
+          personajes_ids: e.personajes_ids ?? [],
         });
       }
     }
@@ -4678,6 +4997,8 @@ export function PanelHistoriaMundo({
               onSelectCancion={onSelectCancion}
               onSelectCapitulo={onSelectCapitulo}
               onSelectPersonaje={onSelectPersonaje}
+              personajesDisponibles={personajesCumple}
+              onPersonajesChange={handleEventoMundoPersonajesChange}
             />
           )}
         </div>
