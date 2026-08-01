@@ -29,6 +29,7 @@ export interface Mensaje {
   created_at: string;
   editado: boolean;
   eliminado: boolean;
+  respuesta_a: string | null;
 }
 
 export interface MensajeReaccion {
@@ -224,6 +225,7 @@ export async function enviarMensaje(
   conversacionId: string,
   contenido: string,
   adjunto?: { url: string; tipo: "imagen" | "audio" | "archivo" },
+  respuestaAId?: string | null,
 ): Promise<Mensaje> {
   const {
     data: { user },
@@ -239,6 +241,7 @@ export async function enviarMensaje(
       contenido: contenido.trim() || null,
       adjunto_url: adjunto?.url ?? null,
       adjunto_tipo: adjunto?.tipo ?? null,
+      respuesta_a: respuestaAId ?? null,
     })
     .select("*")
     .single();
@@ -299,9 +302,11 @@ export async function editarMensaje(mensajeId: string, contenido: string): Promi
 }
 
 /**
- * Borrado "suave": no se elimina la fila (así no se rompe el hilo ni las
- * reacciones asociadas), se marca `eliminado = true` y se limpia el
- * contenido/adjunto. La UI pinta "Mensaje eliminado" para esos casos.
+ * Elimina el mensaje de verdad (DELETE), no un borrado suave. El mensaje
+ * desaparece por completo del hilo para todos — no queda ningún rastro tipo
+ * "Mensaje eliminado". Si algún otro mensaje lo citaba con "responder a",
+ * ese reply queda sin cita (respuesta_a se limpia solo por el ON DELETE SET
+ * NULL de la FK) en vez de romperse.
  */
 export async function eliminarMensaje(mensajeId: string): Promise<void> {
   const {
@@ -311,10 +316,7 @@ export async function eliminarMensaje(mensajeId: string): Promise<void> {
 
   const { error, count } = await supabase
     .from("mensajes")
-    .update(
-      { eliminado: true, contenido: null, adjunto_url: null, adjunto_tipo: null },
-      { count: "exact" },
-    )
+    .delete({ count: "exact" })
     .eq("id", mensajeId)
     .eq("remitente_id", user.id);
   if (error) throw error;
@@ -498,9 +500,9 @@ export function suscribirseAMensajes(
 }
 
 /**
- * Suscripción en vivo a ediciones/borrados de mensajes existentes de la
- * conversación (columnas `editado` / `eliminado`). Comparte el mismo canal
- * reference-counted que el resto.
+ * Suscripción en vivo a ediciones de mensajes existentes de la conversación
+ * (columna `editado`). Comparte el mismo canal reference-counted que el
+ * resto.
  */
 export function suscribirseAMensajesEditados(
   conversacionId: string,
@@ -516,6 +518,30 @@ export function suscribirseAMensajesEditados(
       filter: `conversacion_id=eq.${conversacionId}`,
     },
     (payload) => onMensajeActualizado(payload.new as Mensaje),
+  );
+  return () => _liberarCanalConversacion(conversacionId);
+}
+
+/**
+ * Suscripción en vivo a mensajes eliminados de la conversación. Como
+ * eliminarMensaje ahora borra la fila de verdad (no soft-delete), esto es
+ * lo que le avisa al otro participante que el mensaje desapareció, para
+ * sacarlo de su pantalla también en tiempo real.
+ */
+export function suscribirseAMensajesEliminados(
+  conversacionId: string,
+  onMensajeEliminado: (mensajeId: string) => void,
+): () => void {
+  const entrada = _obtenerCanalConversacion(conversacionId);
+  entrada.canal.on(
+    "postgres_changes",
+    {
+      event: "DELETE",
+      schema: "public",
+      table: "mensajes",
+      filter: `conversacion_id=eq.${conversacionId}`,
+    },
+    (payload) => onMensajeEliminado((payload.old as Mensaje).id),
   );
   return () => _liberarCanalConversacion(conversacionId);
 }

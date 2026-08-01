@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CheckCheck, Paperclip, Phone, Send, SmilePlus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Paperclip, Phone, Reply, Send, SmilePlus, Trash2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -23,6 +23,7 @@ import {
   suscribirseALecturas,
   suscribirseAMensajes,
   suscribirseAMensajesEditados,
+  suscribirseAMensajesEliminados,
   suscribirseAReacciones,
   type Mensaje,
   type MensajeReaccion,
@@ -35,6 +36,15 @@ import {
 } from "@/infra/call/presenceEngine";
 import { supabase } from "@/infra/supabase/supabase";
 import { useAuth } from "@/providers/AuthProvider";
+
+/** Texto corto para mostrar como preview de un mensaje citado (reply). */
+function previsualizarMensaje(m: Mensaje): string {
+  if (m.contenido) return m.contenido;
+  if (m.adjunto_tipo === "imagen") return "📷 Foto";
+  if (m.adjunto_tipo === "audio") return "🎵 Audio";
+  if (m.adjunto_tipo === "archivo") return "📎 Archivo";
+  return "Mensaje";
+}
 
 export default function DetalleConversacion() {
   const searchParams = useSearchParams();
@@ -70,6 +80,9 @@ export default function DetalleConversacion() {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [textoEdicion, setTextoEdicion] = useState("");
   const [menuAbiertoPara, setMenuAbiertoPara] = useState<string | null>(null);
+
+  // ── Responder a un mensaje (quote/reply) ────────────────────────────
+  const [respondiendoA, setRespondiendoA] = useState<Mensaje | null>(null);
 
   // ── Paginación "cargar mensajes anteriores" ─────────────────────────
   const [cargandoAnteriores, setCargandoAnteriores] = useState(false);
@@ -165,6 +178,20 @@ export default function DetalleConversacion() {
       setMensajes((prev) => prev.map((p) => (p.id === m.id ? m : p)));
     });
 
+    // Ahora que eliminar borra la fila de verdad (no soft-delete), esto es
+    // lo que le avisa al otro participante en tiempo real para sacar el
+    // mensaje de su pantalla también. Si algún mensaje lo estaba citando
+    // como reply, le limpiamos la cita en vez de dejarla colgada.
+    const desuscribirEliminados = suscribirseAMensajesEliminados(conversacionId, (mensajeId) => {
+      setMensajes((prev) =>
+        prev
+          .filter((p) => p.id !== mensajeId)
+          .map((p) => (p.respuesta_a === mensajeId ? { ...p, respuesta_a: null } : p)),
+      );
+      setReacciones((prev) => prev.filter((r) => r.mensaje_id !== mensajeId));
+      setRespondiendoA((prev) => (prev?.id === mensajeId ? null : prev));
+    });
+
     const desuscribirReacciones = suscribirseAReacciones(conversacionId, (evento, r) => {
       setReacciones((prev) => {
         if (evento === "INSERT") {
@@ -180,6 +207,7 @@ export default function DetalleConversacion() {
       mounted = false;
       desuscribirMensajes();
       desuscribirEditados();
+      desuscribirEliminados();
       desuscribirReacciones();
     };
   }, [conversacionId]);
@@ -445,14 +473,16 @@ export default function DetalleConversacion() {
     if (!texto.trim() || enviando) return;
     setEnviando(true);
     const contenido = texto;
+    const respuestaAId = respondiendoA?.id ?? null;
     setTexto("");
+    setRespondiendoA(null);
     if (escribiendoOffRef.current) {
       clearTimeout(escribiendoOffRef.current);
       escribiendoOffRef.current = null;
       void emitirEscribiendo(conversacionId, user.id, false);
     }
     try {
-      const enviado = await enviarMensaje(conversacionId, contenido);
+      const enviado = await enviarMensaje(conversacionId, contenido, undefined, respuestaAId);
       // Optimista: lo agregamos ya mismo al estado local en vez de esperar
       // a que vuelva por la suscripción realtime. Antes, quien enviaba
       // dependía 100% de ver su propio INSERT reflejado por Realtime — si
@@ -465,6 +495,7 @@ export default function DetalleConversacion() {
     } catch {
       setError("No se pudo enviar el mensaje.");
       setTexto(contenido);
+      setRespondiendoA(respondiendoA);
     } finally {
       setEnviando(false);
     }
@@ -480,6 +511,12 @@ export default function DetalleConversacion() {
     setMenuAbiertoPara(null);
   };
 
+  const handleResponder = (m: Mensaje) => {
+    setRespondiendoA(m);
+    setMenuAbiertoPara(null);
+    setPickerAbiertoPara(null);
+  };
+
   const handleConfirmarEdicion = async () => {
     if (!editandoId) return;
     try {
@@ -493,10 +530,22 @@ export default function DetalleConversacion() {
 
   const handleEliminarMensaje = async (mensajeId: string) => {
     setMenuAbiertoPara(null);
+    // Optimista: lo sacamos ya mismo de la pantalla propia (antes decía
+    // "Mensaje eliminado"; ahora directamente desaparece de la lista) en
+    // vez de esperar a que vuelva el evento DELETE por Realtime.
+    setMensajes((prev) =>
+      prev
+        .filter((p) => p.id !== mensajeId)
+        .map((p) => (p.respuesta_a === mensajeId ? { ...p, respuesta_a: null } : p)),
+    );
+    setRespondiendoA((prev) => (prev?.id === mensajeId ? null : prev));
     try {
       await eliminarMensaje(mensajeId);
     } catch (err: any) {
       setError(err?.message ?? "No se pudo eliminar el mensaje.");
+      // Si falló en el servidor, refrescamos desde la fuente de verdad en
+      // vez de intentar reconstruir el mensaje a mano.
+      void cargarMensajes(conversacionId).then(setMensajes);
     }
   };
 
@@ -644,6 +693,9 @@ export default function DetalleConversacion() {
               {},
             );
             const enEdicion = editandoId === m.id;
+            const mensajeCitado = m.respuesta_a
+              ? mensajes.find((c) => c.id === m.respuesta_a) ?? null
+              : null;
 
             return (
               <div key={m.id} className={`flex flex-col ${esMio ? "items-end" : "items-start"} group`}>
@@ -656,86 +708,108 @@ export default function DetalleConversacion() {
                     color: esMio ? "var(--btn-text)" : "var(--foreground)",
                   }}
                 >
-                  {m.eliminado ? (
-                    <p className="text-sm font-medium italic opacity-60">Mensaje eliminado</p>
-                  ) : (
-                    <>
-                      {m.adjunto_tipo === "imagen" && m.adjunto_url && (
-                        <div className="w-48 rounded-[var(--radius-btn)] overflow-hidden mb-1">
-                          <SmartImage alt="Adjunto" className="w-full h-full" src={m.adjunto_url} />
-                        </div>
-                      )}
-                      {m.adjunto_tipo === "audio" && m.adjunto_url && (
-                        <audio className="mb-1" controls src={m.adjunto_url} />
-                      )}
-                      {m.adjunto_tipo === "archivo" && m.adjunto_url && (
-                        <a
-                          className="underline text-sm font-bold block mb-1"
-                          href={m.adjunto_url}
-                          rel="noopener noreferrer"
-                          target="_blank"
-                        >
-                          📎 Archivo adjunto
-                        </a>
-                      )}
-
-                      {enEdicion ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            autoFocus
-                            className="flex-1 bg-transparent outline-none text-sm font-medium border-b border-current/30"
-                            value={textoEdicion}
-                            onChange={(e) => setTextoEdicion(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") void handleConfirmarEdicion();
-                              if (e.key === "Escape") setEditandoId(null);
-                            }}
-                          />
-                          <button
-                            className="text-micro font-black underline flex-shrink-0"
-                            onClick={() => void handleConfirmarEdicion()}
-                          >
-                            Listo
-                          </button>
-                        </div>
-                      ) : (
-                        m.contenido && (
-                          <p className="text-sm font-medium">
-                            {m.contenido}
-                            {m.editado && (
-                              <span className="text-micro italic opacity-60 ml-1">(editado)</span>
-                            )}
-                          </p>
-                        )
-                      )}
-                    </>
+                  {/* Preview del mensaje citado, si este mensaje es una
+                      respuesta a otro. Si el citado ya no está entre los
+                      mensajes cargados (se borró, o quedó fuera de la
+                      página actual), simplemente no se muestra nada acá. */}
+                  {mensajeCitado && (
+                    <div
+                      className="mb-1.5 px-2 py-1 rounded text-micro"
+                      style={{
+                        background: "color-mix(in srgb, var(--bg-main) 35%, transparent)",
+                        borderLeft: "2px solid currentColor",
+                        opacity: 0.85,
+                      }}
+                    >
+                      <p className="font-black opacity-80">
+                        {mensajeCitado.remitente_id === user.id
+                          ? "Vos"
+                          : (otroParticipante?.username ?? "Usuario")}
+                      </p>
+                      <p className="truncate opacity-70">{previsualizarMensaje(mensajeCitado)}</p>
+                    </div>
                   )}
 
-                  {/* Menú de opciones (editar/eliminar/reaccionar), solo visible al hover/tap */}
-                  {!m.eliminado && (
-                    <div
-                      className={`absolute top-1 ${esMio ? "-left-16" : "-right-16"} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1`}
+                  {m.adjunto_tipo === "imagen" && m.adjunto_url && (
+                    <div className="w-48 rounded-[var(--radius-btn)] overflow-hidden mb-1">
+                      <SmartImage alt="Adjunto" className="w-full h-full" src={m.adjunto_url} />
+                    </div>
+                  )}
+                  {m.adjunto_tipo === "audio" && m.adjunto_url && (
+                    <audio className="mb-1" controls src={m.adjunto_url} />
+                  )}
+                  {m.adjunto_tipo === "archivo" && m.adjunto_url && (
+                    <a
+                      className="underline text-sm font-bold block mb-1"
+                      href={m.adjunto_url}
+                      rel="noopener noreferrer"
+                      target="_blank"
                     >
+                      📎 Archivo adjunto
+                    </a>
+                  )}
+
+                  {enEdicion ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        className="flex-1 bg-transparent outline-none text-sm font-medium border-b border-current/30"
+                        value={textoEdicion}
+                        onChange={(e) => setTextoEdicion(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void handleConfirmarEdicion();
+                          if (e.key === "Escape") setEditandoId(null);
+                        }}
+                      />
                       <button
-                        aria-label="Reaccionar"
-                        onClick={() => setPickerAbiertoPara(pickerAbiertoPara === m.id ? null : m.id)}
+                        className="text-micro font-black underline flex-shrink-0"
+                        onClick={() => void handleConfirmarEdicion()}
+                      >
+                        Listo
+                      </button>
+                    </div>
+                  ) : (
+                    m.contenido && (
+                      <p className="text-sm font-medium">
+                        {m.contenido}
+                        {m.editado && (
+                          <span className="text-micro italic opacity-60 ml-1">(editado)</span>
+                        )}
+                      </p>
+                    )
+                  )}
+
+                  {/* Menú de opciones (responder/reaccionar/eliminar), solo visible al hover/tap */}
+                  <div
+                    className={`absolute top-1 ${esMio ? "-left-24" : "-right-24"} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1`}
+                  >
+                    <button
+                      aria-label="Responder"
+                      onClick={() => handleResponder(m)}
+                      className="p-1 rounded-full"
+                      style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
+                    >
+                      <Reply className="text-primary/60" size={13} />
+                    </button>
+                    <button
+                      aria-label="Reaccionar"
+                      onClick={() => setPickerAbiertoPara(pickerAbiertoPara === m.id ? null : m.id)}
+                      className="p-1 rounded-full"
+                      style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
+                    >
+                      <SmilePlus className="text-primary/60" size={13} />
+                    </button>
+                    {esMio && (
+                      <button
+                        aria-label="Más opciones"
+                        onClick={() => setMenuAbiertoPara(menuAbiertoPara === m.id ? null : m.id)}
                         className="p-1 rounded-full"
                         style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
                       >
-                        <SmilePlus className="text-primary/60" size={13} />
+                        <Trash2 className="text-primary/60" size={13} />
                       </button>
-                      {esMio && (
-                        <button
-                          aria-label="Más opciones"
-                          onClick={() => setMenuAbiertoPara(menuAbiertoPara === m.id ? null : m.id)}
-                          className="p-1 rounded-full"
-                          style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
-                        >
-                          <Trash2 className="text-primary/60" size={13} />
-                        </button>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Picker de emojis rápidos */}
                   {pickerAbiertoPara === m.id && (
@@ -859,6 +933,32 @@ export default function DetalleConversacion() {
         </div>
       )}
 
+      {/* ── Preview de "respondiendo a…" arriba del input ── */}
+      {respondiendoA && (
+        <div
+          className="flex items-center gap-2 px-4 py-2 mx-4 mt-2 rounded-[var(--radius-btn)]"
+          style={{
+            background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+            borderLeft: "3px solid var(--primary)",
+          }}
+        >
+          <Reply className="text-primary/50 flex-shrink-0" size={14} />
+          <div className="flex-1 min-w-0">
+            <p className="text-micro font-black text-primary/70 uppercase tracking-wide">
+              {respondiendoA.remitente_id === user.id
+                ? "Vos"
+                : (otroParticipante?.username ?? "Usuario")}
+            </p>
+            <p className="text-micro text-primary/50 truncate italic">
+              {previsualizarMensaje(respondiendoA)}
+            </p>
+          </div>
+          <button onClick={() => setRespondiendoA(null)} aria-label="Cancelar respuesta">
+            <X className="text-primary/40" size={14} />
+          </button>
+        </div>
+      )}
+
       {/* ── Input ── */}
       <div
         className="flex items-center gap-2 px-4 py-3"
@@ -881,8 +981,9 @@ export default function DetalleConversacion() {
           />
         </button>
         <input
+          autoFocus={!!respondiendoA}
           className="flex-1 px-4 py-2.5 rounded-[var(--radius-btn)] bg-transparent outline-none text-sm font-medium text-primary placeholder:text-primary/30"
-          placeholder="Escribí un mensaje…"
+          placeholder={respondiendoA ? "Escribí tu respuesta…" : "Escribí un mensaje…"}
           style={{
             background: "color-mix(in srgb, var(--primary) 5%, transparent)",
           }}
@@ -892,6 +993,9 @@ export default function DetalleConversacion() {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               void handleEnviar();
+            }
+            if (e.key === "Escape" && respondiendoA) {
+              setRespondiendoA(null);
             }
           }}
         />
