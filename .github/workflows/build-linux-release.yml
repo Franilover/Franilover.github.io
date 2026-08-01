@@ -133,21 +133,6 @@ jobs:
           # Igual que en Android: activa output:"export" en next.config.mjs
           # y las rutas estáticas en vez de las [slug] dinámicas.
           NEXT_PUBLIC_BUILD_TARGET: tauri
-          # linuxdeploy-plugin-gtk excluye a propósito libEGL/libGL/libgbm
-          # del bundle (son libs "core" del sistema gráfico, atadas al
-          # driver real de la GPU del usuario — no tiene sentido congelarlas).
-          # Pero SÍ empaqueta libepoxy (la capa que WebKit usa para resolver
-          # los símbolos de GL/EGL en runtime), que queda con la versión de
-          # Ubuntu 22.04 del runner de build. Bug real que tuvimos: esa
-          # libepoxy vieja + el libEGL nuevo del sistema del usuario (ej.
-          # Mesa 26.x en Arch) son incompatibles, y WebKit fallaba con
-          # "Could not create default EGL display: EGL_BAD_PARAMETER" — sin
-          # importar qué combinación de variables de entorno (WEBKIT_*,
-          # GDK_BACKEND, etc.) se probara, porque el problema estaba en qué
-          # .so se cargaba, no en la configuración de arranque.
-          # Excluímos libepoxy también, así toda la cadena EGL/GL/epoxy sale
-          # homogénea del sistema del usuario en vez de mezclar versiones.
-          EXCLUDE_LIBS: "libepoxy.so*"
         # Sin --bundles se generan todos los targets que soporte el runner
         # (según tauri.conf.json bundle.targets: "all"); en Linux eso es
         # AppImage + deb. Se deja explícito para no depender de que alguien
@@ -176,14 +161,51 @@ jobs:
           echo "appimage=$APPIMAGE_PATH" >> "$GITHUB_OUTPUT"
           echo "deb=$DEB_PATH" >> "$GITHUB_OUTPUT"
 
-      - name: Verificar que libepoxy NO quedó empaquetada en el AppImage
-        # Confirmado con strace en un sistema real (Arch/Mesa 26.x): si
-        # libepoxy queda empaquetada (vieja, del runner Ubuntu 22.04) pero
-        # libEGL/libGL/libgbm se resuelven del sistema del usuario (más
-        # nuevas), WebKit falla con "Could not create default EGL display:
-        # EGL_BAD_PARAMETER" al abrir la app — ver EXCLUDE_LIBS en el paso
-        # de build. Este chequeo detecta en CI si esa exclusión deja de
-        # aplicarse (ej. por un cambio de versión de linuxdeploy).
+      - name: Quitar libepoxy del AppImage y reempaquetar
+        # Confirmado con strace en un sistema real (Arch/Mesa 26.x): WebKit
+        # carga libepoxy DESDE el AppImage (vieja, del runner Ubuntu 22.04)
+        # pero libEGL/libGL/libgbm los resuelve del sistema del usuario (más
+        # nuevos — linuxdeploy-plugin-gtk excluye esos tres a propósito, son
+        # libs "core" atadas al driver real de la GPU). La mezcla de una
+        # libepoxy vieja con un libEGL nuevo rompe con "Could not create
+        # default EGL display: EGL_BAD_PARAMETER" al abrir la app — pasaba
+        # sin importar qué variables de entorno (WEBKIT_*, GDK_BACKEND,
+        # etc.) se probaran, porque el problema es qué .so se carga, no la
+        # configuración de arranque.
+        #
+        # Tauri arma el AppImage con su propio build_appimage.sh (que
+        # envuelve a linuxdeploy) y no expone ninguna forma de pasarle
+        # --exclude-library ni una env var equivalente — así que el único
+        # lugar donde se puede sacar libepoxy es post-build, reempaquetando
+        # el .AppImage ya generado a mano con appimagetool.
+        run: |
+          APPIMAGE_PATH="${{ steps.artefactos.outputs.appimage }}"
+          chmod +x "$APPIMAGE_PATH"
+
+          "$APPIMAGE_PATH" --appimage-extract >/dev/null
+
+          if [ ! -f squashfs-root/usr/lib/libepoxy.so.0 ]; then
+            echo "::warning::libepoxy.so.0 no estaba en el AppImage — nada que sacar, puede que linuxdeploy haya cambiado de comportamiento."
+          else
+            echo "Borrando libepoxy del bundle (se resolverá del sistema del usuario en runtime):"
+            find squashfs-root/usr/lib -maxdepth 1 -iname "libepoxy.so*" -print -delete
+          fi
+
+          echo "Descargando appimagetool para reempaquetar..."
+          wget -q "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool.AppImage
+          chmod +x appimagetool.AppImage
+
+          rm -f "$APPIMAGE_PATH"
+          ./appimagetool.AppImage --appimage-extract-and-run squashfs-root "$APPIMAGE_PATH"
+
+          rm -rf squashfs-root appimagetool.AppImage
+
+          echo "AppImage reempaquetado: $APPIMAGE_PATH ($(du -h "$APPIMAGE_PATH" | cut -f1))"
+
+      - name: Verificar que libepoxy NO quedó en el AppImage final
+        # Chequeo de sanidad post-reempaquetado, para no descubrir en
+        # producción si el paso de arriba deja de funcionar (ej. cambia el
+        # nombre interno del archivo, o appimagetool cambia de formato).
         run: |
           APPIMAGE_PATH="${{ steps.artefactos.outputs.appimage }}"
           chmod +x "$APPIMAGE_PATH"
@@ -193,11 +215,11 @@ jobs:
           rm -rf squashfs-root
 
           if [ -n "$ENCONTRADA" ]; then
-            echo "::error::libepoxy quedó empaquetada en el AppImage ($ENCONTRADA) — revisar que EXCLUDE_LIBS siga aplicándose en el paso de build."
+            echo "::error::libepoxy sigue en el AppImage final ($ENCONTRADA) — el paso de reempaquetado no funcionó como se esperaba."
             exit 1
           fi
 
-          echo "OK: libepoxy no está empaquetada, se resolverá del sistema del usuario."
+          echo "OK: libepoxy no está en el AppImage final, se resolverá del sistema del usuario."
 
       - name: Crear el Release (draft) y subir los artefactos
         # draft: true — igual que en build-android: queda oculto hasta que
