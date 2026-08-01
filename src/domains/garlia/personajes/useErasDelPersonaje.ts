@@ -23,6 +23,8 @@ export type Era = {
   label: string;
   rasgos: string[];
   notas: string;
+  img_url: string | null;
+  img_cuerpo_url: string | null;
   _saving?: boolean;
 };
 
@@ -47,6 +49,8 @@ export function useErasDelPersonaje(
     label: e.label ?? "",
     rasgos: e.rasgos ?? [],
     notas: e.notas ?? "",
+    img_url: e.img_url ?? null,
+    img_cuerpo_url: e.img_cuerpo_url ?? null,
   });
 
   const updateEra = (id: string, patch: Partial<Era>) =>
@@ -83,7 +87,7 @@ export function useErasDelPersonaje(
       try {
         const { data } = await (supabase as any)
           .from("personaje_eras")
-          .select("id, momento, label, rasgos, notas")
+          .select("id, momento, label, rasgos, notas, img_url, img_cuerpo_url")
           .eq("personaje_id", personajeId)
           .order("momento");
         if (data) {
@@ -121,7 +125,7 @@ export function useErasDelPersonaje(
         rasgos: [],
         notas: "",
       })
-      .select("id, momento, label, rasgos, notas")
+      .select("id, momento, label, rasgos, notas, img_url, img_cuerpo_url")
       .single();
     if (!error && data) {
       const era: Era = {
@@ -130,6 +134,8 @@ export function useErasDelPersonaje(
         label: data.label ?? "",
         rasgos: [],
         notas: "",
+        img_url: null,
+        img_cuerpo_url: null,
       };
       setEras((prev) =>
         [...prev, era].sort((a, b) => a.momento - b.momento),
@@ -200,6 +206,34 @@ export function useErasDelPersonaje(
         .eq("id", era.id);
       updateEra(era.id, { _saving: false });
     }, 800);
+  };
+
+  // Cambia la imagen (cara o cuerpo) propia de una era. `url` vacío/null
+  // borra la imagen propia de la era (vuelve a depender del fallback del
+  // personaje base en la UI).
+  const changeImagen = async (
+    era: Era,
+    campo: "img_url" | "img_cuerpo_url",
+    url: string | null,
+  ) => {
+    const valor = url && url.trim() ? url : null;
+    updateEra(era.id, { [campo]: valor, _saving: true });
+    await (supabase as any)
+      .from("personaje_eras")
+      .update({ [campo]: valor })
+      .eq("id", era.id);
+    try {
+      if (db) {
+        const existing = await (db as any).personaje_eras?.get(era.id);
+        if (existing) {
+          await (db as any).personaje_eras?.put({
+            ...existing,
+            [campo]: valor,
+          });
+        }
+      }
+    } catch {}
+    updateEra(era.id, { _saving: false });
   };
 
   // Cambia el día absoluto de la era (se usa tanto al editar la fecha
@@ -293,6 +327,7 @@ export function useErasDelPersonaje(
     changeNotas,
     changeLabel,
     changeMomento,
+    changeImagen,
     reajustarErasPorNuevaFecha,
   };
 }

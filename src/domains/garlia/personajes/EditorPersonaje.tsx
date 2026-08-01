@@ -450,6 +450,8 @@ export function FormularioPersonaje({
                 {/* Línea de tiempo (reemplaza la descripción general) */}
                 <PersonajeLineaDeTiempo
                   fechaNacimiento={(form as any).fecha_nacimiento ?? null}
+                  imgCuerpoUrlPersonaje={form.img_cuerpo_url ?? null}
+                  imgUrlPersonaje={form.img_url ?? null}
                   personajeId={form.id}
                   onFechaNacimientoChange={onFechaNacimientoChange}
                 />

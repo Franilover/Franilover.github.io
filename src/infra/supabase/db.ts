@@ -360,6 +360,8 @@ export interface PersonajeEra {
   label?: string | null;
   rasgos?: string[] | null;
   notas?: string | null;
+  img_url?: string | null;
+  img_cuerpo_url?: string | null;
   created_at?: string;
   updated_at?: string;
 }
