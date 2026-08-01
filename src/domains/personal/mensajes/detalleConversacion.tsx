@@ -308,10 +308,72 @@ export default function DetalleConversacion() {
     // Si el cambio vino de "cargar anteriores", el otro efecto ya se encarga
     // de reposicionar el scroll — no lo pisamos saltando al fondo.
     if (scrollHeightPrevioRef.current != null) return;
-    const comportamiento: ScrollBehavior = scrolleoInicialHechoRef.current ? "smooth" : "auto";
-    scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: comportamiento });
-    scrolleoInicialHechoRef.current = true;
+
+    const esInicial = !scrolleoInicialHechoRef.current;
+    const irAlFondo = (comportamiento: ScrollBehavior) => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: comportamiento });
+    };
+
+    if (esInicial) {
+      // El contenedor de mensajes recién se montó en este mismo commit (antes
+      // se mostraba <Loading /> en su lugar), así que el navegador puede no
+      // haber terminado el layout todavía — hacer scrollTo ya mismo a veces
+      // calcula contra un scrollHeight incompleto y el chat queda "a medias"
+      // arriba, obligando a scrollear a mano. Un solo rAF no alcanza porque
+      // el layout puede seguir cambiando por imágenes (avatares, adjuntos)
+      // que todavía no bajaron su primer frame; usamos dos rAF encadenados
+      // para asegurarnos de correr después de un paint real ya estabilizado.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => irAlFondo("auto"));
+      });
+      scrolleoInicialHechoRef.current = true;
+    } else {
+      // Mensajes nuevos con el chat ya abierto: scroll suave, sin esperar
+      // frames extra (no hay salto de "recién montado" que compensar).
+      irAlFondo("smooth");
+    }
   }, [mensajes.length]);
+
+  // Red de seguridad adicional para el caso más común de layout tardío:
+  // avatares y adjuntos de imagen que terminan de cargar después del salto
+  // inicial y empujan el contenido, dejando el scroll corto. Mientras seguimos
+  // en la carga inicial de esta conversación, cualquier <img> que termine de
+  // cargar dentro del contenedor vuelve a fijar el scroll al fondo.
+  useEffect(() => {
+    const contenedor = scrollRef.current;
+    if (!contenedor || mensajes.length === 0) return;
+
+    let yaLlego = false;
+    const reforzarScroll = () => {
+      if (yaLlego || !contenedor) return;
+      // Si el usuario ya scrolleó manualmente hacia arriba, no lo interrumpimos.
+      const distanciaAlFondo =
+        contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight;
+      if (distanciaAlFondo > 150) return;
+      contenedor.scrollTop = contenedor.scrollHeight;
+    };
+    const marcarLlegada = () => {
+      yaLlego = true;
+    };
+
+    const imgs = Array.from(contenedor.querySelectorAll("img"));
+    imgs.forEach((img) => {
+      if (!img.complete) img.addEventListener("load", reforzarScroll);
+    });
+    // Si el usuario scrollea a mano mientras las imágenes siguen cargando,
+    // dejamos de "pelearle" el scroll.
+    contenedor.addEventListener("wheel", marcarLlegada, { passive: true });
+    contenedor.addEventListener("touchmove", marcarLlegada, { passive: true });
+
+    return () => {
+      imgs.forEach((img) => img.removeEventListener("load", reforzarScroll));
+      contenedor.removeEventListener("wheel", marcarLlegada);
+      contenedor.removeEventListener("touchmove", marcarLlegada);
+    };
+    // Solo re-evaluamos cuando cambia la conversación o llega un mensaje
+    // nuevo (nuevo adjunto potencial) — no en cada re-render por otros estados.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversacionId, mensajes.length]);
 
   // ── Indicador "escribiendo…" del otro participante ──────────────────────
   useEffect(() => {
