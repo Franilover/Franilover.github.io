@@ -1355,6 +1355,154 @@ function ModalEra({
   );
 }
 
+// ── Generador del documento markdown de "Historia completa" ─────────────────
+// Convierte allEvents (ya filtrados/ordenados por dia_absoluto) en un
+// documento markdown vertical, agrupado por Era (H1) → Año (H2) →
+// evento/capítulo/canción/cumpleaños/era-de-personaje (H3 con el reino
+// como sufijo). Pensado para leerse de corrido, no para editarse — se
+// muestra en RichEditor con editable={false}.
+function generarMarkdownHistoriaCompleta(
+  allEvents: MundoTimelineEvent[],
+  cal: CalCache | null,
+): string {
+  const diasAnioLista =
+    cal?.estaciones?.reduce(
+      (s: number, e: any) => s + (e.duracion_dias ?? 0),
+      0,
+    ) || 365;
+
+  const getEraEvt = (diaAbs: number | null | undefined) =>
+    diaAbs != null
+      ? ((cal?.eras ?? []).find(
+          (era: any) =>
+            era.anio_inicio <= Math.floor(diaAbs / diasAnioLista) &&
+            (era.anio_fin == null ||
+              era.anio_fin >= Math.floor(diaAbs / diasAnioLista)),
+        ) ?? null)
+      : null;
+
+  const conFecha = allEvents.filter((e) => e.dia_absoluto != null);
+  if (conFecha.length === 0) {
+    return "_Sin eventos con fecha asignada todavía._";
+  }
+
+  const lineas: string[] = [];
+  let eraActualId: string | null | undefined = undefined; // undefined = todavía no se emitió ninguna
+  let anioActual: number | null | undefined = undefined;
+
+  for (const evt of conFecha) {
+    const dia = evt.dia_absoluto as number;
+    const anio = Math.floor(dia / diasAnioLista);
+    const eraEvt = getEraEvt(dia);
+    const eraId = eraEvt?.id ?? null;
+
+    // H1 — nombre de la era (o "Sin era" si el año no cae en ninguna)
+    if (eraId !== eraActualId) {
+      eraActualId = eraId;
+      anioActual = undefined; // fuerza a reemitir el año al cambiar de era
+      lineas.push(`# ${eraEvt?.nombre ?? "Sin era"}`);
+    }
+
+    // H2 — año
+    if (anio !== anioActual) {
+      anioActual = anio;
+      lineas.push(`## Año ${anio}`);
+    }
+
+    // H3 — título del evento, con el reino como sufijo cuando aplica
+    const titulo = evt.title?.trim() || "Sin título";
+    const sufijoReino = evt.reinoNombre ? ` — ${evt.reinoNombre}` : "";
+    lineas.push(`### ${titulo}${sufijoReino}`);
+
+    // Cuerpo — descripción/notas si las hay, en texto plano debajo del H3
+    const cuerpo = (evt.description ?? "").trim();
+    if (cuerpo) lineas.push(cuerpo);
+  }
+
+  return lineas.join("\n\n");
+}
+
+// ── Modal: "Historia completa" — línea de tiempo como documento de lectura ──
+// Muestra generarMarkdownHistoriaCompleta() en un RichEditor de solo
+// lectura (editable={false}), para leer la historia del mundo de corrido
+// en vez de navegar tarjeta por tarjeta.
+function ModalHistoriaCompleta({
+  markdown,
+  onClose,
+}: {
+  markdown: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 55%, transparent)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="rounded-2xl border shadow-2xl w-full flex flex-col"
+        style={{
+          maxWidth: 720,
+          maxHeight: "88vh",
+          background: "var(--bg-main)",
+          borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="shrink-0 flex items-center justify-between px-4 py-3 border-b"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+          }}
+        >
+          <span
+            className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em]"
+            style={{ color: "var(--primary)" }}
+          >
+            <BookOpen size={11} />
+            Historia completa
+          </span>
+          <button
+            className="flex items-center justify-center w-6 h-6 rounded-lg border transition-all"
+            style={{
+              borderColor:
+                "color-mix(in srgb, var(--primary) 12%, transparent)",
+              color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+            }}
+            type="button"
+            onClick={onClose}
+          >
+            <X size={10} />
+          </button>
+        </div>
+
+        {/* Documento — RichEditor de solo lectura */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+          <RichEditor
+            editable={false}
+            minHeight={200}
+            value={markdown}
+            onChange={() => {}}
+          />
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ── Modal: gestión completa de todas las eras ────────────────────────────────
 function ModalGestionEras({
   eras,
@@ -1768,18 +1916,16 @@ function PersonajesEventoPicker({
         <div className="flex flex-col gap-1">
           {!buscando ? (
             <button
-              className="self-start flex items-center gap-1 px-2 py-1 rounded-md text-micro font-bold transition-all"
+              className="self-start flex items-center justify-center w-5 h-5 rounded-md transition-all opacity-50 hover:opacity-100"
               style={{
-                background: "color-mix(in srgb, var(--accent) 8%, transparent)",
-                color: "var(--accent)",
-                border:
-                  "1px solid color-mix(in srgb, var(--accent) 18%, transparent)",
+                color:
+                  "color-mix(in srgb, var(--primary) 45%, transparent)",
               }}
+              title="Añadir personaje"
               type="button"
               onClick={() => setBuscando(true)}
             >
-              <Plus size={9} />
-              Añadir personaje
+              <Plus size={11} />
             </button>
           ) : (
             <div
@@ -4590,6 +4736,7 @@ export function PanelHistoriaMundo({
   const [erasLocal, setErasLocal] = useState<any[]>([]);
   const [eraModal, setEraModal] = useState<null | "new" | any>(null);
   const [showGestionEras, setShowGestionEras] = useState(false);
+  const [showHistoriaCompleta, setShowHistoriaCompleta] = useState(false);
 
   // Sincronizar erasLocal con cal.eras cuando el hook carga
   useEffect(() => {
@@ -5050,6 +5197,18 @@ export function PanelHistoriaMundo({
     [reinos, capsReinosIds, eventosMundo, cancionesTimeline],
   );
 
+  // Documento markdown de "Historia completa" — solo se recalcula cuando
+  // el modal está abierto (evita rehacer el join de string en cada
+  // render mientras el usuario solo navega la línea de tiempo normal).
+  const markdownHistoriaCompleta = useMemo(
+    () =>
+      showHistoriaCompleta
+        ? generarMarkdownHistoriaCompleta(allEvents, cal)
+        : "",
+    [showHistoriaCompleta, allEvents, cal],
+  );
+
+
   // Días por año del calendario actual — usado para mostrar "Año N" en la
   // barra lateral, mismo cálculo que diasAnioLista dentro de
   // ListaEventosConMinimapa.
@@ -5284,6 +5443,22 @@ export function PanelHistoriaMundo({
               <Plus size={9} /> Evento
             </button>
 
+            {/* Historia completa — toda la línea de tiempo como documento
+                de lectura vertical (RichEditor de solo lectura). */}
+            <button
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest transition-all"
+              style={{
+                color: "color-mix(in srgb, var(--primary) 50%, transparent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--primary) 14%, transparent)",
+              }}
+              title="Ver la historia completa como documento"
+              type="button"
+              onClick={() => setShowHistoriaCompleta(true)}
+            >
+              <BookOpen size={9} /> Historia
+            </button>
+
           </div>
         </div>
       </div>
@@ -5296,6 +5471,14 @@ export function PanelHistoriaMundo({
           reinos={reinos}
           onClose={() => setShowNuevoEvento(false)}
           onCrear={handleCrearEvento}
+        />
+      )}
+
+      {/* Modal: historia completa como documento de lectura */}
+      {showHistoriaCompleta && (
+        <ModalHistoriaCompleta
+          markdown={markdownHistoriaCompleta}
+          onClose={() => setShowHistoriaCompleta(false)}
         />
       )}
 
