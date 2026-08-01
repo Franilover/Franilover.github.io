@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CheckCheck, Paperclip, Phone, Reply, Send, SmilePlus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Paperclip, Pencil, Phone, Plus, Reply, Send, SmilePlus, Trash2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -46,6 +46,116 @@ function previsualizarMensaje(m: Mensaje): string {
   return "Mensaje";
 }
 
+/** Lista de emojis por categoría para el selector completo (botón "+"). */
+const CATEGORIAS_EMOJI: { nombre: string; emojis: string[] }[] = [
+  {
+    nombre: "Caritas",
+    emojis: [
+      "😀", "😁", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😍",
+      "🥰", "😘", "😋", "😜", "🤪", "🤔", "🤨", "😐", "😑", "😶",
+      "🙄", "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "🥱",
+      "😴", "😌", "😛", "😝", "😒", "😓", "😔", "😕", "🙁", "😖",
+      "😞", "😟", "😤", "😢", "😭", "😦", "😧", "😨", "😩", "🤯",
+      "😬", "😰", "😱", "🥵", "🥶", "😳", "🤗", "🤭", "🫡", "🤫",
+    ],
+  },
+  {
+    nombre: "Gestos",
+    emojis: [
+      "👍", "👎", "👌", "🤌", "✌️", "🤞", "🤟", "🤘", "👏", "🙌",
+      "👐", "🤲", "🙏", "💪", "🫶", "👋", "🤝", "✍️", "💅", "👊",
+    ],
+  },
+  {
+    nombre: "Corazones",
+    emojis: [
+      "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔",
+      "❤️‍🔥", "❤️‍🩹", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟",
+    ],
+  },
+  {
+    nombre: "Animales",
+    emojis: [
+      "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯",
+      "🦁", "🐮", "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🦆", "🦋",
+    ],
+  },
+  {
+    nombre: "Comida",
+    emojis: [
+      "🍎", "🍕", "🍔", "🍟", "🌭", "🍿", "🍩", "🍪", "🎂", "🍰",
+      "🍫", "🍬", "🍭", "☕", "🍺", "🍷", "🥂", "🍾", "🍉", "🍇",
+    ],
+  },
+  {
+    nombre: "Actividades",
+    emojis: [
+      "⚽", "🏀", "🎉", "🎊", "🎈", "🎁", "🏆", "🎮", "🎲", "🎸",
+      "🎨", "📸", "🔥", "✨", "⭐", "🌟", "💯", "✅", "❌", "⚡",
+    ],
+  },
+];
+
+/**
+ * Selector completo de emojis, agrupado por categorías, para cuando los 6
+ * emojis rápidos no alcanzan. Se abre desde el botón "+" del picker rápido.
+ * No depende de ninguna librería externa: es una lista curada suficiente
+ * para reacciones de chat (no un input de texto con emojis arbitrarios).
+ */
+function SelectorEmojisCompleto({
+  alineacion,
+  onSeleccionar,
+  onCerrar,
+}: {
+  alineacion: "left" | "right";
+  onSeleccionar: (emoji: string) => void;
+  onCerrar: () => void;
+}) {
+  return (
+    <div
+      data-mensaje-burbuja
+      className={`absolute top-0 ${alineacion === "right" ? "right-0" : "left-0"} z-20 rounded-[var(--radius-btn)] overflow-hidden`}
+      style={{
+        width: 260,
+        maxHeight: 280,
+        background: "var(--bg-main)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+        border: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
+      }}
+    >
+      <div
+        className="flex items-center justify-between px-3 py-2"
+        style={{ borderBottom: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)" }}
+      >
+        <p className="text-micro font-black uppercase tracking-wide text-primary/60">Reaccionar</p>
+        <button onClick={onCerrar} aria-label="Cerrar selector de emojis">
+          <X className="text-primary/40" size={13} />
+        </button>
+      </div>
+      <div className="overflow-y-auto px-2 py-2" style={{ maxHeight: 230 }}>
+        {CATEGORIAS_EMOJI.map((cat) => (
+          <div key={cat.nombre} className="mb-2">
+            <p className="text-micro font-bold text-primary/40 uppercase tracking-wide mb-1 px-1">
+              {cat.nombre}
+            </p>
+            <div className="grid grid-cols-8 gap-0.5">
+              {cat.emojis.map((emoji) => (
+                <button
+                  key={emoji}
+                  className="text-base leading-none py-1 rounded hover:scale-125 transition-transform"
+                  onClick={() => onSeleccionar(emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DetalleConversacion() {
   const searchParams = useSearchParams();
   // El id real de la conversación viaja siempre como ?id=..., leído con
@@ -74,12 +184,49 @@ export default function DetalleConversacion() {
   // ── Reacciones ───────────────────────────────────────────────────────
   const [reacciones, setReacciones] = useState<MensajeReaccion[]>([]);
   const [pickerAbiertoPara, setPickerAbiertoPara] = useState<string | null>(null);
+  const [selectorCompletoAbiertoPara, setSelectorCompletoAbiertoPara] = useState<string | null>(null);
   const EMOJIS_RAPIDOS = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
 
   // ── Editar / eliminar mensaje propio ────────────────────────────────
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [textoEdicion, setTextoEdicion] = useState("");
   const [menuAbiertoPara, setMenuAbiertoPara] = useState<string | null>(null);
+
+  // ── Menú flotante en mobile (long-press) ────────────────────────────
+  // En touch no existe :hover, así que el menú de acciones (responder/
+  // reaccionar/editar/eliminar) nunca aparecía — y al no interceptar el
+  // gesto, el navegador hacía su selección de texto nativa en su lugar.
+  // Guardamos qué mensaje quedó "activo" por long-press para mostrarle
+  // el menú fijo (sin depender de :hover) hasta que se toque afuera.
+  const [menuTactilPara, setMenuTactilPara] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressDisparadoRef = useRef(false);
+
+  const cancelarLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchStartMensaje = (mensajeId: string) => {
+    longPressDisparadoRef.current = false;
+    cancelarLongPress();
+    longPressTimerRef.current = setTimeout(() => {
+      longPressDisparadoRef.current = true;
+      setMenuTactilPara(mensajeId);
+      if (navigator.vibrate) navigator.vibrate(10);
+    }, 450);
+  };
+
+  const handleTouchEndMensaje = () => {
+    cancelarLongPress();
+  };
+
+  const handleTouchMoveMensaje = () => {
+    // Si el dedo se mueve (empieza a scrollear), no es un long-press: cancelamos.
+    cancelarLongPress();
+  };
 
   // ── Responder a un mensaje (quote/reply) ────────────────────────────
   const [respondiendoA, setRespondiendoA] = useState<Mensaje | null>(null);
@@ -425,6 +572,26 @@ export default function DetalleConversacion() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversacionId, mensajes.length]);
 
+  // Cierra cualquier menú/picker abierto al tocar o clickear fuera de una
+  // burbuja de mensaje (afecta tanto al hover-menu de desktop como al menú
+  // táctil de long-press en mobile, y a los pickers de emoji).
+  useEffect(() => {
+    const cerrarSiEsAfuera = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-mensaje-burbuja]")) return;
+      setPickerAbiertoPara(null);
+      setSelectorCompletoAbiertoPara(null);
+      setMenuAbiertoPara(null);
+      setMenuTactilPara(null);
+    };
+    document.addEventListener("mousedown", cerrarSiEsAfuera);
+    document.addEventListener("touchstart", cerrarSiEsAfuera, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", cerrarSiEsAfuera);
+      document.removeEventListener("touchstart", cerrarSiEsAfuera);
+    };
+  }, []);
+
   // ── Indicador "escribiendo…" del otro participante ──────────────────────
   useEffect(() => {
     if (!conversacionId || !user) return;
@@ -558,7 +725,7 @@ export default function DetalleConversacion() {
       if (yaReaccione) {
         await quitarReaccion(mensajeId, emoji);
       } else {
-        await reaccionarAMensaje(mensajeId, emoji);
+        await reaccionarAMensaje(mensajeId, emoji, conversacionId);
       }
     } catch {
       setError("No se pudo actualizar la reacción.");
@@ -700,12 +867,22 @@ export default function DetalleConversacion() {
             return (
               <div key={m.id} className={`flex flex-col ${esMio ? "items-end" : "items-start"} group`}>
                 <div
-                  className="max-w-[75%] px-4 py-2.5 rounded-[var(--radius-btn)] relative"
+                  data-mensaje-burbuja
+                  className="max-w-[75%] px-4 py-2.5 rounded-[var(--radius-btn)] relative select-none md:select-text"
                   style={{
                     background: esMio
                       ? "var(--primary)"
                       : "color-mix(in srgb, var(--primary) 6%, transparent)",
                     color: esMio ? "var(--btn-text)" : "var(--foreground)",
+                    WebkitTouchCallout: "none",
+                  }}
+                  onTouchStart={() => handleTouchStartMensaje(m.id)}
+                  onTouchEnd={handleTouchEndMensaje}
+                  onTouchMove={handleTouchMoveMensaje}
+                  onContextMenu={(e) => {
+                    // Evita el menú contextual nativo (copiar/seleccionar) en
+                    // mobile, que es lo que se disparaba en vez de nuestro menú.
+                    e.preventDefault();
                   }}
                 >
                   {/* Preview del mensaje citado, si este mensaje es una
@@ -779,13 +956,24 @@ export default function DetalleConversacion() {
                     )
                   )}
 
-                  {/* Menú de opciones (responder/reaccionar/eliminar), solo visible al hover/tap */}
+                  {/* Menú de opciones (responder/reaccionar/editar/eliminar).
+                      En desktop aparece con :hover (group-hover); en mobile
+                      no existe hover, así que también se muestra cuando el
+                      long-press marcó este mensaje como activo
+                      (menuTactilPara), sin necesitar tocar y mantener. */}
                   <div
-                    className={`absolute top-1 ${esMio ? "-left-24" : "-right-24"} opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1`}
+                    className={`absolute top-1 ${esMio ? "-left-32" : "-right-32"} transition-opacity flex items-center gap-1 ${
+                      menuTactilPara === m.id
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    }`}
                   >
                     <button
                       aria-label="Responder"
-                      onClick={() => handleResponder(m)}
+                      onClick={() => {
+                        handleResponder(m);
+                        setMenuTactilPara(null);
+                      }}
                       className="p-1 rounded-full"
                       style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
                     >
@@ -793,28 +981,47 @@ export default function DetalleConversacion() {
                     </button>
                     <button
                       aria-label="Reaccionar"
-                      onClick={() => setPickerAbiertoPara(pickerAbiertoPara === m.id ? null : m.id)}
+                      onClick={() => {
+                        setPickerAbiertoPara(pickerAbiertoPara === m.id ? null : m.id);
+                        setMenuTactilPara(null);
+                      }}
                       className="p-1 rounded-full"
                       style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
                     >
                       <SmilePlus className="text-primary/60" size={13} />
                     </button>
                     {esMio && (
-                      <button
-                        aria-label="Más opciones"
-                        onClick={() => setMenuAbiertoPara(menuAbiertoPara === m.id ? null : m.id)}
-                        className="p-1 rounded-full"
-                        style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
-                      >
-                        <Trash2 className="text-primary/60" size={13} />
-                      </button>
+                      <>
+                        <button
+                          aria-label="Editar"
+                          onClick={() => {
+                            handleIniciarEdicion(m);
+                            setMenuTactilPara(null);
+                          }}
+                          className="p-1 rounded-full"
+                          style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
+                        >
+                          <Pencil className="text-primary/60" size={13} />
+                        </button>
+                        <button
+                          aria-label="Eliminar"
+                          onClick={() => {
+                            void handleEliminarMensaje(m.id);
+                            setMenuTactilPara(null);
+                          }}
+                          className="p-1 rounded-full"
+                          style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
+                        >
+                          <Trash2 className="text-red-400/70" size={13} />
+                        </button>
+                      </>
                     )}
                   </div>
 
-                  {/* Picker de emojis rápidos */}
+                  {/* Picker de emojis rápidos + botón "+" para el selector completo */}
                   {pickerAbiertoPara === m.id && (
                     <div
-                      className={`absolute -top-9 ${esMio ? "right-0" : "left-0"} flex gap-1 px-2 py-1 rounded-full z-10`}
+                      className={`absolute -top-9 ${esMio ? "right-0" : "left-0"} flex items-center gap-1 px-2 py-1 rounded-full z-10`}
                       style={{ background: "var(--bg-main)", boxShadow: "0 2px 12px rgba(0,0,0,0.15)" }}
                     >
                       {EMOJIS_RAPIDOS.map((emoji) => (
@@ -826,28 +1033,34 @@ export default function DetalleConversacion() {
                           {emoji}
                         </button>
                       ))}
+                      <button
+                        aria-label="Más emojis"
+                        className="flex items-center justify-center rounded-full hover:scale-110 transition-transform"
+                        style={{
+                          width: 18,
+                          height: 18,
+                          background: "color-mix(in srgb, var(--primary) 12%, transparent)",
+                        }}
+                        onClick={() => {
+                          setPickerAbiertoPara(null);
+                          setSelectorCompletoAbiertoPara(m.id);
+                        }}
+                      >
+                        <Plus className="text-primary/60" size={12} />
+                      </button>
                     </div>
                   )}
 
-                  {/* Menú editar/eliminar (solo mensajes propios) */}
-                  {menuAbiertoPara === m.id && esMio && (
-                    <div
-                      className={`absolute -top-16 ${esMio ? "right-0" : "left-0"} flex flex-col rounded-[var(--radius-btn)] overflow-hidden z-10`}
-                      style={{ background: "var(--bg-main)", boxShadow: "0 2px 12px rgba(0,0,0,0.15)" }}
-                    >
-                      <button
-                        className="px-3 py-1.5 text-micro font-bold text-left text-primary hover:opacity-70"
-                        onClick={() => handleIniciarEdicion(m)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        className="px-3 py-1.5 text-micro font-bold text-left text-red-400 hover:opacity-70"
-                        onClick={() => void handleEliminarMensaje(m.id)}
-                      >
-                        Eliminar
-                      </button>
-                    </div>
+                  {/* Selector completo de emojis (todas las categorías) */}
+                  {selectorCompletoAbiertoPara === m.id && (
+                    <SelectorEmojisCompleto
+                      alineacion={esMio ? "right" : "left"}
+                      onSeleccionar={(emoji) => {
+                        void handleToggleReaccion(m.id, emoji);
+                        setSelectorCompletoAbiertoPara(null);
+                      }}
+                      onCerrar={() => setSelectorCompletoAbiertoPara(null)}
+                    />
                   )}
                 </div>
 

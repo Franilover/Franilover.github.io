@@ -100,6 +100,26 @@ export async function crearLlamada(
   return { id: data.id, roomName: data.room_name };
 }
 
+// ─── Actualización de estado en la tabla `llamadas` ────────────────────────
+
+/**
+ * Actualiza el estado de la llamada en la tabla `llamadas`. Antes, ningún
+ * lugar del código hacía este UPDATE después de crear la fila (quedaba
+ * "sonando" para siempre, incluso en llamadas que sí se contestaron), así
+ * que `limpiar_llamadas_sin_responder()` terminaba marcando como "perdida"
+ * llamadas que en realidad se habían atendido normalmente.
+ */
+export async function marcarEstadoLlamada(
+  llamadaId: string,
+  estado: "aceptada" | "rechazada" | "colgada",
+): Promise<void> {
+  const ahora = new Date().toISOString();
+  const cambios: Record<string, unknown> = { estado };
+  if (estado === "aceptada") cambios.contestada_at = ahora;
+  if (estado === "rechazada" || estado === "colgada") cambios.finalizada_at = ahora;
+  await supabase.from("llamadas").update(cambios).eq("id", llamadaId);
+}
+
 // ─── Señalización (avisar llamada entrante / colgar) ───────────────────────
 
 /**
@@ -128,15 +148,31 @@ export function suscribirseASenalesDeLlamada(
 /** Envía una señal de llamada al canal del otro usuario. */
 async function enviarSenal(senal: SenalLlamada): Promise<void> {
   const canal = supabase.channel(`llamadas:${senal.paraId}`, {
-    config: { broadcast: { self: false } },
+    config: { broadcast: { self: false, ack: true } },
   });
   // Un canal recién creado necesita suscribirse antes de poder emitir.
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
     canal.subscribe((status) => {
       if (status === "SUBSCRIBED") resolve();
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        reject(new Error(`No se pudo suscribir el canal de señalización (${status}).`));
+      }
     });
   });
-  await canal.send({ type: "broadcast", event: "senal", payload: senal });
+
+  // send() con ack:true devuelve "ok" recién cuando el servidor de Realtime
+  // confirma haber recibido el broadcast (no solo cuando se despachó desde
+  // acá) — sin ack, la promesa podía resolver antes de que el mensaje
+  // llegara a destino, y cerrábamos el canal (removeChannel, más abajo)
+  // antes de que la entrega se completara, perdiendo la señal en silencio
+  // sin ningún error. Esto era la causa más probable de que las llamadas
+  // entrantes no llegaran al otro usuario.
+  const resultado = await canal.send({ type: "broadcast", event: "senal", payload: senal });
+  if (resultado !== "ok") {
+    await supabase.removeChannel(canal);
+    throw new Error(`No se pudo enviar la señal de llamada (${resultado}).`);
+  }
+
   await supabase.removeChannel(canal);
 }
 

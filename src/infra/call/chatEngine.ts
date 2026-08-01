@@ -679,16 +679,23 @@ export async function obtenerUltimoLeidoDeOtro(
 
 // ─── Reacciones ─────────────────────────────────────────────────────────────
 
-export async function reaccionarAMensaje(mensajeId: string, emoji: string): Promise<void> {
+export async function reaccionarAMensaje(
+  mensajeId: string,
+  emoji: string,
+  conversacionId: string,
+): Promise<void> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("No hay sesión activa.");
   // upsert: si el usuario ya puso ese mismo emoji, no duplica (unique de la tabla).
+  // conversacion_id es NOT NULL en la tabla y además lo exige la policy RLS
+  // de INSERT (es_participante(conversacion_id)) — sin mandarlo, Postgres
+  // rechaza el insert con 400 antes de siquiera evaluar el conflicto.
   const { error } = await supabase
     .from("mensaje_reacciones")
     .upsert(
-      { mensaje_id: mensajeId, perfil_id: user.id, emoji },
+      { mensaje_id: mensajeId, perfil_id: user.id, emoji, conversacion_id: conversacionId },
       { onConflict: "mensaje_id,perfil_id,emoji", ignoreDuplicates: true },
     );
   if (error) throw error;

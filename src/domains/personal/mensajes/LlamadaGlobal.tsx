@@ -20,6 +20,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 import {
   colgarLlamada,
+  marcarEstadoLlamada,
   pedirTokenLlamada,
   rechazarLlamada,
   suscribirseASenalesDeLlamada,
@@ -126,6 +127,7 @@ export default function LlamadaGlobal() {
         paraId: otro.id,
         deId: user.id,
       }).catch(() => {});
+      await marcarEstadoLlamada(llamadaId, "colgada").catch(() => {});
     }
     roomRef.current?.disconnect();
     roomRef.current = null;
@@ -141,6 +143,7 @@ export default function LlamadaGlobal() {
         paraId: otro.id,
         deId: user.id,
       }).catch(() => {});
+      await marcarEstadoLlamada(llamadaId, "rechazada").catch(() => {});
     }
     finalizar();
   };
@@ -202,7 +205,10 @@ export default function LlamadaGlobal() {
             <button
               className="flex items-center justify-center rounded-full"
               style={{ width: 56, height: 56, background: "#22c55e" }}
-              onClick={() => marcarConectada()}
+              onClick={() => {
+                if (llamadaId) void marcarEstadoLlamada(llamadaId, "aceptada").catch(() => {});
+                marcarConectada();
+              }}
               aria-label="Aceptar"
             >
               <Phone className="text-white" size={22} />
