@@ -431,15 +431,46 @@ export function _obtenerCanalConversacion(conversacionId: string): EntradaCanalC
   return entrada;
 }
 
-/** @internal contraparte de _obtenerCanalConversacion */
+/** @internal contraparte de _obtenerCanalConversacion
+ *
+ * BUG que esto arregla: `supabase.removeChannel()` es asíncrono (devuelve
+ * una Promise que se resuelve cuando el servidor confirma el cierre), pero
+ * acá se llamaba sin esperarla (`supabase.removeChannel(entrada.canal)`
+ * sin `await`, dentro de una función `void`). El `delete` del mapa local
+ * pasaba en el mismo tick — así que un nuevo `_obtenerCanalConversacion`
+ * para la MISMA conversación (típico: el usuario sale y vuelve a entrar al
+ * chat rápido) creaba un canal completamente nuevo mientras el anterior
+ * todavía estaba a medio cerrar del lado del servidor de Realtime. Con uso
+ * normal (entrar/salir de conversaciones seguido) esto acumulaba canales
+ * huérfanos sin que el cliente se enterara, hasta pegar contra el límite
+ * del servidor ("ChannelRateLimitReached: Too many channels") — momento en
+ * el que CUALQUIER usuario que intentara abrir una suscripción nueva se
+ * quedaba sin poder unirse (ni siquiera ver sus propios mensajes), aunque
+ * otro usuario con un canal más viejo ya "enganchado" siguiera funcionando
+ * con normalidad. Ahora la entrada se saca del mapa de forma síncrona
+ * (para que nadie más pueda reengancharse a un canal que ya está cerrando)
+ * pero se espera la promesa de `removeChannel` antes de dar el cierre por
+ * completo, y se loguea si el servidor no confirma un cierre limpio.
+ */
 export function _liberarCanalConversacion(conversacionId: string): void {
   const topic = `mensajes:${conversacionId}`;
   const entrada = canalesConversacion.get(topic);
   if (!entrada) return;
   entrada.refs--;
   if (entrada.refs <= 0) {
-    supabase.removeChannel(entrada.canal);
+    // Sacamos la entrada YA (síncrono): así, si alguien vuelve a pedir este
+    // mismo topic mientras el removeChannel de abajo sigue en curso,
+    // _obtenerCanalConversacion ve el mapa vacío y crea un canal nuevo
+    // limpio, en vez de reengancharse a uno que está a medio morir.
     canalesConversacion.delete(topic);
+    void supabase.removeChannel(entrada.canal).then((resultado) => {
+      if (resultado !== "ok") {
+        console.warn(
+          `[chatEngine] El canal "${topic}" no se cerró limpiamente (resultado: ${resultado}). ` +
+            "Si esto se repite seguido, revisar el server de Realtime por acumulación de canales.",
+        );
+      }
+    });
   }
 }
 
