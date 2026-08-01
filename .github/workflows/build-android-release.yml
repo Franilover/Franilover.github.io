@@ -406,15 +406,19 @@ jobs:
           }
           echo "Firebase/google-services OK."
 
-      - name: Instalar el servicio de FCM (GarliaFirebaseMessagingService + PuenteFcm)
+      - name: Instalar el servicio de FCM (GarliaFirebaseMessagingService + PuenteFcm + LlamadaEntranteActivity)
         # Los .kt viven en src-tauri/android-templates/ (commiteados, fuera
         # de gen/android que se borra en cada build) y se copian acá al
         # paquete Java real de la app generada por Tauri.
+        # LlamadaEntranteActivity es la pantalla full-screen de "llamada
+        # entrante" (Aceptar/Rechazar) que dispara la notificación cuando
+        # llega un push data.tipo=llamada_entrante desde notify-call.
         run: |
           DESTINO="src-tauri/gen/android/app/src/main/java/com/frani/garlia"
           mkdir -p "$DESTINO"
           cp src-tauri/android-templates/java/com/frani/garlia/GarliaFirebaseMessagingService.kt "$DESTINO/"
           cp src-tauri/android-templates/java/com/frani/garlia/PuenteFcm.kt "$DESTINO/"
+          cp src-tauri/android-templates/java/com/frani/garlia/LlamadaEntranteActivity.kt "$DESTINO/"
           echo "Archivos copiados a $DESTINO:"
           ls "$DESTINO"
 
@@ -554,15 +558,49 @@ jobs:
               cambios = True
               print("Servicio GarliaFirebaseMessagingService agregado.")
 
+          # Declaración de la Activity de llamada entrante (full-screen,
+          # se lanza sobre la lockscreen vía setFullScreenIntent). Necesita
+          # excludeFromRecents (no tiene sentido que quede en el selector
+          # de apps recientes) y showOnLockScreen ya lo maneja la propia
+          # Activity en runtime (setShowWhenLocked / FLAG_SHOW_WHEN_LOCKED),
+          # así que acá solo hace falta declararla.
+          if "LlamadaEntranteActivity" not in contenido:
+              activity_block = (
+                  '        <activity\n'
+                  '            android:name="com.frani.garlia.LlamadaEntranteActivity"\n'
+                  '            android:exported="false"\n'
+                  '            android:excludeFromRecents="true"\n'
+                  '            android:launchMode="singleTop"\n'
+                  '            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />\n'
+              )
+              patron_app_open = re.compile(r'(<application[^>]*>\n)')
+              contenido, n = patron_app_open.subn(r'\1' + activity_block, contenido, count=1)
+              assert n == 1, "No se encontró la etiqueta <application ...> de apertura."
+              cambios = True
+              print("Activity LlamadaEntranteActivity agregada.")
+
           if cambios:
               with open(path, "w") as f:
                   f.write(contenido)
           else:
-              print("AndroidManifest.xml ya tenía el permiso y el servicio, no se tocó.")
+              print("AndroidManifest.xml ya tenía el permiso, el servicio y la activity, no se tocó.")
           PYEOF
 
           echo "Verificación final del manifest:"
-          grep -n "POST_NOTIFICATIONS\|GarliaFirebaseMessagingService" "$MANIFEST"
+          grep -n "POST_NOTIFICATIONS\|GarliaFirebaseMessagingService\|LlamadaEntranteActivity" "$MANIFEST"
+
+      - name: Verificar que LlamadaEntranteActivity quedó instalada
+        run: |
+          KT_FILE="src-tauri/gen/android/app/src/main/java/com/frani/garlia/LlamadaEntranteActivity.kt"
+          test -f "$KT_FILE" || {
+            echo "::error::No se copió LlamadaEntranteActivity.kt — revisar src-tauri/android-templates/."
+            exit 1
+          }
+          grep -q "LlamadaEntranteActivity" src-tauri/gen/android/app/src/main/AndroidManifest.xml || {
+            echo "::error::LlamadaEntranteActivity no quedó declarada en el AndroidManifest.xml."
+            exit 1
+          }
+          echo "LlamadaEntranteActivity OK."
 
       - name: Build del APK universal (release, firmado)
         env:

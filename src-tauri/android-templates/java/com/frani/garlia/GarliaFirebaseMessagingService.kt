@@ -29,6 +29,14 @@ class GarliaFirebaseMessagingService : FirebaseMessagingService() {
     companion object {
         private const val CANAL_ID = "mensajes"
         private const val CANAL_NOMBRE = "Mensajes"
+
+        // Canal separado del de mensajes: necesita IMPORTANCE_HIGH +
+        // sonido de timbre continuo, y no queremos que Android lo agrupe
+        // ni comparta configuración con las notificaciones de mensajes
+        // normales (el usuario podría silenciar "Mensajes" sin querer
+        // silenciar llamadas, o viceversa).
+        private const val CANAL_LLAMADAS_ID = "llamadas_entrantes"
+        private const val CANAL_LLAMADAS_NOMBRE = "Llamadas entrantes"
     }
 
     override fun onNewToken(token: String) {
@@ -38,6 +46,17 @@ class GarliaFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
+
+        // notify-call manda un push data-only con data.tipo = "llamada_entrante"
+        // (a propósito, sin bloque `notification`, para poder decidir acá
+        // mismo cómo mostrarla — con full-screen intent — en vez de dejar
+        // que el sistema la muestre como una notificación normal). Todo lo
+        // demás (notify-message, notify-subscribers) sigue el camino de
+        // siempre, sin tocar.
+        if (remoteMessage.data["tipo"] == "llamada_entrante") {
+            mostrarLlamadaEntrante(remoteMessage)
+            return
+        }
 
         val titulo = remoteMessage.notification?.title
             ?: remoteMessage.data["title"]
@@ -63,6 +82,69 @@ class GarliaFirebaseMessagingService : FirebaseMessagingService() {
         if (entregadoAlWebView != true) {
             mostrarNotificacionDelSistema(titulo, cuerpo, url)
         }
+    }
+
+    // Llamada entrante: siempre se muestra como notificación full-screen
+    // del sistema, sin pasar por el WebView primero. A diferencia de un
+    // mensaje, acá no tiene sentido "avisarle al JS y que decida" — una
+    // llamada tiene que sonar e interrumpir sí o sí, esté la app en
+    // foreground, background, o cerrada.
+    private fun mostrarLlamadaEntrante(remoteMessage: RemoteMessage) {
+        val data = remoteMessage.data
+        val llamadaId = data["llamadaId"] ?: return
+        val conversacionId = data["conversacionId"] ?: ""
+        val roomName = data["roomName"] ?: ""
+        val nombreQuienLlama = data["nombreQuienLlama"] ?: "Alguien"
+
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val canalExistente = manager.getNotificationChannel(CANAL_LLAMADAS_ID)
+            if (canalExistente == null) {
+                val canal = NotificationChannel(
+                    CANAL_LLAMADAS_ID,
+                    CANAL_LLAMADAS_NOMBRE,
+                    NotificationManager.IMPORTANCE_HIGH,
+                )
+                manager.createNotificationChannel(canal)
+            }
+        }
+
+        val intentPantallaCompleta = Intent(this, LlamadaEntranteActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(LlamadaEntranteActivity.EXTRA_LLAMADA_ID, llamadaId)
+            putExtra(LlamadaEntranteActivity.EXTRA_CONVERSACION_ID, conversacionId)
+            putExtra(LlamadaEntranteActivity.EXTRA_ROOM_NAME, roomName)
+            putExtra(LlamadaEntranteActivity.EXTRA_NOMBRE_QUIEN_LLAMA, nombreQuienLlama)
+        }
+        val pendingIntentPantallaCompleta = PendingIntent.getActivity(
+            this,
+            llamadaId.hashCode(),
+            intentPantallaCompleta,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val notificacion = NotificationCompat.Builder(this, CANAL_LLAMADAS_ID)
+            .setContentTitle("Llamada entrante")
+            .setContentText(nombreQuienLlama)
+            .setSmallIcon(applicationInfo.icon)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setAutoCancel(true)
+            .setOngoing(true)
+            // Es lo que hace que, con la pantalla apagada o el teléfono
+            // bloqueado, se dispare directamente LlamadaEntranteActivity
+            // en vez de (o además de) mostrar la notificación en la
+            // bandeja. En foreground con otra app activa, Android puede
+            // optar por mostrar solo un heads-up en vez de la pantalla
+            // completa — comportamiento estándar del sistema.
+            .setFullScreenIntent(pendingIntentPantallaCompleta, true)
+            .setContentIntent(pendingIntentPantallaCompleta)
+            .build()
+
+        manager.notify(llamadaId.hashCode(), notificacion)
     }
 
     private fun mostrarNotificacionDelSistema(titulo: String, cuerpo: String, url: String?) {
