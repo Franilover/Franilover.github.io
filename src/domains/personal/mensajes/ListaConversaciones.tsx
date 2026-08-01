@@ -3,7 +3,7 @@
 import { MessageCircle, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import React, { useEffect, useState, useRef } from "react";
+import React, { Suspense, useEffect, useState, useRef } from "react";
 
 import { Loading } from "@/ui";
 import { SmartImage } from "@/ui/SmartImage";
@@ -43,7 +43,7 @@ type Props = {
   className?: string;
 };
 
-export default function ListaConversaciones({ variante = "pagina", className = "" }: Props) {
+function ListaConversacionesInner({ variante = "pagina", className = "" }: Props) {
   const { user } = useAuth() as { user: any };
   const router = useRouter();
   const pathname = usePathname();
@@ -276,5 +276,18 @@ export default function ListaConversaciones({ variante = "pagina", className = "
     <div className={`min-h-screen bg-bg-main pb-20 ${className}`}>
       <div className="max-w-2xl mx-auto px-6 pt-10">{contenido}</div>
     </div>
+  );
+}
+
+// ListaConversacionesInner usa useSearchParams (para resaltar la
+// conversación activa en modo sidebar), y Next exige que cualquier
+// componente que lo use esté envuelto en Suspense para poder
+// prerenderizarse con output:"export". Se envuelve acá adentro para que
+// ningún consumidor (page.tsx, layout.tsx) tenga que acordarse de hacerlo.
+export default function ListaConversaciones(props: Props) {
+  return (
+    <Suspense fallback={<Loading />}>
+      <ListaConversacionesInner {...props} />
+    </Suspense>
   );
 }

@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import ListaConversaciones from "@/domains/personal/mensajes/ListaConversaciones";
 
 // Layout estilo "WhatsApp Web" para /personal/mensajes:
@@ -27,9 +26,7 @@ export default function MensajesLayout({ children }: { children: React.ReactNode
             Mensajes
           </h1>
         </div>
-        <Suspense fallback={null}>
-          <ListaConversaciones variante="sidebar" className="flex-1" />
-        </Suspense>
+        <ListaConversaciones variante="sidebar" className="flex-1" />
       </aside>
 
       {/* Panel derecho: en mobile es la única vista (children ocupa todo);
