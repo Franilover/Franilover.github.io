@@ -454,6 +454,7 @@ jobs:
           package com.frani.garlia
 
           import android.Manifest
+          import android.content.Intent
           import android.content.pm.PackageManager
           import android.os.Build
           import android.os.Bundle
@@ -466,6 +467,51 @@ jobs:
                   super.onCreate(savedInstanceState)
                   pedirPermisoDeNotificaciones()
                   pedirTokenFcm()
+                  manejarExtrasDeLlamada(intent)
+              }
+
+              // Se dispara cuando la Activity YA está viva (típico caso: la app
+              // estaba abierta en background) y llega un nuevo Intent — por
+              // ejemplo al tocar Aceptar/Rechazar en LlamadaEntranteActivity.
+              // Sin este override, ese intent nunca llega a onCreate (que solo
+              // corre en el primer arranque) y los extras se pierden en
+              // silencio: la app pasaba al frente pero no mostraba nada de la
+              // llamada.
+              override fun onNewIntent(intent: Intent) {
+                  super.onNewIntent(intent)
+                  manejarExtrasDeLlamada(intent)
+              }
+
+              // Lee los extras que LlamadaEntranteActivity adjunta al abrir esta
+              // Activity (ver EXTRA_ACCION y compañía) y se los pasa al WebView
+              // como window.onFcmLlamadaAccion(...) — window.onFcmLlamadaAccion
+              // debe estar declarado del lado JS (ver PushActivator.tsx) y
+              // resolver la acción contra useLlamadaStore / callEngine.ts
+              // (aceptar -> conectar a LiveKit, rechazar -> marcarEstadoLlamada).
+              private fun manejarExtrasDeLlamada(intent: Intent) {
+                  val accion = intent.getStringExtra("fcm_llamada_accion") ?: return
+                  val llamadaId = intent.getStringExtra("llamada_id") ?: ""
+                  val conversacionId = intent.getStringExtra("conversacion_id") ?: ""
+                  val roomName = intent.getStringExtra("room_name") ?: ""
+
+                  val payload = org.json.JSONObject().apply {
+                      put("accion", accion)
+                      put("llamadaId", llamadaId)
+                      put("conversacionId", conversacionId)
+                      put("roomName", roomName)
+                  }
+                  val js = "window.onFcmLlamadaAccion && window.onFcmLlamadaAccion($payload);"
+
+                  // El WebView puede no estar registrado todavía en PuenteFcm
+                  // en el momento exacto en que corre onCreate (misma carrera
+                  // que con el token FCM), así que reusamos el mecanismo de
+                  // reintentos ya existente vía PuenteFcm.evaluarJsConReintentos.
+                  PuenteFcm.evaluarJsConReintentos(js)
+
+                  // Limpiamos los extras del intent para no volver a procesar
+                  // la misma acción si la Activity se recrea (ej. rotación de
+                  // pantalla) sin que haya llegado un intent nuevo.
+                  intent.removeExtra("fcm_llamada_accion")
               }
 
               private fun pedirTokenFcm() {
@@ -506,6 +552,10 @@ jobs:
               override fun onWebViewCreate(webView: WebView) {
                   super.onWebViewCreate(webView)
                   PuenteFcm.registrarWebView(webView)
+                  // Si el intent de arranque ya traía extras de llamada pero el
+                  // WebView todavía no existía cuando corrió onCreate, los
+                  // reintentos de evaluarJsConReintentos (arriba) cubren ese
+                  // hueco — no hace falta repetir la lectura acá.
               }
           }
           KOTLIN_EOF

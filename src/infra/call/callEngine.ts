@@ -10,7 +10,7 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
-import { supabase } from "@/infra/supabase/supabase";
+import { supabase, realtimeAuthListo } from "@/infra/supabase/supabase";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -143,17 +143,30 @@ export function suscribirseASenalesDeLlamada(
     config: { broadcast: { self: false }, private: true },
   });
 
-  canal
-    .on("broadcast", { event: "senal" }, (payload) => {
-      onSenal(payload.payload as SenalLlamada);
-    })
-    .subscribe();
+  canal.on("broadcast", { event: "senal" }, (payload) => {
+    onSenal(payload.payload as SenalLlamada);
+  });
+
+  // Esperamos a que el JWT de Realtime ya esté sincronizado con la sesión
+  // ANTES de suscribirnos — si el subscribe() sale con el anon key todavía
+  // puesto, el canal queda pegado a esa autenticación y el servidor
+  // rechaza cada broadcast con "Unauthorized" indefinidamente, sin
+  // reintentar la autenticación solo (confirmado en logs de Realtime).
+  void realtimeAuthListo.then(() => {
+    canal.subscribe();
+  });
 
   return canal;
 }
 
 /** Envía una señal de llamada al canal del otro usuario. */
 async function enviarSenal(senal: SenalLlamada): Promise<void> {
+  // Misma razón que en suscribirseASenalesDeLlamada: si nos suscribimos
+  // antes de que el JWT de Realtime esté sincronizado, el canal queda
+  // pegado al anon key y el envío falla con "Unauthorized" sin recuperarse
+  // solo, aunque el JWT se corrija después.
+  await realtimeAuthListo;
+
   const canal = supabase.channel(`llamadas:${senal.paraId}`, {
     config: { broadcast: { self: false, ack: true }, private: true },
   });

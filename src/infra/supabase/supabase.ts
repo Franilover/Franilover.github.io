@@ -38,11 +38,32 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Se llama tanto al arrancar (por si ya hay sesión guardada) como en cada
 // evento de auth (login, refresh de token, logout) para que el JWT de
 // Realtime nunca quede desactualizado respecto al de auth.
+//
+// IMPORTANTE — carrera de arranque: setAuth() es async y se dispara desde
+// acá de forma "fire and forget". Si algún código llama a canal.subscribe()
+// en un canal privado ANTES de que este primer setAuth() haya terminado de
+// aplicarse, ese canal queda autenticado con el anon key — y en la práctica
+// NO se re-autentica solo aunque setAuth() corra después (confirmado
+// viendo los logs de Realtime: "Unauthorized" repitiéndose sin parar cada
+// pocos segundos, aunque las policies y el setAuth() ya estuvieran bien).
+// Por eso exponemos esta promesa: cualquier código que abra un canal
+// privado (ver callEngine.ts) debe awaitearla antes de llamar a
+// subscribe(), para garantizar que el JWT ya esté aplicado.
+let resolverRealtimeAuthListo: () => void;
+export const realtimeAuthListo = new Promise<void>((resolve) => {
+  resolverRealtimeAuthListo = resolve;
+});
+
 if (isBrowser) {
-  void supabase.auth.getSession().then(({ data: { session } }) => {
-    void supabase.realtime.setAuth(session?.access_token ?? null);
+  void supabase.auth.getSession().then(async ({ data: { session } }) => {
+    await supabase.realtime.setAuth(session?.access_token ?? null);
+    resolverRealtimeAuthListo();
   });
   supabase.auth.onAuthStateChange((_event, session) => {
     void supabase.realtime.setAuth(session?.access_token ?? null);
   });
+} else {
+  // SSR / build: no hay canales Realtime que abrir, resolvemos directo
+  // para no dejar colgada a ninguna promesa que la esté esperando.
+  resolverRealtimeAuthListo!();
 }

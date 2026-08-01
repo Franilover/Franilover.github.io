@@ -81,4 +81,27 @@ object PuenteFcm {
         webView.post { webView.evaluateJavascript(js, null) }
         return true
     }
+
+    /**
+     * Como evaluarJs, pero reintenta si el WebView todavía no está
+     * registrado (misma carrera que con el token FCM: MainActivity.onCreate
+     * puede correr antes de que Tauri termine de crear el WebView). A
+     * diferencia de intentarEntregarConReintentos (que verifica que exista
+     * una función JS puntual antes de darse por satisfecho), acá solo nos
+     * importa que HAYA un WebView al que evaluarle el JS — el propio js ya
+     * incluye su chequeo de "&&" contra la función global correspondiente,
+     * así que no hace falta duplicar esa lógica acá.
+     */
+    fun evaluarJsConReintentos(js: String, intentosRestantes: Int = REINTENTOS) {
+        val webView = webViewRef?.get()
+        if (webView == null) {
+            if (intentosRestantes <= 0) return
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                { evaluarJsConReintentos(js, intentosRestantes - 1) },
+                INTERVALO_MS,
+            )
+            return
+        }
+        webView.post { webView.evaluateJavascript(js, null) }
+    }
 }
