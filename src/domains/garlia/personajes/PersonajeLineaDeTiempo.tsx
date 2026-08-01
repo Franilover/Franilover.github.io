@@ -58,6 +58,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
+import { useConfirm } from "@/ui/ConfirmModal";
 import {
   FechaMundoBadge,
   SelectorFechaMundo,
@@ -214,8 +215,18 @@ function EraDetallePanel({
   const [nuevoRasgo, setNuevoRasgo] = useState("");
   const [edadStr, setEdadStr] = useState(edad != null ? String(edad) : "");
   const [edadFocused, setEdadFocused] = useState(false);
+  const { confirm, ConfirmModal } = useConfirm();
 
   const puedeEditarEdad = fechaNacimiento != null && diasPorAnio > 0;
+
+  const handleEliminarEra = async () => {
+    const ok = await confirm({
+      message: `¿Eliminar permanentemente la era "${era.label || "sin nombre"}"?`,
+      danger: true,
+      confirmLabel: "Eliminar",
+    });
+    if (ok) onDelete();
+  };
 
   const commitEdad = () => {
     if (!puedeEditarEdad) return;
@@ -243,6 +254,7 @@ function EraDetallePanel({
         borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
       }}
     >
+      <ConfirmModal />
       <div className="flex items-start justify-between gap-2">
         <input
           key={era.id}
@@ -396,7 +408,7 @@ function EraDetallePanel({
         <button
           className="flex items-center gap-1 px-1.5 py-1 rounded-md text-micro text-primary/30 hover:text-accent transition-colors"
           type="button"
-          onClick={onDelete}
+          onClick={handleEliminarEra}
         >
           <Trash2 size={11} /> Eliminar era
         </button>

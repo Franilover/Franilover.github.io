@@ -1867,7 +1867,7 @@ function BibliotecaPortadas({
                       className="p-1.5 rounded bg-white/10 hover:bg-red-500/60 text-white transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDeleteLibro(libro.id);
+                        confirmarEliminarLibro(libro);
                       }}
                     >
                       <Trash2 size={10} />
@@ -2734,6 +2734,28 @@ function SidebarLibros({
   const [dragCapId, setDragCapId] = useState<string | null>(null);
   const [overCapId, setOverCapId] = useState<string | null>(null);
 
+  // Confirmación antes de borrar libro/capítulo desde la barra lateral —
+  // estos botones borraban directo al primer click, sin aviso.
+  const { confirm, ConfirmModal } = useConfirm();
+
+  const confirmarEliminarLibro = async (libro: Libro) => {
+    const ok = await confirm({
+      message: `¿Eliminar permanentemente el libro "${libro.titulo}"? Se eliminarán también todos sus capítulos.`,
+      danger: true,
+      confirmLabel: "Eliminar",
+    });
+    if (ok) onDeleteLibro(libro.id);
+  };
+
+  const confirmarEliminarCap = async (cap: Capitulo, libroId: string) => {
+    const ok = await confirm({
+      message: `¿Eliminar permanentemente "${cap.titulo_capitulo}"?`,
+      danger: true,
+      confirmLabel: "Eliminar",
+    });
+    if (ok) onDeleteCap(cap.id, libroId);
+  };
+
   const handleDropCap = (libroId: string, targetCapId: string) => {
     const caps = porLibro[libroId] ?? [];
     if (!dragCapId || dragCapId === targetCapId) {
@@ -2801,6 +2823,8 @@ function SidebarLibros({
         background: "color-mix(in srgb, var(--primary) 1.5%, var(--bg-main))",
       }}
     >
+      <ConfirmModal />
+
       {/* Header sidebar */}
       <div
         className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-b"
@@ -2898,7 +2922,7 @@ function SidebarLibros({
                       title="Eliminar libro"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onDeleteLibro(libro.id);
+                        confirmarEliminarLibro(libro);
                       }}
                     >
                       <Trash2 size={9} />
@@ -3019,7 +3043,7 @@ function SidebarLibros({
                                 className="p-0.5 rounded hover:bg-red-500/10 text-primary/25 hover:text-red-400 transition-colors"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onDeleteCap(cap.id, libro.id);
+                                  confirmarEliminarCap(cap, libro.id);
                                 }}
                               >
                                 <Trash2 size={9} />
