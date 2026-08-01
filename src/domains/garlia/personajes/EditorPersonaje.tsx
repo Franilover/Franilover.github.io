@@ -27,6 +27,7 @@ import {
   Trash2,
   UserCircle2,
 } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import {
   useMobileAsidePanel,
@@ -41,6 +42,7 @@ import {
   PickerCaraBtn,
   PickerImagen,
   usePersonajeForm,
+  type Era,
   type Personaje,
 } from "@garlia/personajes";
 import { type SaveStatus } from "@/ui/saveStatus";
@@ -94,6 +96,49 @@ export function FormularioPersonaje({
   useRegisterMobileAside();
   const mobileAsideOpen = useMobileAsidePanel((s) => s.open);
   const closeMobileAside = useMobileAsidePanel((s) => s.close);
+
+  // Era seleccionada en la línea de tiempo: cuando hay una, la columna de
+  // imágenes (Cara/Cuerpo) muestra y edita la imagen de ESA era en vez de
+  // la del personaje base (con fallback a la del personaje si la era no
+  // tiene una propia todavía).
+  const [eraSeleccionada, setEraSeleccionada] = useState<Era | null>(null);
+  const changeImagenEraRef = useRef<
+    (
+      era: Era,
+      campo: "img_url" | "img_cuerpo_url",
+      url: string | null,
+    ) => void
+  >(() => {});
+  const registrarChangeImagenEra = useCallback(
+    (fn: typeof changeImagenEraRef.current) => {
+      changeImagenEraRef.current = fn;
+    },
+    [],
+  );
+
+  const caraMostrada = eraSeleccionada
+    ? eraSeleccionada.img_url || form.img_url
+    : form.img_url;
+  const cuerpoMostrado = eraSeleccionada
+    ? eraSeleccionada.img_cuerpo_url || form.img_cuerpo_url
+    : form.img_cuerpo_url;
+  const caraEsDeEra = !!(eraSeleccionada && eraSeleccionada.img_url);
+  const cuerpoEsDeEra = !!(eraSeleccionada && eraSeleccionada.img_cuerpo_url);
+
+  const onCambiarCara = (url: string) => {
+    if (eraSeleccionada) {
+      changeImagenEraRef.current(eraSeleccionada, "img_url", url);
+    } else {
+      setForm((f) => ({ ...f, img_url: url }));
+    }
+  };
+  const onCambiarCuerpo = (url: string) => {
+    if (eraSeleccionada) {
+      changeImagenEraRef.current(eraSeleccionada, "img_cuerpo_url", url);
+    } else {
+      setForm((f) => ({ ...f, img_cuerpo_url: url }));
+    }
+  };
 
   const reinoSeleccionadoId =
     reinosMin.find((r) => r.nombre === form.reino)?.id ?? null;
@@ -205,11 +250,11 @@ export function FormularioPersonaje({
                   className="sm:hidden relative w-full rounded-xl overflow-hidden border border-primary/10 bg-primary/3"
                   style={{ aspectRatio: "1 / 1" }}
                 >
-                  {form.img_url ? (
+                  {caraMostrada ? (
                     <img
                       alt={form.nombre}
                       className="w-full h-full object-cover"
-                      src={form.img_url}
+                      src={caraMostrada}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -218,43 +263,73 @@ export function FormularioPersonaje({
                   )}
                   <div className="absolute top-2 right-2 z-10">
                     <PickerCaraBtn
-                      value={form.img_url ?? ""}
-                      onChange={(url) =>
-                        setForm((f) => ({ ...f, img_url: url }))
-                      }
+                      value={caraMostrada ?? ""}
+                      onChange={onCambiarCara}
                     />
                   </div>
                 </div>
 
                 {/* Desktop: selector normal */}
-                <div className="hidden sm:block w-full">
+                <div className="hidden sm:block w-full relative">
                   <SelectorImagen
                     aspect="square"
-                    label="Cara"
+                    label={eraSeleccionada ? "Cara (era)" : "Cara"}
                     placeholder={
                       <UserCircle2 className="opacity-25" size={20} />
                     }
-                    value={form.img_url ?? ""}
-                    onChange={(url) => setForm((f) => ({ ...f, img_url: url }))}
+                    value={caraMostrada ?? ""}
+                    onChange={onCambiarCara}
                   />
+                  {eraSeleccionada && caraEsDeEra && (
+                    <button
+                      className="mt-1 text-micro text-primary/30 hover:text-accent transition-colors"
+                      title="Quitar imagen propia de esta era (usará la del personaje)"
+                      type="button"
+                      onClick={() =>
+                        changeImagenEraRef.current(
+                          eraSeleccionada,
+                          "img_url",
+                          null,
+                        )
+                      }
+                    >
+                      Quitar imagen de la era
+                    </button>
+                  )}
                 </div>
 
                 {!compacto && (
                   <div className="hidden sm:block rounded-xl overflow-hidden border border-primary/10">
-                    <div className="px-2 py-1 border-b border-primary/[0.06]">
+                    <div className="flex items-center justify-between px-2 py-1 border-b border-primary/[0.06]">
                       <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-                        Cuerpo
+                        {eraSeleccionada ? "Cuerpo (era)" : "Cuerpo"}
                       </span>
+                      {eraSeleccionada && cuerpoEsDeEra && (
+                        <button
+                          className="text-micro text-primary/25 hover:text-accent transition-colors"
+                          title="Quitar imagen propia de esta era (usará la del personaje)"
+                          type="button"
+                          onClick={() =>
+                            changeImagenEraRef.current(
+                              eraSeleccionada,
+                              "img_cuerpo_url",
+                              null,
+                            )
+                          }
+                        >
+                          Quitar
+                        </button>
+                      )}
                     </div>
                     <div
                       className="relative w-full group bg-primary/2"
                       style={{ aspectRatio: "1 / 2" }}
                     >
-                      {form.img_cuerpo_url ? (
+                      {cuerpoMostrado ? (
                         <img
                           alt="Cuerpo completo"
                           className="absolute inset-0 w-full h-full object-contain"
-                          src={form.img_cuerpo_url}
+                          src={cuerpoMostrado}
                           style={{ objectPosition: "top center" }}
                         />
                       ) : (
@@ -271,10 +346,8 @@ export function FormularioPersonaje({
                           aspect="full"
                           label=""
                           placeholder={null}
-                          value={form.img_cuerpo_url ?? ""}
-                          onChange={(url) =>
-                            setForm((f) => ({ ...f, img_cuerpo_url: url }))
-                          }
+                          value={cuerpoMostrado ?? ""}
+                          onChange={onCambiarCuerpo}
                         />
                       </label>
                     </div>
@@ -287,15 +360,13 @@ export function FormularioPersonaje({
                     <PickerImagen
                       icon={<Maximize2 size={11} />}
                       label={
-                        form.img_cuerpo_url
+                        cuerpoMostrado
                           ? "Cambiar cuerpo"
                           : "+ Imagen cuerpo"
                       }
                       titulo="Imagen cuerpo"
-                      value={form.img_cuerpo_url ?? ""}
-                      onChange={(url) =>
-                        setForm((f) => ({ ...f, img_cuerpo_url: url }))
-                      }
+                      value={cuerpoMostrado ?? ""}
+                      onChange={onCambiarCuerpo}
                     />
                   </div>
                 )}
@@ -450,9 +521,9 @@ export function FormularioPersonaje({
                 {/* Línea de tiempo (reemplaza la descripción general) */}
                 <PersonajeLineaDeTiempo
                   fechaNacimiento={(form as any).fecha_nacimiento ?? null}
-                  imgCuerpoUrlPersonaje={form.img_cuerpo_url ?? null}
-                  imgUrlPersonaje={form.img_url ?? null}
                   personajeId={form.id}
+                  onChangeImagenEra={registrarChangeImagenEra}
+                  onEraSeleccionadaChange={setEraSeleccionada}
                   onFechaNacimientoChange={onFechaNacimientoChange}
                 />
               </div>

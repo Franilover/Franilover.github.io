@@ -12,3 +12,4 @@ export { BloqueDones } from "./BloqueDones";
 export { PickerImagen, PickerCaraBtn } from "./PersonajeImagePickers";
 export { usePersonajeForm } from "./usePersonajeForm";
 export type { Personaje } from "./types";
+export type { Era } from "./useErasDelPersonaje";

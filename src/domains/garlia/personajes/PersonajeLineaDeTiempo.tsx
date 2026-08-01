@@ -50,14 +50,12 @@ import {
   Check,
   Clock,
   Loader2,
-  Maximize2,
   Pencil,
   Plus,
   Trash2,
-  UserCircle2,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
 import { useConfirm } from "@/ui/ConfirmModal";
@@ -66,7 +64,6 @@ import {
   SelectorFechaMundo,
   useCalendario,
 } from "@/domains/garlia/calendario/CalendarioMundo";
-import { PickerImagen } from "./PersonajeImagePickers";
 import {
   type Era,
   useErasDelPersonaje,
@@ -190,139 +187,11 @@ function SubEraItem({
   );
 }
 
-// Cara y cuerpo propios de una era particular. Si la era no tiene imagen
-// propia, se muestra la del personaje "base" como fallback (marcada como
-// tal), y el picker permite asignarle una imagen específica a esta era.
-function EraImagenes({
-  era,
-  imgUrlPersonaje,
-  imgCuerpoUrlPersonaje,
-  onChange,
-}: {
-  era: Era;
-  imgUrlPersonaje: string | null;
-  imgCuerpoUrlPersonaje: string | null;
-  onChange: (
-    campo: "img_url" | "img_cuerpo_url",
-    url: string | null,
-  ) => void;
-}) {
-  const caraPropia = !!era.img_url;
-  const cuerpoPropia = !!era.img_cuerpo_url;
-  const caraMostrada = era.img_url || imgUrlPersonaje;
-  const cuerpoMostrado = era.img_cuerpo_url || imgCuerpoUrlPersonaje;
-
-  return (
-    <div className="flex gap-3">
-      {/* Cara */}
-      <div className="flex-1 min-w-0 rounded-xl overflow-hidden border border-primary/10">
-        <div className="flex items-center justify-between px-2 py-1 border-b border-primary/[0.06]">
-          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-            Cara
-          </span>
-          {caraPropia && (
-            <button
-              className="text-micro text-primary/25 hover:text-accent transition-colors"
-              title="Quitar imagen propia de esta era (usará la del personaje)"
-              type="button"
-              onClick={() => onChange("img_url", null)}
-            >
-              <X size={10} />
-            </button>
-          )}
-        </div>
-        <div
-          className="relative w-full group bg-primary/2"
-          style={{ aspectRatio: "1 / 1" }}
-        >
-          {caraMostrada ? (
-            <img
-              alt={era.label || "Cara"}
-              className="absolute inset-0 w-full h-full object-cover"
-              src={caraMostrada}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <UserCircle2 className="opacity-15" size={20} />
-            </div>
-          )}
-          {!caraPropia && caraMostrada && (
-            <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-micro font-bold bg-bg-main/80 backdrop-blur-sm text-primary/40">
-              Del personaje
-            </span>
-          )}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-bg-main/70 backdrop-blur-sm">
-            <PickerImagen
-              icon={<Maximize2 size={11} />}
-              label="Cambiar"
-              titulo="Cara de esta era"
-              value={era.img_url ?? ""}
-              onChange={(url) => onChange("img_url", url)}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Cuerpo */}
-      <div className="flex-1 min-w-0 rounded-xl overflow-hidden border border-primary/10">
-        <div className="flex items-center justify-between px-2 py-1 border-b border-primary/[0.06]">
-          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-            Cuerpo
-          </span>
-          {cuerpoPropia && (
-            <button
-              className="text-micro text-primary/25 hover:text-accent transition-colors"
-              title="Quitar imagen propia de esta era (usará la del personaje)"
-              type="button"
-              onClick={() => onChange("img_cuerpo_url", null)}
-            >
-              <X size={10} />
-            </button>
-          )}
-        </div>
-        <div
-          className="relative w-full group bg-primary/2"
-          style={{ aspectRatio: "1 / 1" }}
-        >
-          {cuerpoMostrado ? (
-            <img
-              alt="Cuerpo completo"
-              className="absolute inset-0 w-full h-full object-contain"
-              src={cuerpoMostrado}
-              style={{ objectPosition: "top center" }}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Maximize2 className="opacity-15" size={20} />
-            </div>
-          )}
-          {!cuerpoPropia && cuerpoMostrado && (
-            <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-micro font-bold bg-bg-main/80 backdrop-blur-sm text-primary/40">
-              Del personaje
-            </span>
-          )}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-bg-main/70 backdrop-blur-sm">
-            <PickerImagen
-              icon={<Maximize2 size={11} />}
-              label="Cambiar"
-              titulo="Cuerpo de esta era"
-              value={era.img_cuerpo_url ?? ""}
-              onChange={(url) => onChange("img_cuerpo_url", url)}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function EraDetallePanel({
   era,
   edad,
   fechaNacimiento,
   diasPorAnio,
-  imgUrlPersonaje,
-  imgCuerpoUrlPersonaje,
   onClose,
   onDelete,
   onAddRasgo,
@@ -330,16 +199,11 @@ function EraDetallePanel({
   onNotasChange,
   onLabelChange,
   onMomentoChange,
-  onImagenChange,
 }: {
   era: Era;
   edad: number | null;
   fechaNacimiento: number | null;
   diasPorAnio: number;
-  /** Fallback: imagen de cara del personaje base, si la era no tiene una propia. */
-  imgUrlPersonaje: string | null;
-  /** Fallback: imagen de cuerpo del personaje base, si la era no tiene una propia. */
-  imgCuerpoUrlPersonaje: string | null;
   onClose: () => void;
   onDelete: () => void;
   onAddRasgo: (r: string) => void;
@@ -347,10 +211,6 @@ function EraDetallePanel({
   onNotasChange: (v: string) => void;
   onLabelChange: (v: string) => void;
   onMomentoChange: (nuevoMomento: number) => void;
-  onImagenChange: (
-    campo: "img_url" | "img_cuerpo_url",
-    url: string | null,
-  ) => void;
 }) {
   const [nuevoRasgo, setNuevoRasgo] = useState("");
   const [edadStr, setEdadStr] = useState(edad != null ? String(edad) : "");
@@ -417,13 +277,6 @@ function EraDetallePanel({
           <X size={13} />
         </button>
       </div>
-
-      <EraImagenes
-        era={era}
-        imgCuerpoUrlPersonaje={imgCuerpoUrlPersonaje}
-        imgUrlPersonaje={imgUrlPersonaje}
-        onChange={onImagenChange}
-      />
 
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0">
@@ -620,17 +473,26 @@ export function PersonajeLineaDeTiempo({
   personajeId,
   fechaNacimiento,
   onFechaNacimientoChange,
-  imgUrlPersonaje,
-  imgCuerpoUrlPersonaje,
+  onEraSeleccionadaChange,
+  onChangeImagenEra,
 }: {
   personajeId: string;
   fechaNacimiento?: number | null;
   onFechaNacimientoChange?: (dia: number | null) => void;
-  /** Imagen de cara del personaje "base", usada como fallback cuando la
-   *  era seleccionada no tiene imagen propia. */
-  imgUrlPersonaje?: string | null;
-  /** Ídem para la imagen de cuerpo completo. */
-  imgCuerpoUrlPersonaje?: string | null;
+  /** Notifica cuál es la era actualmente seleccionada en la línea de
+   *  tiempo (o null si ninguna), para que el panel de imágenes de la
+   *  izquierda del editor pueda mostrar/editar la cara y el cuerpo
+   *  correspondientes a esa era en vez de las del personaje base. */
+  onEraSeleccionadaChange?: (era: Era | null) => void;
+  /** Expone la mutación de imagen por era hacia el panel de imágenes de
+   *  la izquierda del editor (que vive fuera de este componente). */
+  onChangeImagenEra?: (
+    fn: (
+      era: Era,
+      campo: "img_url" | "img_cuerpo_url",
+      url: string | null,
+    ) => void,
+  ) => void;
 }) {
   const { cal } = useCalendario();
   const diasPorAnio = useMemo(() => {
@@ -672,6 +534,17 @@ export function PersonajeLineaDeTiempo({
 
   const [selId, setSelId] = useState<string | null>(null);
   const selEra = eras.find((e) => e.id === selId) ?? null;
+
+  useEffect(() => {
+    onEraSeleccionadaChange?.(selEra);
+  }, [selEra, onEraSeleccionadaChange]);
+
+  useEffect(() => {
+    onChangeImagenEra?.(changeImagen);
+    // Solo se registra una vez: `changeImagen` es estable entre renders
+    // (no depende de estado que cambie su identidad).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAddEra = async () => {
     const num = parseInt(newMomento.trim(), 10);
@@ -1031,17 +904,12 @@ export function PersonajeLineaDeTiempo({
                 edad={edadSelEra}
                 era={selEra}
                 fechaNacimiento={fechaNacimiento ?? null}
-                imgCuerpoUrlPersonaje={imgCuerpoUrlPersonaje ?? null}
-                imgUrlPersonaje={imgUrlPersonaje ?? null}
                 onAddRasgo={(r) => addRasgo(selEra, r)}
                 onClose={() => setSelId(null)}
                 onDelete={() => {
                   deleteEra(selEra.id);
                   setSelId(null);
                 }}
-                onImagenChange={(campo, url) =>
-                  changeImagen(selEra, campo, url)
-                }
                 onLabelChange={(v) => changeLabel(selEra, v)}
                 onMomentoChange={(m) => changeMomento(selEra, m)}
                 onNotasChange={(v) => changeNotas(selEra, v)}
