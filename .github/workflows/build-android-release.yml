@@ -403,6 +403,119 @@ jobs:
           }
           echo "Firebase/google-services OK."
 
+      - name: Instalar el servicio de FCM (GarliaFirebaseMessagingService + PuenteFcm)
+        # Los .kt viven en src-tauri/android-templates/ (commiteados, fuera
+        # de gen/android que se borra en cada build) y se copian acá al
+        # paquete Java real de la app generada por Tauri.
+        run: |
+          DESTINO="src-tauri/gen/android/app/src/main/java/com/frani/garlia"
+          mkdir -p "$DESTINO"
+          cp src-tauri/android-templates/java/com/frani/garlia/GarliaFirebaseMessagingService.kt "$DESTINO/"
+          cp src-tauri/android-templates/java/com/frani/garlia/PuenteFcm.kt "$DESTINO/"
+          echo "Archivos copiados a $DESTINO:"
+          ls "$DESTINO"
+
+      - name: Registrar el puente FCM en MainActivity.kt
+        # `tauri android init` genera MainActivity.kt con una referencia al
+        # WebView interno de Tauri/WRY. Le agregamos una sola línea en
+        # onWebViewCreate (hook que Tauri sí expone) para registrar ese
+        # WebView en PuenteFcm — así el servicio de FCM puede llamar JS
+        # sobre él sin que nosotros toquemos el resto del archivo generado.
+        run: |
+          MAIN_ACTIVITY=$(find src-tauri/gen/android/app/src/main/java -name "MainActivity.kt")
+          if [ -z "$MAIN_ACTIVITY" ]; then
+            echo "::error::No se encontró MainActivity.kt generado por Tauri."
+            exit 1
+          fi
+          echo "MainActivity.kt encontrado en: $MAIN_ACTIVITY"
+
+          python3 - "$MAIN_ACTIVITY" << 'PYEOF'
+          import re
+          import sys
+
+          path = sys.argv[1]
+          with open(path) as f:
+              contenido = f.read()
+
+          if "PuenteFcm.registrarWebView" in contenido:
+              print("MainActivity.kt ya tiene el puente FCM registrado, no se toca.")
+              sys.exit(0)
+
+          # Tauri (WRY) expone un hook onWebViewCreate(webView, ...) en la
+          # MainActivity generada. Si existe, enganchamos ahí. Si el nombre
+          # exacto cambiara entre versiones de Tauri, este assert corta el
+          # build con un mensaje claro en vez de dejar el push silenciosamente roto.
+          patron = re.compile(r'(override fun onWebViewCreate\([^)]*\)\s*\{\n)')
+          nuevo_contenido, n = patron.subn(
+              r'\1        com.frani.garlia.PuenteFcm.registrarWebView(webView)\n',
+              contenido,
+              count=1,
+          )
+          assert n == 1, (
+              "No se encontró 'override fun onWebViewCreate(' en MainActivity.kt — "
+              "la API de Tauri pudo haber cambiado. Registrar el puente FCM a mano."
+          )
+
+          with open(path, "w") as f:
+              f.write(nuevo_contenido)
+          print("Puente FCM registrado en MainActivity.kt.")
+          PYEOF
+
+      - name: Agregar permiso y servicio de FCM al AndroidManifest.xml
+        run: |
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+
+          python3 - "$MANIFEST" << 'PYEOF'
+          import re
+          import sys
+
+          path = sys.argv[1]
+          with open(path) as f:
+              contenido = f.read()
+
+          cambios = False
+
+          # Permiso POST_NOTIFICATIONS (obligatorio desde Android 13 / API 33
+          # para poder mostrar notificaciones). Se pide en runtime del lado
+          # JS/Tauri; acá solo se declara en el manifest.
+          if "android.permission.POST_NOTIFICATIONS" not in contenido:
+              patron_manifest_open = re.compile(r'(<manifest[^>]*>\n)')
+              contenido, n = patron_manifest_open.subn(
+                  r'\1    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n',
+                  contenido,
+                  count=1,
+              )
+              assert n == 1, "No se encontró la etiqueta <manifest ...> de apertura."
+              cambios = True
+              print("Permiso POST_NOTIFICATIONS agregado.")
+
+          # Declaración del <service> de FCM, dentro de <application ...>.
+          if "GarliaFirebaseMessagingService" not in contenido:
+              service_block = (
+                  '        <service\n'
+                  '            android:name="com.frani.garlia.GarliaFirebaseMessagingService"\n'
+                  '            android:exported="false">\n'
+                  '            <intent-filter>\n'
+                  '                <action android:name="com.google.firebase.MESSAGING_EVENT" />\n'
+                  '            </intent-filter>\n'
+                  '        </service>\n'
+              )
+              patron_app_open = re.compile(r'(<application[^>]*>\n)')
+              contenido, n = patron_app_open.subn(r'\1' + service_block, contenido, count=1)
+              assert n == 1, "No se encontró la etiqueta <application ...> de apertura."
+              cambios = True
+              print("Servicio GarliaFirebaseMessagingService agregado.")
+
+          if cambios:
+              with open(path, "w") as f:
+                  f.write(contenido)
+          else:
+              print("AndroidManifest.xml ya tenía el permiso y el servicio, no se tocó.")
+          PYEOF
+
+          echo "Verificación final del manifest:"
+          grep -n "POST_NOTIFICATIONS\|GarliaFirebaseMessagingService" "$MANIFEST"
+
       - name: Build del APK universal (release, firmado)
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

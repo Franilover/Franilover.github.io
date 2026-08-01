@@ -74,7 +74,26 @@ export async function registrarPushSubscription(): Promise<void> {
   }
 }
 
-/** Da de baja la suscripción push del dispositivo actual (p. ej. al hacer logout). */
+/**
+ * Guarda el token FCM del dispositivo actual (APK Android vía Tauri). Se
+ * llama desde el puente nativo cuando Firebase entrega/renueva el token —
+ * ver FirebaseMessagingService.kt, que expone el token al WebView.
+ */
+export async function guardarTokenFcm(token: string): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("perfil_fcm_tokens").upsert(
+    { perfil_id: user.id, token },
+    { onConflict: "token" },
+  );
+}
+
+/** Da de baja el token FCM del dispositivo actual (p. ej. al hacer logout). */
+export async function darDeBajaTokenFcm(token: string): Promise<void> {
+  await supabase.from("perfil_fcm_tokens").delete().eq("token", token);
+}
 export async function darDeBajaPushSubscription(): Promise<void> {
   if (typeof window === "undefined") return;
   if (!("serviceWorker" in navigator)) return;

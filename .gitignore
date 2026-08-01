@@ -48,3 +48,4 @@ src-tauri/target
 src-tauri/gen
 public/dibujos-index.json
 public/sonidos-index.json
+supabase/*firebase-adminsdk*.json
