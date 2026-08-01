@@ -452,7 +452,16 @@ export default function DetalleConversacion() {
       void emitirEscribiendo(conversacionId, user.id, false);
     }
     try {
-      await enviarMensaje(conversacionId, contenido);
+      const enviado = await enviarMensaje(conversacionId, contenido);
+      // Optimista: lo agregamos ya mismo al estado local en vez de esperar
+      // a que vuelva por la suscripción realtime. Antes, quien enviaba
+      // dependía 100% de ver su propio INSERT reflejado por Realtime — si
+      // esa suscripción no estaba sana (canal caído, problema de RLS del
+      // lado del servidor, etc.), la persona ni siquiera veía los mensajes
+      // que ella misma acababa de escribir. El dedupe por id en
+      // suscribirseAMensajes evita que se duplique si el evento realtime
+      // también termina llegando.
+      setMensajes((prev) => (prev.some((p) => p.id === enviado.id) ? prev : [...prev, enviado]));
     } catch {
       setError("No se pudo enviar el mensaje.");
       setTexto(contenido);

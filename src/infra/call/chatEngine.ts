@@ -224,12 +224,12 @@ export async function enviarMensaje(
   conversacionId: string,
   contenido: string,
   adjunto?: { url: string; tipo: "imagen" | "audio" | "archivo" },
-): Promise<void> {
+): Promise<Mensaje> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("No hay sesión activa.");
-  if (!contenido.trim() && !adjunto) return;
+  if (!contenido.trim() && !adjunto) throw new Error("El mensaje está vacío.");
 
   const { data: nuevoMensaje, error } = await supabase
     .from("mensajes")
@@ -240,7 +240,7 @@ export async function enviarMensaje(
       adjunto_url: adjunto?.url ?? null,
       adjunto_tipo: adjunto?.tipo ?? null,
     })
-    .select("id")
+    .select("*")
     .single();
   if (error) throw error;
 
@@ -252,6 +252,8 @@ export async function enviarMensaje(
   if (nuevoMensaje?.id) {
     void dispararNotificacionMensaje(conversacionId, nuevoMensaje.id, user.id);
   }
+
+  return nuevoMensaje as Mensaje;
 }
 
 /**
@@ -404,8 +406,21 @@ export function _obtenerCanalConversacion(conversacionId: string): EntradaCanalC
     const canal = supabase.channel(topic);
     const listo = new Promise<void>((resolve) => {
       queueMicrotask(() => {
-        canal.subscribe((status) => {
-          if (status === "SUBSCRIBED") resolve();
+        canal.subscribe((status, err) => {
+          // Diagnóstico: si el canal no llega a "SUBSCRIBED" (por ejemplo
+          // CHANNEL_ERROR o TIMED_OUT), acá queda registrado en consola.
+          // CHANNEL_ERROR suele significar que la policy de RLS de Realtime
+          // sobre la tabla está rechazando al usuario actual (no puede leer
+          // esa fila/conversación), no un problema de red — conviene mirar
+          // la consola de quien reporta no ver mensajes.
+          if (status === "SUBSCRIBED") {
+            resolve();
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            console.warn(
+              `[chatEngine] Canal "${topic}" no se pudo suscribir (status: ${status}).`,
+              err ?? "",
+            );
+          }
         });
       });
     });
