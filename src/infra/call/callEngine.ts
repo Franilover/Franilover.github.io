@@ -197,6 +197,32 @@ export async function ofrecerLlamada(params: {
   });
 }
 
+/**
+ * Avisa a quien inició la llamada que fue aceptada, para que su lado
+ * también pase a "conectada" y se conecte a LiveKit. Antes esta señal
+ * nunca se enviaba: quien aceptaba se conectaba bien de su lado, pero
+ * quien llamó se quedaba para siempre viendo "Llamando…" porque nada le
+ * avisaba que ya podía conectarse.
+ */
+export async function aceptarLlamada(params: {
+  conversacionId: string;
+  llamadaId: string;
+  roomName: string;
+  paraId: string;
+  deId: string;
+}): Promise<void> {
+  await enviarSenal({
+    tipo: "aceptada",
+    conversacionId: params.conversacionId,
+    llamadaId: params.llamadaId,
+    roomName: params.roomName,
+    deId: params.deId,
+    deNombre: null,
+    deAvatar: null,
+    paraId: params.paraId,
+  });
+}
+
 export async function rechazarLlamada(params: {
   conversacionId: string;
   llamadaId: string;

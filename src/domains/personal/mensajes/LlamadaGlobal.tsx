@@ -19,6 +19,7 @@ import { Phone, PhoneOff, Mic, MicOff } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
 import {
+  aceptarLlamada,
   colgarLlamada,
   marcarEstadoLlamada,
   pedirTokenLlamada,
@@ -63,6 +64,14 @@ export default function LlamadaGlobal() {
           roomName: senal.roomName,
           otro: { id: senal.deId, nombre: senal.deNombre, avatar: senal.deAvatar },
         });
+      }
+      if (senal.tipo === "aceptada") {
+        // Solo nos interesa si somos quien está llamando (estado "llamando")
+        // y es la respuesta a nuestra propia llamada.
+        const actual = useLlamadaStore.getState();
+        if (actual.estado === "llamando" && actual.llamadaId === senal.llamadaId) {
+          marcarConectada();
+        }
       }
       if (senal.tipo === "rechazada" || senal.tipo === "colgada") {
         // El otro lado cortó o rechazó: cerramos todo de nuestro lado también.
@@ -148,6 +157,20 @@ export default function LlamadaGlobal() {
     finalizar();
   };
 
+  const handleAceptar = async () => {
+    marcarConectada();
+    if (llamadaId) void marcarEstadoLlamada(llamadaId, "aceptada").catch(() => {});
+    if (conversacionId && llamadaId && roomName && otro && user) {
+      await aceptarLlamada({
+        conversacionId,
+        llamadaId,
+        roomName,
+        paraId: otro.id,
+        deId: user.id,
+      }).catch(() => {});
+    }
+  };
+
   const toggleMic = async () => {
     if (!roomRef.current) return;
     const nuevo = !micOn;
@@ -205,10 +228,7 @@ export default function LlamadaGlobal() {
             <button
               className="flex items-center justify-center rounded-full"
               style={{ width: 56, height: 56, background: "#22c55e" }}
-              onClick={() => {
-                if (llamadaId) void marcarEstadoLlamada(llamadaId, "aceptada").catch(() => {});
-                marcarConectada();
-              }}
+              onClick={() => void handleAceptar()}
               aria-label="Aceptar"
             >
               <Phone className="text-white" size={22} />
