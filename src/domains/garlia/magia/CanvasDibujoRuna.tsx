@@ -250,7 +250,14 @@ export function CanvasDibujoRuna({
     const ctx = canvas.getContext("2d");
     ctx?.scale(dpr, dpr);
     redibujarFondo();
-  }, [tamano, redibujarFondo]);
+    // Solo se necesita re-setear el tamaño físico del canvas (lo cual
+    // limpia el bitmap) cuando cambia el tamaño real — no cada vez que
+    // cambia el trazo fantasma o cualquier otra dependencia interna de
+    // redibujarFondo. Si no, cada onTrazoCompleto (que típicamente hace
+    // que el padre actualice trazoFantasma) dispara un resize que borra
+    // el trazo recién dibujado antes de que se vuelva a pintar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tamano]);
 
   useEffect(() => {
     puntosRef.current = [];
@@ -350,6 +357,17 @@ export function CanvasDibujoRuna({
     redibujarFondo();
     dibujarTrazoConfirmado();
   }, [redibujarFondo, dibujarTrazoConfirmado]);
+
+  // El fondo puede cambiar sin que cambie el tamaño del canvas — el caso
+  // típico es justo al confirmar un trazo: el padre lo recibe y a veces
+  // lo vuelve a pasar como trazoFantasma, lo que cambia la identidad de
+  // redibujarFondo. Sin este efecto, ese redibujado de fondo pisaba el
+  // trazo recién dibujado (quedaba en puntosRef pero no se repintaba) y
+  // parecía que el trazo "se escondía" hasta la próxima interacción.
+  useEffect(() => {
+    redibujarTodo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [redibujarFondo]);
 
   // ── Modo mano alzada (comportamiento original) ─────────────────────────
   const onPointerDownLibre = (e: React.PointerEvent<HTMLCanvasElement>) => {
