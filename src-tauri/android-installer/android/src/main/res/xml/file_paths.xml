@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Le dice al FileProvider qué carpetas puede exponer via content:// URIs.
-  El APK descargado se guarda en el directorio de datos privados de la app
-  (files dir), así que solo necesitamos exponer esa carpeta — nada de
-  almacenamiento externo ni permisos extra de storage.
+  El APK se descarga con setDestinationInExternalFilesDir(DIRECTORY_DOWNLOADS,
+  ...) en InstallerPlugin.kt, es decir en el directorio EXTERNO propio de la
+  app (getExternalFilesDir), NO en el files dir interno. Por eso acá hay que
+  declarar <external-files-path>, no <files-path> — si no coincide con la
+  carpeta real, FileProvider.getUriForFile() falla con
+  "Failed to find configured root..." al instalar.
 -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <files-path name="apk_updates" path="updates/" />
+    <external-files-path name="apk_updates" path="Download/" />
 </paths>

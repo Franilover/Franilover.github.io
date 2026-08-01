@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manifest propio del plugin android-installer. Gradle/Tauri lo mergea
+  automáticamente dentro del AndroidManifest.xml final de la app (el que
+  vive en gen/android/app/src/main/AndroidManifest.xml) al buildear.
+
+  Sin este archivo, ni el permiso REQUEST_INSTALL_PACKAGES ni el <provider>
+  de FileProvider quedan declarados en ningún lado, y
+  FileProvider.getUriForFile() en InstallerPlugin.kt falla siempre con
+  "Couldn't find meta-data for provider with authority
+  com.frani.garlia.fileprovider" — el error en rojo que se ve al tocar
+  "Actualizar" en la app.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Requerido desde Android 8 (API 26) para poder lanzar el Intent de
+         instalación de un APK que no viene de una app store. Se chequea en
+         runtime con canRequestPackageInstalls() en InstallerPlugin.kt, pero
+         igual hay que declararlo acá para que el sistema exponga el toggle
+         correspondiente en Ajustes → "Instalar apps desconocidas". -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <!-- authorities usa ${applicationId}, que Gradle resuelve al mergear
+             este manifest con el de la app (queda com.frani.garlia.fileprovider).
+             Debe coincidir exactamente con el string usado en
+             FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", apkFile)
+             dentro de InstallerPlugin.kt. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true"
+            tools:replace="android:authorities"
+            xmlns:tools="http://schemas.android.com/tools">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+</manifest>
