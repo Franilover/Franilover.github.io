@@ -2937,6 +2937,26 @@ function EventoDetalleFlotante({
 // ─── EraDropdown ─────────────────────────────────────────────────────────────
 // Selector compacto de era con diseño consistente con el resto del panel.
 
+// Puntaje de similitud simple para búsqueda difusa: prioriza coincidencia
+// exacta > empieza-con > substring > coincidencia de caracteres en orden.
+function similitudTexto(query: string, texto: string): number {
+  const q = query.trim().toLowerCase();
+  const t = texto.toLowerCase();
+  if (!q) return 0;
+  if (t === q) return 1000;
+  if (t.startsWith(q)) return 500 - t.length;
+  const idx = t.indexOf(q);
+  if (idx >= 0) return 300 - idx;
+  // Subsecuencia: todas las letras de q aparecen en orden dentro de t
+  let ti = 0;
+  for (let qi = 0; qi < q.length; qi++) {
+    const found = t.indexOf(q[qi], ti);
+    if (found === -1) return -1;
+    ti = found + 1;
+  }
+  return 100 - t.length;
+}
+
 function EraDropdown({
   eras,
   value,
@@ -2949,13 +2969,31 @@ function EraDropdown({
   onChange: (id: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlightIdx, setHighlightIdx] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{
     top: number;
     left: number;
     width: number;
   } | null>(null);
+
+  // Lista filtrada/ordenada por similitud con la query.
+  const filtradas = useMemo(() => {
+    const q = query.trim();
+    if (!q) return eras;
+    return eras
+      .map((e) => ({ e, score: similitudTexto(q, e.nombre) }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.e);
+  }, [eras, query]);
+
+  useEffect(() => {
+    setHighlightIdx(0);
+  }, [query, open]);
 
   // Cerrar al click fuera
   useEffect(() => {
@@ -2975,12 +3013,12 @@ function EraDropdown({
     const update = () => {
       const r = triggerRef.current?.getBoundingClientRect();
       if (!r) return;
-      const w = Math.max(r.width, 160);
+      const w = Math.max(r.width, 180);
       let left = r.left;
       if (left + w > window.innerWidth - 8)
         left = Math.max(8, window.innerWidth - w - 8);
       const spaceBelow = window.innerHeight - r.bottom;
-      const estimatedH = eras.length * 28 + 36;
+      const estimatedH = Math.min(filtradas.length, 8) * 28 + 76;
       const top =
         spaceBelow < estimatedH && r.top > estimatedH
           ? r.top - estimatedH - 4
@@ -2994,7 +3032,48 @@ function EraDropdown({
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
     };
-  }, [open, eras.length]);
+  }, [open, filtradas.length]);
+
+  // Autofocus del buscador al abrir
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  const elegir = (id: string | null) => {
+    onChange(id === value ? (id === null ? null : id) : id);
+    setOpen(false);
+    setQuery("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Lista navegable: índice 0 = "Todas", 1..n = eras filtradas
+    const total = filtradas.length + 1;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIdx((i) => (i + 1) % total);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIdx((i) => (i - 1 + total) % total);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightIdx === 0) {
+        elegir(null);
+      } else {
+        const era = filtradas[highlightIdx - 1];
+        if (era) elegir(era.id);
+        else if (filtradas.length > 0 && query.trim()) {
+          // Sin selección explícita: usar el de mayor similitud
+          elegir(filtradas[0].id);
+        }
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+    }
+  };
 
   return (
     <div className="relative">
@@ -3034,108 +3113,136 @@ function EraDropdown({
         createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[9999] rounded-xl border shadow-lg overflow-hidden py-1"
+            className="fixed z-[9999] rounded-xl border shadow-lg overflow-hidden flex flex-col"
             style={{
               top: pos.top,
               left: pos.left,
               minWidth: pos.width,
+              maxHeight: 320,
               background: "var(--bg-main)",
               borderColor:
                 "color-mix(in srgb, var(--primary) 12%, transparent)",
             }}
           >
-            {/* Opción "Todas" */}
-            <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
-              style={{
-                color:
-                  value === null
-                    ? "var(--primary)"
-                    : "color-mix(in srgb, var(--primary) 45%, transparent)",
-                background:
-                  value === null
-                    ? "color-mix(in srgb, var(--primary) 7%, transparent)"
-                    : "transparent",
-                fontSize: "8px",
-                fontWeight: 900,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-              }}
-              type="button"
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-            >
-              {value === null && <Check className="shrink-0" size={8} />}
-              <span className={value === null ? "" : "pl-4"}>
-                Todas las eras
-              </span>
-            </button>
-
-            {/* Separador */}
+            {/* Buscador */}
             <div
+              className="px-2 py-1.5 border-b"
               style={{
-                height: 1,
-                margin: "2px 8px",
-                background:
+                borderColor:
                   "color-mix(in srgb, var(--primary) 8%, transparent)",
               }}
-            />
+            >
+              <input
+                ref={inputRef}
+                className="w-full bg-transparent outline-none text-micro px-1 py-1"
+                placeholder="Buscar era…"
+                style={{ color: "var(--primary)" }}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
 
-            {/* Opciones de era */}
-            {eras.map((era: any) => {
-              const activo = value === era.id;
-              return (
-                <button
-                  key={era.id}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
-                  style={{
-                    color: activo
+            <div className="overflow-y-auto py-1">
+              {/* Opción "Todas" */}
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
+                style={{
+                  color:
+                    value === null
                       ? "var(--primary)"
                       : "color-mix(in srgb, var(--primary) 45%, transparent)",
-                    background: activo
-                      ? "color-mix(in srgb, var(--primary) 7%, transparent)"
-                      : "transparent",
-                    fontSize: "8px",
-                    fontWeight: 900,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                  }}
-                  type="button"
-                  onClick={() => {
-                    onChange(activo ? null : era.id);
-                    setOpen(false);
-                  }}
-                >
-                  {activo ? (
-                    <Check className="shrink-0" size={8} />
-                  ) : (
-                    <span
+                  background:
+                    highlightIdx === 0
+                      ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                      : value === null
+                        ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                        : "transparent",
+                  fontSize: "8px",
+                  fontWeight: 900,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                }}
+                type="button"
+                onMouseEnter={() => setHighlightIdx(0)}
+                onClick={() => elegir(null)}
+              >
+                {value === null && <Check className="shrink-0" size={8} />}
+                <span className={value === null ? "" : "pl-4"}>
+                  Todas las eras
+                </span>
+              </button>
+
+              {/* Separador */}
+              <div
+                style={{
+                  height: 1,
+                  margin: "2px 8px",
+                  background:
+                    "color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+              />
+
+              {filtradas.length === 0 ? (
+                <p className="px-3 py-2 text-micro text-primary/25">
+                  Sin resultados
+                </p>
+              ) : (
+                filtradas.map((era: any, idx: number) => {
+                  const activo = value === era.id;
+                  const destacado = highlightIdx === idx + 1;
+                  return (
+                    <button
+                      key={era.id}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
                       style={{
-                        width: 8,
-                        display: "inline-block",
-                        flexShrink: 0,
+                        color: activo
+                          ? "var(--primary)"
+                          : "color-mix(in srgb, var(--primary) 45%, transparent)",
+                        background: destacado
+                          ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                          : activo
+                            ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                            : "transparent",
+                        fontSize: "8px",
+                        fontWeight: 900,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
                       }}
-                    />
-                  )}
-                  <span>{era.nombre}</span>
-                  {era.anio_inicio != null && (
-                    <span
-                      style={{
-                        marginLeft: "auto",
-                        opacity: 0.4,
-                        fontSize: "7px",
-                        fontWeight: 700,
-                      }}
+                      type="button"
+                      onMouseEnter={() => setHighlightIdx(idx + 1)}
+                      onClick={() => elegir(activo ? null : era.id)}
                     >
-                      {era.anio_inicio}
-                      {era.anio_fin != null ? `–${era.anio_fin}` : "+"}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                      {activo ? (
+                        <Check className="shrink-0" size={8} />
+                      ) : (
+                        <span
+                          style={{
+                            width: 8,
+                            display: "inline-block",
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <span>{era.nombre}</span>
+                      {era.anio_inicio != null && (
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            opacity: 0.4,
+                            fontSize: "7px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {era.anio_inicio}
+                          {era.anio_fin != null ? `–${era.anio_fin}` : "+"}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>,
           document.body,
         )}
@@ -3161,8 +3268,10 @@ function PersonajeFilterDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [highlightIdx, setHighlightIdx] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{
     top: number;
     left: number;
@@ -3171,11 +3280,21 @@ function PersonajeFilterDropdown({
 
   const activo = personajes.find((p) => p.id === value) ?? null;
 
+  // Ordenados por similitud con la query (coincidencia exacta > empieza-con
+  // > substring > subsecuencia de caracteres).
   const filtrados = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     if (!q) return personajes;
-    return personajes.filter((p) => p.nombre.toLowerCase().includes(q));
+    return personajes
+      .map((p) => ({ p, score: similitudTexto(q, p.nombre) }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.p);
   }, [personajes, query]);
+
+  useEffect(() => {
+    setHighlightIdx(0);
+  }, [query, open]);
 
   // Cerrar al click fuera
   useEffect(() => {
@@ -3213,6 +3332,48 @@ function PersonajeFilterDropdown({
       window.removeEventListener("resize", update);
     };
   }, [open, personajes.length]);
+
+  // Autofocus del buscador al abrir
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  const elegir = (id: string | null) => {
+    onChange(id);
+    setOpen(false);
+    setQuery("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Lista navegable: índice 0 = "Todos", 1..n = personajes filtrados
+    const total = filtrados.length + 1;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIdx((i) => (i + 1) % total);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIdx((i) => (i - 1 + total) % total);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightIdx === 0) {
+        elegir(null);
+      } else {
+        const p = filtrados[highlightIdx - 1];
+        if (p) {
+          elegir(activo?.id === p.id ? null : p.id);
+        } else if (filtrados.length > 0 && query.trim()) {
+          const top = filtrados[0];
+          elegir(activo?.id === top.id ? null : top.id);
+        }
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+    }
+  };
 
   return (
     <div className="relative">
@@ -3273,12 +3434,13 @@ function PersonajeFilterDropdown({
               }}
             >
               <input
-                autoFocus
+                ref={inputRef}
                 className="w-full bg-transparent outline-none text-micro px-1 py-1"
                 placeholder="Buscar personaje…"
                 style={{ color: "var(--primary)" }}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
               />
             </div>
 
@@ -3292,20 +3454,19 @@ function PersonajeFilterDropdown({
                       ? "var(--primary)"
                       : "color-mix(in srgb, var(--primary) 45%, transparent)",
                   background:
-                    value === null
-                      ? "color-mix(in srgb, var(--primary) 7%, transparent)"
-                      : "transparent",
+                    highlightIdx === 0
+                      ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                      : value === null
+                        ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                        : "transparent",
                   fontSize: "8px",
                   fontWeight: 900,
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
                 }}
                 type="button"
-                onClick={() => {
-                  onChange(null);
-                  setOpen(false);
-                  setQuery("");
-                }}
+                onMouseEnter={() => setHighlightIdx(0)}
+                onClick={() => elegir(null)}
               >
                 {value === null && <Check className="shrink-0" size={8} />}
                 <span className={value === null ? "" : "pl-4"}>
@@ -3327,8 +3488,9 @@ function PersonajeFilterDropdown({
                   Sin resultados
                 </p>
               ) : (
-                filtrados.map((p) => {
+                filtrados.map((p, idx) => {
                   const activoOpt = value === p.id;
+                  const destacado = highlightIdx === idx + 1;
                   return (
                     <button
                       key={p.id}
@@ -3337,20 +3499,19 @@ function PersonajeFilterDropdown({
                         color: activoOpt
                           ? "var(--primary)"
                           : "color-mix(in srgb, var(--primary) 45%, transparent)",
-                        background: activoOpt
-                          ? "color-mix(in srgb, var(--primary) 7%, transparent)"
-                          : "transparent",
+                        background: destacado
+                          ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                          : activoOpt
+                            ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                            : "transparent",
                         fontSize: "8px",
                         fontWeight: 900,
                         letterSpacing: "0.12em",
                         textTransform: "uppercase",
                       }}
                       type="button"
-                      onClick={() => {
-                        onChange(activoOpt ? null : p.id);
-                        setOpen(false);
-                        setQuery("");
-                      }}
+                      onMouseEnter={() => setHighlightIdx(idx + 1)}
+                      onClick={() => elegir(activoOpt ? null : p.id)}
                     >
                       {activoOpt ? (
                         <Check className="shrink-0" size={8} />
@@ -3592,7 +3753,7 @@ function SidebarCumpleanosCanciones({
 
   return (
     <div
-      className="shrink-0 w-[220px] border-l overflow-y-auto flex flex-col gap-4 px-3 py-3"
+      className="shrink-0 w-[196px] border-l overflow-y-auto flex flex-col gap-4 px-3 py-3"
       style={{
         borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
       }}
@@ -3600,7 +3761,7 @@ function SidebarCumpleanosCanciones({
       {showCumpleanos && cumpleanos.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <span
-            className="text-micro font-black uppercase tracking-widest px-0.5"
+            className="text-micro font-black uppercase tracking-widest px-0.5 text-center"
             style={{
               color: "color-mix(in srgb, var(--primary) 35%, transparent)",
             }}
@@ -3611,7 +3772,7 @@ function SidebarCumpleanosCanciones({
             {cumpleanos.map((p) => (
               <button
                 key={p.id}
-                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-lg text-center transition-all"
+                className="flex flex-col items-start justify-center gap-0.5 px-2 py-1.5 rounded-lg text-left transition-all"
                 style={{
                   background:
                     "color-mix(in srgb, var(--primary) 2%, transparent)",
@@ -3647,7 +3808,7 @@ function SidebarCumpleanosCanciones({
       {showCanciones && canciones.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <span
-            className="text-micro font-black uppercase tracking-widest px-0.5"
+            className="text-micro font-black uppercase tracking-widest px-0.5 text-center"
             style={{
               color: "color-mix(in srgb, var(--primary) 35%, transparent)",
             }}
@@ -3658,7 +3819,7 @@ function SidebarCumpleanosCanciones({
             {canciones.map((c) => (
               <button
                 key={c.id}
-                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-lg text-center transition-all"
+                className="flex flex-col items-start justify-center gap-0.5 px-2 py-1.5 rounded-lg text-left transition-all"
                 style={{
                   background:
                     "color-mix(in srgb, var(--primary) 2%, transparent)",
