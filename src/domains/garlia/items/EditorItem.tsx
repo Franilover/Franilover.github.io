@@ -25,7 +25,7 @@
  */
 
 
-import { Bug, Package, Save, Trash2 } from "lucide-react";
+import { Bug, Dices, Package, Save, Trash2, X } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
@@ -71,6 +71,7 @@ export function EditorItem({
 }) {
   const [form, setForm] = useState<Item>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [showModalDnd, setShowModalDnd] = useState(false);
   const { confirm, ConfirmModal } = useConfirm();
   const { onWikilink } = useWikilink();
 
@@ -169,6 +170,15 @@ export function EditorItem({
           value={form.nombre ?? ""}
           onChange={field("nombre")}
         />
+
+        <button
+          className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
+          title="Reglas D&D 2024"
+          type="button"
+          onClick={() => setShowModalDnd(true)}
+        >
+          <Dices size={13} />
+        </button>
 
         <div className="shrink-0 flex items-center gap-1.5">
           <SaveIndicator status={status} />
@@ -343,6 +353,95 @@ export function EditorItem({
               <PanelReglasDnd form={form} onChange={(cambios) => setForm((f: Item) => ({ ...f, ...cambios }))} />
             </div>
           </div>
+        </div>
+      </div>
+
+      {showModalDnd && (
+        <ModalReglasDnd
+          form={form}
+          nombre={form.nombre}
+          onChange={(cambios) => setForm((f: Item) => ({ ...f, ...cambios }))}
+          onClose={() => setShowModalDnd(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal de reglas D&D ────────────────────────────────────────────────────
+// Antes vivía inline en el cuerpo del editor; ahora se accede desde el botón
+// de dado junto al nombre, así el editor queda enfocado en lore/descripción
+// y las reglas mecánicas (D&D) quedan en un modal aparte.
+function ModalReglasDnd({
+  form,
+  nombre,
+  onChange,
+  onClose,
+}: {
+  form: Item;
+  nombre: string;
+  onChange: (cambios: Partial<Item>) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", k);
+    return () => document.removeEventListener("keydown", k);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-80 flex items-center justify-center p-4"
+      style={{
+        background: "color-mix(in srgb, var(--primary) 30%, transparent)",
+        backdropFilter: "blur(6px)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl overflow-hidden shadow-2xl"
+        style={{
+          background: "var(--bg-main)",
+          border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+          animation: "popIn 160ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-center gap-3 px-4 py-3 border-b"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+          }}
+        >
+          <div
+            className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 10%, transparent)",
+              color: "var(--primary)",
+            }}
+          >
+            <Dices size={13} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-micro font-black uppercase tracking-widest text-primary/40">
+              Reglas D&D
+            </p>
+            <p className="text-xs font-bold text-primary truncate">{nombre || "Sin nombre"}</p>
+          </div>
+          <button
+            className="shrink-0 p-1 rounded-lg text-primary/30 hover:text-primary hover:bg-primary/8 transition-all"
+            type="button"
+            onClick={onClose}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="p-4 max-h-[70vh] overflow-y-auto">
+          <PanelReglasDnd form={form} onChange={onChange} />
         </div>
       </div>
     </div>

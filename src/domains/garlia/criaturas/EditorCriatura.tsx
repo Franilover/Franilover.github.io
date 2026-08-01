@@ -21,6 +21,7 @@
 import {
   Bug,
   Brain,
+  Dices,
   Globe,
   MapPin,
   Package,
@@ -104,6 +105,7 @@ export function EditorCriatura({
 }) {
   const [form, setForm] = useState<Criatura>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [showModalDnd, setShowModalDnd] = useState(false);
   const { confirm, ConfirmModal } = useConfirm();
   const { onWikilink } = useWikilink();
 
@@ -286,6 +288,15 @@ export function EditorCriatura({
             onChange={field("nombre")}
           />
 
+          <button
+            className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
+            title="Reglas D&D 2024"
+            type="button"
+            onClick={() => setShowModalDnd(true)}
+          >
+            <Dices size={13} />
+          </button>
+
           <div className="shrink-0 flex items-center gap-1.5">
             <SaveIndicator status={status} />
             <button
@@ -356,48 +367,9 @@ export function EditorCriatura({
             </div>
           </div>
 
-          {/* Descripción D&D — texto plano, se copia a la ficha del
-              personaje que elija esta especie (rasgos raciales, etc). */}
-          <div className="flex flex-col gap-1">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/30">
-              Descripción D&D
-            </label>
-            <textarea
-              className="w-full bg-primary/[0.03] border border-primary/10 rounded-lg px-2.5 py-1.5 text-micro text-primary outline-none focus:border-primary/25 resize-none placeholder:text-primary/25 leading-relaxed"
-              placeholder="Rasgos raciales, resistencias, velocidad especial… lo que verá el jugador en su ficha al elegir esta especie."
-              rows={4}
-              value={form.descripcion_dnd ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  descripcion_dnd: e.target.value || null,
-                }))
-              }
-            />
-          </div>
-
-          {/* Ficha de combate D&D 2024 — CA, HP, velocidades, stats,
-              salvaciones, habilidades, sentidos, RC/PX, resistencias/
-              inmunidades, rasgos y acciones. Colapsada por defecto: es
-              mucha info y la mayoría de las criaturas (decorativas, sin
-              stat block) no la necesitan abierta todo el tiempo. */}
-          <details className="rounded-xl border border-primary/8 open:pb-3">
-            <summary
-              className="flex items-center gap-2 px-2.5 py-2 cursor-pointer select-none rounded-xl"
-              style={{ background: "color-mix(in srgb, var(--primary) 2%, transparent)" }}
-            >
-              <Shield size={11} className="text-primary/35" />
-              <span className="text-[7.5px] font-black uppercase tracking-[0.28em] text-primary/25">
-                Ficha de combate (D&D 2024)
-              </span>
-            </summary>
-            <div className="px-2.5 pt-3">
-              <CriaturaStatsDndEditor
-                valor={form.stats_dnd}
-                onCambiar={(v) => setForm((f) => ({ ...f, stats_dnd: v }))}
-              />
-            </div>
-          </details>
+          {/* Descripción D&D y Ficha de combate ahora viven en el modal de
+              reglas D&D (botón de dado junto al nombre) — ver ModalReglasDndCriatura
+              más abajo. */}
 
           {/* Clasificación */}
           <div
@@ -745,6 +717,130 @@ export function EditorCriatura({
           </div>
         </div>
       )}
+
+      {showModalDnd && (
+        <ModalReglasDndCriatura
+          descripcionDnd={form.descripcion_dnd ?? ""}
+          nombre={form.nombre}
+          statsDnd={form.stats_dnd}
+          onChangeDescripcionDnd={(v) =>
+            setForm((f) => ({ ...f, descripcion_dnd: v || null }))
+          }
+          onChangeStatsDnd={(v) => setForm((f) => ({ ...f, stats_dnd: v }))}
+          onClose={() => setShowModalDnd(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal de reglas D&D ────────────────────────────────────────────────────
+// Antes "Descripción D&D" y la ficha de combate vivían inline en el cuerpo
+// del editor; ahora se acceden desde el botón de dado junto al nombre, así
+// el editor principal queda enfocado en lore/hábitat/relaciones y las
+// reglas mecánicas (D&D) quedan agrupadas en un modal aparte.
+function ModalReglasDndCriatura({
+  nombre,
+  descripcionDnd,
+  statsDnd,
+  onChangeDescripcionDnd,
+  onChangeStatsDnd,
+  onClose,
+}: {
+  nombre: string;
+  descripcionDnd: string;
+  statsDnd: Criatura["stats_dnd"];
+  onChangeDescripcionDnd: (v: string) => void;
+  onChangeStatsDnd: (v: Criatura["stats_dnd"]) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", k);
+    return () => document.removeEventListener("keydown", k);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-80 flex items-center justify-center p-4"
+      style={{
+        background: "color-mix(in srgb, var(--primary) 30%, transparent)",
+        backdropFilter: "blur(6px)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-xl overflow-hidden shadow-2xl"
+        style={{
+          background: "var(--bg-main)",
+          border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+          animation: "popIn 160ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-center gap-3 px-4 py-3 border-b"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+          }}
+        >
+          <div
+            className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 10%, transparent)",
+              color: "var(--primary)",
+            }}
+          >
+            <Dices size={13} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-micro font-black uppercase tracking-widest text-primary/40">
+              Reglas D&D
+            </p>
+            <p className="text-xs font-bold text-primary truncate">{nombre || "Sin nombre"}</p>
+          </div>
+          <button
+            className="shrink-0 p-1 rounded-lg text-primary/30 hover:text-primary hover:bg-primary/8 transition-all"
+            type="button"
+            onClick={onClose}
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="p-4 max-h-[75vh] overflow-y-auto flex flex-col gap-3">
+          {/* Descripción D&D — texto plano, se copia a la ficha del
+              personaje que elija esta especie (rasgos raciales, etc). */}
+          <div className="flex flex-col gap-1">
+            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/30">
+              Descripción D&D
+            </label>
+            <textarea
+              className="w-full bg-primary/[0.03] border border-primary/10 rounded-lg px-2.5 py-1.5 text-micro text-primary outline-none focus:border-primary/25 resize-none placeholder:text-primary/25 leading-relaxed"
+              placeholder="Rasgos raciales, resistencias, velocidad especial… lo que verá el jugador en su ficha al elegir esta especie."
+              rows={4}
+              value={descripcionDnd}
+              onChange={(e) => onChangeDescripcionDnd(e.target.value)}
+            />
+          </div>
+
+          {/* Ficha de combate D&D 2024 — CA, HP, velocidades, stats,
+              salvaciones, habilidades, sentidos, RC/PX, resistencias/
+              inmunidades, rasgos y acciones. */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 px-0.5">
+              <Shield size={11} className="text-primary/35" />
+              <span className="text-[7.5px] font-black uppercase tracking-[0.28em] text-primary/25">
+                Ficha de combate (D&D 2024)
+              </span>
+            </div>
+            <CriaturaStatsDndEditor valor={statsDnd} onCambiar={onChangeStatsDnd} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
