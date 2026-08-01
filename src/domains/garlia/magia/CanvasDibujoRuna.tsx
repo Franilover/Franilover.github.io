@@ -24,7 +24,7 @@
 import { Eraser, Minus, PenTool, Redo2 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Punto } from "./dollarOneRecognizer";
+import { suavizarTrazo, type Punto } from "./dollarOneRecognizer";
 import { clampAForma, verticesPoligono, type FormaLimite } from "./formasLimite";
 
 type Herramienta = "libre" | "recta";
@@ -262,7 +262,12 @@ export function CanvasDibujoRuna({
     if (!dibujando.current) return;
     dibujando.current = false;
     if (puntosRef.current.length > 1) {
-      onTrazoCompleto([...puntosRef.current]);
+      // El suavizado (media móvil) solo tiene sentido para mano alzada:
+      // promedia puntos vecinos para limar el temblor del gesto. Aplicado
+      // a un trazo de líneas rectas, en cambio, "limaría" los vértices
+      // (las esquinas exactas entre segmentos) y deformaría la figura —
+      // por eso el modo recta nunca pasa por acá.
+      onTrazoCompleto(suavizarTrazo([...puntosRef.current]));
     }
   };
 
