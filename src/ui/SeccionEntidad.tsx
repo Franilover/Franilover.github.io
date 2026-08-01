@@ -196,8 +196,10 @@ export const SeccionEntidad = ({
     <div
       ref={containerRef}
       className={
-        fill ? "flex-1 min-h-0 flex flex-col" : "shrink-0 flex flex-col"
+        (fill ? "flex-1 min-h-0 flex flex-col" : "shrink-0 flex flex-col") +
+        " relative"
       }
+      style={open ? { zIndex: 30 } : undefined}
     >
       {/* ── Cabecera ── */}
       <div
@@ -244,15 +246,20 @@ export const SeccionEntidad = ({
         </button>
       </div>
 
-      {/* ── Dropdown mini-combo ── */}
+      {/* ── Dropdown mini-combo ──
+          Flota en position: absolute (no empuja el layout de las
+          secciones siguientes) y con z-index alto para quedar siempre
+          por encima de las cabeceras/contenido de otras secciones,
+          incluso cuando esta sección está más abajo en la barra lateral. */}
       {open && (
         <div
-          className="shrink-0 mx-2 mb-1.5 rounded-lg overflow-hidden"
+          className="absolute left-2 right-2 top-full mt-0.5 rounded-lg overflow-hidden"
           style={{
             border: borderFocus,
             background: "var(--bg-main)",
             boxShadow:
               "0 6px 20px color-mix(in srgb, var(--primary) 10%, transparent)",
+            zIndex: 45,
           }}
         >
           {/* Búsqueda */}

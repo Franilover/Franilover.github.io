@@ -327,12 +327,22 @@ export function FormularioCiudad({
             </div>
           </div>
 
-          {/* Entidades relacionadas */}
-          <div className="flex flex-col sm:flex-row sm:items-stretch gap-4">
+          {/* Entidades relacionadas — mismo diseño que la barra de entidades
+              de EditorCriatura: fila horizontal, sin envoltorio decorado,
+              separadas por borde, con grid de tarjetas para lo seleccionado. */}
+          <div
+            className="flex flex-col sm:flex-row sm:items-stretch border rounded-xl overflow-hidden"
+            style={{
+              borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+              background: "color-mix(in srgb, var(--primary) 1.5%, transparent)",
+            }}
+          >
             {/* Personajes */}
             <div
-              className="min-w-0 rounded-xl overflow-hidden flex flex-col bg-primary/[0.015]"
-              style={{ flexGrow: Math.max(personajes.length, 1), flexBasis: 0 }}
+              className="flex-1 flex flex-col min-w-0 border-b sm:border-b-0 sm:border-r"
+              style={{
+                borderColor: "color-mix(in srgb, var(--primary) 7%, transparent)",
+              }}
             >
               <SeccionEntidad
                 allEntities={todosPersonajes.map((p) => ({
@@ -340,8 +350,10 @@ export function FormularioCiudad({
                   nombre: p.nombre,
                   imagen_url: p.img_url ?? null,
                 }))}
+                columns={4}
                 emptyLabel="Sin personajes en esta ciudad"
-                fallbackIcon={<Users size={10} />}
+                fallbackIcon={<Users size={14} strokeWidth={1} />}
+                fill={false}
                 icon={<Users size={10} />}
                 label="Personajes"
                 loading={loadingP}
@@ -360,13 +372,17 @@ export function FormularioCiudad({
 
             {/* Criaturas */}
             <div
-              className="min-w-0 rounded-xl overflow-hidden flex flex-col bg-primary/[0.015]"
-              style={{ flexGrow: Math.max(criaturas.length, 1), flexBasis: 0 }}
+              className="flex-1 flex flex-col min-w-0 border-b sm:border-b-0 sm:border-r"
+              style={{
+                borderColor: "color-mix(in srgb, var(--primary) 7%, transparent)",
+              }}
             >
               <SeccionEntidad
                 allEntities={todasCriaturas}
+                columns={4}
                 emptyLabel="Sin criaturas en esta ciudad"
-                fallbackIcon={<Bug size={10} />}
+                fallbackIcon={<Bug size={14} strokeWidth={1} />}
+                fill={false}
                 icon={<Bug size={10} />}
                 label="Criaturas"
                 loading={loadingC}
@@ -384,14 +400,13 @@ export function FormularioCiudad({
             </div>
 
             {/* Ítems */}
-            <div
-              className="min-w-0 rounded-xl overflow-hidden flex flex-col bg-primary/[0.015]"
-              style={{ flexGrow: Math.max(items.length, 1), flexBasis: 0 }}
-            >
+            <div className="flex-1 flex flex-col min-w-0">
               <SeccionEntidad
                 allEntities={todosItems}
+                columns={4}
                 emptyLabel="Sin ítems en esta ciudad"
-                fallbackIcon={<Package size={10} />}
+                fallbackIcon={<Package size={14} strokeWidth={1} />}
+                fill={false}
                 icon={<Package size={10} />}
                 label="Ítems"
                 loading={loadingI}
