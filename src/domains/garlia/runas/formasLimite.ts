@@ -275,6 +275,76 @@ export function pathCelda(
   return contorno.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+ * Gaps: líneas divisorias entre celdas consecutivas de un mismo anillo
+ * ────────────────────────────────────────────────────────────────────────
+ * Un anillo con `secciones` celdas tiene `secciones` gaps (cíclico: el
+ * último conecta con el primero). Cada gap es la línea radial que separa
+ * la celda `s` de la celda `s+1` dentro de ese anillo — ahí es donde el
+ * jugador dibuja el separador (ver separadores.ts).
+ * ──────────────────────────────────────────────────────────────────── */
+
+export type Gap = {
+  /** Id estable, ej. "g0-a1": gap entre sección 0 y 1, anillo 1. */
+  id: string;
+  anillo: number;
+  /** Índice de la celda "antes" del gap dentro del anillo (0-based, cíclico). */
+  seccionAntes: number;
+  /** Índice de la celda "después" del gap (seccionAntes + 1, mod secciones). */
+  seccionDespues: number;
+  angulo: number; // radianes, misma convención que anguloInicio/Fin de Celda
+  radioInicioFrac: number;
+  radioFinFrac: number;
+};
+
+/** Genera los gaps de todos los anillos de una rejilla. Si secciones <= 1 no hay gaps (no hay nada que separar). */
+export function generarGaps(rejilla: Rejilla): Gap[] {
+  const { secciones, anillos } = rejilla;
+  if (secciones <= 1) return [];
+  const gaps: Gap[] = [];
+  const offset = -Math.PI / 2;
+  for (let a = 0; a < anillos; a++) {
+    const radioInicioFrac = a / anillos;
+    const radioFinFrac = (a + 1) / anillos;
+    for (let s = 0; s < secciones; s++) {
+      const angulo = offset + (s * 2 * Math.PI) / secciones;
+      gaps.push({
+        id: `g${s}-a${a}`,
+        anillo: a,
+        seccionAntes: (s - 1 + secciones) % secciones,
+        seccionDespues: s,
+        angulo,
+        radioInicioFrac,
+        radioFinFrac,
+      });
+    }
+  }
+  return gaps;
+}
+
+/** Extremos (interior, exterior) del segmento de línea de un gap, en coordenadas del tablero. */
+export function puntosGap(
+  gap: Gap,
+  forma: FormaLimite,
+  centro: Punto,
+  radio: number,
+): { interior: Punto; exterior: Punto } {
+  const puntoEnBorde = (radioFrac: number): Punto => {
+    const r = radio * radioFrac;
+    if (forma.tipo === "circulo") {
+      return {
+        x: centro.x + r * Math.cos(gap.angulo),
+        y: centro.y + r * Math.sin(gap.angulo),
+      };
+    }
+    return puntoSobrePoligonoEnAngulo(gap.angulo, forma.lados, centro, r);
+  };
+  return {
+    interior: puntoEnBorde(gap.radioInicioFrac),
+    exterior: puntoEnBorde(gap.radioFinFrac),
+  };
+}
+
 /** Centro aproximado de una celda (para ubicar su mini-canvas o preview), en coordenadas del tablero. */
 export function centroCelda(
   celda: Celda,

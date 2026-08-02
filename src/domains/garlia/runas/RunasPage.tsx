@@ -22,8 +22,10 @@ import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic"
 import { BloqueProbadorYCombinaciones } from "./BloqueProbadorYCombinaciones";
 import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
+import { PanelConfigRunas } from "./PanelConfigRunas";
 import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica } from "./types";
+import { useConfigRunas } from "./useConfigRunas";
 import { useSubsistemasMagia } from "./useSubsistemasMagia";
 
 interface EntidadMagicaMin {
@@ -186,6 +188,8 @@ export function RunasPage({
   const subsistemaSeleccionado =
     subsistemas.find((s) => s.id === subsistemaSeleccionadoId) ?? null;
 
+  const { config: configRunas, actualizar: actualizarConfigRunas } = useConfigRunas();
+
   if (loading && runas.length === 0) {
     return <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>;
   }
@@ -195,6 +199,9 @@ export function RunasPage({
     return (
       <div>
         <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
+        <div className="mt-6">
+          <PanelConfigRunas config={configRunas} onActualizar={actualizarConfigRunas} />
+        </div>
       </div>
     );
   }
@@ -217,6 +224,10 @@ export function RunasPage({
 
         <div className="mt-6">
           <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
+        </div>
+
+        <div className="mt-6">
+          <PanelConfigRunas config={configRunas} onActualizar={actualizarConfigRunas} />
         </div>
 
         {todasLasRunas && (

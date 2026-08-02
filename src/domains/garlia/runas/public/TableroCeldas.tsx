@@ -20,13 +20,17 @@ import React, { useMemo } from "react";
 
 import {
   generarCeldas,
+  generarGaps,
   labelCelda,
   pathCelda,
+  puntosGap,
   verticesPoligono,
   type Celda,
   type FormaLimite,
+  type Gap,
   type Rejilla,
 } from "../formasLimite";
+import { SIMBOLO_SEPARADOR, type TipoSeparador } from "../separadores";
 import type { EntidadMagica } from "../types";
 
 const TAMANO = 320;
@@ -38,6 +42,9 @@ export function TableroCeldas({
   celdaActivaId,
   runaPorCelda,
   onSeleccionarCelda,
+  gapActivoId,
+  separadorPorGap,
+  onSeleccionarGap,
 }: {
   forma: FormaLimite;
   rejilla: Rejilla;
@@ -45,11 +52,17 @@ export function TableroCeldas({
   /** Mapa celdaId → runa reconocida en esa celda (o null si no hay match confiable) */
   runaPorCelda: Record<string, EntidadMagica | null | undefined>;
   onSeleccionarCelda: (celda: Celda) => void;
+  /** Los 3 props siguientes son opcionales — si no se pasan, no se dibujan gaps
+   *  (comportamiento anterior, tableros de 1 sola sección). */
+  gapActivoId?: string | null;
+  separadorPorGap?: Record<string, TipoSeparador | undefined>;
+  onSeleccionarGap?: (gap: Gap) => void;
 }) {
   const centro = { x: TAMANO / 2, y: TAMANO / 2 };
   const radio = TAMANO / 2 - MARGEN;
 
   const celdas = useMemo(() => generarCeldas(rejilla), [rejilla]);
+  const gaps = useMemo(() => generarGaps(rejilla), [rejilla]);
 
   const marcoExterior = useMemo(() => {
     if (forma.tipo === "circulo") return null;
@@ -115,11 +128,68 @@ export function TableroCeldas({
             </g>
           );
         })}
+
+        {onSeleccionarGap &&
+          gaps.map((gap) => {
+            const activo = gap.id === gapActivoId;
+            const tipo = separadorPorGap?.[gap.id];
+            const { interior, exterior } = puntosGap(gap, forma, centro, radio);
+            return (
+              <g key={gap.id}>
+                {/* Línea invisible más gruesa solo para agrandar el área clickeable */}
+                <line
+                  x1={interior.x}
+                  y1={interior.y}
+                  x2={exterior.x}
+                  y2={exterior.y}
+                  stroke="transparent"
+                  strokeWidth={14}
+                  className="cursor-pointer"
+                  onClick={() => onSeleccionarGap(gap)}
+                />
+                <line
+                  x1={interior.x}
+                  y1={interior.y}
+                  x2={exterior.x}
+                  y2={exterior.y}
+                  stroke={
+                    activo
+                      ? "var(--primary)"
+                      : tipo
+                        ? "color-mix(in srgb, var(--primary) 55%, transparent)"
+                        : "color-mix(in srgb, var(--primary) 20%, transparent)"
+                  }
+                  strokeWidth={activo ? 4 : 3}
+                  strokeLinecap="round"
+                  className="cursor-pointer pointer-events-none"
+                />
+                {tipo && (
+                  <text
+                    x={(interior.x + exterior.x) / 2}
+                    y={(interior.y + exterior.y) / 2}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={11}
+                    fontWeight={900}
+                    fill="var(--primary)"
+                    className="pointer-events-none select-none"
+                  >
+                    {SIMBOLO_SEPARADOR[tipo]}
+                  </text>
+                )}
+              </g>
+            );
+          })}
       </svg>
 
       {celdaActivaId && (
         <p className="text-micro font-black uppercase tracking-[0.25em] text-primary/40">
-          Dibujando en: {labelCelda(celdas.find((c) => c.id === celdaActivaId)!, rejilla)}
+          Dibujando runa en: {labelCelda(celdas.find((c) => c.id === celdaActivaId)!, rejilla)}
+        </p>
+      )}
+      {gapActivoId && (
+        <p className="text-micro font-black uppercase tracking-[0.25em] text-primary/40">
+          Dibujando separador
         </p>
       )}
     </div>

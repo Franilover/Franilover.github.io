@@ -31,6 +31,7 @@ import React, { useMemo, useState } from "react";
 import { PlainMarkdownPreview } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 
+import { armarTodasLasCadenas, type Cadena } from "../cadenasSeparadores";
 import { CanvasDibujoRuna } from "../CanvasDibujoRuna";
 import {
   reconocerRuna,
@@ -40,20 +41,24 @@ import {
 } from "../dollarOneRecognizer";
 import {
   esRejillaSimple,
-  FORMA_CIRCULO,
   generarCeldas,
+  generarGaps,
   labelCelda,
-  REJILLA_SIMPLE,
   type Celda,
-  type FormaLimite,
+  type Gap,
   type Rejilla,
 } from "../formasLimite";
 import { buscarCombinacion } from "../matchCombinacion";
 import { RunaThumbnail } from "../RunaThumbnail";
+import {
+  LABEL_SEPARADOR,
+  patronesSeparadores,
+  SIMBOLO_SEPARADOR,
+  type TipoSeparador,
+} from "../separadores";
 import type { CombinacionRuna, EntidadMagica } from "../types";
+import { useConfigRunas } from "../useConfigRunas";
 
-import { SelectorFormaLimite } from "./SelectorFormaLimite";
-import { SelectorRejilla } from "./SelectorRejilla";
 import { TableroCeldas } from "./TableroCeldas";
 
 // Por debajo de este score no se considera un match confiable: se anima
@@ -72,8 +77,12 @@ export default function RunasDibujo() {
   const [runas, setRunas] = useState<EntidadMagica[]>([]);
   const [combinaciones, setCombinaciones] = useState<CombinacionRuna[]>([]);
   const [estado, setEstado] = useState<Estado>("cargando");
-  const [forma, setForma] = useState<FormaLimite>(FORMA_CIRCULO);
-  const [rejilla, setRejilla] = useState<Rejilla>(REJILLA_SIMPLE);
+
+  // La forma y la rejilla ya no las elige el jugador — las fija el admin
+  // en el panel de config (ver PanelConfigRunas.tsx / useConfigRunas.ts).
+  const { config: configRunas, loading: cargandoConfig } = useConfigRunas();
+  const forma = configRunas.forma;
+  const rejilla = configRunas.rejilla;
 
   // Modo simple (1×1): un solo resultado, igual que antes.
   const [resultadoSimple, setResultadoSimple] = useState<
@@ -85,10 +94,22 @@ export default function RunasDibujo() {
     Record<string, ResultadoCelda>
   >({});
   const [celdaActivaId, setCeldaActivaId] = useState<string | null>(null);
+
+  // Separadores: tipo reconocido por gap + cuál está activo para dibujar.
+  const [separadorPorGap, setSeparadorPorGap] = useState<
+    Record<string, TipoSeparador | undefined>
+  >({});
+  const [gapActivoId, setGapActivoId] = useState<string | null>(null);
+
   const [finalizado, setFinalizado] = useState(false);
 
   const [resetSignal, setResetSignal] = useState(0);
   const [intentos, setIntentos] = useState(0);
+
+  const patronesSeparador = useMemo(
+    () => patronesSeparadores(configRunas.plantillas_separadores),
+    [configRunas.plantillas_separadores],
+  );
 
   React.useEffect(() => {
     let activo = true;
@@ -131,6 +152,7 @@ export default function RunasDibujo() {
 
   const simple = esRejillaSimple(rejilla);
   const celdas = useMemo(() => generarCeldas(rejilla), [rejilla]);
+  const gaps = useMemo(() => generarGaps(rejilla), [rejilla]);
 
   // ── Modo simple ──────────────────────────────────────────────────────
   const mejorMatchSimple: EntidadMagica | null = useMemo(() => {
@@ -168,7 +190,27 @@ export default function RunasDibujo() {
 
   const seleccionarCelda = (celda: Celda) => {
     setCeldaActivaId(celda.id);
+    setGapActivoId(null);
     setResetSignal((s) => s + 1);
+  };
+
+  const seleccionarGap = (gap: Gap) => {
+    setGapActivoId(gap.id);
+    setCeldaActivaId(null);
+    setResetSignal((s) => s + 1);
+  };
+
+  const onTrazoCompletoGap = (puntos: Punto[]) => {
+    if (!gapActivoId) return;
+    const ranking = reconocerRuna(puntos, patronesSeparador);
+    const top = ranking[0];
+    // Los separadores son solo 4 símbolos muy distintos entre sí — usamos
+    // el mismo umbral que las runas para no bajar la exigencia de más.
+    const tipo =
+      top && top.score >= UMBRAL_CONFIANZA
+        ? (top.runaId as TipoSeparador)
+        : undefined;
+    setSeparadorPorGap((prev) => ({ ...prev, [gapActivoId]: tipo }));
   };
 
   const celdasDibujadas = Object.keys(resultadosPorCelda).filter(
@@ -186,6 +228,13 @@ export default function RunasDibujo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finalizado, resultadosPorCelda, combinaciones]);
 
+  // Cadenas formadas por los separadores — solo tiene sentido si hay más de
+  // una sección por anillo (si no, no hay gaps que dibujar).
+  const cadenas: Cadena[] = useMemo(() => {
+    if (!finalizado || rejilla.secciones <= 1) return [];
+    return armarTodasLasCadenas(rejilla, celdas, gaps, separadorPorGap);
+  }, [finalizado, rejilla, celdas, gaps, separadorPorGap]);
+
   const finalizarRejilla = () => {
     setFinalizado(true);
     setIntentos((n) => n + 1);
@@ -194,27 +243,11 @@ export default function RunasDibujo() {
   const reintentarRejilla = () => {
     setResultadosPorCelda({});
     setCeldaActivaId(null);
+    setSeparadorPorGap({});
+    setGapActivoId(null);
     setFinalizado(false);
     setResetSignal((s) => s + 1);
   };
-
-  const cambiarForma = (f: FormaLimite) => {
-    setForma(f);
-    reiniciarTodo();
-  };
-
-  const cambiarRejilla = (r: Rejilla) => {
-    setRejilla(r);
-    reiniciarTodo();
-  };
-
-  function reiniciarTodo() {
-    setResultadoSimple(null);
-    setResultadosPorCelda({});
-    setCeldaActivaId(null);
-    setFinalizado(false);
-    setResetSignal((s) => s + 1);
-  }
 
   const runaPorCeldaParaTablero: Record<
     string,
@@ -242,7 +275,7 @@ export default function RunasDibujo() {
         </div>
       </div>
 
-      {estado === "cargando" && (
+      {(estado === "cargando" || cargandoConfig) && (
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="animate-spin text-primary/20" size={28} />
         </div>
@@ -259,9 +292,6 @@ export default function RunasDibujo() {
 
       {estado === "listo" && (
         <div className="w-full max-w-md flex flex-col items-center gap-4">
-          <SelectorFormaLimite value={forma} onChange={cambiarForma} />
-          <SelectorRejilla value={rejilla} onChange={cambiarRejilla} />
-
           {simple ? (
             <>
               <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
@@ -287,9 +317,12 @@ export default function RunasDibujo() {
               <TableroCeldas
                 celdaActivaId={celdaActivaId}
                 forma={forma}
+                gapActivoId={gapActivoId}
                 rejilla={rejilla}
                 runaPorCelda={runaPorCeldaParaTablero}
+                separadorPorGap={separadorPorGap}
                 onSeleccionarCelda={seleccionarCelda}
+                onSeleccionarGap={seleccionarGap}
               />
 
               {celdaActivaId && !finalizado && (
@@ -309,10 +342,27 @@ export default function RunasDibujo() {
                 </div>
               )}
 
+              {gapActivoId && !finalizado && (
+                <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
+                  <CanvasDibujoRuna
+                    height={160}
+                    resetSignal={resetSignal}
+                    onTrazoCompleto={onTrazoCompletoGap}
+                  />
+                  <p className="text-micro text-center pt-2 font-bold text-primary/50">
+                    {separadorPorGap[gapActivoId]
+                      ? `Reconocido: ${SIMBOLO_SEPARADOR[separadorPorGap[gapActivoId]!]} ${LABEL_SEPARADOR[separadorPorGap[gapActivoId]!]}`
+                      : "Dibujá ⟩⟩ (inicio), ⟩ (continúa), ⟨ (continúa invertido) o | (corta)"}
+                  </p>
+                </div>
+              )}
+
               {!finalizado && (
                 <div className="flex flex-col items-center gap-2">
                   <p className="text-micro text-primary/25 tracking-widest uppercase font-bold text-center">
-                    Tocá una celda del tablero para dibujar ahí
+                    {rejilla.secciones > 1
+                      ? "Tocá una celda para dibujar la runa, o una línea divisoria para dibujar un separador"
+                      : "Tocá una celda del tablero para dibujar ahí"}
                   </p>
                   <button
                     type="button"
@@ -328,10 +378,11 @@ export default function RunasDibujo() {
               {finalizado && (
                 <ResultadoRejillaCard
                   key={intentos}
+                  cadenas={cadenas}
+                  celdas={celdas}
                   combinacion={combinacionEncontrada}
                   resultadosPorCelda={resultadosPorCelda}
                   rejilla={rejilla}
-                  celdas={celdas}
                   onReintentar={reintentarRejilla}
                 />
               )}
@@ -400,17 +451,24 @@ function ResultadoRejillaCard({
   resultadosPorCelda,
   rejilla,
   celdas,
+  cadenas,
   onReintentar,
 }: {
   combinacion: CombinacionRuna | null;
   resultadosPorCelda: Record<string, ResultadoCelda>;
   rejilla: Rejilla;
   celdas: Celda[];
+  cadenas: Cadena[];
   onReintentar: () => void;
 }) {
   const celdasConRuna = celdas.filter(
     (c) => resultadosPorCelda[c.id]?.mejorMatch,
   );
+
+  // Celdas que ya forman parte de alguna cadena — el resto (si las hay)
+  // se sigue mostrando suelto abajo, como antes.
+  const idsEnCadena = new Set(cadenas.flatMap((c) => c.celdaIds));
+  const celdasSueltas = celdasConRuna.filter((c) => !idsEnCadena.has(c.id));
 
   return (
     <div className="w-full rounded-2xl border border-primary/15 bg-white-custom p-5 shadow-md flex flex-col items-center gap-3 text-center animate-[fadeIn_0.2s_ease]">
@@ -450,9 +508,39 @@ function ResultadoRejillaCard({
         </>
       )}
 
-      {!combinacion && celdasConRuna.length > 0 && (
+      {!combinacion && cadenas.length > 0 && (
+        <div className="w-full flex flex-col gap-2 text-left">
+          {cadenas.map((cadena, i) => {
+            const nombresRunas = cadena.celdaIds
+              .map((id) => resultadosPorCelda[id]?.mejorMatch?.nombre)
+              .filter((n): n is string => Boolean(n));
+            return (
+              <div
+                key={cadena.celdaInicioId}
+                className="flex flex-col gap-1 px-3 py-2 rounded-lg bg-primary/5"
+              >
+                <span className="text-micro font-black uppercase tracking-widest text-primary/30">
+                  Secuencia {i + 1}
+                </span>
+                <span className="text-sm text-primary font-semibold">
+                  {nombresRunas.length > 0
+                    ? nombresRunas.join(" → ")
+                    : "(sin runas dibujadas en esta cadena)"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!combinacion && celdasSueltas.length > 0 && (
         <div className="w-full flex flex-col gap-1.5 text-left">
-          {celdasConRuna.map((c) => (
+          {cadenas.length > 0 && (
+            <span className="text-micro font-black uppercase tracking-widest text-primary/30">
+              Runas sueltas
+            </span>
+          )}
+          {celdasSueltas.map((c) => (
             <div
               key={c.id}
               className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-primary/5 text-xs"
