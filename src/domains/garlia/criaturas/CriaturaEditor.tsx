@@ -21,6 +21,7 @@ export function CriaturaEditor({ criatura }: { criatura: Criatura }) {
       onSelectItem={(id) => openEntity("items", id)}
       onSelectPersonaje={(id) => openEntity("personajes", id)}
       onSelectGrupo={(id) => openEntity("grupos", id)}
+      onSelectSubsistema={(id) => openEntity("runas", id)}
       onNavigateCiudad={(id) => openEntity("ciudades", id)}
       onNavigateReino={(id) => openEntity("reinos", id)}
     />

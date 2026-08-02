@@ -236,6 +236,7 @@ export function RunasPage({
               void eliminarSubsistema(subsistemaSeleccionado.id);
               setSubsistemaSeleccionadoId(null);
             }}
+            onSelectCriatura={(id) => onOpen("criaturas", id)}
           />
         ) : (
           <BloqueEnsayoEnergias />

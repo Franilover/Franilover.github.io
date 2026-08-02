@@ -15,9 +15,10 @@
  * Se muestra debajo del bloque de Ensayos GOS+Magia en MagiaPorTipo.
  */
 
-import { ArrowLeft, Plus, Sparkle, Trash2, X } from "lucide-react";
+import { ArrowLeft, Bug, Plus, Sparkle, Trash2, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
+import { useCriaturasPorIds } from "./useCriaturasPorIds";
 import type { SubsistemaFila, SubsistemaMagia } from "./useSubsistemasMagia";
 
 // ─── Editor de tabla de filas (Canales / Filtros / Complementos) ───────────
@@ -115,18 +116,24 @@ export function PanelEditorSubsistema({
   onVolver,
   onSave,
   onDelete,
+  onSelectCriatura,
 }: {
   subsistema: SubsistemaMagia;
   /** Vuelve a mostrar el ensayo de Energías en vez de este editor. */
   onVolver: () => void;
   onSave: (updates: Partial<SubsistemaMagia>) => void;
   onDelete: () => void;
+  /** Se dispara al clickear una criatura de la lista — el padre decide
+   *  a dónde navegar (p. ej. abrir su editor). */
+  onSelectCriatura?: (id: string) => void;
 }) {
   const [nombre, setNombre] = useState(subsistema.nombre);
   const [descripcion, setDescripcion] = useState(subsistema.descripcion ?? "");
   const [canales, setCanales] = useState<SubsistemaFila[]>(subsistema.canales ?? []);
   const [filtros, setFiltros] = useState<SubsistemaFila[]>(subsistema.filtros ?? []);
   const [complementos, setComplementos] = useState<SubsistemaFila[]>(subsistema.complementos ?? []);
+  const { criaturas: criaturasDelSubsistema, loading: loadingCriaturas } =
+    useCriaturasPorIds(subsistema.criatura_ids ?? []);
 
   // Si se selecciona otro subsistema (o se vuelve a abrir el mismo tras
   // guardar en otro lado), sincronizamos el form local con la nueva prop.
@@ -203,6 +210,50 @@ export function PanelEditorSubsistema({
       <EditorFilas titulo="Canales" filas={canales} onChange={setCanales} />
       <EditorFilas titulo="Filtros" filas={filtros} onChange={setFiltros} />
       <EditorFilas titulo="Complementos" filas={complementos} onChange={setComplementos} conCanaliza={false} />
+
+      {/* Criaturas que usan este subsistema — asignadas desde el editor de
+          criaturas (botón Clasificación → Subsistema Mágico). Solo lectura
+          acá: el vínculo se cambia desde la criatura, no desde aquí. */}
+      <div className="mt-2">
+        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+          Criaturas que lo usan
+        </span>
+        {loadingCriaturas ? (
+          <p className="text-micro text-primary/25 italic py-1">Cargando…</p>
+        ) : criaturasDelSubsistema.length === 0 ? (
+          <p className="text-micro text-primary/25 italic py-1">
+            Ninguna criatura asignada todavía
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {criaturasDelSubsistema.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                title={c.nombre}
+                className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border border-primary/10 bg-primary/[0.02] hover:bg-primary/6 hover:border-primary/25 transition-colors"
+                onClick={() => onSelectCriatura?.(c.id)}
+              >
+                <span className="shrink-0 w-5 h-5 rounded-full overflow-hidden bg-primary/8 flex items-center justify-center">
+                  {c.imagen_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt={c.nombre}
+                      className="w-full h-full object-cover"
+                      src={c.imagen_url}
+                    />
+                  ) : (
+                    <Bug size={9} className="text-primary/25" />
+                  )}
+                </span>
+                <span className="text-micro font-bold text-primary/70 truncate max-w-[120px]">
+                  {c.nombre}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

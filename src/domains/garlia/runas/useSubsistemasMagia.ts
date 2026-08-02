@@ -35,6 +35,10 @@ export interface SubsistemaMagia {
   orden: number;
   created_at: string;
   updated_at: string;
+  /** Criaturas (por id) que pertenecen a este subsistema mágico —
+   *  pertenencia exclusiva, asignada desde el editor de criaturas
+   *  (BloqueSubsistemaMagicoCriatura). */
+  criatura_ids?: string[];
 }
 
 export type SubsistemaInput = Partial<
@@ -66,7 +70,7 @@ export function useSubsistemasMagia() {
     setCreating(true);
     const { data, error } = await supabase
       .from("subsistemas_magia")
-      .insert([{ nombre, descripcion: "", canales: [], filtros: [], complementos: [] }])
+      .insert([{ nombre, descripcion: "", canales: [], filtros: [], complementos: [], criatura_ids: [] }])
       .select()
       .single();
     setCreating(false);

@@ -19,6 +19,7 @@
  */
 
 import {
+  Atom,
   Bug,
   Brain,
   Dices,
@@ -55,6 +56,7 @@ import {
   BloqueGrupoCategoria,
   type GrupoMinExt,
 } from "@/domains/garlia/criaturas/BloqueGruposCriatura";
+import { BloqueSubsistemaMagicoCriatura } from "@/domains/garlia/criaturas/BloqueSubsistemaMagicoCriatura";
 import {
   useCriaturaReinos,
   useCriaturaCiudades,
@@ -68,6 +70,7 @@ import {
 } from "@/domains/garlia/_shared/UIComponents";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { useCriaturaAsideCatalogs } from "@/domains/garlia/criaturas/useCriaturaAsideCatalogs";
+import { useMembresiaSubsistemaCriatura } from "@/domains/garlia/criaturas/useMembresiaSubsistemaCriatura";
 import { usePersonajesDeCriatura } from "@/domains/garlia/criaturas/usePersonajesDeCriatura";
 import { useMembresiaGruposCriatura } from "@/domains/garlia/grupos/useMembresiaGruposCriatura";
 import { supabase } from "@/infra/supabase/supabase";
@@ -85,6 +88,7 @@ export function EditorCriatura({
   onSelectItem,
   onSelectPersonaje,
   onSelectGrupo,
+  onSelectSubsistema,
   onNavigateCiudad,
   onNavigateReino,
 }: {
@@ -95,6 +99,7 @@ export function EditorCriatura({
   onSelectItem?: (itemId: string) => void;
   onSelectPersonaje?: (personajeId: string) => void;
   onSelectGrupo?: (grupoId: string) => void;
+  onSelectSubsistema?: (subsistemaId: string) => void;
   onNavigateCiudad?: (id: string) => void;
   onNavigateReino?: (id: string) => void;
 }) {
@@ -114,6 +119,13 @@ export function EditorCriatura({
     addToGrupo,
     removeFromGrupo,
   } = useMembresiaGruposCriatura(form.id);
+
+  // ── Subsistema mágico ────────────────────────────────────────────────────
+  const {
+    subsistemaActual,
+    todosSubsistemas,
+    setSubsistema,
+  } = useMembresiaSubsistemaCriatura(form.id);
 
   // ── Personajes de la especie ───────────────────────────────────────────────
   const {
@@ -474,6 +486,17 @@ export function EditorCriatura({
                         />
                       </div>
                     ))}
+                    <div className="flex flex-col gap-0.5">
+                      <span className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/30 mb-0.5">
+                        <Atom size={7} /> Subsistema Mágico
+                      </span>
+                      <BloqueSubsistemaMagicoCriatura
+                        subsistemaActual={subsistemaActual}
+                        todosSubsistemas={todosSubsistemas}
+                        onChange={setSubsistema}
+                        onSelectSubsistema={onSelectSubsistema}
+                      />
+                    </div>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
