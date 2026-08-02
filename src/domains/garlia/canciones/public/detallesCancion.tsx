@@ -1,6 +1,6 @@
 "use client";
 import { AlertCircle, Music, ExternalLink, ChevronLeft, Info } from "lucide-react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 import { Btn, Loading } from "@/ui";
@@ -228,12 +228,33 @@ function CoverFlip({
 }
 
 export default function CancionDetallesPage({ slug }: { slug?: string } = {}) {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  // En la ruta web (/garlia/canciones/[slug]) el slug llega por prop desde
-  // el server component. En la ruta del APK (/garlia/canciones/detalle?slug=...)
-  // no hay prop, así que se lee del query param.
-  const slugParam = slug ?? searchParams.get("slug") ?? "";
+  // OJO: el `slug` que llega por prop desde el server component NO es
+  // confiable en web. vercel.json reescribe internamente cualquier
+  // `/garlia/canciones/:id` hacia `/garlia/canciones/placeholder` para
+  // servir el único HTML prerrenderizado — el rewrite deja la URL del
+  // navegador intacta, pero el `params.slug` que recibe el server component
+  // en Vercel SÍ pasa a ser literalmente "placeholder", no el slug real.
+  // Por eso el slug real hay que leerlo siempre del lado del cliente, desde
+  // la URL visible (`window.location`), igual que en la ruta del APK
+  // (/garlia/canciones/detalle?slug=...) donde tampoco hay prop y se lee del
+  // query param.
+  //
+  // Nota: acá NO usamos next/navigation useSearchParams() a propósito. Ese
+  // hook obliga a Next a hacer "bail out to client-side rendering" en
+  // cualquier página que lo use sin un <Suspense> boundary alrededor, y en
+  // esta ruta ese bailout terminaba tirando 500 en vez de degradar bien.
+  const [slugParam, setSlugParam] = useState<string>("");
+  useEffect(() => {
+    const segmentos = window.location.pathname.split("/").filter(Boolean);
+    // .../garlia/canciones/:slug
+    const idx = segmentos.indexOf("canciones");
+    const slugDePath = idx >= 0 ? (segmentos[idx + 1] ?? "") : "";
+    const slugDeQuery = new URLSearchParams(window.location.search).get(
+      "slug",
+    );
+    setSlugParam(slugDePath || slugDeQuery || "");
+  }, []);
 
   // id es el UUID real resuelto a partir del slug
   const [id, setId] = useState<string>("");

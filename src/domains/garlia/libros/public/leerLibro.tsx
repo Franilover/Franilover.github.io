@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, List, ChevronRight } from "lucide-react";
 import Image from "next/image";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 
 import { Btn } from "@/ui";
@@ -617,13 +617,38 @@ export default function Lector({
   slug,
   orden,
 }: { slug?: string; orden?: string } = {}) {
-  const searchParams = useSearchParams();
-  // En la ruta web (/garlia/libros/[slug]/leer/[orden]) el slug y el orden
-  // llegan por prop desde el server component. En la ruta del APK
-  // (/garlia/libros/leer?slug=...&orden=...) no hay prop, así que se leen
-  // de los query params.
-  const slugParam = slug ?? searchParams.get("slug") ?? "";
-  const ordenParam = orden ?? searchParams.get("orden") ?? "";
+  // OJO: `slug`/`orden` que llegan por prop desde el server component NO son
+  // confiables en web. vercel.json reescribe internamente cualquier
+  // `/garlia/libros/:id/leer/:capId` hacia
+  // `/garlia/libros/placeholder/leer/placeholder` para servir el único HTML
+  // prerrenderizado — el rewrite deja la URL del navegador intacta, pero los
+  // `params` que recibe el server component en Vercel SÍ pasan a ser
+  // literalmente "placeholder", no los valores reales. Por eso hay que
+  // leerlos siempre del lado del cliente, desde la URL visible
+  // (`window.location`), igual que en la ruta del APK
+  // (/garlia/libros/leer?slug=...&orden=...) donde tampoco hay prop y se
+  // leen de los query params.
+  //
+  // Nota: acá NO usamos next/navigation useSearchParams() a propósito. Ese
+  // hook obliga a Next a hacer "bail out to client-side rendering" en
+  // cualquier página que lo use sin un <Suspense> boundary alrededor, y en
+  // esta ruta ese bailout terminaba tirando 500 en vez de degradar bien.
+  // Leer directo de window.location logra lo mismo sin ese problema, porque
+  // solo corre en el cliente dentro de useEffect.
+  const [slugParam, setSlugParam] = useState<string>("");
+  const [ordenParam, setOrdenParam] = useState<string>("");
+  useEffect(() => {
+    const segmentos = window.location.pathname.split("/").filter(Boolean);
+    // .../garlia/libros/:slug/leer/:orden
+    const idxLibros = segmentos.indexOf("libros");
+    const slugDePath =
+      idxLibros >= 0 ? (segmentos[idxLibros + 1] ?? "") : "";
+    const idxLeer = segmentos.indexOf("leer");
+    const ordenDePath = idxLeer >= 0 ? (segmentos[idxLeer + 1] ?? "") : "";
+    const query = new URLSearchParams(window.location.search);
+    setSlugParam(slugDePath || query.get("slug") || "");
+    setOrdenParam(ordenDePath || query.get("orden") || "");
+  }, []);
 
   const router = useRouter();
 
