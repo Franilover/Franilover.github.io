@@ -20,7 +20,7 @@
  */
 
 import { PenTool, Trash2, Undo2 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
 import type { Punto } from "./dollarOneRecognizer";
@@ -38,6 +38,22 @@ export function PanelPatronRuna({
 }) {
   const [resetSignal, setResetSignal] = useState(0);
   const [ultimoBorrado, setUltimoBorrado] = useState<Punto[] | null>(null);
+  // Medimos el ancho disponible para que el canvas sea siempre cuadrado
+  // (antes tenía una altura fija de 220px sobre un ancho variable, dando
+  // un rectángulo). El lado del cuadrado = ancho del contenedor.
+  const contenedorRef = useRef<HTMLDivElement>(null);
+  const [lado, setLado] = useState(220);
+
+  useEffect(() => {
+    const el = contenedorRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setLado(w);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   // El trazo que se le pasa a CanvasDibujoRuna para precargar como
   // confirmado. Arranca con lo que ya estaba guardado (al montar, o sea
   // al abrir esta runa) y solo se vuelve a tocar explícitamente en
@@ -78,14 +94,16 @@ export function PanelPatronRuna({
           <PenTool size={11} /> Patrón de trazo
         </label>
 
-        <CanvasDibujoRuna
-          color={color}
-          height={220}
-          mostrarHerramientas
-          resetSignal={resetSignal}
-          trazoInicial={trazoParaPrecargar}
-          onTrazoCompleto={fijarTrazo}
-        />
+        <div ref={contenedorRef}>
+          <CanvasDibujoRuna
+            color={color}
+            height={lado}
+            mostrarHerramientas
+            resetSignal={resetSignal}
+            trazoInicial={trazoParaPrecargar}
+            onTrazoCompleto={fijarTrazo}
+          />
+        </div>
 
         {trazoActual && (
           <div className="flex items-center gap-1.5 text-micro text-primary/40 pt-1">
