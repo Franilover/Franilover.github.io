@@ -27,10 +27,15 @@ import { useCanciones } from "@/domains/garlia/canciones/useCanciones";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { Chip } from "@/ui/Chip";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
+import { useGruposRunas } from "@/domains/garlia/grupos/useGruposRunas";
+import { useRunas } from "@/domains/garlia/runas/useRunas";
+import { FormularioRuna } from "@/domains/garlia/runas/FormularioRuna";
+import { RunasPage } from "@/domains/garlia/runas/RunasPage";
 import { useNotas } from "@/editor/notas/useNotas";
 import { type Nota } from "@/domains/garlia/_shared/types";
 import { EditorGrupo, GRUPO_TIPO_CONFIG, useGrupos, type GrupoTipo } from "@/domains/garlia/grupos/EditorGrupo";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
+import { supabase } from "@/infra/supabase/supabase";
 
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { ItemEditor } from "@/domains/garlia/items/ItemEditor";
@@ -98,6 +103,11 @@ export function EntidadesPage({ section, selectedId }: Props) {
     useSupabaseData<Ciudad>("ciudades");
 
   const { grupos: gruposCriaturas, loading: loadingGrupos } = useGruposCriaturas();
+
+  // ── Runas ─────────────────────────────────────────────────────────────
+  const { items: runas, setItems: setRunas, loading: loadingRunas } = useRunas();
+  const { grupos: gruposRunas, loading: loadingGruposRunas } = useGruposRunas();
+  const [creatingRuna, setCreatingRuna] = useState(false);
 
   // ── Organización (Grupos + Notas) ────────────────────────────────────────
   const { grupos, loaded: loadedGrupos, crearGrupo, actualizarGrupo, eliminarGrupo } = useGrupos();
@@ -307,6 +317,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
     () => (section === "letras" ? canciones.find((c) => c.id === selectedId) ?? null : null),
     [section, canciones, selectedId],
   );
+  const selectedRuna = useMemo(
+    () => (section === "runas" ? runas.find((r) => r.id === selectedId) ?? null : null),
+    [section, runas, selectedId],
+  );
 
   if (selectedGrupo) {
     return (
@@ -339,6 +353,27 @@ export function EntidadesPage({ section, selectedId }: Props) {
           onNavigateGrupo={(id) => openEntity("grupos", id)}
           onNavigatePersonaje={(id) => openEntity("personajes", id)}
           onNavigateReino={(id) => openEntity("reinos", id)}
+        />
+      </div>
+    );
+  }
+
+  if (selectedRuna) {
+    return (
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        <FormularioRuna
+          key={selectedRuna.id}
+          item={selectedRuna}
+          grupos={gruposRunas}
+          loadingGrupos={loadingGruposRunas}
+          onDeleted={(id) => {
+            setRunas((prev) => prev.filter((r) => r.id !== id));
+            openEntity("runas", "");
+          }}
+          onNavigateGrupo={(id) => openEntity("grupos", id)}
+          onSaved={(updated) =>
+            setRunas((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+          }
         />
       </div>
     );
@@ -498,6 +533,38 @@ export function EntidadesPage({ section, selectedId }: Props) {
             }}
           />
         )}
+      </div>
+    );
+  }
+
+  // ── Runas ────────────────────────────────────────────────────────────
+  if (section === "runas") {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        <RunasPage
+          creating={creatingRuna}
+          loading={loadingRunas}
+          runas={runas}
+          todasLasRunas={runas}
+          onCreate={async () => {
+            setCreatingRuna(true);
+            try {
+              const { data, error } = await supabase
+                .from("runas")
+                .insert([{ nombre: "Nueva runa" }])
+                .select()
+                .single();
+              if (error) throw error;
+              setRunas((prev) => [...prev, data]);
+              openEntity("runas", data.id);
+            } catch (e) {
+              console.error("[EntidadesPage] error creando runa:", e);
+            } finally {
+              setCreatingRuna(false);
+            }
+          }}
+          onOpen={(section, id) => openEntity(section, id)}
+        />
       </div>
     );
   }

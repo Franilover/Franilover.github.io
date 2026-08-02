@@ -22,6 +22,7 @@ const SECTION_TABLE: Partial<Record<SectionKey, string>> = {
   items: "items",
   reinos: "reinos",
   ciudades: "ciudades",
+  runas: "runas",
 };
 
 const PLACEHOLDER_NAME: Partial<Record<SectionKey, string>> = {
@@ -30,6 +31,7 @@ const PLACEHOLDER_NAME: Partial<Record<SectionKey, string>> = {
   items: "Nuevo objeto",
   reinos: "Nuevo reino",
   ciudades: "Nueva ciudad",
+  runas: "Nueva runa",
 };
 
 export function useCreateEntity() {
