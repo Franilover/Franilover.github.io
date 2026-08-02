@@ -6,15 +6,25 @@
  * Grupos de criaturas (tipo "criaturas" en grupos_mundo), usados para
  * asignar a qué grupos puede pertenecer una runa.
  *
+ * NOTA sobre GrupoMin: existen otras definiciones del mismo nombre en el
+ * repo (useGruposDelPersonaje.ts, useGruposDeLaCancion.ts,
+ * useMembresiaGruposCriatura.ts), con formas ligeramente distintas. No se
+ * unificaron en este paso — queda pendiente como su propio barrido.
+ *
  * Ruta destino:
  *   src/features/editorGarlia/hooks/useGruposCriaturas.ts
  */
 
 import { useEffect, useState } from "react";
 
-import { type GrupoMin } from "@/domains/garlia/magia/types";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
+
+export type GrupoMin = {
+  id: string;
+  nombre: string;
+  miembro_ids: string[];
+};
 
 
 export function useGruposCriaturas() {
