@@ -15,9 +15,12 @@
  * Se muestra debajo del bloque de Ensayos GOS+Magia en MagiaPorTipo.
  */
 
-import { ArrowLeft, Bug, Plus, Sparkle, Trash2, X } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { ArrowLeft, Bug, Plus, Search, Sparkle, Trash2, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import { supabase } from "@/infra/supabase/supabase";
+
+import { useCriaturasCatalogoMin } from "./useCriaturasCatalogoMin";
 import { useCriaturasPorIds } from "./useCriaturasPorIds";
 import type { SubsistemaFila, SubsistemaMagia } from "./useSubsistemasMagia";
 
@@ -132,8 +135,18 @@ export function PanelEditorSubsistema({
   const [canales, setCanales] = useState<SubsistemaFila[]>(subsistema.canales ?? []);
   const [filtros, setFiltros] = useState<SubsistemaFila[]>(subsistema.filtros ?? []);
   const [complementos, setComplementos] = useState<SubsistemaFila[]>(subsistema.complementos ?? []);
+
+  // Ids de criaturas del subsistema — estado local editable, sincronizado
+  // con la prop y con mutaciones optimistas al añadir/quitar. Vive acá (no
+  // solo en el hook de lectura) porque este panel necesita reflejar
+  // cambios al instante sin esperar el refetch del padre (useSubsistemasMagia).
+  const [criaturaIds, setCriaturaIds] = useState<string[]>(
+    subsistema.criatura_ids ?? [],
+  );
   const { criaturas: criaturasDelSubsistema, loading: loadingCriaturas } =
-    useCriaturasPorIds(subsistema.criatura_ids ?? []);
+    useCriaturasPorIds(criaturaIds);
+  const { criaturas: catalogoCriaturas, loading: loadingCatalogo } =
+    useCriaturasCatalogoMin();
 
   // Si se selecciona otro subsistema (o se vuelve a abrir el mismo tras
   // guardar en otro lado), sincronizamos el form local con la nueva prop.
@@ -143,10 +156,52 @@ export function PanelEditorSubsistema({
     setCanales(subsistema.canales ?? []);
     setFiltros(subsistema.filtros ?? []);
     setComplementos(subsistema.complementos ?? []);
+    setCriaturaIds(subsistema.criatura_ids ?? []);
   }, [subsistema.id]);
 
   const guardar = () => {
     onSave({ nombre: nombre.trim() || subsistema.nombre, descripcion, canales, filtros, complementos });
+  };
+
+  // Añade una criatura a este subsistema — pertenencia exclusiva: primero
+  // la saca de cualquier otro subsistema al que perteneciera (mismo
+  // criterio que useMembresiaSubsistemaCriatura, del lado de la criatura).
+  const agregarCriatura = async (criaturaId: string) => {
+    if (criaturaIds.includes(criaturaId)) return;
+    const nuevosIds = [...criaturaIds, criaturaId];
+    setCriaturaIds(nuevosIds); // optimista
+
+    const { data: otros } = await supabase
+      .from("subsistemas_magia")
+      .select("id, criatura_ids")
+      .neq("id", subsistema.id)
+      .contains("criatura_ids", [criaturaId]);
+
+    await Promise.all([
+      supabase
+        .from("subsistemas_magia")
+        .update({ criatura_ids: nuevosIds })
+        .eq("id", subsistema.id),
+      ...(otros ?? []).map((o: { id: string; criatura_ids: string[] }) =>
+        supabase
+          .from("subsistemas_magia")
+          .update({
+            criatura_ids: (o.criatura_ids ?? []).filter(
+              (id) => id !== criaturaId,
+            ),
+          })
+          .eq("id", o.id),
+      ),
+    ]);
+  };
+
+  const quitarCriatura = async (criaturaId: string) => {
+    const nuevosIds = criaturaIds.filter((id) => id !== criaturaId);
+    setCriaturaIds(nuevosIds); // optimista
+    await supabase
+      .from("subsistemas_magia")
+      .update({ criatura_ids: nuevosIds })
+      .eq("id", subsistema.id);
   };
 
   return (
@@ -211,13 +266,25 @@ export function PanelEditorSubsistema({
       <EditorFilas titulo="Filtros" filas={filtros} onChange={setFiltros} />
       <EditorFilas titulo="Complementos" filas={complementos} onChange={setComplementos} conCanaliza={false} />
 
-      {/* Criaturas que usan este subsistema — asignadas desde el editor de
-          criaturas (botón Clasificación → Subsistema Mágico). Solo lectura
-          acá: el vínculo se cambia desde la criatura, no desde aquí. */}
+      {/* Criaturas que usan este subsistema — editable desde acá: añadir
+          por buscador (exclusivo, saca a la criatura de cualquier otro
+          subsistema) o quitar con la X del chip. También editable desde
+          el editor de criaturas (Clasificación → Subsistema Mágico); es
+          el mismo vínculo visto desde los dos lados. */}
       <div className="mt-2">
-        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
-          Criaturas que lo usan
-        </span>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+            Criaturas que lo usan
+          </span>
+        </div>
+
+        <BuscadorCriaturaParaSubsistema
+          catalogo={catalogoCriaturas}
+          excluirIds={criaturaIds}
+          loading={loadingCatalogo}
+          onSelect={(id) => void agregarCriatura(id)}
+        />
+
         {loadingCriaturas ? (
           <p className="text-micro text-primary/25 italic py-1">Cargando…</p>
         ) : criaturasDelSubsistema.length === 0 ? (
@@ -225,35 +292,182 @@ export function PanelEditorSubsistema({
             Ninguna criatura asignada todavía
           </p>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
             {criaturasDelSubsistema.map((c) => (
-              <button
+              <div
                 key={c.id}
-                type="button"
-                title={c.nombre}
-                className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border border-primary/10 bg-primary/[0.02] hover:bg-primary/6 hover:border-primary/25 transition-colors"
-                onClick={() => onSelectCriatura?.(c.id)}
+                className="group flex items-center gap-1.5 pl-1 pr-1 py-1 rounded-full border border-primary/10 bg-primary/[0.02] hover:border-primary/25 transition-colors"
               >
-                <span className="shrink-0 w-5 h-5 rounded-full overflow-hidden bg-primary/8 flex items-center justify-center">
-                  {c.imagen_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      alt={c.nombre}
-                      className="w-full h-full object-cover"
-                      src={c.imagen_url}
-                    />
-                  ) : (
-                    <Bug size={9} className="text-primary/25" />
-                  )}
-                </span>
-                <span className="text-micro font-bold text-primary/70 truncate max-w-[120px]">
-                  {c.nombre}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  title={c.nombre}
+                  className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                  onClick={() => onSelectCriatura?.(c.id)}
+                >
+                  <span className="shrink-0 w-5 h-5 rounded-full overflow-hidden bg-primary/8 flex items-center justify-center">
+                    {c.imagen_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        alt={c.nombre}
+                        className="w-full h-full object-cover"
+                        src={c.imagen_url}
+                      />
+                    ) : (
+                      <Bug size={9} className="text-primary/25" />
+                    )}
+                  </span>
+                  <span className="text-micro font-bold text-primary/70 truncate max-w-[120px]">
+                    {c.nombre}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  title={`Quitar a ${c.nombre}`}
+                  className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-primary/25 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                  onClick={() => void quitarCriatura(c.id)}
+                >
+                  <X size={9} />
+                </button>
+              </div>
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Buscador para añadir una criatura al subsistema ───────────────────────
+
+function BuscadorCriaturaParaSubsistema({
+  catalogo,
+  excluirIds,
+  loading,
+  onSelect,
+}: {
+  catalogo: { id: string; nombre: string; imagen_url: string | null }[];
+  excluirIds: string[];
+  loading: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const disponibles = useMemo(
+    () =>
+      catalogo.filter(
+        (c) =>
+          !excluirIds.includes(c.id) &&
+          c.nombre.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [catalogo, excluirIds, search],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-dashed text-micro font-black uppercase tracking-widest transition-all"
+        style={{
+          borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
+          color: "color-mix(in srgb, var(--primary) 35%, transparent)",
+        }}
+      >
+        <Plus size={8} /> Añadir criatura
+      </button>
+
+      {open && (
+        <div
+          className="absolute z-20 top-full left-0 mt-1 w-56 rounded-xl border shadow-xl overflow-hidden"
+          style={{
+            background: "var(--bg-main)",
+            borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+          }}
+        >
+          <div
+            className="flex items-center gap-2 px-3 py-2"
+            style={{
+              borderBottom:
+                "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+            }}
+          >
+            <Search
+              size={11}
+              style={{
+                color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+                flexShrink: 0,
+              }}
+            />
+            <input
+              autoFocus
+              className="flex-1 bg-transparent outline-none text-micro font-bold uppercase tracking-wide placeholder:normal-case placeholder:font-medium placeholder:tracking-normal"
+              placeholder="Buscar criatura…"
+              style={{ color: "var(--primary)", caretColor: "var(--primary)" }}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === "Escape" && (setOpen(false), setSearch(""))
+              }
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto p-1">
+            {loading ? (
+              <p className="text-micro text-primary/25 italic text-center py-3">
+                Cargando…
+              </p>
+            ) : disponibles.length === 0 ? (
+              <p className="text-micro text-primary/25 italic text-center py-3">
+                {search ? "Sin resultados" : "No hay más criaturas"}
+              </p>
+            ) : (
+              disponibles.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-micro font-bold text-primary/75 hover:bg-primary/6 hover:text-primary transition-colors truncate"
+                  onMouseDown={() => {
+                    onSelect(c.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <span className="shrink-0 w-5 h-5 rounded-full overflow-hidden bg-primary/8 flex items-center justify-center">
+                    {c.imagen_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        alt={c.nombre}
+                        className="w-full h-full object-cover"
+                        src={c.imagen_url}
+                      />
+                    ) : (
+                      <Bug size={9} className="text-primary/25" />
+                    )}
+                  </span>
+                  <span className="truncate">{c.nombre}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
