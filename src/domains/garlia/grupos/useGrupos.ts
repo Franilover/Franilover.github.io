@@ -20,14 +20,10 @@ import {
   Users,
   Bug,
   Package,
-  Sparkles,
-  Star,
   ScrollText,
   Map,
   UserCircle2,
   Swords,
-  Wand2,
-  Gem,
   Feather,
   Music,
   Disc3,
@@ -49,9 +45,6 @@ export type GrupoTipo =
   | "criaturas"
   | "items"
   | "reinos"
-  | "hechizos"
-  | "dones"
-  | "runas"
   | "libros"
   | "canciones";
 
@@ -91,8 +84,6 @@ export type EntidadMin = {
   reino?: string;
   habitat?: string;
   categoria?: string;
-  /** Solo para runas: patrón de trazos, usado para el preview en vez de imagen. */
-  patron_trazos?: unknown[] | null;
 };
 
 // ─── Config de tipos de grupo ─────────────────────────────────────────────────
@@ -187,62 +178,6 @@ export const GRUPO_TIPO_CONFIG: Record<
       "Unión",
       "Federación",
       "Coalición",
-    ],
-  },
-  hechizos: {
-    label: "Hechizo",
-    labelPlural: "Hechizos",
-    Icon: Sparkles,
-    IconAlt: Wand2,
-    color: "var(--accent)",
-    tabla: "hechizos",
-    ejemplo: "Escuela, elemento, estilo…",
-    sugerenciasDefault: [
-      "Escuela",
-      "Elemento",
-      "Estilo",
-      "Tradición",
-      "Arte arcano",
-      "Linaje mágico",
-      "Especialidad",
-      "Corriente",
-    ],
-  },
-  dones: {
-    label: "Don",
-    labelPlural: "Dones",
-    Icon: Star,
-    IconAlt: Gem,
-    color: "color-mix(in srgb, var(--accent) 70%, var(--primary))",
-    tabla: "dones",
-    ejemplo: "Linaje, maldición, don ancestral…",
-    sugerenciasDefault: [
-      "Linaje",
-      "Maldición",
-      "Don ancestral",
-      "Bendición",
-      "Legado",
-      "Herencia divina",
-      "Pacto",
-      "Señal",
-    ],
-  },
-  runas: {
-    label: "Runa",
-    labelPlural: "Runas",
-    Icon: ScrollText,
-    IconAlt: ScrollText,
-    color: "var(--primary)",
-    tabla: "runas",
-    ejemplo: "Conjunto rúnico, tradición…",
-    sugerenciasDefault: [
-      "Conjunto rúnico",
-      "Tradición",
-      "Sistema",
-      "Alfabeto",
-      "Escuela rúnica",
-      "Legado",
-      "Ciclo",
     ],
   },
   libros: {
@@ -376,16 +311,6 @@ export function useEntidades(tabla: string) {
           nombre: r.titulo,
           imagen_url: r.portada_url ?? undefined,
           categoria: r.cantante ?? undefined,
-        }));
-      } else if (tabla === "runas") {
-        const { data } = await supabase
-          .from("runas")
-          .select("id, nombre, patron_trazos")
-          .order("nombre");
-        result = (data ?? []).map((r: any) => ({
-          id: r.id,
-          nombre: r.nombre,
-          patron_trazos: r.patron_trazos ?? undefined,
         }));
       } else {
         const { data } = await (supabase.from(tabla as any) as any)

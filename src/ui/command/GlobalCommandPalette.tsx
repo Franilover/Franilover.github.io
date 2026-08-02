@@ -22,8 +22,6 @@ import {
   Loader2,
   WifiOff,
   BookOpen,
-  Wand2,
-  Zap,
   FileText,
   Clock,
   Layers,
@@ -579,8 +577,6 @@ export function GlobalCommandPalette() {
     cap: "Capítulos",
     lib: "Libros",
     ens: "Ensayos",
-    don: "Dones",
-    hec: "Hechizos",
     run: "Runas",
   };
   // Grupos admin que mapean al mismo tipo
@@ -819,7 +815,7 @@ export function GlobalCommandPalette() {
     [router, pathname],
   );
 
-  // Navega al editor y dispara onAddMagic para el resto (hechizos, notas, etc.)
+  // Navega al editor y dispara onAddMagic para el resto (runas, notas, etc.)
   const goEditorAndDispatch = useCallback(
     (key: string) => {
       const dispatch = () =>
@@ -1121,28 +1117,6 @@ export function GlobalCommandPalette() {
           action: () => {
             setOpen(false);
             goEditorAndDispatch("ciudad");
-          },
-          group: "Crear",
-        },
-        {
-          id: "add-hechizo",
-          label: "Nuevo hechizo",
-          icon: Wand2,
-          keywords: ["add", "crear", "nuevo", "hechizo"],
-          action: () => {
-            setOpen(false);
-            goEditorAndDispatch("hechizos");
-          },
-          group: "Crear",
-        },
-        {
-          id: "add-don",
-          label: "Nuevo don",
-          icon: Zap,
-          keywords: ["add", "crear", "nuevo", "don"],
-          action: () => {
-            setOpen(false);
-            goEditorAndDispatch("dones");
           },
           group: "Crear",
         },

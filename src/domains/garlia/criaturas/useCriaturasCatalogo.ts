@@ -4,7 +4,7 @@
  * useCriaturasCatalogo.ts
  * ─────────────────────────
  * Catálogo global de criaturas (id, nombre, imagen) para alimentar el
- * selector "Criatura" en Items, Runas, Hechizos y Dones.
+ * selector "Criatura" en Items.
  * Usa fetchAllCriaturas (singleton compartido) para no repetir el fetch
  * si hay varios selectores montados en simultáneo.
  *

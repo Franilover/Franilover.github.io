@@ -8,9 +8,6 @@
  * (columna `criatura_id`) — de solo lectura + navegación, ya que la edición
  * del vínculo vive en el selector "Criatura" del editor de cada ítem.
  *
- * Nota: Dones/Runas/Hechizos ya no se vinculan a criaturas — esa relación
- * fue eliminada.
- *
  * Ruta destino:
  *   src/features/editorGarlia/components/criaturas/BloqueEntidadesDeCriatura.tsx
  */

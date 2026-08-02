@@ -26,7 +26,6 @@ import {
   Package,
   ScrollText,
   Sparkles,
-  Star,
   Users,
 } from "lucide-react";
 import React from "react";
@@ -71,11 +70,7 @@ export const MUNDO_MENU_GROUPS: MenuGroup[] = [
   },
   {
     title: "Magia",
-    items: [
-      { key: "hechizos", label: "Hechizos", Icon: Sparkles },
-      { key: "runas", label: "Runas", Icon: ScrollText },
-      { key: "dones", label: "Dones", Icon: Star },
-    ],
+    items: [{ key: "runas", label: "Runas", Icon: Sparkles }],
   },
 ];
 

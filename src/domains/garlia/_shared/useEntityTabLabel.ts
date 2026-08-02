@@ -32,9 +32,6 @@ const SECTION_TABLE: Record<SectionKey, string | null> = {
   reinos: "reinos",
   ciudades: "ciudades",
   grupos: "grupos_mundo",
-  hechizos: "hechizos",
-  dones: "dones",
-  runas: "runas",
   // "capitulos" ahora sí abre pestañas — pero de LIBROS (el documento
   // completo de un libro, ver LibroDocumentoPanel en EditorCapitulos.tsx),
   // no de capítulos individuales.
@@ -48,7 +45,7 @@ const SECTION_TABLE: Record<SectionKey, string | null> = {
 };
 
 /**
- * Resuelve el nombre visible de una entidad (runa/personaje/reino/etc).
+ * Resuelve el nombre visible de una entidad (personaje/reino/etc).
  *
  * "capitulos" resuelve el TÍTULO DEL LIBRO — la pestaña abierta con
  * openEntity("capitulos", libroId) es el documento completo de ese libro

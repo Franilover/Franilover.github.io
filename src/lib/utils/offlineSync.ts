@@ -71,8 +71,6 @@ const SYNC_TABLES: Record<
   // Se excluye "deleted" para que el soft-delete no se suba accidentalmente.
   notas_lore: { supabaseTable: "notas", excludeFields: ["deleted"] },
   // ─── EditorMundo: entidades migradas de useEntityList casero a useSupabaseData ──
-  hechizos: { supabaseTable: "hechizos", excludeFields: ["status", "deleted"] },
-  dones: { supabaseTable: "dones", excludeFields: ["status", "deleted"] },
   runas: { supabaseTable: "runas", excludeFields: ["status", "deleted"] },
   grupos_mundo: {
     supabaseTable: "grupos_mundo",

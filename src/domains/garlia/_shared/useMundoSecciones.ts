@@ -1,7 +1,7 @@
 /**
  * useMundoSecciones.ts
  * ──────────────────────
- * Textos largos de las secciones generales del mundo (magia, geografía,
+ * Textos largos de las secciones generales del mundo (geografía,
  * historia) — usado en la vista general del editor de mundo.
  *
  * Extraído de `hooks/hooks.ts` (archivo cajón-de-sastre con 11 hooks
@@ -20,7 +20,6 @@ import { type MundoSectionKey } from "./types";
 
 export function useMundoSecciones() {
   const [textos, setTextos] = useState<Record<MundoSectionKey, string>>({
-    magia: "",
     geografia: "",
     historia: "",
   });
@@ -55,7 +54,7 @@ export function useMundoSecciones() {
         .select("key, contenido");
       if (!data || cancelled) return;
 
-      const result = { magia: "", geografia: "", historia: "" } as Record<
+      const result = { geografia: "", historia: "" } as Record<
         MundoSectionKey,
         string
       >;

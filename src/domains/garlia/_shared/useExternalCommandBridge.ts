@@ -36,8 +36,6 @@ export const TABLA_TO_SECTION: Record<string, SectionKey> = {
   reinos: "reinos",
   ciudades: "ciudades",
   grupos_mundo: "grupos",
-  hechizos: "hechizos",
-  dones: "dones",
   runas: "runas",
   // "libros" es el nombre de tabla que usa GRUPO_TIPO_CONFIG (cfg.tabla) para
   // el tipo de grupo "Libros" — la sección de navegación equivalente es
@@ -53,7 +51,7 @@ export const TABLA_TO_SECTION: Record<string, SectionKey> = {
   grupos: "grupos",
 };
 
-const MAGIA_TABLAS = new Set(["hechizos", "dones", "runas"]);
+const MAGIA_TABLAS = new Set(["runas"]);
 
 export function useExternalCommandBridge(onCreateEntity: (tab: string) => void) {
   const openEntity = useMundoNavigation((s) => s.openEntity);

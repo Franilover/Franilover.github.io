@@ -4,7 +4,7 @@
  * EntityTabBar
  * ───────────────────────────────────────────────────────────────────────────
  * Barra horizontal, arriba del contenido de EditorMundoRoot, con una pestaña
- * por cada entidad puntual abierta (runa, personaje, capítulo de reino,
+ * por cada entidad puntual abierta (personaje, capítulo de reino,
  * etc — cualquier section+id pasado por useMundoNavigation.openEntity).
  *
  * No es la navegación de secciones (eso vive en navbar.tsx) — es el
@@ -21,15 +21,12 @@ import {
   Bug,
   BookMarked,
   Clock,
-  Compass,
   Crown,
   Landmark,
   Music,
-  Sparkles,
   StickyNote,
   Swords,
   Users,
-  Wand2,
   X,
 } from "lucide-react";
 import React from "react";
@@ -44,9 +41,6 @@ const SECTION_ICON: Partial<Record<SectionKey, React.ElementType>> = {
   reinos: Crown,
   ciudades: Landmark,
   grupos: Users,
-  hechizos: Wand2,
-  dones: Sparkles,
-  runas: Compass,
   letras: Music,
   notas: StickyNote,
   "notas-gos": StickyNote,

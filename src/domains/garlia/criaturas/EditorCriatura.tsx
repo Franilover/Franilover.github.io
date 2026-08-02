@@ -58,7 +58,6 @@ import {
   useCriaturaCiudades,
 } from "@/domains/garlia/criaturas/CriaturaHabitat";
 import { useCraftedItems } from "@/domains/garlia/criaturas/CriaturaItemsCraftedos";
-import { BloqueMagico } from "@/domains/garlia/criaturas/CriaturaMagia";
 import { CriaturaStatsDndEditor } from "@/domains/garlia/criaturas/CriaturaStatsDnd";
 import { PickerImagenCriaturaBtn } from "@/domains/garlia/criaturas/PickerImagenCriaturaBtn";
 import {
@@ -86,7 +85,6 @@ export function EditorCriatura({
   onSelectGrupo,
   onNavigateCiudad,
   onNavigateReino,
-  onNavigateEntidadMagica,
 }: {
   item: Criatura;
   onSaved: (c: Criatura) => void;
@@ -97,11 +95,6 @@ export function EditorCriatura({
   onSelectGrupo?: (grupoId: string) => void;
   onNavigateCiudad?: (id: string) => void;
   onNavigateReino?: (id: string) => void;
-  /** Navega al editor de un hechizo/don/runa vinculado a esta criatura */
-  onNavigateEntidadMagica?: (
-    tipo: "hechizos" | "dones" | "runas",
-    id: string,
-  ) => void;
 }) {
   const [form, setForm] = useState<Criatura>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -550,22 +543,6 @@ export function EditorCriatura({
             />
           </div>
 
-          {/* Dones — este grupo (Personajes/Territorio/Ciudades/Creaciones/
-              Dones) es el bloque dinámico real (SeccionEntidad). El bloque
-              suelto "Vinculados" (BloqueEntidadesDeCriatura) que estaba
-              arriba, fuera de este grupo, se quitó por redundante. */}
-          <div
-            className="shrink-0 flex flex-col h-full overflow-hidden"
-            style={{ width: "110px" }}
-          >
-            <BloqueMagico
-              criaturaId={form.id}
-              gruposActuales={gruposActuales.map((g) => g.id)}
-              icon={Star}
-              label="Dones"
-              usarHook="dones"
-            />
-          </div>
         </div>
       </div>
 
@@ -699,20 +676,6 @@ export function EditorCriatura({
               selectedIds={craftedItems.map((i) => i.itemId)}
               onEntityClick={(id) => onSelectItem?.(id)}
               onToggle={handleToggleCrafted}
-            />
-            <div
-              style={{
-                borderTop:
-                  "1px solid color-mix(in srgb, var(--primary) 7%, transparent)",
-              }}
-            />
-            {/* Dones — bloque dinámico real; ver nota arriba en desktop. */}
-            <BloqueMagico
-              criaturaId={form.id}
-              gruposActuales={gruposActuales.map((g) => g.id)}
-              icon={Star}
-              label="Dones"
-              usarHook="dones"
             />
           </div>
         </div>

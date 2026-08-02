@@ -5,8 +5,8 @@
  * ───────────────────────────────────────────────────────────────────────────
  * Combina varias páginas de "grid de tarjetas" que comparten datos/hooks:
  * Personajes + Reinos + Ciudades (Entidades/Geografía), Criaturas (Items +
- * Personajes agrupados por criatura de origen), Hechizos + Dones + Runas
- * (Magia), Letras/Canciones, y Grupos + Notas (Organización). Cada una es
+ * Personajes agrupados por criatura de origen), Letras/Canciones, y Grupos
+ * + Notas (Organización). Cada una es
  * ahora su propia sección en la navbar (sin sub-tabs internas) — pero
  * reutilizan este mismo componente para su renderizado, ya que comparten
  * hooks de datos (useSupabaseData, useGrupos, useNotas, etc.).
@@ -23,19 +23,14 @@ import React, { useMemo, useState } from "react";
 
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
 import { ModalNuevaCancion } from "@/domains/garlia/canciones/modals/ModalNuevaCancion";
-import { FormularioMagico } from "@/domains/garlia/magia/FormularioMagico";
-import { CONFIG, type EntidadMagica } from "@/domains/garlia/magia/types";
 import { useCanciones } from "@/domains/garlia/canciones/useCanciones";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { Chip } from "@/ui/Chip";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
-import { useGruposRunas } from "@/domains/garlia/grupos/useGruposRunas";
 import { useNotas } from "@/editor/notas/useNotas";
 import { type Nota } from "@/domains/garlia/_shared/types";
-import { useEntidadesMagicas } from "@/domains/garlia/magia/useEntidadesMagicas";
 import { EditorGrupo, GRUPO_TIPO_CONFIG, useGrupos, type GrupoTipo } from "@/domains/garlia/grupos/EditorGrupo";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
-import { supabase } from "@/infra/supabase/supabase";
 
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { ItemEditor } from "@/domains/garlia/items/ItemEditor";
@@ -45,8 +40,7 @@ import { CiudadEditor } from "@garlia/ciudades";
 import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GeografiaJerarquica, type GrupoPersonajeSubtipo } from "@/domains/garlia/_shared/GeografiaJerarquica";
 import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
-import { MagiaJerarquica } from "@/domains/garlia/magia/MagiaJerarquica";
-import { MagiaPorTipo } from "@/domains/garlia/magia/MagiaPorTipo";
+import { CriaturasJerarquica } from "@/domains/garlia/_shared/CriaturasJerarquica";
 import { TABLA_TO_SECTION } from "@/domains/garlia/_shared/useExternalCommandBridge";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
@@ -88,40 +82,6 @@ interface Props {
   selectedId: string | null;
 }
 
-function useMagiaCategoria(modo: "hechizos" | "dones" | "runas") {
-  const { items, setItems, loading } = useEntidadesMagicas(modo);
-  const [creating, setCreating] = useState(false);
-  const cfg = CONFIG[modo];
-
-  const create = async (): Promise<string | null> => {
-    setCreating(true);
-    try {
-      const insertPayload =
-        modo === "runas"
-          ? { nombre: `Nueva ${cfg.labelSing}` }
-          : { nombre: `Nuevo ${cfg.labelSing}`, grupo_ids: [] };
-      const selectFields =
-        modo === "runas"
-          ? "id, nombre, explicacion, imagen_url"
-          : "id, nombre, explicacion, grupo_ids";
-
-      const { data, error } = await supabase
-        .from(cfg.tabla)
-        .insert([insertPayload])
-        .select(selectFields)
-        .single();
-      if (error) throw error;
-      const created = data as unknown as EntidadMagica;
-      setItems((prev) => [created, ...prev]);
-      return created.id;
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  return { items, setItems, loading, creating, create, cfg };
-}
-
 export function EntidadesPage({ section, selectedId }: Props) {
   // ── Entidades ──────────────────────────────────────────────────────────
   const { data: personajes, loading: loadingP, addRow: addPersonaje } =
@@ -137,12 +97,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { data: ciudades, loading: loadingCd, addRow: addCiudad } =
     useSupabaseData<Ciudad>("ciudades");
 
-  // ── Magia ──────────────────────────────────────────────────────────────
-  const hechizos = useMagiaCategoria("hechizos");
-  const dones = useMagiaCategoria("dones");
-  const runas = useMagiaCategoria("runas");
   const { grupos: gruposCriaturas, loading: loadingGrupos } = useGruposCriaturas();
-  const { grupos: gruposRunas, loading: loadingGruposRunas } = useGruposRunas();
 
   // ── Organización (Grupos + Notas) ────────────────────────────────────────
   const { grupos, loaded: loadedGrupos, crearGrupo, actualizarGrupo, eliminarGrupo } = useGrupos();
@@ -353,40 +308,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
     [section, canciones, selectedId],
   );
 
-  const activeMagiaCategoria =
-    section === "hechizos" ? hechizos : section === "dones" ? dones : section === "runas" ? runas : null;
-  const selectedMagia = useMemo(
-    () =>
-      activeMagiaCategoria
-        ? activeMagiaCategoria.items.find((i) => i.id === selectedId) ?? null
-        : null,
-    [activeMagiaCategoria, selectedId],
-  );
-
-  if (selectedMagia && activeMagiaCategoria) {
-    return (
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        <FormularioMagico
-          key={selectedMagia.id}
-          grupos={section === "runas" ? gruposRunas : gruposCriaturas}
-          item={selectedMagia}
-          loadingGrupos={section === "runas" ? loadingGruposRunas : loadingGrupos}
-          modo={section as "hechizos" | "dones" | "runas"}
-          todasLasRunas={section === "runas" ? runas.items : undefined}
-          onDeleted={(id) => {
-            activeMagiaCategoria.setItems((prev) => prev.filter((i) => i.id !== id));
-          }}
-          onSaved={(updated) => {
-            activeMagiaCategoria.setItems((prev) =>
-              prev.map((i) => (i.id === updated.id ? updated : i)),
-            );
-          }}
-          onNavigateGrupo={(id) => openEntity("grupos", id)}
-        />
-      </div>
-    );
-  }
-
   if (selectedGrupo) {
     return (
       <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -460,31 +381,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
         {selectedItem && <ItemEditor item={selectedItem} />}
         {selectedReino && <ReinoEditor reino={selectedReino} />}
         {selectedCiudad && <CiudadEditor ciudad={selectedCiudad} />}
-      </div>
-    );
-  }
-
-  // ── Magia (Hechizos/Dones/Runas) ──────────────────────────────────────
-  // Sección propia de la navbar: tres bloques planos (MagiaPorTipo), sin
-  // agrupar por criatura — esa relación fue eliminada.
-  if (section === "hechizos" || section === "dones" || section === "runas") {
-    return (
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <MagiaPorTipo
-          dones={dones.items}
-          hechizos={hechizos.items}
-          runas={runas.items}
-          loading={hechizos.loading || dones.loading || runas.loading}
-          creating={hechizos.creating || dones.creating || runas.creating}
-          onCreate={async (tipo) => {
-            const categoria = tipo === "hechizos" ? hechizos : tipo === "dones" ? dones : runas;
-            const id = await categoria.create();
-            if (id) openEntity(tipo, id);
-          }}
-          onOpen={(section, id) => openEntity(section, id)}
-          onOpenEnsayo={(id) => openEntity("notas-gos", id)}
-          todasLasRunas={runas.items}
-        />
       </div>
     );
   }
@@ -612,7 +508,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   if (section === "criaturas") {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <MagiaJerarquica
+        <CriaturasJerarquica
           criaturas={criaturas}
           personajes={personajes}
           loading={loadingC || loadingP}
@@ -839,7 +735,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
  * MundoCard
  * ───────────────────────────────────────────────────────────────────────────
  * Card "de mundo" reutilizable — mismo lenguaje visual que usan las cards de
- * Reino (GeografiaJerarquica) y Criatura (MagiaJerarquica): borde redondeado
+ * Reino (GeografiaJerarquica) y Criatura (CriaturasJerarquica): borde redondeado
  * sutil, título centrado y en negrita sobre el borde superior (sin barra de
  * fondo), y contenido libre debajo. Sirve para unificar cualquier nivel de
  * agrupación de la página (Idioma, Compositor, Tipo de grupo, etc.) bajo un

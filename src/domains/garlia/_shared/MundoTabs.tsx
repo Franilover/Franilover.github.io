@@ -12,8 +12,7 @@
  *   - Inicio          → resumen, favoritos y recientes (antes vivía en el
  *                       dashboard de bienvenida; ver MundoHomeContent)
  *   - Entidades       → <EntidadesPage /> (personajes/criaturas/items/
- *                       reinos/ciudades/hechizos/dones/runas/grupos/notas/
- *                       letras)
+ *                       reinos/ciudades/grupos/notas/letras)
  *   - Mapa            → <MapaSection />
  *   - Capítulos       → <CapitulosSection />
  *   - Línea de Tiempo → <LineaTiempoSection />
@@ -33,9 +32,6 @@ const ENTIDADES_SECTIONS: SectionKey[] = [
   "items",
   "reinos",
   "ciudades",
-  "hechizos",
-  "dones",
-  "runas",
   "grupos",
   "notas",
   "letras",

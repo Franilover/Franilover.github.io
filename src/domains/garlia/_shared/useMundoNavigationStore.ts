@@ -31,9 +31,6 @@ export type SectionKey =
   | "reinos"
   | "ciudades"
   | "grupos"
-  | "hechizos"
-  | "dones"
-  | "runas"
   | "capitulos"
   | "letras"
   | "notas"
@@ -41,9 +38,6 @@ export type SectionKey =
   | "mapa"
   | "linea-tiempo"
   | "aventura";
-
-/** @deprecated Magia ya no es una sub-navegación; "hechizos"/"dones"/"runas" son SectionKey propios. */
-export type MagiaTipo = "hechizos" | "dones" | "runas";
 
 /** Una pestaña de entidad abierta: sección + id puntual. */
 export interface MundoTab {

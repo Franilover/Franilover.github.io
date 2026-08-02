@@ -34,8 +34,6 @@ export type TablaEntidad =
   | "items"
   | "reinos"
   | "ciudades"
-  | "hechizos"
-  | "dones"
   | "runas"
   | "fichas_dnd";
 
@@ -45,8 +43,6 @@ export const TABLA_LABEL: Record<TablaEntidad, { singular: string; plural: strin
   items: { singular: "Objeto", plural: "Objetos" },
   reinos: { singular: "Reino", plural: "Reinos" },
   ciudades: { singular: "Ciudad", plural: "Ciudades" },
-  hechizos: { singular: "Hechizo", plural: "Hechizos" },
-  dones: { singular: "Don", plural: "Dones" },
   runas: { singular: "Runa", plural: "Runas" },
   fichas_dnd: { singular: "Ficha de Jugador", plural: "Fichas de Jugadores" },
 };
@@ -57,8 +53,6 @@ export const TABLAS_ENTIDAD: TablaEntidad[] = [
   "items",
   "reinos",
   "ciudades",
-  "hechizos",
-  "dones",
   "runas",
   "fichas_dnd",
 ];

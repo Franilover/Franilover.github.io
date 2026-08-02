@@ -44,9 +44,9 @@ import { EntityTabBar } from "@/domains/garlia/_shared/EntityTabBar";
 import { EnsayoGosScreen } from "@/domains/plataforma/puentes/EnsayoGosScreen";
 
 // ─── Code-splitting por página combinada ──────────────────────────────────
-// Personajes/Criaturas/Items/Reinos/Ciudades/Hechizos/Dones/Runas/Grupos/
+// Personajes/Criaturas/Items/Reinos/Ciudades/Runas/Grupos/
 // Notas/Letras viven TODOS en EntidadesPage (una sola grilla grande de
-// tarjetas). Hechizos/Dones/Runas y Letras se muestran como páginas
+// tarjetas). Runas y Letras se muestran como páginas
 // independientes (sin la sub-barra de Reinos/Criaturas/Organización, que es
 // exclusiva de la sección "Entidades").
 const EntidadesPage = lazy(() =>
@@ -91,8 +91,6 @@ function ActiveSection() {
     case "items":
     case "reinos":
     case "ciudades":
-    case "hechizos":
-    case "dones":
     case "runas":
     case "grupos":
     case "notas":

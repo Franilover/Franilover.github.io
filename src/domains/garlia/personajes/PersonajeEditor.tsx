@@ -3,8 +3,8 @@
 /**
  * PersonajeEditor
  * ───────────────────────────────────────────────────────────────────────────
- * El formulario real (usePersonajeForm, PersonajeSidebarPanel, BloqueDones,
- * etc.) ya estaba bien factorizado en EditorPersonaje.tsx — no hace falta
+ * El formulario real (usePersonajeForm, PersonajeSidebarPanel, etc.)
+ * ya estaba bien factorizado en EditorPersonaje.tsx — no hace falta
  * reescribirlo. Lo único que cambia es cómo navega: antes recibía funciones
  * sueltas (onNavigate, onSelectPersonaje, onOpenGrupo...) que subían como
  * props desde el componente raíz de 2395 líneas. Ahora todas esas funciones
@@ -25,7 +25,7 @@ interface Personaje {
 export function PersonajeEditor({ personaje }: { personaje: Personaje }) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
   // Resuelve nombre → id contra el cache de personajes/criaturas/items/
-  // reinos/ciudades/hechizos/dones/runas y navega. Reusado acá porque
+  // reinos/ciudades y navega. Reusado acá porque
   // onNavigate("criaturas"/"reinos", nombre) de EditorPersonaje solo entrega
   // el NOMBRE de la especie/reino, nunca el id (por diseño de ese formulario).
   const navigateByName = useWikilinkNavigate();

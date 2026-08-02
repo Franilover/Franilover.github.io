@@ -1018,49 +1018,6 @@ export type Database = {
         }
         Relationships: []
       }
-      don_criaturas: {
-        Row: {
-          criatura_id: string | null
-          don_id: string | null
-          id: string
-          variante_id: string | null
-        }
-        Insert: {
-          criatura_id?: string | null
-          don_id?: string | null
-          id?: string
-          variante_id?: string | null
-        }
-        Update: {
-          criatura_id?: string | null
-          don_id?: string | null
-          id?: string
-          variante_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "don_criaturas_criatura_id_fkey"
-            columns: ["criatura_id"]
-            isOneToOne: false
-            referencedRelation: "criaturas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "don_criaturas_don_id_fkey"
-            columns: ["don_id"]
-            isOneToOne: false
-            referencedRelation: "dones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "don_criaturas_variante_id_fkey"
-            columns: ["variante_id"]
-            isOneToOne: false
-            referencedRelation: "criatura_variantes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       dotes_dnd: {
         Row: {
           id: string
@@ -1090,57 +1047,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      dones: {
-        Row: {
-          created_at: string | null
-          criatura_id: string | null
-          explicacion: string | null
-          grupo_ids: string[] | null
-          id: string
-          imagen_url: string | null
-          nombre: string
-          updated_at: string | null
-          variante_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          criatura_id?: string | null
-          explicacion?: string | null
-          grupo_ids?: string[] | null
-          id?: string
-          imagen_url?: string | null
-          nombre?: string
-          updated_at?: string | null
-          variante_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          criatura_id?: string | null
-          explicacion?: string | null
-          grupo_ids?: string[] | null
-          id?: string
-          imagen_url?: string | null
-          nombre?: string
-          updated_at?: string | null
-          variante_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dones_criatura_id_fkey"
-            columns: ["criatura_id"]
-            isOneToOne: false
-            referencedRelation: "criaturas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "dones_variante_id_fkey"
-            columns: ["variante_id"]
-            isOneToOne: false
-            referencedRelation: "criatura_variantes"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       ejercicios_rutina: {
         Row: {
@@ -1433,100 +1339,6 @@ export type Database = {
             columns: ["dote_origen_id"]
             isOneToOne: false
             referencedRelation: "dotes_dnd"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hechizo_criaturas: {
-        Row: {
-          criatura_id: string | null
-          hechizo_id: string | null
-          id: string
-          variante_id: string | null
-        }
-        Insert: {
-          criatura_id?: string | null
-          hechizo_id?: string | null
-          id?: string
-          variante_id?: string | null
-        }
-        Update: {
-          criatura_id?: string | null
-          hechizo_id?: string | null
-          id?: string
-          variante_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hechizo_criaturas_criatura_id_fkey"
-            columns: ["criatura_id"]
-            isOneToOne: false
-            referencedRelation: "criaturas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hechizo_criaturas_hechizo_id_fkey"
-            columns: ["hechizo_id"]
-            isOneToOne: false
-            referencedRelation: "hechizos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hechizo_criaturas_variante_id_fkey"
-            columns: ["variante_id"]
-            isOneToOne: false
-            referencedRelation: "criatura_variantes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hechizos: {
-        Row: {
-          created_at: string | null
-          criatura_id: string | null
-          explicacion: string | null
-          grupo_ids: string[] | null
-          id: string
-          imagen_url: string | null
-          nombre: string
-          updated_at: string | null
-          variante_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          criatura_id?: string | null
-          explicacion?: string | null
-          grupo_ids?: string[] | null
-          id?: string
-          imagen_url?: string | null
-          nombre?: string
-          updated_at?: string | null
-          variante_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          criatura_id?: string | null
-          explicacion?: string | null
-          grupo_ids?: string[] | null
-          id?: string
-          imagen_url?: string | null
-          nombre?: string
-          updated_at?: string | null
-          variante_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hechizos_criatura_id_fkey"
-            columns: ["criatura_id"]
-            isOneToOne: false
-            referencedRelation: "criaturas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hechizos_variante_id_fkey"
-            columns: ["variante_id"]
-            isOneToOne: false
-            referencedRelation: "criatura_variantes"
             referencedColumns: ["id"]
           },
         ]
@@ -2462,39 +2274,6 @@ export type Database = {
           },
         ]
       }
-      personaje_dones: {
-        Row: {
-          don_id: string
-          id: string
-          personaje_id: string
-        }
-        Insert: {
-          don_id: string
-          id?: string
-          personaje_id: string
-        }
-        Update: {
-          don_id?: string
-          id?: string
-          personaje_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "personaje_dones_don_id_fkey"
-            columns: ["don_id"]
-            isOneToOne: false
-            referencedRelation: "dones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "personaje_dones_personaje_id_fkey"
-            columns: ["personaje_id"]
-            isOneToOne: false
-            referencedRelation: "personajes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       personaje_eras: {
         Row: {
           created_at: string | null
@@ -2539,44 +2318,10 @@ export type Database = {
           },
         ]
       }
-      personaje_hechizos: {
-        Row: {
-          hechizo_id: string
-          id: string
-          personaje_id: string
-        }
-        Insert: {
-          hechizo_id: string
-          id?: string
-          personaje_id: string
-        }
-        Update: {
-          hechizo_id?: string
-          id?: string
-          personaje_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "personaje_hechizos_hechizo_id_fkey"
-            columns: ["hechizo_id"]
-            isOneToOne: false
-            referencedRelation: "hechizos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "personaje_hechizos_personaje_id_fkey"
-            columns: ["personaje_id"]
-            isOneToOne: false
-            referencedRelation: "personajes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       personajes: {
         Row: {
           caracteristicas: string | null
           ciudad_id: string | null
-          don: string | null
           especie: string | null
           fecha_nacimiento: number | null
           id: string
@@ -2592,7 +2337,6 @@ export type Database = {
         Insert: {
           caracteristicas?: string | null
           ciudad_id?: string | null
-          don?: string | null
           especie?: string | null
           fecha_nacimiento?: number | null
           id?: string
@@ -2608,7 +2352,6 @@ export type Database = {
         Update: {
           caracteristicas?: string | null
           ciudad_id?: string | null
-          don?: string | null
           especie?: string | null
           fecha_nacimiento?: number | null
           id?: string

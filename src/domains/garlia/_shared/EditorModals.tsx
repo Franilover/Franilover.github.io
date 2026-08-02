@@ -12,13 +12,9 @@ import {
   Bug,
   Package,
   Map,
-  Sparkles,
-  Wand2,
-  Star,
   BookOpen,
   Feather,
   Swords,
-  Gem,
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 
@@ -32,9 +28,6 @@ export type AllItems = {
   criaturas: any[];
   items: any[];
   reinos: any[];
-  hechizos: any[];
-  dones: any[];
-  runas: any[];
   notas: any[];
   grupos: any[];
   capitulos: any[];
@@ -42,9 +35,6 @@ export type AllItems = {
 };
 
 export type MagicAddKey =
-  | "hechizos"
-  | "dones"
-  | "runas"
   | "notas"
   | "acontecimiento"
   | "grupos"
@@ -334,9 +324,6 @@ type GrupoTipoLocal =
   | "criaturas"
   | "items"
   | "reinos"
-  | "hechizos"
-  | "dones"
-  | "runas"
   | "libros";
 
 const GRUPO_MODAL_CONFIG: Record<
@@ -347,9 +334,6 @@ const GRUPO_MODAL_CONFIG: Record<
   criaturas:  { label: "Criatura",  labelPlural: "Criaturas",  Icon: Bug,   IconAlt: Feather, color: "color-mix(in srgb, var(--primary) 70%, #4ade80)", tabla: "criaturas", ejemplo: "Manada, especie, orden…" },
   items:      { label: "Objeto",    labelPlural: "Objetos",    Icon: Package, IconAlt: Swords, color: "color-mix(in srgb, var(--primary) 60%, #f59e0b)", tabla: "items", ejemplo: "Arsenal, colección, reliquias…" },
   reinos:     { label: "Reino",     labelPlural: "Reinos",     Icon: Map,   IconAlt: Map,    color: "color-mix(in srgb, var(--primary) 60%, #60a5fa)", tabla: "reinos", ejemplo: "Alianza, confederación, imperio…" },
-  hechizos:   { label: "Hechizo",   labelPlural: "Hechizos",   Icon: Sparkles, IconAlt: Wand2, color: "var(--accent)", tabla: "hechizos", ejemplo: "Escuela, elemento, estilo…" },
-  dones:      { label: "Don",       labelPlural: "Dones",      Icon: Star,  IconAlt: Gem,    color: "color-mix(in srgb, var(--accent) 70%, var(--primary))", tabla: "dones", ejemplo: "Linaje, maldición, ancestral…" },
-  runas:      { label: "Runa",      labelPlural: "Runas",      Icon: ScrollText, IconAlt: ScrollText, color: "var(--primary)", tabla: "runas", ejemplo: "Conjunto rúnico, tradición…" },
   libros:     { label: "Libro",     labelPlural: "Libros",     Icon: BookOpen, IconAlt: BookOpen, color: "color-mix(in srgb, var(--primary) 60%, #a78bfa)", tabla: "libros", ejemplo: "Novela, poemario, saga, extra…" },
 };
 

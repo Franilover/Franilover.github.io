@@ -72,8 +72,6 @@ const DEXIE_TABLES = new Set([
   "reino_detalles",
   "notas_lore",
   // ─── EditorMundo: migradas de useEntityList casero ──────────────────────────
-  "hechizos",
-  "dones",
   "runas",
   "grupos_mundo",
   "ciudades",
@@ -104,8 +102,6 @@ const OFFLINE_WRITABLE = new Set([
   "relaciones",
   "notas_lore",
   // ─── EditorMundo: migradas de useEntityList casero ──────────────────────────
-  "hechizos",
-  "dones",
   "runas",
   "grupos_mundo",
   "ciudades",

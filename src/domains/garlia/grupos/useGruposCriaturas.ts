@@ -4,7 +4,7 @@
  * useGruposCriaturas.ts
  * ────────────────────────
  * Grupos de criaturas (tipo "criaturas" en grupos_mundo), usados para
- * asignar a qué grupos puede pertenecer un hechizo/don.
+ * asignar a qué grupos puede pertenecer una runa.
  *
  * Ruta destino:
  *   src/features/editorGarlia/hooks/useGruposCriaturas.ts

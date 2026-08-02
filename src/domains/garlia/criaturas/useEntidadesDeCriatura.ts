@@ -5,12 +5,8 @@
  * ───────────────────────────
  * Trae los Ítems vinculados DIRECTAMENTE a una criatura mediante la columna
  * `criatura_id` (relación de origen/pertenencia, 1 criatura → N items).
- * Distinto de las relaciones many-to-many que ya existen (item_crafteres,
- * personaje_hechizos, etc.) — acá la criatura es el "dueño"/origen del item,
- * no una simple asignación.
- *
- * Nota: Dones/Runas/Hechizos ya no tienen `criatura_id` — esa relación fue
- * eliminada (ver MagiaPorTipo).
+ * Distinto de las relaciones many-to-many que ya existen — acá la criatura
+ * es el "dueño"/origen del item, no una simple asignación.
  *
  * Se usa para armar el agrupador visual "Criatura → Items" dentro del editor
  * de Criatura.

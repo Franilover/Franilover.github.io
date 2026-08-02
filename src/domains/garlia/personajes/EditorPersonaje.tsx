@@ -8,7 +8,6 @@
  * allá de UI puramente visual (apertura del drawer mobile).
  *
  * Datos:
- *   hooks/useGruposDeCriatura.ts
  *   hooks/useCiudades.ts
  *   hooks/useReinosMin.ts
  *   hooks/usePersonajeForm.ts
@@ -36,7 +35,6 @@ import {
 import { ComboSelector } from "@/ui/ComboSelector";
 import { useConfirm } from "@/ui/ConfirmModal";
 import {
-  BloqueDones,
   PersonajeLineaDeTiempo,
   PersonajeSidebarPanel,
   PickerCaraBtn,
@@ -47,7 +45,6 @@ import {
 } from "@garlia/personajes";
 import { type SaveStatus } from "@/ui/saveStatus";
 import { useCiudades } from "@garlia/ciudades";
-import { useGruposDeCriatura } from "@/domains/garlia/grupos/useGruposDeCriatura";
 import { useReinosMin } from "@garlia/reinos";
 
 import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
@@ -89,9 +86,6 @@ export function FormularioPersonaje({
   const especies = useNombresDeTabla("criaturas");
   const reinosMin = useReinosMin();
   const ciudades = useCiudades();
-  const { ids: grupoIds, esMagico: especieEsMagica } = useGruposDeCriatura(
-    form.especie,
-  );
 
   useRegisterMobileAside();
   const mobileAsideOpen = useMobileAsidePanel((s) => s.open);
@@ -188,8 +182,6 @@ export function FormularioPersonaje({
   const sidebarProps = {
     personajeId: form.id,
     nombrePersonaje: form.nombre ?? "",
-    grupoIds,
-    especieEsMagica,
     onSelectPersonaje,
     onOpenGrupo,
     onSelectCancion,
@@ -441,7 +433,6 @@ export function FormularioPersonaje({
                         : undefined
                     }
                   />
-                  <BloqueDones grupoIds={grupoIds} personajeId={form.id} />
                 </div>
 
                 {/* Desktop: layout fila de 3 */}
@@ -512,9 +503,6 @@ export function FormularioPersonaje({
                           : undefined
                       }
                     />
-                  </div>
-                  <div className="shrink-0">
-                    <BloqueDones grupoIds={grupoIds} personajeId={form.id} />
                   </div>
                 </div>
 

@@ -5,9 +5,6 @@ import {
   Map,
   Mountain,
   ScrollText,
-  Sparkles,
-  Star,
-  Wand2,
   Layers,
   BookOpen,
   Music,
@@ -30,9 +27,6 @@ export type TabKey =
   | "items"
   | "reinos"
   | "mundo"
-  | "hechizos"
-  | "dones"
-  | "runas"
   | "grupos"
   | "capitulos"
   | "letras";
@@ -58,9 +52,6 @@ export const TAB_CONFIG: Record<
   criaturas: { emoji: "🐛", label: "Criaturas", tabla: "criaturas", Icon: Bug },
   items: { emoji: "📦", label: "Items", tabla: "items", Icon: Package },
   reinos: { emoji: "🗺️", label: "Mapas", tabla: "reinos", Icon: Map },
-  hechizos: { emoji: "✨", label: "Hechizos", tabla: "hechizos", Icon: Wand2 },
-  dones: { emoji: "⭐", label: "Dones", tabla: "dones", Icon: Star },
-  runas: { emoji: "ᚱ", label: "Runas", tabla: "runas", Icon: ScrollText },
   grupos: { emoji: "", label: "Grupos", tabla: "grupos_mundo", Icon: Layers },
   capitulos: {
     emoji: "📖",
@@ -79,7 +70,6 @@ export const TAB_CONFIG: Record<
 };
 
 export const MUNDO_SECTIONS = [
-  { key: "magia", label: "Magia", Icon: Sparkles },
   { key: "geografia", label: "Mundo", Icon: Mountain },
   { key: "historia", label: "Historia", Icon: ScrollText },
 ] as const;

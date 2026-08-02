@@ -2,7 +2,7 @@
  * criaturasCache.ts
  * ───────────────────
  * Singleton de catálogo de criaturas (tabla `criaturas`), compartido entre
- * todos los selectores "Criatura" del editor (Items, Runas, Hechizos, Dones)
+ * todos los selectores "Criatura" del editor (Items, Runas)
  * — un solo fetch aunque haya múltiples selectores montados a la vez.
  *
  * Mismo patrón que criaturaItemsCache.ts.

@@ -267,24 +267,6 @@ export interface SessionCache {
   updated_at: number;
 }
 
-export interface Hechizo {
-  id: string;
-  nombre: string;
-  explicacion?: string;
-  criatura_id?: string | null;
-  variante_id?: string | null;
-  [key: string]: any;
-}
-
-export interface Don {
-  id: string;
-  nombre: string;
-  explicacion?: string;
-  criatura_id?: string | null;
-  variante_id?: string | null;
-  [key: string]: any;
-}
-
 export interface Runa {
   id: string;
   nombre: string;
@@ -311,7 +293,7 @@ export interface Ciudad {
 export interface GrupoMundo {
   id: string;
   nombre: string;
-  tipo: "personajes" | "criaturas" | "items" | "hechizos" | "dones" | "runas";
+  tipo: "personajes" | "criaturas" | "items" | "runas";
   descripcion?: string | null;
   miembro_ids: string[];
   created_at?: string;
@@ -337,19 +319,6 @@ export interface ReinoTileLocal {
   image_url?: string | null;
   label?: string | null;
   order?: number;
-}
-
-// ─── Nuevas interfaces para relaciones lore ───────────────────────────────────
-export interface PersonajeHechizo {
-  id: string; // compuesto: `${personaje_id}_${hechizo_id}`
-  personaje_id: string;
-  hechizo_id: string;
-}
-
-export interface PersonajeDon {
-  id: string; // compuesto: `${personaje_id}_${don_id}`
-  personaje_id: string;
-  don_id: string;
 }
 
 // ─── Eras de personaje (arcos vitales en la línea de tiempo) ─────────────────
@@ -554,15 +523,9 @@ class AgendaFraniDB extends Dexie {
   reproductor_handles!: Table<ReproductorHandle, string>;
 
   session_cache!: Table<SessionCache, string>;
-  hechizos!: Table<Hechizo, string>;
-  dones!: Table<Don, string>;
   runas!: Table<Runa, string>;
   ciudades!: Table<Ciudad, string>;
   grupos_mundo!: Table<GrupoMundo, string>;
-
-  // Nuevas tablas para relaciones lore
-  personaje_hechizos!: Table<PersonajeHechizo, string>;
-  personaje_dones!: Table<PersonajeDon, string>;
 
   // Ítems de criaturas
   criatura_drops!: Table<CriaturaDropLocal, string>;
@@ -1326,6 +1289,17 @@ class AgendaFraniDB extends Dexie {
     // deja de ser el índice principal de consulta.
     this.version(27).stores({
       misiones_usuario: "id, ficha_id, user_id, mision_id, estado, status",
+    });
+
+    // ─── v28: se retira el sistema de Hechizos/Dones — todo pasa a vivir
+    // únicamente en Runas. null borra la tabla de IndexedDB en los
+    // navegadores que ya tenían datos viejos (no se puede simplemente omitir
+    // la tabla: Dexie requiere declarar explícitamente su eliminación).
+    this.version(28).stores({
+      hechizos: null,
+      dones: null,
+      personaje_hechizos: null,
+      personaje_dones: null,
     });
   }
 }

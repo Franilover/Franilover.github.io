@@ -6,7 +6,7 @@
  * El editor de Markdown dispara onWikilink(target) cuando el usuario hace
  * click en un [[nombre]]. Antes esto buscaba en un objeto `allItems` gigante
  * cargado en el componente raíz (personajes + criaturas + items + reinos +
- * hechizos + dones + runas, todo junto). Ahora cada sección mantiene su
+ * runas, todo junto). Ahora cada sección mantiene su
  * propia cache vía useSupabaseData, así que resolvemos el link consultando
  * el cache compartido de datos (DataProvider) directamente, sin depender de
  * que el componente padre haya cargado "todo, siempre".
@@ -30,8 +30,6 @@ const SEARCHABLE: { tabla: string; section: SectionKey }[] = [
   { tabla: "items", section: "items" },
   { tabla: "reinos", section: "reinos" },
   { tabla: "ciudades", section: "ciudades" },
-  { tabla: "hechizos", section: "hechizos" },
-  { tabla: "dones", section: "dones" },
   { tabla: "runas", section: "runas" },
 ];
 

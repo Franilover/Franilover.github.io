@@ -51,7 +51,7 @@ export async function dexieWriteAll(tabla: string, rows: any[]): Promise<void> {
 /**
  * Lee relaciones N:N locales (Dexie), detectando dinámicamente si la tabla
  * indexa por "personaje_id" o "criatura_id" (mismas tablas se reusan para
- * personajes y criaturas, p.ej. personaje_hechizos / personaje_dones).
+ * personajes y criaturas).
  */
 export async function loreReadRelaciones(
   tabla: string,

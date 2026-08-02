@@ -13,7 +13,6 @@ export type Personaje = {
   /** Nombre del reino (no id) — así se guarda hoy en la tabla `personajes`. */
   reino?: string;
   especie?: string;
-  don?: string;
   caracteristicas?: string;
   variante_id?: string | null;
 };

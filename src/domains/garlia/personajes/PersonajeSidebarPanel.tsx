@@ -4,8 +4,8 @@
  * PersonajeSidebarPanel.tsx
  * ─────────────────────────
  * Sidebar de escritorio y drawer mobile del editor de personajes.
- * Compone todos los bloques laterales: relaciones, capítulos, canciones,
- * grupos y hechizos. No tiene estado propio salvo lo puramente visual
+ * Compone todos los bloques laterales: relaciones, capítulos, canciones
+ * y grupos. No tiene estado propio salvo lo puramente visual
  * (no aplica aquí) — toda la lógica vive en los componentes hijos.
  *
  * Ruta: src/features/editorGarlia/components/personajes/PersonajeSidebarPanel.tsx
@@ -17,14 +17,11 @@ import { BloqueRelaciones } from "./BloqueRelaciones";
 import { PersonajeCancionesAsociadas } from "./PersonajeCancionesAsociadas";
 import { PersonajeCapitulosAparece } from "./PersonajeCapitulosAparece";
 import { PersonajeGrupos } from "./PersonajeGrupos";
-import { PersonajeHechizos } from "./PersonajeHechizos";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface PersonajeSidebarPanelProps {
   personajeId: string;
   nombrePersonaje: string;
-  grupoIds: string[];
-  especieEsMagica: boolean;
   /** Modo inline (columna derecha en desktop) o drawer (modal en mobile). */
   modo: "inline" | "drawer";
   /** Solo relevante cuando modo="drawer". */
@@ -39,8 +36,6 @@ interface PersonajeSidebarPanelProps {
 function SidebarContenido({
   personajeId,
   nombrePersonaje,
-  grupoIds,
-  especieEsMagica,
   onSelectPersonaje,
   onOpenGrupo,
   onSelectCancion,
@@ -101,12 +96,6 @@ function SidebarContenido({
         <PersonajeGrupos personajeId={personajeId} onOpenGrupo={onOpenGrupo} />
       </div>
 
-      {/* Hechizos — solo si la especie es mágica */}
-      {especieEsMagica && (
-        <div className="mt-3">
-          <PersonajeHechizos grupoIds={grupoIds} personajeId={personajeId} />
-        </div>
-      )}
     </>
   );
 }

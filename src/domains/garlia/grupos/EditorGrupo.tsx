@@ -78,13 +78,6 @@ export function EditorGrupo({
     setStatus("idle");
   }, [grupo.id]);
 
-  // Hechizos/dones/runas guardan su propio `grupo_ids` (además del
-  // `miembro_ids` de acá) porque su editor (FormularioMagico) necesita
-  // saber a qué grupos pertenece SIN cargar todo el catálogo de grupos.
-  // Son dos lados de la misma relación N:N — hay que mantenerlos en sync
-  // cuando se edita desde este lado (el del grupo).
-  const TIPOS_CON_GRUPO_IDS = new Set<GrupoTipo>(["hechizos", "dones", "runas"]);
-
   const save = async () => {
     setStatus("saving");
     try {
@@ -102,34 +95,6 @@ export function EditorGrupo({
           miembro_ids: form.miembro_ids,
         })
         .eq("id", form.id);
-
-      if (TIPOS_CON_GRUPO_IDS.has(form.tipo)) {
-        const originalMiembros = new Set(grupo.miembro_ids);
-        const currentMiembros = new Set(form.miembro_ids);
-        const agregados = [...currentMiembros].filter((id) => !originalMiembros.has(id));
-        const quitados = [...originalMiembros].filter((id) => !currentMiembros.has(id));
-
-        await Promise.all(
-          [...agregados, ...quitados].map(async (entidadId) => {
-            const { data } = await supabase
-              .from(cfg.tabla)
-              .select("grupo_ids")
-              .eq("id", entidadId)
-              .single();
-            if (!data) return;
-            const actuales: string[] = (data as any).grupo_ids ?? [];
-            const nuevos = agregados.includes(entidadId)
-              ? actuales.includes(form.id)
-                ? actuales
-                : [...actuales, form.id]
-              : actuales.filter((id) => id !== form.id);
-            await supabase
-              .from(cfg.tabla)
-              .update({ grupo_ids: nuevos })
-              .eq("id", entidadId);
-          }),
-        );
-      }
 
       void dexiePut("grupos_mundo", form);
       await onSaved(form);
@@ -691,7 +656,7 @@ export function EditorGrupoStandalone({
               Grupos
             </p>
             <p className="text-micro text-primary/15 tracking-widest text-center max-w-xs px-4">
-              Agrupá personajes, criaturas, objetos o magia en facciones,
+              Agrupá personajes, criaturas u objetos en facciones,
               manadas, colecciones y más
             </p>
           </div>

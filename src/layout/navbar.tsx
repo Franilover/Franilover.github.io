@@ -711,7 +711,7 @@ const Navbar = () => {
   // navegación entre secciones de /myself/garlia pasa a vivir acá.
   // "Criaturas" e "Items" salieron de "Entidades" y tienen su propio estado
   // activo, igual que ya pasaba con "letras" (Canciones) y
-  // "hechizos"/"dones"/"runas" (Magia). "Organización" (Grupos/Notas) ya NO
+  // "runas" (Magia). "Organización" (Grupos/Notas) ya NO
   // vive acá — se sacó del submenú y ahora es un botón propio en el Home
   // del editor de mundo (ver MundoHomeContent), en vez de una sección más
   // de navegación global.
@@ -725,10 +725,10 @@ const Navbar = () => {
 
   const CRIATURAS_SECTIONS = new Set<SectionKey>(["criaturas"]);
 
-  // "Magia" agrupa Hechizos/Dones/Runas — antes vivían dentro de
-  // "Entidades", pero al ser tres catálogos con su propio editor
-  // (FormularioMagico) tiene más sentido como sección propia.
-  const MAGIA_SECTIONS = new Set<SectionKey>(["hechizos", "dones", "runas"]);
+  // "Magia" agrupa Runas — antes vivía dentro de "Entidades", pero al
+  // tener su propio editor (FormularioMagico) tiene más sentido como
+  // sección propia.
+  const MAGIA_SECTIONS = new Set<SectionKey>(["runas"]);
 
   type AdminSubmenuItem = {
     key: string;
@@ -790,7 +790,7 @@ const Navbar = () => {
         isGarliaeditor &&
         mundoSection !== null &&
         MAGIA_SECTIONS.has(mundoSection),
-      onSelect: () => mundoSelectSection("hechizos"),
+      onSelect: () => mundoSelectSection("runas"),
     },
     {
       key: "items",

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * MagiaJerarquica
+ * CriaturasJerarquica
  * ───────────────────────────────────────────────────────────────────────────
  * Vista del sub-tab "Criaturas" de Entidades, agrupada por criatura de
  * origen, análoga a GeografiaJerarquica pero de un solo nivel:
@@ -21,9 +21,6 @@
  *  - Personaje.especie (nombre de la criatura, no FK) → agrupa personajes
  *    bajo la criatura cuyo nombre coincide con su especie.
  * Las entidades sin vínculo caen en el bloque final global "Sin criatura".
- *
- * Nota: Hechizos/Dones/Runas ya no se agrupan por criatura — viven en su
- * propia sección de navbar (ver MagiaPorTipo) sin relación a criaturas.
  */
 
 import { Plus, Users } from "lucide-react";
@@ -100,7 +97,7 @@ function NodoCriatura({
   );
 }
 
-export function MagiaJerarquica({
+export function CriaturasJerarquica({
   criaturas,
   personajes,
   loading,

@@ -8,7 +8,6 @@ export { useEstadoMundoCapitulo } from "./useEstadoMundoCapitulo";
 export { PersonajeEditor } from "./PersonajeEditor";
 export { PersonajeSidebarPanel } from "./PersonajeSidebarPanel";
 export { PersonajeLineaDeTiempo } from "./PersonajeLineaDeTiempo";
-export { BloqueDones } from "./BloqueDones";
 export { PickerImagen, PickerCaraBtn } from "./PersonajeImagePickers";
 export { usePersonajeForm } from "./usePersonajeForm";
 export type { Personaje } from "./types";
