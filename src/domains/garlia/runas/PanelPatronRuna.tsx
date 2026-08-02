@@ -38,14 +38,16 @@ export function PanelPatronRuna({
 }) {
   const [resetSignal, setResetSignal] = useState(0);
   const [ultimoBorrado, setUltimoBorrado] = useState<Punto[] | null>(null);
-  // Medimos el ancho disponible para que el canvas sea siempre cuadrado
-  // (antes tenía una altura fija de 220px sobre un ancho variable, dando
-  // un rectángulo). El lado del cuadrado = ancho del contenedor.
-  const contenedorRef = useRef<HTMLDivElement>(null);
+  // Medimos el ancho disponible con un sentinel vacío (no el wrapper que
+  // contiene el canvas) para que el lado del cuadrado sea siempre el
+  // ancho real de la columna, sin que la altura del propio canvas
+  // (toolbar + lienzo + textos de ayuda) se meta en la medición y
+  // desfase el resultado.
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [lado, setLado] = useState(220);
 
   useEffect(() => {
-    const el = contenedorRef.current;
+    const el = sentinelRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width;
@@ -94,16 +96,15 @@ export function PanelPatronRuna({
           <PenTool size={11} /> Patrón de trazo
         </label>
 
-        <div ref={contenedorRef}>
-          <CanvasDibujoRuna
-            color={color}
-            height={lado}
-            mostrarHerramientas
-            resetSignal={resetSignal}
-            trazoInicial={trazoParaPrecargar}
-            onTrazoCompleto={fijarTrazo}
-          />
-        </div>
+        <div ref={sentinelRef} className="w-full h-0" />
+        <CanvasDibujoRuna
+          color={color}
+          height={lado}
+          mostrarHerramientas
+          resetSignal={resetSignal}
+          trazoInicial={trazoParaPrecargar}
+          onTrazoCompleto={fijarTrazo}
+        />
 
         {trazoActual && (
           <div className="flex items-center gap-1.5 text-micro text-primary/40 pt-1">
