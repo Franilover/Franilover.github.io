@@ -293,10 +293,24 @@ function ModalTriggerWarning({
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function LibroDetalle({ slug }: { slug?: string } = {}) {
   const searchParams = useSearchParams();
-  // En la ruta web (/garlia/libros/[slug]) el slug llega por prop desde el
-  // server component. En la ruta del APK (/garlia/libros/detalle?slug=...)
-  // no hay prop, así que se lee del query param.
-  const slugParam = slug ?? searchParams.get("slug") ?? "";
+  // OJO: el `slug` que llega por prop desde el server component NO es
+  // confiable en web. vercel.json reescribe internamente cualquier
+  // `/garlia/libros/:id` hacia `/garlia/libros/placeholder` para servir el
+  // único HTML prerrenderizado — el rewrite deja la URL del navegador
+  // intacta, pero el `params.slug` que recibe el server component en Vercel
+  // SÍ pasa a ser literalmente "placeholder", no el slug real. Por eso el
+  // slug real hay que leerlo siempre del lado del cliente, desde la URL
+  // visible (`window.location`), igual que en la ruta del APK
+  // (/garlia/libros/detalle?slug=...) donde tampoco hay prop y se lee del
+  // query param.
+  const [slugFromUrl, setSlugFromUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const segmentos = window.location.pathname.split("/").filter(Boolean);
+    // .../garlia/libros/:slug
+    const idx = segmentos.indexOf("libros");
+    setSlugFromUrl(idx >= 0 ? (segmentos[idx + 1] ?? "") : "");
+  }, []);
+  const slugParam = slugFromUrl ?? searchParams.get("slug") ?? "";
 
   const router = useRouter();
 
