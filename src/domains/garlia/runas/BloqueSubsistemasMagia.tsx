@@ -17,6 +17,7 @@
 
 import { ArrowLeft, Bug, Plus, Search, Sparkle, Trash2, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { supabase } from "@/infra/supabase/supabase";
 
@@ -352,7 +353,13 @@ function BuscadorCriaturaParaSubsistema({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const disponibles = useMemo(
     () =>
@@ -364,24 +371,59 @@ function BuscadorCriaturaParaSubsistema({
     [catalogo, excluirIds, search],
   );
 
+  // El panel del subsistema vive dentro de un contenedor con
+  // `overflow-y-auto` (para poder scrollear cuando el contenido no cabe en
+  // la pantalla) — si el dropdown fuera `position: absolute` normal,
+  // quedaría recortado por ese overflow en cuanto el trigger no estuviera
+  // pegado al fondo visible. Por eso el dropdown se monta en un portal a
+  // document.body con `position: fixed`, y acá calculamos su posición a
+  // partir del rect del botón — así escapa de cualquier overflow/clip de
+  // sus ancestros, igual que SelectorFechaMundo.
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const width = Math.max(r.width, 224); // 224px = w-56
+      const espacioAbajo = window.innerHeight - r.bottom;
+      const abreHaciaArriba = espacioAbajo < 260 && r.top > espacioAbajo;
+      setPos({
+        left: Math.min(r.left, window.innerWidth - width - 8),
+        top: abreHaciaArriba ? r.top - 4 : r.bottom + 4,
+        width,
+      });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-        setSearch("");
-      }
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+      setSearch("");
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [open]);
 
+  const abreHaciaArriba =
+    pos != null && triggerRef.current
+      ? pos.top < triggerRef.current.getBoundingClientRect().top
+      : false;
+
   return (
-    <div ref={containerRef} className="relative">
+    <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-dashed text-micro font-black uppercase tracking-widest transition-all"
@@ -393,82 +435,91 @@ function BuscadorCriaturaParaSubsistema({
         <Plus size={8} /> Añadir criatura
       </button>
 
-      {open && (
-        <div
-          className="absolute z-20 top-full left-0 mt-1 w-56 rounded-xl border shadow-xl overflow-hidden"
-          style={{
-            background: "var(--bg-main)",
-            borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
-          }}
-        >
+      {open &&
+        pos &&
+        createPortal(
           <div
-            className="flex items-center gap-2 px-3 py-2"
+            ref={dropdownRef}
+            className="fixed z-[9999] rounded-xl border shadow-xl overflow-hidden"
             style={{
-              borderBottom:
-                "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+              top: pos.top,
+              left: pos.left,
+              width: pos.width,
+              transform: abreHaciaArriba ? "translateY(-100%)" : undefined,
+              maxHeight: "min(320px, calc(100vh - 16px))",
+              background: "var(--bg-main)",
+              borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
             }}
           >
-            <Search
-              size={11}
+            <div
+              className="flex items-center gap-2 px-3 py-2"
               style={{
-                color: "color-mix(in srgb, var(--primary) 30%, transparent)",
-                flexShrink: 0,
+                borderBottom:
+                  "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
               }}
-            />
-            <input
-              autoFocus
-              className="flex-1 bg-transparent outline-none text-micro font-bold uppercase tracking-wide placeholder:normal-case placeholder:font-medium placeholder:tracking-normal"
-              placeholder="Buscar criatura…"
-              style={{ color: "var(--primary)", caretColor: "var(--primary)" }}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Escape" && (setOpen(false), setSearch(""))
-              }
-            />
-          </div>
-          <div className="max-h-52 overflow-y-auto p-1">
-            {loading ? (
-              <p className="text-micro text-primary/25 italic text-center py-3">
-                Cargando…
-              </p>
-            ) : disponibles.length === 0 ? (
-              <p className="text-micro text-primary/25 italic text-center py-3">
-                {search ? "Sin resultados" : "No hay más criaturas"}
-              </p>
-            ) : (
-              disponibles.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-micro font-bold text-primary/75 hover:bg-primary/6 hover:text-primary transition-colors truncate"
-                  onMouseDown={() => {
-                    onSelect(c.id);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                >
-                  <span className="shrink-0 w-5 h-5 rounded-full overflow-hidden bg-primary/8 flex items-center justify-center">
-                    {c.imagen_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        alt={c.nombre}
-                        className="w-full h-full object-cover"
-                        src={c.imagen_url}
-                      />
-                    ) : (
-                      <Bug size={9} className="text-primary/25" />
-                    )}
-                  </span>
-                  <span className="truncate">{c.nombre}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+            >
+              <Search
+                size={11}
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+                  flexShrink: 0,
+                }}
+              />
+              <input
+                autoFocus
+                className="flex-1 bg-transparent outline-none text-micro font-bold uppercase tracking-wide placeholder:normal-case placeholder:font-medium placeholder:tracking-normal"
+                placeholder="Buscar criatura…"
+                style={{ color: "var(--primary)", caretColor: "var(--primary)" }}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Escape" && (setOpen(false), setSearch(""))
+                }
+              />
+            </div>
+            <div className="max-h-52 overflow-y-auto p-1">
+              {loading ? (
+                <p className="text-micro text-primary/25 italic text-center py-3">
+                  Cargando…
+                </p>
+              ) : disponibles.length === 0 ? (
+                <p className="text-micro text-primary/25 italic text-center py-3">
+                  {search ? "Sin resultados" : "No hay más criaturas"}
+                </p>
+              ) : (
+                disponibles.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-micro font-bold text-primary/75 hover:bg-primary/6 hover:text-primary transition-colors truncate"
+                    onMouseDown={() => {
+                      onSelect(c.id);
+                      setOpen(false);
+                      setSearch("");
+                    }}
+                  >
+                    <span className="shrink-0 w-5 h-5 rounded-full overflow-hidden bg-primary/8 flex items-center justify-center">
+                      {c.imagen_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          alt={c.nombre}
+                          className="w-full h-full object-cover"
+                          src={c.imagen_url}
+                        />
+                      ) : (
+                        <Bug size={9} className="text-primary/25" />
+                      )}
+                    </span>
+                    <span className="truncate">{c.nombre}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
