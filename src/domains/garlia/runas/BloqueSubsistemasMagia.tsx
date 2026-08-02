@@ -15,16 +15,10 @@
  * Se muestra debajo del bloque de Ensayos GOS+Magia en MagiaPorTipo.
  */
 
-import { Plus, Sparkle, Trash2, X } from "lucide-react";
-import React, { useState } from "react";
+import { ArrowLeft, Plus, Sparkle, Trash2, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
-import { MotionDiv } from "@/ui/Motion";
-
-import {
-  useSubsistemasMagia,
-  type SubsistemaFila,
-  type SubsistemaMagia,
-} from "./useSubsistemasMagia";
+import type { SubsistemaFila, SubsistemaMagia } from "./useSubsistemasMagia";
 
 // ─── Editor de tabla de filas (Canales / Filtros / Complementos) ───────────
 
@@ -111,16 +105,20 @@ function EditorFilas({
   );
 }
 
-// ─── Modal editor completo de un subsistema ────────────────────────────────
+// ─── Editor completo de un subsistema (inline, sin modal) ──────────────────
+// Antes era un modal flotante (ModalEditorSubsistema) que tapaba la
+// pantalla. Ahora vive inline: se muestra donde antes estaba el ensayo de
+// Energías, reemplazándolo mientras hay un subsistema seleccionado.
 
-function ModalEditorSubsistema({
+export function PanelEditorSubsistema({
   subsistema,
-  onClose,
+  onVolver,
   onSave,
   onDelete,
 }: {
   subsistema: SubsistemaMagia;
-  onClose: () => void;
+  /** Vuelve a mostrar el ensayo de Energías en vez de este editor. */
+  onVolver: () => void;
   onSave: (updates: Partial<SubsistemaMagia>) => void;
   onDelete: () => void;
 }) {
@@ -130,101 +128,82 @@ function ModalEditorSubsistema({
   const [filtros, setFiltros] = useState<SubsistemaFila[]>(subsistema.filtros ?? []);
   const [complementos, setComplementos] = useState<SubsistemaFila[]>(subsistema.complementos ?? []);
 
-  const guardarYCerrar = () => {
+  // Si se selecciona otro subsistema (o se vuelve a abrir el mismo tras
+  // guardar en otro lado), sincronizamos el form local con la nueva prop.
+  useEffect(() => {
+    setNombre(subsistema.nombre);
+    setDescripcion(subsistema.descripcion ?? "");
+    setCanales(subsistema.canales ?? []);
+    setFiltros(subsistema.filtros ?? []);
+    setComplementos(subsistema.complementos ?? []);
+  }, [subsistema.id]);
+
+  const guardar = () => {
     onSave({ nombre: nombre.trim() || subsistema.nombre, descripcion, canales, filtros, complementos });
-    onClose();
   };
 
   return (
-    <>
-      <MotionDiv
-        animate={{ opacity: 1 }}
-        className="fixed inset-0 z-[9999]"
-        exit={{ opacity: 0 }}
-        initial={{ opacity: 0 }}
-        style={{ background: "color-mix(in srgb, var(--bg-main) 70%, transparent)", backdropFilter: "blur(6px)" }}
-        onClick={guardarYCerrar}
-      />
-      <MotionDiv
-        animate={{ opacity: 1, scale: 1, y: 0, x: "-50%" }}
-        className="fixed z-[9999] flex flex-col"
-        exit={{ opacity: 0, scale: 0.97, y: -8, x: "-50%" }}
-        initial={{ opacity: 0, scale: 0.97, y: -8, x: "-50%" }}
-        style={{
-          top: "6%",
-          left: "50%",
-          width: "min(640px, calc(100vw - 32px))",
-          maxHeight: "88vh",
-          background: "var(--bg-menu)",
-          border: "1px solid color-mix(in srgb, var(--foreground) 12%, transparent)",
-          borderRadius: 10,
-          overflow: "hidden",
-          boxShadow: "0 24px 80px color-mix(in srgb, var(--bg-main) 60%, transparent)",
-        }}
-        transition={{ type: "spring", damping: 28, stiffness: 320 }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-primary/10 shrink-0">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <Sparkle size={12} className="text-accent/60 shrink-0" />
-            <input
-              className="flex-1 min-w-0 bg-transparent text-sm font-black uppercase italic tracking-tight text-primary truncate outline-none placeholder:text-primary/25 px-1 py-0.5 rounded hover:bg-primary/5 focus:bg-primary/8"
-              placeholder="Nombre del subsistema…"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={onDelete}
-              title="Eliminar subsistema"
-              className="p-1.5 rounded-lg text-primary/25 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-            >
-              <Trash2 size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={guardarYCerrar}
-              title="Cerrar"
-              className="p-1.5 rounded-lg text-primary/25 hover:text-primary hover:bg-primary/5 transition-colors"
-            >
-              <X size={14} />
-            </button>
-          </div>
+    <div className="flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => {
+            guardar();
+            onVolver();
+          }}
+          title="Volver a Energías"
+          className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
+        >
+          <ArrowLeft size={14} />
+        </button>
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          <Sparkle size={12} className="text-accent/60 shrink-0" />
+          <input
+            className="flex-1 min-w-0 bg-transparent text-sm font-black uppercase italic tracking-tight text-primary truncate outline-none placeholder:text-primary/25 px-1 py-0.5 rounded hover:bg-primary/5 focus:bg-primary/8"
+            placeholder="Nombre del subsistema…"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            onBlur={guardar}
+          />
         </div>
-
-        {/* Contenido scrollable */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="mb-4">
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
-              Reglas / Info
-            </span>
-            <textarea
-              className="w-full min-h-[100px] bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-2 text-xs text-primary/80 outline-none placeholder:text-primary/25 focus:border-primary/25 resize-y leading-relaxed"
-              placeholder="Descripción libre: qué canaliza, cómo funciona, reglas particulares…"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-            />
-          </div>
-
-          <EditorFilas titulo="Canales" filas={canales} onChange={setCanales} />
-          <EditorFilas titulo="Filtros" filas={filtros} onChange={setFiltros} />
-          <EditorFilas titulo="Complementos" filas={complementos} onChange={setComplementos} conCanaliza={false} />
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end px-4 py-2.5 border-t border-primary/10 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            onClick={guardarYCerrar}
+            onClick={onDelete}
+            title="Eliminar subsistema"
+            className="p-1.5 rounded-lg text-primary/25 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+          >
+            <Trash2 size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={guardar}
             className="text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity"
           >
             Guardar
           </button>
         </div>
-      </MotionDiv>
-    </>
+      </div>
+
+      {/* Contenido */}
+      <div className="mb-4">
+        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+          Reglas / Info
+        </span>
+        <textarea
+          className="w-full min-h-[100px] bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-2 text-xs text-primary/80 outline-none placeholder:text-primary/25 focus:border-primary/25 resize-y leading-relaxed"
+          placeholder="Descripción libre: qué canaliza, cómo funciona, reglas particulares…"
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          onBlur={guardar}
+        />
+      </div>
+
+      <EditorFilas titulo="Canales" filas={canales} onChange={setCanales} />
+      <EditorFilas titulo="Filtros" filas={filtros} onChange={setFiltros} />
+      <EditorFilas titulo="Complementos" filas={complementos} onChange={setComplementos} conCanaliza={false} />
+    </div>
   );
 }
 
@@ -232,9 +211,11 @@ function ModalEditorSubsistema({
 
 function ChipSubsistema({
   subsistema,
+  activo,
   onClick,
 }: {
   subsistema: SubsistemaMagia;
+  activo?: boolean;
   onClick: () => void;
 }) {
   const totalFilas =
@@ -246,7 +227,11 @@ function ChipSubsistema({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl border border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25 transition-colors text-left min-w-[140px] max-w-[220px]"
+      className={`flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl border transition-colors text-left min-w-[140px] max-w-[220px] ${
+        activo
+          ? "border-primary/40 bg-primary/8"
+          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+      }`}
     >
       <span className="flex items-center gap-1.5 text-xs font-bold text-primary/80 truncate w-full">
         <Sparkle size={11} className="text-accent/60 shrink-0" />
@@ -270,13 +255,25 @@ function ChipSubsistema({
 
 // ─── Bloque principal ───────────────────────────────────────────────────────
 
-export function BloqueSubsistemasMagia() {
-  const { subsistemas, loading, creating, crear, actualizar, eliminar } = useSubsistemasMagia();
-  const [editandoId, setEditandoId] = useState<string | null>(null);
+export function BloqueSubsistemasMagia({
+  subsistemas,
+  loading,
+  creating,
+  crear,
+  subsistemaSeleccionadoId,
+  onSelect,
+}: {
+  subsistemas: SubsistemaMagia[];
+  loading: boolean;
+  creating: boolean;
+  crear: (nombre: string) => Promise<SubsistemaMagia | null>;
+  /** Id del subsistema actualmente mostrado en el panel derecho (o null). */
+  subsistemaSeleccionadoId?: string | null;
+  /** Se dispara al clickear un chip — el padre decide qué mostrar. */
+  onSelect: (id: string) => void;
+}) {
   const [nombreNuevo, setNombreNuevo] = useState("");
   const [creandoAbierto, setCreandoAbierto] = useState(false);
-
-  const subsistemaEditando = subsistemas.find((s) => s.id === editandoId) ?? null;
 
   const handleCrear = async () => {
     const nombre = nombreNuevo.trim();
@@ -284,7 +281,7 @@ export function BloqueSubsistemasMagia() {
     const nuevo = await crear(nombre);
     setNombreNuevo("");
     setCreandoAbierto(false);
-    if (nuevo) setEditandoId(nuevo.id);
+    if (nuevo) onSelect(nuevo.id);
   };
 
   return (
@@ -318,7 +315,12 @@ export function BloqueSubsistemasMagia() {
       ) : (
         <div className="flex flex-wrap items-start gap-2">
           {subsistemas.map((s) => (
-            <ChipSubsistema key={s.id} subsistema={s} onClick={() => setEditandoId(s.id)} />
+            <ChipSubsistema
+              key={s.id}
+              subsistema={s}
+              activo={s.id === subsistemaSeleccionadoId}
+              onClick={() => onSelect(s.id)}
+            />
           ))}
           {subsistemas.length === 0 && (
             <span className="self-center text-xs text-primary/25 py-2">
@@ -334,18 +336,6 @@ export function BloqueSubsistemasMagia() {
             <Plus size={9} className="text-primary/60" />
           </button>
         </div>
-      )}
-
-      {subsistemaEditando && (
-        <ModalEditorSubsistema
-          subsistema={subsistemaEditando}
-          onClose={() => setEditandoId(null)}
-          onSave={(updates) => void actualizar(subsistemaEditando.id, updates)}
-          onDelete={() => {
-            void eliminar(subsistemaEditando.id);
-            setEditandoId(null);
-          }}
-        />
       )}
     </div>
   );

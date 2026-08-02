@@ -20,10 +20,11 @@ import { RichEditor } from "@/editor/lexical";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
 import { BloqueProbadorYCombinaciones } from "./BloqueProbadorYCombinaciones";
-import { BloqueSubsistemasMagia } from "./BloqueSubsistemasMagia";
+import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
 import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica } from "./types";
+import { useSubsistemasMagia } from "./useSubsistemasMagia";
 
 interface EntidadMagicaMin {
   id: string;
@@ -172,6 +173,19 @@ export function RunasPage({
   onOpenEnsayo,
   todasLasRunas,
 }: Props) {
+  const {
+    subsistemas,
+    loading: loadingSubsistemas,
+    creating: creandoSubsistema,
+    crear: crearSubsistema,
+    actualizar: actualizarSubsistema,
+    eliminar: eliminarSubsistema,
+  } = useSubsistemasMagia();
+  const [subsistemaSeleccionadoId, setSubsistemaSeleccionadoId] = useState<string | null>(null);
+
+  const subsistemaSeleccionado =
+    subsistemas.find((s) => s.id === subsistemaSeleccionadoId) ?? null;
+
   if (loading && runas.length === 0) {
     return <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>;
   }
@@ -186,11 +200,20 @@ export function RunasPage({
   }
 
   // Vista dividida: mitad izquierda = runas + herramientas,
-  // mitad derecha = ensayos con tag GOS + Magia.
+  // mitad derecha = ensayo de Energías — o, si hay un subsistema
+  // seleccionado, su editor reemplaza al ensayo en ese mismo lugar (en
+  // vez de abrirse en un modal flotante encima de todo).
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       <div className="flex-1 min-w-0">
-        <BloqueSubsistemasMagia />
+        <BloqueSubsistemasMagia
+          subsistemas={subsistemas}
+          loading={loadingSubsistemas}
+          creating={creandoSubsistema}
+          crear={crearSubsistema}
+          subsistemaSeleccionadoId={subsistemaSeleccionadoId}
+          onSelect={setSubsistemaSeleccionadoId}
+        />
 
         <div className="mt-6">
           <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
@@ -203,7 +226,20 @@ export function RunasPage({
         )}
       </div>
       <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-        <BloqueEnsayoEnergias />
+        {subsistemaSeleccionado ? (
+          <PanelEditorSubsistema
+            key={subsistemaSeleccionado.id}
+            subsistema={subsistemaSeleccionado}
+            onVolver={() => setSubsistemaSeleccionadoId(null)}
+            onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
+            onDelete={() => {
+              void eliminarSubsistema(subsistemaSeleccionado.id);
+              setSubsistemaSeleccionadoId(null);
+            }}
+          />
+        ) : (
+          <BloqueEnsayoEnergias />
+        )}
       </div>
     </div>
   );
