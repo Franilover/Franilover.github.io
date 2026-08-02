@@ -546,6 +546,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           loading={loadingRunas}
           runas={runas}
           todasLasRunas={runas}
+          onOpenEnsayo={(id) => openEntity("notas-gos", id)}
           onCreate={async () => {
             setCreatingRuna(true);
             try {
