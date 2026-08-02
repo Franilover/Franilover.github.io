@@ -180,7 +180,7 @@ export function RunasPage({
   // Sin onOpenEnsayo: comportamiento anterior, un solo bloque.
   if (!onOpenEnsayo) {
     return (
-      <div className="rounded-lg border border-primary/10">
+      <div>
         <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
       </div>
     );
@@ -193,12 +193,12 @@ export function RunasPage({
       <div className="flex-1 min-w-0">
         <BloqueSubsistemasMagia />
 
-        <div className="mt-6 rounded-lg border border-primary/10">
+        <div className="mt-6">
           <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
         </div>
 
         {todasLasRunas && (
-          <div className="mt-6 rounded-lg border border-primary/10 grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-primary/10">
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <SubBloqueProbador runas={todasLasRunas} />
             <EditorCombinacionesRunas runas={todasLasRunas} />
           </div>
