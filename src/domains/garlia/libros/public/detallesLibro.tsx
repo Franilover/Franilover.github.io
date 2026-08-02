@@ -706,7 +706,7 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
               </div>
               <div className="flex-shrink-0 ml-4 flex flex-col items-end gap-2">
                 {cap.dia_absoluto != null && (
-                  <FechaMundoBadge diaAbsoluto={cap.dia_absoluto} />
+                  <FechaMundoBadge diaAbsoluto={cap.dia_absoluto} mostrarEraDot={false} />
                 )}
                 {leido ? (
                   <CheckCircle2 className="text-primary/25" size={14} />

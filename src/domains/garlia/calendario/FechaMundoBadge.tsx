@@ -23,7 +23,14 @@ import {
 } from "@/lib/utils/calendario";
 
 
-export function FechaMundoBadge({ diaAbsoluto }: { diaAbsoluto: number }) {
+export function FechaMundoBadge({
+  diaAbsoluto,
+  mostrarEraDot = true,
+}: {
+  diaAbsoluto: number;
+  /** Punto de color de la era actual, a la izquierda de la fecha. */
+  mostrarEraDot?: boolean;
+}) {
   const { cal, loading } = useCalendario();
   if (loading || !cal)
     return <Loader2 className="animate-spin text-primary/20" size={8} />;
@@ -38,7 +45,7 @@ export function FechaMundoBadge({ diaAbsoluto }: { diaAbsoluto: number }) {
   const era = eraEnAnio(fecha.anio, cal.eras);
   return (
     <span className="inline-flex items-center gap-1.5">
-      {era && (
+      {mostrarEraDot && era && (
         <span
           className="w-1.5 h-1.5 rounded-full inline-block shrink-0"
           style={{ background: era.color ?? "var(--accent)" }}
