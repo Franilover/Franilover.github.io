@@ -22,7 +22,7 @@
  *   src/features/editorGarlia/components/magia/EditorCombinacionesRunas.tsx
  */
 
-import { ChevronDown, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
@@ -35,14 +35,13 @@ import { TableroCeldas } from "./public/TableroCeldas";
 import type { CombinacionRuna, EntidadMagica } from "./types";
 
 export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) {
-  const [abierto, setAbierto] = useState(false);
   const [combinaciones, setCombinaciones] = useState<CombinacionRuna[]>([]);
   const [loading, setLoading] = useState(false);
   const [cargado, setCargado] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!abierto || cargado) return;
+    if (cargado) return;
     let activo = true;
     const cargarCombinaciones = async () => {
       setLoading(true);
@@ -59,7 +58,7 @@ export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) 
     return () => {
       activo = false;
     };
-  }, [abierto, cargado]);
+  }, [cargado]);
 
   const crear = async () => {
     const { data, error } = await supabase
@@ -77,81 +76,64 @@ export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) 
 
   return (
     <div className="h-full flex flex-col">
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        className="w-full grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 px-2 py-2"
-      >
-        <span />
-        <span className="justify-self-center max-w-[280px] truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
-          Combinaciones
-        </span>
-        <ChevronDown
-          size={14}
-          className={`justify-self-end text-primary/30 transition-transform ${abierto ? "rotate-180" : ""}`}
-        />
-      </button>
+      <div className="p-2 space-y-3">
+        {loading && (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="animate-spin text-primary/20" size={18} />
+          </div>
+        )}
 
-      {abierto && (
-        <div className="p-2 border-t border-primary/10 space-y-3">
-          {loading && (
-            <div className="flex items-center justify-center py-6">
-              <Loader2 className="animate-spin text-primary/20" size={18} />
-            </div>
-          )}
+        {!loading && editando && (
+          <EditorUnaCombinacion
+            combinacion={editando}
+            runas={runas}
+            onCerrar={() => setEditandoId(null)}
+            onEliminada={(id) => {
+              setCombinaciones((prev) => prev.filter((c) => c.id !== id));
+              setEditandoId(null);
+            }}
+            onGuardada={(actualizada) => {
+              setCombinaciones((prev) =>
+                prev.map((c) => (c.id === actualizada.id ? actualizada : c)),
+              );
+            }}
+          />
+        )}
 
-          {!loading && editando && (
-            <EditorUnaCombinacion
-              combinacion={editando}
-              runas={runas}
-              onCerrar={() => setEditandoId(null)}
-              onEliminada={(id) => {
-                setCombinaciones((prev) => prev.filter((c) => c.id !== id));
-                setEditandoId(null);
-              }}
-              onGuardada={(actualizada) => {
-                setCombinaciones((prev) =>
-                  prev.map((c) => (c.id === actualizada.id ? actualizada : c)),
-                );
-              }}
-            />
-          )}
+        {!loading && !editando && (
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              onClick={() => void crear()}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-xs font-semibold text-primary"
+            >
+              <Plus size={13} /> Nueva combinación
+            </button>
 
-          {!loading && !editando && (
-            <div className="space-y-1.5">
-              <button
-                type="button"
-                onClick={() => void crear()}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-xs font-semibold text-primary"
-              >
-                <Plus size={13} /> Nueva combinación
-              </button>
-
-              {combinaciones.length === 0 ? (
-                <p className="text-micro text-primary/25 text-center py-3">
-                  Sin combinaciones definidas todavía
-                </p>
-              ) : (
-                combinaciones.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setEditandoId(c.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left text-primary/70 hover:bg-primary/5 transition-colors border border-primary/8"
-                  >
-                    <Sparkles size={12} className="shrink-0 opacity-40" />
-                    <span className="truncate flex-1">{c.nombre}</span>
-                    <span className="text-micro text-primary/25 shrink-0">
-                      {Object.keys(c.celdas ?? {}).length} celda
-                      {Object.keys(c.celdas ?? {}).length === 1 ? "" : "s"}
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      )}
+            {combinaciones.length === 0 ? (
+              <p className="text-micro text-primary/25 text-center py-3">
+                Sin combinaciones definidas todavía
+              </p>
+            ) : (
+              combinaciones.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setEditandoId(c.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left text-primary/70 hover:bg-primary/5 transition-colors border border-primary/8"
+                >
+                  <Sparkles size={12} className="shrink-0 opacity-40" />
+                  <span className="truncate flex-1">{c.nombre}</span>
+                  <span className="text-micro text-primary/25 shrink-0">
+                    {Object.keys(c.celdas ?? {}).length} celda
+                    {Object.keys(c.celdas ?? {}).length === 1 ? "" : "s"}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
