@@ -15,7 +15,8 @@ import {
   CapituloScrollBlock,
   ToastPortal,
 } from "@/domains/garlia/libros/public/CapituloScrollBlock";
-import { Vignette } from "@/domains/garlia/libros/public/LectorUI";
+import { Vignette, AjustesLectura } from "@/domains/garlia/libros/public/LectorUI";
+import { useLectorAjustes } from "@/domains/garlia/libros/public/useLectorAjustes";
 import {
   useLectorStore,
   capActualDe,
@@ -639,6 +640,7 @@ export default function Lector({
   }, []);
 
   const router = useRouter();
+  const { fontScale } = useLectorAjustes();
 
   // ── Estado de navegación/datos: leído del store, no de useState local ──────
   // Selectores granulares — cada uno solo re-renderiza el componente cuando
@@ -1155,6 +1157,7 @@ export default function Lector({
         >
           <List size={13} /> Índice
         </button>
+        <AjustesLectura compact />
       </div>
 
       {/* ── Drawer lateral en móvil ── */}
@@ -1223,6 +1226,7 @@ export default function Lector({
           height: "100vh",
           overflowY: "auto",
           position: "relative",
+          ["--lector-font-scale" as any]: fontScale,
         }}
       >
         <Vignette />
@@ -1230,7 +1234,7 @@ export default function Lector({
         {/* Indicador de capítulo activo */}
         {activeCapTitle && (
           <div
-            className="hidden md:flex sticky top-0 z-30 items-center gap-3 px-8 py-2.5 pointer-events-none"
+            className="hidden md:flex sticky top-0 z-30 items-center justify-between gap-3 px-8 py-2.5 pointer-events-none"
             style={{
               background:
                 "linear-gradient(to bottom, color-mix(in srgb, var(--bg-main) 90%, transparent), transparent)",
@@ -1239,6 +1243,9 @@ export default function Lector({
             <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/25 italic truncate max-w-sm">
               {activeCapTitle}
             </span>
+            <div className="pointer-events-auto">
+              <AjustesLectura />
+            </div>
           </div>
         )}
 

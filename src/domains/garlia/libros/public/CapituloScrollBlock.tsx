@@ -15,6 +15,12 @@ import { FinCapituloSeparador } from "./LectorUI";
 
 /**
  * Estilos de fuente fluida para el lector.
+ *
+ * `--lector-font-scale` es un multiplicador (0.85–1.35, ver
+ * useLectorAjustes.ts) que el usuario controla desde el selector de
+ * ajustes de lectura — se aplica sobre el fluid type existente, no lo
+ * reemplaza, así que sigue respondiendo al ancho de columna además del
+ * tamaño elegido.
  */
 const FLUID_FONT_STYLES = `
   .lector-article-wrap {
@@ -24,27 +30,27 @@ const FLUID_FONT_STYLES = `
 
   @container lector (min-width: 0px) {
     .lector-article-inner {
-      font-size: clamp(1rem, 2.2cqi, 1.22rem);
+      font-size: calc(var(--lector-font-scale, 1) * clamp(1rem, 2.2cqi, 1.22rem));
       line-height: 1.85;
     }
   }
 
   @container lector (min-width: 600px) {
     .lector-article-inner {
-      font-size: clamp(1.06rem, 1.9cqi, 1.28rem);
+      font-size: calc(var(--lector-font-scale, 1) * clamp(1.06rem, 1.9cqi, 1.28rem));
       line-height: 1.9;
     }
   }
 
   @container lector (min-width: 0px) {
     .lector-titulo {
-      font-size: clamp(1.6rem, 6cqi, 2.5rem);
+      font-size: calc(var(--lector-font-scale, 1) * clamp(1.6rem, 6cqi, 2.5rem));
     }
   }
 
   @container lector (min-width: 0px) {
     .lector-seccion {
-      font-size: clamp(2rem, 7cqi, 3rem);
+      font-size: calc(var(--lector-font-scale, 1) * clamp(2rem, 7cqi, 3rem));
     }
   }
 `;

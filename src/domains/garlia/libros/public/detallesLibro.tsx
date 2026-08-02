@@ -15,6 +15,7 @@ import React, { useEffect, useState, useRef } from "react";
 
 import { Loading, BackBtn } from "@/ui";
 import { SmartImage } from "@/ui/SmartImage";
+import { FechaMundoBadge } from "@/domains/garlia/calendario/FechaMundoBadge";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import {
@@ -40,6 +41,7 @@ interface Capitulo {
   personajes_ids: string[] | null;
   reinos_ids: string[] | null;
   ciudades_ids: string[] | null;
+  dia_absoluto?: number | null;
 }
 
 interface Libro {
@@ -575,41 +577,29 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
       : `/garlia/libros/${slugParam}/leer/${orden}`;
   };
 
-  // ── Fila de personajes ──────────────────────────────────────────────────────
-  const PersonajesRow = ({ cap }: { cap: Capitulo }) => {
-    const ids = [
-      ...(cap.narrador_id ? [cap.narrador_id] : []),
-      ...(cap.personajes_ids ?? []).filter((id) => id !== cap.narrador_id),
-    ];
-    const personajes = ids.map((id) => personajesMap[id]).filter(Boolean);
-    if (personajes.length === 0) return null;
+  // ── Narrador (imagen + nombre) ──────────────────────────────────────────────
+  const NarradorRow = ({ cap }: { cap: Capitulo }) => {
+    const narrador = cap.narrador_id ? personajesMap[cap.narrador_id] : null;
+    if (!narrador) return null;
     return (
-      <div className="flex items-center gap-2 flex-wrap mb-1">
-        {personajes.map((p, i) => (
-          <div key={p.id} className="flex items-center gap-1">
-            <div
-              className={`w-5 h-5 rounded-full overflow-hidden flex-shrink-0 border ${i === 0 && cap.narrador_id === p.id ? "border-primary/30" : "border-primary/10"}`}
-            >
-              {p.img_url ? (
-                <SmartImage
-                  alt={p.nombre}
-                  className="w-full h-full object-cover"
-                  fallbackIcon={<User size={10} />}
-                  src={p.img_url}
-                />
-              ) : (
-                <div className="w-full h-full bg-primary/10 flex items-center justify-center text-micro font-black text-primary/40">
-                  {p.nombre[0]}
-                </div>
-              )}
+      <div className="flex items-center gap-1.5">
+        <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 border border-primary/15">
+          {narrador.img_url ? (
+            <SmartImage
+              alt={narrador.nombre}
+              className="w-full h-full object-cover"
+              fallbackIcon={<User size={10} />}
+              src={narrador.img_url}
+            />
+          ) : (
+            <div className="w-full h-full bg-primary/10 flex items-center justify-center text-micro font-black text-primary/40">
+              {narrador.nombre[0]}
             </div>
-            <span
-              className={`text-micro font-black uppercase tracking-wide ${i === 0 && cap.narrador_id === p.id ? "text-primary/60" : "text-primary/30"}`}
-            >
-              {p.nombre}
-            </span>
-          </div>
-        ))}
+          )}
+        </div>
+        <span className="text-micro font-black uppercase tracking-wide text-primary/50 truncate">
+          {narrador.nombre}
+        </span>
       </div>
     );
   };
@@ -691,7 +681,7 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
               }}
             >
               <div className="flex flex-col gap-1 min-w-0 flex-1">
-                {withPersonajes && <PersonajesRow cap={cap} />}
+                {withPersonajes && <NarradorRow cap={cap} />}
                 {withPersonajes && <LugarRow cap={cap} />}
                 {esRuta && (
                   <span className="text-micro font-black uppercase tracking-widest text-blue-400">
@@ -714,7 +704,10 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
                   </span>
                 )}
               </div>
-              <div className="flex-shrink-0 ml-4">
+              <div className="flex-shrink-0 ml-4 flex flex-col items-end gap-2">
+                {cap.dia_absoluto != null && (
+                  <FechaMundoBadge diaAbsoluto={cap.dia_absoluto} />
+                )}
                 {leido ? (
                   <CheckCircle2 className="text-primary/25" size={14} />
                 ) : (

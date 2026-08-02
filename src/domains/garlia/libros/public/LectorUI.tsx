@@ -1,8 +1,10 @@
 "use client";
-import { motion } from "framer-motion";
-import React, { useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Minus, Plus, RotateCcw, Type } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 
 import type { CapituloScrollItem } from "@/domains/garlia/libros/capitulos/types";
+import { useLectorAjustes } from "@/domains/garlia/libros/public/useLectorAjustes";
 
 
 /* ─────────────────────────────────────────────
@@ -119,6 +121,136 @@ export function FinCapituloSeparador({ cap, onVisible, ocultar = false }: {
           transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
         />
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   AjustesLectura — control de tamaño de fuente persistente
+   ───────────────────────────────────────────────────────────────────────────
+   Popover chico con A- / A+ / reset. El valor se guarda en localStorage vía
+   useLectorAjustes y se aplica como --lector-font-scale en el contenedor del
+   lector (ver leerLibro.tsx), que CapituloScrollBlock multiplica sobre su
+   clamp() fluido existente.
+   ───────────────────────────────────────────── */
+export function AjustesLectura({
+  compact = false,
+}: {
+  /** Versión compacta (solo ícono) para la topbar mobile. */
+  compact?: boolean;
+}) {
+  const { fontScale, incrementarFuente, decrementarFuente, resetFuente, minScale, maxScale } =
+    useLectorAjustes();
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const onClickFuera = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setAbierto(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickFuera);
+    return () => document.removeEventListener("mousedown", onClickFuera);
+  }, [abierto]);
+
+  const pct = Math.round(
+    ((fontScale - minScale) / (maxScale - minScale)) * 100,
+  );
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        aria-label="Ajustes de lectura"
+        className="flex items-center gap-1.5 text-primary/40 hover:text-primary transition-colors font-black text-micro uppercase tracking-widest"
+        onClick={() => setAbierto((v) => !v)}
+      >
+        <Type size={compact ? 13 : 14} />
+        {!compact && "Aa"}
+      </button>
+
+      <AnimatePresence>
+        {abierto && (
+          <motion.div
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="absolute z-50 right-0 mt-2 rounded-xl border p-4"
+            exit={{ opacity: 0, y: -4, scale: 0.97 }}
+            initial={{ opacity: 0, y: -4, scale: 0.97 }}
+            style={{
+              width: 220,
+              background: "var(--bg-main)",
+              borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+              boxShadow: "0 8px 30px color-mix(in srgb, var(--primary) 15%, transparent)",
+            }}
+            transition={{ duration: 0.15 }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-micro font-black uppercase tracking-widest text-primary/50">
+                Tamaño de texto
+              </span>
+              <button
+                aria-label="Restablecer tamaño"
+                className="text-primary/30 hover:text-primary transition-colors"
+                onClick={resetFuente}
+              >
+                <RotateCcw size={12} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                aria-label="Reducir tamaño de texto"
+                className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-primary/50 hover:text-primary transition-colors"
+                disabled={fontScale <= minScale}
+                style={{
+                  background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+                  opacity: fontScale <= minScale ? 0.35 : 1,
+                }}
+                onClick={decrementarFuente}
+              >
+                <Minus size={13} />
+              </button>
+
+              <div
+                className="flex-1 h-1.5 rounded-full relative"
+                style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${pct}%`,
+                    background: "var(--accent, var(--primary))",
+                  }}
+                />
+              </div>
+
+              <button
+                aria-label="Aumentar tamaño de texto"
+                className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-primary/50 hover:text-primary transition-colors"
+                disabled={fontScale >= maxScale}
+                style={{
+                  background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+                  opacity: fontScale >= maxScale ? 0.35 : 1,
+                }}
+                onClick={incrementarFuente}
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+
+            <div
+              className="lector-article-inner mt-4 pt-3 text-primary/70 italic"
+              style={{
+                borderTop: "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                fontSize: `calc(var(--lector-font-scale, 1) * 0.95rem)`,
+              }}
+            >
+              Así se ve el texto.
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
