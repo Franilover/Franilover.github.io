@@ -30,6 +30,7 @@ export type SectionKey =
   | "items"
   | "reinos"
   | "ciudades"
+  | "runas"
   | "grupos"
   | "capitulos"
   | "letras"
