@@ -140,7 +140,7 @@ export function formatFechaMundo(fecha: FechaMundo, _config: CalendarioConfig): 
 
 
 export function formatFechaCorta(fecha: FechaMundo): string {
-  return `Año ${fecha.anio}, ${fecha.estacion.nombre} día ${fecha.dia_en_estacion}`;
+  return `${fecha.dia_en_estacion} de ${fecha.estacion.nombre} de ${fecha.anio}`;
 }
 
 // ─── Era del mundo en un día absoluto ────────────────────────────────────────
