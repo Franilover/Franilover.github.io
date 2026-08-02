@@ -226,20 +226,32 @@ export async function loadPersonajesMap(
   const map: Record<string, any> = {};
   const missing: string[] = [];
 
+  // ── Ronda 1: caché en memoria (sincrónico, sin IO) ─────────────────────────
+  const idsSinMem: string[] = [];
   for (const id of ids) {
     const mem = memGet<any[]>(`personajes:${id}`);
-    if (mem?.[0]) {
-      map[id] = mem[0];
-      continue;
-    }
+    if (mem?.[0]) map[id] = mem[0];
+    else idsSinMem.push(id);
+  }
+
+  // ── Ronda 2: Dexie en una sola llamada (bulkGet) en vez de N .get()
+  // secuenciales — antes, con muchos ids, los últimos de la lista esperaban
+  // a que TODOS los anteriores resolvieran uno por uno (de ahí que algunos
+  // personajes/capítulos aparecieran casi al instante y otros tardaran).
+  if (idsSinMem.length > 0) {
     try {
-      const local = await db?.personajes?.get(id);
-      if (local) {
-        map[id] = local;
-        memSet(`personajes:${id}`, [local]);
-      } else missing.push(id);
+      const rows = (await db?.personajes?.bulkGet(idsSinMem)) ?? [];
+      rows.forEach((row: any, i: number) => {
+        const id = idsSinMem[i];
+        if (row) {
+          map[id] = row;
+          memSet(`personajes:${id}`, [row]);
+        } else {
+          missing.push(id);
+        }
+      });
     } catch {
-      missing.push(id);
+      missing.push(...idsSinMem);
     }
   }
 
@@ -295,14 +307,16 @@ export async function loadReinosMap(
   const map: Record<string, any> = {};
   const missing: string[] = [];
 
-  for (const id of ids) {
-    try {
-      const local = await db?.reinos?.get(id);
-      if (local) map[id] = local;
+  // bulkGet en una sola operación en vez de un .get() por id en serie.
+  try {
+    const rows = (await db?.reinos?.bulkGet(ids)) ?? [];
+    rows.forEach((row: any, i: number) => {
+      const id = ids[i];
+      if (row) map[id] = row;
       else missing.push(id);
-    } catch {
-      missing.push(id);
-    }
+    });
+  } catch {
+    missing.push(...ids);
   }
 
   if (missing.length > 0 && (await isReallyOnline())) {
@@ -401,14 +415,16 @@ export async function loadCiudadesMap(
   const map: Record<string, any> = {};
   const missing: string[] = [];
 
-  for (const id of ids) {
-    try {
-      const local = await db?.ciudades?.get(id);
-      if (local) map[id] = local;
+  // bulkGet en una sola operación en vez de un .get() por id en serie.
+  try {
+    const rows = (await db?.ciudades?.bulkGet(ids)) ?? [];
+    rows.forEach((row: any, i: number) => {
+      const id = ids[i];
+      if (row) map[id] = row;
       else missing.push(id);
-    } catch {
-      missing.push(id);
-    }
+    });
+  } catch {
+    missing.push(...ids);
   }
 
   if (missing.length > 0 && (await isReallyOnline())) {
