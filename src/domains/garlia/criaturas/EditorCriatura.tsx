@@ -23,6 +23,7 @@ import {
   Brain,
   Dices,
   Globe,
+  Image as ImageIcon,
   MapPin,
   Package,
   Save,
@@ -30,6 +31,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Star,
+  Tags,
   Trash2,
   UserCircle2,
   Users,
@@ -99,6 +101,9 @@ export function EditorCriatura({
   const [form, setForm] = useState<Criatura>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [showModalDnd, setShowModalDnd] = useState(false);
+  const [panelActivo, setPanelActivo] = useState<
+    "clasificacion" | "ilustraciones" | null
+  >(null);
   const { confirm, ConfirmModal } = useConfirm();
   const { onWikilink } = useWikilink();
 
@@ -282,6 +287,42 @@ export function EditorCriatura({
           />
 
           <button
+            className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
+              panelActivo === "clasificacion"
+                ? "border-primary/40 text-primary bg-primary/8"
+                : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+            }`}
+            title="Clasificación"
+            type="button"
+            onClick={() =>
+              setPanelActivo((p) =>
+                p === "clasificacion" ? null : "clasificacion",
+              )
+            }
+          >
+            <Tags size={11} />
+            <span className="hidden md:inline">Clasificación</span>
+          </button>
+
+          <button
+            className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
+              panelActivo === "ilustraciones"
+                ? "border-primary/40 text-primary bg-primary/8"
+                : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+            }`}
+            title="Ilustraciones"
+            type="button"
+            onClick={() =>
+              setPanelActivo((p) =>
+                p === "ilustraciones" ? null : "ilustraciones",
+              )
+            }
+          >
+            <ImageIcon size={11} />
+            <span className="hidden md:inline">Ilustraciones</span>
+          </button>
+
+          <button
             className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
             title="Reglas D&D 2024"
             type="button"
@@ -313,104 +354,150 @@ export function EditorCriatura({
           className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto"
           style={{ scrollbarWidth: "none" }}
         >
-          {/* Imagen + Descripción */}
-          <div className="flex gap-3">
-            <div className="hidden sm:block shrink-0 w-36">
-              <SelectorImagen
-                aspect="square"
-                label=""
-                placeholder={<Bug className="opacity-20" size={20} />}
-                value={form.imagen_url ?? ""}
-                onChange={(url) => setForm((f) => ({ ...f, imagen_url: url }))}
-              />
-            </div>
-            <div className="sm:hidden shrink-0 relative w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3">
-              {form.imagen_url ? (
-                <Image
-                  alt={form.nombre}
-                  className="w-full h-full object-cover"
-                  src={form.imagen_url}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Bug className="text-primary/15" size={32} />
-                </div>
-              )}
-              <div className="absolute top-1.5 right-1.5 z-10">
-                <PickerImagenCriaturaBtn
+          {/* Imagen + Descripción + Panel lateral (Clasificación / Ilustraciones) */}
+          <div className="flex gap-3 items-start">
+            {/* Imagen + Descripción: se "empujan" (comprimen) cuando hay panel activo */}
+            <div
+              className={`flex gap-3 min-w-0 transition-all duration-200 ${
+                panelActivo ? "flex-1 basis-0" : "flex-1"
+              }`}
+            >
+              <div className="hidden sm:block shrink-0 w-36">
+                <SelectorImagen
+                  aspect="square"
+                  label=""
+                  placeholder={<Bug className="opacity-20" size={20} />}
                   value={form.imagen_url ?? ""}
                   onChange={(url) =>
                     setForm((f) => ({ ...f, imagen_url: url }))
                   }
                 />
               </div>
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-1">
-              <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/30">
-                Descripción
-              </label>
-              <RichEditor
-                minHeight="8rem"
-                placeholder="Aspecto físico general…"
-                value={form.descripcion ?? ""}
-                wikiEntities={entities}
-                onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
-                onWikilinkNavigate={onWikilink}
-              />
-            </div>
-          </div>
-
-          {/* Descripción D&D y Ficha de combate ahora viven en el modal de
-              reglas D&D (botón de dado junto al nombre) — ver ModalReglasDndCriatura
-              más abajo. */}
-
-          {/* Clasificación */}
-          <div
-            className="rounded-xl p-2.5"
-            style={{
-              background: "color-mix(in srgb, var(--primary) 2%, transparent)",
-              border:
-                "1px solid color-mix(in srgb, var(--primary) 7%, transparent)",
-            }}
-          >
-            <p className="text-[7.5px] font-black uppercase tracking-[0.28em] text-primary/25 mb-2 px-0.5">
-              Clasificación
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              {(
-                [
-                  { label: "Hábitat", subtipo: "Hábitat", icon: Globe },
-                  {
-                    label: "Inteligencia",
-                    subtipo: "Inteligencia",
-                    icon: Brain,
-                  },
-                  { label: "Alma", subtipo: "Alma", icon: Wand2 },
-                  { label: "Usar Mana", subtipo: "Usar Mana", icon: Sparkles },
-                  {
-                    label: "Produce Mana",
-                    subtipo: "Produce Mana",
-                    icon: Star,
-                  },
-                ] as const
-              ).map(({ label, subtipo, icon }) => (
-                <div key={subtipo} className="flex flex-col gap-0.5">
-                  <span className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/30 mb-0.5">
-                    {React.createElement(icon, { size: 7 })} {label}
-                  </span>
-                  <BloqueGrupoCategoria
-                    gruposActuales={gruposActuales as GrupoMinExt[]}
-                    icon={icon}
-                    label={label}
-                    subtipo={subtipo}
-                    todosGrupos={todosGrupos as GrupoMinExt[]}
-                    onAdd={addToGrupo}
-                    onRemove={removeFromGrupo}
-                    onSelectGrupo={onSelectGrupo}
+              <div className="sm:hidden shrink-0 relative w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3">
+                {form.imagen_url ? (
+                  <Image
+                    alt={form.nombre}
+                    className="w-full h-full object-cover"
+                    src={form.imagen_url}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Bug className="text-primary/15" size={32} />
+                  </div>
+                )}
+                <div className="absolute top-1.5 right-1.5 z-10">
+                  <PickerImagenCriaturaBtn
+                    value={form.imagen_url ?? ""}
+                    onChange={(url) =>
+                      setForm((f) => ({ ...f, imagen_url: url }))
+                    }
                   />
                 </div>
-              ))}
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col gap-1">
+                <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/30">
+                  Descripción
+                </label>
+                <RichEditor
+                  minHeight="8rem"
+                  placeholder="Aspecto físico general…"
+                  value={form.descripcion ?? ""}
+                  wikiEntities={entities}
+                  onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
+                  onWikilinkNavigate={onWikilink}
+                />
+              </div>
             </div>
+
+            {/* Panel lateral: Clasificación o Ilustraciones, según el botón activo */}
+            {panelActivo && (
+              <div
+                className="flex-1 basis-0 min-w-0 rounded-xl p-2.5 animate-[popIn_160ms_cubic-bezier(0.34,1.56,0.64,1)]"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--primary) 2%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--primary) 7%, transparent)",
+                }}
+              >
+                <div className="flex items-center justify-between mb-2 px-0.5">
+                  <p className="text-[7.5px] font-black uppercase tracking-[0.28em] text-primary/25">
+                    {panelActivo === "clasificacion"
+                      ? "Clasificación"
+                      : "Ilustraciones"}
+                  </p>
+                  <button
+                    className="text-primary/25 hover:text-primary transition-colors"
+                    type="button"
+                    onClick={() => setPanelActivo(null)}
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+
+                {panelActivo === "clasificacion" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        { label: "Hábitat", subtipo: "Hábitat", icon: Globe },
+                        {
+                          label: "Inteligencia",
+                          subtipo: "Inteligencia",
+                          icon: Brain,
+                        },
+                        { label: "Alma", subtipo: "Alma", icon: Wand2 },
+                        {
+                          label: "Usar Mana",
+                          subtipo: "Usar Mana",
+                          icon: Sparkles,
+                        },
+                        {
+                          label: "Produce Mana",
+                          subtipo: "Produce Mana",
+                          icon: Star,
+                        },
+                      ] as const
+                    ).map(({ label, subtipo, icon }) => (
+                      <div key={subtipo} className="flex flex-col gap-0.5">
+                        <span className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/30 mb-0.5">
+                          {React.createElement(icon, { size: 7 })} {label}
+                        </span>
+                        <BloqueGrupoCategoria
+                          gruposActuales={gruposActuales as GrupoMinExt[]}
+                          icon={icon}
+                          label={label}
+                          subtipo={subtipo}
+                          todosGrupos={todosGrupos as GrupoMinExt[]}
+                          onAdd={addToGrupo}
+                          onRemove={removeFromGrupo}
+                          onSelectGrupo={onSelectGrupo}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-micro text-primary/35 leading-relaxed px-0.5">
+                      Referencias visuales de la criatura (concept art, poses,
+                      variantes…).
+                    </p>
+                    <div className="w-full max-w-[220px]">
+                      <SelectorImagen
+                        aspect="square"
+                        label="Ilustración principal"
+                        placeholder={
+                          <ImageIcon className="opacity-20" size={20} />
+                        }
+                        value={form.imagen_url ?? ""}
+                        onChange={(url) =>
+                          setForm((f) => ({ ...f, imagen_url: url }))
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
