@@ -9,7 +9,7 @@ import {
   BookOpen,
   User,
 } from "lucide-react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import React, { useEffect, useState, useRef } from "react";
 
@@ -292,7 +292,6 @@ function ModalTriggerWarning({
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function LibroDetalle({ slug }: { slug?: string } = {}) {
-  const searchParams = useSearchParams();
   // OJO: el `slug` que llega por prop desde el server component NO es
   // confiable en web. vercel.json reescribe internamente cualquier
   // `/garlia/libros/:id` hacia `/garlia/libros/placeholder` para servir el
@@ -303,14 +302,25 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
   // visible (`window.location`), igual que en la ruta del APK
   // (/garlia/libros/detalle?slug=...) donde tampoco hay prop y se lee del
   // query param.
-  const [slugFromUrl, setSlugFromUrl] = useState<string | null>(null);
+  //
+  // Nota: acá NO usamos next/navigation useSearchParams() a propósito.
+  // Ese hook obliga a Next a hacer "bail out to client-side rendering" en
+  // cualquier página que lo use sin un <Suspense> boundary alrededor, y en
+  // esta ruta ese bailout terminaba tirando 500 en vez de degradar bien
+  // (ver error "Bail out to client-side rendering: useSearchParams()" en
+  // los logs de runtime). Leer directo de window.location logra lo mismo
+  // sin ese problema, porque solo corre en el cliente dentro de useEffect.
+  const [slugParam, setSlugParam] = useState<string>("");
   useEffect(() => {
     const segmentos = window.location.pathname.split("/").filter(Boolean);
     // .../garlia/libros/:slug
     const idx = segmentos.indexOf("libros");
-    setSlugFromUrl(idx >= 0 ? (segmentos[idx + 1] ?? "") : "");
+    const slugDePath = idx >= 0 ? (segmentos[idx + 1] ?? "") : "";
+    const slugDeQuery = new URLSearchParams(window.location.search).get(
+      "slug",
+    );
+    setSlugParam(slugDePath || slugDeQuery || "");
   }, []);
-  const slugParam = slugFromUrl ?? searchParams.get("slug") ?? "";
 
   const router = useRouter();
 
