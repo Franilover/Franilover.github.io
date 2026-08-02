@@ -2969,11 +2969,14 @@ function ListaEventosConMinimapa({
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
-  const diasAnioLista =
-    cal?.estaciones?.reduce(
-      (s: number, e: any) => s + (e.duracion_dias ?? 0),
-      0,
-    ) || 365;
+  const diasAnioLista = useMemo(
+    () =>
+      cal?.estaciones?.reduce(
+        (s: number, e: any) => s + (e.duracion_dias ?? 0),
+        0,
+      ) || 365,
+    [cal?.estaciones],
+  );
 
   // Fecha de nacimiento del personaje filtrado — usada para mostrar la
   // edad que tendría en cada evento/era/capítulo donde participa.

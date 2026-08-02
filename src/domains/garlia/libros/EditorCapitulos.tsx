@@ -3103,6 +3103,7 @@ export function EditorCapitulosPanel() {
     addRow: addLibro,
   } = useSupabaseData<Libro>("libros", {
     isAdmin: true,
+    lite: true,
     order: { campo: "created_at", asc: false },
   });
 
@@ -3184,6 +3185,11 @@ export function EditorCapitulosPanel() {
         }
 
         // ── 2) Supabase, y sincronizamos Dexie con lo remoto ───────────────
+        // NOTA: aunque el sidebar solo renderiza título/orden/visibilidad,
+        // este `remote` también se usa para bulkPut en Dexie más abajo (el
+        // caché offline de capítulos) — recortar el select acá dejaría el
+        // caché offline sin `contenido`, rompiendo la lectura sin conexión.
+        // Por eso mantenemos select("*") en esta ruta específica.
         const { data, error } = await supabase
           .from("capitulos")
           .select("*")

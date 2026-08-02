@@ -188,7 +188,7 @@ export function LibroDocumentoSection() {
   const closeTab = useMundoNavigation((s) => s.closeTab);
   const { data: libros, loading: loadingLibros } = useSupabaseData<Libro>(
     "libros",
-    { isAdmin: true },
+    { isAdmin: true, lite: true },
   );
   const libro = libros.find((l) => l.id === libroId);
   const { capitulos, setCapitulos, loading: loadingCaps } =

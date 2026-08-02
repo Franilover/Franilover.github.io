@@ -13,8 +13,13 @@ export interface Capitulo {
 }
 
 export const librosQueries = {
-  getAll: async (options: { isAdmin?: boolean; order?: { campo: string; asc: boolean } } = {}): Promise<LibroFull[]> => {
-    let query = libroFullQuery();
+  getAll: async (options: { isAdmin?: boolean; lite?: boolean; order?: { campo: string; asc: boolean } } = {}): Promise<LibroFull[]> => {
+    // lite: true evita el join `capitulos (*)` de libroFullQuery(), que trae
+    // el contenido completo de cada capítulo de cada libro — innecesario para
+    // vistas que solo listan/seleccionan libros por id+titulo (editor).
+    let query = options.lite
+      ? supabase.from("libros").select("*")
+      : libroFullQuery();
 
     if (!options.isAdmin) {
       query = query.eq("visibilidad", "publico");
@@ -28,7 +33,7 @@ export const librosQueries = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return data as LibroFull[];
   },
 
   getById: async (id: string): Promise<LibroFull | null> => {

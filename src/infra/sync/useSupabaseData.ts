@@ -119,6 +119,10 @@ interface UseSupabaseOptions {
   select?: string;
   order?: { campo: string; asc?: boolean };
   isAdmin?: boolean;
+  /** Para tablas con getAll() propio (QUERIES_MAP): pide la variante
+   *  liviana de la query cuando el consumidor solo necesita metadata
+   *  (ej. listas/selectores) y no relaciones anidadas pesadas. */
+  lite?: boolean;
   [key: string]: any;
 }
 
@@ -330,10 +334,18 @@ export function useSupabaseData<T = any>(
           const orden = opts.order
             ? { campo: opts.order.campo, asc: opts.order.asc ?? true }
             : undefined;
-          const args =
-            opts.isAdmin !== undefined
-              ? { ...orden, isAdmin: opts.isAdmin }
-              : orden;
+          let args: Record<string, any> | undefined = orden;
+          if (opts.isAdmin !== undefined) {
+            args = { ...(args ?? {}), isAdmin: opts.isAdmin };
+          }
+          // `lite` SÍ se reenvía: para tablas con getAll() que por defecto
+          // traen relaciones anidadas pesadas (ej. librosQueries.getAll trae
+          // libros + TODOS sus capitulos con contenido completo), algunos
+          // consumidores solo necesitan metadata para listas/selectores —
+          // ahí pasan lite:true y la query se salta el contenido pesado.
+          if (opts.lite !== undefined) {
+            args = { ...(args ?? {}), lite: opts.lite };
+          }
           return args
             ? QUERIES_MAP[tabla].getAll(args)
             : QUERIES_MAP[tabla].getAll();

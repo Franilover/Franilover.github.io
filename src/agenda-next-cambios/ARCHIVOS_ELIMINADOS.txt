@@ -1,2 +1,0 @@
-ARCHIVOS ELIMINADOS (no incluidos en este paquete):
-- domains/garlia/libros/capitulos/snippetDefs.ts (0 imports en todo el proyecto)

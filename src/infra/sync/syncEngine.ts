@@ -382,30 +382,9 @@ async function fetchCiudadesPorReino(
   }
 }
 
-export async function invalidateCiudadesPorReino(
-  reinoId: string,
-): Promise<void> {
-  invalidateCache(`ciudades:reino:${reinoId}`);
-}
 
 // ─── Ciudades ─────────────────────────────────────────────────────────────────
 
-export async function loadCiudades(
-  onUpdate?: (data: any[]) => void,
-): Promise<any[]> {
-  return loadWithCache(
-    {
-      cacheKey: "ciudades:all",
-      dexieSource: () => dexieAll(db?.ciudades),
-      supabaseFetch: async () => {
-        const { data } = await supabase.from("ciudades").select("*");
-        return data ?? null;
-      },
-      persist: (rows) => persist("ciudades", rows),
-    },
-    onUpdate,
-  );
-}
 
 export async function loadCiudadesMap(
   ids: string[],
@@ -673,25 +652,6 @@ export async function loadCapituloProximo(
 
 // ─── Libros ───────────────────────────────────────────────────────────────────
 
-export async function loadLibros(
-  onUpdate?: (data: any[]) => void,
-): Promise<any[]> {
-  return loadWithCache(
-    {
-      cacheKey: "libros:all",
-      dexieSource: () => dexieAll(db?.libros),
-      supabaseFetch: async () => {
-        const { data } = await supabase
-          .from("libros")
-          .select("id, titulo, sinopsis, portada_url, categoria")
-          .eq("visibilidad", "publico");
-        return data ?? null;
-      },
-      persist: (rows) => persist("libros", rows),
-    },
-    onUpdate,
-  );
-}
 
 // ─── Descubrimientos de usuario (con caché Dexie via session_cache) ──────────
 //
@@ -1288,78 +1248,6 @@ async function fetchMisionesUsuario(
  * Devuelve la fila local que debe usarse para actualizar el estado de la UI
  * de inmediato (no esperar la respuesta de red).
  */
-export async function aceptarMisionOffline(
-  fichaId: string,
-  misionId: string,
-  userId?: string,
-): Promise<any> {
-  const localRow = {
-    id: `${fichaId}_${misionId}`,
-    ficha_id: fichaId,
-    user_id: userId,
-    mision_id: misionId,
-    estado: "en_curso" as const,
-    progreso: 0,
-    fecha_aceptada: new Date().toISOString(),
-    fecha_completada: null,
-    status: "pending" as const,
-    cached_at: Date.now(),
-  };
-
-  // 1. Escritura local inmediata (Dexie + memoria) — la UI no espera red.
-  await persist("misiones_usuario", [localRow]);
-  invalidateCache(`misiones_usuario:${fichaId}`);
-
-  const online = await isReallyOnline();
-  if (!online) {
-    await enqueueOffline("misiones_usuario", "upsert", localRow.id, {
-      ficha_id: fichaId,
-      user_id: userId,
-      mision_id: misionId,
-      estado: "en_curso",
-      progreso: 0,
-      fecha_aceptada: localRow.fecha_aceptada,
-    });
-    return localRow;
-  }
-
-  // 2. Si hay conexión, intenta confirmar contra Supabase de inmediato.
-  try {
-    const { error } = await supabase.from("misiones_usuario").upsert({
-      ficha_id: fichaId,
-      user_id: userId,
-      mision_id: misionId,
-      estado: "en_curso",
-      progreso: 0,
-      fecha_aceptada: localRow.fecha_aceptada,
-    });
-    if (error) {
-      // Falló pese a "estar online" (ej. red inestable) — encola para reintento.
-      await enqueueOffline("misiones_usuario", "upsert", localRow.id, {
-        ficha_id: fichaId,
-        user_id: userId,
-        mision_id: misionId,
-        estado: "en_curso",
-        progreso: 0,
-        fecha_aceptada: localRow.fecha_aceptada,
-      });
-      return localRow;
-    }
-    const synced = { ...localRow, status: "synced" as const };
-    await persist("misiones_usuario", [synced]);
-    return synced;
-  } catch {
-    await enqueueOffline("misiones_usuario", "upsert", localRow.id, {
-      ficha_id: fichaId,
-      user_id: userId,
-      mision_id: misionId,
-      estado: "en_curso",
-      progreso: 0,
-      fecha_aceptada: localRow.fecha_aceptada,
-    });
-    return localRow;
-  }
-}
 
 /**
  * Reclama la recompensa de una misión completada.
@@ -1442,22 +1330,6 @@ async function enqueueOffline(
 // gestiona el set completo — si se borra una relación en Supabase, debe
 // desaparecer también del caché offline.
 
-export async function loadRelaciones(
-  onUpdate?: (data: any[]) => void,
-): Promise<any[]> {
-  return loadWithCache(
-    {
-      cacheKey: "relaciones:all",
-      dexieSource: () => dexieAll(db?.relaciones),
-      supabaseFetch: async () => {
-        const { data } = await supabase.from("relaciones").select("*");
-        return data ?? null;
-      },
-      persist: (rows) => persistReplace("relaciones", rows),
-    },
-    onUpdate,
-  );
-}
 
 export async function invalidateRelaciones(): Promise<void> {
   invalidateCache("relaciones:all");
@@ -1468,24 +1340,6 @@ export async function invalidateRelaciones(): Promise<void> {
 // Igual patrón: catálogo compartido, poco volátil, panel admin necesita ver
 // el set completo (persistReplace para que las desvinculaciones se reflejen).
 
-export async function loadMisionEntidades(
-  onUpdate?: (data: any[]) => void,
-): Promise<any[]> {
-  return loadWithCache(
-    {
-      cacheKey: "mision_entidades:all",
-      dexieSource: () => dexieAll(db?.mision_entidades),
-      supabaseFetch: async () => {
-        const { data } = await supabase
-          .from("mision_entidades")
-          .select("id, mision_id, tipo, entidad_id, rol, nombre, imagen_url");
-        return data ?? null;
-      },
-      persist: (rows) => persistReplace("mision_entidades", rows),
-    },
-    onUpdate,
-  );
-}
 
 /** Variante filtrada por misión — útil si el editor de una misión puntual
  * no necesita cargar el catálogo completo de vínculos. */
@@ -1535,17 +1389,9 @@ async function fetchMisionEntidadesPorMision(
   }
 }
 
-export async function invalidateMisionEntidades(): Promise<void> {
-  invalidateCache("mision_entidades:");
-}
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
-export function toMap<T extends { id: string }>(arr: T[]): Record<string, T> {
-  const map: Record<string, T> = {};
-  for (const item of arr) map[item.id] = item;
-  return map;
-}
 
 export function collectIds(caps: any[], field: string): string[] {
   const set = new Set<string>();

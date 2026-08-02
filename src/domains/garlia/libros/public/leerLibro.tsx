@@ -1037,17 +1037,28 @@ export default function Lector({
       const cap = capitulos.find((c) => c.id === targetCapId);
       if (!cap) return;
       const url = rutaLeer(slugParam, cap.orden);
-      const el = document.getElementById(`cap-${targetCapId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        router.replace(url, { scroll: false });
-      } else {
-        router.push(url);
-      }
+      // IMPORTANTE: el lector solo monta un capítulo a la vez (nunca todos),
+      // así que el capítulo destino ya está disponible en `capitulos`
+      // (cargado por el Efecto A) sin necesidad de una navegación completa.
+      // Usamos history.pushState directo — NO router.push/replace — porque
+      // esta ruta usa `orden` como segmento de path dinámico ([orden]), y
+      // cualquier navegación vía el router de Next hace que vuelva a
+      // resolverse el Server Component de la página (aunque sea con
+      // router.replace), lo que remonta el árbol un par de segundos después
+      // y reinicia todo el estado del lector. history.pushState cambia la
+      // URL visible (compartible, indexable si se visita directo — ver
+      // generateMetadata en page.tsx) sin pasar por ese ciclo.
+      window.history.pushState(null, "", url);
       setCapId(targetCapId);
       setActiveCapTitle(`${cap.orden}. ${cap.titulo_capitulo}`);
+      hasScrolled.current = false;
+      requestAnimationFrame(() => {
+        document
+          .getElementById(`cap-${targetCapId}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     },
-    [capitulos, slugParam, router],
+    [capitulos, slugParam],
   );
 
   const capActual = capActualDe(capitulos, capId);
@@ -1290,11 +1301,7 @@ export default function Lector({
                 {capAnterior ? (
                   <button
                     className="flex items-center gap-2 text-primary/40 hover:text-primary font-black text-micro uppercase tracking-widest transition-all"
-                    onClick={() =>
-                      router.push(
-                        rutaLeer(slugParam, capAnterior.orden),
-                      )
-                    }
+                    onClick={() => handleNavigate(capAnterior.id)}
                   >
                     <ChevronLeft size={14} /> Cap. {capAnterior.orden}
                   </button>
@@ -1312,11 +1319,7 @@ export default function Lector({
                 {capSiguiente ? (
                   <button
                     className="flex items-center gap-2 text-primary/40 hover:text-primary font-black text-micro uppercase tracking-widest transition-all"
-                    onClick={() =>
-                      router.push(
-                        rutaLeer(slugParam, capSiguiente.orden),
-                      )
-                    }
+                    onClick={() => handleNavigate(capSiguiente.id)}
                   >
                     Cap. {capSiguiente.orden} <ChevronRight size={14} />
                   </button>
