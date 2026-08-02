@@ -1,0 +1,5999 @@
+"use client";
+
+/**
+ * EditorLineaTiempo.tsx
+ * ────────────────────────
+ * View de "Historia del mundo / Línea de tiempo": orquesta el panel
+ * PanelHistoriaMundo (tarjetas de evento, modales de evento/eras, minimapa).
+ *
+ * Piezas que antes vivían acá y se extrajeron:
+ *   useCalendario     → hooks/useCalendario.ts (catálogo de estaciones/eras)
+ *   SelectorFechaMundo → components/calendario/SelectorFechaMundo.tsx
+ *   FechaMundoBadge    → components/calendario/FechaMundoBadge.tsx
+ * (las tres se usan también fuera de esta view — Personaje, Capítulos, etc.
+ * — así que no correspondía dejarlas acá).
+ *
+ * Todo lo demás en este archivo (CapituloEventoRow, ModalEra,
+ * ListaEventosConMinimapa, etc.) es exclusivo de esta pantalla y se queda.
+ *
+ * Ruta destino:
+ *   src/features/editorGarlia/views/EditorLineaTiempo.tsx
+ */
+
+import {
+  BookOpen,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Clock,
+  Crown,
+  ExternalLink,
+  Loader2,
+  Music,
+  Plus,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+
+import { onSyncDone } from "@/infra/sync/useOfflineSync";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
+import type { EraMundo} from "@/lib/utils/calendario";
+import { diaAbsolutoAFecha, eraEnAnio } from "@/lib/utils/calendario";
+
+import { RichEditor } from "@/editor/lexical";
+
+import { SelectorFechaMundo } from "@/domains/garlia/calendario/SelectorFechaMundo";
+import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
+import { useErasDelPersonaje, type Era } from "@/domains/garlia/personajes/useErasDelPersonaje";
+import {
+  useCalendario,
+  invalidarCacheEras,
+  type CalCache,
+} from "@/domains/garlia/calendario/useCalendario";
+import { type Reino } from "@/domains/garlia/reinos/types";
+import { type SaveStatus } from "@/domains/garlia/_shared/types";
+
+// ════════════════════════════════════════════════════════════════════════════
+// ─── Historia del mundo / Línea de tiempo (movido desde EditorMundo.tsx) ────
+// Incluye: tarjetas de evento (capítulos, canciones, cumpleaños, eventos sueltos),
+// modales de creación de evento y de gestión de eras, el hook de reinos con
+// historia completa, y el panel PanelHistoriaMundo que orquesta todo.
+// ════════════════════════════════════════════════════════════════════════════
+
+type TimelineEvent = {
+  id: string;
+  year: string;
+  title: string;
+  description: string;
+  dia_absoluto?: number;
+  reinoId?: string | null;
+  reinoNombre?: string | null;
+};
+
+type MundoTimelineEvent = TimelineEvent & {
+  source: "mundo" | "reino" | "capitulo" | "cancion" | "cumpleanos" | "era_personaje";
+  reinoNombre?: string;
+  reinoId?: string;
+  yearNum: number; // dia_absoluto — para ordenar
+  dia_absoluto?: number; // el valor real del calendario
+  /** Personajes que participan en este evento — solo aplica a "mundo"/"reino"
+   * (editable) y "capitulo" (solo lectura, ya vinculados desde el editor
+   * del capítulo). Arreglo de ids de la tabla `personajes`. */
+  personajes_ids?: string[];
+  capData?: CapTimeline;
+  cancionData?: {
+    id: string;
+    titulo: string;
+    cantante?: string | null;
+    reinoNombre?: string | null;
+    dia_absoluto?: number;
+  };
+  cumpleanosData?: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    reino: string | null;
+    fecha_nacimiento: number;
+  };
+  eraPersonajeData?: {
+    id: string;
+    personajeId: string;
+    personajeNombre: string;
+    rasgos: string[];
+    notas: string;
+  };
+};
+
+// (Eliminados: parseYear, decodeTimeline, encodeTimeline, newEvent — sistema antiguo)
+
+// ── Tarjeta de capítulo en la línea de tiempo ────────────────────────────────
+function CapituloEventoRow({
+  cap,
+  reinos = [],
+  onNavigate,
+  onDiaChange,
+}: {
+  cap: CapTimeline;
+  reinos?: { id: string; nombre: string }[];
+  onNavigate: () => void;
+  onDiaChange?: (id: string, dia: number) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  const commitDia = async (dia: number | null) => {
+    if (dia == null) return;
+    setSaving(true);
+    await supabase
+      .from("capitulos")
+      .update({ dia_absoluto: dia } as any)
+      .eq("id", cap.id);
+    try {
+      if (db && (db as any).capitulos) {
+        const existing = await (db as any).capitulos.get(cap.id);
+        await (db as any).capitulos.put({
+          ...(existing ?? { id: cap.id }),
+          dia_absoluto: dia,
+        });
+      }
+    } catch {}
+    onDiaChange?.(cap.id, dia);
+    setSaving(false);
+  };
+
+  const reinosDelCap = (cap.reinos_ids ?? [])
+    .map((id) => reinos.find((r) => r.id === id)?.nombre)
+    .filter(Boolean) as string[];
+
+  const diaActual = cap.dia_absoluto ?? null;
+
+  return (
+    <div className="group/card" style={{ width: 220 }}>
+      <div
+        className="mx-1.5 rounded-xl transition-all"
+        style={{
+          border:
+            "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
+          background: "color-mix(in srgb, var(--primary) 2%, transparent)",
+        }}
+      >
+        <div className="flex flex-col gap-1.5 p-2">
+          {/* Libro */}
+          {cap.libroTitulo && (
+            <span
+              className="text-micro font-black uppercase tracking-widest truncate"
+              style={{
+                color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+              }}
+            >
+              {cap.libroTitulo}
+            </span>
+          )}
+
+          {/* Selector de fecha */}
+          <div className="relative">
+            {saving && (
+              <Loader2
+                className="animate-spin absolute right-2 top-2 z-10 text-primary/30"
+                size={8}
+              />
+            )}
+            <SelectorFechaMundo
+              placeholder="Sin fecha…"
+              value={diaActual}
+              onChange={commitDia}
+            />
+          </div>
+
+          {/* Título navegable */}
+          <button
+            className="flex items-center gap-1 px-1.5 py-1 rounded-lg border w-full text-left transition-all"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 4%, transparent)",
+              borderColor:
+                "color-mix(in srgb, var(--primary) 10%, transparent)",
+            }}
+            title={`Abrir: ${cap.titulo_capitulo}`}
+            type="button"
+            onClick={onNavigate}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background =
+                "color-mix(in srgb, var(--primary) 9%, transparent)";
+              el.style.borderColor =
+                "color-mix(in srgb, var(--primary) 22%, transparent)";
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background =
+                "color-mix(in srgb, var(--primary) 4%, transparent)";
+              el.style.borderColor =
+                "color-mix(in srgb, var(--primary) 10%, transparent)";
+            }}
+          >
+            <BookOpen
+              size={8}
+              style={{
+                color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              className="text-micro font-bold truncate"
+              style={{
+                color: "color-mix(in srgb, var(--primary) 65%, transparent)",
+              }}
+            >
+              {cap.titulo_capitulo}
+            </span>
+          </button>
+
+          {/* Reinos */}
+          {reinosDelCap.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {reinosDelCap.map((nombre) => (
+                <span
+                  key={nombre}
+                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-micro font-black uppercase tracking-widest"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--primary) 8%, transparent)",
+                    color:
+                      "color-mix(in srgb, var(--primary) 50%, transparent)",
+                    border:
+                      "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+                  }}
+                >
+                  <Crown size={6} /> {nombre}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tarjeta horizontal de canción en la línea de tiempo ─────────────────────
+function CancionMundoRow({
+  cancion,
+  onDiaChange,
+}: {
+  cancion: {
+    id: string;
+    titulo: string;
+    cantante?: string | null;
+    reinoNombre?: string | null;
+    dia_absoluto?: number;
+  };
+  onDiaChange?: (id: string, dia: number) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  const commitDia = async (dia: number | null) => {
+    if (dia == null) return;
+    setSaving(true);
+    await supabase
+      .from("canciones")
+      .update({ dia_absoluto: dia } as any)
+      .eq("id", cancion.id);
+    try {
+      if (db && (db as any).canciones) {
+        const existing = await (db as any).canciones.get(cancion.id);
+        await (db as any).canciones.put({
+          ...(existing ?? { id: cancion.id }),
+          dia_absoluto: dia,
+        });
+      }
+    } catch {}
+    onDiaChange?.(cancion.id, dia);
+    setSaving(false);
+  };
+
+  const navigate = () => {
+    window.dispatchEvent(
+      new CustomEvent("garlia-open-entity", {
+        detail: { tabla: "canciones", id: cancion.id },
+      }),
+    );
+  };
+  return (
+    <div className="group/card" style={{ width: 220 }}>
+      <div
+        className="mx-1.5 rounded-xl transition-all"
+        style={{
+          border:
+            "1px solid color-mix(in srgb, var(--accent) 14%, transparent)",
+          background: "color-mix(in srgb, var(--accent) 2%, transparent)",
+        }}
+      >
+        <div className="flex flex-col gap-1.5 p-2">
+          {/* Reino */}
+          {cancion.reinoNombre && (
+            <span
+              className="text-micro font-black uppercase tracking-widest truncate"
+              style={{
+                color: "color-mix(in srgb, var(--accent) 35%, transparent)",
+              }}
+            >
+              {cancion.reinoNombre}
+            </span>
+          )}
+          {/* Selector de fecha */}
+          <div className="relative">
+            {saving && (
+              <Loader2
+                className="animate-spin absolute right-2 top-2 z-10 text-accent/40"
+                size={8}
+              />
+            )}
+            <SelectorFechaMundo
+              placeholder="Sin fecha…"
+              value={cancion.dia_absoluto ?? null}
+              onChange={commitDia}
+            />
+          </div>
+          {/* Título */}
+          <button
+            className="flex items-center gap-1 px-1.5 py-1 rounded-lg border w-full text-left transition-all"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 4%, transparent)",
+              borderColor: "color-mix(in srgb, var(--accent) 10%, transparent)",
+            }}
+            title={`Abrir: ${cancion.titulo}`}
+            type="button"
+            onClick={navigate}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background =
+                "color-mix(in srgb, var(--accent) 9%, transparent)";
+              el.style.borderColor =
+                "color-mix(in srgb, var(--accent) 22%, transparent)";
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget as HTMLElement;
+              el.style.background =
+                "color-mix(in srgb, var(--accent) 4%, transparent)";
+              el.style.borderColor =
+                "color-mix(in srgb, var(--accent) 10%, transparent)";
+            }}
+          >
+            <Music
+              size={8}
+              style={{
+                color: "color-mix(in srgb, var(--accent) 40%, transparent)",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              className="text-micro font-bold truncate"
+              style={{
+                color: "color-mix(in srgb, var(--accent) 65%, var(--primary))",
+              }}
+            >
+              {cancion.titulo}
+            </span>
+          </button>
+          {cancion.cantante && (
+            <span
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-micro font-black uppercase tracking-widest truncate self-start"
+              style={{
+                background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+                color: "color-mix(in srgb, var(--accent) 50%, transparent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--accent) 12%, transparent)",
+                maxWidth: "100%",
+              }}
+            >
+              <Music size={6} /> {cancion.cantante}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tarjeta de cumpleaños en la línea de tiempo ──────────────────────────────
+function CumpleanosTimelineRow({
+  data,
+  onNavigate,
+}: {
+  data: NonNullable<MundoTimelineEvent["cumpleanosData"]>;
+  onNavigate?: () => void;
+}) {
+  return (
+    <div className="group/card" style={{ width: 220 }}>
+      <div
+        className="mx-1.5 rounded-xl transition-all"
+        style={{
+          border:
+            "1px solid color-mix(in srgb, var(--accent) 22%, transparent)",
+          background: "color-mix(in srgb, var(--accent) 4%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-2 p-2">
+          {/* Avatar */}
+          <div
+            className="shrink-0 w-7 h-7 rounded-full border overflow-hidden flex items-center justify-center"
+            style={{
+              borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
+              background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+            }}
+          >
+            {data.img_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                alt={data.nombre}
+                className="w-full h-full object-cover"
+                src={data.img_url}
+              />
+            ) : (
+              <svg
+                fill="none"
+                height="12"
+                stroke="var(--accent)"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                width="12"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <button
+              className="w-full text-left flex items-center gap-1 rounded transition-opacity hover:opacity-70"
+              type="button"
+              onClick={onNavigate}
+            >
+              <span
+                className="text-micro font-black uppercase italic truncate"
+                style={{ color: "var(--accent)" }}
+              >
+                {data.nombre}
+              </span>
+            </button>
+            {data.reino && (
+              <span
+                className="flex items-center gap-0.5 text-micro font-black uppercase tracking-widest truncate mt-0.5"
+                style={{
+                  color: "color-mix(in srgb, var(--accent) 50%, transparent)",
+                }}
+              >
+                <Crown size={6} /> {data.reino}
+              </span>
+            )}
+          </div>
+
+          {/* Icono torta */}
+          <svg
+            className="shrink-0 opacity-40"
+            fill="none"
+            height="11"
+            stroke="var(--accent)"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+            width="11"
+          >
+            <path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" />
+            <path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2 1 2 1" />
+            <path d="M2 21h20" />
+            <path d="M7 8v2" />
+            <path d="M12 8v2" />
+            <path d="M17 8v2" />
+            <path d="M7 4h.01" />
+            <path d="M12 4h.01" />
+            <path d="M17 4h.01" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventoMundoRow({
+  evt,
+  onDiaChange,
+  onFieldChange,
+  onDelete,
+  showDescripciones = true,
+}: {
+  evt: MundoTimelineEvent;
+  onDiaChange?: (id: string, dia: number) => void;
+  onFieldChange?: (
+    id: string,
+    field: "titulo" | "descripcion",
+    value: string,
+  ) => void;
+  onDelete?: (id: string) => void;
+  showDescripciones?: boolean;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [titulo, setTitulo] = useState(evt.title);
+  const [descripcion, setDescripcion] = useState(evt.description);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setTitulo(evt.title);
+  }, [evt.title]);
+  useEffect(() => {
+    setDescripcion(evt.description);
+  }, [evt.description]);
+
+  const commitDia = async (dia: number | null) => {
+    if (dia == null) return;
+    setSaving(true);
+    await onDiaChange?.(evt.id, dia);
+    setSaving(false);
+  };
+
+  const scheduleSave = (field: "titulo" | "descripcion", value: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onFieldChange?.(evt.id, field, value);
+    }, 800);
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    await onDelete?.(evt.id);
+    setDeleting(false);
+  };
+
+  return (
+    <div className="group/card" style={{ width: 220 }}>
+      <div
+        className="mx-1.5 rounded-xl p-2 flex flex-col gap-1.5 transition-all"
+        style={{
+          border:
+            "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+          background: "color-mix(in srgb, var(--primary) 2.5%, transparent)",
+        }}
+      >
+        {/* Selector de fecha — solo en modo expandido */}
+        {showDescripciones && (
+          <div className="relative">
+            {saving && (
+              <Loader2
+                className="animate-spin absolute right-2 top-2 z-10 text-primary/30"
+                size={8}
+              />
+            )}
+            <SelectorFechaMundo
+              placeholder="Sin fecha…"
+              value={evt.dia_absoluto ?? null}
+              onChange={commitDia}
+            />
+          </div>
+        )}
+
+        {/* Título + botón eliminar */}
+        <div className="flex items-center gap-1">
+          <input
+            className="flex-1 min-w-0 px-1 bg-transparent outline-none rounded transition-all"
+            placeholder="Título del evento…"
+            style={{
+              color: "var(--primary)",
+              fontSize: showDescripciones ? "10px" : "13px",
+              fontWeight: showDescripciones ? 700 : 900,
+            }}
+            value={titulo}
+            onBlur={(e) => onFieldChange?.(evt.id, "titulo", e.target.value)}
+            onChange={(e) => {
+              setTitulo(e.target.value);
+              scheduleSave("titulo", e.target.value);
+            }}
+          />
+          {!confirmDel ? (
+            <button
+              className="shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity p-1 rounded-md"
+              style={{
+                color: "color-mix(in srgb, var(--primary) 25%, transparent)",
+              }}
+              title="Eliminar evento"
+              type="button"
+              onClick={() => setConfirmDel(true)}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = "#ef4444";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color =
+                  "color-mix(in srgb, var(--primary) 25%, transparent)";
+              }}
+            >
+              <Trash2 size={9} />
+            </button>
+          ) : (
+            <div className="shrink-0 flex items-center gap-1">
+              <button
+                className="px-1.5 py-0.5 rounded text-micro font-black uppercase tracking-widest transition-all"
+                disabled={deleting}
+                style={{ background: "#ef444420", color: "#ef4444" }}
+                type="button"
+                onClick={handleDelete}
+              >
+                {deleting ? (
+                  <Loader2 className="animate-spin" size={7} />
+                ) : (
+                  "Sí"
+                )}
+              </button>
+              <button
+                className="px-1.5 py-0.5 rounded text-micro font-black uppercase tracking-widest"
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 35%, transparent)",
+                }}
+                type="button"
+                onClick={() => setConfirmDel(false)}
+              >
+                No
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Reino — siempre visible */}
+        {evt.reinoNombre && (
+          <span
+            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-micro font-black uppercase tracking-widest truncate self-start"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+              color: "color-mix(in srgb, var(--primary) 50%, transparent)",
+              border:
+                "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+              maxWidth: "150px",
+            }}
+          >
+            <Crown size={6} /> {evt.reinoNombre}
+          </span>
+        )}
+
+        {/* Descripción — solo en modo expandido */}
+        {showDescripciones && (
+          <textarea
+            className="px-1 text-micro leading-relaxed bg-transparent outline-none w-full rounded resize-y"
+            placeholder="Descripción…"
+            rows={6}
+            style={{
+              color: "color-mix(in srgb, var(--primary) 70%, transparent)",
+              minHeight: "90px",
+            }}
+            value={descripcion}
+            onBlur={(e) =>
+              onFieldChange?.(evt.id, "descripcion", e.target.value)
+            }
+            onChange={(e) => {
+              setDescripcion(e.target.value);
+              scheduleSave("descripcion", e.target.value);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: crear nuevo evento de línea de tiempo (mundo o reino) ─────────────
+function ModalNuevoEvento({
+  reinos,
+  onClose,
+  onCrear,
+  creando,
+  reinoFijoId,
+}: {
+  reinos: { id: string; nombre: string }[];
+  onClose: () => void;
+  onCrear: (datos: {
+    titulo: string;
+    reinoId: string | null;
+    dia_absoluto: number;
+  }) => void;
+  creando: boolean;
+  /** Cuando se pasa, el reino queda pre-seleccionado y no se puede cambiar */
+  reinoFijoId?: string | null;
+}) {
+  const [titulo, setTitulo] = useState("");
+  const [reinoId, setReinoId] = useState<string | null>(reinoFijoId ?? null);
+  const [diaAbsoluto, setDiaAbsoluto] = useState<number | null>(null);
+
+  const puedeCrear = titulo.trim().length > 0 && diaAbsoluto != null;
+
+  return (
+    <>
+      {/* Backdrop separado — no bloquea el portal del selector de fecha */}
+      <div
+        className="fixed inset-0 z-[1100]"
+        style={{ background: "color-mix(in srgb, black 45%, transparent)" }}
+        onMouseDown={onClose}
+      />
+      <div className="fixed inset-0 z-[1101] flex items-center justify-center p-3 pointer-events-none">
+        <div
+          className="w-full max-w-sm rounded-2xl border shadow-lg p-4 space-y-3 pointer-events-auto"
+          style={{
+            background: "var(--bg-main)",
+            borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <span
+              className="text-micro font-black uppercase tracking-[0.2em]"
+              style={{ color: "var(--primary)" }}
+            >
+              Nuevo evento
+            </span>
+            <button
+              className="flex items-center justify-center w-6 h-6 rounded-lg border transition-all"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 12%, transparent)",
+                color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+              }}
+              type="button"
+              onClick={onClose}
+            >
+              <X size={10} />
+            </button>
+          </div>
+
+          {/* Título */}
+          <div className="space-y-1">
+            <label className="text-micro font-black uppercase tracking-[0.18em] text-primary/35">
+              Título
+            </label>
+            <input
+              autoFocus
+              className="w-full rounded-lg border px-2.5 py-1.5 text-micro font-bold outline-none transition-all"
+              placeholder="Título del evento…"
+              style={{
+                background: "transparent",
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 14%, transparent)",
+                color: "var(--primary)",
+              }}
+              type="text"
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+            />
+          </div>
+
+          {/* Selector de reino — oculto cuando hay un reinoFijoId */}
+          {reinoFijoId == null && (
+            <div className="space-y-1">
+              <label className="text-micro font-black uppercase tracking-[0.18em] text-primary/35">
+                Reino
+              </label>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  className="px-2.5 py-1 rounded-lg border text-micro font-black uppercase tracking-widest transition-all"
+                  style={
+                    reinoId === null
+                      ? {
+                          background:
+                            "color-mix(in srgb, var(--accent) 15%, transparent)",
+                          borderColor:
+                            "color-mix(in srgb, var(--accent) 35%, transparent)",
+                          color: "var(--accent)",
+                        }
+                      : {
+                          borderColor:
+                            "color-mix(in srgb, var(--primary) 10%, transparent)",
+                          color:
+                            "color-mix(in srgb, var(--primary) 45%, transparent)",
+                        }
+                  }
+                  type="button"
+                  onClick={() => setReinoId(null)}
+                >
+                  Mundo (sin reino)
+                </button>
+                {reinos.map((r) => (
+                  <button
+                    key={r.id}
+                    className="px-2.5 py-1 rounded-lg border text-micro font-black uppercase tracking-widest transition-all"
+                    style={
+                      reinoId === r.id
+                        ? {
+                            background:
+                              "color-mix(in srgb, var(--accent) 15%, transparent)",
+                            borderColor:
+                              "color-mix(in srgb, var(--accent) 35%, transparent)",
+                            color: "var(--accent)",
+                          }
+                        : {
+                            borderColor:
+                              "color-mix(in srgb, var(--primary) 10%, transparent)",
+                            color:
+                              "color-mix(in srgb, var(--primary) 45%, transparent)",
+                          }
+                    }
+                    type="button"
+                    onClick={() => setReinoId(r.id)}
+                  >
+                    {r.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Selector de fecha */}
+          <div className="space-y-1">
+            <label className="text-micro font-black uppercase tracking-[0.18em] text-primary/35">
+              Fecha
+            </label>
+            <SelectorFechaMundo
+              placeholder="Elegir fecha…"
+              value={diaAbsoluto}
+              onChange={setDiaAbsoluto}
+            />
+          </div>
+
+          {/* Acciones */}
+          <div className="flex gap-1.5 pt-1">
+            <button
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-micro font-black uppercase tracking-widest transition-all"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 12%, transparent)",
+                color: "color-mix(in srgb, var(--primary) 35%, transparent)",
+              }}
+              type="button"
+              onClick={onClose}
+            >
+              Cancelar
+            </button>
+            <button
+              className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest transition-all"
+              disabled={!puedeCrear || creando}
+              style={{
+                background: puedeCrear
+                  ? "var(--accent)"
+                  : "color-mix(in srgb, var(--primary) 12%, transparent)",
+                color: puedeCrear
+                  ? "white"
+                  : "color-mix(in srgb, var(--primary) 35%, transparent)",
+                cursor: puedeCrear ? "pointer" : "default",
+              }}
+              type="button"
+              onClick={() => {
+                if (puedeCrear)
+                  onCrear({
+                    titulo: titulo.trim(),
+                    reinoId,
+                    dia_absoluto: diaAbsoluto!,
+                  });
+              }}
+            >
+              {creando ? (
+                <Loader2 className="animate-spin" size={9} />
+              ) : (
+                <Check size={9} />
+              )}{" "}
+              Crear
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Tarjeta horizontal de evento (mundo O reino) — solo visualización ────────
+// ─── Tipo para capítulos con posición en línea de tiempo ─────────────────────
+type CapTimeline = {
+  id: string;
+  libro_id: string;
+  titulo_capitulo: string;
+  orden_linea_tiempo?: number; // legacy — opcional, se mantiene por compatibilidad
+  dia_absoluto?: number; // nuevo campo del calendario
+  libroTitulo?: string;
+  reinos_ids?: string[];
+  personajes_ids?: string[];
+};
+
+// ── Carga reinos con historia completa (query dedicada, no el hook genérico) ──
+let _reinosLastFetch = 0;
+const REINOS_TTL_MS = 60_000; // 1 minuto
+
+function useReinosConHistoria() {
+  const [reinos, setReinos] = useState<Reino[]>([]);
+  const [loading, setLoading] = useState(true);
+  const isMounted = useRef(true);
+
+  const cargar = useCallback(async (force = false) => {
+    if (!isMounted.current) return;
+    if (!force) setLoading(true);
+
+    // 1. Dexie primero — respuesta inmediata aunque estemos offline
+    try {
+      const local: any[] = db
+        ? ((await (db as any).reinos?.toArray()) ?? [])
+        : [];
+      const filtered = local.filter((r: any) => !r.deleted);
+      if (filtered.length && isMounted.current) {
+        setReinos(filtered as Reino[]);
+        setLoading(false);
+      }
+    } catch {}
+
+    // 2. Supabase — solo si hay conexión real
+    if (!navigator.onLine || !isMounted.current) {
+      setLoading(false);
+      return;
+    }
+
+    // Si no es un force-reload y el fetch fue reciente, nos quedamos con Dexie
+    if (!force && Date.now() - _reinosLastFetch < REINOS_TTL_MS) {
+      return;
+    }
+
+    try {
+      const { data } = await supabase
+        .from("reinos")
+        .select("*") // necesitamos historia completa
+        .order("nombre");
+      if (!isMounted.current) return;
+      if (data?.length) {
+        setReinos(data as Reino[]);
+        _reinosLastFetch = Date.now();
+        // Persistir en Dexie con historia incluida
+        try {
+          if (db) await (db as any).reinos?.bulkPut(data);
+        } catch {}
+      }
+    } catch {}
+
+    if (isMounted.current) setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    isMounted.current = true;
+    void cargar();
+
+    // Recargar al recuperar conexión
+    const handleOnline = () => {
+      void cargar(true);
+    };
+    window.addEventListener("online", handleOnline);
+
+    // Recargar cuando el sync offline termina de subir cambios
+    const unsubSync = onSyncDone(() => {
+      if (isMounted.current) void cargar(true);
+    });
+
+    return () => {
+      isMounted.current = false;
+      window.removeEventListener("online", handleOnline);
+      unsubSync();
+    };
+  }, [cargar]);
+
+  return { reinos, setReinos, loading, recargar: () => cargar(true) };
+}
+
+// ─── Eras: helpers y modal CRUD ──────────────────────────────────────────────
+const COLORES_ERA_PRESET = [
+  "#6366f1",
+  "#8b5cf6",
+  "#ec4899",
+  "#f59e0b",
+  "#10b981",
+  "#06b6d4",
+  "#f97316",
+  "#ef4444",
+  "#84cc16",
+  "#64748b",
+];
+// invalidarCacheEras ahora se importa desde @/domains/garlia/calendario/useCalendario — necesita
+// tocar las variables privadas del módulo (_cache, _lastFetch, LS_KEY) que
+// respaldan el cache en memoria, y esas viven ahí desde el refactor que
+// movió useCalendario a hooks/. Se usa en ModalEra/ModalGestionEras más
+// abajo para forzar un refetch real tras crear/editar/borrar una era.
+
+type EraFormData = {
+  nombre: string;
+  descripcion: string;
+  anio_inicio: string;
+  anio_fin: string;
+  color: string;
+};
+const ERA_FORM_VACIO: EraFormData = {
+  nombre: "",
+  descripcion: "",
+  anio_inicio: "0",
+  anio_fin: "",
+  color: COLORES_ERA_PRESET[0],
+};
+
+function ModalEra({
+  era,
+  onClose,
+  onSaved,
+  onDeleted,
+}: {
+  era: any | null;
+  onClose: () => void;
+  onSaved: (era: any) => void;
+  onDeleted?: (id: string) => void;
+}) {
+  const [form, setForm] = useState<EraFormData>(
+    era
+      ? {
+          nombre: era.nombre ?? "",
+          descripcion: era.descripcion ?? "",
+          anio_inicio: String(era.anio_inicio ?? 0),
+          anio_fin: era.anio_fin != null ? String(era.anio_fin) : "",
+          color: era.color ?? COLORES_ERA_PRESET[0],
+        }
+      : ERA_FORM_VACIO,
+  );
+  const [saving, setSaving] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const upd = (p: Partial<EraFormData>) => setForm((f) => ({ ...f, ...p }));
+
+  const guardar = async () => {
+    if (!form.nombre.trim()) return;
+    setSaving(true);
+    setError(null);
+    const payload: any = {
+      nombre: form.nombre.trim(),
+      descripcion: form.descripcion.trim() || null,
+      anio_inicio: parseInt(form.anio_inicio, 10) || 0,
+      anio_fin:
+        form.anio_fin.trim() !== "" ? parseInt(form.anio_fin, 10) : null,
+      color: form.color,
+    };
+    try {
+      if (era?.id) {
+        const { data, error: err } = await (supabase as any)
+          .from("eras_mundo")
+          .update(payload)
+          .eq("id", era.id)
+          .select()
+          .single();
+        if (err) throw err;
+        invalidarCacheEras();
+        try {
+          if (db && (db as any).eras_mundo)
+            await (db as any).eras_mundo.put(data);
+        } catch {}
+        onSaved(data);
+      } else {
+        const { data, error: err } = await (supabase as any)
+          .from("eras_mundo")
+          .insert(payload)
+          .select()
+          .single();
+        if (err) throw err;
+        invalidarCacheEras();
+        try {
+          if (db && (db as any).eras_mundo)
+            await (db as any).eras_mundo.put(data);
+        } catch {}
+        onSaved(data);
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "Error al guardar");
+      setSaving(false);
+    }
+  };
+
+  const borrar = async () => {
+    if (!era?.id) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { error: err } = await (supabase as any)
+        .from("eras_mundo")
+        .delete()
+        .eq("id", era.id);
+      if (err) throw err;
+      invalidarCacheEras();
+      try {
+        if (db && (db as any).eras_mundo)
+          await (db as any).eras_mundo.delete(era.id);
+      } catch {}
+      onDeleted?.(era.id);
+    } catch (e: any) {
+      setError(e?.message ?? "Error al borrar");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[1200] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 55%, transparent)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl border shadow-2xl p-4 space-y-3"
+        style={{
+          background: "var(--bg-main)",
+          borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span
+              className="text-micro font-black uppercase tracking-[0.2em]"
+              style={{ color: "var(--primary)" }}
+            >
+              {era ? "Editar era" : "Nueva era"}
+            </span>
+            {era && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: era.color ?? "var(--accent)" }}
+                />
+                <span
+                  className="text-micro font-bold"
+                  style={{ color: era.color ?? "var(--accent)" }}
+                >
+                  {era.nombre}
+                </span>
+              </div>
+            )}
+          </div>
+          <button
+            className="flex items-center justify-center w-6 h-6 rounded-lg border"
+            style={{
+              borderColor:
+                "color-mix(in srgb, var(--primary) 12%, transparent)",
+              color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+            }}
+            type="button"
+            onClick={onClose}
+          >
+            <X size={10} />
+          </button>
+        </div>
+
+        {error && (
+          <div
+            className="px-3 py-2 rounded-lg text-micro font-bold"
+            style={{
+              background: "#ef444415",
+              color: "#ef4444",
+              border: "1px solid #ef444428",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {/* Nombre */}
+        <div className="space-y-1">
+          <label className="text-micro font-black uppercase tracking-[0.18em] text-primary/35">
+            Nombre
+          </label>
+          <input
+            autoFocus
+            className="w-full rounded-lg border px-2.5 py-1.5 text-micro font-bold outline-none"
+            placeholder="ej. Prehistoria, Edad de Hierro…"
+            style={{
+              background: "transparent",
+              borderColor:
+                "color-mix(in srgb, var(--primary) 14%, transparent)",
+              color: "var(--primary)",
+            }}
+            type="text"
+            value={form.nombre}
+            onChange={(e) => upd({ nombre: e.target.value })}
+          />
+        </div>
+
+        {/* Descripción */}
+        <div className="space-y-1">
+          <label className="text-micro font-black uppercase tracking-[0.18em] text-primary/35">
+            Descripción (opcional)
+          </label>
+          <textarea
+            className="w-full rounded-lg border px-2.5 py-1.5 text-micro outline-none resize-none"
+            placeholder="Breve descripción…"
+            rows={2}
+            style={{
+              background: "transparent",
+              borderColor:
+                "color-mix(in srgb, var(--primary) 14%, transparent)",
+              color: "var(--primary)",
+            }}
+            value={form.descripcion}
+            onChange={(e) => upd({ descripcion: e.target.value })}
+          />
+        </div>
+
+        {/* Años */}
+        <div className="grid grid-cols-2 gap-2">
+          {(["anio_inicio", "anio_fin"] as const).map((k, i) => (
+            <div key={k} className="space-y-1">
+              <label className="text-micro font-black uppercase tracking-[0.18em] text-primary/35">
+                {i === 0 ? "Año inicio" : "Año fin (vacío = sin fin)"}
+              </label>
+              <input
+                className="w-full rounded-lg border px-2.5 py-1.5 text-micro font-bold outline-none text-center"
+                placeholder={i === 0 ? "0" : "—"}
+                style={{
+                  background: "transparent",
+                  borderColor:
+                    "color-mix(in srgb, var(--primary) 14%, transparent)",
+                  color: "var(--primary)",
+                }}
+                type="number"
+                value={form[k]}
+                onChange={(e) => upd({ [k]: e.target.value })}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Color */}
+        <div className="space-y-1.5">
+          <label className="text-micro font-black uppercase tracking-[0.18em] text-primary/35">
+            Color
+          </label>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {COLORES_ERA_PRESET.map((c) => (
+              <button
+                key={c}
+                className="w-5 h-5 rounded-full transition-transform hover:scale-110"
+                style={{
+                  background: c,
+                  outline: form.color === c ? `2px solid ${c}` : "none",
+                  outlineOffset: 2,
+                }}
+                type="button"
+                onClick={() => upd({ color: c })}
+              />
+            ))}
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                className="w-5 h-5 cursor-pointer border-0 p-0 rounded"
+                style={{ background: "transparent" }}
+                type="color"
+                value={form.color}
+                onChange={(e) => upd({ color: e.target.value })}
+              />
+              <span className="text-micro text-primary/40 font-bold">Otro</span>
+            </label>
+          </div>
+          {/* Preview badge */}
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg w-fit"
+            style={{ background: `${form.color}18` }}
+          >
+            <div
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: form.color }}
+            />
+            <span
+              className="text-micro font-black uppercase tracking-widest"
+              style={{ color: form.color }}
+            >
+              {form.nombre || "Nombre de la era"}
+            </span>
+            {form.anio_fin && (
+              <span className="text-micro text-primary/30 ml-1">
+                {form.anio_inicio} – {form.anio_fin}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="flex gap-1.5 pt-1">
+          {era && !confirmDel && (
+            <button
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-micro font-black uppercase tracking-widest"
+              disabled={saving}
+              style={{ borderColor: "#ef444425", color: "#ef4444aa" }}
+              type="button"
+              onClick={() => setConfirmDel(true)}
+            >
+              <Trash2 size={9} /> Borrar
+            </button>
+          )}
+          {confirmDel && (
+            <>
+              <button
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest"
+                disabled={saving}
+                style={{ background: "#ef444420", color: "#ef4444" }}
+                type="button"
+                onClick={borrar}
+              >
+                {saving ? (
+                  <Loader2 className="animate-spin" size={9} />
+                ) : (
+                  <Check size={9} />
+                )}{" "}
+                Confirmar
+              </button>
+              <button
+                className="px-2.5 py-1.5 rounded-lg border text-micro font-black uppercase tracking-widest"
+                style={{
+                  borderColor:
+                    "color-mix(in srgb, var(--primary) 12%, transparent)",
+                  color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+                }}
+                type="button"
+                onClick={() => setConfirmDel(false)}
+              >
+                Cancelar
+              </button>
+            </>
+          )}
+          {!confirmDel && (
+            <>
+              <button
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-micro font-black uppercase tracking-widest"
+                disabled={saving}
+                style={{
+                  borderColor:
+                    "color-mix(in srgb, var(--primary) 12%, transparent)",
+                  color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+                }}
+                type="button"
+                onClick={onClose}
+              >
+                <X size={9} /> Cancelar
+              </button>
+              <button
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest disabled:opacity-40"
+                disabled={saving || !form.nombre.trim()}
+                style={{ background: "var(--accent)", color: "white" }}
+                type="button"
+                onClick={guardar}
+              >
+                {saving ? (
+                  <Loader2 className="animate-spin" size={9} />
+                ) : (
+                  <Check size={9} />
+                )}
+                {era ? "Guardar cambios" : "Crear era"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Generador del documento markdown de "Historia completa" ─────────────────
+// Convierte allEvents (ya filtrados/ordenados por dia_absoluto) en un
+// documento markdown vertical, agrupado por Era (H1) → Año (H2) →
+// evento de mundo/reino (H3 con el reino como sufijo).
+//
+// Solo incluye eventos "mundo"/"reino" — son los únicos editables desde
+// este documento. Capítulos, canciones y cumpleaños viven en sus propios
+// editores (capítulo, canción, personaje) y no se muestran acá.
+//
+// Cada H3 lleva un id embebido como texto plano (<!--tl:ID-->) al final
+// del encabezado, que el parser usa para saber qué fila de
+// `eventos_mundo` actualizar. No es invisible (el editor no interpreta
+// HTML dentro de headings, así que el usuario lo verá) pero es
+// reconocible como "no tocar".
+//
+// filtroLabel: nombre del reino/personaje activo en la línea de tiempo
+// (viene ya filtrado desde afuera vía allEvents) — solo se usa para
+// personalizar el mensaje cuando no hay nada que mostrar, así el usuario
+// entiende que es el filtro y no un documento roto.
+function generarMarkdownHistoriaCompleta(
+  allEvents: MundoTimelineEvent[],
+  cal: CalCache | null,
+  filtroLabel?: string | null,
+): string {
+  const diasAnioLista =
+    cal?.estaciones?.reduce(
+      (s: number, e: any) => s + (e.duracion_dias ?? 0),
+      0,
+    ) || 365;
+
+  const getEraEvt = (diaAbs: number | null | undefined) =>
+    diaAbs != null
+      ? ((cal?.eras ?? []).find(
+          (era: any) =>
+            era.anio_inicio <= Math.floor(diaAbs / diasAnioLista) &&
+            (era.anio_fin == null ||
+              era.anio_fin >= Math.floor(diaAbs / diasAnioLista)),
+        ) ?? null)
+      : null;
+
+  const conFecha = allEvents.filter(
+    (e) =>
+      e.dia_absoluto != null &&
+      (e.source === "mundo" || e.source === "reino"),
+  );
+
+  // Eras internas del personaje (personaje_eras), si hay un personaje
+  // filtrado. Se listan aparte, en orden cronológico, como sección de
+  // solo lectura al final del documento — no se mezclan con los bloques
+  // "###" editables de arriba porque su edición vive en otro lugar
+  // (el detalle de era dentro del editor de personaje / la línea de
+  // tiempo normal), no en este documento.
+  const erasPersonaje = allEvents
+    .filter((e) => e.source === "era_personaje")
+    .sort((a, b) => a.yearNum - b.yearNum);
+
+  if (conFecha.length === 0 && erasPersonaje.length === 0) {
+    return filtroLabel
+      ? `_Sin eventos de mundo/reino con fecha asignada para "${filtroLabel}" todavía._`
+      : "_Sin eventos de mundo/reino con fecha asignada todavía._";
+  }
+
+  const lineas: string[] = [];
+
+  if (conFecha.length > 0) {
+    let eraActualId: string | null | undefined = undefined; // undefined = todavía no se emitió ninguna
+    let anioActual: number | null | undefined = undefined;
+
+    for (const evt of conFecha) {
+      const dia = evt.dia_absoluto as number;
+      const anio = Math.floor(dia / diasAnioLista);
+      const eraEvt = getEraEvt(dia);
+      const eraId = eraEvt?.id ?? null;
+
+      // H1 — nombre de la era (o "Sin era" si el año no cae en ninguna)
+      if (eraId !== eraActualId) {
+        eraActualId = eraId;
+        anioActual = undefined; // fuerza a reemitir el año al cambiar de era
+        lineas.push(`# ${eraEvt?.nombre ?? "Sin era"}`);
+      }
+
+      // H2 — año
+      if (anio !== anioActual) {
+        anioActual = anio;
+        lineas.push(`## Año ${anio}`);
+      }
+
+      // H3 — título del evento, con el reino como sufijo cuando aplica,
+      // más el id embebido para el parser.
+      const titulo = evt.title?.trim() || "Sin título";
+      const sufijoReino = evt.reinoNombre ? ` — ${evt.reinoNombre}` : "";
+      lineas.push(`### ${titulo}${sufijoReino} <!--tl:${evt.id}-->`);
+
+      // Cuerpo — descripción/notas si las hay, en texto plano debajo del H3
+      const cuerpo = (evt.description ?? "").trim();
+      if (cuerpo) lineas.push(cuerpo);
+    }
+  }
+
+  // Sección aparte con las eras internas del personaje filtrado, si tiene.
+  if (erasPersonaje.length > 0) {
+    const nombrePersonaje = erasPersonaje[0].eraPersonajeData?.personajeNombre;
+    lineas.push(
+      `# Eras internas${nombrePersonaje ? ` de ${nombrePersonaje}` : ""}`,
+    );
+    for (const evt of erasPersonaje) {
+      const titulo = evt.title?.trim() || "Sin título";
+      lineas.push(`### ${titulo}`);
+      const rasgos = evt.eraPersonajeData?.rasgos ?? [];
+      if (rasgos.length > 0) lineas.push(`_${rasgos.join(" · ")}_`);
+      const cuerpo = (evt.description ?? "").trim();
+      if (cuerpo) lineas.push(cuerpo);
+    }
+  }
+
+  return lineas.join("\n\n");
+}
+
+// ── Parser del documento markdown editado ────────────────────────────────
+// Recorre el markdown línea por línea reconstruyendo bloques # Era /
+// ## Año N / ### Título — Reino <!--tl:id--> \n cuerpo. El documento solo
+// contiene eventos de mundo/reino (ver generarMarkdownHistoriaCompleta),
+// así que todo "###" debería traer su id — si no lo trae, es porque el
+// usuario lo borró por accidente, y se avisa sin bloquear el guardado
+// del resto.
+interface BloqueEditado {
+  id: string;
+  titulo: string;
+  anio: number | null; // año vigente (del último ## Año N visto antes del bloque)
+  descripcion: string;
+}
+
+interface ParseResultado {
+  bloques: BloqueEditado[];
+  avisos: string[]; // líneas/bloques que no se pudieron interpretar
+}
+
+function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
+  const bloques: BloqueEditado[] = [];
+  const avisos: string[] = [];
+
+  // Separar en líneas, preservando estructura de párrafos en blanco.
+  const lineasCrudas = markdown.split("\n");
+
+  let anioActual: number | null = null;
+  let bloqueActivo: {
+    id: string | null;
+    tituloCrudo: string;
+    cuerpo: string[];
+  } | null = null;
+
+  const cerrarBloque = () => {
+    if (!bloqueActivo) return;
+    if (bloqueActivo.id) {
+      // Quita el sufijo " — Reino" del título para dejar solo el título
+      // real (el reino no se edita desde aquí, se preserva del original).
+      const tituloSinReino = bloqueActivo.tituloCrudo
+        .replace(/\s+—\s+[^—]+$/, "")
+        .trim();
+      bloques.push({
+        id: bloqueActivo.id,
+        titulo: tituloSinReino,
+        anio: anioActual,
+        descripcion: bloqueActivo.cuerpo.join("\n\n").trim(),
+      });
+    } else {
+      // "###" sin id — probablemente el usuario borró el <!--tl:id-->
+      // por accidente.
+      avisos.push(
+        `No se pudo identificar el evento "${bloqueActivo.tituloCrudo.trim() || "(sin título)"}" — puede que se haya borrado su marcador oculto. Este cambio no se guardará.`,
+      );
+    }
+    bloqueActivo = null;
+  };
+
+  for (const lineaCruda of lineasCrudas) {
+    const linea = lineaCruda.trim();
+
+    if (linea.startsWith("# ") && !linea.startsWith("## ")) {
+      // H1 (Era) — cierra el bloque anterior, no aporta datos editables.
+      cerrarBloque();
+      continue;
+    }
+
+    if (linea.startsWith("## ")) {
+      cerrarBloque();
+      const m = linea.match(/^##\s+Año\s+(-?\d+)/i);
+      anioActual = m ? parseInt(m[1], 10) : anioActual;
+      continue;
+    }
+
+    if (linea.startsWith("### ")) {
+      cerrarBloque();
+      const contenido = linea.slice(4);
+      const idMatch = contenido.match(/<!--tl:([a-zA-Z0-9-]+)-->\s*$/);
+      const tituloCrudo = contenido
+        .replace(/<!--tl:[a-zA-Z0-9-]+-->\s*$/, "")
+        .trim();
+      bloqueActivo = {
+        id: idMatch ? idMatch[1] : null,
+        tituloCrudo,
+        cuerpo: [],
+      };
+      continue;
+    }
+
+    if (linea === "") continue; // línea en blanco, ignorar
+
+    // Texto suelto: si hay un bloque activo, es su cuerpo; si no, es una
+    // línea huérfana fuera de cualquier evento.
+    if (bloqueActivo) {
+      bloqueActivo.cuerpo.push(lineaCruda);
+    } else {
+      avisos.push(
+        `Línea fuera de cualquier evento, se ignorará: "${linea.slice(0, 60)}${linea.length > 60 ? "…" : ""}"`,
+      );
+    }
+  }
+  cerrarBloque();
+
+  return { bloques, avisos };
+}
+
+// ── Panel: "Historia completa" — línea de tiempo como documento editable ──
+// Muestra generarMarkdownHistoriaCompleta() en un RichEditor. Solo los
+// eventos "mundo"/"reino" son editables (título, descripción, año →
+// dia_absoluto); capítulos/canciones/cumpleaños se muestran de corrido
+// pero cualquier edición sobre ellos se descarta al guardar. Autosave
+// con debounce + indicador de estado visible.
+//
+// Vive como contenido normal de sección (no modal/portal): se abre como
+// una pestaña más de la barra de entidades, igual que Personajes o
+// Criaturas — ver LineaTiempoSection.tsx.
+export function HistoriaCompletaPanel({
+  markdown,
+  allEvents,
+  diasAnioLista,
+  filtroLabel,
+  onFieldChange,
+  onDiaChange,
+}: {
+  markdown: string;
+  allEvents: MundoTimelineEvent[];
+  diasAnioLista: number;
+  /** Reino y/o personaje activo en el filtro de la línea de tiempo —
+   * cuando está presente, el documento ya viene acotado a ese filtro
+   * (ver PanelHistoriaMundo) y esto solo se usa para mostrarlo en el
+   * header, así se entiende que no es el documento completo. */
+  filtroLabel?: string | null;
+  onFieldChange: (
+    id: string,
+    field: "titulo" | "descripcion",
+    value: string,
+  ) => Promise<void>;
+  onDiaChange: (id: string, dia: number) => Promise<void>;
+}) {
+  const [valor, setValor] = useState(markdown);
+  const [avisos, setAvisos] = useState<string[]>([]);
+  const [estado, setEstado] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Si el documento generado cambia por fuera, resincroniza el valor
+  // local en dos casos:
+  //  1) primera carga real de datos (markdown pasa de "" a no-vacío) —
+  //     evita pisar lo que el usuario esté escribiendo en cada render.
+  //  2) cambia el filtro activo (reino/personaje) — ahí SÍ queremos
+  //     reemplazar el documento entero, porque es un contexto distinto
+  //     (otro conjunto de eventos), no una edición en curso del mismo.
+  const markdownInicialRef = useRef(markdown);
+  const filtroPrevioRef = useRef(filtroLabel);
+  useEffect(() => {
+    const cambioFiltro = filtroPrevioRef.current !== filtroLabel;
+    if (cambioFiltro) {
+      filtroPrevioRef.current = filtroLabel;
+      markdownInicialRef.current = markdown;
+      setValor(markdown);
+      return;
+    }
+    if (markdownInicialRef.current === "" && markdown !== "") {
+      markdownInicialRef.current = markdown;
+      setValor(markdown);
+    }
+  }, [markdown, filtroLabel]);
+
+  // Snapshot original indexado por id — sirve para diffear solo lo que
+  // realmente cambió (evita updates innecesarios en cada autosave).
+  const indiceOriginal = useMemo(() => {
+    const m = new Map<string, MundoTimelineEvent>();
+    for (const e of allEvents) {
+      if (e.source === "mundo" || e.source === "reino") m.set(e.id, e);
+    }
+    return m;
+  }, [allEvents]);
+
+  const guardar = useCallback(
+    async (texto: string) => {
+      const { bloques, avisos: avisosParse } =
+        parsearMarkdownHistoriaCompleta(texto);
+      setAvisos(avisosParse);
+
+      const cambios: Array<() => Promise<void>> = [];
+
+      for (const b of bloques) {
+        const original = indiceOriginal.get(b.id);
+        if (!original) continue; // id desconocido (evento borrado en otra pestaña, etc.)
+
+        if (b.titulo && b.titulo !== (original.title?.trim() || "")) {
+          cambios.push(() => onFieldChange(b.id, "titulo", b.titulo));
+        }
+        if (b.descripcion !== (original.description ?? "").trim()) {
+          cambios.push(() =>
+            onFieldChange(b.id, "descripcion", b.descripcion),
+          );
+        }
+        if (b.anio != null && original.dia_absoluto != null) {
+          const anioOriginal = Math.floor(
+            original.dia_absoluto / diasAnioLista,
+          );
+          if (b.anio !== anioOriginal) {
+            const nuevoDia = b.anio * diasAnioLista;
+            cambios.push(() => onDiaChange(b.id, nuevoDia));
+          }
+        }
+      }
+
+      if (cambios.length === 0) {
+        setEstado("idle");
+        return;
+      }
+
+      setEstado("saving");
+      try {
+        for (const c of cambios) await c();
+        setEstado("saved");
+        setTimeout(() => setEstado((s) => (s === "saved" ? "idle" : s)), 2000);
+      } catch {
+        setEstado("error");
+      }
+    },
+    [indiceOriginal, diasAnioLista, onFieldChange, onDiaChange],
+  );
+
+  const handleChange = useCallback(
+    (nuevoTexto: string) => {
+      setValor(nuevoTexto);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        void guardar(nuevoTexto);
+      }, 1200);
+    },
+    [guardar],
+  );
+
+  // Ctrl+S fuerza guardado inmediato, saltándose el debounce.
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+          debounceRef.current = null;
+        }
+        void guardar(valor);
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [guardar, valor]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* Header */}
+      <div
+        className="shrink-0 flex items-center justify-between px-4 py-3 border-b"
+        style={{
+          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+        }}
+      >
+        <span
+          className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em]"
+          style={{ color: "var(--primary)" }}
+        >
+          <BookOpen size={11} />
+          Historia completa
+          {filtroLabel && (
+            <span
+              className="normal-case font-bold tracking-normal"
+              style={{ color: "color-mix(in srgb, var(--primary) 50%, transparent)" }}
+            >
+              · {filtroLabel}
+            </span>
+          )}
+        </span>
+        <SaveIndicator status={estado} />
+      </div>
+
+      {/* Nota de alcance: qué es editable y qué no */}
+      <div
+        className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b"
+        style={{
+          color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+          background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+        }}
+      >
+        {filtroLabel ? (
+          <>
+            Mostrando solo los eventos de mundo/reino de{" "}
+            <strong>{filtroLabel}</strong> — cambiá o quitá el filtro en la
+            línea de tiempo para ver el resto.{" "}
+          </>
+        ) : null}
+        Este documento muestra y edita solo los eventos de mundo/reino
+        (título, descripción y año). Capítulos, canciones y cumpleaños se
+        editan desde sus propios lugares y no aparecen acá. No borres el{" "}
+        <code>&lt;!--tl:...--&gt;</code> al final de un título — se usa
+        para saber qué evento actualizar.
+      </div>
+
+      {/* Avisos de líneas/bloques no interpretables o no editables */}
+      {avisos.length > 0 && (
+        <div
+          className="shrink-0 px-4 py-2 text-micro leading-relaxed border-b space-y-0.5"
+          style={{
+            color: "#b45309",
+            borderColor:
+              "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, #f59e0b 8%, transparent)",
+          }}
+        >
+          {avisos.map((a, i) => (
+            <div key={i}>⚠ {a}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Documento — RichEditor editable */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <RichEditor
+          editable
+          minHeight={200}
+          value={valor}
+          onChange={handleChange}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: gestión completa de todas las eras ────────────────────────────────
+function ModalGestionEras({
+  eras,
+  onClose,
+  onEditEra,
+  onNewEra,
+}: {
+  eras: any[];
+  onClose: () => void;
+  onEditEra: (era: any) => void;
+  onNewEra: () => void;
+}) {
+  const erasOrdenadas = [...eras].sort(
+    (a, b) => (a.anio_inicio ?? 0) - (b.anio_inicio ?? 0),
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-[1150] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 55%, transparent)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border shadow-2xl flex flex-col"
+        style={{
+          background: "var(--bg-main)",
+          borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+          maxHeight: "80vh",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="shrink-0 flex items-center justify-between px-4 py-3 border-b"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+          }}
+        >
+          <div>
+            <span
+              className="text-micro font-black uppercase tracking-[0.2em]"
+              style={{ color: "var(--primary)" }}
+            >
+              Todas las eras
+            </span>
+            <div className="text-micro text-primary/35 mt-0.5">
+              {erasOrdenadas.length} era{erasOrdenadas.length !== 1 ? "s" : ""}{" "}
+              definida{erasOrdenadas.length !== 1 ? "s" : ""}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-micro font-black uppercase tracking-widest transition-all"
+              style={{ background: "var(--accent)", color: "white" }}
+              type="button"
+              onClick={onNewEra}
+            >
+              <Plus size={9} /> Nueva era
+            </button>
+            <button
+              className="flex items-center justify-center w-6 h-6 rounded-lg border transition-all"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 12%, transparent)",
+                color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+              }}
+              type="button"
+              onClick={onClose}
+            >
+              <X size={10} />
+            </button>
+          </div>
+        </div>
+
+        {/* Lista de eras */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {erasOrdenadas.length === 0 ? (
+            <div className="text-center py-8">
+              <Clock
+                className="mx-auto mb-2 opacity-20"
+                size={20}
+                style={{ color: "var(--primary)" }}
+              />
+              <p className="text-micro text-primary/30 font-bold uppercase tracking-widest">
+                No hay eras definidas
+              </p>
+              <button
+                className="mt-3 px-3 py-1.5 rounded-xl text-micro font-black uppercase tracking-widest transition-all"
+                style={{ background: "var(--accent)", color: "white" }}
+                type="button"
+                onClick={onNewEra}
+              >
+                Crear la primera era
+              </button>
+            </div>
+          ) : (
+            erasOrdenadas.map((era) => (
+              <button
+                key={era.id}
+                className="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl border text-left transition-all group"
+                style={{
+                  background: era.color
+                    ? `${era.color}08`
+                    : "color-mix(in srgb, var(--primary) 2%, transparent)",
+                  borderColor: era.color
+                    ? `${era.color}25`
+                    : "color-mix(in srgb, var(--primary) 10%, transparent)",
+                }}
+                type="button"
+                onClick={() => onEditEra(era)}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget;
+                  el.style.background = era.color
+                    ? `${era.color}15`
+                    : "color-mix(in srgb, var(--primary) 5%, transparent)";
+                  el.style.borderColor = era.color
+                    ? `${era.color}40`
+                    : "color-mix(in srgb, var(--primary) 20%, transparent)";
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget;
+                  el.style.background = era.color
+                    ? `${era.color}08`
+                    : "color-mix(in srgb, var(--primary) 2%, transparent)";
+                  el.style.borderColor = era.color
+                    ? `${era.color}25`
+                    : "color-mix(in srgb, var(--primary) 10%, transparent)";
+                }}
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-full shrink-0 mt-0.5"
+                  style={{ background: era.color ?? "var(--accent)" }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-micro font-black truncate"
+                      style={{ color: era.color ?? "var(--primary)" }}
+                    >
+                      {era.nombre}
+                    </span>
+                    <span
+                      className="text-micro font-bold shrink-0"
+                      style={{
+                        color:
+                          "color-mix(in srgb, var(--primary) 35%, transparent)",
+                      }}
+                    >
+                      {era.anio_inicio != null &&
+                        (era.anio_fin != null
+                          ? `Año ${era.anio_inicio} – ${era.anio_fin}`
+                          : `Desde año ${era.anio_inicio}`)}
+                    </span>
+                  </div>
+                  {era.descripcion && (
+                    <p
+                      className="text-micro leading-relaxed mt-0.5 line-clamp-2"
+                      style={{
+                        color:
+                          "color-mix(in srgb, var(--primary) 50%, transparent)",
+                      }}
+                    >
+                      {era.descripcion}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className="text-micro font-black uppercase tracking-widest shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{
+                    color:
+                      era.color ??
+                      "color-mix(in srgb, var(--primary) 35%, transparent)",
+                  }}
+                >
+                  Editar
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Botón toggle de "mostrar/ocultar tipo" (capítulos, canciones, eventos,
+// cumpleaños) en la cabecera de la línea de tiempo ────────────────────────────
+function ToggleTipoBtn({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="relative flex items-center justify-center transition-all"
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: "var(--radius-btn)",
+        border: `1px solid ${
+          active
+            ? "color-mix(in srgb, var(--accent) 30%, transparent)"
+            : "color-mix(in srgb, var(--primary) 10%, transparent)"
+        }`,
+        background: active
+          ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+          : "transparent",
+        color: active
+          ? "var(--accent)"
+          : "color-mix(in srgb, var(--primary) 28%, transparent)",
+      }}
+      title={
+        active
+          ? `Ocultar ${label.toLowerCase()}`
+          : `Mostrar ${label.toLowerCase()}`
+      }
+      type="button"
+      onClick={onClick}
+    >
+      {icon}
+      <span
+        style={{
+          position: "absolute",
+          bottom: 2,
+          right: 2,
+          width: 3,
+          height: 3,
+          borderRadius: "50%",
+          background: active
+            ? "var(--accent)"
+            : "color-mix(in srgb, var(--primary) 18%, transparent)",
+          transition: "background 0.15s",
+        }}
+      />
+    </button>
+  );
+}
+
+// ── Panel de detalle de evento (click en la lista) ───────────────────────────
+// Editable para eventos "mundo"/"reino" (tabla eventos_mundo): título,
+// descripción y fecha. También editable para "era_personaje" (personaje_eras
+// del personaje filtrado): label, fecha, rasgos y notas — usa los mismos
+// handlers que PersonajeLineaDeTiempo (useErasDelPersonaje). Capítulos/
+// canciones/cumpleaños se muestran solo lectura porque no tienen un campo
+// de descripción propio aquí y editar su título cambiaría la entidad real
+// (capítulo, canción o personaje).
+// ─── edadEnDia ───────────────────────────────────────────────────────────────
+// Calcula la edad (en años del calendario del mundo) que tendría un
+// personaje en un día absoluto dado, a partir de su fecha_nacimiento.
+// Devuelve null si falta cualquiera de los dos datos, o si el evento
+// ocurre antes de que el personaje naciera (edad negativa no tiene
+// sentido mostrarla).
+function edadEnDia(
+  fechaNacimiento: number | null | undefined,
+  diaAbsolutoEvento: number | null | undefined,
+  diasAnioLista: number,
+): number | null {
+  if (fechaNacimiento == null || diaAbsolutoEvento == null) return null;
+  if (!diasAnioLista) return null;
+  const edad = Math.floor(
+    (diaAbsolutoEvento - fechaNacimiento) / diasAnioLista,
+  );
+  return edad >= 0 ? edad : null;
+}
+
+// ─── PersonajesEventoPicker ───────────────────────────────────────────────────
+// Personajes que participan en un evento. Dos modos:
+//   - editable=true (eventos "mundo"/"reino"): permite añadir/quitar
+//     personajes con un buscador empotrado (sin portal — mismo criterio
+//     que el selector de fecha, para no anidar paneles flotantes).
+//   - editable=false (capítulos): solo muestra los personajes YA vinculados
+//     al capítulo (campo personajes_ids editado desde el editor del libro),
+//     con un botón para ir al personaje.
+function PersonajesEventoPicker({
+  personajesIds,
+  personajesDisponibles,
+  editable,
+  onChange,
+  onSelectPersonaje,
+  diaAbsolutoEvento,
+  diasAnioLista,
+}: {
+  personajesIds: string[];
+  personajesDisponibles: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    fecha_nacimiento?: number | null;
+  }[];
+  editable: boolean;
+  onChange?: (ids: string[]) => void;
+  onSelectPersonaje?: (id: string) => void;
+  /** Día absoluto del evento/era — junto con la fecha de nacimiento de
+   * cada personaje vinculado, permite mostrar la edad que tendría en
+   * ese momento. Si falta, no se muestra ninguna edad. */
+  diaAbsolutoEvento?: number | null;
+  /** Días por año del calendario del mundo — para convertir la
+   * diferencia de días en años. */
+  diasAnioLista?: number;
+}) {
+  const [query, setQuery] = useState("");
+  const [buscando, setBuscando] = useState(false);
+
+  const vinculados = personajesIds
+    .map((id) => personajesDisponibles.find((p) => p.id === id))
+    .filter(Boolean) as {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    fecha_nacimiento?: number | null;
+  }[];
+
+  const resultados = useMemo(() => {
+    if (!buscando) return [];
+    const q = query.trim().toLowerCase();
+    const candidatos = personajesDisponibles.filter(
+      (p) => !personajesIds.includes(p.id),
+    );
+    if (!q) return candidatos.slice(0, 8);
+    return candidatos
+      .filter((p) => p.nombre.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [buscando, query, personajesDisponibles, personajesIds]);
+
+  const agregar = (id: string) => {
+    if (personajesIds.includes(id)) return;
+    onChange?.([...personajesIds, id]);
+    setQuery("");
+    setBuscando(false);
+  };
+
+  const quitar = (id: string) => {
+    onChange?.(personajesIds.filter((pid) => pid !== id));
+  };
+
+  if (!editable && vinculados.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {/* Chips de personajes ya vinculados */}
+      {vinculados.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {vinculados.map((p) => (
+            <span
+              key={p.id}
+              className="flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full text-micro font-bold transition-all"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+                color: "color-mix(in srgb, var(--primary) 60%, transparent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+              }}
+            >
+              {p.img_url ? (
+                <img
+                  alt=""
+                  className="w-4 h-4 rounded-full object-cover"
+                  src={p.img_url}
+                />
+              ) : (
+                <User size={9} className="opacity-50" />
+              )}
+              <button
+                className="hover:underline"
+                title={onSelectPersonaje ? "Ir al personaje" : undefined}
+                type="button"
+                onClick={() => onSelectPersonaje?.(p.id)}
+              >
+                {p.nombre}
+              </button>
+              {(() => {
+                const edad = edadEnDia(
+                  p.fecha_nacimiento,
+                  diaAbsolutoEvento,
+                  diasAnioLista ?? 0,
+                );
+                if (edad == null) return null;
+                return (
+                  <span
+                    className="text-micro font-black tabular-nums opacity-60"
+                    title="Edad en este momento"
+                  >
+                    {edad}a
+                  </span>
+                );
+              })()}
+              {editable && (
+                <button
+                  className="opacity-50 hover:opacity-100 transition-opacity"
+                  title="Quitar"
+                  type="button"
+                  onClick={() => quitar(p.id)}
+                >
+                  <X size={8} />
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Buscador empotrado — solo en modo editable */}
+      {editable && (
+        <div className="flex flex-col gap-1">
+          {!buscando ? (
+            <button
+              className="self-start flex items-center justify-center w-5 h-5 rounded-md transition-all opacity-50 hover:opacity-100"
+              style={{
+                color:
+                  "color-mix(in srgb, var(--primary) 45%, transparent)",
+              }}
+              title="Añadir personaje"
+              type="button"
+              onClick={() => setBuscando(true)}
+            >
+              <Plus size={11} />
+            </button>
+          ) : (
+            <div
+              className="rounded-lg border overflow-hidden"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 2%, transparent)",
+                borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+              }}
+            >
+              <input
+                autoFocus
+                className="w-full px-2 py-1.5 text-micro outline-none bg-transparent"
+                placeholder="Buscar personaje…"
+                style={{ color: "var(--primary)" }}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setBuscando(false);
+                    setQuery("");
+                  }
+                }}
+              />
+              <div
+                className="max-h-40 overflow-y-auto"
+                style={{
+                  borderTop:
+                    "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+              >
+                {resultados.length === 0 ? (
+                  <p
+                    className="px-2 py-1.5 text-micro italic"
+                    style={{
+                      color: "color-mix(in srgb, var(--primary) 25%, transparent)",
+                    }}
+                  >
+                    Sin resultados.
+                  </p>
+                ) : (
+                  resultados.map((p) => (
+                    <button
+                      key={p.id}
+                      className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold transition-colors"
+                      style={{ color: "var(--primary)" }}
+                      type="button"
+                      onClick={() => agregar(p.id)}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.background =
+                          "color-mix(in srgb, var(--primary) 6%, transparent)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background =
+                          "transparent";
+                      }}
+                    >
+                      {p.img_url ? (
+                        <img
+                          alt=""
+                          className="w-4 h-4 rounded-full object-cover"
+                          src={p.img_url}
+                        />
+                      ) : (
+                        <User size={9} className="opacity-40" />
+                      )}
+                      <span className="truncate flex-1">{p.nombre}</span>
+                      {(() => {
+                        const edad = edadEnDia(
+                          p.fecha_nacimiento,
+                          diaAbsolutoEvento,
+                          diasAnioLista ?? 0,
+                        );
+                        if (edad == null) return null;
+                        return (
+                          <span className="text-micro font-black tabular-nums opacity-50 shrink-0">
+                            {edad}a
+                          </span>
+                        );
+                      })()}
+                    </button>
+                  ))
+                )}
+              </div>
+              <button
+                className="w-full text-center py-1 text-micro font-black uppercase tracking-widest transition-colors"
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+                  borderTop:
+                    "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+                type="button"
+                onClick={() => {
+                  setBuscando(false);
+                  setQuery("");
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventoDetallePanel({
+  evt,
+  era,
+  eraColor,
+  eraPersonaje,
+  diasAnioLista,
+  onFieldChange,
+  onDiaChange,
+  onDiaChangeCancion,
+  onDiaChangeCumpleanos,
+  onDiaChangeCapitulo,
+  onClose,
+  onLabelChangeEraPersonaje,
+  onNotasChangeEraPersonaje,
+  onMomentoChangeEraPersonaje,
+  onAddRasgoEraPersonaje,
+  onRemoveRasgoEraPersonaje,
+  onDeleteEraPersonaje,
+  onSelectCapitulo,
+  onSelectCancion,
+  onSelectPersonaje,
+  personajesDisponibles,
+  onPersonajesChange,
+}: {
+  evt: MundoTimelineEvent;
+  era: EraMundo | null;
+  eraColor: string | null;
+  eraPersonaje?: Era | null;
+  diasAnioLista: number;
+  onFieldChange?: (
+    id: string,
+    field: "titulo" | "descripcion",
+    value: string,
+  ) => void;
+  onDiaChange?: (id: string, dia: number) => void;
+  /** Cambia la fecha (dia_absoluto) de una canción — tabla `canciones`. */
+  onDiaChangeCancion?: (id: string, dia: number) => void;
+  /** Cambia la fecha de nacimiento de un personaje — tabla `personajes`. */
+  onDiaChangeCumpleanos?: (id: string, dia: number) => void;
+  /** Cambia la fecha (dia_absoluto) de un capítulo — tabla `capitulos`. */
+  onDiaChangeCapitulo?: (id: string, dia: number) => void;
+  onClose?: () => void;
+  onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
+  onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
+  onMomentoChangeEraPersonaje?: (era: Era, nuevoMomento: number) => Promise<void>;
+  onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onDeleteEraPersonaje?: (id: string) => void;
+  /** Navega al capítulo/libro — se dispara solo con este botón, nunca con
+   * el click que abre el panel. */
+  onSelectCapitulo?: (capituloId: string, libroId: string) => void;
+  onSelectCancion?: (cancionId: string) => void;
+  onSelectPersonaje?: (personajeId: string) => void;
+  /** Lista completa de personajes disponibles (para resolver nombre/avatar
+   * de los ya vinculados y para el buscador de "añadir personaje" en
+   * eventos mundo/reino). */
+  personajesDisponibles?: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    fecha_nacimiento?: number | null;
+  }[];
+  /** Guarda los personajes_ids de un evento mundo/reino — solo aplica
+   * cuando evt.source es "mundo" o "reino". */
+  onPersonajesChange?: (id: string, personajesIds: string[]) => void;
+}) {
+  const editable = evt.source === "mundo" || evt.source === "reino";
+  const editableEraPersonaje =
+    evt.source === "era_personaje" && eraPersonaje != null;
+
+  const [titulo, setTitulo] = useState(evt.title);
+  const [descripcion, setDescripcion] = useState(evt.description);
+  const [savingFecha, setSavingFecha] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Estado local para el título/notas de la era del personaje — mismo
+  // patrón de debounce que titulo/descripcion, pero llama a los handlers
+  // de useErasDelPersonaje en vez de onFieldChange.
+  const [labelEra, setLabelEra] = useState(eraPersonaje?.label ?? "");
+  const [notasEra, setNotasEra] = useState(eraPersonaje?.notas ?? "");
+  const [nuevoRasgo, setNuevoRasgo] = useState("");
+  const labelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notasDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Resincronizar campos locales al cambiar de evento seleccionado
+  useEffect(() => {
+    setTitulo(evt.title);
+    setDescripcion(evt.description);
+  }, [evt.id, evt.title, evt.description]);
+
+  useEffect(() => {
+    setLabelEra(eraPersonaje?.label ?? "");
+    setNotasEra(eraPersonaje?.notas ?? "");
+  }, [eraPersonaje?.id, eraPersonaje?.label, eraPersonaje?.notas]);
+
+  const scheduleSave = (field: "titulo" | "descripcion", value: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onFieldChange?.(evt.id, field, value);
+    }, 600);
+  };
+
+  const scheduleLabelEra = (value: string) => {
+    if (!eraPersonaje) return;
+    if (labelDebounceRef.current) clearTimeout(labelDebounceRef.current);
+    labelDebounceRef.current = setTimeout(() => {
+      onLabelChangeEraPersonaje?.(eraPersonaje, value);
+    }, 600);
+  };
+
+  const scheduleNotasEra = (value: string) => {
+    if (!eraPersonaje) return;
+    if (notasDebounceRef.current) clearTimeout(notasDebounceRef.current);
+    notasDebounceRef.current = setTimeout(() => {
+      onNotasChangeEraPersonaje?.(eraPersonaje, value);
+    }, 600);
+  };
+
+  const commitDia = async (dia: number | null) => {
+    if (dia == null) return;
+    setSavingFecha(true);
+    if (editableEraPersonaje && eraPersonaje) {
+      await onMomentoChangeEraPersonaje?.(eraPersonaje, dia);
+    } else if (evt.source === "cancion" && evt.cancionData) {
+      await onDiaChangeCancion?.(evt.cancionData.id, dia);
+    } else if (evt.source === "cumpleanos" && evt.cumpleanosData) {
+      await onDiaChangeCumpleanos?.(evt.cumpleanosData.id, dia);
+    } else if (evt.source === "capitulo" && evt.capData) {
+      await onDiaChangeCapitulo?.(evt.capData.id, dia);
+    } else {
+      await onDiaChange?.(evt.id, dia);
+    }
+    setSavingFecha(false);
+  };
+
+  // Fecha editable: eventos "mundo"/"reino", eras de personaje, y también
+  // canciones/cumpleaños/capítulos (antes solo lectura) — ahora se pueden
+  // reprogramar desde este mismo panel flotante.
+  const fechaEditable =
+    editable ||
+    editableEraPersonaje ||
+    evt.source === "cancion" ||
+    evt.source === "cumpleanos" ||
+    evt.source === "capitulo";
+
+  // Handler de "Ir al…" — capítulo/libro, canción o cumpleaños (personaje).
+  // Nunca se dispara solo, requiere click explícito en el botón.
+  const irADestino = () => {
+    if (evt.source === "capitulo" && evt.capData) {
+      onSelectCapitulo?.(evt.capData.id, evt.capData.libro_id);
+    } else if (evt.source === "cancion" && evt.cancionData) {
+      onSelectCancion?.(evt.cancionData.id);
+    } else if (evt.source === "cumpleanos" && evt.cumpleanosData) {
+      onSelectPersonaje?.(evt.cumpleanosData.id);
+    }
+  };
+  const etiquetaDestino =
+    evt.source === "capitulo"
+      ? "Ir al libro"
+      : evt.source === "cancion"
+        ? "Ir a la canción"
+        : evt.source === "cumpleanos"
+          ? "Ir al personaje"
+          : null;
+
+  const agregarRasgo = () => {
+    const val = nuevoRasgo.trim();
+    if (!val || !eraPersonaje) return;
+    onAddRasgoEraPersonaje?.(eraPersonaje, val);
+    setNuevoRasgo("");
+  };
+
+  const Icon = iconoPorSource(evt.source);
+
+  return (
+    <div
+      className="rounded-xl p-4 flex flex-col gap-3"
+      style={{
+        background: eraColor
+          ? `${eraColor}08`
+          : "color-mix(in srgb, var(--primary) 3%, transparent)",
+        border: `1px solid ${eraColor ? `${eraColor}22` : "color-mix(in srgb, var(--primary) 10%, transparent)"}`,
+      }}
+    >
+      {/* Era + tipo — misma fila, aprovecha el ancho ganado del panel */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {era && (
+          <span
+            className="text-micro font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-full"
+            style={{
+              background: eraColor
+                ? `${eraColor}18`
+                : "color-mix(in srgb, var(--primary) 7%, transparent)",
+              color:
+                eraColor ?? "color-mix(in srgb, var(--primary) 45%, transparent)",
+              border: `1px solid ${eraColor ? `${eraColor}30` : "color-mix(in srgb, var(--primary) 12%, transparent)"}`,
+            }}
+          >
+            {era.nombre}
+          </span>
+        )}
+        <span
+          className="flex items-center gap-1 text-micro font-black uppercase tracking-widest px-1.5 py-0.5 rounded"
+          style={{
+            background: "color-mix(in srgb, var(--primary) 5%, transparent)",
+            color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+            border:
+              "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+          }}
+        >
+          <Icon size={7} />
+          {evt.source}
+        </span>
+        {editableEraPersonaje && eraPersonaje && onDeleteEraPersonaje && (
+          <button
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-black uppercase tracking-widest transition-all hover:opacity-100"
+            style={{
+              color: "color-mix(in srgb, #ef4444 60%, transparent)",
+              opacity: 0.7,
+            }}
+            title="Eliminar esta era"
+            type="button"
+            onClick={() => {
+              onDeleteEraPersonaje(eraPersonaje.id);
+              onClose?.();
+            }}
+          >
+            <Trash2 size={9} />
+          </button>
+        )}
+        {etiquetaDestino && (
+          <button
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-black uppercase tracking-widest transition-all"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+              color: "var(--accent)",
+              border:
+                "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+            }}
+            title={etiquetaDestino}
+            type="button"
+            onClick={irADestino}
+          >
+            <ExternalLink size={9} />
+            {etiquetaDestino}
+          </button>
+        )}
+        {onClose && (
+          <button
+            className={`shrink-0 flex items-center justify-center rounded-full transition-all hover:opacity-100 ${etiquetaDestino ? "" : "ml-auto"}`}
+            style={{
+              width: 18,
+              height: 18,
+              color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+              opacity: 0.7,
+            }}
+            title="Cerrar"
+            type="button"
+            onClick={onClose}
+          >
+            <X size={11} />
+          </button>
+        )}
+      </div>
+
+      {/* Título */}
+      {editable ? (
+        <input
+          className="text-sm font-black uppercase leading-tight bg-transparent outline-none w-full rounded px-0.5 -mx-0.5"
+          placeholder="Sin título"
+          style={{ color: "var(--primary)" }}
+          value={titulo}
+          onBlur={(e) => onFieldChange?.(evt.id, "titulo", e.target.value)}
+          onChange={(e) => {
+            setTitulo(e.target.value);
+            scheduleSave("titulo", e.target.value);
+          }}
+        />
+      ) : editableEraPersonaje ? (
+        <input
+          className="text-sm font-black uppercase leading-tight bg-transparent outline-none w-full rounded px-0.5 -mx-0.5"
+          placeholder="Nombre del período…"
+          style={{ color: "var(--primary)" }}
+          value={labelEra}
+          onBlur={(e) => {
+            if (eraPersonaje) onLabelChangeEraPersonaje?.(eraPersonaje, e.target.value);
+          }}
+          onChange={(e) => {
+            setLabelEra(e.target.value);
+            scheduleLabelEra(e.target.value);
+          }}
+        />
+      ) : (
+        <p
+          className="text-sm font-black uppercase leading-tight"
+          style={{ color: "var(--primary)" }}
+        >
+          {evt.title || <span className="italic opacity-40">Sin título</span>}
+        </p>
+      )}
+
+      {/* Fecha + reino/personaje — misma fila cuando hay espacio */}
+      <div className="flex items-center gap-2">
+        {fechaEditable ? (
+          <div className="relative flex-1 min-w-0">
+            {savingFecha && (
+              <Loader2
+                className="animate-spin absolute right-2 top-1.5 z-10 text-primary/30"
+                size={9}
+              />
+            )}
+            <SelectorFechaMundo
+              autoOpen={
+                evt.source === "capitulo" ||
+                evt.source === "cancion" ||
+                evt.source === "cumpleanos"
+              }
+              inline={
+                evt.source === "capitulo" ||
+                evt.source === "cancion" ||
+                evt.source === "cumpleanos"
+              }
+              hideTrigger={
+                evt.source === "capitulo" ||
+                evt.source === "cancion" ||
+                evt.source === "cumpleanos"
+              }
+              placeholder="Sin fecha…"
+              value={evt.dia_absoluto ?? null}
+              onChange={commitDia}
+            />
+          </div>
+        ) : (
+          evt.dia_absoluto != null && (
+            <p
+              className="text-micro font-black uppercase tracking-widest"
+              style={{
+                color:
+                  eraColor ??
+                  "color-mix(in srgb, var(--primary) 35%, transparent)",
+              }}
+            >
+              Año {Math.floor(evt.dia_absoluto / diasAnioLista)}
+            </p>
+          )
+        )}
+        {evt.reinoNombre && (
+          <span
+            className="shrink-0 flex items-center gap-1 text-micro font-black uppercase tracking-widest"
+            style={{
+              color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+            }}
+          >
+            <Crown size={8} /> {evt.reinoNombre}
+          </span>
+        )}
+      </div>
+
+      {/* Separador */}
+      <div
+        style={{
+          height: 1,
+          background: eraColor
+            ? `${eraColor}20`
+            : "color-mix(in srgb, var(--primary) 8%, transparent)",
+        }}
+      />
+
+      {/* Personajes involucrados/vinculados — editable en mundo/reino,
+          solo lectura (ya vinculados desde el editor del libro) en
+          capítulos. No aplica a canciones/cumpleaños/eras de personaje. */}
+      {(editable || evt.source === "capitulo") &&
+        personajesDisponibles &&
+        personajesDisponibles.length > 0 && (
+          <PersonajesEventoPicker
+            editable={editable}
+            personajesIds={evt.personajes_ids ?? []}
+            personajesDisponibles={personajesDisponibles}
+            diaAbsolutoEvento={evt.dia_absoluto ?? null}
+            diasAnioLista={diasAnioLista}
+            onChange={
+              editable
+                ? (ids) => onPersonajesChange?.(evt.id, ids)
+                : undefined
+            }
+            onSelectPersonaje={onSelectPersonaje}
+          />
+        )}
+
+      {/* Rasgos — solo para era_personaje editable, chips con quitar + agregar */}
+      {editableEraPersonaje && eraPersonaje && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap gap-1">
+            {eraPersonaje.rasgos.map((r) => (
+              <span
+                key={r}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-micro font-bold"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--primary) 6%, transparent)",
+                  color: "color-mix(in srgb, var(--primary) 55%, transparent)",
+                }}
+              >
+                {r}
+                <button
+                  className="opacity-50 hover:opacity-100 transition-opacity"
+                  title="Quitar rasgo"
+                  type="button"
+                  onClick={() => onRemoveRasgoEraPersonaje?.(eraPersonaje, r)}
+                >
+                  <X size={8} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              className="flex-1 min-w-0 rounded-md px-2 py-1 text-micro outline-none"
+              placeholder="Nuevo rasgo…"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+                color: "var(--primary)",
+              }}
+              value={nuevoRasgo}
+              onChange={(e) => setNuevoRasgo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  agregarRasgo();
+                }
+              }}
+            />
+            <button
+              className="shrink-0 flex items-center justify-center rounded-md transition-all"
+              style={{
+                width: 24,
+                height: 24,
+                background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+                color: "var(--accent)",
+              }}
+              title="Agregar rasgo"
+              type="button"
+              onClick={agregarRasgo}
+            >
+              <Plus size={10} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Descripción / notas — a todo el ancho del panel, editor Lexical completo */}
+      {editable ? (
+        <div className="flex-1 min-h-0">
+          <RichEditor
+            minHeight={160}
+            placeholder="Sin descripción…"
+            value={descripcion}
+            onChange={(v) => {
+              setDescripcion(v);
+              scheduleSave("descripcion", v);
+            }}
+          />
+        </div>
+      ) : editableEraPersonaje ? (
+        <div className="flex-1 min-h-0">
+          <RichEditor
+            minHeight={160}
+            placeholder="Sin notas…"
+            value={notasEra}
+            onChange={(v) => {
+              setNotasEra(v);
+              scheduleNotasEra(v);
+            }}
+          />
+        </div>
+      ) : evt.description ? (
+        <p
+          className="text-micro leading-relaxed"
+          style={{
+            color: "color-mix(in srgb, var(--primary) 65%, transparent)",
+          }}
+        >
+          {evt.description}
+        </p>
+      ) : (
+        <p
+          className="text-micro italic"
+          style={{
+            color: "color-mix(in srgb, var(--primary) 20%, transparent)",
+          }}
+        >
+          Sin descripción.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Ícono representativo por tipo de evento — usado en las tarjetas del grid
+// y en los puntos de la línea de tiempo horizontal.
+function iconoPorSource(source: MundoTimelineEvent["source"]) {
+  switch (source) {
+    case "capitulo":
+      return BookOpen;
+    case "cancion":
+      return Music;
+    case "cumpleanos":
+      return CalendarDays;
+    case "era_personaje":
+      return User;
+    default:
+      return Clock;
+  }
+}
+
+// ── Lista vertical de eventos + minimap sincronizado por posición real ──────
+// El bug: el minimap ubicaba cada punto por índice (i / total), asumiendo que
+// todos los items tienen la misma altura. Pero los separadores de año
+// (que no tienen una altura fija/predecible) rompen esa suposición — por eso
+// el primer evento, que casi siempre lleva un separador justo encima, queda
+// visualmente más abajo que su punto (que sí está fijo arriba, en 0%).
+// Fix: medimos la posición real (en píxeles) de cada evento dentro de la
+// lista con refs + getBoundingClientRect, y usamos esa fracción real para
+// ubicar los puntos — así siempre coinciden con su evento, sin importar
+// separadores, distinto alto de fila, o el ancho cambiante de la lista.
+function ListaEventosConMinimapa({
+  allEvents,
+  cal,
+  erasPersonaje,
+  filterPersonaje,
+  evtSeleccionado,
+  setEvtSeleccionado,
+  onFieldChange,
+  onDiaChange,
+  onDiaChangeCancion,
+  onDiaChangeCumpleanos,
+  onDiaChangeCapitulo,
+  onSelectPersonaje,
+  onSelectCapitulo,
+  onSelectCancion,
+  onLabelChangeEraPersonaje,
+  onNotasChangeEraPersonaje,
+  onMomentoChangeEraPersonaje,
+  onAddRasgoEraPersonaje,
+  onRemoveRasgoEraPersonaje,
+  onDeleteEraPersonaje,
+  personajesDisponibles,
+  onPersonajesChange,
+}: {
+  allEvents: MundoTimelineEvent[];
+  cal: CalCache | null;
+  /** Eras internas del personaje actualmente filtrado — se usan para
+   * resolver el objeto Era completo (no solo su id) que necesitan los
+   * handlers de edición al abrir el panel de detalle. */
+  erasPersonaje?: Era[];
+  /** Id del personaje seleccionado en el filtro superior — cuando está
+   * activo, cada tarjeta de evento/era/capítulo donde ese personaje
+   * participa muestra a la derecha del título la edad que tendría en
+   * ese momento (número con el color de la era del mundo). */
+  filterPersonaje?: string | null;
+  evtSeleccionado: string | null;
+  setEvtSeleccionado: (id: string | null) => void;
+  onFieldChange?: (
+    id: string,
+    field: "titulo" | "descripcion",
+    value: string,
+  ) => void;
+  onDiaChange?: (id: string, dia: number) => void;
+  onDiaChangeCancion?: (id: string, dia: number) => void;
+  onDiaChangeCumpleanos?: (id: string, dia: number) => void;
+  onDiaChangeCapitulo?: (id: string, dia: number) => void;
+  onSelectPersonaje?: (id: string) => void;
+  onSelectCapitulo?: (capituloId: string, libroId: string) => void;
+  onSelectCancion?: (cancionId: string) => void;
+  /** Handlers de edición de eras internas del personaje (personaje_eras) —
+   * ver useErasDelPersonaje en PanelHistoriaMundo. Solo se usan cuando el
+   * evento seleccionado es de tipo "era_personaje". */
+  onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
+  onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
+  onMomentoChangeEraPersonaje?: (era: Era, nuevoMomento: number) => Promise<void>;
+  onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onDeleteEraPersonaje?: (id: string) => void;
+  /** Lista completa de personajes (id/nombre/avatar) — para mostrar los
+   * personajes vinculados a un evento/capítulo y, en eventos mundo/reino,
+   * habilitar el buscador de "añadir personaje". */
+  personajesDisponibles?: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    fecha_nacimiento?: number | null;
+  }[];
+  /** Guarda personajes_ids de un evento mundo/reino. */
+  onPersonajesChange?: (id: string, personajesIds: string[]) => void;
+}) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  const diasAnioLista = useMemo(
+    () =>
+      cal?.estaciones?.reduce(
+        (s: number, e: any) => s + (e.duracion_dias ?? 0),
+        0,
+      ) || 365,
+    [cal?.estaciones],
+  );
+
+  // Fecha de nacimiento del personaje filtrado — usada para mostrar la
+  // edad que tendría en cada evento/era/capítulo donde participa.
+  const fechaNacimientoFiltrado = useMemo(
+    () =>
+      filterPersonaje
+        ? (personajesDisponibles?.find((p) => p.id === filterPersonaje)
+            ?.fecha_nacimiento ?? null)
+        : null,
+    [filterPersonaje, personajesDisponibles],
+  );
+
+  // Determina si el personaje filtrado participa de un evento — vía
+  // personajes_ids (mundo/reino/capítulo) o porque el evento ES ese
+  // personaje (cumpleaños/era_personaje, que ya vienen acotados a él).
+  const participaPersonajeFiltrado = (evt: MundoTimelineEvent): boolean => {
+    if (!filterPersonaje) return false;
+    if (evt.source === "cumpleanos")
+      return evt.cumpleanosData?.id === filterPersonaje;
+    if (evt.source === "era_personaje")
+      return evt.eraPersonajeData?.personajeId === filterPersonaje;
+    return (evt.personajes_ids ?? []).includes(filterPersonaje);
+  };
+
+  const getEraEvt = (diaAbs: number | null | undefined) =>
+    diaAbs != null
+      ? ((cal?.eras ?? []).find(
+          (era: any) =>
+            era.anio_inicio <= Math.floor(diaAbs / diasAnioLista) &&
+            (era.anio_fin == null ||
+              era.anio_fin >= Math.floor(diaAbs / diasAnioLista)),
+        ) ?? null)
+      : null;
+
+  const selEvt = allEvents.find((e) => e.id === evtSeleccionado) ?? null;
+  const selEra = selEvt ? getEraEvt(selEvt.dia_absoluto) : null;
+  const selEraColor = selEra?.color ?? null;
+  // Objeto Era completo (personaje_eras) correspondiente al evento
+  // seleccionado, cuando ese evento es de tipo "era_personaje" — lo
+  // necesitan los handlers de edición que vienen de useErasDelPersonaje.
+  const selEraPersonaje =
+    selEvt?.source === "era_personaje" && selEvt.eraPersonajeData
+      ? (erasPersonaje?.find((e) => e.id === selEvt.eraPersonajeData!.id) ??
+        null)
+      : null;
+
+  // ── Minimapa horizontal ─────────────────────────────────────────────────
+  // Franja compacta arriba de la lista: un punto por evento, coloreado por
+  // era. Da un vistazo de "dónde estoy" en la línea de tiempo completa y usa
+  // el ancho horizontal que antes quedaba vacío. Clic en un punto selecciona
+  // (y hace scroll a) ese evento en la lista de abajo.
+  //
+  // IMPORTANTE: la distribución es por ÍNDICE (uniforme), no proporcional al
+  // dia_absoluto real. Con proporción real, un cluster de eventos ocurridos
+  // en un rango corto de tiempo (ej. 5 eventos en el mismo año, en una línea
+  // de tiempo que abarca siglos) quedaba con sus puntos superpuestos —
+  // imposible de clickear individualmente — mientras los huecos sin eventos
+  // (siglos sin nada) desperdiciaban todo ese ancho. Al distribuir por índice
+  // cada evento recibe el mismo espacio sin importar cuán cerca esté en el
+  // tiempo de sus vecinos, así los clusters se separan y usan el espacio que
+  // antes quedaba vacío en los huecos.
+  const eventosConFecha = useMemo(
+    () => allEvents.filter((e) => e.dia_absoluto != null),
+    [allEvents],
+  );
+
+  return (
+    <div className="flex flex-col gap-2" style={{ minHeight: 120 }}>
+      {/* ── Minimapa horizontal: toda la línea de tiempo en una franja ── */}
+      {eventosConFecha.length > 1 && (
+        <div
+          className="relative shrink-0 rounded-lg"
+          style={{
+            height: 28,
+            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+            border:
+              "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+          }}
+        >
+          {/* Línea base */}
+          <div
+            className="absolute left-2 right-2 top-1/2 -translate-y-1/2"
+            style={{
+              height: 1,
+              background:
+                "color-mix(in srgb, var(--primary) 12%, transparent)",
+            }}
+          />
+          {eventosConFecha.map((evt, idx) => {
+            // Distribución uniforme: idx/(n-1) en vez de (dia-min)/rango.
+            const pct =
+              eventosConFecha.length > 1
+                ? (idx / (eventosConFecha.length - 1)) * 100
+                : 50;
+            const eraEvt = getEraEvt(evt.dia_absoluto);
+            const eraColor = eraEvt?.color ?? null;
+            const isSel = evt.id === evtSeleccionado;
+            const Icon = iconoPorSource(evt.source);
+            return (
+              <button
+                key={`mini-${evt.id}`}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full flex items-center justify-center transition-all hover:scale-125"
+                style={{
+                  left: `${pct}%`,
+                  marginLeft: 8 - (16 * pct) / 100,
+                  width: isSel ? 12 : 7,
+                  height: isSel ? 12 : 7,
+                  background: eraColor ?? "color-mix(in srgb, var(--primary) 35%, transparent)",
+                  boxShadow: isSel
+                    ? `0 0 0 3px ${eraColor ? `${eraColor}30` : "color-mix(in srgb, var(--primary) 18%, transparent)"}`
+                    : "none",
+                  zIndex: isSel ? 2 : 1,
+                }}
+                title={evt.title || "Sin título"}
+                type="button"
+                onClick={() => {
+                  setEvtSeleccionado(evt.id);
+                  itemRefs.current
+                    .get(evt.id)
+                    ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+              >
+                {isSel && <Icon color="var(--bg-main)" size={7} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Lista (grid) ── */}
+      <div className="flex gap-2 items-start flex-1 min-h-0">
+        {/* ── Lista agrupada por ERA (cada era = su propia fila, obligatoria)
+             y dentro de cada era, carriles por año dispuestos en flex-wrap:
+             se ponen lado a lado hasta llegar al borde del contenedor y ahí
+             continúan en la siguiente línea, sin scroll horizontal infinito. ── */}
+        <div
+          ref={listRef}
+          className="min-w-0"
+          style={{
+            flex: "1",
+            overflowY: "auto",
+            overflowX: "hidden",
+          }}
+        >
+          {allEvents.length === 0 && (
+            <p className="text-micro text-primary/20 italic px-2 py-2">
+              Sin eventos con fecha asignada.
+            </p>
+          )}
+          {(() => {
+            // Paso 1 — Agrupar eventos consecutivos por año → carriles.
+            type Carril = {
+              anio: number | null;
+              eraId: string | null;
+              eventos: MundoTimelineEvent[];
+            };
+            const carriles: Carril[] = [];
+            for (const evt of allEvents) {
+              const anio =
+                evt.dia_absoluto != null
+                  ? Math.floor(evt.dia_absoluto / diasAnioLista)
+                  : null;
+              const eraEvt = getEraEvt(evt.dia_absoluto);
+              const eraId = eraEvt?.id ?? null;
+              const last = carriles[carriles.length - 1];
+              if (last && last.anio === anio && last.eraId === eraId) {
+                last.eventos.push(evt);
+              } else {
+                carriles.push({ anio, eraId, eventos: [evt] });
+              }
+            }
+
+            // Paso 2 — Agrupar esos carriles consecutivos por ERA — cada era
+            //    obligatoriamente en su propia fila, nunca comparte fila con
+            //    la era anterior o siguiente.
+            type GrupoEra = {
+              eraId: string | null;
+              eraNombre: string | null;
+              eraColor: string | null;
+              carriles: Carril[];
+            };
+            const grupos: GrupoEra[] = [];
+            for (const carril of carriles) {
+              const eraEvt = getEraEvt(carril.eventos[0]?.dia_absoluto);
+              const last = grupos[grupos.length - 1];
+              if (last && last.eraId === carril.eraId) {
+                last.carriles.push(carril);
+              } else {
+                grupos.push({
+                  eraId: carril.eraId,
+                  eraNombre: eraEvt?.nombre ?? null,
+                  eraColor: eraEvt?.color ?? null,
+                  carriles: [carril],
+                });
+              }
+            }
+
+            return grupos.map((grupo, gi) => (
+              <div
+                key={`era-grupo-${grupo.eraId ?? "sin-era"}-${gi}`}
+                className="mb-3"
+              >
+                {/* Badge de era — encabezado obligatorio de su propia fila */}
+                {grupo.eraNombre && (
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span
+                      className="text-micro font-black uppercase tracking-[0.2em] px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1"
+                      style={{
+                        background: grupo.eraColor
+                          ? `${grupo.eraColor}18`
+                          : "color-mix(in srgb, var(--primary) 7%, transparent)",
+                        color:
+                          grupo.eraColor ??
+                          "color-mix(in srgb, var(--primary) 45%, transparent)",
+                        border: `1px solid ${grupo.eraColor ? `${grupo.eraColor}35` : "color-mix(in srgb, var(--primary) 12%, transparent)"}`,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: 5,
+                          height: 5,
+                          borderRadius: "50%",
+                          background: grupo.eraColor ?? "currentColor",
+                          flexShrink: 0,
+                        }}
+                      />
+                      {grupo.eraNombre}
+                    </span>
+                    <div
+                      className="flex-1 h-px"
+                      style={{
+                        background: grupo.eraColor
+                          ? `${grupo.eraColor}20`
+                          : "color-mix(in srgb, var(--primary) 8%, transparent)",
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Carriles de año de esta era — envuelven al llegar al borde */}
+                <div className="flex flex-wrap items-start gap-3 min-w-0">
+                  {grupo.carriles.map((carril, i) => {
+                    // Ancho de cada tarjeta de evento — el carril entero se
+                    // estira según cuántos eventos tenga (en vez de un ancho
+                    // fijo con eventos apilados hacia abajo). El header del
+                    // año, al ser w-full del carril, se expande junto con él.
+                    // Antes esto se achicaba a 130 cuando había un evento
+                    // seleccionado, para dejarle lugar al panel de detalle
+                    // que empujaba el layout. Ahora el panel flota encima
+                    // (no empuja nada), así que el ancho siempre es el mismo.
+                    const anchoEvento = 170;
+                    const anchoCarril =
+                      anchoEvento * carril.eventos.length +
+                      6 * (carril.eventos.length - 1); // gaps entre tarjetas
+
+                    return (
+                      <div
+                        key={`carril-${carril.anio ?? "sin-fecha"}-${gi}-${i}`}
+                        className="flex flex-col gap-1 min-w-0 max-w-full"
+                        style={{ width: anchoCarril, maxWidth: "100%" }}
+                      >
+                        {/* Encabezado del año — se expande a todo el ancho del carril */}
+                        <div className="flex items-center gap-1.5 w-full">
+                          <span
+                            className="text-micro font-black tabular-nums px-1.5 py-0.5 rounded shrink-0"
+                            style={{
+                              color:
+                                grupo.eraColor ??
+                                "color-mix(in srgb, var(--primary) 35%, transparent)",
+                              background: grupo.eraColor
+                                ? `${grupo.eraColor}10`
+                                : "color-mix(in srgb, var(--primary) 4%, transparent)",
+                            }}
+                          >
+                            {carril.anio ?? "S/F"}
+                          </span>
+                          <div
+                            className="flex-1 h-px"
+                            style={{
+                              background: grupo.eraColor
+                                ? `${grupo.eraColor}15`
+                                : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                            }}
+                          />
+                        </div>
+
+                        {/* Eventos del año — lado a lado (fila), envuelven si no caben */}
+                        <div className="flex flex-row flex-wrap gap-1.5">
+                          {carril.eventos.map((evt) => {
+                            const eraEvt = getEraEvt(evt.dia_absoluto);
+                            const eraColor = eraEvt?.color ?? null;
+                            const isSel = evt.id === evtSeleccionado;
+                            const Icon = iconoPorSource(evt.source);
+
+                            return (
+                              <button
+                                key={`list-${evt.id}`}
+                                ref={(el) => {
+                                  if (el) itemRefs.current.set(evt.id, el);
+                                  else itemRefs.current.delete(evt.id);
+                                }}
+                                className="flex flex-col gap-1 px-2 py-1.5 rounded-lg text-left transition-all min-w-0 shrink-0"
+                                style={{
+                                  width: anchoEvento,
+                                  background: isSel
+                                    ? eraColor
+                                      ? `${eraColor}14`
+                                      : "color-mix(in srgb, var(--primary) 6%, transparent)"
+                                    : "color-mix(in srgb, var(--primary) 2%, transparent)",
+                                  border: `1px solid ${
+                                    isSel
+                                      ? eraColor
+                                        ? `${eraColor}30`
+                                        : "color-mix(in srgb, var(--primary) 15%, transparent)"
+                                      : "color-mix(in srgb, var(--primary) 8%, transparent)"
+                                  }`,
+                                }}
+                                type="button"
+                                onClick={() => {
+                                  // El primer click solo abre el panel flotante
+                                  // de detalle (EventoDetalleFlotante); nunca
+                                  // navega directo al libro/canción/personaje.
+                                  // La navegación queda detrás de un botón
+                                  // explícito ("Ir al libro…") dentro de ese
+                                  // panel — ver EventoDetallePanel.
+                                  setEvtSeleccionado(isSel ? null : evt.id);
+                                }}
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Icon
+                                    className="shrink-0"
+                                    size={10}
+                                    style={{
+                                      color:
+                                        eraColor ??
+                                        "color-mix(in srgb, var(--primary) 40%, transparent)",
+                                    }}
+                                  />
+                                  <span
+                                    className="text-micro font-bold truncate flex-1"
+                                    style={{
+                                      color: isSel
+                                        ? "var(--primary)"
+                                        : "color-mix(in srgb, var(--primary) 65%, transparent)",
+                                    }}
+                                  >
+                                    {evt.title || (
+                                      <span className="italic opacity-40">
+                                        Sin título
+                                      </span>
+                                    )}
+                                  </span>
+                                  {/* Edad del personaje filtrado en este
+                                      momento — número con el color de la
+                                      era del mundo, a la derecha del título. */}
+                                  {participaPersonajeFiltrado(evt) &&
+                                    (() => {
+                                      const edad = edadEnDia(
+                                        fechaNacimientoFiltrado,
+                                        evt.dia_absoluto,
+                                        diasAnioLista,
+                                      );
+                                      if (edad == null) return null;
+                                      return (
+                                        <span
+                                          className="shrink-0 text-micro font-black tabular-nums px-1 py-0.5 rounded"
+                                          style={{
+                                            color:
+                                              eraColor ??
+                                              "var(--accent)",
+                                            background: eraColor
+                                              ? `${eraColor}18`
+                                              : "color-mix(in srgb, var(--accent) 12%, transparent)",
+                                          }}
+                                          title="Edad del personaje en este momento"
+                                        >
+                                          {edad}
+                                        </span>
+                                      );
+                                    })()}
+                                </div>
+                                {evt.reinoNombre && (
+                                  <span
+                                    className="text-micro font-black uppercase tracking-widest truncate pl-[18px]"
+                                    style={{
+                                      color:
+                                        "color-mix(in srgb, var(--primary) 30%, transparent)",
+                                    }}
+                                  >
+                                    {evt.reinoNombre}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      </div>
+
+      {/* ── Panel de detalle flotante (modal centrado) ── ────────────────────
+          Editable para eventos "mundo"/"reino" (título/descripción/fecha) y
+          para "era_personaje" (label/notas/rasgos/fecha de la era interna
+          del personaje filtrado) — ver EventoDetallePanel más abajo. */}
+      {selEvt && (
+        <EventoDetalleFlotante
+          anchorEl={itemRefs.current.get(selEvt.id) ?? null}
+          diasAnioLista={diasAnioLista}
+          era={selEra}
+          eraColor={selEraColor}
+          eraPersonaje={selEraPersonaje}
+          evt={selEvt}
+          onAddRasgoEraPersonaje={onAddRasgoEraPersonaje}
+          onClose={() => setEvtSeleccionado(null)}
+          onDeleteEraPersonaje={onDeleteEraPersonaje}
+          onDiaChange={onDiaChange}
+          onDiaChangeCancion={onDiaChangeCancion}
+          onDiaChangeCumpleanos={onDiaChangeCumpleanos}
+          onDiaChangeCapitulo={onDiaChangeCapitulo}
+          onFieldChange={onFieldChange}
+          onLabelChangeEraPersonaje={onLabelChangeEraPersonaje}
+          onMomentoChangeEraPersonaje={onMomentoChangeEraPersonaje}
+          onNotasChangeEraPersonaje={onNotasChangeEraPersonaje}
+          onRemoveRasgoEraPersonaje={onRemoveRasgoEraPersonaje}
+          onSelectCapitulo={onSelectCapitulo}
+          onSelectCancion={onSelectCancion}
+          onSelectPersonaje={onSelectPersonaje}
+          personajesDisponibles={personajesDisponibles}
+          onPersonajesChange={onPersonajesChange}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Wrapper que muestra EventoDetallePanel como modal centrado (portal) ─────
+// Antes este panel se anclaba a la tarjeta clickeada y recalculaba posición
+// en cada scroll/resize (mismo patrón que EraDropdown). Se cambió a un
+// modal centrado y fijo: no se mueve con el scroll de la página, y usa
+// buena parte del ancho de la pantalla — más cómodo para escribir en el
+// editor Lexical de la descripción sin que el panel esté anclado (y a
+// veces cortado) contra el borde de una tarjeta angosta.
+function EventoDetalleFlotante({
+  anchorEl: _anchorEl,
+  evt,
+  era,
+  eraColor,
+  eraPersonaje,
+  diasAnioLista,
+  onFieldChange,
+  onDiaChange,
+  onDiaChangeCancion,
+  onDiaChangeCumpleanos,
+  onDiaChangeCapitulo,
+  onClose,
+  onLabelChangeEraPersonaje,
+  onNotasChangeEraPersonaje,
+  onMomentoChangeEraPersonaje,
+  onAddRasgoEraPersonaje,
+  onRemoveRasgoEraPersonaje,
+  onDeleteEraPersonaje,
+  onSelectCapitulo,
+  onSelectCancion,
+  onSelectPersonaje,
+  personajesDisponibles,
+  onPersonajesChange,
+}: {
+  anchorEl: HTMLElement | null;
+  evt: MundoTimelineEvent;
+  era: EraMundo | null;
+  eraColor: string | null;
+  /** Objeto Era (personaje_eras) completo cuando evt.source es
+   * "era_personaje" — habilita la edición completa dentro del panel. */
+  eraPersonaje?: Era | null;
+  diasAnioLista: number;
+  onFieldChange?: (
+    id: string,
+    field: "titulo" | "descripcion",
+    value: string,
+  ) => void;
+  onDiaChange?: (id: string, dia: number) => void;
+  onDiaChangeCancion?: (id: string, dia: number) => void;
+  onDiaChangeCumpleanos?: (id: string, dia: number) => void;
+  onDiaChangeCapitulo?: (id: string, dia: number) => void;
+  onClose: () => void;
+  onLabelChangeEraPersonaje?: (era: Era, val: string) => void;
+  onNotasChangeEraPersonaje?: (era: Era, val: string) => void;
+  onMomentoChangeEraPersonaje?: (era: Era, nuevoMomento: number) => Promise<void>;
+  onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
+  onDeleteEraPersonaje?: (id: string) => void;
+  onSelectCapitulo?: (capituloId: string, libroId: string) => void;
+  onSelectCancion?: (cancionId: string) => void;
+  onSelectPersonaje?: (personajeId: string) => void;
+  personajesDisponibles?: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    fecha_nacimiento?: number | null;
+  }[];
+  onPersonajesChange?: (id: string, personajesIds: string[]) => void;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar con Escape. El click afuera lo maneja el overlay directamente
+  // (más simple y confiable que comparar contains() contra un anchorEl que
+  // ya no es relevante para la posición del modal).
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 45%, transparent)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={panelRef}
+        className="rounded-xl shadow-lg w-full"
+        style={{
+          maxWidth: 760,
+          maxHeight: "85vh",
+          overflowY: "auto",
+          background: "var(--bg-main)",
+          border:
+            "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+        }}
+      >
+        <EventoDetallePanel
+          diasAnioLista={diasAnioLista}
+          era={era}
+          eraColor={eraColor}
+          eraPersonaje={eraPersonaje}
+          evt={evt}
+          onAddRasgoEraPersonaje={onAddRasgoEraPersonaje}
+          onClose={onClose}
+          onDeleteEraPersonaje={onDeleteEraPersonaje}
+          onDiaChange={onDiaChange}
+          onDiaChangeCancion={onDiaChangeCancion}
+          onDiaChangeCumpleanos={onDiaChangeCumpleanos}
+          onDiaChangeCapitulo={onDiaChangeCapitulo}
+          onFieldChange={onFieldChange}
+          onLabelChangeEraPersonaje={onLabelChangeEraPersonaje}
+          onMomentoChangeEraPersonaje={onMomentoChangeEraPersonaje}
+          onNotasChangeEraPersonaje={onNotasChangeEraPersonaje}
+          onRemoveRasgoEraPersonaje={onRemoveRasgoEraPersonaje}
+          onSelectCapitulo={onSelectCapitulo}
+          onSelectCancion={onSelectCancion}
+          onSelectPersonaje={onSelectPersonaje}
+          personajesDisponibles={personajesDisponibles}
+          onPersonajesChange={onPersonajesChange}
+        />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ─── EraDropdown ─────────────────────────────────────────────────────────────
+// Selector compacto de era con diseño consistente con el resto del panel.
+
+// Puntaje de similitud simple para búsqueda difusa: prioriza coincidencia
+// exacta > empieza-con > substring > coincidencia de caracteres en orden.
+function similitudTexto(query: string, texto: string): number {
+  const q = query.trim().toLowerCase();
+  const t = texto.toLowerCase();
+  if (!q) return 0;
+  if (t === q) return 1000;
+  if (t.startsWith(q)) return 500 - t.length;
+  const idx = t.indexOf(q);
+  if (idx >= 0) return 300 - idx;
+  // Subsecuencia: todas las letras de q aparecen en orden dentro de t
+  let ti = 0;
+  for (let qi = 0; qi < q.length; qi++) {
+    const found = t.indexOf(q[qi], ti);
+    if (found === -1) return -1;
+    ti = found + 1;
+  }
+  return 100 - t.length;
+}
+
+function EraDropdown({
+  eras,
+  value,
+  eraActiva,
+  onChange,
+}: {
+  eras: any[];
+  value: string | null;
+  eraActiva: any | null;
+  onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlightIdx, setHighlightIdx] = useState(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+
+  // Lista filtrada/ordenada por similitud con la query.
+  const filtradas = useMemo(() => {
+    const q = query.trim();
+    if (!q) return eras;
+    return eras
+      .map((e) => ({ e, score: similitudTexto(q, e.nombre) }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.e);
+  }, [eras, query]);
+
+  useEffect(() => {
+    setHighlightIdx(0);
+  }, [query, open]);
+
+  // Cerrar al click fuera
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Posición del panel
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const w = Math.max(r.width, 180);
+      let left = r.left;
+      if (left + w > window.innerWidth - 8)
+        left = Math.max(8, window.innerWidth - w - 8);
+      const spaceBelow = window.innerHeight - r.bottom;
+      const estimatedH = Math.min(filtradas.length, 8) * 28 + 76;
+      const top =
+        spaceBelow < estimatedH && r.top > estimatedH
+          ? r.top - estimatedH - 4
+          : r.bottom + 4;
+      setPos({ top, left, width: w });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, filtradas.length]);
+
+  // Autofocus del buscador al abrir
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  const elegir = (id: string | null) => {
+    onChange(id === value ? (id === null ? null : id) : id);
+    setOpen(false);
+    setQuery("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Lista navegable: índice 0 = "Todas", 1..n = eras filtradas
+    const total = filtradas.length + 1;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIdx((i) => (i + 1) % total);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIdx((i) => (i - 1 + total) % total);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightIdx === 0) {
+        elegir(null);
+      } else {
+        const era = filtradas[highlightIdx - 1];
+        if (era) elegir(era.id);
+        else if (filtradas.length > 0 && query.trim()) {
+          // Sin selección explícita: usar el de mayor similitud
+          elegir(filtradas[0].id);
+        }
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+    }
+  };
+
+  return (
+    <div className="relative">
+      {/* Trigger */}
+      <button
+        ref={triggerRef}
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest transition-all"
+        style={{
+          background:
+            open || value
+              ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+              : "color-mix(in srgb, var(--primary) 4%, transparent)",
+          border: `1px solid color-mix(in srgb, var(--primary) ${open || value ? "20" : "8"}%, transparent)`,
+          color:
+            open || value
+              ? "var(--primary)"
+              : "color-mix(in srgb, var(--primary) 40%, transparent)",
+        }}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Clock size={8} />
+        <span>{eraActiva ? eraActiva.nombre : "Era"}</span>
+        <ChevronDown
+          size={7}
+          style={{
+            transform: open ? "rotate(180deg)" : undefined,
+            transition: "transform 0.15s",
+          }}
+        />
+      </button>
+
+      {/* Panel — portal para no quedar cortado */}
+      {open &&
+        pos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[9999] rounded-xl border shadow-lg overflow-hidden flex flex-col"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              minWidth: pos.width,
+              maxHeight: 320,
+              background: "var(--bg-main)",
+              borderColor:
+                "color-mix(in srgb, var(--primary) 12%, transparent)",
+            }}
+          >
+            {/* Buscador */}
+            <div
+              className="px-2 py-1.5 border-b"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 8%, transparent)",
+              }}
+            >
+              <input
+                ref={inputRef}
+                className="w-full bg-transparent outline-none text-micro px-1 py-1"
+                placeholder="Buscar era…"
+                style={{ color: "var(--primary)" }}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+
+            <div className="overflow-y-auto py-1">
+              {/* Opción "Todas" */}
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
+                style={{
+                  color:
+                    value === null
+                      ? "var(--primary)"
+                      : "color-mix(in srgb, var(--primary) 45%, transparent)",
+                  background:
+                    highlightIdx === 0
+                      ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                      : value === null
+                        ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                        : "transparent",
+                  fontSize: "8px",
+                  fontWeight: 900,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                }}
+                type="button"
+                onMouseEnter={() => setHighlightIdx(0)}
+                onClick={() => elegir(null)}
+              >
+                {value === null && <Check className="shrink-0" size={8} />}
+                <span className={value === null ? "" : "pl-4"}>
+                  Todas las eras
+                </span>
+              </button>
+
+              {/* Separador */}
+              <div
+                style={{
+                  height: 1,
+                  margin: "2px 8px",
+                  background:
+                    "color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+              />
+
+              {filtradas.length === 0 ? (
+                <p className="px-3 py-2 text-micro text-primary/25">
+                  Sin resultados
+                </p>
+              ) : (
+                filtradas.map((era: any, idx: number) => {
+                  const activo = value === era.id;
+                  const destacado = highlightIdx === idx + 1;
+                  return (
+                    <button
+                      key={era.id}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
+                      style={{
+                        color: activo
+                          ? "var(--primary)"
+                          : "color-mix(in srgb, var(--primary) 45%, transparent)",
+                        background: destacado
+                          ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                          : activo
+                            ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                            : "transparent",
+                        fontSize: "8px",
+                        fontWeight: 900,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                      }}
+                      type="button"
+                      onMouseEnter={() => setHighlightIdx(idx + 1)}
+                      onClick={() => elegir(activo ? null : era.id)}
+                    >
+                      {activo ? (
+                        <Check className="shrink-0" size={8} />
+                      ) : (
+                        <span
+                          style={{
+                            width: 8,
+                            display: "inline-block",
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <span>{era.nombre}</span>
+                      {era.anio_inicio != null && (
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            opacity: 0.4,
+                            fontSize: "7px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {era.anio_inicio}
+                          {era.anio_fin != null ? `–${era.anio_fin}` : "+"}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+// ─── PersonajeFilterDropdown ─────────────────────────────────────────────────
+// Selector de personaje para la línea de tiempo: mismo patrón visual que
+// EraDropdown (trigger + panel portal), con búsqueda porque la lista de
+// personajes puede ser larga. Al elegir un personaje, el panel muestra
+// además sus eras internas (personaje_eras) y acota capítulos/canciones/
+// cumpleaños a los vinculados a ese personaje — ver allEvents en
+// PanelHistoriaMundo.
+function PersonajeFilterDropdown({
+  personajes,
+  value,
+  onChange,
+}: {
+  personajes: { id: string; nombre: string; img_url: string | null }[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [highlightIdx, setHighlightIdx] = useState(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+
+  const activo = personajes.find((p) => p.id === value) ?? null;
+
+  // Ordenados por similitud con la query (coincidencia exacta > empieza-con
+  // > substring > subsecuencia de caracteres).
+  const filtrados = useMemo(() => {
+    const q = query.trim();
+    if (!q) return personajes;
+    return personajes
+      .map((p) => ({ p, score: similitudTexto(q, p.nombre) }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.p);
+  }, [personajes, query]);
+
+  useEffect(() => {
+    setHighlightIdx(0);
+  }, [query, open]);
+
+  // Cerrar al click fuera
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Posicionar contra el trigger — mismo patrón que EraDropdown.
+  useEffect(() => {
+    if (!open || !triggerRef.current) {
+      setPos(null);
+      return;
+    }
+    const update = () => {
+      if (!triggerRef.current) return;
+      const r = triggerRef.current.getBoundingClientRect();
+      const w = Math.max(r.width, 220);
+      let left = r.left;
+      if (left + w > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - w - 8);
+      }
+      setPos({ top: r.bottom + 4, left, width: w });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, personajes.length]);
+
+  // Autofocus del buscador al abrir
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  const elegir = (id: string | null) => {
+    onChange(id);
+    setOpen(false);
+    setQuery("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Lista navegable: índice 0 = "Todos", 1..n = personajes filtrados
+    const total = filtrados.length + 1;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIdx((i) => (i + 1) % total);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIdx((i) => (i - 1 + total) % total);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightIdx === 0) {
+        elegir(null);
+      } else {
+        const p = filtrados[highlightIdx - 1];
+        if (p) {
+          elegir(activo?.id === p.id ? null : p.id);
+        } else if (filtrados.length > 0 && query.trim()) {
+          const top = filtrados[0];
+          elegir(activo?.id === top.id ? null : top.id);
+        }
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+    }
+  };
+
+  return (
+    <div className="relative">
+      {/* Trigger */}
+      <button
+        ref={triggerRef}
+        className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest transition-all max-w-[140px]"
+        style={{
+          background:
+            open || value
+              ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+              : "color-mix(in srgb, var(--primary) 4%, transparent)",
+          border: `1px solid color-mix(in srgb, var(--primary) ${open || value ? "20" : "8"}%, transparent)`,
+          color:
+            open || value
+              ? "var(--primary)"
+              : "color-mix(in srgb, var(--primary) 40%, transparent)",
+        }}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <User size={8} className="shrink-0" />
+        <span className="truncate">{activo ? activo.nombre : "Personaje"}</span>
+        <ChevronDown
+          className="shrink-0"
+          size={7}
+          style={{
+            transform: open ? "rotate(180deg)" : undefined,
+            transition: "transform 0.15s",
+          }}
+        />
+      </button>
+
+      {/* Panel — portal para no quedar cortado */}
+      {open &&
+        pos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[9999] rounded-xl border shadow-lg overflow-hidden flex flex-col"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              minWidth: pos.width,
+              maxHeight: 320,
+              background: "var(--bg-main)",
+              borderColor:
+                "color-mix(in srgb, var(--primary) 12%, transparent)",
+            }}
+          >
+            {/* Buscador */}
+            <div
+              className="px-2 py-1.5 border-b"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--primary) 8%, transparent)",
+              }}
+            >
+              <input
+                ref={inputRef}
+                className="w-full bg-transparent outline-none text-micro px-1 py-1"
+                placeholder="Buscar personaje…"
+                style={{ color: "var(--primary)" }}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+
+            <div className="overflow-y-auto py-1">
+              {/* Opción "Todos" */}
+              <button
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
+                style={{
+                  color:
+                    value === null
+                      ? "var(--primary)"
+                      : "color-mix(in srgb, var(--primary) 45%, transparent)",
+                  background:
+                    highlightIdx === 0
+                      ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                      : value === null
+                        ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                        : "transparent",
+                  fontSize: "8px",
+                  fontWeight: 900,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                }}
+                type="button"
+                onMouseEnter={() => setHighlightIdx(0)}
+                onClick={() => elegir(null)}
+              >
+                {value === null && <Check className="shrink-0" size={8} />}
+                <span className={value === null ? "" : "pl-4"}>
+                  Todos los personajes
+                </span>
+              </button>
+
+              <div
+                style={{
+                  height: 1,
+                  margin: "2px 8px",
+                  background:
+                    "color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+              />
+
+              {filtrados.length === 0 ? (
+                <p className="px-3 py-2 text-micro text-primary/25">
+                  Sin resultados
+                </p>
+              ) : (
+                filtrados.map((p, idx) => {
+                  const activoOpt = value === p.id;
+                  const destacado = highlightIdx === idx + 1;
+                  return (
+                    <button
+                      key={p.id}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-all"
+                      style={{
+                        color: activoOpt
+                          ? "var(--primary)"
+                          : "color-mix(in srgb, var(--primary) 45%, transparent)",
+                        background: destacado
+                          ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                          : activoOpt
+                            ? "color-mix(in srgb, var(--primary) 7%, transparent)"
+                            : "transparent",
+                        fontSize: "8px",
+                        fontWeight: 900,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                      }}
+                      type="button"
+                      onMouseEnter={() => setHighlightIdx(idx + 1)}
+                      onClick={() => elegir(activoOpt ? null : p.id)}
+                    >
+                      {activoOpt ? (
+                        <Check className="shrink-0" size={8} />
+                      ) : (
+                        <span
+                          style={{
+                            width: 8,
+                            display: "inline-block",
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                      <span className="truncate">{p.nombre}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+// ── Menú flotante de cumpleaños/canción en la barra lateral ─────────────────
+// Se abre al hacer click en un ítem del sidebar (en vez de navegar/filtrar
+// directo). Permite cambiar la fecha (dia_absoluto / fecha_nacimiento) desde
+// un selector, y tiene un botón explícito de "Viajar" al lado para recién
+// ahí navegar al personaje o a la canción — el click que abre el menú nunca
+// viaja por sí solo.
+function SidebarItemDetalleFlotante({
+  tipo,
+  titulo,
+  subtitulo,
+  dia,
+  diasAnioLista,
+  onClose,
+  onDiaChange,
+  onViajar,
+}: {
+  tipo: "cumpleanos" | "cancion";
+  titulo: string;
+  subtitulo?: string | null;
+  dia: number;
+  diasAnioLista: number;
+  onClose: () => void;
+  onDiaChange: (dia: number) => void | Promise<void>;
+  onViajar: () => void;
+}) {
+  const [savingFecha, setSavingFecha] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  const commitDia = async (nuevoDia: number | null) => {
+    if (nuevoDia == null) return;
+    setSavingFecha(true);
+    await onDiaChange(nuevoDia);
+    setSavingFecha(false);
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 45%, transparent)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="rounded-xl shadow-lg w-full flex flex-col gap-3 p-4"
+        style={{
+          maxWidth: 360,
+          background: "var(--bg-main)",
+          border:
+            "1px solid color-mix(in srgb, var(--primary) 12%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <span
+            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest px-1.5 py-0.5 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 5%, transparent)",
+              color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+              border:
+                "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+            }}
+          >
+            {tipo === "cumpleanos" ? (
+              <CalendarDays size={7} />
+            ) : (
+              <Music size={7} />
+            )}
+            {tipo === "cumpleanos" ? "Cumpleaños" : "Canción"}
+          </span>
+          <button
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-black uppercase tracking-widest transition-all"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+              color: "var(--accent)",
+              border:
+                "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+            }}
+            title={tipo === "cumpleanos" ? "Ir al personaje" : "Ir a la canción"}
+            type="button"
+            onClick={onViajar}
+          >
+            <ExternalLink size={9} />
+            Viajar
+          </button>
+          <button
+            className="shrink-0 flex items-center justify-center rounded-full transition-all hover:opacity-100"
+            style={{
+              width: 18,
+              height: 18,
+              color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+              opacity: 0.7,
+            }}
+            title="Cerrar"
+            type="button"
+            onClick={onClose}
+          >
+            <X size={11} />
+          </button>
+        </div>
+
+        <p
+          className="text-sm font-black uppercase leading-tight"
+          style={{ color: "var(--primary)" }}
+        >
+          {titulo}
+        </p>
+        {subtitulo && (
+          <p
+            className="text-micro font-bold -mt-2"
+            style={{
+              color: "color-mix(in srgb, var(--primary) 45%, transparent)",
+            }}
+          >
+            {subtitulo}
+          </p>
+        )}
+
+        <div className="relative">
+          {savingFecha && (
+            <Loader2
+              className="animate-spin absolute right-2 top-1.5 z-10 text-primary/30"
+              size={9}
+            />
+          )}
+          <SelectorFechaMundo
+            autoOpen
+            inline
+            hideTrigger
+            placeholder="Sin fecha…"
+            value={dia}
+            onChange={commitDia}
+          />
+        </div>
+        <p
+          className="text-micro"
+          style={{
+            color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+          }}
+        >
+          Año {Math.floor(dia / diasAnioLista)}
+        </p>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ─── SidebarCumpleanosCanciones ──────────────────────────────────────────────
+// Barra lateral derecha con cumpleaños y canciones de TODOS los personajes,
+// ordenados por año. Reemplaza el comportamiento anterior de mezclarlos
+// siempre en la pista principal — ahí solo aparecen cuando hay un personaje
+// filtrado (ver allEvents en PanelHistoriaMundo). El primer click en un
+// ítem NUNCA navega/filtra directo: abre un menú flotante
+// (SidebarItemDetalleFlotante) con la fecha editable y un botón "Viajar"
+// explícito — recién ese botón activa el filtro de personaje o abre el
+// editor de la canción.
+function SidebarCumpleanosCanciones({
+  cumpleanos,
+  canciones,
+  diasAnioLista,
+  showCumpleanos,
+  showCanciones,
+  onSelectPersonaje,
+  onSelectCancion,
+  onDiaChangeCumpleanos,
+  onDiaChangeCancion,
+}: {
+  cumpleanos: {
+    id: string;
+    nombre: string;
+    img_url: string | null;
+    reino: string | null;
+    fecha_nacimiento: number;
+  }[];
+  canciones: {
+    id: string;
+    titulo: string;
+    cantante?: string | null;
+    reinoNombre?: string | null;
+    dia_absoluto?: number;
+  }[];
+  diasAnioLista: number;
+  showCumpleanos: boolean;
+  showCanciones: boolean;
+  onSelectPersonaje?: (id: string) => void;
+  onSelectCancion?: (id: string) => void;
+  onDiaChangeCumpleanos?: (id: string, dia: number) => void | Promise<void>;
+  onDiaChangeCancion?: (id: string, dia: number) => void | Promise<void>;
+}) {
+  const [seleccionado, setSeleccionado] = useState<
+    { tipo: "cumpleanos" | "cancion"; id: string } | null
+  >(null);
+
+  if (!showCumpleanos && !showCanciones) return null;
+  if (cumpleanos.length === 0 && canciones.length === 0) return null;
+
+  const cumpleSel =
+    seleccionado?.tipo === "cumpleanos"
+      ? cumpleanos.find((p) => p.id === seleccionado.id)
+      : null;
+  const cancionSel =
+    seleccionado?.tipo === "cancion"
+      ? canciones.find((c) => c.id === seleccionado.id)
+      : null;
+
+  return (
+    <div
+      className="shrink-0 w-[196px] border-l overflow-y-auto flex flex-col gap-4 px-3 py-3"
+      style={{
+        borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+      }}
+    >
+      {showCumpleanos && cumpleanos.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span
+            className="text-micro font-black uppercase tracking-widest px-0.5 text-center"
+            style={{
+              color: "color-mix(in srgb, var(--primary) 35%, transparent)",
+            }}
+          >
+            Cumpleaños
+          </span>
+          <div className="flex flex-col gap-1">
+            {cumpleanos.map((p) => (
+              <button
+                key={p.id}
+                className="flex flex-col items-start justify-center gap-0.5 px-2 py-1.5 rounded-lg text-left transition-all"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--primary) 2%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+                title={`Ver ${p.nombre}`}
+                type="button"
+                onClick={() => setSeleccionado({ tipo: "cumpleanos", id: p.id })}
+              >
+                <span
+                  className="text-micro font-bold truncate w-full"
+                  style={{
+                    color: "color-mix(in srgb, var(--primary) 65%, transparent)",
+                  }}
+                >
+                  {p.nombre}
+                </span>
+                <span
+                  className="text-micro font-black tabular-nums"
+                  style={{
+                    color: "color-mix(in srgb, var(--primary) 30%, transparent)",
+                  }}
+                >
+                  Año {Math.floor(p.fecha_nacimiento / diasAnioLista)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showCanciones && canciones.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span
+            className="text-micro font-black uppercase tracking-widest px-0.5 text-center"
+            style={{
+              color: "color-mix(in srgb, var(--primary) 35%, transparent)",
+            }}
+          >
+            Canciones
+          </span>
+          <div className="flex flex-col gap-1">
+            {canciones.map((c) => (
+              <button
+                key={c.id}
+                className="flex flex-col items-start justify-center gap-0.5 px-2 py-1.5 rounded-lg text-left transition-all"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--primary) 2%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                }}
+                title={`Ver ${c.titulo}`}
+                type="button"
+                onClick={() => setSeleccionado({ tipo: "cancion", id: c.id })}
+              >
+                <span
+                  className="text-micro font-bold truncate w-full"
+                  style={{
+                    color: "color-mix(in srgb, var(--primary) 65%, transparent)",
+                  }}
+                >
+                  {c.titulo}
+                </span>
+                {c.dia_absoluto != null && (
+                  <span
+                    className="text-micro font-black tabular-nums"
+                    style={{
+                      color:
+                        "color-mix(in srgb, var(--primary) 30%, transparent)",
+                    }}
+                  >
+                    Año {Math.floor(c.dia_absoluto / diasAnioLista)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {cumpleSel && (
+        <SidebarItemDetalleFlotante
+          diasAnioLista={diasAnioLista}
+          dia={cumpleSel.fecha_nacimiento}
+          onClose={() => setSeleccionado(null)}
+          onDiaChange={(dia) => onDiaChangeCumpleanos?.(cumpleSel.id, dia)}
+          onViajar={() => {
+            onSelectPersonaje?.(cumpleSel.id);
+            setSeleccionado(null);
+          }}
+          subtitulo={cumpleSel.reino}
+          tipo="cumpleanos"
+          titulo={cumpleSel.nombre}
+        />
+      )}
+      {cancionSel && cancionSel.dia_absoluto != null && (
+        <SidebarItemDetalleFlotante
+          diasAnioLista={diasAnioLista}
+          dia={cancionSel.dia_absoluto}
+          onClose={() => setSeleccionado(null)}
+          onDiaChange={(dia) => onDiaChangeCancion?.(cancionSel.id, dia)}
+          onViajar={() => {
+            onSelectCancion?.(cancionSel.id);
+            setSeleccionado(null);
+          }}
+          subtitulo={cancionSel.cantante ?? cancionSel.reinoNombre}
+          tipo="cancion"
+          titulo={cancionSel.titulo}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Panel principal — vista y edición unificadas, ambas pistas editables ──────
+export function PanelHistoriaMundo({
+  texto: _texto,
+  onChange: _onChange,
+  onSave,
+  initialFilterReino,
+  reinoFijo,
+  onSelectPersonaje,
+  onSelectCapitulo,
+  onSelectCancion,
+  onOpenHistoriaCompleta,
+  mostrarHistoriaCompleta,
+  personajePreseleccionado,
+}: {
+  texto: string;
+  onChange: (v: string) => void;
+  onSave: () => Promise<void>;
+  initialFilterReino?: string | null;
+  /**
+   * Cuando se pasa, el filtro de reino queda fijado a este ID y los
+   * botones de selección de reino se ocultan. Usar cuando el panel se
+   * abre dentro del editor de un reino concreto.
+   */
+  reinoFijo?: string | null;
+  onSelectPersonaje?: (id: string) => void;
+  // Abren el editor de capítulo/canción en el panel lateral de la app —
+  // PanelHistoriaMundo solo avisa, la navegación real la maneja quien
+  // renderiza este componente.
+  onSelectCapitulo?: (capituloId: string, libroId: string) => void;
+  onSelectCancion?: (cancionId: string) => void;
+  /**
+   * Abre "Historia completa" como su propia pestaña (en vez del modal
+   * flotante anterior). Si no se pasa, el botón "Historia" no se
+   * muestra — quien renderiza este panel decide si soporta esa vista.
+   */
+  onOpenHistoriaCompleta?: () => void;
+  /**
+   * Cuando es true, el panel renderiza solo el documento de "Historia
+   * completa" (HistoriaCompletaPanel) en vez de la línea de tiempo
+   * normal — controlado por el padre según la pestaña activa
+   * (useMundoNavigation: section "linea-tiempo", selectedId "historia").
+   */
+  mostrarHistoriaCompleta?: boolean;
+  /**
+   * Id de personaje que estaba abierto en otra pestaña al entrar a
+   * "Historia completa". Si se pasa, el filtro de personaje se
+   * preselecciona automáticamente con ese id (si el usuario no eligió
+   * otro manualmente), de forma que sus eras internas (personaje_eras)
+   * aparezcan en el documento generado — ver el useEffect que sincroniza
+   * filterPersonaje más abajo.
+   */
+  personajePreseleccionado?: string | null;
+}) {
+  // Sistema antiguo de eventos "mundo"/"reino" (basado en columna historia JSON) eliminado.
+
+  const {
+    reinos,
+    setReinos: _setReinos,
+    loading: loadingReinos,
+  } = useReinosConHistoria();
+
+  // ── Capítulos con posición en línea de tiempo ─────────────────────────────
+  const [capsTimeline, setCapsTimeline] = useState<CapTimeline[]>([]);
+  // Mapa de todos los capítulos con reinos_ids (para los botones de filtro,
+  // independientemente de si tienen orden_linea_tiempo)
+  const [capsReinosIds, setCapsReinosIds] = useState<Record<string, string[]>>(
+    {},
+  );
+
+  // ── Canciones con posición en línea de tiempo ─────────────────────────────
+  const [cancionesTimeline, setCancionesTimeline] = useState<
+    {
+      id: string;
+      titulo: string;
+      cantante?: string | null;
+      reinoId?: string | null;
+      reinoNombre?: string | null;
+      dia_absoluto?: number;
+      orden_linea_tiempo?: number;
+      personajeId?: string | null;
+    }[]
+  >([]);
+
+  // ── Eventos de mundo/reino (tabla eventos_mundo, sistema nuevo) ───────────
+  const [eventosMundo, setEventosMundo] = useState<
+    {
+      id: string;
+      titulo: string;
+      descripcion: string;
+      dia_absoluto: number;
+      reinoId?: string | null;
+      reinoNombre?: string | null;
+      source: string;
+      personajes_ids?: string[];
+    }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cargarEventosMundo = async () => {
+      // 1. Dexie primero
+      try {
+        if (db && (db as any).eventos_mundo) {
+          const local: any[] = await (db as any).eventos_mundo.toArray();
+          if (local.length && !cancelled) {
+            const reinoMap: Record<string, string> = {};
+            try {
+              if (db && (db as any).reinos) {
+                const rs: any[] = await (db as any).reinos.toArray();
+                rs.forEach((r: any) => {
+                  reinoMap[r.id] = r.nombre;
+                });
+              }
+            } catch {}
+            setEventosMundo(
+              local.map((e: any) => ({
+                id: e.id,
+                titulo: e.titulo ?? "Sin título",
+                descripcion: e.descripcion ?? "",
+                dia_absoluto: e.dia_absoluto,
+                reinoId: e.reino_id ?? null,
+                reinoNombre: e.reino_id ? (reinoMap[e.reino_id] ?? null) : null,
+                source: e.source ?? "mundo",
+                personajes_ids: e.personajes_ids ?? [],
+              })),
+            );
+          }
+        }
+      } catch {}
+      if (!navigator.onLine || cancelled) return;
+      // 2. Remoto
+      try {
+        const { data } = await supabase
+          .from("eventos_mundo")
+          .select(
+            "id, titulo, descripcion, dia_absoluto, reino_id, source, personajes_ids, reinos!reino_id(nombre)",
+          );
+        if (!data || cancelled) return;
+        setEventosMundo(
+          data.map((e: any) => {
+            const reino = Array.isArray(e.reinos) ? e.reinos[0] : e.reinos;
+            return {
+              id: e.id,
+              titulo: e.titulo ?? "Sin título",
+              descripcion: e.descripcion ?? "",
+              dia_absoluto: e.dia_absoluto,
+              reinoId: e.reino_id ?? null,
+              reinoNombre: reino?.nombre ?? null,
+              source: e.source ?? "mundo",
+              personajes_ids: e.personajes_ids ?? [],
+            };
+          }),
+        );
+        const flat = data.map((e: any) => ({ ...e, reinos: undefined }));
+        try {
+          if (db && (db as any).eventos_mundo)
+            await (db as any).eventos_mundo.bulkPut(flat);
+        } catch {}
+      } catch {}
+    };
+    void cargarEventosMundo();
+    const handleOnline = () => {
+      if (!cancelled) void cargarEventosMundo();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cargarCanciones = async () => {
+      // 1. Dexie primero
+      try {
+        if (db && (db as any).canciones) {
+          const local: any[] = await (db as any).canciones.toArray();
+          const conDia = local.filter(
+            (c) => c.dia_absoluto != null && !c.deleted,
+          );
+          if (conDia.length && !cancelled) {
+            const reinoMap: Record<string, string> = {};
+            try {
+              if (db && (db as any).reinos) {
+                const rs: any[] = await (db as any).reinos.toArray();
+                rs.forEach((r: any) => {
+                  reinoMap[r.id] = r.nombre;
+                });
+              }
+            } catch {}
+            setCancionesTimeline(
+              conDia.map((c) => ({
+                id: c.id,
+                titulo: c.titulo ?? "Sin título",
+                cantante: c.cantante ?? null,
+                reinoId: c.reino_id ?? null,
+                reinoNombre: c.reino_id ? (reinoMap[c.reino_id] ?? null) : null,
+                dia_absoluto: c.dia_absoluto,
+                personajeId: c.personaje_id ?? null,
+              })),
+            );
+          }
+        }
+      } catch {}
+      if (!navigator.onLine || cancelled) return;
+      // 2. Remoto
+      try {
+        const { data } = await supabase
+          .from("canciones")
+          .select(
+            "id, titulo, cantante, dia_absoluto, reino_id, personaje_id, reinos!reino_id(nombre)",
+          )
+          .not("dia_absoluto", "is", null);
+        if (!data?.length || cancelled) return;
+        setCancionesTimeline(
+          data.map((c: any) => {
+            const reino = Array.isArray(c.reinos) ? c.reinos[0] : c.reinos;
+            return {
+              id: c.id,
+              titulo: c.titulo ?? "Sin título",
+              cantante: c.cantante ?? null,
+              reinoId: c.reino_id ?? null,
+              reinoNombre: reino?.nombre ?? null,
+              dia_absoluto: c.dia_absoluto ?? undefined,
+              orden_linea_tiempo: c.orden_linea_tiempo ?? undefined,
+              personajeId: c.personaje_id ?? null,
+            };
+          }),
+        );
+        const flat = data.map((c: any) => ({ ...c, reinos: undefined }));
+        if (db && (db as any).canciones)
+          await (db as any).canciones.bulkPut(flat);
+      } catch {}
+    };
+    void cargarCanciones();
+    const handleOnline = () => {
+      if (!cancelled) void cargarCanciones();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const cargarCaps = async () => {
+      // 1. Leer de Dexie primero — respuesta instantánea sin red
+      try {
+        if (db) {
+          const [localCaps, localLibros]: [any[], any[]] = await Promise.all([
+            (db as any).capitulos?.toArray() ?? [],
+            (db as any).libros?.toArray() ?? [],
+          ]);
+          const libroMapLocal: Record<string, string> = {};
+          localLibros.forEach((l: any) => {
+            libroMapLocal[l.id] = l.titulo ?? "";
+          });
+
+          const conDia = localCaps.filter((c: any) => c.dia_absoluto != null);
+          if (conDia.length && !cancelled) {
+            setCapsTimeline(
+              conDia.map((c: any) => ({
+                id: c.id,
+                libro_id: c.libro_id,
+                titulo_capitulo: c.titulo_capitulo,
+                dia_absoluto: c.dia_absoluto,
+                libroTitulo: libroMapLocal[c.libro_id] ?? "",
+                reinos_ids: c.reinos_ids ?? [],
+                personajes_ids: c.personajes_ids ?? [],
+              })),
+            );
+          }
+
+          const mapLocal: Record<string, string[]> = {};
+          localCaps.forEach((c: any) => {
+            if (c.reinos_ids?.length) mapLocal[c.id] = c.reinos_ids;
+          });
+          if (Object.keys(mapLocal).length && !cancelled)
+            setCapsReinosIds(mapLocal);
+        }
+      } catch {}
+
+      // 2. Fetch remoto en paralelo si hay conexión
+      if (!navigator.onLine || cancelled) return;
+
+      try {
+        // Lanzar ambas queries al mismo tiempo en lugar de secuencialmente
+        const [capsRes, capsReinosRes] = await Promise.all([
+          supabase
+            .from("capitulos")
+            .select(
+              "id, libro_id, titulo_capitulo, dia_absoluto, orden_linea_tiempo, reinos_ids, personajes_ids",
+            )
+            .not("dia_absoluto", "is", null),
+          supabase
+            .from("capitulos")
+            .select("id, reinos_ids")
+            .not("reinos_ids", "is", null),
+        ]);
+        if (cancelled) return;
+
+        // Actualizar mapa de reinos_ids para los filtros
+        const capsConReinos = capsReinosRes.data ?? [];
+        if (capsConReinos.length) {
+          const map: Record<string, string[]> = {};
+          for (const c of capsConReinos as any[]) {
+            if (c.reinos_ids?.length) map[c.id] = c.reinos_ids;
+          }
+          if (!cancelled) setCapsReinosIds(map);
+        }
+
+        // Actualizar pista de línea de tiempo
+        const capsData = capsRes.data ?? [];
+        if (capsData.length) {
+          // Resolver títulos de libros desde Dexie primero, solo pedir los que faltan
+          const libroIds = [
+            ...new Set(
+              (capsData as any[]).map((c: any) => c.libro_id).filter(Boolean),
+            ),
+          ];
+          const libroMap: Record<string, string> = {};
+          try {
+            if (db && libroIds.length) {
+              const localLibros: any[] =
+                (await (db as any).libros?.toArray()) ?? [];
+              localLibros.forEach((l: any) => {
+                libroMap[l.id] = l.titulo ?? "";
+              });
+            }
+          } catch {}
+
+          const missingIds = libroIds.filter((id) => !libroMap[id]);
+          if (missingIds.length) {
+            try {
+              const { data: libros } = await supabase
+                .from("libros")
+                .select("id, titulo")
+                .in("id", missingIds);
+              if (!cancelled) {
+                (libros ?? []).forEach((l: any) => {
+                  libroMap[l.id] = l.titulo ?? "";
+                });
+                // Persistir libros nuevos en Dexie
+                if (db && libros?.length)
+                  await (db as any).libros?.bulkPut(libros).catch(() => {});
+              }
+            } catch {}
+          }
+
+          if (!cancelled) {
+            setCapsTimeline(
+              (capsData as any[]).map((c) => ({
+                id: c.id,
+                libro_id: c.libro_id,
+                titulo_capitulo: c.titulo_capitulo,
+                orden_linea_tiempo: c.orden_linea_tiempo,
+                dia_absoluto: c.dia_absoluto,
+                libroTitulo: libroMap[c.libro_id] ?? "",
+                reinos_ids: c.reinos_ids ?? [],
+                personajes_ids: c.personajes_ids ?? [],
+              })),
+            );
+            // Persistir capítulos en Dexie para la próxima carga offline
+            try {
+              if (db)
+                await (db as any).capitulos?.bulkPut(capsData).catch(() => {});
+            } catch {}
+          }
+        }
+      } catch {}
+    };
+
+    void cargarCaps();
+
+    // Recargar al volver online
+    const handleOnline = () => {
+      if (!cancelled) void cargarCaps();
+    };
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
+  // (Eliminado: inicialización de reinoEvents desde reino.historia)
+
+  // (Eliminados: handleMundoChange, updateReinoEvent, removeReinoEvent, saveReinoHistory)
+
+  // ── Personajes con fecha de nacimiento (cumpleaños) ──────────────────────
+  // Se usa SOLO para la barra lateral de cumpleaños y el evento sintético
+  // "cumpleanos"/"era_personaje" de la pista principal — no para los
+  // selectores de personaje (filtro superior, picker de "añadir personaje"
+  // a un evento), que deben listar a TODOS los personajes, tengan o no
+  // fecha de nacimiento asignada (ver personajesTodos más abajo).
+  const [personajesCumple, setPersonajesCumple] = useState<
+    {
+      id: string;
+      nombre: string;
+      img_url: string | null;
+      reino: string | null;
+      fecha_nacimiento: number;
+    }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cargar = async () => {
+      // 1. Dexie
+      try {
+        if (db && (db as any).personajes) {
+          const local: any[] = await (db as any).personajes.toArray();
+          const conFecha = local.filter(
+            (p: any) => p.fecha_nacimiento != null && !p.deleted,
+          );
+          if (conFecha.length && !cancelled) {
+            setPersonajesCumple(
+              conFecha.map((p: any) => ({
+                id: p.id,
+                nombre: p.nombre ?? "Sin nombre",
+                img_url: p.img_url ?? null,
+                reino: p.reino ?? null,
+                fecha_nacimiento: p.fecha_nacimiento,
+              })),
+            );
+          }
+        }
+      } catch {}
+      if (!navigator.onLine || cancelled) return;
+      // 2. Supabase
+      try {
+        const { data } = await supabase
+          .from("personajes")
+          .select("id, nombre, img_url, reino, fecha_nacimiento")
+          .not("fecha_nacimiento", "is", null);
+        if (!data || cancelled) return;
+        setPersonajesCumple(
+          data.map((p: any) => ({
+            id: p.id,
+            nombre: p.nombre ?? "Sin nombre",
+            img_url: p.img_url ?? null,
+            reino: p.reino ?? null,
+            fecha_nacimiento: p.fecha_nacimiento,
+          })),
+        );
+      } catch {}
+    };
+    void cargar();
+    const handleOnline = () => {
+      if (!cancelled) void cargar();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
+  // ── TODOS los personajes (con o sin cumpleaños) ───────────────────────────
+  // Fuente para el dropdown de filtro por personaje y para el picker de
+  // "añadir personaje" dentro de un evento — antes ambos usaban
+  // personajesCumple por error, así que solo listaban personajes que ya
+  // tenían fecha de nacimiento asignada.
+  // fecha_nacimiento se incluye (puede ser null) para poder calcular la
+  // edad del personaje en el momento de cada evento/era donde participa —
+  // ver PersonajesEventoPicker y edadEnDia() más abajo.
+  const [personajesTodos, setPersonajesTodos] = useState<
+    {
+      id: string;
+      nombre: string;
+      img_url: string | null;
+      fecha_nacimiento: number | null;
+    }[]
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cargar = async () => {
+      // 1. Dexie
+      try {
+        if (db && (db as any).personajes) {
+          const local: any[] = await (db as any).personajes.toArray();
+          const vivos = local.filter((p: any) => !p.deleted);
+          if (vivos.length && !cancelled) {
+            setPersonajesTodos(
+              vivos
+                .map((p: any) => ({
+                  id: p.id,
+                  nombre: p.nombre ?? "Sin nombre",
+                  img_url: p.img_url ?? null,
+                  fecha_nacimiento: p.fecha_nacimiento ?? null,
+                }))
+                .sort((a: any, b: any) => a.nombre.localeCompare(b.nombre)),
+            );
+          }
+        }
+      } catch {}
+      if (!navigator.onLine || cancelled) return;
+      // 2. Supabase
+      try {
+        const { data } = await supabase
+          .from("personajes")
+          .select("id, nombre, img_url, fecha_nacimiento")
+          .order("nombre", { ascending: true });
+        if (!data || cancelled) return;
+        setPersonajesTodos(
+          data.map((p: any) => ({
+            id: p.id,
+            nombre: p.nombre ?? "Sin nombre",
+            img_url: p.img_url ?? null,
+            fecha_nacimiento: p.fecha_nacimiento ?? null,
+          })),
+        );
+      } catch {}
+    };
+    void cargar();
+    const handleOnline = () => {
+      if (!cancelled) void cargar();
+    };
+    window.addEventListener("online", handleOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
+
+  const { cal } = useCalendario();
+  // reinoFijo tiene prioridad sobre initialFilterReino.
+  // Cuando reinoFijo está activo el filtro no puede cambiarse.
+  const [filterReino, setFilterReino] = useState<string | null>(
+    reinoFijo ?? initialFilterReino ?? null,
+  );
+  const [filterEra, setFilterEra] = useState<string | null>(null);
+  // Personaje seleccionado en el filtro — al elegirlo se muestran también
+  // sus eras internas (personaje_eras) mezcladas en la línea de tiempo,
+  // y el resto de eventos (capítulos, canciones, cumpleaños) se acota a
+  // los que están vinculados a ese personaje.
+  const [filterPersonaje, setFilterPersonaje] = useState<string | null>(null);
+
+  // Al entrar a "Historia completa" con un personaje abierto en otra
+  // pestaña, preseleccionamos su filtro automáticamente (una sola vez por
+  // apertura) para que sus eras internas aparezcan de entrada, sin que el
+  // usuario tenga que volver a elegirlo del dropdown. Si el usuario ya
+  // había elegido otro personaje distinto manualmente, no lo pisamos.
+  const personajePreseleccionadoAplicado = useRef<string | null>(null);
+  useEffect(() => {
+    if (!mostrarHistoriaCompleta) {
+      personajePreseleccionadoAplicado.current = null;
+      return;
+    }
+    if (!personajePreseleccionado) return;
+    if (personajePreseleccionadoAplicado.current === personajePreseleccionado)
+      return;
+    setFilterPersonaje(personajePreseleccionado);
+    personajePreseleccionadoAplicado.current = personajePreseleccionado;
+  }, [mostrarHistoriaCompleta, personajePreseleccionado]);
+
+  // Antes se buscaba solo en personajesCumple, así que si el personaje
+  // filtrado no tenía fecha de nacimiento, personajeSeleccionado quedaba
+  // null y perdía su nombre en el resto del panel. Ahora se arma con el
+  // catálogo completo (personajesTodos) y se le añade la fecha de
+  // nacimiento si existe (o null si el personaje no tiene cumpleaños).
+  const personajeSeleccionado = useMemo(() => {
+    const base = personajesTodos.find((p) => p.id === filterPersonaje);
+    if (!base) return null;
+    const cumple = personajesCumple.find((p) => p.id === filterPersonaje);
+    return {
+      id: base.id,
+      nombre: base.nombre,
+      img_url: base.img_url,
+      reino: cumple?.reino ?? null,
+      fecha_nacimiento: cumple?.fecha_nacimiento ?? null,
+    };
+  }, [personajesTodos, personajesCumple, filterPersonaje]);
+  const {
+    eras: erasPersonaje,
+    changeLabel: changeLabelEraPersonaje,
+    changeNotas: changeNotasEraPersonaje,
+    changeMomento: changeMomentoEraPersonaje,
+    addRasgo: addRasgoEraPersonaje,
+    removeRasgo: removeRasgoEraPersonaje,
+    deleteEra: deleteEraPersonaje,
+  } = useErasDelPersonaje(
+    filterPersonaje ?? "",
+    personajeSeleccionado?.fecha_nacimiento ?? null,
+  );
+
+  // Si reinoFijo cambia en tiempo de ejecución (cambio de reino sin desmontar),
+  // sincronizamos el filtro.
+  useEffect(() => {
+    if (reinoFijo !== undefined) setFilterReino(reinoFijo ?? null);
+  }, [reinoFijo]);
+  const [showCapitulos, setShowCapitulos] = useState(true);
+  // Antes eran togglees en la cabecera (mostrar/ocultar canciones y
+  // cumpleaños en la pista principal). Se quitaron esos botones porque
+  // canciones/cumpleaños ahora viven siempre en el panel lateral derecho
+  // (SidebarCumpleanosCanciones); se dejan fijas en `true` para no romper
+  // el filtro de allEvents cuando hay un personaje seleccionado (ahí sí
+  // siguen apareciendo en la pista principal, el cumpleaños/canciones de
+  // ESE personaje).
+  const showCanciones = true;
+  const showCumpleanos = true;
+  const [showEventos, setShowEventos] = useState(true);
+  const [evtSeleccionado, setEvtSeleccionado] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [diaOverrides, setDiaOverrides] = useState<Record<string, number>>({});
+  const [showNuevoEvento, setShowNuevoEvento] = useState(false);
+  const [creandoEvento, setCreandoEvento] = useState(false);
+  const [erasLocal, setErasLocal] = useState<any[]>([]);
+  const [eraModal, setEraModal] = useState<null | "new" | any>(null);
+  const [showGestionEras, setShowGestionEras] = useState(false);
+
+  // Sincronizar erasLocal con cal.eras cuando el hook carga
+  useEffect(() => {
+    if (cal?.eras?.length) setErasLocal(cal.eras);
+  }, [cal?.eras]);
+
+  const handleCrearEvento = useCallback(
+    async (datos: {
+      titulo: string;
+      reinoId: string | null;
+      dia_absoluto: number;
+    }) => {
+      setCreandoEvento(true);
+      try {
+        const reinoNombre = datos.reinoId
+          ? (reinos.find((r) => r.id === datos.reinoId)?.nombre ?? null)
+          : null;
+        const { data, error } = await supabase
+          .from("eventos_mundo")
+          .insert([
+            {
+              titulo: datos.titulo || "Sin título",
+              descripcion: "",
+              dia_absoluto: datos.dia_absoluto,
+              reino_id: datos.reinoId,
+              source: datos.reinoId ? "reino" : "mundo",
+            },
+          ] as any)
+          .select("id, titulo, descripcion, dia_absoluto, reino_id, source")
+          .single();
+        if (error || !data) return;
+        const nuevo = {
+          id: (data as any).id,
+          titulo: (data as any).titulo ?? "Sin título",
+          descripcion: (data as any).descripcion ?? "",
+          dia_absoluto: (data as any).dia_absoluto,
+          reinoId: (data as any).reino_id ?? null,
+          reinoNombre,
+          source: (data as any).source ?? "mundo",
+        };
+        setEventosMundo((prev) => [...prev, nuevo]);
+        try {
+          if (db && (db as any).eventos_mundo) {
+            await (db as any).eventos_mundo.put({ ...data });
+          }
+        } catch {}
+        setShowNuevoEvento(false);
+      } finally {
+        setCreandoEvento(false);
+      }
+    },
+    [reinos],
+  );
+
+  const _handleDiaChange = (id: string, dia: number) => {
+    setDiaOverrides((prev) => ({ ...prev, [id]: dia }));
+  };
+
+  const handleEventoMundoDiaChange = useCallback(
+    async (id: string, dia: number) => {
+      setEventosMundo((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, dia_absoluto: dia } : e)),
+      );
+      try {
+        await supabase
+          .from("eventos_mundo")
+          .update({ dia_absoluto: dia } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).eventos_mundo) {
+          const existing = await (db as any).eventos_mundo.get(id);
+          await (db as any).eventos_mundo.put({
+            ...(existing ?? { id }),
+            dia_absoluto: dia,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  // Cambia la fecha (dia_absoluto) de una canción — tabla `canciones`.
+  // Usado desde el panel flotante de detalle al reprogramar una canción
+  // (antes solo se podía navegar directo a su editor).
+  const handleCancionDiaChange = useCallback(
+    async (id: string, dia: number) => {
+      setCancionesTimeline((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, dia_absoluto: dia } : c)),
+      );
+      try {
+        await supabase
+          .from("canciones")
+          .update({ dia_absoluto: dia } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).canciones) {
+          const existing = await (db as any).canciones.get(id);
+          await (db as any).canciones.put({
+            ...(existing ?? { id }),
+            dia_absoluto: dia,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  // Cambia la fecha de nacimiento de un personaje — tabla `personajes`.
+  // Usado desde el panel flotante de detalle al reprogramar un cumpleaños.
+  const handleCumpleanosDiaChange = useCallback(
+    async (id: string, dia: number) => {
+      setPersonajesCumple((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, fecha_nacimiento: dia } : p)),
+      );
+      try {
+        await supabase
+          .from("personajes")
+          .update({ fecha_nacimiento: dia } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).personajes) {
+          const existing = await (db as any).personajes.get(id);
+          await (db as any).personajes.put({
+            ...(existing ?? { id }),
+            fecha_nacimiento: dia,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  // Cambia la fecha (dia_absoluto) de un capítulo — tabla `capitulos`.
+  // Usado desde el panel flotante de detalle para reprogramar un capítulo
+  // sin tener que entrar al libro.
+  const handleCapituloDiaChange = useCallback(
+    async (id: string, dia: number) => {
+      setCapsTimeline((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, dia_absoluto: dia } : c)),
+      );
+      try {
+        await supabase
+          .from("capitulos")
+          .update({ dia_absoluto: dia } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).capitulos) {
+          const existing = await (db as any).capitulos.get(id);
+          await (db as any).capitulos.put({
+            ...(existing ?? { id }),
+            dia_absoluto: dia,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  // Cambia los personajes vinculados (personajes_ids) de un evento
+  // mundo/reino — usado desde el panel flotante de detalle para
+  // añadir/quitar personajes que participan en el evento.
+  const handleEventoMundoPersonajesChange = useCallback(
+    async (id: string, personajesIds: string[]) => {
+      setEventosMundo((prev) =>
+        prev.map((e) =>
+          e.id === id ? { ...e, personajes_ids: personajesIds } : e,
+        ),
+      );
+      try {
+        await supabase
+          .from("eventos_mundo")
+          .update({ personajes_ids: personajesIds } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).eventos_mundo) {
+          const existing = await (db as any).eventos_mundo.get(id);
+          await (db as any).eventos_mundo.put({
+            ...(existing ?? { id }),
+            personajes_ids: personajesIds,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+
+  const handleEventoMundoFieldChange = useCallback(
+    async (id: string, field: "titulo" | "descripcion", value: string) => {
+      setEventosMundo((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)),
+      );
+      try {
+        await supabase
+          .from("eventos_mundo")
+          .update({ [field]: value } as any)
+          .eq("id", id);
+      } catch {}
+      try {
+        if (db && (db as any).eventos_mundo) {
+          const existing = await (db as any).eventos_mundo.get(id);
+          await (db as any).eventos_mundo.put({
+            ...(existing ?? { id }),
+            [field]: value,
+          });
+        }
+      } catch {}
+    },
+    [],
+  );
+  const _handleEventoMundoDelete = useCallback(async (id: string) => {
+    setEventosMundo((prev) => prev.filter((e) => e.id !== id));
+    try {
+      await supabase.from("eventos_mundo").delete().eq("id", id);
+    } catch {}
+    try {
+      if (db && (db as any).eventos_mundo)
+        await (db as any).eventos_mundo.delete(id);
+    } catch {}
+  }, []);
+
+  const debounceHistRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSave = useCallback(async () => {
+    setSaveStatus("saving");
+    try {
+      await onSave();
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+    }
+  }, [onSave]);
+
+  // Ctrl+S
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (debounceHistRef.current) {
+          clearTimeout(debounceHistRef.current);
+          debounceHistRef.current = null;
+        }
+        void handleSave();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleSave]);
+
+  // (Eliminados: add, update, remove, handleSaveReinoEvent — eventos "mundo"/"reino")
+
+  const allEvents = useMemo<MundoTimelineEvent[]>(() => {
+    const list: MundoTimelineEvent[] = [];
+    // Sistema antiguo (mundoEvents / reinoEvents basados en "historia" JSON) eliminado.
+    // Solo se usa el sistema nuevo: capítulos y canciones con dia_absoluto.
+    // Capítulos — solo los que tienen dia_absoluto
+    if (showCapitulos) {
+      for (const cap of capsTimeline) {
+        if (filterReino && !(cap.reinos_ids ?? []).includes(filterReino))
+          continue;
+        if (
+          filterPersonaje &&
+          !(cap.personajes_ids ?? []).includes(filterPersonaje)
+        )
+          continue;
+        const dia = diaOverrides[cap.id] ?? cap.dia_absoluto;
+        if (dia == null) continue; // sin fecha del calendario → no aparece
+        if (filterEra && cal) {
+          const fechaCap = diaAbsolutoAFecha(dia, cal.estaciones, cal.config);
+          if (!fechaCap?.estacion) continue;
+          const era = eraEnAnio(fechaCap.anio, cal.eras);
+          if (!era || era.id !== filterEra) continue;
+        }
+        list.push({
+          id: `cap:${cap.id}`,
+          year: String(dia),
+          title: cap.titulo_capitulo,
+          description: "",
+          source: "capitulo",
+          yearNum: dia,
+          dia_absoluto: dia,
+          capData: cap,
+          personajes_ids: cap.personajes_ids ?? [],
+        });
+      }
+    }
+    // Eventos de mundo/reino — tabla eventos_mundo (sistema nuevo).
+    // Con un personaje filtrado, solo entran los eventos donde ESE
+    // personaje participa (personajes_ids) — así el documento "Historia
+    // completa" (que solo lee source mundo/reino, ver
+    // generarMarkdownHistoriaCompleta) tiene algo que mostrar al filtrar
+    // por personaje, en vez de quedar vacío.
+    if (showEventos) {
+      for (const e of eventosMundo) {
+        if (filterReino && e.reinoId !== filterReino) continue;
+        if (
+          filterPersonaje &&
+          !(e.personajes_ids ?? []).includes(filterPersonaje)
+        )
+          continue;
+        const dia = e.dia_absoluto;
+        if (dia == null) continue;
+        if (filterEra && cal) {
+          const fechaEvt = diaAbsolutoAFecha(dia, cal.estaciones, cal.config);
+          if (!fechaEvt?.estacion) continue;
+          const era = eraEnAnio(fechaEvt.anio, cal.eras);
+          if (!era || era.id !== filterEra) continue;
+        }
+        list.push({
+          id: e.id,
+          year: String(dia),
+          title: e.titulo,
+          description: e.descripcion,
+          source: e.reinoId ? "reino" : "mundo",
+          reinoId: e.reinoId ?? undefined,
+          reinoNombre: e.reinoNombre ?? undefined,
+          yearNum: dia,
+          dia_absoluto: dia,
+          personajes_ids: e.personajes_ids ?? [],
+        });
+      }
+    }
+    // Canciones — solo las que tienen dia_absoluto. Solo aparecen en la
+    // pista principal cuando hay un personaje filtrado (si no, van en la
+    // barra lateral de "Cumpleaños y canciones" — ver cancionesSidebar).
+    if (showCanciones && filterPersonaje) {
+      for (const c of cancionesTimeline) {
+        if (filterReino && c.reinoId !== filterReino) continue;
+        if (filterPersonaje && c.personajeId !== filterPersonaje) continue;
+        const dia = diaOverrides[c.id] ?? c.dia_absoluto;
+        if (dia == null) continue; // sin fecha del calendario → no aparece
+        if (filterEra && cal) {
+          const fechaCan = diaAbsolutoAFecha(dia, cal.estaciones, cal.config);
+          if (!fechaCan?.estacion) continue;
+          const era = eraEnAnio(fechaCan.anio, cal.eras);
+          if (!era || era.id !== filterEra) continue;
+        }
+        list.push({
+          id: `cancion:${c.id}`,
+          year: String(dia),
+          title: c.titulo,
+          description: "",
+          source: "cancion",
+          yearNum: dia,
+          dia_absoluto: dia,
+          cancionData: {
+            id: c.id,
+            titulo: c.titulo,
+            cantante: c.cantante,
+            reinoNombre: c.reinoNombre ?? null,
+            dia_absoluto: dia,
+          },
+        });
+      }
+    }
+    // Cumpleaños — personajes con fecha_nacimiento. Igual que canciones:
+    // solo aparecen en la pista principal cuando hay un personaje
+    // filtrado (muestra el cumpleaños de ESE personaje). Sin filtro,
+    // los cumpleaños de todos se ven en la barra lateral.
+    if (showCumpleanos && filterPersonaje) {
+      for (const p of personajesCumple) {
+        if (
+          filterReino &&
+          p.reino !== reinos.find((r) => r.id === filterReino)?.nombre
+        )
+          continue;
+        if (filterPersonaje && p.id !== filterPersonaje) continue;
+        const dia = p.fecha_nacimiento;
+        if (filterEra && cal) {
+          const fechaCumple = diaAbsolutoAFecha(
+            dia,
+            cal.estaciones,
+            cal.config,
+          );
+          if (!fechaCumple?.estacion) continue;
+          const era = eraEnAnio(fechaCumple.anio, cal.eras);
+          if (!era || era.id !== filterEra) continue;
+        }
+        list.push({
+          id: `cumple:${p.id}`,
+          year: String(dia),
+          title: `Cumpleaños ${p.nombre}`,
+          description: "",
+          source: "cumpleanos",
+          yearNum: dia,
+          dia_absoluto: dia,
+          cumpleanosData: p,
+        });
+      }
+    }
+    // Eras internas del personaje seleccionado — solo aparecen cuando hay
+    // un filtro de personaje activo (no tiene sentido mezclarlas con la
+    // línea de tiempo general del mundo, son momentos de la vida de UN
+    // personaje, no del mundo entero).
+    if (filterPersonaje && personajeSeleccionado) {
+      for (const era of erasPersonaje) {
+        list.push({
+          id: `era_personaje:${era.id}`,
+          year: String(era.momento),
+          title: era.label || `Era de ${personajeSeleccionado.nombre}`,
+          description: era.notas,
+          source: "era_personaje",
+          reinoNombre: personajeSeleccionado.nombre,
+          yearNum: era.momento,
+          dia_absoluto: era.momento,
+          eraPersonajeData: {
+            id: era.id,
+            personajeId: filterPersonaje,
+            personajeNombre: personajeSeleccionado.nombre,
+            rasgos: era.rasgos,
+            notas: era.notas,
+          },
+        });
+      }
+    }
+    return list.sort((a, b) => {
+      const diff = a.yearNum - b.yearNum;
+      if (diff !== 0) return diff;
+      const order: Record<string, number> = {
+        mundo: 0,
+        reino: 1,
+        cancion: 2,
+        capitulo: 3,
+        cumpleanos: 4,
+        era_personaje: 5,
+      };
+      return (order[a.source] ?? 1) - (order[b.source] ?? 1);
+    });
+  }, [
+    filterReino,
+    filterEra,
+    filterPersonaje,
+    personajeSeleccionado,
+    erasPersonaje,
+    cal,
+    capsTimeline,
+    cancionesTimeline,
+    eventosMundo,
+    diaOverrides,
+    showCapitulos,
+    showCanciones,
+    showEventos,
+    showCumpleanos,
+    personajesCumple,
+    reinos,
+  ]);
+
+  const reinosConEventos = useMemo(
+    () =>
+      reinos.filter((r) => {
+        // Sistema nuevo: reinos con capítulos, eventos o canciones asociados
+        // (antes solo se consideraban capítulos, así que un reino con eventos
+        // o canciones pero sin capítulos nunca aparecía como filtro).
+        const tieneCaps = Object.values(capsReinosIds).some((ids) =>
+          ids.includes(r.id),
+        );
+        const tieneEventos = eventosMundo.some((e) => e.reinoId === r.id);
+        const tieneCanciones = cancionesTimeline.some(
+          (c) => c.reinoId === r.id,
+        );
+        return tieneCaps || tieneEventos || tieneCanciones;
+      }),
+    [reinos, capsReinosIds, eventosMundo, cancionesTimeline],
+  );
+
+
+  // Días por año del calendario actual — usado para mostrar "Año N" en la
+  // barra lateral, mismo cálculo que diasAnioLista dentro de
+  // ListaEventosConMinimapa.
+  const diasAnioBarra =
+    cal?.estaciones?.reduce(
+      (s: number, e: any) => s + (e.duracion_dias ?? 0),
+      0,
+    ) || 365;
+
+  // ── Barra lateral: cumpleaños y canciones de TODOS los personajes ────────
+  // Antes vivían mezclados en la pista principal siempre. Ahora solo entran
+  // a la pista principal cuando hay un personaje filtrado (ver allEvents);
+  // sin filtro, se listan acá aparte, ordenados por año, para no saturar
+  // la línea de tiempo del mundo con cumpleaños/canciones de decenas de
+  // personajes.
+  const cumpleanosSidebar = useMemo(
+    () =>
+      personajesCumple
+        .filter((p) => {
+          if (
+            filterReino &&
+            p.reino !== reinos.find((r) => r.id === filterReino)?.nombre
+          )
+            return false;
+          return true;
+        })
+        .slice()
+        .sort((a, b) => a.fecha_nacimiento - b.fecha_nacimiento),
+    [personajesCumple, filterReino, reinos],
+  );
+
+  const cancionesSidebar = useMemo(
+    () =>
+      cancionesTimeline
+        .filter((c) => {
+          if (c.dia_absoluto == null) return false;
+          if (filterReino && c.reinoId !== filterReino) return false;
+          return true;
+        })
+        .slice()
+        .sort((a, b) => (a.dia_absoluto ?? 0) - (b.dia_absoluto ?? 0)),
+    [cancionesTimeline, filterReino],
+  );
+
+  // (Eliminados: selectedEvt, handleUpdateSelected — panel de edición de eventos "mundo"/"reino")
+
+  // Vista "Historia completa" — se abre como pestaña propia (ver
+  // LineaTiempoSection), no como modal flotante. El documento solo se
+  // genera cuando esta vista está activa, para no rehacer el join de
+  // string en cada render de la línea de tiempo normal.
+  //
+  // Respeta los filtros activos de la línea de tiempo (filterReino /
+  // filterPersonaje): allEvents ya viene acotado a ellos (ver el useMemo
+  // de allEvents más arriba), así que el documento generado automáticamente
+  // solo muestra los eventos de mundo/reino del reino o personaje
+  // seleccionado. filtroLabel es solo para el mensaje "sin eventos" y el
+  // encabezado del panel — no vuelve a filtrar nada acá.
+  if (mostrarHistoriaCompleta) {
+    const nombreReinoFiltrado = filterReino
+      ? (reinos.find((r) => r.id === filterReino)?.nombre ?? null)
+      : null;
+    const filtroLabel =
+      nombreReinoFiltrado && personajeSeleccionado
+        ? `${nombreReinoFiltrado} · ${personajeSeleccionado.nombre}`
+        : (nombreReinoFiltrado ?? personajeSeleccionado?.nombre ?? null);
+    const markdownHistoriaCompleta = generarMarkdownHistoriaCompleta(
+      allEvents,
+      cal,
+      filtroLabel,
+    );
+    return (
+      <HistoriaCompletaPanel
+        markdown={markdownHistoriaCompleta}
+        allEvents={allEvents}
+        diasAnioLista={diasAnioBarra}
+        filtroLabel={filtroLabel}
+        onFieldChange={handleEventoMundoFieldChange}
+        onDiaChange={handleEventoMundoDiaChange}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* ── Cabecera ──────────────────────────────────────────────────────── */}
+      <div
+        className="shrink-0 flex flex-col border-b"
+        style={{
+          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+        }}
+      >
+        {/* Fila 1: filtros + acciones */}
+        <div className="flex items-center gap-2 px-3 py-1.5 flex-wrap">
+          {/* ── Filtros de tipo ── */}
+          <div
+            className="flex items-center gap-0.5 p-0.5 rounded-lg"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 4%, transparent)",
+              border:
+                "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+            }}
+          >
+            <ToggleTipoBtn
+              active={showCapitulos}
+              icon={<BookOpen size={9} />}
+              label="Capítulos"
+              onClick={() => setShowCapitulos((v) => !v)}
+            />
+            <ToggleTipoBtn
+              active={showEventos}
+              icon={<CalendarDays size={9} />}
+              label="Eventos"
+              onClick={() => setShowEventos((v) => !v)}
+            />
+          </div>
+          {/* Los toggles de "Canciones" y "Cumpleaños" se quitaron: ya no
+              se muestran mezclados en la pista principal, sino siempre en
+              el panel lateral derecho (SidebarCumpleanosCanciones). Las
+              variables showCanciones/showCumpleanos se mantienen fijas en
+              true (ver más abajo) para no romper el filtro que usa
+              allEvents cuando hay un personaje seleccionado. */}
+
+          {/* ── Filtro por reino ── (oculto cuando hay un reinoFijo) */}
+          {reinoFijo == null && reinosConEventos.length > 0 && (
+            <div
+              className="flex items-center gap-0.5 p-0.5 rounded-lg flex-wrap"
+              style={{
+                background:
+                  "color-mix(in srgb, var(--primary) 4%, transparent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+              }}
+            >
+              <button
+                className="px-2 py-1 rounded-md text-micro font-black uppercase tracking-widest transition-all"
+                style={
+                  filterReino === null
+                    ? {
+                        background:
+                          "color-mix(in srgb, var(--primary) 12%, transparent)",
+                        color: "var(--primary)",
+                      }
+                    : {
+                        color:
+                          "color-mix(in srgb, var(--primary) 30%, transparent)",
+                      }
+                }
+                type="button"
+                onClick={() => setFilterReino(null)}
+              >
+                Todos
+              </button>
+              {reinosConEventos.map((r) => (
+                <button
+                  key={r.id}
+                  className="px-2 py-1 rounded-md text-micro font-black uppercase tracking-widest transition-all"
+                  style={
+                    filterReino === r.id
+                      ? {
+                          background:
+                            "color-mix(in srgb, var(--primary) 12%, transparent)",
+                          color: "var(--primary)",
+                        }
+                      : {
+                          color:
+                            "color-mix(in srgb, var(--primary) 28%, transparent)",
+                        }
+                  }
+                  type="button"
+                  onClick={() =>
+                    setFilterReino((prev) => (prev === r.id ? null : r.id))
+                  }
+                >
+                  {r.nombre}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── Filtro por era ── */}
+          {(erasLocal.length > 0 || (cal?.eras?.length ?? 0) > 0) &&
+            (() => {
+              const eras = erasLocal.length > 0 ? erasLocal : (cal?.eras ?? []);
+              const eraActiva =
+                eras.find((e: any) => e.id === filterEra) ?? null;
+              return (
+                <EraDropdown
+                  eraActiva={eraActiva}
+                  eras={eras}
+                  value={filterEra}
+                  onChange={setFilterEra}
+                />
+              );
+            })()}
+
+          {/* ── Filtro por personaje ── */}
+          {/* Antes usaba personajesCumple, que solo trae personajes con
+              fecha de nacimiento asignada — por eso el selector solo
+              mostraba a quienes ya tenían cumpleaños. Ahora usa
+              personajesTodos, que trae el catálogo completo. */}
+          {personajesTodos.length > 0 && (
+            <PersonajeFilterDropdown
+              personajes={personajesTodos}
+              value={filterPersonaje}
+              onChange={setFilterPersonaje}
+            />
+          )}
+
+          {/* ── Acciones (derecha) ── */}
+          <div className="ml-auto flex items-center gap-1.5">
+            <SaveIndicator status={saveStatus} />
+
+            {/* Eras: botón principal + botón + pegados */}
+            <div
+              className="flex items-stretch rounded-lg overflow-hidden"
+              style={{
+                border:
+                  "1px solid color-mix(in srgb, var(--primary) 14%, transparent)",
+              }}
+            >
+              <button
+                className="flex items-center gap-1 px-2 py-1 text-micro font-black uppercase tracking-widest transition-all"
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 50%, transparent)",
+                  background: "transparent",
+                }}
+                title="Ver y editar eras"
+                type="button"
+                onClick={() => setShowGestionEras(true)}
+              >
+                <Clock size={9} /> Eras
+              </button>
+              <div
+                style={{
+                  width: 1,
+                  background:
+                    "color-mix(in srgb, var(--primary) 10%, transparent)",
+                  margin: "4px 0",
+                }}
+              />
+              <button
+                className="flex items-center px-1.5 py-1 transition-all"
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 40%, transparent)",
+                  background: "transparent",
+                }}
+                title="Nueva era"
+                type="button"
+                onClick={() => setEraModal("new")}
+              >
+                <Plus size={9} />
+              </button>
+            </div>
+
+            {/* + Evento */}
+            <button
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest transition-all"
+              style={{
+                background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--accent) 22%, transparent)",
+                color: "var(--accent)",
+              }}
+              title="Añadir evento"
+              type="button"
+              onClick={() => setShowNuevoEvento(true)}
+            >
+              <Plus size={9} /> Evento
+            </button>
+
+            {/* Historia completa — toda la línea de tiempo como documento,
+                ahora como su propia pestaña (ver LineaTiempoSection). */}
+            {onOpenHistoriaCompleta && (
+              <button
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest transition-all"
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 50%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--primary) 14%, transparent)",
+                }}
+                title="Abrir la historia completa como documento"
+                type="button"
+                onClick={onOpenHistoriaCompleta}
+              >
+                <BookOpen size={9} /> Historia
+              </button>
+            )}
+
+          </div>
+        </div>
+      </div>
+
+      {/* Modal: nuevo evento */}
+      {showNuevoEvento && (
+        <ModalNuevoEvento
+          creando={creandoEvento}
+          reinoFijoId={reinoFijo}
+          reinos={reinos}
+          onClose={() => setShowNuevoEvento(false)}
+          onCrear={handleCrearEvento}
+        />
+      )}
+
+      {/* Modal: gestionar todas las eras */}
+      {showGestionEras && (
+        <ModalGestionEras
+          eras={erasLocal.length > 0 ? erasLocal : (cal?.eras ?? [])}
+          onClose={() => setShowGestionEras(false)}
+          onEditEra={(era) => {
+            setShowGestionEras(false);
+            setEraModal(era);
+          }}
+          onNewEra={() => {
+            setShowGestionEras(false);
+            setEraModal("new");
+          }}
+        />
+      )}
+
+      {/* Modal: crear/editar era */}
+      {eraModal && (
+        <ModalEra
+          era={eraModal === "new" ? null : eraModal}
+          onClose={() => setEraModal(null)}
+          onDeleted={(id) => {
+            setErasLocal((prev) => prev.filter((e: any) => e.id !== id));
+            setEraModal(null);
+          }}
+          onSaved={(eraGuardada) => {
+            setErasLocal((prev) => {
+              const idx = prev.findIndex((e: any) => e.id === eraGuardada.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = eraGuardada;
+                return next;
+              }
+              return [...prev, eraGuardada].sort(
+                (a: any, b: any) => a.anio_inicio - b.anio_inicio,
+              );
+            });
+            setEraModal(null);
+          }}
+        />
+      )}
+
+      {/* ── Pista principal + barra lateral de cumpleaños/canciones ─────────── */}
+      <div className="flex flex-1 min-h-0">
+        <div className="px-3 py-3 flex-1 min-h-0 overflow-y-auto">
+          {loadingReinos ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="animate-spin text-primary/20" size={14} />
+            </div>
+          ) : (
+            /* ── MODO LISTA VERTICAL (solo en modo compacto) ─────────────── */
+            <ListaEventosConMinimapa
+              allEvents={allEvents}
+              cal={cal}
+              erasPersonaje={erasPersonaje}
+              filterPersonaje={filterPersonaje}
+              evtSeleccionado={evtSeleccionado}
+              setEvtSeleccionado={setEvtSeleccionado}
+              onAddRasgoEraPersonaje={addRasgoEraPersonaje}
+              onDeleteEraPersonaje={deleteEraPersonaje}
+              onDiaChange={handleEventoMundoDiaChange}
+              onDiaChangeCancion={handleCancionDiaChange}
+              onDiaChangeCumpleanos={handleCumpleanosDiaChange}
+              onDiaChangeCapitulo={handleCapituloDiaChange}
+              onFieldChange={handleEventoMundoFieldChange}
+              onLabelChangeEraPersonaje={changeLabelEraPersonaje}
+              onMomentoChangeEraPersonaje={changeMomentoEraPersonaje}
+              onNotasChangeEraPersonaje={changeNotasEraPersonaje}
+              onRemoveRasgoEraPersonaje={removeRasgoEraPersonaje}
+              onSelectCancion={onSelectCancion}
+              onSelectCapitulo={onSelectCapitulo}
+              onSelectPersonaje={onSelectPersonaje}
+              personajesDisponibles={personajesTodos}
+              onPersonajesChange={handleEventoMundoPersonajesChange}
+            />
+          )}
+        </div>
+
+        {/* Barra lateral: solo tiene sentido sin un personaje filtrado —
+            con un personaje seleccionado, su cumpleaños y canciones ya
+            aparecen en la pista principal (ver allEvents). */}
+        {!filterPersonaje && (
+          <SidebarCumpleanosCanciones
+            cumpleanos={cumpleanosSidebar}
+            canciones={cancionesSidebar}
+            diasAnioLista={diasAnioBarra}
+            showCanciones={showCanciones}
+            showCumpleanos={showCumpleanos}
+            onDiaChangeCancion={handleCancionDiaChange}
+            onDiaChangeCumpleanos={handleCumpleanosDiaChange}
+            onSelectCancion={onSelectCancion}
+            onSelectPersonaje={(id) => {
+              setFilterPersonaje(id);
+              onSelectPersonaje?.(id);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
