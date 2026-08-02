@@ -19,10 +19,9 @@ import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStor
 import { RichEditor } from "@/editor/lexical";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
-import { SubBloqueProbador } from "./BloqueHerramientasRunas";
+import { BloqueProbadorYCombinaciones } from "./BloqueProbadorYCombinaciones";
 import { BloqueSubsistemasMagia } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
-import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
 import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica } from "./types";
 
@@ -198,9 +197,8 @@ export function RunasPage({
         </div>
 
         {todasLasRunas && (
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <SubBloqueProbador runas={todasLasRunas} />
-            <EditorCombinacionesRunas runas={todasLasRunas} />
+          <div className="mt-6">
+            <BloqueProbadorYCombinaciones runas={todasLasRunas} />
           </div>
         )}
       </div>
