@@ -16,6 +16,12 @@ import {
   ToastPortal,
 } from "@/domains/garlia/libros/public/CapituloScrollBlock";
 import { Vignette } from "@/domains/garlia/libros/public/LectorUI";
+import {
+  useLectorStore,
+  capActualDe,
+  capVecino,
+} from "@/domains/garlia/libros/useLectorStore";
+import { useLectorEntidadesStore } from "@/domains/garlia/libros/useLectorEntidadesStore";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 // ⚠️ Ajustar esta ruta si syncEngine.ts vive en otra carpeta del proyecto.
@@ -121,18 +127,10 @@ function BarraProgresoVertical({ capId }: { capId: string }) {
    (ver cargarEntidades en el efecto principal). Sin fetch propio:
    así cambiar de capítulo no dispara red/IO y no parpadea.
    ───────────────────────────────────────────── */
-function PersonajesPanel({
-  ids,
-  border,
-  personajesMap,
-}: {
-  ids: string[];
-  border: string;
-  personajesMap: Record<
-    string,
-    { id: string; nombre: string; img_url?: string | null }
-  >;
-}) {
+function PersonajesPanel({ ids, border }: { ids: string[]; border: string }) {
+  // Selector granular: este panel solo re-renderiza cuando cambia
+  // personajesMap, no cuando cambia capId, activeCapTitle, etc.
+  const personajesMap = useLectorEntidadesStore((s) => s.personajesMap);
   const personajes = ids.map((id) => personajesMap[id]).filter(Boolean) as {
     id: string;
     nombre: string;
@@ -224,15 +222,15 @@ function LugaresPanel({
   reinosIds,
   ciudadesIds,
   border: _border,
-  reinosMap,
-  ciudadesMap,
 }: {
   reinosIds: string[];
   ciudadesIds: string[];
   border: string;
-  reinosMap: Record<string, { id: string; nombre: string }>;
-  ciudadesMap: Record<string, { id: string; nombre: string }>;
 }) {
+  // Selectores granulares: no re-renderiza con cambios de capId ni de
+  // personajesMap — solo con reinosMap/ciudadesMap.
+  const reinosMap = useLectorEntidadesStore((s) => s.reinosMap);
+  const ciudadesMap = useLectorEntidadesStore((s) => s.ciudadesMap);
   const reinos = reinosIds.map((id) => reinosMap[id]).filter(Boolean) as {
     id: string;
     nombre: string;
@@ -350,30 +348,26 @@ function LugaresPanel({
 function PanelLateral({
   libroTitulo: _libroTitulo,
   capActual,
-  capitulos,
-  capIdActual,
-  loading,
   esExtra,
   onVolver,
   onSelectCap,
   isMobile,
-  personajesMap,
-  reinosMap,
-  ciudadesMap,
 }: {
   libroTitulo?: string;
   capActual: CapituloScrollItem | null;
-  capitulos: CapituloScrollItem[];
-  capIdActual: string;
-  loading?: boolean;
   esExtra?: boolean;
   onVolver: () => void;
   onSelectCap?: (capId: string) => void;
   isMobile?: boolean;
-  personajesMap: Record<string, any>;
-  reinosMap: Record<string, any>;
-  ciudadesMap: Record<string, any>;
 }) {
+  // Selectores granulares: cambiar capId (navegar de capítulo) SÍ toca este
+  // panel (resalta el ítem activo), pero cambiar personajesMap/reinosMap NO
+  // dispara un re-render de la lista de índice — cada bloque hijo
+  // (PersonajesPanel/LugaresPanel) tiene su propio selector.
+  const capitulos = useLectorStore((s) => s.capitulos);
+  const loading = useLectorStore((s) => s.loading);
+  const capIdActual = useLectorStore((s) => s.capId);
+
   const border =
     "1px solid color-mix(in srgb, var(--primary) 10%, transparent)";
   const narrador = (capActual as any)?._narrador as
@@ -486,18 +480,12 @@ function PanelLateral({
           <LugaresPanel
             border={border}
             ciudadesIds={(capActual as any).ciudades_ids ?? []}
-            ciudadesMap={ciudadesMap}
             reinosIds={(capActual as any).reinos_ids ?? []}
-            reinosMap={reinosMap}
           />
         )}
         {!loading && !esExtra && personajesIds.length > 0 && (
           <div style={{ padding: "10px 16px 0" }}>
-            <PersonajesPanel
-              border={border}
-              ids={personajesIds}
-              personajesMap={personajesMap}
-            />
+            <PersonajesPanel border={border} ids={personajesIds} />
           </div>
         )}
 
@@ -652,24 +640,32 @@ export default function Lector({
 
   const router = useRouter();
 
-  const [_id, setId] = useState<string>("");
-  const [capId, setCapId] = useState<string>("");
-  const [capitulos, setCapitulos] = useState<CapituloScrollItem[]>([]);
-  const [_listaCapitulos, setListaCapitulos] = useState<CapituloLista[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [esExtra, setEsExtra] = useState(false); // poemario / sin grupo
-  const [activeCapTitle, setActiveCapTitle] = useState<string | null>(null);
-  const [showSidebar, setShowSidebar] = useState(false); // móvil: drawer lateral
-  // Slug canónico del libro (puede diferir de slugParam si llegó un UUID legacy).
-  const [slugCanonico, setSlugCanonico] = useState(slugParam);
-  // Mapas de entidades (reino / ciudad / personaje) cacheados vía Dexie,
-  // precargados una sola vez para TODO el libro. Cambiar de capítulo es
-  // luego un simple lookup sincrónico sobre estos mapas — sin red, sin
-  // parpadeo. Se rellenan en el efecto de carga del libro (ver más abajo).
-  const [personajesMap, setPersonajesMap] = useState<Record<string, any>>({});
-  const [reinosMap, setReinosMap] = useState<Record<string, any>>({});
-  const [ciudadesMap, setCiudadesMap] = useState<Record<string, any>>({});
+  // ── Estado de navegación/datos: leído del store, no de useState local ──────
+  // Selectores granulares — cada uno solo re-renderiza el componente cuando
+  // ESE campo cambia, no cuando cambia cualquier otro campo del store.
+  const capId = useLectorStore((s) => s.capId);
+  const capitulos = useLectorStore((s) => s.capitulos);
+  const loading = useLectorStore((s) => s.loading);
+  const error = useLectorStore((s) => s.error);
+  const esExtra = useLectorStore((s) => s.esExtra);
+  const activeCapTitle = useLectorStore((s) => s.activeCapTitle);
+  const showSidebar = useLectorStore((s) => s.showSidebar);
+  const slugCanonico = useLectorStore((s) => s.slugCanonico);
+
+  const resetLibro = useLectorStore((s) => s.resetLibro);
+  const setLoading = useLectorStore((s) => s.setLoading);
+  const setError = useLectorStore((s) => s.setError);
+  const setLibroResuelto = useLectorStore((s) => s.setLibroResuelto);
+  const setCapitulosStore = useLectorStore((s) => s.setCapitulos);
+  const setCapId = useLectorStore((s) => s.setCapId);
+  const setActiveCapTitle = useLectorStore((s) => s.setActiveCapTitle);
+  const setShowSidebar = useLectorStore((s) => s.setShowSidebar);
+
+  const resetEntidades = useLectorEntidadesStore((s) => s.resetEntidades);
+  const mergePersonajes = useLectorEntidadesStore((s) => s.mergePersonajes);
+  const mergeReinos = useLectorEntidadesStore((s) => s.mergeReinos);
+  const mergeCiudades = useLectorEntidadesStore((s) => s.mergeCiudades);
+
   const hasScrolled = useRef(false);
 
   // ── Efecto A: resolver libro + cargar TODOS los capítulos ──────────────────
@@ -681,6 +677,8 @@ export default function Lector({
     if (!slugParam) return;
     let cancelled = false;
     let resolvedLibroId: string | null = null;
+    resetLibro();
+    resetEntidades();
     setLoading(true);
     setError(null);
 
@@ -727,21 +725,21 @@ export default function Lector({
       const ciudadesIds = collectIds(caps, "ciudades_ids");
 
       void loadPersonajesMap(personajesIds, (m) => {
-        if (!cancelled) setPersonajesMap((prev) => ({ ...prev, ...m }));
+        if (!cancelled) mergePersonajes(m);
       }).then((m) => {
-        if (!cancelled) setPersonajesMap((prev) => ({ ...prev, ...m }));
+        if (!cancelled) mergePersonajes(m);
       });
 
       void loadReinosMap(reinosIds, (m) => {
-        if (!cancelled) setReinosMap((prev) => ({ ...prev, ...m }));
+        if (!cancelled) mergeReinos(m);
       }).then((m) => {
-        if (!cancelled) setReinosMap((prev) => ({ ...prev, ...m }));
+        if (!cancelled) mergeReinos(m);
       });
 
       void loadCiudadesMap(ciudadesIds, (m) => {
-        if (!cancelled) setCiudadesMap((prev) => ({ ...prev, ...m }));
+        if (!cancelled) mergeCiudades(m);
       }).then((m) => {
-        if (!cancelled) setCiudadesMap((prev) => ({ ...prev, ...m }));
+        if (!cancelled) mergeCiudades(m);
       });
     };
 
@@ -774,11 +772,12 @@ export default function Lector({
         fecha_publicacion: c.fecha_publicacion,
       }));
 
-      setId(libroId);
-      setEsExtra(esExtraLocal);
-      setSlugCanonico(actualSlug);
-      setListaCapitulos(lista);
-      setCapitulos(caps as unknown as CapituloScrollItem[]);
+      setLibroResuelto({
+        libroId,
+        slugCanonico: actualSlug,
+        esExtra: esExtraLocal,
+      });
+      setCapitulosStore(caps as unknown as CapituloScrollItem[], lista);
       cargarEntidades(caps);
       // La resolución de capId a partir de ordenParam queda a cargo del
       // Efecto B (más abajo), que reacciona a este nuevo `capitulos`.
@@ -971,7 +970,13 @@ export default function Lector({
                 !c.deleted && c.libro_id === resolvedLibroId && c.contenido,
             );
             if (cached.length > 0) {
-              aplicarCaps(cached, resolvedLibroId, esExtra, slugCanonico);
+              const estadoActual = useLectorStore.getState();
+              aplicarCaps(
+                cached,
+                resolvedLibroId,
+                estadoActual.esExtra,
+                estadoActual.slugCanonico,
+              );
               return;
             }
           }
@@ -1045,12 +1050,12 @@ export default function Lector({
     [capitulos, slugParam, router],
   );
 
-  const capActual = capitulos.find((c) => c.id === capId) ?? null;
+  const capActual = capActualDe(capitulos, capId);
   const capAnterior = capActual
-    ? (capitulos.find((c) => c.orden === capActual.orden - 1) ?? null)
+    ? capVecino(capitulos, capActual.orden, -1)
     : null;
   const capSiguiente = capActual
-    ? (capitulos.find((c) => c.orden === capActual.orden + 1) ?? null)
+    ? capVecino(capitulos, capActual.orden, 1)
     : null;
   const libroTitulo = capitulos[0]?.libros?.titulo;
   const _personajesIds = Array.from(new Set(capActual?.personajes_ids ?? []));
@@ -1173,15 +1178,9 @@ export default function Lector({
             >
               <PanelLateral
                 capActual={capActual}
-                capIdActual={capId}
-                capitulos={capitulos}
-                ciudadesMap={ciudadesMap}
                 esExtra={esExtra}
                 isMobile={true}
                 libroTitulo={libroTitulo}
-                loading={loading}
-                personajesMap={personajesMap}
-                reinosMap={reinosMap}
                 onSelectCap={(id) => {
                   handleNavigate(id);
                   setShowSidebar(false);
@@ -1197,14 +1196,8 @@ export default function Lector({
       <div className="hidden md:flex">
         <PanelLateral
           capActual={capActual}
-          capIdActual={capId}
-          capitulos={capitulos}
-          ciudadesMap={ciudadesMap}
           esExtra={esExtra}
           libroTitulo={libroTitulo}
-          loading={loading}
-          personajesMap={personajesMap}
-          reinosMap={reinosMap}
           onSelectCap={handleNavigate}
           onVolver={() => router.push(rutaLibro(slugParam))}
         />
