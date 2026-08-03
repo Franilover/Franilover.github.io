@@ -252,5 +252,9 @@ const GLIFO_PATH: Record<TipoSeparador, string> = {
   corta: "M 0 -1 L 0 1",
   continua: "M -0.75 -0.35 L 0 1 L 0.75 -0.35",
   continua_inv: "M -0.75 0.35 L 0 -1 L 0.75 0.35",
-  inicio: "M -0.75 -1 L 0 -0.15 L 0.75 -1 M -0.75 -0.15 L 0 0.7 L 0.75 -0.15",
+  // Dos chevrones "⟩⟩" en sucesión a lo largo del eje Y (uno cerca de
+  // `interior`, el otro cerca de `exterior`), cada uno con el vértice
+  // apuntando hacia `exterior` — igual sentido que "continua" pero
+  // repetido, no uno "arriba" y otro "abajo" en X.
+  inicio: "M -0.75 -1 L 0 -0.35 L 0.75 -1 M -0.75 0.05 L 0 0.7 L 0.75 0.05",
 };
