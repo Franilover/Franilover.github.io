@@ -281,12 +281,6 @@ export default function RunasDibujo() {
         <ArrowLeft size={12} /> Volver
       </Link>
 
-      <div className="flex flex-col items-center gap-1.5 pt-8 md:pt-2 text-center">
-        <div className="flex items-center gap-2">
-          <ScrollText size={20} style={{ color: "var(--primary)" }} />
-        </div>
-      </div>
-
       {(estado === "cargando" || cargandoConfig) && (
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="animate-spin text-primary/20" size={28} />
@@ -295,7 +289,6 @@ export default function RunasDibujo() {
 
       {estado === "sin-runas" && (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-4">
-          <ScrollText size={40} strokeWidth={1} className="text-primary/15" />
           <p className="text-sm text-primary/40 max-w-sm">
             Todavía no hay runas con patrón de trazo definido.
           </p>
