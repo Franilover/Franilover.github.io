@@ -260,9 +260,17 @@ export function pathCelda(
     return puntoSobrePoligonoEnAngulo(angulo, forma.lados, centro, r);
   };
 
+  // Si la celda cubre el círculo entero (rejilla con 1 sola sección), el
+  // ángulo de inicio y de fin son el mismo punto — no hay que repetirlo al
+  // final del arco, o el <polygon> dibuja ese punto de cierre como si fuera
+  // una arista real (se ve como una línea radial de más, cuando en realidad
+  // no hay ninguna sección vecina de la que separarse).
+  const esCirculoCompleto = celda.anguloFin - celda.anguloInicio >= 2 * Math.PI - 1e-6;
+  const segmentos = esCirculoCompleto ? SEGMENTOS_POR_CELDA - 1 : SEGMENTOS_POR_CELDA;
+
   const arcoExterior: Punto[] = [];
   const arcoInterior: Punto[] = [];
-  for (let i = 0; i <= SEGMENTOS_POR_CELDA; i++) {
+  for (let i = 0; i <= segmentos; i++) {
     const t = i / SEGMENTOS_POR_CELDA;
     const ang = celda.anguloInicio + t * (celda.anguloFin - celda.anguloInicio);
     arcoExterior.push(puntoEnBorde(ang, celda.radioFinFrac));
