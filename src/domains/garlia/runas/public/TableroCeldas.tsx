@@ -212,11 +212,6 @@ export function TableroCeldas({
           Dibujando runa en: {labelCelda(celdas.find((c) => c.id === celdaActivaId)!, rejilla)}
         </p>
       )}
-      {gapActivoId && (
-        <p className="text-micro font-black uppercase tracking-[0.25em] text-primary/40">
-          Dibujando separador
-        </p>
-      )}
     </div>
   );
 }

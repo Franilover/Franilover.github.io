@@ -111,9 +111,6 @@ export function PanelConfigRunas({
           </div>
 
           <div className="space-y-1.5 pt-1">
-            <p className="text-micro font-black uppercase tracking-widest text-primary/30">
-              Forma exterior
-            </p>
             <SelectorFormaLimite
               value={config.forma}
               onChange={(forma) => onActualizar({ forma })}
@@ -121,14 +118,7 @@ export function PanelConfigRunas({
           </div>
 
           <div className="space-y-1.5 pt-1">
-            <p className="text-micro font-black uppercase tracking-widest text-primary/30">
-              Separador
-            </p>
-            {previewCombinacion ? (
-              <p className="text-micro text-primary/25 text-center">
-                Editando desde la combinación — usá sus selectores de al lado
-              </p>
-            ) : gapActivoId ? (
+            {!previewCombinacion && gapActivoId ? (
               <div className="flex items-center justify-center gap-2">
                 {TIPOS_SEPARADOR.map((tipo) => {
                   const activo = separadorPorGapMostrado[gapActivoId] === tipo;
@@ -164,11 +154,11 @@ export function PanelConfigRunas({
                   );
                 })}
               </div>
-            ) : (
+            ) : !previewCombinacion ? (
               <p className="text-micro text-primary/25 text-center">
                 Tocá un gap del tablero de arriba para elegir su separador
               </p>
-            )}
+            ) : null}
           </div>
 
           <div className="space-y-1.5 pt-1">

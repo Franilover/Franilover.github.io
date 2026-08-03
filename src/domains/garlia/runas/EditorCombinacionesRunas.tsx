@@ -295,9 +295,6 @@ function EditorUnaCombinacion({
       />
 
       <div className="space-y-1.5">
-        <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
-          Runa por celda
-        </label>
         {celdas.map((celda) => {
           // Gap "siguiente" a esta celda dentro de su mismo anillo: el que
           // arranca en esta sección (seccionAntes === celda.seccion) — así
