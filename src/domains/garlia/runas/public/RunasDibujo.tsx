@@ -3,27 +3,30 @@
 /**
  * RunasDibujo.tsx (público)
  * ────────────────────────────────────────────────────────────────────
- * /garlia/runas — el usuario dibuja un trazo en un canvas y el sistema
- * intenta reconocer cuál de las runas definidas en el mundo dibujó,
- * usando el algoritmo $1 Unistroke Recognizer contra los patrones que
- * el admin grabó en el editor (PanelPatronRuna).
+ * /garlia/runas — el jugador dibuja TODO a mano alzada sobre un único
+ * canvas libre: el contorno que quiera (círculo, triángulo, cuadrado,
+ * lo que sea), opcionalmente líneas radiales para dividirlo en
+ * secciones, y dentro de cada sección la runa que corresponda —
+ * separando secciones consecutivas con uno de los 4 símbolos de
+ * separador si así lo requiere la combinación que está intentando armar.
  *
- * Además del modo simple (un solo dibujo), el jugador puede dividir el
- * tablero en celdas (secciones × anillos) y dibujar una runa distinta
- * en cada una — ver TableroCeldas.tsx y SelectorRejilla.tsx. Al terminar,
- * se evalúan todas las celdas dibujadas: si coinciden exactamente con
- * una combinación definida en admin (matchCombinacion.ts), se muestra
- * el resultado compuesto; si no, se muestra la lista de runas
- * individuales reconocidas por celda.
+ * No hay selectores de forma, ni de celda, ni de separador: todo se
+ * infiere geométricamente del dibujo (ver interpretarDibujoLibre.ts,
+ * que a su vez usa detectarFormaLibre.ts para el contorno/secciones y
+ * dollarOneRecognizer.ts para reconocer cada runa/separador). El
+ * resultado (mapa celdaId→runaId + gapId→separador) se compara contra
+ * el catálogo de combinaciones definidas en admin (matchCombinacion.ts):
+ * si matchea exactamente una, se muestra el hechizo compuesto; si no,
+ * se listan las runas sueltas que sí se reconocieron.
  *
- * Si el mejor match de una celda supera un umbral de confianza, se
- * cuenta como "reconocida". Si no, se invita a intentar de nuevo.
+ * Solo soporta 1 anillo por ahora — igual que detectarFormaLibre.ts, la
+ * detección de anillos concéntricos queda para una iteración futura.
  *
  * Ruta destino:
  *   src/features/garliaPublic/runas/RunasDibujo.tsx
  */
 
-import { ArrowLeft, Loader2, ScrollText, Sparkles, Wand2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
@@ -32,92 +35,33 @@ import { PlainMarkdownPreview } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { armarTodasLasCadenas, type Cadena } from "../cadenasSeparadores";
-import { CanvasDibujoRuna } from "../CanvasDibujoRuna";
+import { CanvasFormaLibre } from "../CanvasFormaLibre";
+import type { TrazoLibre } from "../deteccionFormaLibre";
+import { labelForma, labelCelda, generarCeldas, generarGaps, type Celda, type Rejilla } from "../formasLimite";
 import {
-  reconocerRuna,
-  type PatronRuna,
-  type Punto,
-  type ResultadoReconocimiento,
-} from "../dollarOneRecognizer";
-import {
-  esRejillaSimple,
-  FORMA_CIRCULO,
-  generarCeldas,
-  generarGaps,
-  labelCelda,
-  REJILLA_SIMPLE,
-  type Celda,
-  type Gap,
-  type Rejilla,
-} from "../formasLimite";
+  interpretarDibujoLibre,
+  type InterpretacionDibujoLibre,
+  type ResultadoCelda,
+} from "../interpretarDibujoLibre";
 import { buscarCombinacion } from "../matchCombinacion";
 import { RunaThumbnail } from "../RunaThumbnail";
-import {
-  LABEL_SEPARADOR,
-  patronesSeparadores,
-  SIMBOLO_SEPARADOR,
-  TIPOS_SEPARADOR,
-  type TipoSeparador,
-} from "../separadores";
 import type { CombinacionRuna, EntidadMagica } from "../types";
 import { useConfigRunas } from "../useConfigRunas";
 
-import { TableroCeldas } from "./TableroCeldas";
-
-// Por debajo de este score no se considera un match confiable: se anima
-// al usuario a intentar de nuevo en vez de mostrarle un resultado dudoso.
-const UMBRAL_CONFIANZA = 0.72;
-
 type Estado = "cargando" | "listo" | "sin-runas";
-
-/** Resultado de reconocimiento guardado por celda. */
-type ResultadoCelda = {
-  ranking: ResultadoReconocimiento[];
-  mejorMatch: EntidadMagica | null;
-};
 
 export default function RunasDibujo() {
   const [runas, setRunas] = useState<EntidadMagica[]>([]);
   const [combinaciones, setCombinaciones] = useState<CombinacionRuna[]>([]);
   const [estado, setEstado] = useState<Estado>("cargando");
 
-  // La forma y la rejilla ya no son una config global única: cada
-  // CombinacionRuna define la suya (ver types.ts). Por ahora el tablero
-  // del jugador sigue siendo fijo (círculo, 1 sección × 1 anillo, "modo
-  // simple") — solo matchean acá las combinaciones que también usan esa
-  // forma+rejilla. Dejar que el jugador dibuje su propia forma+rejilla a
-  // mano alzada es la Parte 2 del plan (RunasDibujo.tsx pendiente de
-  // reescritura de flujo — ver charla de diseño).
   const { config: configRunas, loading: cargandoConfig } = useConfigRunas();
-  const forma = FORMA_CIRCULO;
-  const rejilla = REJILLA_SIMPLE;
 
-  // Modo simple (1×1): un solo resultado, igual que antes.
-  const [resultadoSimple, setResultadoSimple] = useState<
-    ResultadoReconocimiento[] | null
-  >(null);
-
-  // Modo rejilla: resultado por celda + cuál está activa para dibujar.
-  const [resultadosPorCelda, setResultadosPorCelda] = useState<
-    Record<string, ResultadoCelda>
-  >({});
-  const [celdaActivaId, setCeldaActivaId] = useState<string | null>(null);
-
-  // Separadores: tipo reconocido por gap + cuál está activo para dibujar.
-  const [separadorPorGap, setSeparadorPorGap] = useState<
-    Record<string, TipoSeparador | undefined>
-  >({});
-  const [gapActivoId, setGapActivoId] = useState<string | null>(null);
-
+  const [trazos, setTrazos] = useState<TrazoLibre[]>([]);
+  const [interpretacion, setInterpretacion] = useState<InterpretacionDibujoLibre | null>(null);
   const [finalizado, setFinalizado] = useState(false);
-
   const [resetSignal, setResetSignal] = useState(0);
   const [intentos, setIntentos] = useState(0);
-
-  const patronesSeparador = useMemo(
-    () => patronesSeparadores(configRunas.plantillas_separadores),
-    [configRunas.plantillas_separadores],
-  );
 
   React.useEffect(() => {
     let activo = true;
@@ -148,131 +92,54 @@ export default function RunasDibujo() {
     };
   }, []);
 
-  const patrones: PatronRuna[] = useMemo(
-    () =>
-      runas.map((r) => ({
-        runaId: r.id,
-        nombre: r.nombre,
-        trazos: r.patron_trazos ?? [],
-      })),
-    [runas],
-  );
-
-  const simple = esRejillaSimple(rejilla);
-  const celdas = useMemo(() => generarCeldas(rejilla), [rejilla]);
-  const gaps = useMemo(() => generarGaps(rejilla), [rejilla]);
-
-  // ── Modo simple ──────────────────────────────────────────────────────
-  const mejorMatchSimple: EntidadMagica | null = useMemo(() => {
-    if (!resultadoSimple || resultadoSimple.length === 0) return null;
-    const top = resultadoSimple[0];
-    if (top.score < UMBRAL_CONFIANZA) return null;
-    return runas.find((r) => r.id === top.runaId) ?? null;
-  }, [resultadoSimple, runas]);
-
-  const onTrazoCompletoSimple = (puntos: Punto[]) => {
-    const ranking = reconocerRuna(puntos, patrones);
-    setResultadoSimple(ranking);
-    setIntentos((n) => n + 1);
+  // Se re-interpreta el dibujo completo en cada cambio de trazos — el
+  // costo es bajo (unos pocos trazos, cada uno de a lo sumo unas
+  // decenas de puntos) y así el jugador puede ver feedback en vivo de
+  // qué se está reconociendo antes de finalizar.
+  const onTrazosChange = (nuevos: TrazoLibre[]) => {
+    setTrazos(nuevos);
+    setInterpretacion(interpretarDibujoLibre(nuevos, runas, configRunas.plantillas_separadores));
   };
-
-  const reintentarSimple = () => {
-    setResultadoSimple(null);
-    setResetSignal((s) => s + 1);
-  };
-
-  // ── Modo rejilla ─────────────────────────────────────────────────────
-  const onTrazoCompletoCelda = (puntos: Punto[]) => {
-    if (!celdaActivaId) return;
-    const ranking = reconocerRuna(puntos, patrones);
-    const top = ranking[0];
-    const mejorMatch =
-      top && top.score >= UMBRAL_CONFIANZA
-        ? (runas.find((r) => r.id === top.runaId) ?? null)
-        : null;
-    setResultadosPorCelda((prev) => ({
-      ...prev,
-      [celdaActivaId]: { ranking, mejorMatch },
-    }));
-  };
-
-  const seleccionarCelda = (celda: Celda) => {
-    setCeldaActivaId(celda.id);
-    setGapActivoId(null);
-    setResetSignal((s) => s + 1);
-  };
-
-  const seleccionarGap = (gap: Gap) => {
-    setGapActivoId(gap.id);
-    setCeldaActivaId(null);
-    setResetSignal((s) => s + 1);
-  };
-
-  const onTrazoCompletoGap = (puntos: Punto[]) => {
-    if (!gapActivoId) return;
-    const ranking = reconocerRuna(puntos, patronesSeparador);
-    const top = ranking[0];
-    // Los separadores son solo 4 símbolos muy distintos entre sí — usamos
-    // el mismo umbral que las runas para no bajar la exigencia de más.
-    const tipo =
-      top && top.score >= UMBRAL_CONFIANZA
-        ? (top.runaId as TipoSeparador)
-        : undefined;
-    setSeparadorPorGap((prev) => ({ ...prev, [gapActivoId]: tipo }));
-  };
-
-  const celdasDibujadas = Object.keys(resultadosPorCelda).filter(
-    (id) => resultadosPorCelda[id].mejorMatch,
-  );
-
-  const mapaCeldaRuna: Record<string, string> = {};
-  for (const id of celdasDibujadas) {
-    mapaCeldaRuna[id] = resultadosPorCelda[id].mejorMatch!.id;
-  }
 
   const combinacionEncontrada = useMemo(() => {
-    if (!finalizado) return null;
-    return buscarCombinacion(mapaCeldaRuna, combinaciones, separadorPorGap, { forma, rejilla });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finalizado, resultadosPorCelda, combinaciones, separadorPorGap, forma, rejilla]);
+    if (!finalizado || !interpretacion) return null;
+    return buscarCombinacion(
+      interpretacion.celdaRunaId,
+      combinaciones,
+      interpretacion.separadorPorGap,
+      { forma: interpretacion.forma, rejilla: interpretacion.rejilla },
+    );
+  }, [finalizado, interpretacion, combinaciones]);
 
-  // Cadenas formadas por los separadores — solo tiene sentido si hay más de
-  // una sección por anillo (si no, no hay gaps que dibujar).
+  // Cadenas formadas por los separadores — solo tiene sentido si el
+  // jugador dibujó más de una sección (si dibujó un contorno sin
+  // dividir, no hay gaps que interpretar).
   const cadenas: Cadena[] = useMemo(() => {
-    if (!finalizado || rejilla.secciones <= 1) return [];
-    return armarTodasLasCadenas(rejilla, celdas, gaps, separadorPorGap);
-  }, [finalizado, rejilla, celdas, gaps, separadorPorGap]);
+    if (!finalizado || !interpretacion || interpretacion.rejilla.secciones <= 1) return [];
+    const celdas = generarCeldas(interpretacion.rejilla);
+    const gaps = generarGaps(interpretacion.rejilla);
+    return armarTodasLasCadenas(interpretacion.rejilla, celdas, gaps, interpretacion.separadorPorGap);
+  }, [finalizado, interpretacion]);
 
-  const finalizarRejilla = () => {
+  const hayAlgoReconocido =
+    interpretacion !== null && Object.keys(interpretacion.celdaRunaId).length > 0;
+
+  const finalizarDibujo = () => {
     setFinalizado(true);
     setIntentos((n) => n + 1);
   };
 
-  const reintentarRejilla = () => {
-    setResultadosPorCelda({});
-    setCeldaActivaId(null);
-    setSeparadorPorGap({});
-    setGapActivoId(null);
+  const reintentar = () => {
+    setTrazos([]);
+    setInterpretacion(null);
     setFinalizado(false);
     setResetSignal((s) => s + 1);
   };
-
-  const runaPorCeldaParaTablero: Record<
-    string,
-    EntidadMagica | null | undefined
-  > = {};
-  for (const [id, r] of Object.entries(resultadosPorCelda)) {
-    runaPorCeldaParaTablero[id] = r.mejorMatch;
-  }
 
   return (
     <div
       className="relative flex flex-col items-center p-4 md:p-8 gap-6"
       style={{ minHeight: "calc(100svh - 64px)" }}
-      onClick={() => {
-        setCeldaActivaId(null);
-        setGapActivoId(null);
-      }}
     >
       <Link
         href="/garlia/aventura"
@@ -297,139 +164,41 @@ export default function RunasDibujo() {
 
       {estado === "listo" && (
         <div className="w-full max-w-md flex flex-col items-center gap-4">
-          {simple ? (
+          {!finalizado && (
             <>
               <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
-                <CanvasDibujoRuna
-                  forma={forma}
-                  height={300}
-                  resetSignal={resetSignal}
-                  onTrazoCompleto={onTrazoCompletoSimple}
-                />
+                <CanvasFormaLibre height={340} resetSignal={resetSignal} onTrazosChange={onTrazosChange} />
               </div>
 
-              {resultadoSimple && (
-                <ResultadoCard
-                  key={intentos}
-                  mejorMatch={mejorMatchSimple}
-                  resultado={resultadoSimple}
-                  onReintentar={reintentarSimple}
-                />
-              )}
+              <PistaInterpretacion interpretacion={interpretacion} trazos={trazos} />
+
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-micro text-primary/25 tracking-widest uppercase font-bold text-center max-w-xs">
+                  Dibujá tu forma, dividila en secciones si querés, y una
+                  runa (o separador) en cada una
+                </p>
+                <button
+                  type="button"
+                  disabled={!hayAlgoReconocido}
+                  onClick={finalizarDibujo}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-40"
+                >
+                  Terminar y ver resultado
+                </button>
+              </div>
             </>
-          ) : (
-            <div className="w-full flex flex-col items-center gap-4">
-              <TableroCeldas
-                celdaActivaId={celdaActivaId}
-                forma={forma}
-                gapActivoId={gapActivoId}
-                rejilla={rejilla}
-                runaPorCelda={runaPorCeldaParaTablero}
-                separadorPorGap={separadorPorGap}
-                onSeleccionarCelda={seleccionarCelda}
-                onSeleccionarGap={seleccionarGap}
-              />
+          )}
 
-              {celdaActivaId && !finalizado && (
-                <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
-                  <CanvasDibujoRuna
-                    height={220}
-                    resetSignal={resetSignal}
-                    onTrazoCompleto={onTrazoCompletoCelda}
-                  />
-                  {resultadosPorCelda[celdaActivaId] && (
-                    <p className="text-micro text-center pt-2 font-bold text-primary/50">
-                      {resultadosPorCelda[celdaActivaId].mejorMatch
-                        ? `Reconocida: ${resultadosPorCelda[celdaActivaId].mejorMatch!.nombre}`
-                        : "No se reconoció ninguna runa en esta celda"}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {gapActivoId && !finalizado && (
-                <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
-                  <div className="flex items-center justify-center gap-2 pb-3">
-                    {TIPOS_SEPARADOR.map((tipo) => {
-                      const activo = separadorPorGap[gapActivoId] === tipo;
-                      return (
-                        <button
-                          key={tipo}
-                          type="button"
-                          title={LABEL_SEPARADOR[tipo]}
-                          onClick={() =>
-                            setSeparadorPorGap((prev) => ({
-                              ...prev,
-                              [gapActivoId]: tipo,
-                            }))
-                          }
-                          className="flex flex-col items-center gap-0.5 w-16 py-2 rounded-xl border transition-all"
-                          style={{
-                            background: activo
-                              ? "var(--primary)"
-                              : "color-mix(in srgb, var(--primary) 6%, transparent)",
-                            borderColor: activo
-                              ? "var(--primary)"
-                              : "color-mix(in srgb, var(--primary) 20%, transparent)",
-                            color: activo ? "var(--btn-text)" : "var(--primary)",
-                          }}
-                        >
-                          <span className="text-base font-black leading-none">
-                            {SIMBOLO_SEPARADOR[tipo]}
-                          </span>
-                          <span className="text-[9px] font-bold uppercase tracking-wide leading-none">
-                            {LABEL_SEPARADOR[tipo]}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-micro text-center pb-2 font-bold text-primary/30">
-                    Tocá un símbolo, o dibujalo abajo
-                  </p>
-                  <CanvasDibujoRuna
-                    height={160}
-                    resetSignal={resetSignal}
-                    onTrazoCompleto={onTrazoCompletoGap}
-                  />
-                  <p className="text-micro text-center pt-2 font-bold text-primary/50">
-                    {separadorPorGap[gapActivoId]
-                      ? `Seleccionado: ${SIMBOLO_SEPARADOR[separadorPorGap[gapActivoId]!]} ${LABEL_SEPARADOR[separadorPorGap[gapActivoId]!]}`
-                      : "Dibujá ⟩⟩ (inicio), ⟩ (continúa), ⟨ (continúa invertido) o | (corta)"}
-                  </p>
-                </div>
-              )}
-
-              {!finalizado && (
-                <div className="flex flex-col items-center gap-2">
-                  <p className="text-micro text-primary/25 tracking-widest uppercase font-bold text-center">
-                    {rejilla.secciones > 1
-                      ? "Tocá una celda para dibujar la runa, o una línea divisoria para dibujar un separador"
-                      : "Tocá una celda del tablero para dibujar ahí"}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={celdasDibujadas.length === 0}
-                    onClick={finalizarRejilla}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-40"
-                  >
-                    Terminar y ver resultado
-                  </button>
-                </div>
-              )}
-
-              {finalizado && (
-                <ResultadoRejillaCard
-                  key={intentos}
-                  cadenas={cadenas}
-                  celdas={celdas}
-                  combinacion={combinacionEncontrada}
-                  resultadosPorCelda={resultadosPorCelda}
-                  rejilla={rejilla}
-                  onReintentar={reintentarRejilla}
-                />
-              )}
-            </div>
+          {finalizado && interpretacion && (
+            <ResultadoDibujoCard
+              key={intentos}
+              cadenas={cadenas}
+              celdas={generarCeldas(interpretacion.rejilla)}
+              combinacion={combinacionEncontrada}
+              interpretacion={interpretacion}
+              rejilla={interpretacion.rejilla}
+              onReintentar={reintentar}
+            />
           )}
         </div>
       )}
@@ -437,80 +206,117 @@ export default function RunasDibujo() {
   );
 }
 
-function ResultadoCard({
-  resultado,
-  mejorMatch,
-  onReintentar,
+/**
+ * Feedback en vivo mientras el jugador dibuja: qué forma se está
+ * leyendo y cuántas runas/separadores ya se reconocieron. No bloquea
+ * ni corrige nada — solo informa, para que el jugador sepa si el
+ * sistema está entendiendo su trazo antes de finalizar.
+ */
+function PistaInterpretacion({
+  interpretacion,
+  trazos,
 }: {
-  resultado: ResultadoReconocimiento[];
-  mejorMatch: EntidadMagica | null;
-  onReintentar: () => void;
+  interpretacion: InterpretacionDibujoLibre | null;
+  trazos: TrazoLibre[];
 }) {
+  if (trazos.length === 0) return null;
+  if (!interpretacion) {
+    return (
+      <p className="text-micro text-primary/30 text-center">
+        Dibujá un contorno cerrado para que el sistema identifique la forma
+      </p>
+    );
+  }
+  const celdasReconocidas = Object.values(interpretacion.resultadosPorCelda).filter(
+    (r) => r.mejorMatch,
+  ).length;
+  const gapsReconocidos = Object.values(interpretacion.resultadosPorGap).filter(
+    (r) => r.tipo,
+  ).length;
   return (
-    <div className="w-full rounded-2xl border border-primary/15 bg-white-custom p-5 shadow-md flex flex-col items-center gap-3 text-center animate-[fadeIn_0.2s_ease]">
-      {mejorMatch ? (
-        <>
-          <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
-            Runa reconocida
-          </div>
-          <div className="w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3 flex items-center justify-center">
-            <RunaThumbnail patronTrazos={mejorMatch.patron_trazos} />
-          </div>
-          <h2 className="text-lg font-black text-primary">
-            {mejorMatch.nombre}
-          </h2>
-          {mejorMatch.explicacion && (
-            <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
-              <PlainMarkdownPreview value={mejorMatch.explicacion} />
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <p className="text-sm font-bold text-primary/50">
-            No se reconoció ninguna runa conocida
-          </p>
-          <p className="text-micro text-primary/30">
-            {resultado[0]
-              ? `Lo más parecido fue "${resultado[0].nombre}", pero no lo suficiente.`
-              : "Intentá trazar el símbolo con más cuidado."}
-          </p>
-        </>
-      )}
-      <button
-        type="button"
-        className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
-        onClick={onReintentar}
-      >
-        Intentar de nuevo
-      </button>
-    </div>
+    <p className="text-micro text-primary/40 text-center">
+      {labelForma(interpretacion.forma)}
+      {interpretacion.rejilla.secciones > 1
+        ? ` · ${interpretacion.rejilla.secciones} secciones`
+        : ""}
+      {celdasReconocidas > 0 &&
+        ` · ${celdasReconocidas} runa${celdasReconocidas === 1 ? "" : "s"} reconocida${celdasReconocidas === 1 ? "" : "s"}`}
+      {gapsReconocidos > 0 &&
+        ` · ${gapsReconocidos} separador${gapsReconocidos === 1 ? "" : "es"}`}
+    </p>
   );
 }
 
-function ResultadoRejillaCard({
+function ResultadoDibujoCard({
   combinacion,
-  resultadosPorCelda,
+  interpretacion,
   rejilla,
   celdas,
   cadenas,
   onReintentar,
 }: {
   combinacion: CombinacionRuna | null;
-  resultadosPorCelda: Record<string, ResultadoCelda>;
+  interpretacion: InterpretacionDibujoLibre;
   rejilla: Rejilla;
   celdas: Celda[];
   cadenas: Cadena[];
   onReintentar: () => void;
 }) {
-  const celdasConRuna = celdas.filter(
-    (c) => resultadosPorCelda[c.id]?.mejorMatch,
-  );
+  const resultadosPorCelda: Record<string, ResultadoCelda> = interpretacion.resultadosPorCelda;
+  const celdasConRuna = celdas.filter((c) => resultadosPorCelda[c.id]?.mejorMatch);
 
   // Celdas que ya forman parte de alguna cadena — el resto (si las hay)
-  // se sigue mostrando suelto abajo, como antes.
+  // se sigue mostrando suelto abajo.
   const idsEnCadena = new Set(cadenas.flatMap((c) => c.celdaIds));
   const celdasSueltas = celdasConRuna.filter((c) => !idsEnCadena.has(c.id));
+
+  // Caso más simple de todos: contorno sin dividir en secciones (1 sola
+  // "celda") y esa celda tiene una runa reconocida — se muestra igual
+  // que el viejo modo simple (1 runa, sin hablar de tablero ni celdas).
+  const esRunaUnica = rejilla.secciones <= 1 && celdas.length === 1;
+  const runaUnica = esRunaUnica ? (resultadosPorCelda[celdas[0].id]?.mejorMatch ?? null) : null;
+  const rankingUnico = esRunaUnica ? (resultadosPorCelda[celdas[0].id]?.ranking ?? []) : [];
+
+  if (esRunaUnica && !combinacion) {
+    return (
+      <div className="w-full rounded-2xl border border-primary/15 bg-white-custom p-5 shadow-md flex flex-col items-center gap-3 text-center animate-[fadeIn_0.2s_ease]">
+        {runaUnica ? (
+          <>
+            <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
+              Runa reconocida
+            </div>
+            <div className="w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3 flex items-center justify-center">
+              <RunaThumbnail patronTrazos={runaUnica.patron_trazos} />
+            </div>
+            <h2 className="text-lg font-black text-primary">{runaUnica.nombre}</h2>
+            {runaUnica.explicacion && (
+              <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
+                <PlainMarkdownPreview value={runaUnica.explicacion} />
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-bold text-primary/50">
+              No se reconoció ninguna runa conocida
+            </p>
+            <p className="text-micro text-primary/30">
+              {rankingUnico[0]
+                ? `Lo más parecido fue "${rankingUnico[0].nombre}", pero no lo suficiente.`
+                : "Intentá trazar el símbolo con más cuidado."}
+            </p>
+          </>
+        )}
+        <button
+          type="button"
+          className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20"
+          onClick={onReintentar}
+        >
+          Intentar de nuevo
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full rounded-2xl border border-primary/15 bg-white-custom p-5 shadow-md flex flex-col items-center gap-3 text-center animate-[fadeIn_0.2s_ease]">
@@ -530,9 +336,7 @@ function ResultadoRejillaCard({
               />
             </div>
           )}
-          <h2 className="text-lg font-black text-primary">
-            {combinacion.nombre}
-          </h2>
+          <h2 className="text-lg font-black text-primary">{combinacion.nombre}</h2>
           {combinacion.explicacion && (
             <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
               <PlainMarkdownPreview value={combinacion.explicacion} />
@@ -543,7 +347,7 @@ function ResultadoRejillaCard({
         <>
           <p className="text-sm font-bold text-primary/50">
             {celdasConRuna.length === 0
-              ? "No se reconoció ninguna runa en el tablero"
+              ? "No se reconoció ninguna runa en el dibujo"
               : "No hay un hechizo compuesto para esta combinación, pero se reconocieron estas runas:"}
           </p>
         </>
@@ -586,9 +390,7 @@ function ResultadoRejillaCard({
               key={c.id}
               className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-primary/5 text-xs"
             >
-              <span className="text-primary/40 font-bold">
-                {labelCelda(c, rejilla)}
-              </span>
+              <span className="text-primary/40 font-bold">{labelCelda(c, rejilla)}</span>
               <span className="text-primary font-semibold">
                 {resultadosPorCelda[c.id].mejorMatch!.nombre}
               </span>
