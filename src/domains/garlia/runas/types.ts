@@ -12,6 +12,7 @@
 import { ScrollText } from "lucide-react";
 
 import type { Punto } from "./dollarOneRecognizer";
+import type { TipoSeparador } from "./separadores";
 
 /**
  * Se mantiene el nombre `EntidadMagica` (en vez de renombrar a algo como
@@ -46,6 +47,14 @@ export type CombinacionRuna = {
   imagen_url?: string | null;
   /** Mapa celdaId → runaId. El match debe ser exacto: mismas celdas, ni de más ni de menos. */
   celdas: Record<string, string>;
+  /**
+   * Mapa gapId → tipo de separador exigido en ese gap. Igual de estricto
+   * que `celdas`: el match exige exactamente estos gaps con exactamente
+   * estos separadores, ni de más ni de menos. Opcional/vacío para
+   * combinaciones que no dependen de separadores (rejillas de 1 sola
+   * sección, o combinaciones que solo importan por runas).
+   */
+  separadores?: Record<string, TipoSeparador>;
 };
 
 // Grupo mínimo de criaturas

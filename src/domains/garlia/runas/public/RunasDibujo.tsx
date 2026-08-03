@@ -225,9 +225,9 @@ export default function RunasDibujo() {
 
   const combinacionEncontrada = useMemo(() => {
     if (!finalizado) return null;
-    return buscarCombinacion(mapaCeldaRuna, combinaciones);
+    return buscarCombinacion(mapaCeldaRuna, combinaciones, separadorPorGap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finalizado, resultadosPorCelda, combinaciones]);
+  }, [finalizado, resultadosPorCelda, combinaciones, separadorPorGap]);
 
   // Cadenas formadas por los separadores — solo tiene sentido si hay más de
   // una sección por anillo (si no, no hay gaps que dibujar).

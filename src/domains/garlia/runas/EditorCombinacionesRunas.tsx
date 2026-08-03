@@ -9,8 +9,12 @@
  *
  * Cada combinación define, por celda (identificada por su id estable
  * "s{seccion}-a{anillo}", independiente de la forma exterior elegida por
- * el jugador), qué runa debe estar dibujada ahí. El match en la página
- * pública es exacto (ver matchCombinacion.ts).
+ * el jugador), qué runa debe estar dibujada ahí, y opcionalmente, por gap
+ * (id estable "g{seccion}-a{anillo}"), qué separador debe estar dibujado
+ * ahí. El match en la página pública es exacto en ambos (ver
+ * matchCombinacion.ts): mismas celdas+runas Y mismos gaps+separadores,
+ * ni de más ni de menos — así, la misma runa en la misma celda puede dar
+ * resultados distintos según qué separador se dibuje entre secciones.
  *
  * Vive al lado del bloque "Forma exterior" en PanelConfigRunas: comparte
  * esa misma `rejilla` (recibida por prop, sin selector propio acá) y ese
@@ -27,10 +31,35 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
-import { FORMA_CIRCULO, centroCelda, generarCeldas, labelCelda, pathCelda, type Celda, type Rejilla } from "./formasLimite";
+import {
+  FORMA_CIRCULO,
+  centroCelda,
+  generarCeldas,
+  generarGaps,
+  labelCelda,
+  pathCelda,
+  puntosGap,
+  type Celda,
+  type Gap,
+  type Rejilla,
+} from "./formasLimite";
 import { PickerImagenRunaBtn } from "./PickerImagenRunaBtn";
 import { RunaThumbnail } from "./RunaThumbnail";
+import { LABEL_SEPARADOR, SIMBOLO_SEPARADOR, TIPOS_SEPARADOR, type TipoSeparador } from "./separadores";
 import type { CombinacionRuna, EntidadMagica } from "./types";
+
+/** Etiqueta legible corta de un gap: "Sección 1 → 2 (Anillo interior)". */
+function labelGap(gap: Gap, rejilla: Rejilla): string {
+  const seccionParte = `Sección ${gap.seccionAntes + 1} → ${gap.seccionDespues + 1}`;
+  if (rejilla.anillos <= 1) return seccionParte;
+  const anilloParte =
+    gap.anillo === 0
+      ? "Anillo interior"
+      : gap.anillo === rejilla.anillos - 1
+        ? "Anillo exterior"
+        : `Anillo ${gap.anillo + 1}`;
+  return `${seccionParte} (${anilloParte})`;
+}
 
 export function EditorCombinacionesRunas({
   runas,
@@ -52,7 +81,7 @@ export function EditorCombinacionesRunas({
       setLoading(true);
       const { data, error } = await supabase
         .from("combinaciones_runas")
-        .select("id, nombre, explicacion, imagen_url, celdas")
+        .select("id, nombre, explicacion, imagen_url, celdas, separadores")
         .order("nombre");
       if (!activo) return;
       if (!error && data) setCombinaciones(data as unknown as CombinacionRuna[]);
@@ -68,8 +97,8 @@ export function EditorCombinacionesRunas({
   const crear = async () => {
     const { data, error } = await supabase
       .from("combinaciones_runas")
-      .insert([{ nombre: "Nueva combinación", celdas: {} }])
-      .select("id, nombre, explicacion, imagen_url, celdas")
+      .insert([{ nombre: "Nueva combinación", celdas: {}, separadores: {} }])
+      .select("id, nombre, explicacion, imagen_url, celdas, separadores")
       .single();
     if (error || !data) return;
     const nueva = data as unknown as CombinacionRuna;
@@ -99,7 +128,11 @@ export function EditorCombinacionesRunas({
           {combinaciones.map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre} ({Object.keys(c.celdas ?? {}).length} celda
-              {Object.keys(c.celdas ?? {}).length === 1 ? "" : "s"})
+              {Object.keys(c.celdas ?? {}).length === 1 ? "" : "s"}
+              {Object.keys(c.separadores ?? {}).length > 0
+                ? `, ${Object.keys(c.separadores ?? {}).length} separador${Object.keys(c.separadores ?? {}).length === 1 ? "" : "es"}`
+                : ""}
+              )
             </option>
           ))}
         </select>
@@ -162,6 +195,7 @@ function EditorUnaCombinacion({
   }, [combinacion.id]);
 
   const celdas = generarCeldas(rejilla);
+  const gaps = generarGaps(rejilla);
 
   const asignarRunaACelda = (celdaId: string, runaId: string | null) => {
     setForm((f) => {
@@ -169,6 +203,15 @@ function EditorUnaCombinacion({
       if (runaId) nuevasCeldas[celdaId] = runaId;
       else delete nuevasCeldas[celdaId];
       return { ...f, celdas: nuevasCeldas };
+    });
+  };
+
+  const asignarSeparadorAGap = (gapId: string, tipo: TipoSeparador | null) => {
+    setForm((f) => {
+      const nuevosSeparadores = { ...(f.separadores ?? {}) };
+      if (tipo) nuevosSeparadores[gapId] = tipo;
+      else delete nuevosSeparadores[gapId];
+      return { ...f, separadores: nuevosSeparadores };
     });
   };
 
@@ -182,6 +225,7 @@ function EditorUnaCombinacion({
           explicacion: form.explicacion || null,
           imagen_url: form.imagen_url || null,
           celdas: form.celdas,
+          separadores: form.separadores ?? {},
         })
         .eq("id", form.id);
       if (!error) onGuardada(form);
@@ -232,7 +276,14 @@ function EditorUnaCombinacion({
         onChange={(e) => setForm((f) => ({ ...f, explicacion: e.target.value }))}
       />
 
-      <TableroCombinacion celdas={celdas} rejilla={rejilla} celdaRunaIds={form.celdas} runas={runas} />
+      <TableroCombinacion
+        celdas={celdas}
+        gaps={gaps}
+        rejilla={rejilla}
+        celdaRunaIds={form.celdas}
+        separadorPorGap={form.separadores ?? {}}
+        runas={runas}
+      />
 
       <div className="space-y-1.5">
         <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
@@ -258,6 +309,38 @@ function EditorUnaCombinacion({
           </div>
         ))}
       </div>
+
+      {gaps.length > 0 && (
+        <div className="space-y-1.5">
+          <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
+            Separador por gap
+          </label>
+          <p className="text-micro text-primary/25">
+            Cada separador distinto cuenta como una combinación distinta con las mismas runas.
+          </p>
+          {gaps.map((gap) => (
+            <div key={gap.id} className="flex items-center gap-2">
+              <span className="text-micro text-primary/40 w-32 shrink-0 truncate">
+                {labelGap(gap, rejilla)}
+              </span>
+              <select
+                className="flex-1 min-w-0 bg-primary/3 rounded-lg px-2 py-1.5 text-xs text-primary outline-none"
+                value={form.separadores?.[gap.id] ?? ""}
+                onChange={(e) =>
+                  asignarSeparadorAGap(gap.id, (e.target.value as TipoSeparador) || null)
+                }
+              >
+                <option value="">— cualquiera / sin exigir —</option>
+                {TIPOS_SEPARADOR.map((tipo) => (
+                  <option key={tipo} value={tipo}>
+                    {SIMBOLO_SEPARADOR[tipo]} {LABEL_SEPARADOR[tipo]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center justify-between pt-1">
         <button
@@ -295,14 +378,19 @@ const MARGEN_TABLERO = 14;
 
 function TableroCombinacion({
   celdas,
+  gaps,
   rejilla,
   celdaRunaIds,
+  separadorPorGap,
   runas,
 }: {
   celdas: Celda[];
+  gaps: Gap[];
   rejilla: Rejilla;
   /** Mapa celdaId → runaId, tal como se guarda en la combinación. */
   celdaRunaIds: Record<string, string>;
+  /** Mapa gapId → separador exigido, tal como se guarda en la combinación. */
+  separadorPorGap: Record<string, TipoSeparador | undefined>;
   runas: EntidadMagica[];
 }) {
   const runasPorId = useMemo(() => new Map(runas.map((r) => [r.id, r])), [runas]);
@@ -365,10 +453,73 @@ function TableroCombinacion({
             </g>
           );
         })}
+
+        {gaps.map((gap) => {
+          const tipo = separadorPorGap[gap.id];
+          if (!tipo) return null;
+          const { interior, exterior } = puntosGap(gap, FORMA_CIRCULO, centro, radio);
+          return (
+            <GlifoSeparadorPreview
+              key={gap.id}
+              tipo={tipo}
+              interior={interior}
+              exterior={exterior}
+            />
+          );
+        })}
       </svg>
       <p className="text-micro text-primary/25 text-center">
-        Vista previa — el trazo se actualiza al elegir una runa abajo
+        Vista previa — el trazo y los separadores se actualizan al elegir abajo
       </p>
     </div>
   );
 }
+
+/**
+ * Glifo vectorial de un separador (⟩⟩ ⟩ ⟨ |), escalado para cubrir todo
+ * el gap entre `interior` y `exterior`. Copia reducida (solo lectura,
+ * sin interacción) del mismo dibujo que usa TableroCeldas.tsx en la
+ * página pública — se duplica acá en vez de importarse desde /public
+ * para no acoplar el editor de admin a ese módulo.
+ */
+function GlifoSeparadorPreview({
+  tipo,
+  interior,
+  exterior,
+}: {
+  tipo: TipoSeparador;
+  interior: { x: number; y: number };
+  exterior: { x: number; y: number };
+}) {
+  const dx = exterior.x - interior.x;
+  const dy = exterior.y - interior.y;
+  const largo = Math.hypot(dx, dy);
+  const anguloGrados = (Math.atan2(dy, dx) * 180) / Math.PI - 90;
+  const medio = { x: (interior.x + exterior.x) / 2, y: (interior.y + exterior.y) / 2 };
+  const mitadLargo = largo / 2;
+  const ancho = Math.min(9, largo * 0.16);
+
+  return (
+    <g
+      transform={`translate(${medio.x.toFixed(1)},${medio.y.toFixed(1)}) rotate(${anguloGrados.toFixed(1)}) scale(${ancho.toFixed(2)},${mitadLargo.toFixed(2)})`}
+      className="pointer-events-none"
+    >
+      <path
+        d={GLIFO_PATH_PREVIEW[tipo]}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </g>
+  );
+}
+
+const GLIFO_PATH_PREVIEW: Record<TipoSeparador, string> = {
+  corta: "M 0 -1 L 0 1",
+  continua: "M 0.7 -1 L -0.7 0 L 0.7 1",
+  continua_inv: "M -0.7 -1 L 0.7 0 L -0.7 1",
+  inicio: "M 0.7 -1 L -0.7 -0.35 L 0.7 0.3 M 0.7 0.05 L -0.7 0.7 L 0.7 1",
+};
