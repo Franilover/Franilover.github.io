@@ -247,7 +247,7 @@ function GlifoSeparador({
   const dx = exterior.x - interior.x;
   const dy = exterior.y - interior.y;
   const largo = Math.hypot(dx, dy);
-  const anguloGrados = (Math.atan2(dy, dx) * 180) / Math.PI - 90; // -90: el glifo local apunta "hacia arriba" en Y-
+  const anguloGrados = (Math.atan2(dy, dx) * 180) / Math.PI + 90; // +90: alinea el vértice del chevron con el sentido horario (s creciente)
   const medio = { x: (interior.x + exterior.x) / 2, y: (interior.y + exterior.y) / 2 };
 
   const mitadLargo = largo / 2;
