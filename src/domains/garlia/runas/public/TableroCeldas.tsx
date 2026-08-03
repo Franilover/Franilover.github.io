@@ -238,23 +238,22 @@ function GlifoSeparador({
 
 /**
  * Paths en espacio local [-1, 1] × [-1, 1] (antes de escalar), con el
- * origen en el centro del gap y el eje Y apuntando hacia `exterior`
- * (Y=-1 es `interior`, Y=+1 es `exterior`).
+ * origen en el centro del gap. Eje Y = interior(-1)..exterior(+1)
+ * (dirección radial, es la que se estira para cubrir todo el gap).
+ * Eje X = dirección tangencial (hacia los costados del gap) — ahí es
+ * donde el chevron apunta, siguiendo la forma original ⟩ / ⟨.
  *
- *   corta:        una línea recta de punta a punta.
- *   continua:     chevron "⟩" — el vértice apunta hacia `exterior`
- *                 (Y=+1), como una flecha que sale del tablero.
- *   continua_inv: el mismo chevron pero con el vértice hacia `interior`
- *                 (Y=-1) — exactamente invertido respecto a `continua`.
- *   inicio:       doble chevron, mismo sentido que `continua`.
+ *   corta:        una línea recta de punta a punta (sin apuntar a ningún lado).
+ *   continua:     chevron "⟩" — apunta hacia la derecha (visto con el
+ *                 gap en la parte de arriba del tablero).
+ *   continua_inv: chevron "⟨" — apunta hacia la izquierda, exactamente
+ *                 invertido respecto a "continua".
+ *   inicio:       doble chevron "⟩⟩", mismo sentido que "continua",
+ *                 repetido dos veces a lo largo del eje Y.
  */
 const GLIFO_PATH: Record<TipoSeparador, string> = {
   corta: "M 0 -1 L 0 1",
-  continua: "M -0.75 -0.35 L 0 1 L 0.75 -0.35",
-  continua_inv: "M -0.75 0.35 L 0 -1 L 0.75 0.35",
-  // Dos chevrones "⟩⟩" en sucesión a lo largo del eje Y (uno cerca de
-  // `interior`, el otro cerca de `exterior`), cada uno con el vértice
-  // apuntando hacia `exterior` — igual sentido que "continua" pero
-  // repetido, no uno "arriba" y otro "abajo" en X.
-  inicio: "M -0.75 -1 L 0 -0.35 L 0.75 -1 M -0.75 0.05 L 0 0.7 L 0.75 0.05",
+  continua: "M 0.7 -1 L -0.7 0 L 0.7 1",
+  continua_inv: "M -0.7 -1 L 0.7 0 L -0.7 1",
+  inicio: "M 0.7 -1 L -0.7 -0.35 L 0.7 0.3 M 0.7 0.05 L -0.7 0.7 L 0.7 1",
 };
