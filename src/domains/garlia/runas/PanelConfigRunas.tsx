@@ -20,7 +20,7 @@
  */
 
 import { ChevronDown, RotateCcw, Settings2, Sparkles } from "lucide-react";
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
 import type { Punto } from "./dollarOneRecognizer";
@@ -48,33 +48,14 @@ export function PanelConfigRunas({
   /** Catálogo de runas, para el selector "runa por celda" de combinaciones. */
   runas: EntidadMagica[];
 }) {
-  // Gap activo compartido entre los dos tableros (izquierda: "Forma
-  // exterior"; derecha: preview dentro de Combinaciones) y estado en vivo
-  // de la combinación que se está editando a la derecha — así ambos
-  // tableros muestran y editan exactamente los mismos separadores.
+  // Estado puramente local, solo para TESTEAR cómo se ve un separador en un
+  // gap del preview — nunca se guarda en Supabase ni pisa `plantillas_separadores`.
+  // Si el admin sale de la pestaña o recarga, se pierde (a propósito).
   const [gapActivoId, setGapActivoId] = useState<string | null>(null);
-  const [estadoCombinacionActiva, setEstadoCombinacionActiva] = useState<{
-    celdas: Record<string, string>;
-    separadores: Record<string, TipoSeparador>;
-  } | null>(null);
-  const asignarSeparadorRef = useRef<((gapId: string, tipo: TipoSeparador | null) => void) | null>(
-    null,
-  );
+  const [separadorPorGapTest, setSeparadorPorGapTest] = useState<
+    Record<string, TipoSeparador | undefined>
+  >({});
   const [plantillasAbiertas, setPlantillasAbiertas] = useState(false);
-
-  const separadorPorGap: Record<string, TipoSeparador | undefined> =
-    estadoCombinacionActiva?.separadores ?? {};
-  const hayCombinacionActiva = estadoCombinacionActiva !== null;
-
-  const runasPorId = React.useMemo(() => new Map(runas.map((r) => [r.id, r])), [runas]);
-  const runaPorCeldaActiva: Record<string, EntidadMagica | null | undefined> = React.useMemo(() => {
-    if (!estadoCombinacionActiva) return {};
-    const mapa: Record<string, EntidadMagica | null | undefined> = {};
-    for (const [celdaId, runaId] of Object.entries(estadoCombinacionActiva.celdas)) {
-      mapa[celdaId] = runasPorId.get(runaId) ?? null;
-    }
-    return mapa;
-  }, [estadoCombinacionActiva, runasPorId]);
 
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
@@ -84,20 +65,16 @@ export function PanelConfigRunas({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="space-y-3">
-          <SelectorFormaLimite
-            value={config.forma}
-            onChange={(forma) => onActualizar({ forma })}
-          />
           <div className="flex justify-center">
             <div className="w-full max-w-[220px]">
               <TableroCeldas
                 forma={config.forma}
                 rejilla={config.rejilla}
                 celdaActivaId={null}
-                runaPorCelda={runaPorCeldaActiva}
+                runaPorCelda={{}}
                 onSeleccionarCelda={() => {}}
                 gapActivoId={gapActivoId}
-                separadorPorGap={separadorPorGap}
+                separadorPorGap={separadorPorGapTest}
                 onSeleccionarGap={(gap) =>
                   setGapActivoId((actual) => (actual === gap.id ? null : gap.id))
                 }
@@ -105,85 +82,104 @@ export function PanelConfigRunas({
             </div>
           </div>
           <p className="text-micro text-primary/30 text-center">
-            {hayCombinacionActiva
-              ? ""
-              : "Elegí una combinación en el panel de la derecha para ver y editar sus separadores acá."}
+            Solo para probar cómo se ve — esto no guarda nada todavía.
           </p>
-          {gapActivoId && (
-            <div className="flex items-center justify-center gap-2 pt-1">
-              {TIPOS_SEPARADOR.map((tipo) => {
-                const activo = separadorPorGap[gapActivoId] === tipo;
-                return (
-                  <button
-                    key={tipo}
-                    type="button"
-                    title={LABEL_SEPARADOR[tipo]}
-                    disabled={!hayCombinacionActiva}
-                    onClick={() =>
-                      asignarSeparadorRef.current?.(gapActivoId, activo ? null : tipo)
-                    }
-                    className="flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl border transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                    style={{
-                      background: activo
-                        ? "var(--primary)"
-                        : "color-mix(in srgb, var(--primary) 6%, transparent)",
-                      borderColor: activo
-                        ? "var(--primary)"
-                        : "color-mix(in srgb, var(--primary) 20%, transparent)",
-                      color: activo ? "var(--btn-text)" : "var(--primary)",
-                    }}
-                  >
-                    <span className="text-sm font-black leading-none">
-                      {SIMBOLO_SEPARADOR[tipo]}
-                    </span>
-                    <span className="text-[8px] font-bold uppercase tracking-wide leading-none">
-                      {LABEL_SEPARADOR[tipo]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
 
-          <div className="grid grid-cols-2 gap-4 pt-1">
-            <div className="space-y-1.5">
-              <label className="text-micro font-black uppercase tracking-widest text-primary/30">
-                {config.rejilla.secciones === 1
-                  ? "1 sección"
-                  : `${config.rejilla.secciones} secciones`}
-              </label>
-              <input
-                className="w-full accent-[var(--primary)]"
-                max={MAX_SECCIONES}
-                min={MIN_SECCIONES}
-                type="range"
-                value={config.rejilla.secciones}
-                onChange={(e) =>
-                  onActualizar({
-                    rejilla: { ...config.rejilla, secciones: Number(e.target.value) },
-                  })
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-micro font-black uppercase tracking-widest text-primary/30">
-                {config.rejilla.anillos === 1
-                  ? "1 anillo"
-                  : `${config.rejilla.anillos} anillos`}
-              </label>
-              <input
-                className="w-full accent-[var(--primary)]"
-                max={MAX_ANILLOS}
-                min={MIN_ANILLOS}
-                type="range"
-                value={config.rejilla.anillos}
-                onChange={(e) =>
-                  onActualizar({
-                    rejilla: { ...config.rejilla, anillos: Number(e.target.value) },
-                  })
-                }
-              />
-            </div>
+          <div className="space-y-1.5 pt-1">
+            <p className="text-micro font-black uppercase tracking-widest text-primary/30">
+              Forma exterior
+            </p>
+            <SelectorFormaLimite
+              value={config.forma}
+              onChange={(forma) => onActualizar({ forma })}
+            />
+          </div>
+
+          <div className="space-y-1.5 pt-1">
+            <p className="text-micro font-black uppercase tracking-widest text-primary/30">
+              Separador
+            </p>
+            {gapActivoId ? (
+              <div className="flex items-center justify-center gap-2">
+                {TIPOS_SEPARADOR.map((tipo) => {
+                  const activo = separadorPorGapTest[gapActivoId] === tipo;
+                  return (
+                    <button
+                      key={tipo}
+                      type="button"
+                      title={LABEL_SEPARADOR[tipo]}
+                      onClick={() =>
+                        setSeparadorPorGapTest((prev) => ({
+                          ...prev,
+                          [gapActivoId]: tipo,
+                        }))
+                      }
+                      className="flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl border transition-all"
+                      style={{
+                        background: activo
+                          ? "var(--primary)"
+                          : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                        borderColor: activo
+                          ? "var(--primary)"
+                          : "color-mix(in srgb, var(--primary) 20%, transparent)",
+                        color: activo ? "var(--btn-text)" : "var(--primary)",
+                      }}
+                    >
+                      <span className="text-sm font-black leading-none">
+                        {SIMBOLO_SEPARADOR[tipo]}
+                      </span>
+                      <span className="text-[8px] font-bold uppercase tracking-wide leading-none">
+                        {LABEL_SEPARADOR[tipo]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-micro text-primary/25 text-center">
+                Tocá un gap del tablero de arriba para elegir su separador
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5 pt-1">
+            <label className="text-micro font-black uppercase tracking-widest text-primary/30">
+              {config.rejilla.secciones === 1
+                ? "1 sección"
+                : `${config.rejilla.secciones} secciones`}
+            </label>
+            <input
+              className="w-full accent-[var(--primary)]"
+              max={MAX_SECCIONES}
+              min={MIN_SECCIONES}
+              type="range"
+              value={config.rejilla.secciones}
+              onChange={(e) =>
+                onActualizar({
+                  rejilla: { ...config.rejilla, secciones: Number(e.target.value) },
+                })
+              }
+            />
+          </div>
+
+          <div className="space-y-1.5 pt-1">
+            <label className="text-micro font-black uppercase tracking-widest text-primary/30">
+              {config.rejilla.anillos === 1
+                ? "1 anillo"
+                : `${config.rejilla.anillos} anillos`}
+            </label>
+            <input
+              className="w-full accent-[var(--primary)]"
+              max={MAX_ANILLOS}
+              min={MIN_ANILLOS}
+              type="range"
+              value={config.rejilla.anillos}
+              onChange={(e) =>
+                onActualizar({
+                  rejilla: { ...config.rejilla, anillos: Number(e.target.value) },
+                })
+              }
+            />
           </div>
         </div>
 
@@ -191,14 +187,7 @@ export function PanelConfigRunas({
           <p className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/30">
             <Sparkles size={11} /> Combinaciones
           </p>
-          <EditorCombinacionesRunas
-            runas={runas}
-            rejilla={config.rejilla}
-            gapActivoId={gapActivoId}
-            onSeleccionarGap={setGapActivoId}
-            onEstadoEdicionChange={setEstadoCombinacionActiva}
-            asignarSeparadorRef={asignarSeparadorRef}
-          />
+          <EditorCombinacionesRunas runas={runas} rejilla={config.rejilla} />
         </div>
       </div>
 
