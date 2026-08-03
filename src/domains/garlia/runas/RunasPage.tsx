@@ -22,7 +22,6 @@ import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic"
 import { BloqueProbadorYCombinaciones } from "./BloqueProbadorYCombinaciones";
 import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
-import { PanelTestFormaLibre } from "./PanelTestFormaLibre";
 import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
@@ -208,9 +207,6 @@ export function RunasPage({
             />
           </div>
         )}
-        <div className="mt-6">
-          <PanelTestFormaLibre />
-        </div>
       </div>
     );
   }
@@ -244,10 +240,6 @@ export function RunasPage({
             />
           </div>
         )}
-
-        <div className="mt-6">
-          <PanelTestFormaLibre />
-        </div>
       </div>
       <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
         {subsistemaSeleccionado ? (

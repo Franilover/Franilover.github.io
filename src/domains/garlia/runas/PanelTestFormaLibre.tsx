@@ -22,7 +22,7 @@
  *   src/features/garliaPublic/runas/PanelTestFormaLibre.tsx
  */
 
-import { CircleDashed, RotateCcw, Sparkles } from "lucide-react";
+import { RotateCcw, Sparkles } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { CanvasFormaLibre } from "./CanvasFormaLibre";
@@ -31,9 +31,9 @@ import type { Punto } from "./dollarOneRecognizer";
 import { labelForma } from "./formasLimite";
 
 /** Colores distintos por rol, para que se vea claro en el overlay qué interpretó el detector de cada trazo. */
-const COLOR_CONTORNO = "#22c55e"; // verde
-const COLOR_SECCION = "#3b82f6"; // azul
-const COLOR_IGNORADO = "#94a3b8"; // gris
+const COLOR_CONTORNO = "#1e3a8a"; // azul oscuro
+const COLOR_SECCION = "#38bdf8"; // celeste
+const COLOR_IGNORADO = "#ef4444"; // rojo
 
 function OverlayInterpretacion({
   trazos,
@@ -104,20 +104,7 @@ export function PanelTestFormaLibre() {
   const onTrazosChange = (nuevos: Punto[][]) => setTrazos(nuevos);
 
   return (
-    <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-4">
-      <div className="flex items-center gap-2">
-        <CircleDashed size={16} className="text-primary/50" />
-        <p className="text-micro font-black uppercase tracking-widest text-primary/40">
-          Probador — forma + secciones a mano libre
-        </p>
-      </div>
-
-      <p className="text-micro text-primary/40 leading-relaxed">
-        Dibujá primero el contorno exterior (círculo o polígono), después
-        una línea por cada sección que quieras (del centro hacia el
-        borde, o de borde a borde). Todavía no interpreta anillos.
-      </p>
-
+    <div className="space-y-4">
       <div className="relative">
         <CanvasFormaLibre
           height={tamanoCanvas.h}
