@@ -3,13 +3,12 @@
 /**
  * BloqueProbadorYCombinaciones
  * ───────────────────────────────────────────────────────────────────────────
- * Antes SubBloqueProbador y EditorCombinacionesRunas se mostraban lado a
- * lado, cada uno en su mitad. Ahora conviven como un solo bloque con un
- * selector de sección (pestañas) arriba, mostrando una sección a la vez —
- * estética más uniforme, sin dividir la pantalla en dos columnas.
+ * Dos pestañas: "Probador" (test de reconocimiento $1) y "Config"
+ * (config del tablero — forma/rejilla/separadores — más el editor de
+ * combinaciones de runas, ambos apilados en esa misma pestaña).
  */
 
-import { Settings2, Sparkles, Wand2 } from "lucide-react";
+import { Settings2, Wand2 } from "lucide-react";
 import React, { useState } from "react";
 
 import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
@@ -18,12 +17,11 @@ import { PanelTestReconocimiento } from "./PanelTestReconocimiento";
 import type { EntidadMagica } from "./types";
 import type { ConfigRunas } from "./useConfigRunas";
 
-type Seccion = "probador" | "combinaciones" | "config";
+type Seccion = "probador" | "config";
 
 const SECCIONES: { key: Seccion; label: string; Icon: React.ElementType }[] = [
   { key: "probador", label: "Probador", Icon: Wand2 },
-  { key: "combinaciones", label: "Combinaciones", Icon: Sparkles },
-  { key: "config", label: "Config del tablero", Icon: Settings2 },
+  { key: "config", label: "Config", Icon: Settings2 },
 ];
 
 export function BloqueProbadorYCombinaciones({
@@ -64,10 +62,11 @@ export function BloqueProbadorYCombinaciones({
       <div className="px-2 pb-2">
         {seccion === "probador" ? (
           <PanelTestReconocimiento runas={runas} trazosActuales={[]} />
-        ) : seccion === "combinaciones" ? (
-          <EditorCombinacionesRunas runas={runas} />
         ) : (
-          <PanelConfigRunas config={configRunas} onActualizar={onActualizarConfigRunas} />
+          <div className="space-y-6">
+            <PanelConfigRunas config={configRunas} onActualizar={onActualizarConfigRunas} />
+            <EditorCombinacionesRunas runas={runas} />
+          </div>
         )}
       </div>
     </div>
