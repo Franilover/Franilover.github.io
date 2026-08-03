@@ -109,7 +109,10 @@ export function TableroCeldas({
             <g key={celda.id}>
               <polygon
                 points={puntos}
-                onClick={() => onSeleccionarCelda(celda)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSeleccionarCelda(celda);
+                }}
                 className="cursor-pointer transition-colors"
                 fill={
                   activa
@@ -147,7 +150,10 @@ export function TableroCeldas({
                   stroke="transparent"
                   strokeWidth={14}
                   className="cursor-pointer"
-                  onClick={() => onSeleccionarGap(gap)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSeleccionarGap(gap);
+                  }}
                 />
                 {activo && (
                   <line
@@ -232,15 +238,19 @@ function GlifoSeparador({
 
 /**
  * Paths en espacio local [-1, 1] × [-1, 1] (antes de escalar), con el
- * origen en el centro del gap y el eje Y apuntando hacia `exterior`.
+ * origen en el centro del gap y el eje Y apuntando hacia `exterior`
+ * (Y=-1 es `interior`, Y=+1 es `exterior`).
+ *
  *   corta:        una línea recta de punta a punta.
- *   continua:     un chevron ">" apuntando hacia el exterior (afuera).
- *   continua_inv: el mismo chevron pero apuntando hacia el interior.
- *   inicio:       doble chevron (como "continua" pero repetido).
+ *   continua:     chevron "⟩" — el vértice apunta hacia `exterior`
+ *                 (Y=+1), como una flecha que sale del tablero.
+ *   continua_inv: el mismo chevron pero con el vértice hacia `interior`
+ *                 (Y=-1) — exactamente invertido respecto a `continua`.
+ *   inicio:       doble chevron, mismo sentido que `continua`.
  */
 const GLIFO_PATH: Record<TipoSeparador, string> = {
   corta: "M 0 -1 L 0 1",
-  continua: "M -0.6 -1 L 0.6 0 L -0.6 1",
-  continua_inv: "M 0.6 -1 L -0.6 0 L 0.6 1",
-  inicio: "M -0.6 -1 L 0.6 -0.35 L -0.6 0.3 M -0.6 0.15 L 0.6 0.8 L -0.6 1",
+  continua: "M -0.75 -0.35 L 0 1 L 0.75 -0.35",
+  continua_inv: "M -0.75 0.35 L 0 -1 L 0.75 0.35",
+  inicio: "M -0.75 -1 L 0 -0.15 L 0.75 -1 M -0.75 -0.15 L 0 0.7 L 0.75 -0.15",
 };

@@ -262,6 +262,10 @@ export default function RunasDibujo() {
     <div
       className="relative flex flex-col items-center p-4 md:p-8 gap-6"
       style={{ minHeight: "calc(100svh - 64px)" }}
+      onClick={() => {
+        setCeldaActivaId(null);
+        setGapActivoId(null);
+      }}
     >
       <Link
         href="/garlia/aventura"
@@ -314,7 +318,7 @@ export default function RunasDibujo() {
               )}
             </>
           ) : (
-            <>
+            <div className="w-full flex flex-col items-center gap-4">
               <TableroCeldas
                 celdaActivaId={celdaActivaId}
                 forma={forma}
@@ -425,7 +429,7 @@ export default function RunasDibujo() {
                   onReintentar={reintentarRejilla}
                 />
               )}
-            </>
+            </div>
           )}
         </div>
       )}
