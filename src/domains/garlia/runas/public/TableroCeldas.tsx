@@ -291,12 +291,14 @@ function GlifoSeparador({
  *   continua_inv: chevron "⟨" — el vértice se abre hacia la izquierda,
  *                 exactamente invertido respecto a "continua".
  *   inicio:       doble chevron "⟩⟩", mismo sentido que "continua",
- *                 dos vértices consecutivos a lo largo del eje Y, con
- *                 el punto de unión entre ambos también en x=0.
+ *                 dos vértices independientes, uno seguido del otro a lo
+ *                 largo del eje Y con un pequeño hueco entre ambos (no
+ *                 comparten el punto x=0 del medio, para que se lean
+ *                 como dos chevrones separados y no como un rombo).
  */
 const GLIFO_PATH: Record<TipoSeparador, string> = {
   corta: "M 0 -1 L 0 1",
   continua: "M 0 -1 L 0.85 0 L 0 1",
   continua_inv: "M 0 -1 L -0.85 0 L 0 1",
-  inicio: "M 0 -1 L 0.85 -0.5 L 0 0 L 0.85 0.5 L 0 1",
+  inicio: "M 0 -1 L 0.85 -0.65 L 0 -0.3 M 0 0.3 L 0.85 0.65 L 0 1",
 };
