@@ -143,7 +143,22 @@ export function TableroCeldas({
                   className="pointer-events-none"
                 >
                   <foreignObject width={ladoThumb} height={ladoThumb}>
-                    <RunaThumbnail patronTrazos={runa.patron_trazos} />
+                    {/* Blindaje extra: aunque el SVG interno ya centra y escala
+                        su contenido vía preserveAspectRatio, este wrapper
+                        garantiza que nada se salga del cuadrado asignado
+                        a la celda, sea cual sea el tamaño real del trazo. */}
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <RunaThumbnail patronTrazos={runa.patron_trazos} />
+                    </div>
                   </foreignObject>
                 </g>
               )}

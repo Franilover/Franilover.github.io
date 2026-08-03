@@ -30,7 +30,10 @@ export function RunaThumbnail({
   return (
     <svg
       viewBox={`0 0 ${TRAZO_THUMBNAIL_VIEWBOX} ${TRAZO_THUMBNAIL_VIEWBOX}`}
-      className={className ?? "w-full h-full"}
+      // Centra el trazo y lo encoge/agranda para que siempre quepa entero
+      // en el cuadro disponible, sin deformarlo (mantiene su proporción).
+      preserveAspectRatio="xMidYMid meet"
+      className={`${className ?? "w-full h-full"} overflow-hidden block`}
     >
       {paths.map((d, i) => (
         <path
