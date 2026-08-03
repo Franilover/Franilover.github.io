@@ -9,25 +9,32 @@
  * estética más uniforme, sin dividir la pantalla en dos columnas.
  */
 
-import { Sparkles, Wand2 } from "lucide-react";
+import { Settings2, Sparkles, Wand2 } from "lucide-react";
 import React, { useState } from "react";
 
 import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
+import { PanelConfigRunas } from "./PanelConfigRunas";
 import { PanelTestReconocimiento } from "./PanelTestReconocimiento";
 import type { EntidadMagica } from "./types";
+import type { ConfigRunas } from "./useConfigRunas";
 
-type Seccion = "probador" | "combinaciones";
+type Seccion = "probador" | "combinaciones" | "config";
 
 const SECCIONES: { key: Seccion; label: string; Icon: React.ElementType }[] = [
   { key: "probador", label: "Probador", Icon: Wand2 },
   { key: "combinaciones", label: "Combinaciones", Icon: Sparkles },
+  { key: "config", label: "Config del tablero", Icon: Settings2 },
 ];
 
 export function BloqueProbadorYCombinaciones({
   runas,
+  configRunas,
+  onActualizarConfigRunas,
 }: {
   /** Catálogo completo de runas, para el probador y el editor de combinaciones. */
   runas: EntidadMagica[];
+  configRunas: ConfigRunas;
+  onActualizarConfigRunas: (updates: Partial<ConfigRunas>) => void;
 }) {
   const [seccion, setSeccion] = useState<Seccion>("probador");
 
@@ -57,8 +64,10 @@ export function BloqueProbadorYCombinaciones({
       <div className="px-2 pb-2">
         {seccion === "probador" ? (
           <PanelTestReconocimiento runas={runas} trazosActuales={[]} />
-        ) : (
+        ) : seccion === "combinaciones" ? (
           <EditorCombinacionesRunas runas={runas} />
+        ) : (
+          <PanelConfigRunas config={configRunas} onActualizar={onActualizarConfigRunas} />
         )}
       </div>
     </div>

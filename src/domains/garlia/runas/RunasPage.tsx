@@ -22,7 +22,6 @@ import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic"
 import { BloqueProbadorYCombinaciones } from "./BloqueProbadorYCombinaciones";
 import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
-import { PanelConfigRunas } from "./PanelConfigRunas";
 import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
@@ -199,9 +198,15 @@ export function RunasPage({
     return (
       <div>
         <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
-        <div className="mt-6">
-          <PanelConfigRunas config={configRunas} onActualizar={actualizarConfigRunas} />
-        </div>
+        {todasLasRunas && (
+          <div className="mt-6">
+            <BloqueProbadorYCombinaciones
+              runas={todasLasRunas}
+              configRunas={configRunas}
+              onActualizarConfigRunas={actualizarConfigRunas}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -226,13 +231,13 @@ export function RunasPage({
           <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
         </div>
 
-        <div className="mt-6">
-          <PanelConfigRunas config={configRunas} onActualizar={actualizarConfigRunas} />
-        </div>
-
         {todasLasRunas && (
           <div className="mt-6">
-            <BloqueProbadorYCombinaciones runas={todasLasRunas} />
+            <BloqueProbadorYCombinaciones
+              runas={todasLasRunas}
+              configRunas={configRunas}
+              onActualizarConfigRunas={actualizarConfigRunas}
+            />
           </div>
         )}
       </div>

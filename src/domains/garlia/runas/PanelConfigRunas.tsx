@@ -34,6 +34,7 @@ import {
   type TipoSeparador,
 } from "./separadores";
 import { SelectorFormaLimite } from "./public/SelectorFormaLimite";
+import { TableroCeldas } from "./public/TableroCeldas";
 import type { ConfigRunas } from "./useConfigRunas";
 
 export function PanelConfigRunas({
@@ -57,6 +58,17 @@ export function PanelConfigRunas({
           value={config.forma}
           onChange={(forma) => onActualizar({ forma })}
         />
+        <div className="flex justify-center">
+          <div className="w-full max-w-[220px]">
+            <TableroCeldas
+              forma={config.forma}
+              rejilla={config.rejilla}
+              celdaActivaId={null}
+              runaPorCelda={{}}
+              onSeleccionarCelda={() => {}}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
