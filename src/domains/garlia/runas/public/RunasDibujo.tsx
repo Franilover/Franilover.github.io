@@ -279,7 +279,13 @@ export default function RunasDibujo() {
         className="absolute top-2 left-2 md:top-4 md:left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-main/90 backdrop-blur-sm border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/30 transition-colors shadow-sm text-micro font-black uppercase tracking-widest"
       >
         <ArrowLeft size={12} /> Volver
-      </Link> 
+      </Link>
+
+      <div className="flex flex-col items-center gap-1.5 pt-8 md:pt-2 text-center">
+        <div className="flex items-center gap-2">
+          <ScrollText size={20} style={{ color: "var(--primary)" }} />
+        </div>
+      </div>
 
       {(estado === "cargando" || cargandoConfig) && (
         <div className="flex-1 flex items-center justify-center">
@@ -452,7 +458,7 @@ function ResultadoCard({
       {mejorMatch ? (
         <>
           <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
-            <Sparkles size={12} /> Runa reconocida
+            Runa reconocida
           </div>
           <div className="w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3 flex items-center justify-center">
             <RunaThumbnail patronTrazos={mejorMatch.patron_trazos} />
@@ -519,7 +525,7 @@ function ResultadoRejillaCard({
       {combinacion ? (
         <>
           <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
-            <Sparkles size={12} /> ¡Hechizo compuesto!
+            ¡Hechizo compuesto!
           </div>
           {combinacion.imagen_url && (
             <div className="w-24 h-24 rounded-xl overflow-hidden border border-primary/10 bg-primary/3">
