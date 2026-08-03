@@ -19,8 +19,10 @@
 import React, { useMemo } from "react";
 
 import type { Punto } from "../dollarOneRecognizer";
+import { RunaThumbnail } from "../RunaThumbnail";
 
 import {
+  centroCelda,
   generarCeldas,
   generarGaps,
   labelCelda,
@@ -66,6 +68,10 @@ export function TableroCeldas({
   const celdas = useMemo(() => generarCeldas(rejilla), [rejilla]);
   const gaps = useMemo(() => generarGaps(rejilla), [rejilla]);
 
+  // Tamaño del thumbnail de trazo dentro de cada celda: más chico cuanto
+  // más anillos hay, para que no se pisen entre sí en rejillas densas.
+  const ladoThumb = Math.max(28, Math.min(80, radio / Math.max(1, rejilla.anillos + 1)));
+
   const marcoExterior = useMemo(() => {
     if (forma.tipo === "circulo") return null;
     return verticesPoligono(forma.lados, centro, radio)
@@ -105,6 +111,7 @@ export function TableroCeldas({
           const runa = runaPorCelda[celda.id];
           const tieneDibujo = runa !== undefined;
           const puntos = pathCelda(celda, forma, centro, radio);
+          const centroCeldaPos = centroCelda(celda, forma, centro, radio);
           return (
             <g key={celda.id}>
               <polygon
@@ -130,6 +137,17 @@ export function TableroCeldas({
               >
                 <title>{labelCelda(celda, rejilla)}</title>
               </polygon>
+
+              {runa?.patron_trazos && (
+                <g
+                  transform={`translate(${(centroCeldaPos.x - ladoThumb / 2).toFixed(1)},${(centroCeldaPos.y - ladoThumb / 2).toFixed(1)})`}
+                  className="pointer-events-none"
+                >
+                  <foreignObject width={ladoThumb} height={ladoThumb}>
+                    <RunaThumbnail patronTrazos={runa.patron_trazos} />
+                  </foreignObject>
+                </g>
+              )}
             </g>
           );
         })}

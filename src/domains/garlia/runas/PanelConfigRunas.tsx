@@ -109,8 +109,8 @@ export function PanelConfigRunas({
           </div>
           <p className="text-micro text-primary/30 text-center">
             {hayCombinacionActiva
-              ? "Vinculado a la combinación que estás editando a la derecha."
-              : "Elegí una combinación en el panel de la derecha para editar sus separadores acá."}
+              ? "Vinculado a la combinación que estás editando a la derecha: runas y separadores se ven acá."
+              : "Elegí una combinación en el panel de la derecha para ver y editar sus separadores acá."}
           </p>
           {gapActivoId && (
             <div className="flex items-center justify-center gap-2 pt-1">

@@ -16,10 +16,14 @@
  * ni de más ni de menos — así, la misma runa en la misma celda puede dar
  * resultados distintos según qué separador se dibuje entre secciones.
  *
- * Vive al lado del bloque "Forma exterior" en PanelConfigRunas: comparte
- * esa misma `rejilla` (recibida por prop, sin selector propio acá) y ese
- * mismo tablero visual — este componente es solo: dropdown para elegir
- * qué combinación editar + nombre/descripción/runa-por-celda.
+ * Vive al lado del bloque "Forma exterior" en PanelConfigRunas, y comparte
+ * esa misma `rejilla` (recibida por prop, sin selector propio acá). El
+ * único tablero visual del sistema es el de "Forma exterior" (TableroCeldas,
+ * a la izquierda): este componente es puramente de controles — dropdown
+ * para elegir qué combinación editar, nombre/descripción, runa por celda y
+ * separador por gap — y sincroniza su estado en vivo con ese tablero vía
+ * las props `gapActivoId` / `onSeleccionarGap` / `onEstadoEdicionChange` /
+ * `asignarSeparadorRef` (ver PanelConfigRunas, que las conecta a ambos).
  *
  * Ruta destino:
  *   src/features/editorGarlia/components/magia/EditorCombinacionesRunas.tsx
@@ -27,24 +31,12 @@
 
 import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import Image from "next/image";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
-import {
-  FORMA_CIRCULO,
-  centroCelda,
-  generarCeldas,
-  generarGaps,
-  labelCelda,
-  pathCelda,
-  puntosGap,
-  type Celda,
-  type Gap,
-  type Rejilla,
-} from "./formasLimite";
+import { generarCeldas, generarGaps, labelCelda, type Gap, type Rejilla } from "./formasLimite";
 import { PickerImagenRunaBtn } from "./PickerImagenRunaBtn";
-import { RunaThumbnail } from "./RunaThumbnail";
 import { LABEL_SEPARADOR, SIMBOLO_SEPARADOR, TIPOS_SEPARADOR, type TipoSeparador } from "./separadores";
 import type { CombinacionRuna, EntidadMagica } from "./types";
 
@@ -336,17 +328,6 @@ function EditorUnaCombinacion({
         onChange={(e) => setForm((f) => ({ ...f, explicacion: e.target.value }))}
       />
 
-      <TableroCombinacion
-        celdas={celdas}
-        gaps={gaps}
-        rejilla={rejilla}
-        celdaRunaIds={form.celdas}
-        separadorPorGap={form.separadores ?? {}}
-        runas={runas}
-        gapActivoId={gapActivoId}
-        onSeleccionarGap={(gapId) => onSeleccionarGap?.(gapId === gapActivoId ? null : gapId)}
-      />
-
       <div className="space-y-1.5">
         <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
           Runa por celda
@@ -437,191 +418,3 @@ function EditorUnaCombinacion({
   );
 }
 
-/**
- * TableroCombinacion
- * ────────────────────
- * Vista previa del tablero (círculo dividido en celdas según `rejilla`,
- * igual que en la página pública) donde cada celda muestra el trazo
- * (RunaThumbnail) de la runa que se le asignó en el <select> de abajo.
- * Puramente visual — el estado sigue viviendo en `form.celdas` del
- * padre; esto solo lee `celdaRunaIds` para renderizar el preview.
- */
-const TAMANO_TABLERO = 220;
-const MARGEN_TABLERO = 14;
-
-function TableroCombinacion({
-  celdas,
-  gaps,
-  rejilla,
-  celdaRunaIds,
-  separadorPorGap,
-  runas,
-  gapActivoId = null,
-  onSeleccionarGap,
-}: {
-  celdas: Celda[];
-  gaps: Gap[];
-  rejilla: Rejilla;
-  /** Mapa celdaId → runaId, tal como se guarda en la combinación. */
-  celdaRunaIds: Record<string, string>;
-  /** Mapa gapId → separador exigido, tal como se guarda en la combinación. */
-  separadorPorGap: Record<string, TipoSeparador | undefined>;
-  runas: EntidadMagica[];
-  gapActivoId?: string | null;
-  onSeleccionarGap?: (gapId: string) => void;
-}) {
-  const runasPorId = useMemo(() => new Map(runas.map((r) => [r.id, r])), [runas]);
-
-  const centro = { x: TAMANO_TABLERO / 2, y: TAMANO_TABLERO / 2 };
-  const radio = TAMANO_TABLERO / 2 - MARGEN_TABLERO;
-
-  // Tamaño del thumbnail de trazo dentro de cada celda: más chico cuanto
-  // más celdas hay, para que no se pisen entre sí en rejillas densas.
-  const ladoThumb = Math.max(24, Math.min(60, radio / Math.max(1, rejilla.anillos + 1)));
-
-  return (
-    <div className="flex flex-col items-center gap-1.5 py-1">
-      <svg
-        viewBox={`0 0 ${TAMANO_TABLERO} ${TAMANO_TABLERO}`}
-        className="w-full max-w-[220px] aspect-square"
-        role="img"
-        aria-label="Vista previa del tablero de la combinación"
-      >
-        <circle
-          cx={centro.x}
-          cy={centro.y}
-          r={radio}
-          fill="none"
-          stroke="color-mix(in srgb, var(--primary) 15%, transparent)"
-          strokeWidth={1.5}
-        />
-
-        {celdas.map((celda) => {
-          const runaId = celdaRunaIds[celda.id];
-          const runa = runaId ? runasPorId.get(runaId) : undefined;
-          const puntos = pathCelda(celda, FORMA_CIRCULO, centro, radio);
-          const centroCeldaPos = centroCelda(celda, FORMA_CIRCULO, centro, radio);
-
-          return (
-            <g key={celda.id}>
-              <polygon
-                points={puntos}
-                fill={
-                  runa
-                    ? "color-mix(in srgb, var(--primary) 10%, transparent)"
-                    : "color-mix(in srgb, var(--primary) 3%, transparent)"
-                }
-                stroke="color-mix(in srgb, var(--primary) 18%, transparent)"
-                strokeWidth={1}
-              >
-                <title>{labelCelda(celda, rejilla)}</title>
-              </polygon>
-
-              {runa?.patron_trazos && (
-                <g
-                  transform={`translate(${(centroCeldaPos.x - ladoThumb / 2).toFixed(1)},${(centroCeldaPos.y - ladoThumb / 2).toFixed(1)})`}
-                  className="pointer-events-none"
-                >
-                  <foreignObject width={ladoThumb} height={ladoThumb}>
-                    <RunaThumbnail patronTrazos={runa.patron_trazos} />
-                  </foreignObject>
-                </g>
-              )}
-            </g>
-          );
-        })}
-
-        {gaps.map((gap) => {
-          const tipo = separadorPorGap[gap.id];
-          const activo = gap.id === gapActivoId;
-          const { interior, exterior } = puntosGap(gap, FORMA_CIRCULO, centro, radio);
-          return (
-            <g key={gap.id}>
-              {/* Línea invisible más gruesa solo para agrandar el área clickeable */}
-              <line
-                x1={interior.x}
-                y1={interior.y}
-                x2={exterior.x}
-                y2={exterior.y}
-                stroke="transparent"
-                strokeWidth={14}
-                className={onSeleccionarGap ? "cursor-pointer" : undefined}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSeleccionarGap?.(gap.id);
-                }}
-              />
-              {activo && (
-                <line
-                  x1={interior.x}
-                  y1={interior.y}
-                  x2={exterior.x}
-                  y2={exterior.y}
-                  stroke="var(--primary)"
-                  strokeWidth={4}
-                  strokeLinecap="round"
-                  className="pointer-events-none"
-                />
-              )}
-              {tipo && (
-                <GlifoSeparadorPreview tipo={tipo} interior={interior} exterior={exterior} />
-              )}
-            </g>
-          );
-        })}
-      </svg>
-      <p className="text-micro text-primary/25 text-center">
-        Vista previa — el trazo y los separadores se actualizan al elegir abajo
-      </p>
-    </div>
-  );
-}
-
-/**
- * Glifo vectorial de un separador (⟩⟩ ⟩ ⟨ |), escalado para cubrir todo
- * el gap entre `interior` y `exterior`. Copia reducida (solo lectura,
- * sin interacción) del mismo dibujo que usa TableroCeldas.tsx en la
- * página pública — se duplica acá en vez de importarse desde /public
- * para no acoplar el editor de admin a ese módulo.
- */
-function GlifoSeparadorPreview({
-  tipo,
-  interior,
-  exterior,
-}: {
-  tipo: TipoSeparador;
-  interior: { x: number; y: number };
-  exterior: { x: number; y: number };
-}) {
-  const dx = exterior.x - interior.x;
-  const dy = exterior.y - interior.y;
-  const largo = Math.hypot(dx, dy);
-  const anguloGrados = (Math.atan2(dy, dx) * 180) / Math.PI - 90;
-  const medio = { x: (interior.x + exterior.x) / 2, y: (interior.y + exterior.y) / 2 };
-  const mitadLargo = largo / 2;
-  const ancho = Math.min(9, largo * 0.16);
-
-  return (
-    <g
-      transform={`translate(${medio.x.toFixed(1)},${medio.y.toFixed(1)}) rotate(${anguloGrados.toFixed(1)}) scale(${ancho.toFixed(2)},${mitadLargo.toFixed(2)})`}
-      className="pointer-events-none"
-    >
-      <path
-        d={GLIFO_PATH_PREVIEW[tipo]}
-        fill="none"
-        stroke="var(--primary)"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </g>
-  );
-}
-
-const GLIFO_PATH_PREVIEW: Record<TipoSeparador, string> = {
-  corta: "M 0 -1 L 0 1",
-  continua: "M 0.7 -1 L -0.7 0 L 0.7 1",
-  continua_inv: "M -0.7 -1 L 0.7 0 L -0.7 1",
-  inicio: "M 0.7 -1 L -0.7 -0.35 L 0.7 0.3 M 0.7 0.05 L -0.7 0.7 L 0.7 1",
-};
