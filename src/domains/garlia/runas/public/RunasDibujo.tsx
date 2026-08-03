@@ -54,6 +54,7 @@ import {
   LABEL_SEPARADOR,
   patronesSeparadores,
   SIMBOLO_SEPARADOR,
+  TIPOS_SEPARADOR,
   type TipoSeparador,
 } from "../separadores";
 import type { CombinacionRuna, EntidadMagica } from "../types";
@@ -344,6 +345,44 @@ export default function RunasDibujo() {
 
               {gapActivoId && !finalizado && (
                 <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
+                  <div className="flex items-center justify-center gap-2 pb-3">
+                    {TIPOS_SEPARADOR.map((tipo) => {
+                      const activo = separadorPorGap[gapActivoId] === tipo;
+                      return (
+                        <button
+                          key={tipo}
+                          type="button"
+                          title={LABEL_SEPARADOR[tipo]}
+                          onClick={() =>
+                            setSeparadorPorGap((prev) => ({
+                              ...prev,
+                              [gapActivoId]: tipo,
+                            }))
+                          }
+                          className="flex flex-col items-center gap-0.5 w-16 py-2 rounded-xl border transition-all"
+                          style={{
+                            background: activo
+                              ? "var(--primary)"
+                              : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                            borderColor: activo
+                              ? "var(--primary)"
+                              : "color-mix(in srgb, var(--primary) 20%, transparent)",
+                            color: activo ? "var(--btn-text)" : "var(--primary)",
+                          }}
+                        >
+                          <span className="text-base font-black leading-none">
+                            {SIMBOLO_SEPARADOR[tipo]}
+                          </span>
+                          <span className="text-[9px] font-bold uppercase tracking-wide leading-none">
+                            {LABEL_SEPARADOR[tipo]}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-micro text-center pb-2 font-bold text-primary/30">
+                    Tocá un símbolo, o dibujalo abajo
+                  </p>
                   <CanvasDibujoRuna
                     height={160}
                     resetSignal={resetSignal}
@@ -351,7 +390,7 @@ export default function RunasDibujo() {
                   />
                   <p className="text-micro text-center pt-2 font-bold text-primary/50">
                     {separadorPorGap[gapActivoId]
-                      ? `Reconocido: ${SIMBOLO_SEPARADOR[separadorPorGap[gapActivoId]!]} ${LABEL_SEPARADOR[separadorPorGap[gapActivoId]!]}`
+                      ? `Seleccionado: ${SIMBOLO_SEPARADOR[separadorPorGap[gapActivoId]!]} ${LABEL_SEPARADOR[separadorPorGap[gapActivoId]!]}`
                       : "Dibujá ⟩⟩ (inicio), ⟩ (continúa), ⟨ (continúa invertido) o | (corta)"}
                   </p>
                 </div>
