@@ -26,11 +26,10 @@
  */
 
 import { ChevronDown, RotateCcw } from "lucide-react";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
 import type { Punto } from "./dollarOneRecognizer";
-import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
 import { FORMA_CIRCULO, labelForma as labelFormaCorta, REJILLA_SIMPLE, type FormaLimite, type Rejilla } from "./formasLimite";
 import {
   LABEL_SEPARADOR,
@@ -43,33 +42,32 @@ import { TableroCeldas } from "./public/TableroCeldas";
 import type { EntidadMagica } from "./types";
 import type { ConfigRunas } from "./useConfigRunas";
 
+export type PreviewCombinacion = {
+  forma: FormaLimite;
+  rejilla: Rejilla;
+  celdaRunaIds: Record<string, string>;
+  separadorPorGap: Record<string, TipoSeparador | undefined>;
+} | null;
+
 export function PanelConfigRunas({
   config,
   onActualizar,
   runas,
+  previewCombinacion,
 }: {
   config: ConfigRunas;
   onActualizar: (updates: Partial<ConfigRunas>) => void;
   /** Catálogo de runas, para el selector "runa por celda" de combinaciones. */
   runas: EntidadMagica[];
+  /**
+   * Preview de la combinación en edición (levantado al padre para que el
+   * editor de combinaciones, ahora en otra columna, pueda escribirlo).
+   * `null` cuando no hay ninguna combinación en edición — en ese caso el
+   * tablero muestra un aviso en vez de un círculo vacío editable.
+   */
+  previewCombinacion: PreviewCombinacion;
 }) {
   const [plantillasAbiertas, setPlantillasAbiertas] = useState(false);
-
-  // Preview de la combinación que se está editando en EditorCombinacionesRunas
-  // (al lado): trae su propia forma+rejilla+celdas+separadores. `null`
-  // cuando no hay ninguna combinación en edición — en ese caso el tablero
-  // muestra un aviso en vez de un círculo vacío editable, porque ya no hay
-  // una "forma oficial" que editar sin elegir combinación primero.
-  const [previewCombinacion, setPreviewCombinacion] = useState<{
-    forma: FormaLimite;
-    rejilla: Rejilla;
-    celdaRunaIds: Record<string, string>;
-    separadorPorGap: Record<string, TipoSeparador | undefined>;
-  } | null>(null);
-  const onCambiarPreview = useCallback(
-    (preview: typeof previewCombinacion) => setPreviewCombinacion(preview),
-    [],
-  );
 
   const runasPorId = useMemo(() => new Map(runas.map((r) => [r.id, r])), [runas]);
   const runaPorCelda = useMemo(() => {
@@ -88,39 +86,30 @@ export function PanelConfigRunas({
 
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <div className="space-y-3">
-          <div className="flex justify-center">
-            <div className="w-full max-w-[340px]">
-              <TableroCeldas
-                forma={formaPreview}
-                rejilla={rejillaPreview}
-                celdaActivaId={null}
-                runaPorCelda={runaPorCelda}
-                onSeleccionarCelda={() => {}}
-                separadorPorGap={separadorPorGap}
-              />
-            </div>
+      <div className="space-y-3">
+        <div className="flex justify-center">
+          <div className="w-full max-w-[340px]">
+            <TableroCeldas
+              forma={formaPreview}
+              rejilla={rejillaPreview}
+              celdaActivaId={null}
+              runaPorCelda={runaPorCelda}
+              onSeleccionarCelda={() => {}}
+              separadorPorGap={separadorPorGap}
+            />
           </div>
-
-          {!hayComboEnEdicion ? (
-            <p className="text-micro text-primary/30 text-center">
-              Elegí una combinación para definir su forma
-            </p>
-          ) : (
-            <p className="text-micro text-primary/30 text-center">
-              {labelFormaCorta(formaPreview)} · {rejillaPreview.secciones}×
-              {rejillaPreview.anillos}
-            </p>
-          )}
         </div>
 
-        <div className="space-y-3 sm:border-l sm:border-primary/10 sm:pl-5">
-          <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center">
-            Combinaciones
+        {!hayComboEnEdicion ? (
+          <p className="text-micro text-primary/30 text-center">
+            Elegí una combinación para definir su forma
           </p>
-          <EditorCombinacionesRunas runas={runas} onCambiarPreview={onCambiarPreview} />
-        </div>
+        ) : (
+          <p className="text-micro text-primary/30 text-center">
+            {labelFormaCorta(formaPreview)} · {rejillaPreview.secciones}×
+            {rejillaPreview.anillos}
+          </p>
+        )}
       </div>
 
       <div className="border-t border-primary/10 pt-3">

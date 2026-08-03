@@ -19,9 +19,14 @@ import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStor
 import { RichEditor } from "@/editor/lexical";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
 
-import { BloqueProbadorYCombinaciones } from "./BloqueProbadorYCombinaciones";
+import {
+  PanelCombinacionesRunas,
+  SelectorProbadorConfig,
+  type SeccionProbadorConfig,
+} from "./BloqueProbadorYCombinaciones";
 import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
+import type { PreviewCombinacion } from "./PanelConfigRunas";
 import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
@@ -189,74 +194,109 @@ export function RunasPage({
 
   const { config: configRunas, actualizar: actualizarConfigRunas } = useConfigRunas();
 
+  // Sección activa de la columna 1: "probador" (Probador de reconocimiento
+  // $1) o "config" (tablero de forma/rejilla/separadores). Cuando está en
+  // "config", la columna 2 se reserva para el editor de combinaciones en
+  // vez del ensayo/subsistema.
+  const [seccionProbadorConfig, setSeccionProbadorConfig] =
+    useState<SeccionProbadorConfig>("probador");
+  // Preview de la combinación en edición dentro del editor de
+  // combinaciones (columna 2, sección "config") — se muestra en el
+  // tablero de la columna 1.
+  const [previewCombinacion, setPreviewCombinacion] = useState<PreviewCombinacion>(null);
+
   if (loading && runas.length === 0) {
     return <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>;
   }
 
-  // Sin onOpenEnsayo: comportamiento anterior, un solo bloque.
+  // Sin onOpenEnsayo: comportamiento anterior, un solo bloque apilado.
   if (!onOpenEnsayo) {
     return (
       <div>
         <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
         {todasLasRunas && (
-          <div className="mt-6">
-            <BloqueProbadorYCombinaciones
+          <div className="mt-6 space-y-6">
+            <SelectorProbadorConfig
+              seccion={seccionProbadorConfig}
+              onCambiarSeccion={setSeccionProbadorConfig}
               runas={todasLasRunas}
               configRunas={configRunas}
               onActualizarConfigRunas={actualizarConfigRunas}
+              previewCombinacion={previewCombinacion}
             />
+            {seccionProbadorConfig === "config" && (
+              <PanelCombinacionesRunas
+                runas={todasLasRunas}
+                onCambiarPreview={setPreviewCombinacion}
+              />
+            )}
           </div>
         )}
       </div>
     );
   }
 
-  // Vista dividida: mitad izquierda = runas + herramientas,
-  // mitad derecha = ensayo de Energías — o, si hay un subsistema
-  // seleccionado, su editor reemplaza al ensayo en ese mismo lugar (en
-  // vez de abrirse en un modal flotante encima de todo).
+  // Vista con dos grandes columnas (Runas | Sistemas):
+  //
+  //   [tarjetas de Runas — fila superior, full width]
+  //   [columna 1                ] [columna 2                    ]
+  //   [Probador / Config (tabs) ] [chips de Subsistemas         ]
+  //   [contenido del tab activo ] [contenido: subsistema, o el
+  //                                editor de combinaciones si el
+  //                                tab activo es "config", o si no
+  //                                hay nada seleccionado el ensayo
+  //                                de Energías]
+  const mostrarCombinacionesEnCol2 = seccionProbadorConfig === "config";
+
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
-      <div className="flex-1 min-w-0">
-        <BloqueSubsistemasMagia
-          subsistemas={subsistemas}
-          loading={loadingSubsistemas}
-          creating={creandoSubsistema}
-          crear={crearSubsistema}
-          subsistemaSeleccionadoId={subsistemaSeleccionadoId}
-          onSelect={setSubsistemaSeleccionadoId}
-        />
+    <div>
+      <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
 
-        <div className="mt-6">
-          <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
-        </div>
-
-        {todasLasRunas && (
-          <div className="mt-6">
-            <BloqueProbadorYCombinaciones
+      <div className="mt-6 flex flex-col lg:flex-row gap-6">
+        <div className="flex-1 min-w-0">
+          {todasLasRunas && (
+            <SelectorProbadorConfig
+              seccion={seccionProbadorConfig}
+              onCambiarSeccion={setSeccionProbadorConfig}
               runas={todasLasRunas}
               configRunas={configRunas}
               onActualizarConfigRunas={actualizarConfigRunas}
+              previewCombinacion={previewCombinacion}
             />
-          </div>
-        )}
-      </div>
-      <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-        {subsistemaSeleccionado ? (
-          <PanelEditorSubsistema
-            key={subsistemaSeleccionado.id}
-            subsistema={subsistemaSeleccionado}
-            onVolver={() => setSubsistemaSeleccionadoId(null)}
-            onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
-            onDelete={() => {
-              void eliminarSubsistema(subsistemaSeleccionado.id);
-              setSubsistemaSeleccionadoId(null);
-            }}
-            onSelectCriatura={(id) => onOpen("criaturas", id)}
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+          <BloqueSubsistemasMagia
+            subsistemas={subsistemas}
+            loading={loadingSubsistemas}
+            creating={creandoSubsistema}
+            crear={crearSubsistema}
+            subsistemaSeleccionadoId={subsistemaSeleccionadoId}
+            onSelect={setSubsistemaSeleccionadoId}
           />
-        ) : (
-          <BloqueEnsayoEnergias />
-        )}
+
+          {mostrarCombinacionesEnCol2 && todasLasRunas ? (
+            <PanelCombinacionesRunas
+              runas={todasLasRunas}
+              onCambiarPreview={setPreviewCombinacion}
+            />
+          ) : subsistemaSeleccionado ? (
+            <PanelEditorSubsistema
+              key={subsistemaSeleccionado.id}
+              subsistema={subsistemaSeleccionado}
+              onVolver={() => setSubsistemaSeleccionadoId(null)}
+              onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
+              onDelete={() => {
+                void eliminarSubsistema(subsistemaSeleccionado.id);
+                setSubsistemaSeleccionadoId(null);
+              }}
+              onSelectCriatura={(id) => onOpen("criaturas", id)}
+            />
+          ) : (
+            <BloqueEnsayoEnergias />
+          )}
+        </div>
       </div>
     </div>
   );
