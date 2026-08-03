@@ -174,22 +174,17 @@ export function FormularioRuna({
           de Runas (son herramientas globales, no de una runa en
           particular). */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col sm:flex-row gap-0 h-full">
-          <div
-            className="sm:w-1/2 min-w-0 p-4 sm:border-r"
-            style={{ borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)" }}
-          >
-            <PanelPatronRuna
-              key={form.id}
-              color={CONFIG.color}
-              patronTrazos={(form.patron_trazos as any) ?? []}
-              onChange={(trazos) =>
-                setForm((f) => ({ ...f, patron_trazos: trazos }))
-              }
-            />
-          </div>
+        <div className="flex flex-col gap-4 p-4">
+          <PanelPatronRuna
+            key={form.id}
+            color={CONFIG.color}
+            patronTrazos={(form.patron_trazos as any) ?? []}
+            onChange={(trazos) =>
+              setForm((f) => ({ ...f, patron_trazos: trazos }))
+            }
+          />
 
-          <div className="sm:w-1/2 min-w-0 p-4 space-y-4">
+          <div className="space-y-4">
             <PanelGruposAsignados
               color={CONFIG.color}
               entidadId={form.id}

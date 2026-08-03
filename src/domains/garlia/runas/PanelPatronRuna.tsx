@@ -96,15 +96,17 @@ export function PanelPatronRuna({
           <PenTool size={11} /> Patrón de trazo
         </label>
 
-        <div ref={sentinelRef} className="w-full h-0" />
-        <CanvasDibujoRuna
-          color={color}
-          height={lado}
-          mostrarHerramientas
-          resetSignal={resetSignal}
-          trazoInicial={trazoParaPrecargar}
-          onTrazoCompleto={fijarTrazo}
-        />
+        <div ref={sentinelRef} className="w-full max-w-md h-0" />
+        <div className="max-w-md">
+          <CanvasDibujoRuna
+            color={color}
+            height={lado}
+            mostrarHerramientas
+            resetSignal={resetSignal}
+            trazoInicial={trazoParaPrecargar}
+            onTrazoCompleto={fijarTrazo}
+          />
+        </div>
 
         {trazoActual && (
           <div className="flex items-center gap-1.5 text-micro text-primary/40 pt-1">
