@@ -79,7 +79,7 @@ export function TableroCeldas({
     <div className="w-full flex flex-col items-center gap-1.5">
       <svg
         viewBox={`0 0 ${TAMANO} ${TAMANO}`}
-        className="w-full max-w-[320px] aspect-square"
+        className="w-full max-w-[420px] aspect-square"
         role="group"
         aria-label="Tablero de celdas para dibujar runas"
       >
@@ -110,7 +110,7 @@ export function TableroCeldas({
           const centroCeldaPos = centroCelda(celda, forma, centro, radio);
           // Thumbnail más chico cuanto más celdas hay, para que no se pisen
           // entre sí en rejillas densas (mismo criterio que el preview de combinaciones).
-          const ladoThumb = Math.max(20, Math.min(52, radio / Math.max(1, rejilla.anillos + 1)));
+          const ladoThumb = Math.max(20, Math.min(72, radio / Math.max(1, rejilla.anillos + 1)));
           return (
             <g key={celda.id}>
               <polygon

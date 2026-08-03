@@ -48,18 +48,13 @@ export function PanelConfigRunas({
   /** Catálogo de runas, para el selector "runa por celda" de combinaciones. */
   runas: EntidadMagica[];
 }) {
-  // Estado puramente local, solo para TESTEAR cómo se ve un separador en un
-  // gap del preview — nunca se guarda en Supabase ni pisa `plantillas_separadores`.
-  // Si el admin sale de la pestaña o recarga, se pierde (a propósito).
-  const [gapActivoId, setGapActivoId] = useState<string | null>(null);
-  const [separadorPorGapTest, setSeparadorPorGapTest] = useState<
-    Record<string, TipoSeparador | undefined>
-  >({});
   const [plantillasAbiertas, setPlantillasAbiertas] = useState(false);
 
   // Preview de la combinación que se está editando en EditorCombinacionesRunas
   // (al lado). Este tablero es el único que renderiza runas + separadores;
-  // el editor de combinaciones solo tiene los selectores.
+  // el editor de combinaciones solo tiene los selectores. Ya no hay modo de
+  // click-en-gap-para-probar acá: eso se maneja por completo desde el panel
+  // de Combinaciones.
   const [previewCombinacion, setPreviewCombinacion] = useState<{
     celdaRunaIds: Record<string, string>;
     separadorPorGap: Record<string, TipoSeparador | undefined>;
@@ -79,29 +74,21 @@ export function PanelConfigRunas({
     return mapa;
   }, [previewCombinacion, runasPorId]);
 
-  // Mientras se edita una combinación, el tablero muestra sus separadores;
-  // si no, sigue disponible el modo de prueba libre de separadorPorGapTest.
-  const separadorPorGapMostrado = previewCombinacion
-    ? previewCombinacion.separadorPorGap
-    : separadorPorGapTest;
+  const separadorPorGap = previewCombinacion?.separadorPorGap ?? {};
 
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="space-y-3">
           <div className="flex justify-center">
-            <div className="w-full max-w-[220px]">
+            <div className="w-full max-w-[340px]">
               <TableroCeldas
                 forma={config.forma}
                 rejilla={config.rejilla}
                 celdaActivaId={null}
                 runaPorCelda={runaPorCelda}
                 onSeleccionarCelda={() => {}}
-                gapActivoId={gapActivoId}
-                separadorPorGap={separadorPorGapMostrado}
-                onSeleccionarGap={(gap) =>
-                  setGapActivoId((actual) => (actual === gap.id ? null : gap.id))
-                }
+                separadorPorGap={separadorPorGap}
               />
             </div>
           </div>
@@ -111,50 +98,6 @@ export function PanelConfigRunas({
               value={config.forma}
               onChange={(forma) => onActualizar({ forma })}
             />
-          </div>
-
-          <div className="space-y-1.5 pt-1">
-            {!previewCombinacion && gapActivoId ? (
-              <div className="flex items-center justify-center gap-2">
-                {TIPOS_SEPARADOR.map((tipo) => {
-                  const activo = separadorPorGapMostrado[gapActivoId] === tipo;
-                  return (
-                    <button
-                      key={tipo}
-                      type="button"
-                      title={LABEL_SEPARADOR[tipo]}
-                      onClick={() =>
-                        setSeparadorPorGapTest((prev) => ({
-                          ...prev,
-                          [gapActivoId]: tipo,
-                        }))
-                      }
-                      className="flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl border transition-all"
-                      style={{
-                        background: activo
-                          ? "var(--primary)"
-                          : "color-mix(in srgb, var(--primary) 6%, transparent)",
-                        borderColor: activo
-                          ? "var(--primary)"
-                          : "color-mix(in srgb, var(--primary) 20%, transparent)",
-                        color: activo ? "var(--btn-text)" : "var(--primary)",
-                      }}
-                    >
-                      <span className="text-sm font-black leading-none">
-                        {SIMBOLO_SEPARADOR[tipo]}
-                      </span>
-                      <span className="text-[8px] font-bold uppercase tracking-wide leading-none">
-                        {LABEL_SEPARADOR[tipo]}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : !previewCombinacion ? (
-              <p className="text-micro text-primary/25 text-center">
-                Tocá un gap del tablero de arriba para elegir su separador
-              </p>
-            ) : null}
           </div>
 
           <div className="space-y-1.5 pt-1">
