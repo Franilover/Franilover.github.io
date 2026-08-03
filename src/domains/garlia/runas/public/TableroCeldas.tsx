@@ -222,10 +222,13 @@ export function TableroCeldas({
  * exterior de su gap — no un texto de tamaño fijo centrado en el medio.
  *
  * Cada glifo se define en un espacio local con origen en el punto medio
- * del gap, eje Y de -1 (hacia `interior`) a +1 (hacia `exterior`). Se
- * escala en Y a la mitad de la longitud real del gap (para cubrirlo
- * entero) y un poco en X (ensanche horizontal leve), luego se rota al
- * ángulo real del gap y se traslada a su punto medio real.
+ * del gap, eje Y de -1 (hacia `interior`) a +1 (hacia `exterior`). Los
+ * extremos del trazo quedan siempre en x=0 (sobre la línea real del
+ * gap); solo el vértice del chevron se desvía hacia un costado, sin
+ * cruzarla nunca. Se escala en Y a la mitad de la longitud real del gap
+ * (para cubrirlo entero) y en X lo justo para que ese desvío no invada
+ * el gap vecino, luego se rota al ángulo real del gap y se traslada a
+ * su punto medio real.
  */
 function GlifoSeparador({
   tipo,
@@ -243,7 +246,11 @@ function GlifoSeparador({
   const medio = { x: (interior.x + exterior.x) / 2, y: (interior.y + exterior.y) / 2 };
 
   const mitadLargo = largo / 2;
-  const ancho = Math.min(9, largo * 0.16); // ensanche horizontal leve, proporcional pero acotado
+  // Antes el trazo oscilaba ±0.7 a ambos lados de la línea; ahora el
+  // vértice se desvía hasta 0.85 pero de un solo lado, así que un ancho
+  // levemente menor alcanza para el mismo alcance visual sin invadir
+  // de más el gap vecino.
+  const ancho = Math.min(7.5, largo * 0.14);
 
   return (
     <g
@@ -267,20 +274,24 @@ function GlifoSeparador({
  * Paths en espacio local [-1, 1] × [-1, 1] (antes de escalar), con el
  * origen en el centro del gap. Eje Y = interior(-1)..exterior(+1)
  * (dirección radial, es la que se estira para cubrir todo el gap).
- * Eje X = dirección tangencial (hacia los costados del gap) — ahí es
- * donde el chevron apunta, siguiendo la forma original ⟩ / ⟨.
+ * Eje X = dirección tangencial (hacia los costados del gap).
  *
- *   corta:        una línea recta de punta a punta (sin apuntar a ningún lado).
- *   continua:     chevron "⟩" — apunta hacia la derecha (visto con el
- *                 gap en la parte de arriba del tablero).
- *   continua_inv: chevron "⟨" — apunta hacia la izquierda, exactamente
- *                 invertido respecto a "continua".
+ * El inicio y el fin de cada trazo quedan siempre en x=0 — es decir,
+ * exactamente sobre la línea recta e invisible del gap (alineados con
+ * el borde interior y exterior real). Solo el vértice/panza del chevron
+ * se desvía hacia un costado, sin cruzar nunca esa línea al otro lado.
+ *
+ *   corta:        una línea recta de punta a punta, siempre en x=0.
+ *   continua:     chevron "⟩" — el vértice se abre hacia la derecha.
+ *   continua_inv: chevron "⟨" — el vértice se abre hacia la izquierda,
+ *                 exactamente invertido respecto a "continua".
  *   inicio:       doble chevron "⟩⟩", mismo sentido que "continua",
- *                 repetido dos veces a lo largo del eje Y.
+ *                 dos vértices consecutivos a lo largo del eje Y, con
+ *                 el punto de unión entre ambos también en x=0.
  */
 const GLIFO_PATH: Record<TipoSeparador, string> = {
   corta: "M 0 -1 L 0 1",
-  continua: "M 0.7 -1 L -0.7 0 L 0.7 1",
-  continua_inv: "M -0.7 -1 L 0.7 0 L -0.7 1",
-  inicio: "M 0.7 -1 L -0.7 -0.35 L 0.7 0.3 M 0.7 0.05 L -0.7 0.7 L 0.7 1",
+  continua: "M 0 -1 L 0.85 0 L 0 1",
+  continua_inv: "M 0 -1 L -0.85 0 L 0 1",
+  inicio: "M 0 -1 L 0.85 -0.5 L 0 0 L 0.85 0.5 L 0 1",
 };
