@@ -3,20 +3,19 @@
 /**
  * EditorCombinacionesRunas.tsx
  * ────────────────────────────
- * Panel de admin (montado dentro de FormularioMagico cuando modo==="runas")
- * para crear/editar "combinaciones" — hechizos compuestos que se activan
- * cuando el jugador dibuja runas específicas en celdas específicas del
- * tablero de /garlia/runas (ver formasLimite.ts: Rejilla/Celda).
+ * Panel de admin para crear/editar "combinaciones" — hechizos compuestos
+ * que se activan cuando el jugador dibuja runas específicas en celdas
+ * específicas del tablero de /garlia/runas (ver formasLimite.ts: Rejilla/Celda).
  *
  * Cada combinación define, por celda (identificada por su id estable
  * "s{seccion}-a{anillo}", independiente de la forma exterior elegida por
  * el jugador), qué runa debe estar dibujada ahí. El match en la página
  * pública es exacto (ver matchCombinacion.ts).
  *
- * La rejilla usada acá para armar el selector de celdas es configurable
- * con el mismo SelectorRejilla que usa la página pública, así el admin
- * puede definir combinaciones para cualquier tamaño de tablero que
- * planee ofrecer a los jugadores.
+ * Vive al lado del bloque "Forma exterior" en PanelConfigRunas: comparte
+ * esa misma `rejilla` (recibida por prop, sin selector propio acá) y ese
+ * mismo tablero visual — este componente es solo: dropdown para elegir
+ * qué combinación editar + nombre/descripción/runa-por-celda.
  *
  * Ruta destino:
  *   src/features/editorGarlia/components/magia/EditorCombinacionesRunas.tsx
@@ -28,13 +27,18 @@ import React, { useEffect, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
-import { FORMA_CIRCULO, generarCeldas, labelCelda, REJILLA_SIMPLE, type Rejilla } from "./formasLimite";
+import { generarCeldas, labelCelda, type Rejilla } from "./formasLimite";
 import { PickerImagenRunaBtn } from "./PickerImagenRunaBtn";
-import { SelectorRejilla } from "./public/SelectorRejilla";
-import { TableroCeldas } from "./public/TableroCeldas";
 import type { CombinacionRuna, EntidadMagica } from "./types";
 
-export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) {
+export function EditorCombinacionesRunas({
+  runas,
+  rejilla,
+}: {
+  runas: EntidadMagica[];
+  /** Misma rejilla que "Forma exterior" — acá no hay selector propio. */
+  rejilla: Rejilla;
+}) {
   const [combinaciones, setCombinaciones] = useState<CombinacionRuna[]>([]);
   const [loading, setLoading] = useState(false);
   const [cargado, setCargado] = useState(false);
@@ -74,110 +78,86 @@ export function EditorCombinacionesRunas({ runas }: { runas: EntidadMagica[] }) 
 
   const editando = combinaciones.find((c) => c.id === editandoId) ?? null;
 
-  return (
-    <div className="h-full flex flex-col">
-      <div className="p-2 space-y-3">
-        {loading && (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="animate-spin text-primary/20" size={18} />
-          </div>
-        )}
-
-        {!loading && editando && (
-          <EditorUnaCombinacion
-            combinacion={editando}
-            runas={runas}
-            onCerrar={() => setEditandoId(null)}
-            onEliminada={(id) => {
-              setCombinaciones((prev) => prev.filter((c) => c.id !== id));
-              setEditandoId(null);
-            }}
-            onGuardada={(actualizada) => {
-              setCombinaciones((prev) =>
-                prev.map((c) => (c.id === actualizada.id ? actualizada : c)),
-              );
-            }}
-          />
-        )}
-
-        {!loading && !editando && (
-          <div className="space-y-1.5">
-            <button
-              type="button"
-              onClick={() => void crear()}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-xs font-semibold text-primary"
-            >
-              <Plus size={13} /> Nueva combinación
-            </button>
-
-            {combinaciones.length === 0 ? (
-              <p className="text-micro text-primary/25 text-center py-3">
-                Sin combinaciones definidas todavía
-              </p>
-            ) : (
-              combinaciones.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setEditandoId(c.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left text-primary/70 hover:bg-primary/5 transition-colors border border-primary/8"
-                >
-                  <Sparkles size={12} className="shrink-0 opacity-40" />
-                  <span className="truncate flex-1">{c.nombre}</span>
-                  <span className="text-micro text-primary/25 shrink-0">
-                    {Object.keys(c.celdas ?? {}).length} celda
-                    {Object.keys(c.celdas ?? {}).length === 1 ? "" : "s"}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <Loader2 className="animate-spin text-primary/20" size={18} />
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <select
+          className="flex-1 min-w-0 bg-primary/3 rounded-lg px-2 py-1.5 text-xs text-primary outline-none"
+          value={editandoId ?? ""}
+          onChange={(e) => setEditandoId(e.target.value || null)}
+        >
+          <option value="">— elegir combinación —</option>
+          {combinaciones.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre} ({Object.keys(c.celdas ?? {}).length} celda
+              {Object.keys(c.celdas ?? {}).length === 1 ? "" : "s"})
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => void crear()}
+          title="Nueva combinación"
+          className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-micro font-black uppercase tracking-widest text-primary shrink-0"
+        >
+          <Plus size={12} />
+        </button>
+      </div>
+
+      {!editando && (
+        <p className="text-micro text-primary/25 text-center py-3">
+          {combinaciones.length === 0
+            ? "Sin combinaciones definidas todavía"
+            : "Elegí una combinación arriba para editarla"}
+        </p>
+      )}
+
+      {editando && (
+        <EditorUnaCombinacion
+          combinacion={editando}
+          rejilla={rejilla}
+          runas={runas}
+          onEliminada={(id) => {
+            setCombinaciones((prev) => prev.filter((c) => c.id !== id));
+            setEditandoId(null);
+          }}
+          onGuardada={(actualizada) => {
+            setCombinaciones((prev) =>
+              prev.map((c) => (c.id === actualizada.id ? actualizada : c)),
+            );
+          }}
+        />
+      )}
     </div>
   );
 }
 
 function EditorUnaCombinacion({
   combinacion,
+  rejilla,
   runas,
   onGuardada,
   onEliminada,
-  onCerrar,
 }: {
   combinacion: CombinacionRuna;
+  rejilla: Rejilla;
   runas: EntidadMagica[];
   onGuardada: (c: CombinacionRuna) => void;
   onEliminada: (id: string) => void;
-  onCerrar: () => void;
 }) {
   const [form, setForm] = useState<CombinacionRuna>(combinacion);
-  const [rejilla, setRejilla] = useState<Rejilla>(REJILLA_SIMPLE);
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
     setForm(combinacion);
-  }, [combinacion.id]);
-
-  // Al abrir, arrancamos con una rejilla que al menos cubra las celdas ya
-  // guardadas (si las hay), para no perderlas de vista visualmente.
-  useEffect(() => {
-    const idsGuardados = Object.keys(combinacion.celdas ?? {});
-    if (idsGuardados.length === 0) return;
-    let mejorSecciones = 1;
-    let mejorAnillos = 1;
-    for (let secciones = 1; secciones <= 8; secciones++) {
-      for (let anillos = 1; anillos <= 4; anillos++) {
-        const ids = new Set(generarCeldas({ secciones, anillos }).map((c) => c.id));
-        if (idsGuardados.every((id) => ids.has(id))) {
-          mejorSecciones = secciones;
-          mejorAnillos = anillos;
-          break;
-        }
-      }
-    }
-    setRejilla({ secciones: mejorSecciones, anillos: mejorAnillos });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [combinacion.id]);
 
   const celdas = generarCeldas(rejilla);
@@ -213,11 +193,6 @@ function EditorUnaCombinacion({
     await supabase.from("combinaciones_runas").delete().eq("id", form.id);
     onEliminada(form.id);
   };
-
-  const runaPorCelda: Record<string, EntidadMagica | null | undefined> = {};
-  for (const [celdaId, runaId] of Object.entries(form.celdas)) {
-    runaPorCelda[celdaId] = runas.find((r) => r.id === runaId) ?? null;
-  }
 
   return (
     <div className="space-y-3 pt-1">
@@ -256,23 +231,6 @@ function EditorUnaCombinacion({
         onChange={(e) => setForm((f) => ({ ...f, explicacion: e.target.value }))}
       />
 
-      <div className="space-y-2">
-        <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
-          Tamaño del tablero
-        </label>
-        <SelectorRejilla value={rejilla} onChange={setRejilla} />
-      </div>
-
-      <div className="flex flex-col items-center gap-2">
-        <TableroCeldas
-          celdaActivaId={null}
-          forma={FORMA_CIRCULO}
-          rejilla={rejilla}
-          runaPorCelda={runaPorCelda}
-          onSeleccionarCelda={() => {}}
-        />
-      </div>
-
       <div className="space-y-1.5">
         <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
           Runa por celda
@@ -301,29 +259,20 @@ function EditorUnaCombinacion({
       <div className="flex items-center justify-between pt-1">
         <button
           type="button"
-          onClick={onCerrar}
-          className="text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors"
+          onClick={() => void eliminar()}
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
         >
-          Volver
+          <Trash2 size={10} /> Eliminar
         </button>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => void eliminar()}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
-          >
-            <Trash2 size={10} />
-          </button>
-          <button
-            type="button"
-            disabled={guardando}
-            onClick={() => void guardar()}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
-          >
-            {guardando ? <Loader2 size={10} className="animate-spin" /> : null}
-            Guardar
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={guardando}
+          onClick={() => void guardar()}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
+        >
+          {guardando ? <Loader2 size={10} className="animate-spin" /> : null}
+          Guardar
+        </button>
       </div>
     </div>
   );

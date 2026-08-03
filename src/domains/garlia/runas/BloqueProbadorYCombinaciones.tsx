@@ -11,7 +11,6 @@
 import { Settings2, Wand2 } from "lucide-react";
 import React, { useState } from "react";
 
-import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
 import { PanelConfigRunas } from "./PanelConfigRunas";
 import { PanelTestReconocimiento } from "./PanelTestReconocimiento";
 import type { EntidadMagica } from "./types";
@@ -63,10 +62,7 @@ export function BloqueProbadorYCombinaciones({
         {seccion === "probador" ? (
           <PanelTestReconocimiento runas={runas} trazosActuales={[]} />
         ) : (
-          <div className="space-y-6">
-            <PanelConfigRunas config={configRunas} onActualizar={onActualizarConfigRunas} />
-            <EditorCombinacionesRunas runas={runas} />
-          </div>
+          <PanelConfigRunas config={configRunas} onActualizar={onActualizarConfigRunas} runas={runas} />
         )}
       </div>
     </div>

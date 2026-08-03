@@ -19,11 +19,12 @@
  *   src/features/editorGarlia/components/magia/PanelConfigRunas.tsx
  */
 
-import { RotateCcw, Settings2 } from "lucide-react";
+import { ChevronDown, RotateCcw, Settings2, Sparkles } from "lucide-react";
 import React, { useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
 import type { Punto } from "./dollarOneRecognizer";
+import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
 import { MAX_ANILLOS, MAX_SECCIONES, MIN_ANILLOS, MIN_SECCIONES } from "./formasLimite";
 import {
   LABEL_SEPARADOR,
@@ -34,14 +35,18 @@ import {
 } from "./separadores";
 import { SelectorFormaLimite } from "./public/SelectorFormaLimite";
 import { TableroCeldas } from "./public/TableroCeldas";
+import type { EntidadMagica } from "./types";
 import type { ConfigRunas } from "./useConfigRunas";
 
 export function PanelConfigRunas({
   config,
   onActualizar,
+  runas,
 }: {
   config: ConfigRunas;
   onActualizar: (updates: Partial<ConfigRunas>) => void;
+  /** Catálogo de runas, para el selector "runa por celda" de combinaciones. */
+  runas: EntidadMagica[];
 }) {
   // Estado puramente local, solo para TESTEAR cómo se ve un separador en un
   // gap del preview — nunca se guarda en Supabase ni pisa `plantillas_separadores`.
@@ -50,6 +55,7 @@ export function PanelConfigRunas({
   const [separadorPorGapTest, setSeparadorPorGapTest] = useState<
     Record<string, TipoSeparador | undefined>
   >({});
+  const [plantillasAbiertas, setPlantillasAbiertas] = useState(false);
 
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
@@ -57,137 +63,161 @@ export function PanelConfigRunas({
         <Settings2 size={12} /> Config del tablero
       </div>
 
-      <div className="space-y-3">
-        <p className="text-micro font-black uppercase tracking-widest text-primary/30">
-          Forma exterior
-        </p>
-        <SelectorFormaLimite
-          value={config.forma}
-          onChange={(forma) => onActualizar({ forma })}
-        />
-        <div className="flex justify-center">
-          <div className="w-full max-w-[220px]">
-            <TableroCeldas
-              forma={config.forma}
-              rejilla={config.rejilla}
-              celdaActivaId={null}
-              runaPorCelda={{}}
-              onSeleccionarCelda={() => {}}
-              gapActivoId={gapActivoId}
-              separadorPorGap={separadorPorGapTest}
-              onSeleccionarGap={(gap) =>
-                setGapActivoId((actual) => (actual === gap.id ? null : gap.id))
-              }
-            />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="space-y-3">
+          <p className="text-micro font-black uppercase tracking-widest text-primary/30">
+            Forma exterior
+          </p>
+          <SelectorFormaLimite
+            value={config.forma}
+            onChange={(forma) => onActualizar({ forma })}
+          />
+          <div className="flex justify-center">
+            <div className="w-full max-w-[220px]">
+              <TableroCeldas
+                forma={config.forma}
+                rejilla={config.rejilla}
+                celdaActivaId={null}
+                runaPorCelda={{}}
+                onSeleccionarCelda={() => {}}
+                gapActivoId={gapActivoId}
+                separadorPorGap={separadorPorGapTest}
+                onSeleccionarGap={(gap) =>
+                  setGapActivoId((actual) => (actual === gap.id ? null : gap.id))
+                }
+              />
+            </div>
+          </div>
+          <p className="text-micro text-primary/30 text-center">
+            Solo para probar cómo se ve — esto no guarda nada todavía.
+          </p>
+          {gapActivoId && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              {TIPOS_SEPARADOR.map((tipo) => {
+                const activo = separadorPorGapTest[gapActivoId] === tipo;
+                return (
+                  <button
+                    key={tipo}
+                    type="button"
+                    title={LABEL_SEPARADOR[tipo]}
+                    onClick={() =>
+                      setSeparadorPorGapTest((prev) => ({
+                        ...prev,
+                        [gapActivoId]: tipo,
+                      }))
+                    }
+                    className="flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl border transition-all"
+                    style={{
+                      background: activo
+                        ? "var(--primary)"
+                        : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                      borderColor: activo
+                        ? "var(--primary)"
+                        : "color-mix(in srgb, var(--primary) 20%, transparent)",
+                      color: activo ? "var(--btn-text)" : "var(--primary)",
+                    }}
+                  >
+                    <span className="text-sm font-black leading-none">
+                      {SIMBOLO_SEPARADOR[tipo]}
+                    </span>
+                    <span className="text-[8px] font-bold uppercase tracking-wide leading-none">
+                      {LABEL_SEPARADOR[tipo]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-micro font-black uppercase tracking-widest text-primary/30">
+                {config.rejilla.secciones === 1
+                  ? "1 sección"
+                  : `${config.rejilla.secciones} secciones`}
+              </label>
+              <input
+                className="w-full accent-[var(--primary)]"
+                max={MAX_SECCIONES}
+                min={MIN_SECCIONES}
+                type="range"
+                value={config.rejilla.secciones}
+                onChange={(e) =>
+                  onActualizar({
+                    rejilla: { ...config.rejilla, secciones: Number(e.target.value) },
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-micro font-black uppercase tracking-widest text-primary/30">
+                {config.rejilla.anillos === 1
+                  ? "1 anillo"
+                  : `${config.rejilla.anillos} anillos`}
+              </label>
+              <input
+                className="w-full accent-[var(--primary)]"
+                max={MAX_ANILLOS}
+                min={MIN_ANILLOS}
+                type="range"
+                value={config.rejilla.anillos}
+                onChange={(e) =>
+                  onActualizar({
+                    rejilla: { ...config.rejilla, anillos: Number(e.target.value) },
+                  })
+                }
+              />
+            </div>
           </div>
         </div>
-        <p className="text-micro text-primary/30 text-center">
-          Solo para probar cómo se ve — esto no guarda nada todavía.
-        </p>
-        {gapActivoId && (
-          <div className="flex items-center justify-center gap-2 pt-1">
-            {TIPOS_SEPARADOR.map((tipo) => {
-              const activo = separadorPorGapTest[gapActivoId] === tipo;
-              return (
-                <button
+
+        <div className="space-y-3 sm:border-l sm:border-primary/10 sm:pl-5">
+          <p className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/30">
+            <Sparkles size={11} /> Combinaciones
+          </p>
+          <EditorCombinacionesRunas runas={runas} rejilla={config.rejilla} />
+        </div>
+      </div>
+
+      <div className="border-t border-primary/10 pt-3">
+        <button
+          type="button"
+          onClick={() => setPlantillasAbiertas((v) => !v)}
+          className="w-full flex items-center justify-between gap-2"
+        >
+          <span className="text-micro font-black uppercase tracking-widest text-primary/30">
+            Plantillas de separador
+          </span>
+          <ChevronDown
+            size={14}
+            className="text-primary/30 transition-transform"
+            style={{ transform: plantillasAbiertas ? "rotate(180deg)" : "rotate(0deg)" }}
+          />
+        </button>
+        {plantillasAbiertas && (
+          <div className="space-y-3 pt-3">
+            <p className="text-micro text-primary/30 -mt-1">
+              El jugador dibuja uno de estos 4 símbolos sobre cada línea que
+              separa dos celdas de un anillo. Redibujá cualquiera para
+              cambiar cómo se reconoce.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {TIPOS_SEPARADOR.map((tipo) => (
+                <PlantillaSeparadorItem
                   key={tipo}
-                  type="button"
-                  title={LABEL_SEPARADOR[tipo]}
-                  onClick={() =>
-                    setSeparadorPorGapTest((prev) => ({
-                      ...prev,
-                      [gapActivoId]: tipo,
-                    }))
-                  }
-                  className="flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl border transition-all"
-                  style={{
-                    background: activo
-                      ? "var(--primary)"
-                      : "color-mix(in srgb, var(--primary) 6%, transparent)",
-                    borderColor: activo
-                      ? "var(--primary)"
-                      : "color-mix(in srgb, var(--primary) 20%, transparent)",
-                    color: activo ? "var(--btn-text)" : "var(--primary)",
+                  tipo={tipo}
+                  trazoCustom={config.plantillas_separadores?.[tipo]?.[0] ?? null}
+                  onChange={(trazo) => {
+                    const actuales = { ...(config.plantillas_separadores ?? {}) };
+                    if (trazo) actuales[tipo] = [trazo];
+                    else delete actuales[tipo];
+                    onActualizar({ plantillas_separadores: actuales });
                   }}
-                >
-                  <span className="text-sm font-black leading-none">
-                    {SIMBOLO_SEPARADOR[tipo]}
-                  </span>
-                  <span className="text-[8px] font-bold uppercase tracking-wide leading-none">
-                    {LABEL_SEPARADOR[tipo]}
-                  </span>
-                </button>
-              );
-            })}
+                />
+              ))}
+            </div>
           </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <label className="text-micro font-black uppercase tracking-widest text-primary/30">
-            {config.rejilla.secciones === 1
-              ? "1 sección"
-              : `${config.rejilla.secciones} secciones`}
-          </label>
-          <input
-            className="w-full accent-[var(--primary)]"
-            max={MAX_SECCIONES}
-            min={MIN_SECCIONES}
-            type="range"
-            value={config.rejilla.secciones}
-            onChange={(e) =>
-              onActualizar({
-                rejilla: { ...config.rejilla, secciones: Number(e.target.value) },
-              })
-            }
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-micro font-black uppercase tracking-widest text-primary/30">
-            {config.rejilla.anillos === 1
-              ? "1 anillo"
-              : `${config.rejilla.anillos} anillos`}
-          </label>
-          <input
-            className="w-full accent-[var(--primary)]"
-            max={MAX_ANILLOS}
-            min={MIN_ANILLOS}
-            type="range"
-            value={config.rejilla.anillos}
-            onChange={(e) =>
-              onActualizar({
-                rejilla: { ...config.rejilla, anillos: Number(e.target.value) },
-              })
-            }
-          />
-        </div>
-      </div>
-
-      <div className="space-y-3 pt-1 border-t border-primary/10">
-        <p className="text-micro font-black uppercase tracking-widest text-primary/30 pt-3">
-          Plantillas de separador
-        </p>
-        <p className="text-micro text-primary/30 -mt-2">
-          El jugador dibuja uno de estos 4 símbolos sobre cada línea que
-          separa dos celdas de un anillo. Redibujá cualquiera para
-          cambiar cómo se reconoce.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {TIPOS_SEPARADOR.map((tipo) => (
-            <PlantillaSeparadorItem
-              key={tipo}
-              tipo={tipo}
-              trazoCustom={config.plantillas_separadores?.[tipo]?.[0] ?? null}
-              onChange={(trazo) => {
-                const actuales = { ...(config.plantillas_separadores ?? {}) };
-                if (trazo) actuales[tipo] = [trazo];
-                else delete actuales[tipo];
-                onActualizar({ plantillas_separadores: actuales });
-              }}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );
