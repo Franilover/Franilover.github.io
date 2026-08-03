@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Plus, ScrollText, Sparkles, Waypoints } from "lucide-react";
+import { Maximize2, Plus, ScrollText, Sparkles, Waypoints, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -248,6 +248,13 @@ export function RunasPage({
 
   const [seccionMagia, setSeccionMagia] = useState<SeccionMagia>("sistema");
 
+  // Modo pantalla completa: "probador" agranda el Probador de
+  // reconocimiento solo; "combinaciones" agranda el render (preview) y
+  // el editor de combinaciones lado a lado. null = layout normal.
+  const [pantallaCompleta, setPantallaCompleta] = useState<
+    "probador" | "combinaciones" | null
+  >(null);
+
   if (loading && runas.length === 0) {
     return <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>;
   }
@@ -332,7 +339,15 @@ export function RunasPage({
           {/* Columna izquierda: Probador (arriba) + Lista de runas (abajo) */}
           <div className="flex-1 min-w-0 space-y-6">
             {todasLasRunas && (
-              <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4">
+              <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 relative">
+                <button
+                  type="button"
+                  onClick={() => setPantallaCompleta("probador")}
+                  className="absolute top-3 right-3 p-1.5 rounded-lg text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
+                  title="Ver probador en pantalla completa"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
                 <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
                   Probador
                 </p>
@@ -346,23 +361,93 @@ export function RunasPage({
           {/* Columna derecha: bloque de config (previsualización) + editor de combinaciones, lado a lado */}
           <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
             {todasLasRunas && (
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex-1 min-w-0">
-                  <PanelConfigRunas
-                    config={configRunas}
-                    onActualizar={actualizarConfigRunas}
-                    runas={todasLasRunas}
-                    previewCombinacion={previewCombinacion}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <PanelCombinacionesRunas
-                    runas={todasLasRunas}
-                    onCambiarPreview={setPreviewCombinacion}
-                  />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setPantallaCompleta("combinaciones")}
+                  className="absolute -top-1 right-0 z-10 p-1.5 rounded-lg text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
+                  title="Ver render y combinaciones en pantalla completa"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="flex-1 min-w-0">
+                    <PanelConfigRunas
+                      config={configRunas}
+                      onActualizar={actualizarConfigRunas}
+                      runas={todasLasRunas}
+                      previewCombinacion={previewCombinacion}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <PanelCombinacionesRunas
+                      runas={todasLasRunas}
+                      onCambiarPreview={setPreviewCombinacion}
+                    />
+                  </div>
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Pantalla completa: Probador solo, usando todo el espacio */}
+      {pantallaCompleta === "probador" && todasLasRunas && (
+        <div className="fixed inset-0 z-50 bg-white-custom flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-primary/10">
+            <p className="text-micro font-black uppercase tracking-widest text-primary/30">
+              Probador
+            </p>
+            <button
+              type="button"
+              onClick={() => setPantallaCompleta(null)}
+              className="p-1.5 rounded-lg text-primary/40 hover:text-primary/70 hover:bg-primary/5 transition-colors"
+              title="Cerrar pantalla completa"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-6">
+            <PanelDetectorUnificado runas={todasLasRunas} />
+          </div>
+        </div>
+      )}
+
+      {/* Pantalla completa: render (preview) y editor de combinaciones,
+          uno al lado del otro usando todo el espacio disponible */}
+      {pantallaCompleta === "combinaciones" && todasLasRunas && (
+        <div className="fixed inset-0 z-50 bg-white-custom flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-primary/10">
+            <p className="text-micro font-black uppercase tracking-widest text-primary/30">
+              Render y combinaciones
+            </p>
+            <button
+              type="button"
+              onClick={() => setPantallaCompleta(null)}
+              className="p-1.5 rounded-lg text-primary/40 hover:text-primary/70 hover:bg-primary/5 transition-colors"
+              title="Cerrar pantalla completa"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-6">
+            <div className="flex flex-col md:flex-row gap-6 h-full">
+              <div className="flex-1 min-w-0">
+                <PanelConfigRunas
+                  config={configRunas}
+                  onActualizar={actualizarConfigRunas}
+                  runas={todasLasRunas}
+                  previewCombinacion={previewCombinacion}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <PanelCombinacionesRunas
+                  runas={todasLasRunas}
+                  onCambiarPreview={setPreviewCombinacion}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
