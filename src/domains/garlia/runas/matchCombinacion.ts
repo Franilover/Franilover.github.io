@@ -14,8 +14,17 @@
  *   src/features/garliaPublic/runas/matchCombinacion.ts
  */
 
+import type { FormaLimite, Rejilla } from "./formasLimite";
 import type { TipoSeparador } from "./separadores";
 import type { CombinacionRuna } from "./types";
+
+function mismaForma(a: FormaLimite, b: FormaLimite): boolean {
+  return a.tipo === b.tipo && a.lados === b.lados;
+}
+
+function mismaRejilla(a: Rejilla, b: Rejilla): boolean {
+  return a.secciones === b.secciones && a.anillos === b.anillos;
+}
 
 /**
  * @param celdasDibujadas mapa celdaId → runaId reconocida en esa celda.
@@ -28,16 +37,29 @@ import type { CombinacionRuna } from "./types";
  *   `celdasDibujadas`). Opcional: si no se pasa, el match ignora
  *   separadores por completo (compatibilidad con combinaciones viejas
  *   sin `separadores` definido).
+ * @param formaDibujada forma+rejilla que el jugador dibujó. Si se pasa,
+ *   es el primer filtro: una combinación con forma/rejilla distinta ni
+ *   siquiera llega a compararse por celdas. Opcional por compatibilidad
+ *   con llamadas viejas que no la pasen.
  */
 export function buscarCombinacion(
   celdasDibujadas: Record<string, string>,
   combinaciones: CombinacionRuna[],
   separadoresDibujados: Record<string, TipoSeparador | undefined> = {},
+  formaDibujada?: { forma: FormaLimite; rejilla: Rejilla },
 ): CombinacionRuna | null {
   const idsDibujadas = Object.keys(celdasDibujadas);
   if (idsDibujadas.length === 0) return null;
 
   for (const combo of combinaciones) {
+    if (
+      formaDibujada &&
+      (!mismaForma(combo.forma, formaDibujada.forma) ||
+        !mismaRejilla(combo.rejilla, formaDibujada.rejilla))
+    ) {
+      continue;
+    }
+
     const idsCombo = Object.keys(combo.celdas);
     if (idsCombo.length !== idsDibujadas.length) continue;
 

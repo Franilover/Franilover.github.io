@@ -41,9 +41,11 @@ import {
 } from "../dollarOneRecognizer";
 import {
   esRejillaSimple,
+  FORMA_CIRCULO,
   generarCeldas,
   generarGaps,
   labelCelda,
+  REJILLA_SIMPLE,
   type Celda,
   type Gap,
   type Rejilla,
@@ -79,11 +81,16 @@ export default function RunasDibujo() {
   const [combinaciones, setCombinaciones] = useState<CombinacionRuna[]>([]);
   const [estado, setEstado] = useState<Estado>("cargando");
 
-  // La forma y la rejilla ya no las elige el jugador — las fija el admin
-  // en el panel de config (ver PanelConfigRunas.tsx / useConfigRunas.ts).
+  // La forma y la rejilla ya no son una config global única: cada
+  // CombinacionRuna define la suya (ver types.ts). Por ahora el tablero
+  // del jugador sigue siendo fijo (círculo, 1 sección × 1 anillo, "modo
+  // simple") — solo matchean acá las combinaciones que también usan esa
+  // forma+rejilla. Dejar que el jugador dibuje su propia forma+rejilla a
+  // mano alzada es la Parte 2 del plan (RunasDibujo.tsx pendiente de
+  // reescritura de flujo — ver charla de diseño).
   const { config: configRunas, loading: cargandoConfig } = useConfigRunas();
-  const forma = configRunas.forma;
-  const rejilla = configRunas.rejilla;
+  const forma = FORMA_CIRCULO;
+  const rejilla = REJILLA_SIMPLE;
 
   // Modo simple (1×1): un solo resultado, igual que antes.
   const [resultadoSimple, setResultadoSimple] = useState<
@@ -120,7 +127,7 @@ export default function RunasDibujo() {
         .select("id, nombre, explicacion, patron_trazos"),
       supabase
         .from("combinaciones_runas")
-        .select("id, nombre, explicacion, imagen_url, celdas"),
+        .select("id, nombre, explicacion, imagen_url, forma, rejilla, celdas, separadores"),
     ]).then(([runasRes, comboRes]) => {
       if (!activo) return;
       if (runasRes.error || !runasRes.data) {
@@ -225,9 +232,9 @@ export default function RunasDibujo() {
 
   const combinacionEncontrada = useMemo(() => {
     if (!finalizado) return null;
-    return buscarCombinacion(mapaCeldaRuna, combinaciones, separadorPorGap);
+    return buscarCombinacion(mapaCeldaRuna, combinaciones, separadorPorGap, { forma, rejilla });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finalizado, resultadosPorCelda, combinaciones, separadorPorGap]);
+  }, [finalizado, resultadosPorCelda, combinaciones, separadorPorGap, forma, rejilla]);
 
   // Cadenas formadas por los separadores — solo tiene sentido si hay más de
   // una sección por anillo (si no, no hay gaps que dibujar).

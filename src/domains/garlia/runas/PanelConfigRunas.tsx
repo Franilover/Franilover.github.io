@@ -4,13 +4,19 @@
  * PanelConfigRunas.tsx
  * ──────────────────────
  * Panel de admin para la config global de runas:
- *   1. Rejilla oficial (secciones × anillos) y forma exterior — antes
- *      era un selector libre que el jugador manejaba en la página
- *      pública; ahora lo fija el admin acá y el jugador solo dibuja.
+ *   1. Tablero de forma/rejilla — ya no hay una rejilla oficial única:
+ *      cada combinación define la suya propia (ver types.ts,
+ *      EditorCombinacionesRunas.tsx). Este tablero es un preview
+ *      de solo lectura de la combinación en edición (al lado); los
+ *      controles reales de forma/secciones/anillos viven en
+ *      EditorCombinacionesRunas.tsx, junto al resto del form de esa
+ *      combinación. Si no hay ninguna combinación en edición, el
+ *      tablero muestra un aviso en vez de un círculo vacío.
  *   2. Plantillas de trazo de los 4 separadores (⟩⟩ ⟩ ⟨ |). Vienen con
  *      un trazo de fábrica (ver separadores.ts) pero el admin puede
  *      redibujar cualquiera de los 4 acá, con el mismo canvas que usa
- *      PanelPatronRuna para las runas.
+ *      PanelPatronRuna para las runas. Esto sigue siendo global (no hay
+ *      "un separador por combinación").
  *
  * Vive en RunasPage.tsx, junto a las demás herramientas globales del
  * sistema de runas (probador, combinaciones).
@@ -25,7 +31,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
 import type { Punto } from "./dollarOneRecognizer";
 import { EditorCombinacionesRunas } from "./EditorCombinacionesRunas";
-import { MAX_ANILLOS, MAX_SECCIONES, MIN_ANILLOS, MIN_SECCIONES } from "./formasLimite";
+import { FORMA_CIRCULO, labelForma as labelFormaCorta, REJILLA_SIMPLE, type FormaLimite, type Rejilla } from "./formasLimite";
 import {
   LABEL_SEPARADOR,
   PLANTILLAS_SEPARADOR_DEFAULT,
@@ -33,7 +39,6 @@ import {
   TIPOS_SEPARADOR,
   type TipoSeparador,
 } from "./separadores";
-import { SelectorFormaLimite } from "./public/SelectorFormaLimite";
 import { TableroCeldas } from "./public/TableroCeldas";
 import type { EntidadMagica } from "./types";
 import type { ConfigRunas } from "./useConfigRunas";
@@ -51,11 +56,13 @@ export function PanelConfigRunas({
   const [plantillasAbiertas, setPlantillasAbiertas] = useState(false);
 
   // Preview de la combinación que se está editando en EditorCombinacionesRunas
-  // (al lado). Este tablero es el único que renderiza runas + separadores;
-  // el editor de combinaciones solo tiene los selectores. Ya no hay modo de
-  // click-en-gap-para-probar acá: eso se maneja por completo desde el panel
-  // de Combinaciones.
+  // (al lado): trae su propia forma+rejilla+celdas+separadores. `null`
+  // cuando no hay ninguna combinación en edición — en ese caso el tablero
+  // muestra un aviso en vez de un círculo vacío editable, porque ya no hay
+  // una "forma oficial" que editar sin elegir combinación primero.
   const [previewCombinacion, setPreviewCombinacion] = useState<{
+    forma: FormaLimite;
+    rejilla: Rejilla;
     celdaRunaIds: Record<string, string>;
     separadorPorGap: Record<string, TipoSeparador | undefined>;
   } | null>(null);
@@ -75,6 +82,9 @@ export function PanelConfigRunas({
   }, [previewCombinacion, runasPorId]);
 
   const separadorPorGap = previewCombinacion?.separadorPorGap ?? {};
+  const formaPreview = previewCombinacion?.forma ?? FORMA_CIRCULO;
+  const rejillaPreview = previewCombinacion?.rejilla ?? REJILLA_SIMPLE;
+  const hayComboEnEdicion = previewCombinacion !== null;
 
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
@@ -83,8 +93,8 @@ export function PanelConfigRunas({
           <div className="flex justify-center">
             <div className="w-full max-w-[340px]">
               <TableroCeldas
-                forma={config.forma}
-                rejilla={config.rejilla}
+                forma={formaPreview}
+                rejilla={rejillaPreview}
                 celdaActivaId={null}
                 runaPorCelda={runaPorCelda}
                 onSeleccionarCelda={() => {}}
@@ -93,63 +103,23 @@ export function PanelConfigRunas({
             </div>
           </div>
 
-          <div className="space-y-1.5 pt-1">
-            <SelectorFormaLimite
-              value={config.forma}
-              onChange={(forma) => onActualizar({ forma })}
-            />
-          </div>
-
-          <div className="space-y-1.5 pt-1">
-            <label className="text-micro font-black uppercase tracking-widest text-primary/30">
-              {config.rejilla.secciones === 1
-                ? "1 sección"
-                : `${config.rejilla.secciones} secciones`}
-            </label>
-            <input
-              className="w-full accent-[var(--primary)]"
-              max={MAX_SECCIONES}
-              min={MIN_SECCIONES}
-              type="range"
-              value={config.rejilla.secciones}
-              onChange={(e) =>
-                onActualizar({
-                  rejilla: { ...config.rejilla, secciones: Number(e.target.value) },
-                })
-              }
-            />
-          </div>
-
-          <div className="space-y-1.5 pt-1">
-            <label className="text-micro font-black uppercase tracking-widest text-primary/30">
-              {config.rejilla.anillos === 1
-                ? "1 anillo"
-                : `${config.rejilla.anillos} anillos`}
-            </label>
-            <input
-              className="w-full accent-[var(--primary)]"
-              max={MAX_ANILLOS}
-              min={MIN_ANILLOS}
-              type="range"
-              value={config.rejilla.anillos}
-              onChange={(e) =>
-                onActualizar({
-                  rejilla: { ...config.rejilla, anillos: Number(e.target.value) },
-                })
-              }
-            />
-          </div>
+          {!hayComboEnEdicion ? (
+            <p className="text-micro text-primary/30 text-center">
+              Elegí una combinación para definir su forma
+            </p>
+          ) : (
+            <p className="text-micro text-primary/30 text-center">
+              {labelFormaCorta(formaPreview)} · {rejillaPreview.secciones}×
+              {rejillaPreview.anillos}
+            </p>
+          )}
         </div>
 
         <div className="space-y-3 sm:border-l sm:border-primary/10 sm:pl-5">
           <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center">
             Combinaciones
           </p>
-          <EditorCombinacionesRunas
-            runas={runas}
-            rejilla={config.rejilla}
-            onCambiarPreview={onCambiarPreview}
-          />
+          <EditorCombinacionesRunas runas={runas} onCambiarPreview={onCambiarPreview} />
         </div>
       </div>
 

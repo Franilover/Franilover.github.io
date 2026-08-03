@@ -12,6 +12,7 @@
 import { ScrollText } from "lucide-react";
 
 import type { Punto } from "./dollarOneRecognizer";
+import type { FormaLimite, Rejilla } from "./formasLimite";
 import type { TipoSeparador } from "./separadores";
 
 /**
@@ -45,6 +46,15 @@ export type CombinacionRuna = {
   nombre: string;
   explicacion?: string | null;
   imagen_url?: string | null;
+  /**
+   * Forma exterior y rejilla (secciones × anillos) propias de esta
+   * combinación. Antes eran una config global única (`config_runas`);
+   * ahora cada combinación define su propio tablero, y el match exige
+   * que el jugador haya dibujado sobre exactamente esta forma+rejilla
+   * antes de siquiera comparar celdas/separadores (ver matchCombinacion.ts).
+   */
+  forma: FormaLimite;
+  rejilla: Rejilla;
   /** Mapa celdaId → runaId. El match debe ser exacto: mismas celdas, ni de más ni de menos. */
   celdas: Record<string, string>;
   /**

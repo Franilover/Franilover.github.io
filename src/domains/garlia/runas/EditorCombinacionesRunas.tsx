@@ -7,19 +7,22 @@
  * que se activan cuando el jugador dibuja runas específicas en celdas
  * específicas del tablero de /garlia/runas (ver formasLimite.ts: Rejilla/Celda).
  *
- * Cada combinación define, por celda (identificada por su id estable
- * "s{seccion}-a{anillo}", independiente de la forma exterior elegida por
- * el jugador), qué runa debe estar dibujada ahí, y opcionalmente, por gap
- * (id estable "g{seccion}-a{anillo}"), qué separador debe estar dibujado
- * ahí. El match en la página pública es exacto en ambos (ver
- * matchCombinacion.ts): mismas celdas+runas Y mismos gaps+separadores,
- * ni de más ni de menos — así, la misma runa en la misma celda puede dar
- * resultados distintos según qué separador se dibuje entre secciones.
+ * Cada combinación define su propia forma exterior y rejilla (secciones ×
+ * anillos) — antes esto era una config global única que el admin fijaba
+ * para todos los jugadores; ahora cada combinación arma su propio tablero,
+ * porque distintos hechizos compuestos pueden necesitar formas distintas.
  *
- * Vive al lado del bloque "Forma exterior" en PanelConfigRunas: comparte
- * esa misma `rejilla` (recibida por prop, sin selector propio acá) y ese
- * mismo tablero visual — este componente es solo: dropdown para elegir
- * qué combinación editar + nombre/descripción/runa-por-celda.
+ * Además define, por celda (identificada por su id estable "s{seccion}-a{anillo}",
+ * independiente de la forma exterior elegida), qué runa debe estar
+ * dibujada ahí, y opcionalmente, por gap (id estable "g{seccion}-a{anillo}"),
+ * qué separador debe estar dibujado ahí. El match en la página pública es
+ * exacto en todo (ver matchCombinacion.ts): misma forma+rejilla, mismas
+ * celdas+runas Y mismos gaps+separadores, ni de más ni de menos.
+ *
+ * Vive al lado del tablero compartido en PanelConfigRunas: ese tablero
+ * refleja siempre la forma+rejilla de la combinación en edición acá (vía
+ * `onCambiarPreview`) — este componente ahora también trae su propio
+ * selector de forma/rejilla, deshabilitado si no hay combinación elegida.
  *
  * Ruta destino:
  *   src/features/editorGarlia/components/magia/EditorCombinacionesRunas.tsx
@@ -31,8 +34,22 @@ import React, { useEffect, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
-import { generarCeldas, generarGaps, labelCelda, type Gap, type Rejilla } from "./formasLimite";
+import {
+  FORMA_CIRCULO,
+  generarCeldas,
+  generarGaps,
+  labelCelda,
+  MAX_ANILLOS,
+  MAX_SECCIONES,
+  MIN_ANILLOS,
+  MIN_SECCIONES,
+  REJILLA_SIMPLE,
+  type FormaLimite,
+  type Gap,
+  type Rejilla,
+} from "./formasLimite";
 import { PickerImagenRunaBtn } from "./PickerImagenRunaBtn";
+import { SelectorFormaLimite } from "./public/SelectorFormaLimite";
 import { LABEL_SEPARADOR, SIMBOLO_SEPARADOR, TIPOS_SEPARADOR, type TipoSeparador } from "./separadores";
 import type { CombinacionRuna, EntidadMagica } from "./types";
 
@@ -51,18 +68,18 @@ function labelGap(gap: Gap, rejilla: Rejilla): string {
 
 export function EditorCombinacionesRunas({
   runas,
-  rejilla,
   onCambiarPreview,
 }: {
   runas: EntidadMagica[];
-  /** Misma rejilla que "Forma exterior" — acá no hay selector propio. */
-  rejilla: Rejilla;
   /**
-   * Se llama en cada cambio de celdas/separadores de la combinación en
-   * edición, para que el tablero compartido (en PanelConfigRunas) la
-   * dibuje. `null` cuando no hay ninguna combinación en edición.
+   * Se llama en cada cambio de forma/rejilla/celdas/separadores de la
+   * combinación en edición, para que el tablero compartido (en
+   * PanelConfigRunas) la dibuje. `null` cuando no hay ninguna combinación
+   * en edición.
    */
   onCambiarPreview: (preview: {
+    forma: FormaLimite;
+    rejilla: Rejilla;
     celdaRunaIds: Record<string, string>;
     separadorPorGap: Record<string, TipoSeparador | undefined>;
   } | null) => void;
@@ -84,7 +101,7 @@ export function EditorCombinacionesRunas({
       setLoading(true);
       const { data, error } = await supabase
         .from("combinaciones_runas")
-        .select("id, nombre, explicacion, imagen_url, celdas, separadores")
+        .select("id, nombre, explicacion, imagen_url, forma, rejilla, celdas, separadores")
         .order("nombre");
       if (!activo) return;
       if (!error && data) setCombinaciones(data as unknown as CombinacionRuna[]);
@@ -100,8 +117,16 @@ export function EditorCombinacionesRunas({
   const crear = async () => {
     const { data, error } = await supabase
       .from("combinaciones_runas")
-      .insert([{ nombre: "Nueva combinación", celdas: {}, separadores: {} }])
-      .select("id, nombre, explicacion, imagen_url, celdas, separadores")
+      .insert([
+        {
+          nombre: "Nueva combinación",
+          forma: FORMA_CIRCULO,
+          rejilla: REJILLA_SIMPLE,
+          celdas: {},
+          separadores: {},
+        },
+      ])
+      .select("id, nombre, explicacion, imagen_url, forma, rejilla, celdas, separadores")
       .single();
     if (error || !data) return;
     const nueva = data as unknown as CombinacionRuna;
@@ -160,7 +185,6 @@ export function EditorCombinacionesRunas({
       {editando && (
         <EditorUnaCombinacion
           combinacion={editando}
-          rejilla={rejilla}
           runas={runas}
           onCambiarPreview={onCambiarPreview}
           onEliminada={(id) => {
@@ -178,18 +202,30 @@ export function EditorCombinacionesRunas({
   );
 }
 
+/** Purga de un mapa celdaId/gapId → algo, las claves que no existen en la nueva rejilla. */
+function purgarClavesHuerfanas<T>(
+  mapa: Record<string, T>,
+  idsValidos: Set<string>,
+): Record<string, T> {
+  const limpio: Record<string, T> = {};
+  for (const [id, v] of Object.entries(mapa)) {
+    if (idsValidos.has(id)) limpio[id] = v;
+  }
+  return limpio;
+}
+
 function EditorUnaCombinacion({
   combinacion,
-  rejilla,
   runas,
   onCambiarPreview,
   onGuardada,
   onEliminada,
 }: {
   combinacion: CombinacionRuna;
-  rejilla: Rejilla;
   runas: EntidadMagica[];
   onCambiarPreview: (preview: {
+    forma: FormaLimite;
+    rejilla: Rejilla;
     celdaRunaIds: Record<string, string>;
     separadorPorGap: Record<string, TipoSeparador | undefined>;
   } | null) => void;
@@ -204,16 +240,35 @@ function EditorUnaCombinacion({
   }, [combinacion.id]);
 
   // El tablero compartido (en PanelConfigRunas) refleja siempre la
-  // combinación que se está editando acá.
+  // forma+rejilla+celdas+separadores de la combinación que se está
+  // editando acá.
   useEffect(() => {
     onCambiarPreview({
+      forma: form.forma,
+      rejilla: form.rejilla,
       celdaRunaIds: form.celdas,
       separadorPorGap: form.separadores ?? {},
     });
-  }, [form.celdas, form.separadores, onCambiarPreview]);
+  }, [form.forma, form.rejilla, form.celdas, form.separadores, onCambiarPreview]);
 
-  const celdas = generarCeldas(rejilla);
-  const gaps = generarGaps(rejilla);
+  const celdas = generarCeldas(form.rejilla);
+  const gaps = generarGaps(form.rejilla);
+
+  // Al cambiar secciones/anillos, purgamos celdas/gaps asignados que ya
+  // no existen en la nueva rejilla (evita ids huérfanos tipo "s3-a2" si
+  // ahora solo hay 2 secciones).
+  const cambiarRejilla = (rejilla: Rejilla) => {
+    setForm((f) => {
+      const idsCeldasValidas = new Set(generarCeldas(rejilla).map((c) => c.id));
+      const idsGapsValidos = new Set(generarGaps(rejilla).map((g) => g.id));
+      return {
+        ...f,
+        rejilla,
+        celdas: purgarClavesHuerfanas(f.celdas, idsCeldasValidas),
+        separadores: purgarClavesHuerfanas(f.separadores ?? {}, idsGapsValidos),
+      };
+    });
+  };
 
   const asignarRunaACelda = (celdaId: string, runaId: string | null) => {
     setForm((f) => {
@@ -242,6 +297,8 @@ function EditorUnaCombinacion({
           nombre: form.nombre,
           explicacion: form.explicacion || null,
           imagen_url: form.imagen_url || null,
+          forma: form.forma,
+          rejilla: form.rejilla,
           celdas: form.celdas,
           separadores: form.separadores ?? {},
         })
@@ -294,6 +351,48 @@ function EditorUnaCombinacion({
         onChange={(e) => setForm((f) => ({ ...f, explicacion: e.target.value }))}
       />
 
+      <div className="space-y-2 border-t border-primary/10 pt-2">
+        <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center">
+          Forma de esta combinación
+        </p>
+        <SelectorFormaLimite
+          value={form.forma}
+          onChange={(forma) => setForm((f) => ({ ...f, forma }))}
+        />
+
+        <div className="space-y-1.5 pt-1">
+          <label className="text-micro font-black uppercase tracking-widest text-primary/30">
+            {form.rejilla.secciones === 1
+              ? "1 sección"
+              : `${form.rejilla.secciones} secciones`}
+          </label>
+          <input
+            className="w-full accent-[var(--primary)]"
+            max={MAX_SECCIONES}
+            min={MIN_SECCIONES}
+            type="range"
+            value={form.rejilla.secciones}
+            onChange={(e) =>
+              cambiarRejilla({ ...form.rejilla, secciones: Number(e.target.value) })
+            }
+          />
+        </div>
+
+        <div className="space-y-1.5 pt-1">
+          <label className="text-micro font-black uppercase tracking-widest text-primary/30">
+            {form.rejilla.anillos === 1 ? "1 anillo" : `${form.rejilla.anillos} anillos`}
+          </label>
+          <input
+            className="w-full accent-[var(--primary)]"
+            max={MAX_ANILLOS}
+            min={MIN_ANILLOS}
+            type="range"
+            value={form.rejilla.anillos}
+            onChange={(e) => cambiarRejilla({ ...form.rejilla, anillos: Number(e.target.value) })}
+          />
+        </div>
+      </div>
+
       <div className="space-y-1.5">
         {celdas.map((celda) => {
           // Gap "siguiente" a esta celda dentro de su mismo anillo: el que
@@ -307,7 +406,7 @@ function EditorUnaCombinacion({
             <div key={celda.id} className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-micro text-primary/40 w-32 shrink-0 truncate">
-                  {labelCelda(celda, rejilla)}
+                  {labelCelda(celda, form.rejilla)}
                 </span>
                 <select
                   className="flex-1 min-w-0 bg-primary/3 rounded-lg px-2 py-1.5 text-xs text-primary outline-none"
@@ -326,7 +425,7 @@ function EditorUnaCombinacion({
               {gapSiguiente && (
                 <div className="flex justify-center">
                   <select
-                    title={labelGap(gapSiguiente, rejilla)}
+                    title={labelGap(gapSiguiente, form.rejilla)}
                     className="w-[70%] min-w-0 bg-primary/8 border border-primary/15 rounded-lg px-2 py-1 text-micro text-primary/70 outline-none text-center"
                     value={form.separadores?.[gapSiguiente.id] ?? ""}
                     onChange={(e) =>
