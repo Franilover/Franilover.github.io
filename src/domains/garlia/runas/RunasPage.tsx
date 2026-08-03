@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Plus, ScrollText } from "lucide-react";
+import { Plus, ScrollText, Sparkles, Waypoints } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -26,7 +26,8 @@ import {
 } from "./BloqueProbadorYCombinaciones";
 import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
-import type { PreviewCombinacion } from "./PanelConfigRunas";
+import { PanelConfigRunas, type PreviewCombinacion } from "./PanelConfigRunas";
+import { PanelDetectorUnificado } from "./PanelDetectorUnificado";
 import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
@@ -170,6 +171,46 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
   );
 }
 
+// ─── Toggle "Sistema" / "Runas" ─────────────────────────────────────────────
+// Sistema: ensayo (Energías) a la izquierda + subsistemas a la derecha,
+// nada más. Runas: el bloque de herramientas de runas (probador, lista,
+// config), sin ensayo ni subsistemas.
+type SeccionMagia = "sistema" | "runas";
+
+const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
+  { key: "sistema", label: "Sistema", Icon: Sparkles },
+  { key: "runas", label: "Runas", Icon: Waypoints },
+];
+
+function SelectorSeccionMagia({
+  seccion,
+  onCambiarSeccion,
+}: {
+  seccion: SeccionMagia;
+  onCambiarSeccion: (seccion: SeccionMagia) => void;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-1 px-2 py-2">
+      {SECCIONES_MAGIA.map(({ key, label, Icon }) => {
+        const activa = seccion === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onCambiarSeccion(key)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-micro font-bold uppercase tracking-[0.12em] transition-colors ${
+              activa ? "bg-primary/10 text-primary" : "text-primary/40 hover:text-primary/70"
+            }`}
+          >
+            <Icon size={13} />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function RunasPage({
   runas,
   loading,
@@ -205,11 +246,15 @@ export function RunasPage({
   // tablero de la columna 1.
   const [previewCombinacion, setPreviewCombinacion] = useState<PreviewCombinacion>(null);
 
+  const [seccionMagia, setSeccionMagia] = useState<SeccionMagia>("sistema");
+
   if (loading && runas.length === 0) {
     return <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>;
   }
 
-  // Sin onOpenEnsayo: comportamiento anterior, un solo bloque apilado.
+  // Sin onOpenEnsayo: comportamiento anterior, un solo bloque apilado
+  // (no hay toggle Sistema/Runas porque no hay ensayo/subsistemas que
+  // mostrar en "Sistema").
   if (!onOpenEnsayo) {
     return (
       <div>
@@ -236,68 +281,81 @@ export function RunasPage({
     );
   }
 
-  // Vista con dos grandes columnas (Runas | Sistemas):
+  // Vista con toggle "Sistema" / "Runas":
   //
-  //   [tarjetas de Runas — fila superior, full width]
-  //   [columna 1                ] [columna 2                    ]
-  //   [Probador / Config (tabs) ] [chips de Subsistemas         ]
-  //   [contenido del tab activo ] [contenido: subsistema, o el
-  //                                editor de combinaciones si el
-  //                                tab activo es "config", o si no
-  //                                hay nada seleccionado el ensayo
-  //                                de Energías]
-  const mostrarCombinacionesEnCol2 = seccionProbadorConfig === "config";
-
+  //   [Sistema | Runas]  ← toggle
+  //
+  //   Sistema:
+  //     [Ensayo (izquierda)] [Subsistemas (derecha)]
+  //     — nada más.
+  //
+  //   Runas:
+  //     [Probador (cuadrado 1:1) + panel lateral Forma/Runa] [Config/preview]
+  //     [Lista de runas                                    ] [   (arriba)  ]
   return (
     <div>
-      <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
+      <SelectorSeccionMagia seccion={seccionMagia} onCambiarSeccion={setSeccionMagia} />
 
-      <div className="mt-6 flex flex-col lg:flex-row gap-6">
-        <div className="flex-1 min-w-0">
-          {todasLasRunas && (
-            <SelectorProbadorConfig
-              seccion={seccionProbadorConfig}
-              onCambiarSeccion={setSeccionProbadorConfig}
-              runas={todasLasRunas}
-              configRunas={configRunas}
-              onActualizarConfigRunas={actualizarConfigRunas}
-              previewCombinacion={previewCombinacion}
-            />
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-          <BloqueSubsistemasMagia
-            subsistemas={subsistemas}
-            loading={loadingSubsistemas}
-            creating={creandoSubsistema}
-            crear={crearSubsistema}
-            subsistemaSeleccionadoId={subsistemaSeleccionadoId}
-            onSelect={setSubsistemaSeleccionadoId}
-          />
-
-          {mostrarCombinacionesEnCol2 && todasLasRunas ? (
-            <PanelCombinacionesRunas
-              runas={todasLasRunas}
-              onCambiarPreview={setPreviewCombinacion}
-            />
-          ) : subsistemaSeleccionado ? (
-            <PanelEditorSubsistema
-              key={subsistemaSeleccionado.id}
-              subsistema={subsistemaSeleccionado}
-              onVolver={() => setSubsistemaSeleccionadoId(null)}
-              onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
-              onDelete={() => {
-                void eliminarSubsistema(subsistemaSeleccionado.id);
-                setSubsistemaSeleccionadoId(null);
-              }}
-              onSelectCriatura={(id) => onOpen("criaturas", id)}
-            />
-          ) : (
+      {seccionMagia === "sistema" ? (
+        <div className="mt-4 flex flex-col lg:flex-row gap-6">
+          <div className="flex-1 min-w-0">
             <BloqueEnsayoEnergias />
-          )}
+          </div>
+
+          <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+            <BloqueSubsistemasMagia
+              subsistemas={subsistemas}
+              loading={loadingSubsistemas}
+              creating={creandoSubsistema}
+              crear={crearSubsistema}
+              subsistemaSeleccionadoId={subsistemaSeleccionadoId}
+              onSelect={setSubsistemaSeleccionadoId}
+            />
+
+            {subsistemaSeleccionado && (
+              <PanelEditorSubsistema
+                key={subsistemaSeleccionado.id}
+                subsistema={subsistemaSeleccionado}
+                onVolver={() => setSubsistemaSeleccionadoId(null)}
+                onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
+                onDelete={() => {
+                  void eliminarSubsistema(subsistemaSeleccionado.id);
+                  setSubsistemaSeleccionadoId(null);
+                }}
+                onSelectCriatura={(id) => onOpen("criaturas", id)}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="mt-4 flex flex-col lg:flex-row gap-6">
+          {/* Columna izquierda: Probador (arriba) + Lista de runas (abajo) */}
+          <div className="flex-1 min-w-0 space-y-6">
+            {todasLasRunas && (
+              <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4">
+                <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
+                  Probador
+                </p>
+                <PanelDetectorUnificado runas={todasLasRunas} />
+              </div>
+            )}
+
+            <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
+          </div>
+
+          {/* Columna derecha: bloque de config (previsualización) */}
+          <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+            {todasLasRunas && (
+              <PanelConfigRunas
+                config={configRunas}
+                onActualizar={actualizarConfigRunas}
+                runas={todasLasRunas}
+                previewCombinacion={previewCombinacion}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
