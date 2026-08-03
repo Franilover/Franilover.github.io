@@ -43,6 +43,14 @@ export function PanelConfigRunas({
   config: ConfigRunas;
   onActualizar: (updates: Partial<ConfigRunas>) => void;
 }) {
+  // Estado puramente local, solo para TESTEAR cómo se ve un separador en un
+  // gap del preview — nunca se guarda en Supabase ni pisa `plantillas_separadores`.
+  // Si el admin sale de la pestaña o recarga, se pierde (a propósito).
+  const [gapActivoId, setGapActivoId] = useState<string | null>(null);
+  const [separadorPorGapTest, setSeparadorPorGapTest] = useState<
+    Record<string, TipoSeparador | undefined>
+  >({});
+
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
       <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
@@ -65,9 +73,54 @@ export function PanelConfigRunas({
               celdaActivaId={null}
               runaPorCelda={{}}
               onSeleccionarCelda={() => {}}
+              gapActivoId={gapActivoId}
+              separadorPorGap={separadorPorGapTest}
+              onSeleccionarGap={(gap) =>
+                setGapActivoId((actual) => (actual === gap.id ? null : gap.id))
+              }
             />
           </div>
         </div>
+        <p className="text-micro text-primary/30 text-center">
+          Solo para probar cómo se ve — esto no guarda nada todavía.
+        </p>
+        {gapActivoId && (
+          <div className="flex items-center justify-center gap-2 pt-1">
+            {TIPOS_SEPARADOR.map((tipo) => {
+              const activo = separadorPorGapTest[gapActivoId] === tipo;
+              return (
+                <button
+                  key={tipo}
+                  type="button"
+                  title={LABEL_SEPARADOR[tipo]}
+                  onClick={() =>
+                    setSeparadorPorGapTest((prev) => ({
+                      ...prev,
+                      [gapActivoId]: tipo,
+                    }))
+                  }
+                  className="flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl border transition-all"
+                  style={{
+                    background: activo
+                      ? "var(--primary)"
+                      : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                    borderColor: activo
+                      ? "var(--primary)"
+                      : "color-mix(in srgb, var(--primary) 20%, transparent)",
+                    color: activo ? "var(--btn-text)" : "var(--primary)",
+                  }}
+                >
+                  <span className="text-sm font-black leading-none">
+                    {SIMBOLO_SEPARADOR[tipo]}
+                  </span>
+                  <span className="text-[8px] font-bold uppercase tracking-wide leading-none">
+                    {LABEL_SEPARADOR[tipo]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
