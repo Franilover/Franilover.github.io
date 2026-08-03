@@ -166,14 +166,18 @@ export function TableroCeldas({
           );
         })}
 
-        {onSeleccionarGap &&
-          gaps.map((gap) => {
-            const activo = gap.id === gapActivoId;
-            const tipo = separadorPorGap?.[gap.id];
-            const { interior, exterior } = puntosGap(gap, forma, centro, radio);
-            return (
-              <g key={gap.id}>
-                {/* Línea invisible más gruesa solo para agrandar el área clickeable */}
+        {gaps.map((gap) => {
+          const activo = gap.id === gapActivoId;
+          const tipo = separadorPorGap?.[gap.id];
+          const { interior, exterior } = puntosGap(gap, forma, centro, radio);
+          return (
+            <g key={gap.id}>
+              {/* Línea invisible más gruesa solo para agrandar el área
+                  clickeable. Solo tiene sentido cuando el tablero es
+                  interactivo (se pasó onSeleccionarGap); en modo preview
+                  de solo lectura se omite, pero el glifo del separador
+                  (más abajo) se sigue dibujando siempre. */}
+              {onSeleccionarGap && (
                 <line
                   x1={interior.x}
                   y1={interior.y}
@@ -187,24 +191,25 @@ export function TableroCeldas({
                     onSeleccionarGap(gap);
                   }}
                 />
-                {activo && (
-                  <line
-                    x1={interior.x}
-                    y1={interior.y}
-                    x2={exterior.x}
-                    y2={exterior.y}
-                    stroke="var(--primary)"
-                    strokeWidth={4}
-                    strokeLinecap="round"
-                    className="cursor-pointer pointer-events-none"
-                  />
-                )}
-                {tipo && (
-                  <GlifoSeparador tipo={tipo} interior={interior} exterior={exterior} />
-                )}
-              </g>
-            );
-          })}
+              )}
+              {onSeleccionarGap && activo && (
+                <line
+                  x1={interior.x}
+                  y1={interior.y}
+                  x2={exterior.x}
+                  y2={exterior.y}
+                  stroke="var(--primary)"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                  className="cursor-pointer pointer-events-none"
+                />
+              )}
+              {tipo && (
+                <GlifoSeparador tipo={tipo} interior={interior} exterior={exterior} />
+              )}
+            </g>
+          );
+        })}
       </svg>
 
       {celdaActivaId && (
