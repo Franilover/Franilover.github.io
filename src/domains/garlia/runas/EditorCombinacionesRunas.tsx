@@ -64,10 +64,35 @@ function labelGap(gap: Gap, rejilla: Rejilla): string {
 export function EditorCombinacionesRunas({
   runas,
   rejilla,
+  gapActivoId = null,
+  onSeleccionarGap,
+  onEstadoEdicionChange,
+  asignarSeparadorRef,
 }: {
   runas: EntidadMagica[];
   /** Misma rejilla que "Forma exterior" — acá no hay selector propio. */
   rejilla: Rejilla;
+  /**
+   * Gap actualmente activo (seleccionado desde el tablero de "Forma
+   * exterior", a la izquierda) — controlado desde el padre para que
+   * ambos tableros resalten el mismo gap.
+   */
+  gapActivoId?: string | null;
+  onSeleccionarGap?: (gapId: string | null) => void;
+  /**
+   * Notifica al padre el estado en vivo de la combinación que se está
+   * editando (celdas + separadores), para que el tablero de la izquierda
+   * pueda mostrar los mismos separadores sin duplicar el form acá.
+   * Se llama con `null` cuando no hay ninguna combinación en edición.
+   */
+  onEstadoEdicionChange?: (estado: { celdas: Record<string, string>; separadores: Record<string, TipoSeparador> } | null) => void;
+  /**
+   * El padre recibe acá una función para asignar separador a un gap
+   * directamente sobre la combinación en edición — así el tablero de la
+   * izquierda edita el mismo estado que el panel de combinaciones, sin
+   * que ninguno de los dos posea "la verdad" por separado.
+   */
+  asignarSeparadorRef?: React.MutableRefObject<((gapId: string, tipo: TipoSeparador | null) => void) | null>;
 }) {
   const [combinaciones, setCombinaciones] = useState<CombinacionRuna[]>([]);
   const [loading, setLoading] = useState(false);
@@ -107,6 +132,11 @@ export function EditorCombinacionesRunas({
   };
 
   const editando = combinaciones.find((c) => c.id === editandoId) ?? null;
+
+  useEffect(() => {
+    if (!editando) onEstadoEdicionChange?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editando?.id]);
 
   if (loading) {
     return (
@@ -159,6 +189,10 @@ export function EditorCombinacionesRunas({
           combinacion={editando}
           rejilla={rejilla}
           runas={runas}
+          gapActivoId={gapActivoId}
+          onSeleccionarGap={onSeleccionarGap}
+          onEstadoEdicionChange={onEstadoEdicionChange}
+          asignarSeparadorRef={asignarSeparadorRef}
           onEliminada={(id) => {
             setCombinaciones((prev) => prev.filter((c) => c.id !== id));
             setEditandoId(null);
@@ -178,12 +212,20 @@ function EditorUnaCombinacion({
   combinacion,
   rejilla,
   runas,
+  gapActivoId = null,
+  onSeleccionarGap,
+  onEstadoEdicionChange,
+  asignarSeparadorRef,
   onGuardada,
   onEliminada,
 }: {
   combinacion: CombinacionRuna;
   rejilla: Rejilla;
   runas: EntidadMagica[];
+  gapActivoId?: string | null;
+  onSeleccionarGap?: (gapId: string | null) => void;
+  onEstadoEdicionChange?: (estado: { celdas: Record<string, string>; separadores: Record<string, TipoSeparador> } | null) => void;
+  asignarSeparadorRef?: React.MutableRefObject<((gapId: string, tipo: TipoSeparador | null) => void) | null>;
   onGuardada: (c: CombinacionRuna) => void;
   onEliminada: (id: string) => void;
 }) {
@@ -214,6 +256,24 @@ function EditorUnaCombinacion({
       return { ...f, separadores: nuevosSeparadores };
     });
   };
+
+  // Expone asignarSeparadorAGap al padre (vía ref) para que el tablero de
+  // "Forma exterior", a la izquierda, pueda editar el mismo estado sin que
+  // este componente deje de ser quien lo posee.
+  useEffect(() => {
+    if (asignarSeparadorRef) asignarSeparadorRef.current = asignarSeparadorAGap;
+    return () => {
+      if (asignarSeparadorRef) asignarSeparadorRef.current = null;
+    };
+  });
+
+  // Notifica al padre el estado en vivo (celdas + separadores) cada vez
+  // que cambia, para que el tablero izquierdo se mantenga sincronizado.
+  useEffect(() => {
+    onEstadoEdicionChange?.({ celdas: form.celdas, separadores: form.separadores ?? {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.celdas, form.separadores]);
+
 
   const guardar = async () => {
     setGuardando(true);
@@ -283,6 +343,8 @@ function EditorUnaCombinacion({
         celdaRunaIds={form.celdas}
         separadorPorGap={form.separadores ?? {}}
         runas={runas}
+        gapActivoId={gapActivoId}
+        onSeleccionarGap={(gapId) => onSeleccionarGap?.(gapId === gapActivoId ? null : gapId)}
       />
 
       <div className="space-y-1.5">
@@ -319,16 +381,27 @@ function EditorUnaCombinacion({
             Cada separador distinto cuenta como una combinación distinta con las mismas runas.
           </p>
           {gaps.map((gap) => (
-            <div key={gap.id} className="flex items-center gap-2">
+            <div
+              key={gap.id}
+              className="flex items-center gap-2 -mx-1 px-1 py-0.5 rounded-lg transition-colors"
+              style={{
+                background:
+                  gap.id === gapActivoId
+                    ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+                    : "transparent",
+              }}
+            >
               <span className="text-micro text-primary/40 w-32 shrink-0 truncate">
                 {labelGap(gap, rejilla)}
               </span>
               <select
                 className="flex-1 min-w-0 bg-primary/3 rounded-lg px-2 py-1.5 text-xs text-primary outline-none"
                 value={form.separadores?.[gap.id] ?? ""}
-                onChange={(e) =>
-                  asignarSeparadorAGap(gap.id, (e.target.value as TipoSeparador) || null)
-                }
+                onFocus={() => onSeleccionarGap?.(gap.id)}
+                onChange={(e) => {
+                  asignarSeparadorAGap(gap.id, (e.target.value as TipoSeparador) || null);
+                  onSeleccionarGap?.(gap.id);
+                }}
               >
                 <option value="">— cualquiera / sin exigir —</option>
                 {TIPOS_SEPARADOR.map((tipo) => (
@@ -383,6 +456,8 @@ function TableroCombinacion({
   celdaRunaIds,
   separadorPorGap,
   runas,
+  gapActivoId = null,
+  onSeleccionarGap,
 }: {
   celdas: Celda[];
   gaps: Gap[];
@@ -392,6 +467,8 @@ function TableroCombinacion({
   /** Mapa gapId → separador exigido, tal como se guarda en la combinación. */
   separadorPorGap: Record<string, TipoSeparador | undefined>;
   runas: EntidadMagica[];
+  gapActivoId?: string | null;
+  onSeleccionarGap?: (gapId: string) => void;
 }) {
   const runasPorId = useMemo(() => new Map(runas.map((r) => [r.id, r])), [runas]);
 
@@ -456,15 +533,40 @@ function TableroCombinacion({
 
         {gaps.map((gap) => {
           const tipo = separadorPorGap[gap.id];
-          if (!tipo) return null;
+          const activo = gap.id === gapActivoId;
           const { interior, exterior } = puntosGap(gap, FORMA_CIRCULO, centro, radio);
           return (
-            <GlifoSeparadorPreview
-              key={gap.id}
-              tipo={tipo}
-              interior={interior}
-              exterior={exterior}
-            />
+            <g key={gap.id}>
+              {/* Línea invisible más gruesa solo para agrandar el área clickeable */}
+              <line
+                x1={interior.x}
+                y1={interior.y}
+                x2={exterior.x}
+                y2={exterior.y}
+                stroke="transparent"
+                strokeWidth={14}
+                className={onSeleccionarGap ? "cursor-pointer" : undefined}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSeleccionarGap?.(gap.id);
+                }}
+              />
+              {activo && (
+                <line
+                  x1={interior.x}
+                  y1={interior.y}
+                  x2={exterior.x}
+                  y2={exterior.y}
+                  stroke="var(--primary)"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                  className="pointer-events-none"
+                />
+              )}
+              {tipo && (
+                <GlifoSeparadorPreview tipo={tipo} interior={interior} exterior={exterior} />
+              )}
+            </g>
           );
         })}
       </svg>

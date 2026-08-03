@@ -20,7 +20,7 @@
  */
 
 import { ChevronDown, RotateCcw, Settings2, Sparkles } from "lucide-react";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
 import type { Punto } from "./dollarOneRecognizer";
@@ -48,14 +48,33 @@ export function PanelConfigRunas({
   /** Catálogo de runas, para el selector "runa por celda" de combinaciones. */
   runas: EntidadMagica[];
 }) {
-  // Estado puramente local, solo para TESTEAR cómo se ve un separador en un
-  // gap del preview — nunca se guarda en Supabase ni pisa `plantillas_separadores`.
-  // Si el admin sale de la pestaña o recarga, se pierde (a propósito).
+  // Gap activo compartido entre los dos tableros (izquierda: "Forma
+  // exterior"; derecha: preview dentro de Combinaciones) y estado en vivo
+  // de la combinación que se está editando a la derecha — así ambos
+  // tableros muestran y editan exactamente los mismos separadores.
   const [gapActivoId, setGapActivoId] = useState<string | null>(null);
-  const [separadorPorGapTest, setSeparadorPorGapTest] = useState<
-    Record<string, TipoSeparador | undefined>
-  >({});
+  const [estadoCombinacionActiva, setEstadoCombinacionActiva] = useState<{
+    celdas: Record<string, string>;
+    separadores: Record<string, TipoSeparador>;
+  } | null>(null);
+  const asignarSeparadorRef = useRef<((gapId: string, tipo: TipoSeparador | null) => void) | null>(
+    null,
+  );
   const [plantillasAbiertas, setPlantillasAbiertas] = useState(false);
+
+  const separadorPorGap: Record<string, TipoSeparador | undefined> =
+    estadoCombinacionActiva?.separadores ?? {};
+  const hayCombinacionActiva = estadoCombinacionActiva !== null;
+
+  const runasPorId = React.useMemo(() => new Map(runas.map((r) => [r.id, r])), [runas]);
+  const runaPorCeldaActiva: Record<string, EntidadMagica | null | undefined> = React.useMemo(() => {
+    if (!estadoCombinacionActiva) return {};
+    const mapa: Record<string, EntidadMagica | null | undefined> = {};
+    for (const [celdaId, runaId] of Object.entries(estadoCombinacionActiva.celdas)) {
+      mapa[celdaId] = runasPorId.get(runaId) ?? null;
+    }
+    return mapa;
+  }, [estadoCombinacionActiva, runasPorId]);
 
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
@@ -78,10 +97,10 @@ export function PanelConfigRunas({
                 forma={config.forma}
                 rejilla={config.rejilla}
                 celdaActivaId={null}
-                runaPorCelda={{}}
+                runaPorCelda={runaPorCeldaActiva}
                 onSeleccionarCelda={() => {}}
                 gapActivoId={gapActivoId}
-                separadorPorGap={separadorPorGapTest}
+                separadorPorGap={separadorPorGap}
                 onSeleccionarGap={(gap) =>
                   setGapActivoId((actual) => (actual === gap.id ? null : gap.id))
                 }
@@ -89,24 +108,24 @@ export function PanelConfigRunas({
             </div>
           </div>
           <p className="text-micro text-primary/30 text-center">
-            Solo para probar cómo se ve — esto no guarda nada todavía.
+            {hayCombinacionActiva
+              ? "Vinculado a la combinación que estás editando a la derecha."
+              : "Elegí una combinación en el panel de la derecha para editar sus separadores acá."}
           </p>
           {gapActivoId && (
             <div className="flex items-center justify-center gap-2 pt-1">
               {TIPOS_SEPARADOR.map((tipo) => {
-                const activo = separadorPorGapTest[gapActivoId] === tipo;
+                const activo = separadorPorGap[gapActivoId] === tipo;
                 return (
                   <button
                     key={tipo}
                     type="button"
                     title={LABEL_SEPARADOR[tipo]}
+                    disabled={!hayCombinacionActiva}
                     onClick={() =>
-                      setSeparadorPorGapTest((prev) => ({
-                        ...prev,
-                        [gapActivoId]: tipo,
-                      }))
+                      asignarSeparadorRef.current?.(gapActivoId, activo ? null : tipo)
                     }
-                    className="flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl border transition-all"
+                    className="flex flex-col items-center gap-0.5 w-14 py-1.5 rounded-xl border transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                     style={{
                       background: activo
                         ? "var(--primary)"
@@ -175,7 +194,14 @@ export function PanelConfigRunas({
           <p className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/30">
             <Sparkles size={11} /> Combinaciones
           </p>
-          <EditorCombinacionesRunas runas={runas} rejilla={config.rejilla} />
+          <EditorCombinacionesRunas
+            runas={runas}
+            rejilla={config.rejilla}
+            gapActivoId={gapActivoId}
+            onSeleccionarGap={setGapActivoId}
+            onEstadoEdicionChange={setEstadoCombinacionActiva}
+            asignarSeparadorRef={asignarSeparadorRef}
+          />
         </div>
       </div>
 
