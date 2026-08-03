@@ -30,7 +30,6 @@ import {
   PLANTILLAS_SEPARADOR_DEFAULT,
   SIMBOLO_SEPARADOR,
   TIPOS_SEPARADOR,
-  pathPreviewSeparador,
   type TipoSeparador,
 } from "./separadores";
 import { SelectorFormaLimite } from "./public/SelectorFormaLimite";
@@ -150,77 +149,43 @@ function PlantillaSeparadorItem({
   trazoCustom: Punto[] | null;
   onChange: (trazo: Punto[] | null) => void;
 }) {
-  const [editando, setEditando] = useState(false);
   const [resetSignal, setResetSignal] = useState(0);
 
   const trazoActual = trazoCustom ?? PLANTILLAS_SEPARADOR_DEFAULT[tipo];
   const esCustom = trazoCustom !== null;
 
-  if (editando) {
-    return (
-      <div className="col-span-2 rounded-xl border border-primary/20 p-2 space-y-2">
-        <p className="text-micro font-black text-center text-primary/50">
-          {SIMBOLO_SEPARADOR[tipo]} {LABEL_SEPARADOR[tipo]}
-        </p>
-        <CanvasDibujoRuna
-          height={140}
-          resetSignal={resetSignal}
-          trazoInicial={trazoActual}
-          onTrazoCompleto={(puntos) => {
-            onChange(puntos);
-            setEditando(false);
-          }}
-        />
-        <div className="flex items-center justify-center gap-3 text-micro">
-          <button
-            type="button"
-            className="text-primary/40 hover:text-primary font-black uppercase tracking-widest"
-            onClick={() => setResetSignal((s) => s + 1)}
-          >
-            Limpiar
-          </button>
-          <button
-            type="button"
-            className="text-primary/40 hover:text-primary font-black uppercase tracking-widest"
-            onClick={() => setEditando(false)}
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <button
-      type="button"
-      onClick={() => setEditando(true)}
-      className="flex flex-col items-center gap-1 rounded-xl border border-primary/15 hover:border-primary/40 p-2 transition-colors"
-    >
-      <svg viewBox="0 0 100 100" className="w-12 h-12">
-        <polyline
-          points={pathPreviewSeparador(trazoActual)}
-          fill="none"
-          stroke="var(--primary)"
-          strokeWidth={4}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <span className="text-micro font-black text-primary/50">
-        {LABEL_SEPARADOR[tipo]}
-      </span>
-      {esCustom && (
-        <span
-          className="flex items-center gap-0.5 text-[9px] text-primary/30 hover:text-red-400"
-          onClick={(e) => {
-            e.stopPropagation();
-            onChange(null);
-          }}
+    <div className="rounded-xl border border-primary/15 p-2 space-y-2">
+      <p className="text-micro font-black text-center text-primary/50">
+        {SIMBOLO_SEPARADOR[tipo]} {LABEL_SEPARADOR[tipo]}
+      </p>
+      <CanvasDibujoRuna
+        height={140}
+        resetSignal={resetSignal}
+        trazoInicial={trazoActual}
+        onTrazoCompleto={(puntos) => onChange(puntos)}
+      />
+      <div className="flex items-center justify-center gap-3 text-micro">
+        <button
+          type="button"
+          className="text-primary/40 hover:text-primary font-black uppercase tracking-widest"
+          onClick={() => setResetSignal((s) => s + 1)}
         >
-          <RotateCcw size={8} /> Original
-        </span>
-      )}
-    </button>
+          Limpiar
+        </button>
+        {esCustom && (
+          <button
+            type="button"
+            className="flex items-center gap-0.5 text-primary/40 hover:text-red-400 font-black uppercase tracking-widest"
+            onClick={() => {
+              onChange(null);
+              setResetSignal((s) => s + 1);
+            }}
+          >
+            <RotateCcw size={9} /> Original
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
