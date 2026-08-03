@@ -346,12 +346,20 @@ export function RunasPage({
           {/* Columna derecha: bloque de config (previsualización) */}
           <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
             {todasLasRunas && (
-              <PanelConfigRunas
-                config={configRunas}
-                onActualizar={actualizarConfigRunas}
-                runas={todasLasRunas}
-                previewCombinacion={previewCombinacion}
-              />
+              <>
+                <PanelConfigRunas
+                  config={configRunas}
+                  onActualizar={actualizarConfigRunas}
+                  runas={todasLasRunas}
+                  previewCombinacion={previewCombinacion}
+                />
+                <div className="mt-6">
+                  <PanelCombinacionesRunas
+                    runas={todasLasRunas}
+                    onCambiarPreview={setPreviewCombinacion}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
