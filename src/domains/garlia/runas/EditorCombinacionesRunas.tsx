@@ -27,24 +27,12 @@
 
 import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import Image from "next/image";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
-import {
-  FORMA_CIRCULO,
-  centroCelda,
-  generarCeldas,
-  generarGaps,
-  labelCelda,
-  pathCelda,
-  puntosGap,
-  type Celda,
-  type Gap,
-  type Rejilla,
-} from "./formasLimite";
+import { generarCeldas, generarGaps, labelCelda, type Gap, type Rejilla } from "./formasLimite";
 import { PickerImagenRunaBtn } from "./PickerImagenRunaBtn";
-import { RunaThumbnail } from "./RunaThumbnail";
 import { LABEL_SEPARADOR, SIMBOLO_SEPARADOR, TIPOS_SEPARADOR, type TipoSeparador } from "./separadores";
 import type { CombinacionRuna, EntidadMagica } from "./types";
 
@@ -64,15 +52,30 @@ function labelGap(gap: Gap, rejilla: Rejilla): string {
 export function EditorCombinacionesRunas({
   runas,
   rejilla,
+  onCambiarPreview,
 }: {
   runas: EntidadMagica[];
   /** Misma rejilla que "Forma exterior" — acá no hay selector propio. */
   rejilla: Rejilla;
+  /**
+   * Se llama en cada cambio de celdas/separadores de la combinación en
+   * edición, para que el tablero compartido (en PanelConfigRunas) la
+   * dibuje. `null` cuando no hay ninguna combinación en edición.
+   */
+  onCambiarPreview: (preview: {
+    celdaRunaIds: Record<string, string>;
+    separadorPorGap: Record<string, TipoSeparador | undefined>;
+  } | null) => void;
 }) {
   const [combinaciones, setCombinaciones] = useState<CombinacionRuna[]>([]);
   const [loading, setLoading] = useState(false);
   const [cargado, setCargado] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  // Al dejar de editar (o desmontar), limpiar el preview del tablero compartido.
+  useEffect(() => {
+    if (!editandoId) onCambiarPreview(null);
+  }, [editandoId, onCambiarPreview]);
 
   useEffect(() => {
     if (cargado) return;
@@ -159,6 +162,7 @@ export function EditorCombinacionesRunas({
           combinacion={editando}
           rejilla={rejilla}
           runas={runas}
+          onCambiarPreview={onCambiarPreview}
           onEliminada={(id) => {
             setCombinaciones((prev) => prev.filter((c) => c.id !== id));
             setEditandoId(null);
@@ -178,12 +182,17 @@ function EditorUnaCombinacion({
   combinacion,
   rejilla,
   runas,
+  onCambiarPreview,
   onGuardada,
   onEliminada,
 }: {
   combinacion: CombinacionRuna;
   rejilla: Rejilla;
   runas: EntidadMagica[];
+  onCambiarPreview: (preview: {
+    celdaRunaIds: Record<string, string>;
+    separadorPorGap: Record<string, TipoSeparador | undefined>;
+  } | null) => void;
   onGuardada: (c: CombinacionRuna) => void;
   onEliminada: (id: string) => void;
 }) {
@@ -193,6 +202,15 @@ function EditorUnaCombinacion({
   useEffect(() => {
     setForm(combinacion);
   }, [combinacion.id]);
+
+  // El tablero compartido (en PanelConfigRunas) refleja siempre la
+  // combinación que se está editando acá.
+  useEffect(() => {
+    onCambiarPreview({
+      celdaRunaIds: form.celdas,
+      separadorPorGap: form.separadores ?? {},
+    });
+  }, [form.celdas, form.separadores, onCambiarPreview]);
 
   const celdas = generarCeldas(rejilla);
   const gaps = generarGaps(rejilla);
@@ -276,26 +294,10 @@ function EditorUnaCombinacion({
         onChange={(e) => setForm((f) => ({ ...f, explicacion: e.target.value }))}
       />
 
-      <TableroCombinacion
-        celdas={celdas}
-        gaps={gaps}
-        rejilla={rejilla}
-        celdaRunaIds={form.celdas}
-        separadorPorGap={form.separadores ?? {}}
-        runas={runas}
-      />
-
       <div className="space-y-1.5">
         <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
           Runa por celda
         </label>
-        {gaps.length > 0 && (
-          <p className="text-micro text-primary/25">
-            El separador debajo de cada runa es el gap que sigue a esa celda en su
-            mismo anillo (sentido horario). Cada separador distinto cuenta como una
-            combinación distinta con las mismas runas.
-          </p>
-        )}
         {celdas.map((celda) => {
           // Gap "siguiente" a esta celda dentro de su mismo anillo: el que
           // arranca en esta sección (seccionAntes === celda.seccion) — así
@@ -373,162 +375,3 @@ function EditorUnaCombinacion({
   );
 }
 
-/**
- * TableroCombinacion
- * ────────────────────
- * Vista previa del tablero (círculo dividido en celdas según `rejilla`,
- * igual que en la página pública) donde cada celda muestra el trazo
- * (RunaThumbnail) de la runa que se le asignó en el <select> de abajo.
- * Puramente visual — el estado sigue viviendo en `form.celdas` del
- * padre; esto solo lee `celdaRunaIds` para renderizar el preview.
- */
-const TAMANO_TABLERO = 220;
-const MARGEN_TABLERO = 14;
-
-function TableroCombinacion({
-  celdas,
-  gaps,
-  rejilla,
-  celdaRunaIds,
-  separadorPorGap,
-  runas,
-}: {
-  celdas: Celda[];
-  gaps: Gap[];
-  rejilla: Rejilla;
-  /** Mapa celdaId → runaId, tal como se guarda en la combinación. */
-  celdaRunaIds: Record<string, string>;
-  /** Mapa gapId → separador exigido, tal como se guarda en la combinación. */
-  separadorPorGap: Record<string, TipoSeparador | undefined>;
-  runas: EntidadMagica[];
-}) {
-  const runasPorId = useMemo(() => new Map(runas.map((r) => [r.id, r])), [runas]);
-
-  const centro = { x: TAMANO_TABLERO / 2, y: TAMANO_TABLERO / 2 };
-  const radio = TAMANO_TABLERO / 2 - MARGEN_TABLERO;
-
-  // Tamaño del thumbnail de trazo dentro de cada celda: más chico cuanto
-  // más celdas hay, para que no se pisen entre sí en rejillas densas.
-  const ladoThumb = Math.max(24, Math.min(60, radio / Math.max(1, rejilla.anillos + 1)));
-
-  return (
-    <div className="flex flex-col items-center gap-1.5 py-1">
-      <svg
-        viewBox={`0 0 ${TAMANO_TABLERO} ${TAMANO_TABLERO}`}
-        className="w-full max-w-[220px] aspect-square"
-        role="img"
-        aria-label="Vista previa del tablero de la combinación"
-      >
-        <circle
-          cx={centro.x}
-          cy={centro.y}
-          r={radio}
-          fill="none"
-          stroke="color-mix(in srgb, var(--primary) 15%, transparent)"
-          strokeWidth={1.5}
-        />
-
-        {celdas.map((celda) => {
-          const runaId = celdaRunaIds[celda.id];
-          const runa = runaId ? runasPorId.get(runaId) : undefined;
-          const puntos = pathCelda(celda, FORMA_CIRCULO, centro, radio);
-          const centroCeldaPos = centroCelda(celda, FORMA_CIRCULO, centro, radio);
-
-          return (
-            <g key={celda.id}>
-              <polygon
-                points={puntos}
-                fill={
-                  runa
-                    ? "color-mix(in srgb, var(--primary) 10%, transparent)"
-                    : "color-mix(in srgb, var(--primary) 3%, transparent)"
-                }
-                stroke="color-mix(in srgb, var(--primary) 18%, transparent)"
-                strokeWidth={1}
-              >
-                <title>{labelCelda(celda, rejilla)}</title>
-              </polygon>
-
-              {runa?.patron_trazos && (
-                <g
-                  transform={`translate(${(centroCeldaPos.x - ladoThumb / 2).toFixed(1)},${(centroCeldaPos.y - ladoThumb / 2).toFixed(1)})`}
-                  className="pointer-events-none"
-                >
-                  <foreignObject width={ladoThumb} height={ladoThumb}>
-                    <RunaThumbnail patronTrazos={runa.patron_trazos} />
-                  </foreignObject>
-                </g>
-              )}
-            </g>
-          );
-        })}
-
-        {gaps.map((gap) => {
-          const tipo = separadorPorGap[gap.id];
-          if (!tipo) return null;
-          const { interior, exterior } = puntosGap(gap, FORMA_CIRCULO, centro, radio);
-          return (
-            <GlifoSeparadorPreview
-              key={gap.id}
-              tipo={tipo}
-              interior={interior}
-              exterior={exterior}
-            />
-          );
-        })}
-      </svg>
-      <p className="text-micro text-primary/25 text-center">
-        Vista previa — el trazo y los separadores se actualizan al elegir abajo
-      </p>
-    </div>
-  );
-}
-
-/**
- * Glifo vectorial de un separador (⟩⟩ ⟩ ⟨ |), escalado para cubrir todo
- * el gap entre `interior` y `exterior`. Copia reducida (solo lectura,
- * sin interacción) del mismo dibujo que usa TableroCeldas.tsx en la
- * página pública — se duplica acá en vez de importarse desde /public
- * para no acoplar el editor de admin a ese módulo.
- */
-function GlifoSeparadorPreview({
-  tipo,
-  interior,
-  exterior,
-}: {
-  tipo: TipoSeparador;
-  interior: { x: number; y: number };
-  exterior: { x: number; y: number };
-}) {
-  const dx = exterior.x - interior.x;
-  const dy = exterior.y - interior.y;
-  const largo = Math.hypot(dx, dy);
-  const anguloGrados = (Math.atan2(dy, dx) * 180) / Math.PI - 90;
-  const medio = { x: (interior.x + exterior.x) / 2, y: (interior.y + exterior.y) / 2 };
-  const mitadLargo = largo / 2;
-  const ancho = Math.min(9, largo * 0.16);
-
-  return (
-    <g
-      transform={`translate(${medio.x.toFixed(1)},${medio.y.toFixed(1)}) rotate(${anguloGrados.toFixed(1)}) scale(${ancho.toFixed(2)},${mitadLargo.toFixed(2)})`}
-      className="pointer-events-none"
-    >
-      <path
-        d={GLIFO_PATH_PREVIEW[tipo]}
-        fill="none"
-        stroke="var(--primary)"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </g>
-  );
-}
-
-const GLIFO_PATH_PREVIEW: Record<TipoSeparador, string> = {
-  corta: "M 0 -1 L 0 1",
-  continua: "M 0.7 -1 L -0.7 0 L 0.7 1",
-  continua_inv: "M -0.7 -1 L 0.7 0 L -0.7 1",
-  inicio: "M 0.7 -1 L -0.7 -0.35 L 0.7 0.3 M 0.7 0.05 L -0.7 0.7 L 0.7 1",
-};

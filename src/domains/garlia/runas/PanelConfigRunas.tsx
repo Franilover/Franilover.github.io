@@ -20,7 +20,7 @@
  */
 
 import { ChevronDown, RotateCcw, Settings2, Sparkles } from "lucide-react";
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
 import type { Punto } from "./dollarOneRecognizer";
@@ -57,6 +57,34 @@ export function PanelConfigRunas({
   >({});
   const [plantillasAbiertas, setPlantillasAbiertas] = useState(false);
 
+  // Preview de la combinación que se está editando en EditorCombinacionesRunas
+  // (al lado). Este tablero es el único que renderiza runas + separadores;
+  // el editor de combinaciones solo tiene los selectores.
+  const [previewCombinacion, setPreviewCombinacion] = useState<{
+    celdaRunaIds: Record<string, string>;
+    separadorPorGap: Record<string, TipoSeparador | undefined>;
+  } | null>(null);
+  const onCambiarPreview = useCallback(
+    (preview: typeof previewCombinacion) => setPreviewCombinacion(preview),
+    [],
+  );
+
+  const runasPorId = useMemo(() => new Map(runas.map((r) => [r.id, r])), [runas]);
+  const runaPorCelda = useMemo(() => {
+    if (!previewCombinacion) return {};
+    const mapa: Record<string, EntidadMagica | null | undefined> = {};
+    for (const [celdaId, runaId] of Object.entries(previewCombinacion.celdaRunaIds)) {
+      mapa[celdaId] = runasPorId.get(runaId) ?? null;
+    }
+    return mapa;
+  }, [previewCombinacion, runasPorId]);
+
+  // Mientras se edita una combinación, el tablero muestra sus separadores;
+  // si no, sigue disponible el modo de prueba libre de separadorPorGapTest.
+  const separadorPorGapMostrado = previewCombinacion
+    ? previewCombinacion.separadorPorGap
+    : separadorPorGapTest;
+
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
       <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
@@ -71,19 +99,16 @@ export function PanelConfigRunas({
                 forma={config.forma}
                 rejilla={config.rejilla}
                 celdaActivaId={null}
-                runaPorCelda={{}}
+                runaPorCelda={runaPorCelda}
                 onSeleccionarCelda={() => {}}
                 gapActivoId={gapActivoId}
-                separadorPorGap={separadorPorGapTest}
+                separadorPorGap={separadorPorGapMostrado}
                 onSeleccionarGap={(gap) =>
                   setGapActivoId((actual) => (actual === gap.id ? null : gap.id))
                 }
               />
             </div>
           </div>
-          <p className="text-micro text-primary/30 text-center">
-            Solo para probar cómo se ve — esto no guarda nada todavía.
-          </p>
 
           <div className="space-y-1.5 pt-1">
             <p className="text-micro font-black uppercase tracking-widest text-primary/30">
@@ -99,10 +124,14 @@ export function PanelConfigRunas({
             <p className="text-micro font-black uppercase tracking-widest text-primary/30">
               Separador
             </p>
-            {gapActivoId ? (
+            {previewCombinacion ? (
+              <p className="text-micro text-primary/25 text-center">
+                Editando desde la combinación — usá sus selectores de al lado
+              </p>
+            ) : gapActivoId ? (
               <div className="flex items-center justify-center gap-2">
                 {TIPOS_SEPARADOR.map((tipo) => {
-                  const activo = separadorPorGapTest[gapActivoId] === tipo;
+                  const activo = separadorPorGapMostrado[gapActivoId] === tipo;
                   return (
                     <button
                       key={tipo}
@@ -187,7 +216,11 @@ export function PanelConfigRunas({
           <p className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/30">
             <Sparkles size={11} /> Combinaciones
           </p>
-          <EditorCombinacionesRunas runas={runas} rejilla={config.rejilla} />
+          <EditorCombinacionesRunas
+            runas={runas}
+            rejilla={config.rejilla}
+            onCambiarPreview={onCambiarPreview}
+          />
         </div>
       </div>
 
