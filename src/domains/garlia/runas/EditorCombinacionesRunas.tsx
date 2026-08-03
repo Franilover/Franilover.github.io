@@ -358,9 +358,6 @@ function EditorUnaCombinacion({
           <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
             Separador por gap
           </label>
-          <p className="text-micro text-primary/25">
-            Cada separador distinto cuenta como una combinación distinta con las mismas runas.
-          </p>
           {gaps.map((gap) => (
             <div
               key={gap.id}

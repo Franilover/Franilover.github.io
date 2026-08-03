@@ -84,9 +84,6 @@ export function PanelConfigRunas({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="space-y-3">
-          <p className="text-micro font-black uppercase tracking-widest text-primary/30">
-            Forma exterior
-          </p>
           <SelectorFormaLimite
             value={config.forma}
             onChange={(forma) => onActualizar({ forma })}
@@ -109,7 +106,7 @@ export function PanelConfigRunas({
           </div>
           <p className="text-micro text-primary/30 text-center">
             {hayCombinacionActiva
-              ? "Vinculado a la combinación que estás editando a la derecha: runas y separadores se ven acá."
+              ? ""
               : "Elegí una combinación en el panel de la derecha para ver y editar sus separadores acá."}
           </p>
           {gapActivoId && (
