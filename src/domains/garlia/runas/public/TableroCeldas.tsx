@@ -18,6 +18,8 @@
 
 import React, { useMemo } from "react";
 
+import type { Punto } from "../dollarOneRecognizer";
+
 import {
   generarCeldas,
   generarGaps,
@@ -30,7 +32,7 @@ import {
   type Gap,
   type Rejilla,
 } from "../formasLimite";
-import { SIMBOLO_SEPARADOR, type TipoSeparador } from "../separadores";
+import type { TipoSeparador } from "../separadores";
 import type { EntidadMagica } from "../types";
 
 const TAMANO = 320;
@@ -134,10 +136,6 @@ export function TableroCeldas({
             const activo = gap.id === gapActivoId;
             const tipo = separadorPorGap?.[gap.id];
             const { interior, exterior } = puntosGap(gap, forma, centro, radio);
-            const centroGap = {
-              x: (interior.x + exterior.x) / 2,
-              y: (interior.y + exterior.y) / 2,
-            };
             return (
               <g key={gap.id}>
                 {/* Línea invisible más gruesa solo para agrandar el área clickeable */}
@@ -164,18 +162,7 @@ export function TableroCeldas({
                   />
                 )}
                 {tipo && (
-                  <text
-                    x={centroGap.x}
-                    y={centroGap.y}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={11}
-                    fontWeight={900}
-                    fill="var(--primary)"
-                    className="pointer-events-none select-none"
-                  >
-                    {SIMBOLO_SEPARADOR[tipo]}
-                  </text>
+                  <GlifoSeparador tipo={tipo} interior={interior} exterior={exterior} />
                 )}
               </g>
             );
@@ -195,3 +182,65 @@ export function TableroCeldas({
     </div>
   );
 }
+
+/**
+ * Glifo vectorial de un separador (⟩⟩ ⟩ ⟨ |), dibujado para ocupar TODA
+ * la distancia entre el centro/anillo interior y la circunferencia
+ * exterior de su gap — no un texto de tamaño fijo centrado en el medio.
+ *
+ * Cada glifo se define en un espacio local con origen en el punto medio
+ * del gap, eje Y de -1 (hacia `interior`) a +1 (hacia `exterior`). Se
+ * escala en Y a la mitad de la longitud real del gap (para cubrirlo
+ * entero) y un poco en X (ensanche horizontal leve), luego se rota al
+ * ángulo real del gap y se traslada a su punto medio real.
+ */
+function GlifoSeparador({
+  tipo,
+  interior,
+  exterior,
+}: {
+  tipo: TipoSeparador;
+  interior: Punto;
+  exterior: Punto;
+}) {
+  const dx = exterior.x - interior.x;
+  const dy = exterior.y - interior.y;
+  const largo = Math.hypot(dx, dy);
+  const anguloGrados = (Math.atan2(dy, dx) * 180) / Math.PI - 90; // -90: el glifo local apunta "hacia arriba" en Y-
+  const medio = { x: (interior.x + exterior.x) / 2, y: (interior.y + exterior.y) / 2 };
+
+  const mitadLargo = largo / 2;
+  const ancho = Math.min(9, largo * 0.16); // ensanche horizontal leve, proporcional pero acotado
+
+  return (
+    <g
+      transform={`translate(${medio.x.toFixed(1)},${medio.y.toFixed(1)}) rotate(${anguloGrados.toFixed(1)}) scale(${ancho.toFixed(2)},${mitadLargo.toFixed(2)})`}
+      className="pointer-events-none"
+    >
+      <path
+        d={GLIFO_PATH[tipo]}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </g>
+  );
+}
+
+/**
+ * Paths en espacio local [-1, 1] × [-1, 1] (antes de escalar), con el
+ * origen en el centro del gap y el eje Y apuntando hacia `exterior`.
+ *   corta:        una línea recta de punta a punta.
+ *   continua:     un chevron ">" apuntando hacia el exterior (afuera).
+ *   continua_inv: el mismo chevron pero apuntando hacia el interior.
+ *   inicio:       doble chevron (como "continua" pero repetido).
+ */
+const GLIFO_PATH: Record<TipoSeparador, string> = {
+  corta: "M 0 -1 L 0 1",
+  continua: "M -0.6 -1 L 0.6 0 L -0.6 1",
+  continua_inv: "M 0.6 -1 L -0.6 0 L 0.6 1",
+  inicio: "M -0.6 -1 L 0.6 -0.35 L -0.6 0.3 M -0.6 0.15 L 0.6 0.8 L -0.6 1",
+};
