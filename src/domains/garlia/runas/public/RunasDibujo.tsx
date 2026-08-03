@@ -279,13 +279,7 @@ export default function RunasDibujo() {
         className="absolute top-2 left-2 md:top-4 md:left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-main/90 backdrop-blur-sm border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/30 transition-colors shadow-sm text-micro font-black uppercase tracking-widest"
       >
         <ArrowLeft size={12} /> Volver
-      </Link>
-
-      <div className="flex flex-col items-center gap-1.5 pt-8 md:pt-2 text-center">
-        <div className="flex items-center gap-2">
-          <ScrollText size={20} style={{ color: "var(--primary)" }} />
-        </div>
-      </div>
+      </Link> 
 
       {(estado === "cargando" || cargandoConfig) && (
         <div className="flex-1 flex items-center justify-center">
