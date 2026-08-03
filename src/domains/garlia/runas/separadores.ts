@@ -88,7 +88,7 @@ export const PLANTILLAS_SEPARADOR_DEFAULT: Record<TipoSeparador, Punto[]> = {
 
 /** Convierte el mapa de plantillas (custom o default) al formato que espera reconocerRuna. */
 export function patronesSeparadores(
-  plantillas: Record<TipoSeparador, Punto[][]> | null | undefined,
+  plantillas: Partial<Record<TipoSeparador, Punto[][]>> | null | undefined,
 ): PatronRuna[] {
   return TIPOS_SEPARADOR.map((tipo) => ({
     runaId: tipo,
