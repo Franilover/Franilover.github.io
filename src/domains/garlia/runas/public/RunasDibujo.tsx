@@ -467,7 +467,6 @@ function ResultadoCard({
         </>
       ) : (
         <>
-          <Wand2 size={28} className="text-primary/20" />
           <p className="text-sm font-bold text-primary/50">
             No se reconoció ninguna runa conocida
           </p>
@@ -542,7 +541,6 @@ function ResultadoRejillaCard({
         </>
       ) : (
         <>
-          <Wand2 size={28} className="text-primary/20" />
           <p className="text-sm font-bold text-primary/50">
             {celdasConRuna.length === 0
               ? "No se reconoció ninguna runa en el tablero"
