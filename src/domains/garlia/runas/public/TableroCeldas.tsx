@@ -134,6 +134,10 @@ export function TableroCeldas({
             const activo = gap.id === gapActivoId;
             const tipo = separadorPorGap?.[gap.id];
             const { interior, exterior } = puntosGap(gap, forma, centro, radio);
+            const centroGap = {
+              x: (interior.x + exterior.x) / 2,
+              y: (interior.y + exterior.y) / 2,
+            };
             return (
               <g key={gap.id}>
                 {/* Línea invisible más gruesa solo para agrandar el área clickeable */}
@@ -147,26 +151,22 @@ export function TableroCeldas({
                   className="cursor-pointer"
                   onClick={() => onSeleccionarGap(gap)}
                 />
-                <line
-                  x1={interior.x}
-                  y1={interior.y}
-                  x2={exterior.x}
-                  y2={exterior.y}
-                  stroke={
-                    activo
-                      ? "var(--primary)"
-                      : tipo
-                        ? "color-mix(in srgb, var(--primary) 55%, transparent)"
-                        : "color-mix(in srgb, var(--primary) 20%, transparent)"
-                  }
-                  strokeWidth={activo ? 4 : 3}
-                  strokeLinecap="round"
-                  className="cursor-pointer pointer-events-none"
-                />
+                {activo && (
+                  <line
+                    x1={interior.x}
+                    y1={interior.y}
+                    x2={exterior.x}
+                    y2={exterior.y}
+                    stroke="var(--primary)"
+                    strokeWidth={4}
+                    strokeLinecap="round"
+                    className="cursor-pointer pointer-events-none"
+                  />
+                )}
                 {tipo && (
                   <text
-                    x={(interior.x + exterior.x) / 2}
-                    y={(interior.y + exterior.y) / 2}
+                    x={centroGap.x}
+                    y={centroGap.y}
                     textAnchor="middle"
                     dominantBaseline="central"
                     fontSize={11}
