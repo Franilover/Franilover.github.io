@@ -93,41 +93,66 @@ function areaAproximada(trazo: TrazoLibre): number {
 }
 
 /**
- * ¿Este trazo está "cerrado"? — el punto final vuelve a estar cerca del
- * inicial, en relación al tamaño del propio trazo (no un umbral fijo en
- * píxeles: un círculo grande y uno chico deben tolerar el mismo % de
- * imprecisión relativa).
+ * Qué tan "cerrado" está un trazo, como score continuo 0..1 (1 = cierre
+ * perfecto), en vez de una decisión sí/no. El umbral duro anterior
+ * descartaba por completo trazos que cerraban al 26% cuando el límite
+ * era 25% — un jugador que dibuja con el dedo en mobile cae del lado
+ * malo del umbral todo el tiempo por ruido de captura, no porque su
+ * intención fuera distinta a la de alguien que cerró al 24%.
+ *
+ * Devolver un score permite que `elegirContorno` compare "qué tan bien
+ * cerrado + qué tan grande" en vez de aceptar/rechazar en un corte
+ * arbitrario, y que la UI pueda mostrar confianza baja en vez de "no
+ * se detectó nada" cuando el cierre fue imperfecto pero razonable.
  */
-const TOLERANCIA_CIERRE = 0.25; // el gap final-inicio puede ser hasta 25% del "radio" del trazo
-function estaCerrado(trazo: TrazoLibre): boolean {
-  if (trazo.length < 8) return false;
+const CIERRE_TOLERANCIA_BLANDA = 0.45; // más allá de esto, score de cierre = 0
+function scoreCierre(trazo: TrazoLibre): number {
+  if (trazo.length < 8) return 0;
   const inicio = trazo[0];
   const fin = trazo[trazo.length - 1];
   const c = centroide(trazo);
   const radioAprox = trazo.reduce((s, p) => s + distancia(p, c), 0) / trazo.length;
-  if (radioAprox < 1e-6) return false;
-  return distancia(inicio, fin) <= radioAprox * TOLERANCIA_CIERRE;
+  if (radioAprox < 1e-6) return 0;
+  const gapRelativo = distancia(inicio, fin) / radioAprox;
+  if (gapRelativo >= CIERRE_TOLERANCIA_BLANDA) return 0;
+  // Decae linealmente de 1 (gap=0) a 0 (gap=tolerancia). Un trazo que
+  // cierra "perfecto" pesa igual que antes; uno que cierra mal todavía
+  // puede ganar si es mucho más grande que las alternativas.
+  return 1 - gapRelativo / CIERRE_TOLERANCIA_BLANDA;
 }
+
+/** Por debajo de este score de cierre, ni siquiera es candidato razonable a contorno (evita que un garabato abierto cualquiera gane por área). */
+const CIERRE_MINIMO_CANDIDATO = 0.15;
 
 /**
  * Elige, entre todos los trazos, el que mejor pinta tiene de ser el
- * contorno exterior: debe estar cerrado, y entre los cerrados se toma
- * el de mayor área (un separador radial no es un trazo cerrado, así
- * que ya queda afuera por el primer filtro casi siempre; el área es
- * desempate si hubiera más de un trazo cerrado, ej. el jugador re-trazó
- * el contorno duplicado sin querer).
+ * contorno exterior. Combina qué tan cerrado está (score continuo, ver
+ * scoreCierre) con el área — así un círculo grande con cierre imperfecto
+ * le sigue ganando a una línea radial corta y bien cerrada por accidente,
+ * pero un trazo apenas entreabierto ya no se descarta de plano solo por
+ * cruzar un umbral fijo.
  */
 function elegirContorno(trazos: TrazoLibre[]): number | null {
+  const areas = trazos.map((t) => areaAproximada(t));
+  const areaMax = Math.max(1e-6, ...areas);
+
   let mejorIndice: number | null = null;
-  let mejorArea = -Infinity;
+  let mejorPuntaje = -Infinity;
+
   trazos.forEach((trazo, i) => {
-    if (!estaCerrado(trazo)) return;
-    const area = areaAproximada(trazo);
-    if (area > mejorArea) {
-      mejorArea = area;
+    const cierre = scoreCierre(trazo);
+    if (cierre < CIERRE_MINIMO_CANDIDATO) return;
+    const areaNormalizada = areas[i] / areaMax; // 0..1, relativo al trazo más grande del set
+    // Pesamos más el cierre que el área: preferimos un contorno más
+    // chico pero bien cerrado a uno grande pero muy abierto, que
+    // probablemente ni sea el contorno real.
+    const puntaje = 0.65 * cierre + 0.35 * areaNormalizada;
+    if (puntaje > mejorPuntaje) {
+      mejorPuntaje = puntaje;
       mejorIndice = i;
     }
   });
+
   return mejorIndice;
 }
 
@@ -238,7 +263,27 @@ function suavizarSenal(valores: number[], radioVentana: number): number[] {
  * mal interpretado como línea.
  */
 const TOLERANCIA_CERCA_CENTRO = 0.35; // qué tan cerca del centro cuenta como "empieza/pasa por el centro", relativo al radio
-const TOLERANCIA_RECTITUD = 0.85; // longitud recta (extremo a extremo) / longitud recorrida del trazo — 1.0 = perfectamente recta
+
+// La tolerancia de rectitud escala con el largo del trazo relativo al
+// radio del tablero: una línea corta (dedo en mobile, trazo breve)
+// acumula más error relativo de captura por el mismo temblor de mano
+// que una línea larga, así que exigirle 0.85 fijo la descarta seguido
+// aunque la intención sea clara. Trazos largos (>=80% del radio) se
+// quedan con el umbral estricto original; trazos cortos (<=25% del
+// radio) toleran hasta 0.65; en el medio, interpola.
+const RECTITUD_ESTRICTA = 0.85; // para líneas largas (>= UMBRAL_LARGO_ALTO * radio)
+const RECTITUD_LAXA = 0.65; // para líneas cortas (<= UMBRAL_LARGO_BAJO * radio)
+const UMBRAL_LARGO_BAJO = 0.25;
+const UMBRAL_LARGO_ALTO = 0.8;
+
+function toleranciaRectitudPara(largoRecorrido: number, radio: number): number {
+  if (radio < 1e-6) return RECTITUD_ESTRICTA;
+  const proporcion = largoRecorrido / radio;
+  if (proporcion <= UMBRAL_LARGO_BAJO) return RECTITUD_LAXA;
+  if (proporcion >= UMBRAL_LARGO_ALTO) return RECTITUD_ESTRICTA;
+  const t = (proporcion - UMBRAL_LARGO_BAJO) / (UMBRAL_LARGO_ALTO - UMBRAL_LARGO_BAJO);
+  return RECTITUD_LAXA + t * (RECTITUD_ESTRICTA - RECTITUD_LAXA);
+}
 
 function esLineaRadial(trazo: TrazoLibre, centro: Punto, radio: number): boolean {
   if (trazo.length < 2) return false;
@@ -249,7 +294,7 @@ function esLineaRadial(trazo: TrazoLibre, centro: Punto, radio: number): boolean
   if (largoRecorrido < 1e-6) return false;
 
   const rectitud = largoRecto / largoRecorrido;
-  if (rectitud < TOLERANCIA_RECTITUD) return false;
+  if (rectitud < toleranciaRectitudPara(largoRecorrido, radio)) return false;
 
   const distInicioCentro = distancia(inicio, centro);
   const distFinCentro = distancia(fin, centro);
@@ -318,6 +363,7 @@ export function detectarFormaLibre(trazos: TrazoLibre[]): FormaDetectada | null 
   if (indiceContorno === null) return null;
 
   const contorno = trazosValidos[indiceContorno];
+  const cierreContorno = scoreCierre(contorno);
   const centro = centroide(contorno);
   const radioPromedio = contorno.reduce((s, p) => s + distancia(p, centro), 0) / contorno.length;
 
@@ -343,14 +389,16 @@ export function detectarFormaLibre(trazos: TrazoLibre[]): FormaDetectada | null 
     Math.min(MAX_SECCIONES_DETECTABLES, agruparAngulosCercanos(angulosLineas)),
   );
 
-  // Confianza global: promedio pesado entre qué tan clara fue la forma
-  // del contorno y qué tan "limpias" fueron las líneas de sección
-  // (menos trazos ignorados = más limpio). Es una heurística para UI,
-  // no una medida estadística — ver FormaDetectada.confianza.
+  // Confianza global: combina qué tan clara fue la forma del contorno,
+  // qué tan bien cerrado estaba el contorno elegido (nuevo — antes esto
+  // era implícitamente 1 o "no existe", ahora es continuo), y qué tan
+  // "limpias" fueron las líneas de sección (menos trazos ignorados =
+  // más limpio). Es una heurística para UI, no una medida estadística
+  // — ver FormaDetectada.confianza.
   const totalNoContorno = trazosValidos.length - 1;
   const proporcionLimpia =
     totalNoContorno === 0 ? 1 : indicesSecciones.length / totalNoContorno;
-  const confianza = 0.6 * confianzaForma + 0.4 * proporcionLimpia;
+  const confianza = 0.45 * confianzaForma + 0.25 * cierreContorno + 0.3 * proporcionLimpia;
 
   return {
     forma,

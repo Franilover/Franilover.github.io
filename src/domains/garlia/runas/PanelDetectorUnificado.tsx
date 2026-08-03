@@ -85,89 +85,17 @@ function OverlayInterpretacion({
   );
 }
 
-/**
- * Panel lateral vertical: detector de Forma + detector de Runa, apilados.
- * Antes vivían en un grid 2 columnas debajo del canvas; ahora se muestran
- * al lado del canvas (que pasó a ser un cuadrado 1:1), en una sola columna
- * angosta.
- */
-function PanelLateralDetectores({
-  forma,
-  patrones,
-  resultadosRuna,
-}: {
-  forma: FormaDetectada | null;
-  patrones: PatronRuna[];
-  resultadosRuna: ResultadoReconocimiento[] | null;
-}) {
-  return (
-    <div className="flex flex-col gap-3 h-full">
-      {/* Interpretación de forma */}
-      <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
-        <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/50 mb-1.5">
-          <Sparkles size={12} /> Forma
-        </div>
-        {forma ? (
-          <div className="flex flex-col gap-1">
-            <p className="text-sm text-primary font-semibold">
-              {labelForma(forma.forma)}
-              {forma.forma.tipo === "poligono" ? ` (${forma.forma.lados} lados)` : ""}
-              {" · "}
-              {forma.secciones === 1 ? "1 sección" : `${forma.secciones} secciones`}
-            </p>
-            <p className="text-micro text-primary/40">
-              Confianza: {Math.round(forma.confianza * 100)}%
-              {forma.indicesIgnorados.length > 0 && (
-                <> · {forma.indicesIgnorados.length} trazo(s) sin interpretar</>
-              )}
-            </p>
-          </div>
-        ) : (
-          <p className="text-micro text-primary/30 py-2">Dibujá un contorno cerrado para empezar</p>
-        )}
-      </div>
-
-      {/* Interpretación de runa */}
-      <div className="rounded-xl border border-primary/15 bg-primary/5 p-3 flex-1">
-        <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/50 mb-1.5">
-          <ScrollText size={12} /> Runa (último trazo)
-        </div>
-        {patrones.length === 0 ? (
-          <p className="text-micro text-primary/30 py-2">Sin patrones guardados para comparar.</p>
-        ) : resultadosRuna && resultadosRuna.length > 0 ? (
-          <div className="space-y-1">
-            {resultadosRuna.slice(0, 3).map((r, idx) => (
-              <div key={r.runaId} className="flex items-center gap-2 text-micro">
-                <span className={`font-black w-4 shrink-0 ${idx === 0 ? "text-primary" : "text-primary/30"}`}>
-                  {idx + 1}
-                </span>
-                <span className={`flex-1 truncate ${idx === 0 ? "font-bold text-primary" : "text-primary/50"}`}>
-                  {r.nombre}
-                </span>
-                <span className="text-primary/30 shrink-0 tabular-nums">{Math.round(r.score * 100)}%</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-micro text-primary/30 py-2">Dibujá al menos un trazo para comparar.</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function PanelDetectorUnificado({ runas }: { runas: EntidadMagica[] }) {
   const [trazos, setTrazos] = useState<TrazoLibre[]>([]);
   const [resetSignal, setResetSignal] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [lado, setLado] = useState(340);
+  const [ancho, setAncho] = useState(400);
+  const alto = 340;
 
-  // El canvas ocupa un cuadrado perfecto (1:1): el lado se recalcula
-  // según el ancho disponible del contenedor.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const observer = new ResizeObserver((entries) => setLado(entries[0].contentRect.width));
+    const observer = new ResizeObserver((entries) => setAncho(entries[0].contentRect.width));
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
@@ -188,8 +116,17 @@ export function PanelDetectorUnificado({ runas }: { runas: EntidadMagica[] }) {
 
   // El detector de runas compara contra el último trazo dibujado —
   // el gesto más reciente es el candidato natural a "esto es una runa".
+  //
+  // Filtramos trazos vacíos/degenerados (< 2 puntos) antes de tomar
+  // "el último": si CanvasFormaLibre llega a emitir un trazo vacío al
+  // reiniciar o al cancelar un gesto a mitad de camino (ej. el usuario
+  // levanta el dedo sin mover el mouse), "el último trazo" pasaba a ser
+  // ese trazo vacío y reconocerRuna comparaba contra basura en vez del
+  // gesto real anterior. Tomar el último trazo *válido* es más robusto
+  // sin cambiar el comportamiento en el caso normal.
   const resultadosRuna: ResultadoReconocimiento[] | null = useMemo(() => {
-    const ultimo = trazos[trazos.length - 1];
+    const trazosValidos = trazos.filter((t) => t.length >= 2);
+    const ultimo = trazosValidos[trazosValidos.length - 1];
     if (!ultimo || patrones.length === 0) return null;
     return reconocerRuna(ultimo, patrones);
   }, [trazos, patrones]);
@@ -197,18 +134,10 @@ export function PanelDetectorUnificado({ runas }: { runas: EntidadMagica[] }) {
   const onTrazosChange = (nuevos: Punto[][]) => setTrazos(nuevos);
 
   return (
-    <div className="space-y-3">
-      {/* Fila superior: canvas cuadrado 1:1 a la izquierda + panel lateral
-          vertical (Forma + Runa) al lado. */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start">
-        <div ref={containerRef} className="relative w-full sm:w-1/2 aspect-square shrink-0">
-          <CanvasFormaLibre height={lado} resetSignal={resetSignal} onTrazosChange={onTrazosChange} />
-          <OverlayInterpretacion trazos={trazos} resultado={forma} ancho={lado} alto={lado} />
-        </div>
-
-        <div className="w-full sm:w-1/2 sm:self-stretch">
-          <PanelLateralDetectores forma={forma} patrones={patrones} resultadosRuna={resultadosRuna} />
-        </div>
+    <div className="space-y-4">
+      <div ref={containerRef} className="relative">
+        <CanvasFormaLibre height={alto} resetSignal={resetSignal} onTrazosChange={onTrazosChange} />
+        <OverlayInterpretacion trazos={trazos} resultado={forma} ancho={ancho} alto={alto} />
       </div>
 
       <div className="flex items-center justify-between">
@@ -233,6 +162,59 @@ export function PanelDetectorUnificado({ runas }: { runas: EntidadMagica[] }) {
         >
           <RotateCcw size={11} /> Reiniciar
         </button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* Interpretación de forma */}
+        <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
+          <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/50 mb-1.5">
+            <Sparkles size={12} /> Forma
+          </div>
+          {forma ? (
+            <div className="flex flex-col gap-1">
+              <p className="text-sm text-primary font-semibold">
+                {labelForma(forma.forma)}
+                {forma.forma.tipo === "poligono" ? ` (${forma.forma.lados} lados)` : ""}
+                {" · "}
+                {forma.secciones === 1 ? "1 sección" : `${forma.secciones} secciones`}
+              </p>
+              <p className="text-micro text-primary/40">
+                Confianza: {Math.round(forma.confianza * 100)}%
+                {forma.indicesIgnorados.length > 0 && (
+                  <> · {forma.indicesIgnorados.length} trazo(s) sin interpretar</>
+                )}
+              </p>
+            </div>
+          ) : (
+            <p className="text-micro text-primary/30 py-2">Dibujá un contorno cerrado para empezar</p>
+          )}
+        </div>
+
+        {/* Interpretación de runa */}
+        <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
+          <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/50 mb-1.5">
+            <ScrollText size={12} /> Runa (último trazo)
+          </div>
+          {patrones.length === 0 ? (
+            <p className="text-micro text-primary/30 py-2">Sin patrones guardados para comparar.</p>
+          ) : resultadosRuna && resultadosRuna.length > 0 ? (
+            <div className="space-y-1">
+              {resultadosRuna.slice(0, 3).map((r, idx) => (
+                <div key={r.runaId} className="flex items-center gap-2 text-micro">
+                  <span className={`font-black w-4 shrink-0 ${idx === 0 ? "text-primary" : "text-primary/30"}`}>
+                    {idx + 1}
+                  </span>
+                  <span className={`flex-1 truncate ${idx === 0 ? "font-bold text-primary" : "text-primary/50"}`}>
+                    {r.nombre}
+                  </span>
+                  <span className="text-primary/30 shrink-0 tabular-nums">{Math.round(r.score * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-micro text-primary/30 py-2">Dibujá al menos un trazo para comparar.</p>
+          )}
+        </div>
       </div>
     </div>
   );
