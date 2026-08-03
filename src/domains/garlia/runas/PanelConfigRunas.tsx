@@ -19,7 +19,7 @@
  *   src/features/editorGarlia/components/magia/PanelConfigRunas.tsx
  */
 
-import { ChevronDown, RotateCcw, Settings2, Sparkles } from "lucide-react";
+import { ChevronDown, RotateCcw } from "lucide-react";
 import React, { useCallback, useMemo, useState } from "react";
 
 import { CanvasDibujoRuna } from "./CanvasDibujoRuna";
@@ -87,10 +87,6 @@ export function PanelConfigRunas({
 
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-5">
-      <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.3em] text-primary/40">
-        <Settings2 size={12} /> Config del tablero
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="space-y-3">
           <div className="flex justify-center">
@@ -203,8 +199,8 @@ export function PanelConfigRunas({
         </div>
 
         <div className="space-y-3 sm:border-l sm:border-primary/10 sm:pl-5">
-          <p className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/30">
-            <Sparkles size={11} /> Combinaciones
+          <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center">
+            Combinaciones
           </p>
           <EditorCombinacionesRunas
             runas={runas}
