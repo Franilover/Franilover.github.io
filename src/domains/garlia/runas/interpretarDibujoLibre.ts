@@ -48,6 +48,12 @@ export type ResultadoCelda = {
   mejorMatch: EntidadMagica | null;
   /** El trazo real que el jugador dibujó en esta celda (el que ganó el ranking) — para poder mostrarlo tal cual, ej. al registrar una runa lograda con alta confianza. */
   trazo: TrazoLibre | null;
+  /**
+   * true si el mejor score cayó en la zona "casi" (entre UMBRAL_CASI y
+   * UMBRAL_CONFIANZA_RUNA, sin llegar a `mejorMatch`) — se usa para el
+   * feedback "Estás cerca…" en vez de "no se reconoció nada".
+   */
+  casi: boolean;
 };
 
 export type ResultadoGap = {
@@ -76,10 +82,16 @@ export type InterpretacionDibujoLibre = {
   trazosSinUbicar: TrazoLibre[];
 };
 
-// Mismo umbral que ya se usaba en RunasDibujo.tsx con el tablero de
-// selectores — se mantiene acá para no bajar la exigencia solo porque
-// ahora el trazo llega por una vía distinta.
-const UMBRAL_CONFIANZA = 0.72;
+// Separadores: umbral sin cambios (la forma y los separadores están bien
+// como están, solo se ajusta la exigencia para reconocer RUNAS).
+const UMBRAL_CONFIANZA_SEPARADOR = 0.72;
+
+// Runas: reconocimiento "correcto" ahora exige 95% (antes 72%, mismo
+// umbral que separadores). Entre UMBRAL_CASI_RUNA (85%) y este umbral,
+// el trazo no cuenta como reconocido pero se marca `casi: true` para
+// que la UI pueda decir "estás cerca" en vez de "no se reconoció nada".
+const UMBRAL_CONFIANZA_RUNA = 0.95;
+const UMBRAL_CASI_RUNA = 0.85;
 
 function angulo(p: Punto, centro: Punto): number {
   return Math.atan2(p.y - centro.y, p.x - centro.x);
@@ -247,10 +259,11 @@ export function interpretarDibujoLibre(
     }
     const top = mejorRanking[0];
     const mejorMatch =
-      top && top.score >= UMBRAL_CONFIANZA
+      top && top.score >= UMBRAL_CONFIANZA_RUNA
         ? (runas.find((r) => r.id === top.runaId) ?? null)
         : null;
-    resultadosPorCelda[celda.id] = { celda, ranking: mejorRanking, mejorMatch, trazo: mejorTrazo };
+    const casi = !mejorMatch && !!top && top.score >= UMBRAL_CASI_RUNA;
+    resultadosPorCelda[celda.id] = { celda, ranking: mejorRanking, mejorMatch, trazo: mejorTrazo, casi };
     if (mejorMatch) celdaRunaId[celda.id] = mejorMatch.id;
   }
 
@@ -268,7 +281,7 @@ export function interpretarDibujoLibre(
       }
     }
     const top = mejorRanking[0];
-    const tipo = top && top.score >= UMBRAL_CONFIANZA ? (top.runaId as TipoSeparador) : null;
+    const tipo = top && top.score >= UMBRAL_CONFIANZA_SEPARADOR ? (top.runaId as TipoSeparador) : null;
     resultadosPorGap[gap.id] = { gap, ranking: mejorRanking, tipo };
     if (tipo) separadorPorGap[gap.id] = tipo;
   }

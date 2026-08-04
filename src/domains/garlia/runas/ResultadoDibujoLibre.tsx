@@ -101,6 +101,9 @@ export function PistaInterpretacion({
   const celdasReconocidas = Object.values(interpretacion.resultadosPorCelda).filter(
     (r) => r.mejorMatch,
   ).length;
+  const celdasCasi = Object.values(interpretacion.resultadosPorCelda).filter(
+    (r) => !r.mejorMatch && r.casi,
+  ).length;
   const gapsReconocidos = Object.values(interpretacion.resultadosPorGap).filter(
     (r) => r.tipo,
   ).length;
@@ -112,6 +115,12 @@ export function PistaInterpretacion({
         : ""}
       {celdasReconocidas > 0 &&
         ` · ${celdasReconocidas} runa${celdasReconocidas === 1 ? "" : "s"} reconocida${celdasReconocidas === 1 ? "" : "s"}`}
+      {celdasCasi > 0 && (
+        <span className="text-amber-600">
+          {" "}
+          · {celdasCasi} cerca (mejorá el trazo)
+        </span>
+      )}
       {gapsReconocidos > 0 &&
         ` · ${gapsReconocidos} separador${gapsReconocidos === 1 ? "" : "es"}`}
     </p>
@@ -140,6 +149,9 @@ export function ResultadoDibujoCard({
 }) {
   const resultadosPorCelda: Record<string, ResultadoCelda> = interpretacion.resultadosPorCelda;
   const celdasConRuna = celdas.filter((c) => resultadosPorCelda[c.id]?.mejorMatch);
+  const celdasCasi = celdas.filter(
+    (c) => !resultadosPorCelda[c.id]?.mejorMatch && resultadosPorCelda[c.id]?.casi,
+  );
 
   const idsEnCadena = new Set(cadenas.flatMap((c) => c.celdaIds));
   const celdasSueltas = celdasConRuna.filter((c) => !idsEnCadena.has(c.id));
@@ -147,6 +159,7 @@ export function ResultadoDibujoCard({
   const esRunaUnica = rejilla.secciones <= 1 && celdas.length === 1;
   const runaUnica = esRunaUnica ? (resultadosPorCelda[celdas[0].id]?.mejorMatch ?? null) : null;
   const rankingUnico = esRunaUnica ? (resultadosPorCelda[celdas[0].id]?.ranking ?? []) : [];
+  const casiUnica = esRunaUnica ? (resultadosPorCelda[celdas[0].id]?.casi ?? false) : false;
 
   if (esRunaUnica && !combinacion) {
     return (
@@ -165,6 +178,15 @@ export function ResultadoDibujoCard({
                 <PlainMarkdownPreview value={runaUnica.explicacion} />
               </div>
             )}
+          </>
+        ) : casiUnica ? (
+          <>
+            <p className="text-sm font-bold text-amber-600">Estás cerca…</p>
+            <p className="text-micro text-primary/40">
+              Hay una runa con esa forma
+              {rankingUnico[0] ? ` ("${rankingUnico[0].nombre}")` : ""}, pero tenés que mejorar tu
+              trazo.
+            </p>
           </>
         ) : (
           <>
@@ -267,6 +289,29 @@ export function ResultadoDibujoCard({
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {!combinacion && celdasCasi.length > 0 && (
+        <div className="w-full flex flex-col gap-1.5 text-left">
+          <span className="text-micro font-black uppercase tracking-widest text-amber-600/70">
+            Estás cerca…
+          </span>
+          {celdasCasi.map((c) => {
+            const top = resultadosPorCelda[c.id]?.ranking[0];
+            return (
+              <div
+                key={c.id}
+                className="flex flex-col gap-0.5 px-3 py-1.5 rounded-lg bg-amber-500/5 text-xs"
+              >
+                <span className="text-primary/40 font-bold">{labelCelda(c, rejilla)}</span>
+                <span className="text-primary/60">
+                  Hay una runa con esa forma
+                  {top ? ` ("${top.nombre}")` : ""}, pero tenés que mejorar tu trazo.
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
