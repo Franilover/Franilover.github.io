@@ -81,6 +81,35 @@ function centroide(trazo: TrazoLibre): Punto {
   return { x, y };
 }
 
+/**
+ * Centro del bounding box del contorno — a diferencia de centroide()
+ * (promedio simple de los puntos), esto es inmune a que el trazo tenga
+ * densidad de puntos desigual entre zonas.
+ *
+ * Esto importa porque nadie dibuja a velocidad constante: la gente se
+ * frena en las esquinas y acelera en los tramos rectos, y pointermove
+ * dispara mucho más seguido cuando el movimiento es lento — así que un
+ * cuadrado real trazado a mano puede tener 5-10x más puntos cerca de
+ * una esquina que cerca de otra. Con centroide() simple, esa esquina
+ * "pesada" arrastra el centro estimado varias decenas de píxeles fuera
+ * del centro geométrico real, lo que deforma el perfil radio(ángulo)
+ * usado para contar lados y hace que cuadrados/pentágonos/hexágonos se
+ * lean como triángulo (el conteo de cruces cae al mínimo permitido
+ * cuando el perfil queda suficientemente distorsionado). El bounding
+ * box, al depender solo de los puntos extremos y no de cuántos hay en
+ * cada tramo, no sufre este sesgo.
+ */
+function centroBoundingBox(trazo: TrazoLibre): Punto {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of trazo) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
+
 /** Área con la fórmula del "shoelace" (asume trazo aprox. cerrado). Siempre positiva. */
 function areaAproximada(trazo: TrazoLibre): number {
   let area = 0;
@@ -364,7 +393,7 @@ export function detectarFormaLibre(trazos: TrazoLibre[]): FormaDetectada | null 
 
   const contorno = trazosValidos[indiceContorno];
   const cierreContorno = scoreCierre(contorno);
-  const centro = centroide(contorno);
+  const centro = centroBoundingBox(contorno);
   const radioPromedio = contorno.reduce((s, p) => s + distancia(p, centro), 0) / contorno.length;
 
   const muestras = muestrearRadioPorAngulo(contorno, centro, NUM_MUESTRAS_RADIO);
