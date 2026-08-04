@@ -808,14 +808,13 @@ export function CanvasDibujoRuna({
   const botonHerramienta = (
     h: Herramienta,
     Icono: React.ComponentType<{ size?: number }>,
-    label: string,
     title: string,
   ) => (
     <button
       type="button"
       title={title}
       onClick={() => cambiarHerramienta(h)}
-      className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border transition-all"
+      className="flex items-center justify-center w-7 h-7 rounded-lg border transition-all"
       style={{
         borderColor:
           herramienta === h
@@ -831,7 +830,7 @@ export function CanvasDibujoRuna({
             : "color-mix(in srgb, var(--primary) 50%, transparent)",
       }}
     >
-      <Icono size={11} /> {label}
+      <Icono size={13} />
     </button>
   );
 
@@ -843,30 +842,27 @@ export function CanvasDibujoRuna({
     <div ref={containerRef} className="w-full relative" style={{ color }}>
       {mostrarHerramientas && (
         <div className="flex items-center flex-wrap gap-1 mb-2">
-          {botonHerramienta("libre", PenTool, "Mano alzada", "Mano alzada")}
+          {botonHerramienta("libre", PenTool, "Mano alzada")}
           {botonHerramienta(
             "recta",
             Minus,
-            "Línea recta",
             "Línea recta (con snap a 0°/45°/90°… — mantené Shift para dibujar libre)",
           )}
           {botonHerramienta(
             "curva",
             Spline,
-            "Curva",
             "Curva (arrastrá el segmento, después ajustá cuánto se curva)",
           )}
           {botonHerramienta(
             "editar",
             MousePointer2,
-            "Editar",
             "Editar vértices — arrastrá cualquier punto del trazo para corregirlo",
           )}
           <button
             type="button"
             title="Ajustar a grilla — snapea los puntos de recta/curva a una cuadrícula fija"
             onClick={() => setSnapGrilla((v) => !v)}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border transition-all ml-auto"
+            className="flex items-center justify-center w-7 h-7 rounded-lg border transition-all"
             style={{
               borderColor: snapGrilla
                 ? "color-mix(in srgb, var(--primary) 40%, transparent)"
@@ -879,8 +875,31 @@ export function CanvasDibujoRuna({
                 : "color-mix(in srgb, var(--primary) 50%, transparent)",
             }}
           >
-            <Grid3x3 size={11} /> Grilla
+            <Grid3x3 size={13} />
           </button>
+
+          <div className="ml-auto flex items-center gap-1">
+            {herramienta === "recta" && tieneTrazo && numPuntos > 1 && (
+              <button
+                type="button"
+                title="Deshacer último segmento"
+                onClick={deshacerUltimoSegmento}
+                className="flex items-center justify-center w-7 h-7 rounded-lg border border-primary/12 text-primary/50 hover:text-primary hover:border-primary/25 transition-all"
+              >
+                <Redo2 size={13} className="scale-x-[-1]" />
+              </button>
+            )}
+            {tieneTrazo && (
+              <button
+                type="button"
+                title="Borrar trazo"
+                onClick={limpiar}
+                className="flex items-center justify-center w-7 h-7 rounded-lg border border-primary/12 text-primary/50 hover:text-primary hover:border-primary/25 transition-all"
+              >
+                <Eraser size={13} />
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -924,31 +943,10 @@ export function CanvasDibujoRuna({
         </p>
       )}
 
-      <div className="absolute top-2 right-2 flex items-center gap-1">
-        {herramienta === "recta" && mostrarHerramientas && tieneTrazo && numPuntos > 1 && (
-          <button
-            type="button"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-bg-main/90 border border-primary/20 text-primary/50 hover:text-primary transition-all"
-            onClick={deshacerUltimoSegmento}
-            title="Deshacer último segmento"
-          >
-            <Redo2 size={11} className="scale-x-[-1]" /> Deshacer
-          </button>
-        )}
-        {tieneTrazo && (
-          <button
-            type="button"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-bg-main/90 border border-primary/20 text-primary/50 hover:text-primary transition-all"
-            onClick={limpiar}
-          >
-            <Eraser size={11} /> Borrar
-          </button>
-        )}
-      </div>
-
       {puedeConfirmar && (
         <button
           type="button"
+          title="Confirmar trazo"
           className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all"
           onClick={confirmarTrazo}
         >

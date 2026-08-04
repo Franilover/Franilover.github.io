@@ -109,16 +109,16 @@ export function PanelPatronRuna({
         </div>
 
         {trazoActual && (
-          <div className="flex items-center gap-1.5 text-micro text-primary/40 pt-1">
+          <div className="flex items-center gap-2 pt-1">
             <button
               type="button"
-              className="flex items-center gap-1 font-black uppercase tracking-widest text-red-400/60 hover:text-red-400 transition-colors"
+              title="Borrar trazo"
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-red-400/20 text-red-400/60 hover:text-red-400 hover:border-red-400/40 transition-colors"
               onClick={eliminarTrazo}
             >
-              <Trash2 size={10} /> Borrar trazo
+              <Trash2 size={13} />
             </button>
-            <span className="text-primary/20">·</span>
-            <span className="text-primary/25">
+            <span className="text-micro text-primary/25">
               Dibujá de nuevo arriba para reemplazarlo
             </span>
           </div>
@@ -131,13 +131,14 @@ export function PanelPatronRuna({
         )}
 
         {ultimoBorrado && (
-          <div className="flex items-center gap-1.5 text-micro text-primary/40 pt-1">
+          <div className="flex items-center gap-2 pt-1">
             <button
               type="button"
-              className="flex items-center gap-1 font-black uppercase tracking-widest hover:text-primary transition-colors"
+              title="Deshacer borrado"
+              className="flex items-center justify-center w-7 h-7 rounded-lg border border-primary/12 text-primary/50 hover:text-primary hover:border-primary/25 transition-colors"
               onClick={deshacerBorrado}
             >
-              <Undo2 size={10} /> Deshacer borrado
+              <Undo2 size={13} />
             </button>
           </div>
         )}

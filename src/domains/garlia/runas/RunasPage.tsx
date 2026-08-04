@@ -148,40 +148,49 @@ function BloqueRunas({
  * Panel editable del trazo de la runa seleccionada, en el mismo lugar
  * donde normalmente vive el canvas del Probador. Reemplaza al preview
  * de solo-lectura: ahora el admin puede dibujar/rehacer el trazo acá
- * mismo, sin pasar por un editor aparte.
+ * mismo, sin pasar por un editor aparte. El nombre también es editable
+ * inline, arriba del canvas.
  */
 function PatronRunaSeleccionada({
   runa,
   onPatronChange,
+  onNombreChange,
 }: {
   runa: EntidadMagica;
   onPatronChange: (trazos: Punto[][]) => void;
+  onNombreChange: (nombre: string) => void;
 }) {
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4">
-      <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
-        {runa.nombre || "(sin nombre)"}
-      </p>
+      <input
+        type="text"
+        value={runa.nombre}
+        onChange={(e) => onNombreChange(e.target.value)}
+        placeholder="Nombre de la runa"
+        className="w-full bg-transparent text-micro font-black uppercase tracking-widest text-primary/70 text-center mb-3 outline-none placeholder:text-primary/25 focus:text-primary"
+      />
       <PanelPatronRuna patronTrazos={runa.patron_trazos ?? []} onChange={onPatronChange} />
     </div>
   );
 }
 
 /**
- * Explicación de la runa seleccionada + grupos asignados, debajo. Vive en
- * la columna derecha (donde antes iba el editor de combinaciones/config)
- * mientras haya una runa seleccionada.
+ * Explicación (editable) de la runa seleccionada + grupos asignados,
+ * debajo. Vive en la columna derecha (donde antes iba el editor de
+ * combinaciones/config) mientras haya una runa seleccionada.
  */
 function DetalleRunaSeleccionada({
   runa,
   grupos,
   loadingGrupos,
   onGrupoIdsChange,
+  onExplicacionChange,
 }: {
   runa: EntidadMagica;
   grupos: GrupoMin[];
   loadingGrupos: boolean;
   onGrupoIdsChange: (ids: string[]) => void;
+  onExplicacionChange: (explicacion: string) => void;
 }) {
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-4">
@@ -189,14 +198,13 @@ function DetalleRunaSeleccionada({
         <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">
           Explicación
         </label>
-        {runa.explicacion ? (
-          <div
-            className="text-sm text-primary/80 prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: runa.explicacion }}
-          />
-        ) : (
-          <p className="text-micro text-primary/30 italic">Sin explicación todavía.</p>
-        )}
+        <RichEditor
+          key={runa.id}
+          value={runa.explicacion || ""}
+          onChange={onExplicacionChange}
+          placeholder="Qué significa esta runa, cómo se activa, su poder…"
+          minHeight={140}
+        />
       </div>
 
       <div className="border-t border-primary/10 pt-4">
@@ -385,6 +393,20 @@ export function RunasPage({
     onActualizarRuna?.(runaSeleccionada.id, { patron_trazos: trazos });
   };
 
+  // Nombre y explicación editables inline en el panel derecho —
+  // reemplazan al editor aparte para estos dos campos también.
+  const actualizarNombreDeRunaSeleccionada = (nombre: string) => {
+    if (!runaSeleccionada) return;
+    void supabase.from("runas").update({ nombre }).eq("id", runaSeleccionada.id);
+    onActualizarRuna?.(runaSeleccionada.id, { nombre });
+  };
+
+  const actualizarExplicacionDeRunaSeleccionada = (explicacion: string) => {
+    if (!runaSeleccionada) return;
+    void supabase.from("runas").update({ explicacion }).eq("id", runaSeleccionada.id);
+    onActualizarRuna?.(runaSeleccionada.id, { explicacion });
+  };
+
   // Sección activa de la columna 1: "probador" (Probador de reconocimiento
   // $1) o "config" (tablero de forma/rejilla/separadores). Cuando está en
   // "config", la columna 2 se reserva para el editor de combinaciones en
@@ -428,6 +450,7 @@ export function RunasPage({
               <PatronRunaSeleccionada
                 runa={runaSeleccionada}
                 onPatronChange={actualizarPatronDeRunaSeleccionada}
+                onNombreChange={actualizarNombreDeRunaSeleccionada}
               />
             ) : (
               <SelectorProbadorConfig
@@ -445,6 +468,7 @@ export function RunasPage({
                 grupos={grupos}
                 loadingGrupos={loadingGrupos}
                 onGrupoIdsChange={actualizarGrupoIdsDeRunaSeleccionada}
+                onExplicacionChange={actualizarExplicacionDeRunaSeleccionada}
               />
             ) : (
               seccionProbadorConfig === "config" && (
@@ -515,6 +539,7 @@ export function RunasPage({
               <PatronRunaSeleccionada
                 runa={runaSeleccionada}
                 onPatronChange={actualizarPatronDeRunaSeleccionada}
+                onNombreChange={actualizarNombreDeRunaSeleccionada}
               />
             )}
 
@@ -554,6 +579,7 @@ export function RunasPage({
                 grupos={grupos}
                 loadingGrupos={loadingGrupos}
                 onGrupoIdsChange={actualizarGrupoIdsDeRunaSeleccionada}
+                onExplicacionChange={actualizarExplicacionDeRunaSeleccionada}
               />
             ) : (
               todasLasRunas && (
