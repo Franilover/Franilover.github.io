@@ -198,15 +198,21 @@ export function ResultadoDibujoCard({
         ) : casiUnica ? (
           <>
             <p className="text-sm font-bold text-amber-600">Estás cerca…</p>
-            <p className="text-micro text-primary/40">
-              Hay una runa con esa forma
-              {rankingUnico[0] ? ` ("${rankingUnico[0].nombre}")` : ""}, pero tenés que mejorar tu
-              trazo.
-            </p>
-            {explicacionPorScore && (
-              <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
-                <PlainMarkdownPreview value={explicacionPorScore} />
-              </div>
+            {explicacionPorScore ? (
+              <>
+                {entidadCandidatoTop && (
+                  <h2 className="text-lg font-black text-primary">{entidadCandidatoTop.nombre}</h2>
+                )}
+                <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
+                  <PlainMarkdownPreview value={explicacionPorScore} />
+                </div>
+              </>
+            ) : (
+              <p className="text-micro text-primary/40">
+                Hay una runa con esa forma
+                {rankingUnico[0] ? ` ("${rankingUnico[0].nombre}")` : ""}, pero tenés que mejorar tu
+                trazo.
+              </p>
             )}
           </>
         ) : (
@@ -214,15 +220,21 @@ export function ResultadoDibujoCard({
             <p className="text-sm font-bold text-primary/50">
               {explicacionPorScore ? "Vas por buen camino…" : "No se reconoció ninguna runa conocida"}
             </p>
-            <p className="text-micro text-primary/30">
-              {rankingUnico[0]
-                ? `Lo más parecido fue "${rankingUnico[0].nombre}", pero no lo suficiente.`
-                : "Intentá trazar el símbolo con más cuidado."}
-            </p>
-            {explicacionPorScore && (
-              <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
-                <PlainMarkdownPreview value={explicacionPorScore} />
-              </div>
+            {explicacionPorScore ? (
+              <>
+                {entidadCandidatoTop && (
+                  <h2 className="text-lg font-black text-primary">{entidadCandidatoTop.nombre}</h2>
+                )}
+                <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
+                  <PlainMarkdownPreview value={explicacionPorScore} />
+                </div>
+              </>
+            ) : (
+              <p className="text-micro text-primary/30">
+                {rankingUnico[0]
+                  ? `Lo más parecido fue "${rankingUnico[0].nombre}", pero no lo suficiente.`
+                  : "Intentá trazar el símbolo con más cuidado."}
+              </p>
             )}
           </>
         )}
