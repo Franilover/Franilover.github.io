@@ -224,15 +224,92 @@ function muestrearRadioPorAngulo(
  *
  * Círculo: el radio es ~constante en todos los ángulos (baja desviación
  * relativa). Polígono regular de N lados: el radio tiene exactamente N
- * mínimos locales (los puntos medios de cada lado, más cerca del
- * centro) y N máximos locales (los vértices, más lejos) — se cuentan
- * los mínimos vía cruces de la señal suavizada por debajo de su propio
- * promedio, ya que contar picos crudos es muy sensible al ruido de un
- * trazo a mano.
+ * máximos locales (los vértices, más lejos del centro que sus vecinos
+ * inmediatos) — se cuentan directamente esos máximos sobre la señal
+ * suavizada, en vez de cruces por el promedio global (ver comentario
+ * en detectarFormaContorno: contar por promedio es sensible a que el
+ * muestreo entre lados sea desparejo, algo común con mouse/dedo real).
  */
 const UMBRAL_DESVIACION_CIRCULO = 0.09; // desviación relativa (std/mean) por debajo de esto = círculo
 const MIN_LADOS_DETECTABLES = 3;
 const MAX_LADOS_DETECTABLES = 10;
+
+/**
+ * Cuenta lados de un polígono a partir del perfil radio(ángulo) ya
+ * muestreado, contando MÁXIMOS LOCALES (vértices) en vez de cruces por
+ * el promedio global — el conteo por cruces depende de dónde cae ese
+ * promedio, y con mousemove real (dispara según tiempo, no distancia)
+ * el muestreo entre lados queda desparejo, lo que puede fusionar dos
+ * valles en una sola racha por debajo del promedio y perder un lado
+ * entero.
+ *
+ * Contar máximos locales es local por definición: un vértice es, sin
+ * importar el resto de la figura, un punto más lejos del centro que
+ * sus vecinos inmediatos. Se suaviza antes para no contar micro-picos
+ * de ruido, y se fusionan picos vecinos separados por un valle poco
+ * profundo (mismo vértice partido en dos por ruido residual) — el
+ * umbral de fusión es deliberadamente bajo para no fusionar vértices
+ * *reales* que están angularmente cerca (posible en un rectángulo
+ * angosto, donde los lados cortos generan vértices con poco ángulo
+ * entre sí).
+ */
+function contarLadosPorGiro(muestras: number[]): number {
+  const n = muestras.length;
+  const media = muestras.reduce((s, r) => s + r, 0) / n;
+
+  // Suavizado moderado para no perder de vista vértices reales que
+  // están angularmente cerca (ej. los lados cortos de un rectángulo
+  // angosto) — un suavizado más fuerte los erosiona antes de que
+  // lleguen a analizarse.
+  const suavizado = suavizarSenal(muestras, 2);
+
+  const picos: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const anterior = suavizado[(i - 1 + n) % n];
+    const actual = suavizado[i];
+    const siguiente = suavizado[(i + 1) % n];
+    if (actual > anterior && actual >= siguiente) picos.push(i);
+  }
+  if (picos.length === 0) return MIN_LADOS_DETECTABLES;
+
+  // Prominencia de cada pico: cuánto sobresale por encima del punto
+  // más bajo de la señal en TODO su entorno (hasta el valle más
+  // profundo antes de toparse con un pico igual o mayor a cada lado),
+  // en vez de comparar solo contra el vecino inmediato de al lado —
+  // eso es lo que distingue un vértice real (que domina un tramo
+  // entero del contorno) de una micro-oscilación de ruido residual que
+  // el suavizado no terminó de aplanar (esas quedan "ahogadas" dentro
+  // del entorno de un pico vecino más alto, con prominencia baja).
+  function prominencia(idx: number): number {
+    let minIzq = suavizado[idx];
+    let i = idx;
+    for (let pasos = 0; pasos < n; pasos++) {
+      i = (i - 1 + n) % n;
+      if (suavizado[i] > suavizado[idx]) break;
+      if (suavizado[i] < minIzq) minIzq = suavizado[i];
+    }
+    let minDer = suavizado[idx];
+    let j = idx;
+    for (let pasos = 0; pasos < n; pasos++) {
+      j = (j + 1) % n;
+      if (suavizado[j] > suavizado[idx]) break;
+      if (suavizado[j] < minDer) minDer = suavizado[j];
+    }
+    return suavizado[idx] - Math.max(minIzq, minDer);
+  }
+
+  // Umbral relativo al radio promedio: un vértice real de un polígono
+  // de hasta MAX_LADOS_DETECTABLES lados sobresale bastante más que el
+  // ruido residual típico de un trazo a mano/mouse (que ronda 1-3% del
+  // radio); 2.5% separa cómodamente ruido de vértice real sin perder
+  // los lados cortos de figuras no regulares.
+  const UMBRAL_PROMINENCIA_RELATIVA = 0.025;
+  const picosValidos = picos.filter(
+    (idx) => prominencia(idx) / (media || 1) >= UMBRAL_PROMINENCIA_RELATIVA,
+  );
+
+  return picosValidos.length > 0 ? picosValidos.length : MIN_LADOS_DETECTABLES;
+}
 
 function detectarFormaContorno(muestras: number[]): { forma: FormaLimite; confianzaForma: number } {
   const media = muestras.reduce((s, r) => s + r, 0) / muestras.length;
@@ -245,25 +322,12 @@ function detectarFormaContorno(muestras: number[]): { forma: FormaLimite; confia
     return { forma: FORMA_CIRCULO, confianzaForma };
   }
 
-  // Suavizado simple (media móvil) para no contar mínimos espurios por
-  // el temblor del trazo, antes de contar cuántas veces la señal cruza
-  // por debajo de su propio promedio (cada cruce descendente = un lado).
-  const suavizado = suavizarSenal(muestras, 3);
-  const promedioSuavizado = suavizado.reduce((s, r) => s + r, 0) / suavizado.length;
-
-  let cruces = 0;
-  for (let i = 0; i < suavizado.length; i++) {
-    const actual = suavizado[i];
-    const siguiente = suavizado[(i + 1) % suavizado.length];
-    if (actual >= promedioSuavizado && siguiente < promedioSuavizado) cruces++;
-  }
-
-  const lados = Math.min(MAX_LADOS_DETECTABLES, Math.max(MIN_LADOS_DETECTABLES, cruces));
-  // Confianza más floja acá: contar lados de un polígono dibujado a mano
-  // es más ruidoso que distinguir "es o no es círculo". Si `cruces` cayó
-  // fuera del rango detectable, ya perdimos precisión.
-  const confianzaForma = cruces >= MIN_LADOS_DETECTABLES && cruces <= MAX_LADOS_DETECTABLES ? 0.7 : 0.4;
-  return { forma: { tipo: "poligono", lados }, confianzaForma };
+  const lados = contarLadosPorGiro(muestras);
+  const confianzaForma = lados >= MIN_LADOS_DETECTABLES && lados <= MAX_LADOS_DETECTABLES ? 0.7 : 0.4;
+  return {
+    forma: { tipo: "poligono", lados: Math.min(MAX_LADOS_DETECTABLES, Math.max(MIN_LADOS_DETECTABLES, lados)) },
+    confianzaForma,
+  };
 }
 
 function suavizarSenal(valores: number[], radioVentana: number): number[] {
