@@ -378,16 +378,33 @@ function toleranciaRectitudPara(largoRecorrido: number, radio: number): number {
   return RECTITUD_LAXA + t * (RECTITUD_ESTRICTA - RECTITUD_LAXA);
 }
 
-function esLineaRadial(trazo: TrazoLibre, centro: Punto, radio: number): boolean {
-  if (trazo.length < 2) return false;
+/**
+ * Clasifica un trazo candidato a "línea de sección": ¿es una línea recta
+ * que pasa cerca del centro? Y si lo es, ¿de qué tipo?
+ *   - "centro-borde": un extremo está en el centro, el otro en el borde
+ *     (media cuña — el jugador dibujó cada línea radial por separado).
+ *   - "borde-borde": ambos extremos están en el borde, pasando cerca del
+ *     centro en el medio (diámetro completo — el jugador partió la forma
+ *     de un solo trazo). Geométricamente ESTA es una sola línea recta,
+ *     pero representa DOS radios en ángulos opuestos (dos cuñas), no uno.
+ * Devuelve `null` si no califica como línea de sección en absoluto.
+ */
+type TipoLineaRadial = "centro-borde" | "borde-borde";
+
+function clasificarLineaRadial(
+  trazo: TrazoLibre,
+  centro: Punto,
+  radio: number,
+): TipoLineaRadial | null {
+  if (trazo.length < 2) return null;
   const inicio = trazo[0];
   const fin = trazo[trazo.length - 1];
   const largoRecorrido = longitud(trazo);
   const largoRecto = distancia(inicio, fin);
-  if (largoRecorrido < 1e-6) return false;
+  if (largoRecorrido < 1e-6) return null;
 
   const rectitud = largoRecto / largoRecorrido;
-  if (rectitud < toleranciaRectitudPara(largoRecorrido, radio)) return false;
+  if (rectitud < toleranciaRectitudPara(largoRecorrido, radio)) return null;
 
   const distInicioCentro = distancia(inicio, centro);
   const distFinCentro = distancia(fin, centro);
@@ -398,14 +415,16 @@ function esLineaRadial(trazo: TrazoLibre, centro: Punto, radio: number): boolean
   const centroABorde =
     (distInicioCentro <= umbralCentro && distFinCentro > umbralCentro) ||
     (distFinCentro <= umbralCentro && distInicioCentro > umbralCentro);
-  if (centroABorde) return true;
+  if (centroABorde) return "centro-borde";
 
   // Caso "borde a borde pasando por el centro": el punto del trazo más
   // cercano al centro está efectivamente cerca, y ambos extremos están
   // lejos (son los dos bordes).
   const distanciaMinAlCentro = Math.min(...trazo.map((p) => distancia(p, centro)));
   const ambosLejos = distInicioCentro > umbralCentro && distFinCentro > umbralCentro;
-  return ambosLejos && distanciaMinAlCentro <= umbralCentro;
+  if (ambosLejos && distanciaMinAlCentro <= umbralCentro) return "borde-borde";
+
+  return null;
 }
 
 /**
@@ -414,13 +433,30 @@ function esLineaRadial(trazo: TrazoLibre, centro: Punto, radio: number): boolean
  */
 const TOLERANCIA_ANGULO_DUPLICADO = (10 * Math.PI) / 180; // 10°
 
-function anguloLinea(trazo: TrazoLibre, centro: Punto): number {
-  // Ángulo del extremo más lejano al centro (el que está "sobre el
-  // borde"), que es más estable que promediar todo el trazo.
-  const extremoLejano = trazo.reduce((mejor, p) =>
-    distancia(p, centro) > distancia(mejor, centro) ? p : mejor,
-  );
-  return Math.atan2(extremoLejano.y - centro.y, extremoLejano.x - centro.x);
+/**
+ * Ángulo(s) que aporta esta línea a la lista de "cortes" de sección.
+ *   - "centro-borde": un solo ángulo, el del extremo sobre el borde.
+ *   - "borde-borde": DOS ángulos (opuestos entre sí, ~180°), uno por
+ *     cada extremo — una línea-diámetro dibujada de un solo trazo
+ *     equivale a dos líneas radiales independientes, y debe contar
+ *     como tal para no perder una de las dos mitades (ver bug: antes
+ *     solo se tomaba "el extremo más lejano", perdiendo el otro y
+ *     subcontando `secciones` en exactamente este caso — el más común,
+ *     "partir el círculo a la mitad de un solo trazo").
+ */
+function angulosDeLinea(trazo: TrazoLibre, centro: Punto, tipo: TipoLineaRadial): number[] {
+  const anguloDe = (p: Punto) => Math.atan2(p.y - centro.y, p.x - centro.x);
+
+  if (tipo === "centro-borde") {
+    const inicio = trazo[0];
+    const fin = trazo[trazo.length - 1];
+    const extremoLejano = distancia(fin, centro) > distancia(inicio, centro) ? fin : inicio;
+    return [anguloDe(extremoLejano)];
+  }
+
+  // "borde-borde": los dos extremos son los dos bordes — cada uno aporta
+  // su propio ángulo, no hay que elegir "el más lejano" (ambos lo son).
+  return [anguloDe(trazo[0]), anguloDe(trazo[trazo.length - 1])];
 }
 
 function agruparAngulosCercanos(angulos: number[]): number {
@@ -469,9 +505,10 @@ export function detectarFormaLibre(trazos: TrazoLibre[]): FormaDetectada | null 
 
   trazosValidos.forEach((trazo, i) => {
     if (i === indiceContorno) return;
-    if (esLineaRadial(trazo, centro, radioPromedio)) {
+    const tipoLinea = clasificarLineaRadial(trazo, centro, radioPromedio);
+    if (tipoLinea) {
       indicesSecciones.push(i);
-      angulosLineas.push(anguloLinea(trazo, centro));
+      angulosLineas.push(...angulosDeLinea(trazo, centro, tipoLinea));
     } else {
       indicesIgnorados.push(i);
     }
