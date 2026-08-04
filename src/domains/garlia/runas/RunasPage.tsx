@@ -351,7 +351,7 @@ export function RunasPage({
                 <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
                   Probador
                 </p>
-                <PanelDetectorUnificado runas={todasLasRunas} />
+                <PanelDetectorUnificado runas={todasLasRunas} plantillasSeparadores={configRunas.plantillas_separadores} />
               </div>
             )}
 
@@ -409,7 +409,7 @@ export function RunasPage({
             </button>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto p-6">
-            <PanelDetectorUnificado runas={todasLasRunas} />
+            <PanelDetectorUnificado runas={todasLasRunas} plantillasSeparadores={configRunas.plantillas_separadores} />
           </div>
         </div>
       )}
