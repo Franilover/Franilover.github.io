@@ -524,6 +524,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
           runas={runas}
           todasLasRunas={runas}
           seleccionarRunaId={runaRecienCreadaId}
+          onActualizarRuna={(id, cambios) =>
+            setRunas((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)))
+          }
           onOpenEnsayo={(id) => openEntity("notas-gos", id)}
           onCreate={async () => {
             setCreatingRuna(true);

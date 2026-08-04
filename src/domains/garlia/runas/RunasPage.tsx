@@ -30,6 +30,7 @@ import type { Punto } from "./dollarOneRecognizer";
 import { PanelConfigRunas, type PreviewCombinacion } from "./PanelConfigRunas";
 import { PanelDetectorUnificado } from "./PanelDetectorUnificado";
 import { PanelGruposAsignados } from "./PanelGruposAsignados";
+import { PanelPatronRuna } from "./PanelPatronRuna";
 import { RunaThumbnail } from "./RunaThumbnail";
 import type { EntidadMagica, GrupoMin } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
@@ -59,6 +60,11 @@ interface Props {
   // reemplaza la navegación a un editor aparte: ahora, tras crear, la
   // runa nueva simplemente queda abierta inline acá mismo.
   seleccionarRunaId?: string | null;
+  // Refleja en el estado del padre un cambio guardado acá (ej. el
+  // patrón de trazo editado desde el panel inline), para que el grid y
+  // el resto de la página no queden desincronizados hasta el próximo
+  // refetch.
+  onActualizarRuna?: (id: string, cambios: Partial<EntidadMagica>) => void;
 }
 
 /**
@@ -139,27 +145,24 @@ function BloqueRunas({
 }
 
 /**
- * Muestra el patrón de trazo de la runa seleccionada, en el mismo lugar
- * donde normalmente vive el canvas del Probador (mismo alto ~340px para
- * que el layout no salte al togglear).
+ * Panel editable del trazo de la runa seleccionada, en el mismo lugar
+ * donde normalmente vive el canvas del Probador. Reemplaza al preview
+ * de solo-lectura: ahora el admin puede dibujar/rehacer el trazo acá
+ * mismo, sin pasar por un editor aparte.
  */
-function PatronRunaSeleccionada({ runa }: { runa: EntidadMagica }) {
+function PatronRunaSeleccionada({
+  runa,
+  onPatronChange,
+}: {
+  runa: EntidadMagica;
+  onPatronChange: (trazos: Punto[][]) => void;
+}) {
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4">
       <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
         {runa.nombre || "(sin nombre)"}
       </p>
-      <div className="h-[340px] flex items-center justify-center">
-        {runa.patron_trazos && runa.patron_trazos.length > 0 ? (
-          <div className="w-full max-w-[280px] h-full">
-            <RunaThumbnail patronTrazos={runa.patron_trazos} />
-          </div>
-        ) : (
-          <p className="text-micro text-primary/30 text-center">
-            Esta runa todavía no tiene patrón de trazo definido.
-          </p>
-        )}
-      </div>
+      <PanelPatronRuna patronTrazos={runa.patron_trazos ?? []} onChange={onPatronChange} />
     </div>
   );
 }
@@ -323,6 +326,7 @@ export function RunasPage({
   onOpenEnsayo,
   todasLasRunas,
   seleccionarRunaId,
+  onActualizarRuna,
 }: Props) {
   const {
     subsistemas,
@@ -370,6 +374,15 @@ export function RunasPage({
     const gruposAntes = runaSeleccionada.grupo_ids ?? [];
     void sincronizarGruposDeRuna(runaSeleccionada.id, gruposAntes, ids);
     void supabase.from("runas").update({ grupo_ids: ids }).eq("id", runaSeleccionada.id);
+    onActualizarRuna?.(runaSeleccionada.id, { grupo_ids: ids });
+  };
+
+  // Trazo editado desde el panel que reemplaza al Probador cuando hay
+  // una runa seleccionada — persiste directo, sin editor aparte.
+  const actualizarPatronDeRunaSeleccionada = (trazos: Punto[][]) => {
+    if (!runaSeleccionada) return;
+    void supabase.from("runas").update({ patron_trazos: trazos }).eq("id", runaSeleccionada.id);
+    onActualizarRuna?.(runaSeleccionada.id, { patron_trazos: trazos });
   };
 
   // Sección activa de la columna 1: "probador" (Probador de reconocimiento
@@ -412,7 +425,10 @@ export function RunasPage({
         {todasLasRunas && (
           <div className="mt-6 space-y-6">
             {runaSeleccionada ? (
-              <PatronRunaSeleccionada runa={runaSeleccionada} />
+              <PatronRunaSeleccionada
+                runa={runaSeleccionada}
+                onPatronChange={actualizarPatronDeRunaSeleccionada}
+              />
             ) : (
               <SelectorProbadorConfig
                 seccion={seccionProbadorConfig}
@@ -495,7 +511,12 @@ export function RunasPage({
           {/* Columna izquierda: Probador (o patrón de la runa seleccionada,
               arriba) + Lista de runas (abajo) */}
           <div className="flex-1 min-w-0 space-y-6">
-            {todasLasRunas && runaSeleccionada && <PatronRunaSeleccionada runa={runaSeleccionada} />}
+            {todasLasRunas && runaSeleccionada && (
+              <PatronRunaSeleccionada
+                runa={runaSeleccionada}
+                onPatronChange={actualizarPatronDeRunaSeleccionada}
+              />
+            )}
 
             {todasLasRunas && !runaSeleccionada && (
               <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 relative">
