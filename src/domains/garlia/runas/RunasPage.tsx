@@ -18,6 +18,7 @@ import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { RichEditor } from "@/editor/lexical";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
+import { supabase } from "@/infra/supabase/supabase";
 
 import {
   PanelCombinacionesRunas,
@@ -28,9 +29,11 @@ import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistem
 import type { Punto } from "./dollarOneRecognizer";
 import { PanelConfigRunas, type PreviewCombinacion } from "./PanelConfigRunas";
 import { PanelDetectorUnificado } from "./PanelDetectorUnificado";
+import { PanelGruposAsignados } from "./PanelGruposAsignados";
 import { RunaThumbnail } from "./RunaThumbnail";
-import type { EntidadMagica } from "./types";
+import type { EntidadMagica, GrupoMin } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
+import { useGruposRunas } from "./useGruposRunas";
 import { useSubsistemasMagia } from "./useSubsistemasMagia";
 
 interface EntidadMagicaMin {
@@ -52,16 +55,29 @@ interface Props {
   // (probador + editor de combinaciones), movido acá desde el editor
   // interno de una runa individual.
   todasLasRunas?: EntidadMagica[];
+  // Id de runa a dejar seleccionada (ej. la recién creada por onCreate) —
+  // reemplaza la navegación a un editor aparte: ahora, tras crear, la
+  // runa nueva simplemente queda abierta inline acá mismo.
+  seleccionarRunaId?: string | null;
 }
 
+/**
+ * Grid de tarjetas de runas. Ya no navega a un editor aparte: al hacer
+ * click en una runa se selecciona (toggle) — el padre (RunasPage) usa esa
+ * selección para mostrar el patrón de trazo en el lugar del Probador y la
+ * explicación + grupos en la columna derecha. Un segundo click sobre la
+ * misma runa la deselecciona.
+ */
 function BloqueRunas({
   entidades,
-  onOpen,
+  runaSeleccionadaId,
+  onToggleSeleccion,
   onCreate,
   creating,
 }: {
   entidades: EntidadMagicaMin[];
-  onOpen: (section: SectionKey, id: string) => void;
+  runaSeleccionadaId?: string | null;
+  onToggleSeleccion?: (id: string) => void;
   onCreate?: () => void;
   creating?: boolean;
 }) {
@@ -96,18 +112,105 @@ function BloqueRunas({
             className="grid gap-1"
             style={{ gridTemplateColumns: "repeat(auto-fill, 52px)" }}
           >
-            {entidades.map((e) => (
-              <EntityCard
-                key={e.id}
-                nombre={e.nombre}
-                imageUrl={null}
-                Icon={ScrollText}
-                visual={<RunaThumbnail patronTrazos={e.patron_trazos} />}
-                onClick={() => onOpen("runas", e.id)}
-              />
-            ))}
+            {entidades.map((e) => {
+              const seleccionada = runaSeleccionadaId === e.id;
+              return (
+                <div
+                  key={e.id}
+                  className={`rounded-lg transition-shadow ${
+                    seleccionada ? "ring-2 ring-primary/60" : ""
+                  }`}
+                >
+                  <EntityCard
+                    nombre={e.nombre}
+                    imageUrl={null}
+                    Icon={ScrollText}
+                    visual={<RunaThumbnail patronTrazos={e.patron_trazos} />}
+                    onClick={() => onToggleSeleccion?.(e.id)}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Muestra el patrón de trazo de la runa seleccionada, en el mismo lugar
+ * donde normalmente vive el canvas del Probador (mismo alto ~340px para
+ * que el layout no salte al togglear).
+ */
+function PatronRunaSeleccionada({ runa }: { runa: EntidadMagica }) {
+  return (
+    <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4">
+      <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
+        {runa.nombre || "(sin nombre)"}
+      </p>
+      <div className="h-[340px] flex items-center justify-center">
+        {runa.patron_trazos && runa.patron_trazos.length > 0 ? (
+          <div className="w-full max-w-[280px] h-full">
+            <RunaThumbnail patronTrazos={runa.patron_trazos} />
+          </div>
+        ) : (
+          <p className="text-micro text-primary/30 text-center">
+            Esta runa todavía no tiene patrón de trazo definido.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Explicación de la runa seleccionada + grupos asignados, debajo. Vive en
+ * la columna derecha (donde antes iba el editor de combinaciones/config)
+ * mientras haya una runa seleccionada.
+ */
+function DetalleRunaSeleccionada({
+  runa,
+  grupos,
+  loadingGrupos,
+  onGrupoIdsChange,
+}: {
+  runa: EntidadMagica;
+  grupos: GrupoMin[];
+  loadingGrupos: boolean;
+  onGrupoIdsChange: (ids: string[]) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-4">
+      <div className="space-y-1.5">
+        <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">
+          Explicación
+        </label>
+        {runa.explicacion ? (
+          <div
+            className="text-sm text-primary/80 prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: runa.explicacion }}
+          />
+        ) : (
+          <p className="text-micro text-primary/30 italic">Sin explicación todavía.</p>
+        )}
+      </div>
+
+      <div className="border-t border-primary/10 pt-4">
+        <PanelGruposAsignados
+          color="var(--primary)"
+          entidadId={runa.id}
+          grupoIds={runa.grupo_ids ?? []}
+          grupos={grupos}
+          label="Grupos de runas"
+          labelMiembros="runas"
+          loadingGrupos={loadingGrupos}
+          mensajeVacio="Sin grupos asignados — categorizá esta runa (ej. Naturales, De fuego, Impacto rápido…)"
+          modo="runas"
+          placeholderBusqueda="Buscar grupo de runas…"
+          textoBoton="Agregar grupo de runas"
+          onGrupoIdsChange={onGrupoIdsChange}
+        />
       </div>
     </div>
   );
@@ -219,6 +322,7 @@ export function RunasPage({
   creating,
   onOpenEnsayo,
   todasLasRunas,
+  seleccionarRunaId,
 }: Props) {
   const {
     subsistemas,
@@ -234,6 +338,39 @@ export function RunasPage({
     subsistemas.find((s) => s.id === subsistemaSeleccionadoId) ?? null;
 
   const { config: configRunas, actualizar: actualizarConfigRunas } = useConfigRunas();
+
+  // Grupos de runas — antes vivían en el editor externo de una runa
+  // individual (FormularioRuna), recibidos por props. Ahora la asignación
+  // de grupos se hace acá mismo, en el panel derecho.
+  const { grupos, loading: loadingGrupos, sincronizarGruposDeRuna } = useGruposRunas();
+
+  // Runa actualmente seleccionada en el grid (click para mostrar su
+  // patrón + explicación/grupos, click de nuevo para esconder). Reemplaza
+  // al editor aparte: ya no se navega a otra pantalla, todo pasa acá
+  // mismo — el patrón ocupa el lugar del Probador y la explicación +
+  // grupos ocupan la columna derecha.
+  const [runaSeleccionadaId, setRunaSeleccionadaId] = useState<string | null>(null);
+  const runaSeleccionada = useMemo(
+    () => todasLasRunas?.find((r) => r.id === runaSeleccionadaId) ?? null,
+    [todasLasRunas, runaSeleccionadaId],
+  );
+
+  const toggleSeleccionRuna = (id: string) => {
+    setRunaSeleccionadaId((actual) => (actual === id ? null : id));
+  };
+
+  // Cuando el padre pide dejar seleccionada una runa puntual (ej. justo
+  // después de crearla vía onCreate), la reflejamos acá.
+  useEffect(() => {
+    if (seleccionarRunaId) setRunaSeleccionadaId(seleccionarRunaId);
+  }, [seleccionarRunaId]);
+
+  const actualizarGrupoIdsDeRunaSeleccionada = (ids: string[]) => {
+    if (!runaSeleccionada) return;
+    const gruposAntes = runaSeleccionada.grupo_ids ?? [];
+    void sincronizarGruposDeRuna(runaSeleccionada.id, gruposAntes, ids);
+    void supabase.from("runas").update({ grupo_ids: ids }).eq("id", runaSeleccionada.id);
+  };
 
   // Sección activa de la columna 1: "probador" (Probador de reconocimiento
   // $1) o "config" (tablero de forma/rejilla/separadores). Cuando está en
@@ -265,22 +402,41 @@ export function RunasPage({
   if (!onOpenEnsayo) {
     return (
       <div>
-        <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
+        <BloqueRunas
+          entidades={runas}
+          creating={creating}
+          onCreate={onCreate}
+          runaSeleccionadaId={runaSeleccionadaId}
+          onToggleSeleccion={toggleSeleccionRuna}
+        />
         {todasLasRunas && (
           <div className="mt-6 space-y-6">
-            <SelectorProbadorConfig
-              seccion={seccionProbadorConfig}
-              onCambiarSeccion={setSeccionProbadorConfig}
-              runas={todasLasRunas}
-              configRunas={configRunas}
-              onActualizarConfigRunas={actualizarConfigRunas}
-              previewCombinacion={previewCombinacion}
-            />
-            {seccionProbadorConfig === "config" && (
-              <PanelCombinacionesRunas
+            {runaSeleccionada ? (
+              <PatronRunaSeleccionada runa={runaSeleccionada} />
+            ) : (
+              <SelectorProbadorConfig
+                seccion={seccionProbadorConfig}
+                onCambiarSeccion={setSeccionProbadorConfig}
                 runas={todasLasRunas}
-                onCambiarPreview={setPreviewCombinacion}
+                configRunas={configRunas}
+                onActualizarConfigRunas={actualizarConfigRunas}
+                previewCombinacion={previewCombinacion}
               />
+            )}
+            {runaSeleccionada ? (
+              <DetalleRunaSeleccionada
+                runa={runaSeleccionada}
+                grupos={grupos}
+                loadingGrupos={loadingGrupos}
+                onGrupoIdsChange={actualizarGrupoIdsDeRunaSeleccionada}
+              />
+            ) : (
+              seccionProbadorConfig === "config" && (
+                <PanelCombinacionesRunas
+                  runas={todasLasRunas}
+                  onCambiarPreview={setPreviewCombinacion}
+                />
+              )
             )}
           </div>
         )}
@@ -336,9 +492,12 @@ export function RunasPage({
         </div>
       ) : (
         <div className="mt-4 flex flex-col lg:flex-row gap-6">
-          {/* Columna izquierda: Probador (arriba) + Lista de runas (abajo) */}
+          {/* Columna izquierda: Probador (o patrón de la runa seleccionada,
+              arriba) + Lista de runas (abajo) */}
           <div className="flex-1 min-w-0 space-y-6">
-            {todasLasRunas && (
+            {todasLasRunas && runaSeleccionada && <PatronRunaSeleccionada runa={runaSeleccionada} />}
+
+            {todasLasRunas && !runaSeleccionada && (
               <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 relative">
                 <button
                   type="button"
@@ -355,38 +514,55 @@ export function RunasPage({
               </div>
             )}
 
-            <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
+            <BloqueRunas
+              entidades={runas}
+              creating={creating}
+              onCreate={onCreate}
+              runaSeleccionadaId={runaSeleccionadaId}
+              onToggleSeleccion={toggleSeleccionRuna}
+            />
           </div>
 
-          {/* Columna derecha: bloque de config (previsualización) + editor de combinaciones, lado a lado */}
+          {/* Columna derecha: si hay una runa seleccionada, su explicación +
+              grupos asignados. Si no, el bloque de config (previsualización)
+              + editor de combinaciones, lado a lado (comportamiento previo). */}
           <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-            {todasLasRunas && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setPantallaCompleta("combinaciones")}
-                  className="absolute -top-1 right-0 z-10 p-1.5 rounded-lg text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
-                  title="Ver render y combinaciones en pantalla completa"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-1 min-w-0">
-                    <PanelConfigRunas
-                      config={configRunas}
-                      onActualizar={actualizarConfigRunas}
-                      runas={todasLasRunas}
-                      previewCombinacion={previewCombinacion}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <PanelCombinacionesRunas
-                      runas={todasLasRunas}
-                      onCambiarPreview={setPreviewCombinacion}
-                    />
+            {runaSeleccionada ? (
+              <DetalleRunaSeleccionada
+                runa={runaSeleccionada}
+                grupos={grupos}
+                loadingGrupos={loadingGrupos}
+                onGrupoIdsChange={actualizarGrupoIdsDeRunaSeleccionada}
+              />
+            ) : (
+              todasLasRunas && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setPantallaCompleta("combinaciones")}
+                    className="absolute -top-1 right-0 z-10 p-1.5 rounded-lg text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
+                    title="Ver render y combinaciones en pantalla completa"
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="flex-1 min-w-0">
+                      <PanelConfigRunas
+                        config={configRunas}
+                        onActualizar={actualizarConfigRunas}
+                        runas={todasLasRunas}
+                        previewCombinacion={previewCombinacion}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <PanelCombinacionesRunas
+                        runas={todasLasRunas}
+                        onCambiarPreview={setPreviewCombinacion}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )
             )}
           </div>
         </div>

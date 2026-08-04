@@ -27,9 +27,7 @@ import { useCanciones } from "@/domains/garlia/canciones/useCanciones";
 import type { Cancion } from "@/domains/garlia/canciones/types";
 import { Chip } from "@/ui/Chip";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
-import { useGruposRunas } from "@/domains/garlia/grupos/useGruposRunas";
 import { useRunas } from "@/domains/garlia/runas/useRunas";
-import { FormularioRuna } from "@/domains/garlia/runas/FormularioRuna";
 import { RunasPage } from "@/domains/garlia/runas/RunasPage";
 import { useNotas } from "@/editor/notas/useNotas";
 import { type Nota } from "@/domains/garlia/_shared/types";
@@ -105,9 +103,14 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { grupos: gruposCriaturas, loading: loadingGrupos } = useGruposCriaturas();
 
   // ── Runas ─────────────────────────────────────────────────────────────
+  // Los grupos de runas ahora los carga RunasPage internamente
+  // (useGruposRunas propio, junto al panel de selección inline) — ya no
+  // hace falta cargarlos acá para pasárselos a un editor aparte.
   const { items: runas, setItems: setRunas, loading: loadingRunas } = useRunas();
-  const { grupos: gruposRunas, loading: loadingGruposRunas } = useGruposRunas();
   const [creatingRuna, setCreatingRuna] = useState(false);
+  // Runa a dejar seleccionada dentro de RunasPage tras crearla — ya no
+  // navegamos a un editor aparte (FormularioRuna, eliminado).
+  const [runaRecienCreadaId, setRunaRecienCreadaId] = useState<string | null>(null);
 
   // ── Organización (Grupos + Notas) ────────────────────────────────────────
   const { grupos, loaded: loadedGrupos, crearGrupo, actualizarGrupo, eliminarGrupo } = useGrupos();
@@ -317,11 +320,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
     () => (section === "letras" ? canciones.find((c) => c.id === selectedId) ?? null : null),
     [section, canciones, selectedId],
   );
-  const selectedRuna = useMemo(
-    () => (section === "runas" ? runas.find((r) => r.id === selectedId) ?? null : null),
-    [section, runas, selectedId],
-  );
-
   if (selectedGrupo) {
     return (
       <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -353,27 +351,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
           onNavigateGrupo={(id) => openEntity("grupos", id)}
           onNavigatePersonaje={(id) => openEntity("personajes", id)}
           onNavigateReino={(id) => openEntity("reinos", id)}
-        />
-      </div>
-    );
-  }
-
-  if (selectedRuna) {
-    return (
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        <FormularioRuna
-          key={selectedRuna.id}
-          item={selectedRuna}
-          grupos={gruposRunas}
-          loadingGrupos={loadingGruposRunas}
-          onDeleted={(id) => {
-            setRunas((prev) => prev.filter((r) => r.id !== id));
-            openEntity("runas", "");
-          }}
-          onNavigateGrupo={(id) => openEntity("grupos", id)}
-          onSaved={(updated) =>
-            setRunas((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
-          }
         />
       </div>
     );
@@ -546,6 +523,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           loading={loadingRunas}
           runas={runas}
           todasLasRunas={runas}
+          seleccionarRunaId={runaRecienCreadaId}
           onOpenEnsayo={(id) => openEntity("notas-gos", id)}
           onCreate={async () => {
             setCreatingRuna(true);
@@ -557,7 +535,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
                 .single();
               if (error) throw error;
               setRunas((prev) => [...prev, data]);
-              openEntity("runas", data.id);
+              setRunaRecienCreadaId(data.id);
             } catch (e) {
               console.error("[EntidadesPage] error creando runa:", e);
             } finally {
