@@ -649,6 +649,14 @@ const Navbar = () => {
       : []),
   ];
 
+  // Aventura y Runas solo se muestran con sesión iniciada. En desktop van
+  // como dos ítems normales y seguidos en el sidebar (Runas debajo de
+  // Aventura, sin flyout). En mobile, Aventura se agrupa con Runas bajo un
+  // solo botón con panel flotante (subLinks) — ver mobileGarliaLinks más
+  // abajo, que reusa esta misma definición y solo cambia cómo se agrupan.
+  const isRunas = currentPath?.startsWith("/garlia/runas") ?? false;
+  const isAventura = currentPath?.startsWith("/garlia/aventura") ?? false;
+
   const garliaLinks: NavLinkDef[] = [
     {
       href: user ? "/garlia/personal" : "/auth/login",
@@ -668,7 +676,13 @@ const Navbar = () => {
             href: "/garlia/aventura",
             label: "Aventura",
             icon: BookOpen,
-            active: currentPath?.startsWith("/garlia/aventura") ?? false,
+            active: isAventura,
+          },
+          {
+            href: "/garlia/runas",
+            label: "Runas",
+            icon: ScrollText,
+            active: isRunas,
           },
         ]
       : []),
@@ -677,6 +691,55 @@ const Navbar = () => {
       label: "Libros",
       icon: BookText,
       active: currentPath?.startsWith("/garlia/libros") ?? false,
+    },
+  ];
+
+  // Versión mobile: mismos links, pero Aventura y Runas se agrupan en un
+  // solo botón con subLinks (panel flotante), en vez de dos íconos sueltos
+  // en la barra inferior.
+  const mobileGarliaLinks: NavLinkDef[] = [
+    {
+      href: user ? "/garlia/personal" : "/auth/login",
+      label: "Cuenta",
+      icon: CircleUser,
+      active: personalIsActive,
+    },
+    ...(user
+      ? [
+          {
+            href: "/garlia/mapa",
+            label: "Mapa",
+            icon: Compass,
+            active: currentPath?.startsWith("/garlia/mapa") ?? false,
+          },
+          {
+            href: "/garlia/aventura",
+            label: "Aventura",
+            icon: BookOpen,
+            active: isAventura || isRunas,
+          },
+        ]
+      : []),
+    {
+      href: "/garlia/libros",
+      label: "Libros",
+      icon: BookText,
+      active: currentPath?.startsWith("/garlia/libros") ?? false,
+    },
+  ];
+
+  const aventuraSubLinks: NavLinkDef[] = [
+    {
+      href: "/garlia/aventura",
+      label: "Aventura",
+      icon: BookOpen,
+      active: isAventura,
+    },
+    {
+      href: "/garlia/runas",
+      label: "Runas",
+      icon: ScrollText,
+      active: isRunas,
     },
   ];
 
@@ -1422,7 +1485,7 @@ const Navbar = () => {
                   ),
                 )}
                 <NavVerticalDivider />
-                {garliaLinks.map(
+                {mobileGarliaLinks.map(
                   ({ href, label, icon, active, fillActive }) => (
                     <MobileNavItem
                       key={href}
@@ -1432,6 +1495,10 @@ const Navbar = () => {
                       icon={icon}
                       isOpen={mobileOpenMenu === href}
                       label={label}
+                      // "Aventura" agrupa Runas debajo en un panel flotante
+                      // (mismo patrón que cualquier otro ítem con subLinks);
+                      // el resto navega directo como siempre.
+                      subLinks={href === "/garlia/aventura" ? aventuraSubLinks : undefined}
                       onClose={closeAll}
                       onToggle={() => mobileToggle(href)}
                     />
