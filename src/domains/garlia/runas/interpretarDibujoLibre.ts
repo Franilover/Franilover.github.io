@@ -46,6 +46,8 @@ export type ResultadoCelda = {
   celda: Celda;
   ranking: ResultadoReconocimiento[];
   mejorMatch: EntidadMagica | null;
+  /** El trazo real que el jugador dibujó en esta celda (el que ganó el ranking) — para poder mostrarlo tal cual, ej. al registrar una runa lograda con alta confianza. */
+  trazo: TrazoLibre | null;
 };
 
 export type ResultadoGap = {
@@ -235,10 +237,12 @@ export function interpretarDibujoLibre(
     if (patronesRuna.length === 0) continue;
 
     let mejorRanking: ResultadoReconocimiento[] = [];
+    let mejorTrazo: TrazoLibre | null = null;
     for (const trazo of trazosCelda) {
       const ranking = reconocerRuna(trazo, patronesRuna);
       if (ranking[0] && (!mejorRanking[0] || ranking[0].score > mejorRanking[0].score)) {
         mejorRanking = ranking;
+        mejorTrazo = trazo;
       }
     }
     const top = mejorRanking[0];
@@ -246,7 +250,7 @@ export function interpretarDibujoLibre(
       top && top.score >= UMBRAL_CONFIANZA
         ? (runas.find((r) => r.id === top.runaId) ?? null)
         : null;
-    resultadosPorCelda[celda.id] = { celda, ranking: mejorRanking, mejorMatch };
+    resultadosPorCelda[celda.id] = { celda, ranking: mejorRanking, mejorMatch, trazo: mejorTrazo };
     if (mejorMatch) celdaRunaId[celda.id] = mejorMatch.id;
   }
 

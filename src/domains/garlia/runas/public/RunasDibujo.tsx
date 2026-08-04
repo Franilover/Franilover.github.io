@@ -39,6 +39,8 @@ import { supabase } from "@/infra/supabase/supabase";
 import { CanvasFormaLibre } from "../CanvasFormaLibre";
 import type { TrazoLibre } from "../deteccionFormaLibre";
 import { generarCeldas } from "../formasLimite";
+import { PanelNotasJugador } from "./PanelNotasJugador";
+import { PanelRunasLogradas } from "./PanelRunasLogradas";
 import { PistaInterpretacion, ResultadoDibujoCard, useResultadoDibujoLibre } from "../ResultadoDibujoLibre";
 import type { CombinacionRuna, EntidadMagica } from "../types";
 import { useConfigRunas } from "../useConfigRunas";
@@ -134,43 +136,52 @@ export default function RunasDibujo() {
       )}
 
       {estado === "listo" && (
-        <div className="w-full max-w-md flex flex-col items-center gap-4">
-          {!finalizado && (
-            <>
-              <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
-                <CanvasFormaLibre height={340} resetSignal={resetSignal} onTrazosChange={onTrazosChange} />
-              </div>
+        <div className="w-full max-w-4xl flex flex-col lg:flex-row items-start justify-center gap-6">
+          {/* Columna principal: canvas / resultado */}
+          <div className="w-full max-w-md flex flex-col items-center gap-4 mx-auto lg:mx-0">
+            {!finalizado && (
+              <>
+                <div className="w-full rounded-2xl border border-primary/15 bg-white-custom/60 p-3 shadow-sm">
+                  <CanvasFormaLibre height={340} resetSignal={resetSignal} onTrazosChange={onTrazosChange} />
+                </div>
 
-              <PistaInterpretacion interpretacion={interpretacion} trazos={trazos} />
+                <PistaInterpretacion interpretacion={interpretacion} trazos={trazos} />
 
-              <div className="flex flex-col items-center gap-2">
-                <p className="text-micro text-primary/25 tracking-widest uppercase font-bold text-center max-w-xs">
-                  Dibujá tu forma, dividila en secciones si querés, y una
-                  runa (o separador) en cada una
-                </p>
-                <button
-                  type="button"
-                  disabled={!hayAlgoReconocido}
-                  onClick={finalizarDibujo}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-40"
-                >
-                  Terminar y ver resultado
-                </button>
-              </div>
-            </>
-          )}
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-micro text-primary/25 tracking-widest uppercase font-bold text-center max-w-xs">
+                    Dibujá tu forma, dividila en secciones si querés, y una
+                    runa (o separador) en cada una
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!hayAlgoReconocido}
+                    onClick={finalizarDibujo}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-40"
+                  >
+                    Terminar y ver resultado
+                  </button>
+                </div>
+              </>
+            )}
 
-          {finalizado && interpretacion && (
-            <ResultadoDibujoCard
-              key={intentos}
-              cadenas={cadenas}
-              celdas={generarCeldas(interpretacion.rejilla)}
-              combinacion={combinacionEncontrada}
-              interpretacion={interpretacion}
-              rejilla={interpretacion.rejilla}
-              onReintentar={reintentar}
-            />
-          )}
+            {finalizado && interpretacion && (
+              <ResultadoDibujoCard
+                key={intentos}
+                cadenas={cadenas}
+                celdas={generarCeldas(interpretacion.rejilla)}
+                combinacion={combinacionEncontrada}
+                interpretacion={interpretacion}
+                rejilla={interpretacion.rejilla}
+                onReintentar={reintentar}
+              />
+            )}
+          </div>
+
+          {/* Columna lateral: notas del jugador + runas logradas */}
+          <div className="w-full lg:w-72 shrink-0 flex flex-col gap-4 mx-auto lg:mx-0">
+            <PanelNotasJugador />
+            <PanelRunasLogradas interpretacion={interpretacion} />
+          </div>
         </div>
       )}
     </div>
