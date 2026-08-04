@@ -26,8 +26,6 @@ interface Props {
   /** Contenido custom para la miniatura, reemplaza imagen/ícono por defecto
    *  (ej. preview de trazos de una runa). Si no se pasa, usa imageUrl/Icon. */
   visual?: React.ReactNode;
-  /** Resalta la tarjeta como activa/seleccionada (ej. panel inline abierto). */
-  selected?: boolean;
 }
 
 export function EntityCard({
@@ -39,14 +37,9 @@ export function EntityCard({
   isFavorite,
   onToggleFavorite,
   visual,
-  selected,
 }: Props) {
   return (
-    <div
-      className={`group/card relative flex flex-col items-center gap-1 p-1 rounded-lg transition-colors hover:bg-primary/5 text-center ${
-        selected ? "bg-primary/10 ring-1 ring-primary/30" : ""
-      }`}
-    >
+    <div className="group/card relative flex flex-col items-center gap-1 p-1 rounded-lg transition-colors hover:bg-primary/5 text-center">
       {onToggleFavorite && (
         <button
           type="button"
@@ -68,11 +61,7 @@ export function EntityCard({
         </button>
       )}
       <button type="button" onClick={onClick} className="flex flex-col items-center gap-1 w-full">
-        <div
-          className={`w-full aspect-square rounded-xl overflow-hidden bg-primary/5 border flex items-center justify-center group-hover/card:border-primary/25 transition-colors ${
-            selected ? "border-primary/40" : "border-primary/10"
-          }`}
-        >
+        <div className="w-full aspect-square rounded-xl overflow-hidden bg-primary/5 border border-primary/10 flex items-center justify-center group-hover/card:border-primary/25 transition-colors">
           {visual ? (
             visual
           ) : imageUrl ? (
