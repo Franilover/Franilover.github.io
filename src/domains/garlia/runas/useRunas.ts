@@ -19,7 +19,7 @@ import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 export function useRunas() {
   const { data, setData, loading } = useSupabaseData<EntidadMagica>(CONFIG.tabla, {
-    select: "id, nombre, explicacion, patron_trazos, grupo_ids",
+    select: "id, nombre, explicacion, explicacion_por_rango, patron_trazos, grupo_ids",
     order: { campo: "nombre" },
   });
 

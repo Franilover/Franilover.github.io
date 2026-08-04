@@ -64,7 +64,7 @@ export default function RunasDibujo() {
     void Promise.all([
       supabase
         .from("runas")
-        .select("id, nombre, explicacion, patron_trazos"),
+        .select("id, nombre, explicacion, explicacion_por_rango, patron_trazos"),
       supabase
         .from("combinaciones_runas")
         .select("id, nombre, explicacion, imagen_url, forma, rejilla, celdas, separadores"),
@@ -172,6 +172,7 @@ export default function RunasDibujo() {
                 combinacion={combinacionEncontrada}
                 interpretacion={interpretacion}
                 rejilla={interpretacion.rejilla}
+                runas={runas}
                 onReintentar={reintentar}
               />
             )}

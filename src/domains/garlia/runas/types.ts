@@ -16,6 +16,47 @@ import type { FormaLimite, Rejilla } from "./formasLimite";
 import type { TipoSeparador } from "./separadores";
 
 /**
+ * Rango de precisión (score $1, 0..1) sobre el que se puede definir una
+ * explicación distinta — pensado para dar feedback progresivo al
+ * jugador según qué tan bien dibujó el trazo, no solo al llegar al
+ * umbral de reconocimiento "oficial".
+ */
+export type RangoAcierto = "50-70" | "70-85" | "85-98" | "98-100";
+
+export const RANGOS_ACIERTO: { key: RangoAcierto; label: string; min: number; max: number }[] = [
+  { key: "50-70", label: "50% – 70%", min: 0.5, max: 0.7 },
+  { key: "70-85", label: "70% – 85%", min: 0.7, max: 0.85 },
+  { key: "85-98", label: "85% – 98%", min: 0.85, max: 0.98 },
+  { key: "98-100", label: "98% – 100%", min: 0.98, max: 1.001 },
+];
+
+/** Encuentra el rango al que pertenece un score (0..1). Null si no llega al 50%. */
+export function rangoParaScore(score: number): RangoAcierto | null {
+  for (const r of RANGOS_ACIERTO) {
+    if (score >= r.min && score < r.max) return r.key;
+  }
+  if (score >= 1) return "98-100";
+  return null;
+}
+
+/**
+ * Elige el texto a mostrarle al jugador según su score: primero busca la
+ * explicación específica del rango correspondiente; si esa runa no tiene
+ * una definida para ese rango, cae a la explicación general. Null si no
+ * hay ninguna de las dos (o si el score no llegó al 50%).
+ */
+export function explicacionParaScore(
+  runa: Pick<EntidadMagica, "explicacion" | "explicacion_por_rango">,
+  score: number,
+): string | null {
+  const rango = rangoParaScore(score);
+  if (!rango) return null;
+  const especifica = runa.explicacion_por_rango?.[rango];
+  if (especifica) return especifica;
+  return runa.explicacion || null;
+}
+
+/**
  * Se mantiene el nombre `EntidadMagica` (en vez de renombrar a algo como
  * `EntidadRuna`) para minimizar diffs con el resto de los archivos
  * copiados sin cambios de lógica, que ya importan este tipo por ese
@@ -24,7 +65,13 @@ import type { TipoSeparador } from "./separadores";
 export type EntidadMagica = {
   id: string;
   nombre: string;
+  /** Explicación general/por defecto — se usa si no hay una específica
+   *  del rango de acierto, o en contextos donde no aplica un score. */
   explicacion?: string;
+  /** Explicación distinta según qué tan preciso fue el trazo del
+   *  jugador (feedback progresivo). Cada clave es opcional — si el
+   *  rango correspondiente no tiene texto propio, se cae a `explicacion`. */
+  explicacion_por_rango?: Partial<Record<RangoAcierto, string>> | null;
   grupo_ids?: string[];
   /**
    * Lista de trazos-ejemplo (cada uno una polilínea de puntos crudos) que

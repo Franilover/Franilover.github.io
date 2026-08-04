@@ -28,7 +28,7 @@ import {
 } from "./interpretarDibujoLibre";
 import { buscarCombinacion } from "./matchCombinacion";
 import { RunaThumbnail } from "./RunaThumbnail";
-import type { CombinacionRuna, EntidadMagica } from "./types";
+import { explicacionParaScore, type CombinacionRuna, type EntidadMagica } from "./types";
 import type { TipoSeparador } from "./separadores";
 import type { Punto } from "./dollarOneRecognizer";
 import { useMemo } from "react";
@@ -138,6 +138,7 @@ export function ResultadoDibujoCard({
   rejilla,
   celdas,
   cadenas,
+  runas,
   onReintentar,
 }: {
   combinacion: CombinacionRuna | null;
@@ -145,6 +146,9 @@ export function ResultadoDibujoCard({
   rejilla: Rejilla;
   celdas: Celda[];
   cadenas: Cadena[];
+  /** Catálogo completo de runas — para resolver la explicación por rango
+   *  del candidato top del ranking, que no viaja en ResultadoReconocimiento. */
+  runas: EntidadMagica[];
   onReintentar: () => void;
 }) {
   const resultadosPorCelda: Record<string, ResultadoCelda> = interpretacion.resultadosPorCelda;
@@ -160,6 +164,18 @@ export function ResultadoDibujoCard({
   const runaUnica = esRunaUnica ? (resultadosPorCelda[celdas[0].id]?.mejorMatch ?? null) : null;
   const rankingUnico = esRunaUnica ? (resultadosPorCelda[celdas[0].id]?.ranking ?? []) : [];
   const casiUnica = esRunaUnica ? (resultadosPorCelda[celdas[0].id]?.casi ?? false) : false;
+  // Candidato top del ranking (aunque no haya llegado al umbral de
+  // reconocimiento) — se usa para elegir la explicación por rango de
+  // acierto, que arranca en 50% (antes de la zona "casi" y de la zona
+  // "reconocida").
+  const candidatoTop = rankingUnico[0] ?? null;
+  const entidadCandidatoTop = candidatoTop
+    ? (runas.find((r) => r.id === candidatoTop.runaId) ?? null)
+    : null;
+  const explicacionPorScore =
+    esRunaUnica && candidatoTop && entidadCandidatoTop
+      ? explicacionParaScore(entidadCandidatoTop, candidatoTop.score)
+      : null;
 
   if (esRunaUnica && !combinacion) {
     return (
@@ -173,9 +189,9 @@ export function ResultadoDibujoCard({
               <RunaThumbnail patronTrazos={runaUnica.patron_trazos} />
             </div>
             <h2 className="text-lg font-black text-primary">{runaUnica.nombre}</h2>
-            {runaUnica.explicacion && (
+            {explicacionPorScore && (
               <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
-                <PlainMarkdownPreview value={runaUnica.explicacion} />
+                <PlainMarkdownPreview value={explicacionPorScore} />
               </div>
             )}
           </>
@@ -187,17 +203,27 @@ export function ResultadoDibujoCard({
               {rankingUnico[0] ? ` ("${rankingUnico[0].nombre}")` : ""}, pero tenés que mejorar tu
               trazo.
             </p>
+            {explicacionPorScore && (
+              <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
+                <PlainMarkdownPreview value={explicacionPorScore} />
+              </div>
+            )}
           </>
         ) : (
           <>
             <p className="text-sm font-bold text-primary/50">
-              No se reconoció ninguna runa conocida
+              {explicacionPorScore ? "Vas por buen camino…" : "No se reconoció ninguna runa conocida"}
             </p>
             <p className="text-micro text-primary/30">
               {rankingUnico[0]
                 ? `Lo más parecido fue "${rankingUnico[0].nombre}", pero no lo suficiente.`
                 : "Intentá trazar el símbolo con más cuidado."}
             </p>
+            {explicacionPorScore && (
+              <div className="text-sm text-primary/60 text-left max-h-40 overflow-y-auto w-full">
+                <PlainMarkdownPreview value={explicacionPorScore} />
+              </div>
+            )}
           </>
         )}
         <button

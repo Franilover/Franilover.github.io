@@ -32,7 +32,8 @@ import { PanelDetectorUnificado } from "./PanelDetectorUnificado";
 import { PanelGruposAsignados } from "./PanelGruposAsignados";
 import { PanelPatronRuna } from "./PanelPatronRuna";
 import { RunaThumbnail } from "./RunaThumbnail";
-import type { EntidadMagica, GrupoMin } from "./types";
+import type { EntidadMagica, GrupoMin, RangoAcierto } from "./types";
+import { RANGOS_ACIERTO } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
 import { useGruposRunas } from "./useGruposRunas";
 import { useSubsistemasMagia } from "./useSubsistemasMagia";
@@ -178,6 +179,10 @@ function PatronRunaSeleccionada({
  * Explicación (editable) de la runa seleccionada + grupos asignados,
  * debajo. Vive en la columna derecha (donde antes iba el editor de
  * combinaciones/config) mientras haya una runa seleccionada.
+ *
+ * Además de la explicación general, permite definir una explicación
+ * distinta por rango de precisión del trazo (feedback progresivo al
+ * jugador) — cada rango cae a la explicación general si se deja vacío.
  */
 function DetalleRunaSeleccionada({
   runa,
@@ -185,12 +190,14 @@ function DetalleRunaSeleccionada({
   loadingGrupos,
   onGrupoIdsChange,
   onExplicacionChange,
+  onExplicacionPorRangoChange,
 }: {
   runa: EntidadMagica;
   grupos: GrupoMin[];
   loadingGrupos: boolean;
   onGrupoIdsChange: (ids: string[]) => void;
   onExplicacionChange: (explicacion: string) => void;
+  onExplicacionPorRangoChange: (rango: RangoAcierto, texto: string) => void;
 }) {
   return (
     <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 space-y-4">
@@ -205,6 +212,27 @@ function DetalleRunaSeleccionada({
           placeholder="Qué significa esta runa, cómo se activa, su poder…"
           minHeight={140}
         />
+      </div>
+
+      <div className="border-t border-primary/10 pt-4 space-y-3">
+        <label className="text-micro font-black uppercase tracking-[0.3em] text-primary/35">
+          Explicación por precisión del trazo
+        </label>
+        <p className="text-micro text-primary/30 -mt-1.5">
+          Opcional — si se deja vacío, ese rango usa la explicación general de arriba.
+        </p>
+        {RANGOS_ACIERTO.map((r) => (
+          <div key={r.key} className="space-y-1">
+            <span className="text-micro font-bold text-primary/45">{r.label}</span>
+            <RichEditor
+              key={`${runa.id}-${r.key}`}
+              value={runa.explicacion_por_rango?.[r.key] || ""}
+              onChange={(texto) => onExplicacionPorRangoChange(r.key, texto)}
+              placeholder="Explicación para este rango…"
+              minHeight={80}
+            />
+          </div>
+        ))}
       </div>
 
       <div className="border-t border-primary/10 pt-4">
@@ -407,6 +435,18 @@ export function RunasPage({
     onActualizarRuna?.(runaSeleccionada.id, { explicacion });
   };
 
+  // Explicación específica de un rango de acierto (feedback progresivo al
+  // jugador según qué tan preciso fue su trazo).
+  const actualizarExplicacionPorRangoDeRunaSeleccionada = (rango: RangoAcierto, texto: string) => {
+    if (!runaSeleccionada) return;
+    const actualizado = { ...(runaSeleccionada.explicacion_por_rango ?? {}), [rango]: texto };
+    void supabase
+      .from("runas")
+      .update({ explicacion_por_rango: actualizado })
+      .eq("id", runaSeleccionada.id);
+    onActualizarRuna?.(runaSeleccionada.id, { explicacion_por_rango: actualizado });
+  };
+
   // Sección activa de la columna 1: "probador" (Probador de reconocimiento
   // $1) o "config" (tablero de forma/rejilla/separadores). Cuando está en
   // "config", la columna 2 se reserva para el editor de combinaciones en
@@ -469,6 +509,7 @@ export function RunasPage({
                 loadingGrupos={loadingGrupos}
                 onGrupoIdsChange={actualizarGrupoIdsDeRunaSeleccionada}
                 onExplicacionChange={actualizarExplicacionDeRunaSeleccionada}
+                onExplicacionPorRangoChange={actualizarExplicacionPorRangoDeRunaSeleccionada}
               />
             ) : (
               seccionProbadorConfig === "config" && (
@@ -580,6 +621,7 @@ export function RunasPage({
                 loadingGrupos={loadingGrupos}
                 onGrupoIdsChange={actualizarGrupoIdsDeRunaSeleccionada}
                 onExplicacionChange={actualizarExplicacionDeRunaSeleccionada}
+                onExplicacionPorRangoChange={actualizarExplicacionPorRangoDeRunaSeleccionada}
               />
             ) : (
               todasLasRunas && (

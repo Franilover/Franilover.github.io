@@ -234,6 +234,7 @@ export function PanelDetectorUnificado({
                 combinacion={combinacionEncontrada}
                 interpretacion={interpretacion}
                 rejilla={interpretacion.rejilla}
+                runas={runas}
                 onReintentar={() => setMostrarComoJugador(false)}
               />
             ) : (
