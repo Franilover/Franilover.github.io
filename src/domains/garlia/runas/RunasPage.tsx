@@ -313,6 +313,66 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
   );
 }
 
+// ─── Bloque de ensayo "Runas" (tag GOS + tag Runas) ─────────────────────────
+// Mismo patrón que BloqueEnsayoEnergias: un ensayo único y fijo, buscado
+// por título+tags, que se crea automáticamente la primera vez que se abre
+// la sección Runas si todavía no existe. Vive en la columna derecha de la
+// vista "Runas", debajo (o al lado) del editor de combinaciones / detalle
+// de runa seleccionada.
+const TITULO_ENSAYO_RUNAS = "Runas";
+
+function BloqueEnsayoRunas(_props: { onOpenEnsayo?: (id: string) => void }) {
+  const { ensayos, loading, crearNotaPendiente, actualizarLocal } = useEnsayoEditorLogic(null);
+  const creandoRef = useRef(false);
+  const [creando, setCreando] = useState(false);
+
+  const ensayoRunas = useMemo(
+    () =>
+      ensayos.find((e: any) => {
+        const tags = (e.tags ?? []).map((t: string) => t.trim().toLowerCase());
+        return (
+          (e.titulo ?? "").trim().toLowerCase() === TITULO_ENSAYO_RUNAS.toLowerCase() &&
+          tags.includes("gos") &&
+          tags.includes("runas")
+        );
+      }),
+    [ensayos],
+  );
+
+  useEffect(() => {
+    if (loading || ensayoRunas || creandoRef.current) return;
+    creandoRef.current = true;
+    setCreando(true);
+    void crearNotaPendiente(TITULO_ENSAYO_RUNAS, ["gos", "runas"]).finally(() => {
+      setCreando(false);
+      creandoRef.current = false;
+    });
+  }, [loading, ensayoRunas, crearNotaPendiente]);
+
+  if (loading || creando || !ensayoRunas) {
+    return (
+      <div className="w-full py-6 text-xs text-primary/30 text-center mb-6">
+        {creando ? "Creando ensayo…" : "Cargando…"}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4">
+      <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
+        Ensayo
+      </p>
+      <RichEditor
+        key={ensayoRunas.id}
+        value={ensayoRunas.contenido || ""}
+        onChange={(value) => actualizarLocal(ensayoRunas.id, "contenido", value)}
+        placeholder="Escribe aquí…"
+        minHeight={220}
+      />
+    </div>
+  );
+}
+
 // ─── Toggle "Sistema" / "Runas" ─────────────────────────────────────────────
 // Sistema: ensayo (Energías) a la izquierda + subsistemas a la derecha,
 // nada más. Runas: el bloque de herramientas de runas (probador, lista,
@@ -573,8 +633,8 @@ export function RunasPage({
         </div>
       ) : (
         <div className="mt-4 flex flex-col lg:flex-row gap-6">
-          {/* Columna izquierda: Probador (o patrón de la runa seleccionada,
-              arriba) + Lista de runas (abajo) */}
+          {/* Columna izquierda: toggle Probador/Config (o patrón de la runa
+              seleccionada, arriba) + Lista de runas (abajo) */}
           <div className="flex-1 min-w-0 space-y-6">
             {todasLasRunas && runaSeleccionada && (
               <PatronRunaSeleccionada
@@ -594,10 +654,14 @@ export function RunasPage({
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>
-                <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
-                  Probador
-                </p>
-                <PanelDetectorUnificado runas={todasLasRunas} plantillasSeparadores={configRunas.plantillas_separadores} />
+                <SelectorProbadorConfig
+                  seccion={seccionProbadorConfig}
+                  onCambiarSeccion={setSeccionProbadorConfig}
+                  runas={todasLasRunas}
+                  configRunas={configRunas}
+                  onActualizarConfigRunas={actualizarConfigRunas}
+                  previewCombinacion={previewCombinacion}
+                />
               </div>
             )}
 
@@ -611,9 +675,10 @@ export function RunasPage({
           </div>
 
           {/* Columna derecha: si hay una runa seleccionada, su explicación +
-              grupos asignados. Si no, el bloque de config (previsualización)
-              + editor de combinaciones, lado a lado (comportamiento previo). */}
-          <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+              grupos asignados. Si no, el editor de combinaciones (solo
+              cuando la sección activa a la izquierda es "config") seguido
+              del ensayo de Runas (tags GOS + Runas). */}
+          <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto space-y-6">
             {runaSeleccionada ? (
               <DetalleRunaSeleccionada
                 runa={runaSeleccionada}
@@ -625,32 +690,25 @@ export function RunasPage({
               />
             ) : (
               todasLasRunas && (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setPantallaCompleta("combinaciones")}
-                    className="absolute -top-1 right-0 z-10 p-1.5 rounded-lg text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
-                    title="Ver render y combinaciones en pantalla completa"
-                  >
-                    <Maximize2 className="w-4 h-4" />
-                  </button>
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex-1 min-w-0">
-                      <PanelConfigRunas
-                        config={configRunas}
-                        onActualizar={actualizarConfigRunas}
-                        runas={todasLasRunas}
-                        previewCombinacion={previewCombinacion}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
+                <>
+                  {seccionProbadorConfig === "config" && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setPantallaCompleta("combinaciones")}
+                        className="absolute -top-1 right-0 z-10 p-1.5 rounded-lg text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
+                        title="Ver render y combinaciones en pantalla completa"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                      </button>
                       <PanelCombinacionesRunas
                         runas={todasLasRunas}
                         onCambiarPreview={setPreviewCombinacion}
                       />
                     </div>
-                  </div>
-                </div>
+                  )}
+                  <BloqueEnsayoRunas />
+                </>
               )
             )}
           </div>
