@@ -81,35 +81,6 @@ function centroide(trazo: TrazoLibre): Punto {
   return { x, y };
 }
 
-/**
- * Centro del bounding box del contorno — a diferencia de centroide()
- * (promedio simple de los puntos), esto es inmune a que el trazo tenga
- * densidad de puntos desigual entre zonas.
- *
- * Esto importa porque nadie dibuja a velocidad constante: la gente se
- * frena en las esquinas y acelera en los tramos rectos, y pointermove
- * dispara mucho más seguido cuando el movimiento es lento — así que un
- * cuadrado real trazado a mano puede tener 5-10x más puntos cerca de
- * una esquina que cerca de otra. Con centroide() simple, esa esquina
- * "pesada" arrastra el centro estimado varias decenas de píxeles fuera
- * del centro geométrico real, lo que deforma el perfil radio(ángulo)
- * usado para contar lados y hace que cuadrados/pentágonos/hexágonos se
- * lean como triángulo (el conteo de cruces cae al mínimo permitido
- * cuando el perfil queda suficientemente distorsionado). El bounding
- * box, al depender solo de los puntos extremos y no de cuántos hay en
- * cada tramo, no sufre este sesgo.
- */
-function centroBoundingBox(trazo: TrazoLibre): Punto {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const p of trazo) {
-    if (p.x < minX) minX = p.x;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y < minY) minY = p.y;
-    if (p.y > maxY) maxY = p.y;
-  }
-  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
-}
-
 /** Área con la fórmula del "shoelace" (asume trazo aprox. cerrado). Siempre positiva. */
 function areaAproximada(trazo: TrazoLibre): number {
   let area = 0;
@@ -122,66 +93,41 @@ function areaAproximada(trazo: TrazoLibre): number {
 }
 
 /**
- * Qué tan "cerrado" está un trazo, como score continuo 0..1 (1 = cierre
- * perfecto), en vez de una decisión sí/no. El umbral duro anterior
- * descartaba por completo trazos que cerraban al 26% cuando el límite
- * era 25% — un jugador que dibuja con el dedo en mobile cae del lado
- * malo del umbral todo el tiempo por ruido de captura, no porque su
- * intención fuera distinta a la de alguien que cerró al 24%.
- *
- * Devolver un score permite que `elegirContorno` compare "qué tan bien
- * cerrado + qué tan grande" en vez de aceptar/rechazar en un corte
- * arbitrario, y que la UI pueda mostrar confianza baja en vez de "no
- * se detectó nada" cuando el cierre fue imperfecto pero razonable.
+ * ¿Este trazo está "cerrado"? — el punto final vuelve a estar cerca del
+ * inicial, en relación al tamaño del propio trazo (no un umbral fijo en
+ * píxeles: un círculo grande y uno chico deben tolerar el mismo % de
+ * imprecisión relativa).
  */
-const CIERRE_TOLERANCIA_BLANDA = 0.45; // más allá de esto, score de cierre = 0
-function scoreCierre(trazo: TrazoLibre): number {
-  if (trazo.length < 8) return 0;
+const TOLERANCIA_CIERRE = 0.25; // el gap final-inicio puede ser hasta 25% del "radio" del trazo
+function estaCerrado(trazo: TrazoLibre): boolean {
+  if (trazo.length < 8) return false;
   const inicio = trazo[0];
   const fin = trazo[trazo.length - 1];
   const c = centroide(trazo);
   const radioAprox = trazo.reduce((s, p) => s + distancia(p, c), 0) / trazo.length;
-  if (radioAprox < 1e-6) return 0;
-  const gapRelativo = distancia(inicio, fin) / radioAprox;
-  if (gapRelativo >= CIERRE_TOLERANCIA_BLANDA) return 0;
-  // Decae linealmente de 1 (gap=0) a 0 (gap=tolerancia). Un trazo que
-  // cierra "perfecto" pesa igual que antes; uno que cierra mal todavía
-  // puede ganar si es mucho más grande que las alternativas.
-  return 1 - gapRelativo / CIERRE_TOLERANCIA_BLANDA;
+  if (radioAprox < 1e-6) return false;
+  return distancia(inicio, fin) <= radioAprox * TOLERANCIA_CIERRE;
 }
-
-/** Por debajo de este score de cierre, ni siquiera es candidato razonable a contorno (evita que un garabato abierto cualquiera gane por área). */
-const CIERRE_MINIMO_CANDIDATO = 0.15;
 
 /**
  * Elige, entre todos los trazos, el que mejor pinta tiene de ser el
- * contorno exterior. Combina qué tan cerrado está (score continuo, ver
- * scoreCierre) con el área — así un círculo grande con cierre imperfecto
- * le sigue ganando a una línea radial corta y bien cerrada por accidente,
- * pero un trazo apenas entreabierto ya no se descarta de plano solo por
- * cruzar un umbral fijo.
+ * contorno exterior: debe estar cerrado, y entre los cerrados se toma
+ * el de mayor área (un separador radial no es un trazo cerrado, así
+ * que ya queda afuera por el primer filtro casi siempre; el área es
+ * desempate si hubiera más de un trazo cerrado, ej. el jugador re-trazó
+ * el contorno duplicado sin querer).
  */
 function elegirContorno(trazos: TrazoLibre[]): number | null {
-  const areas = trazos.map((t) => areaAproximada(t));
-  const areaMax = Math.max(1e-6, ...areas);
-
   let mejorIndice: number | null = null;
-  let mejorPuntaje = -Infinity;
-
+  let mejorArea = -Infinity;
   trazos.forEach((trazo, i) => {
-    const cierre = scoreCierre(trazo);
-    if (cierre < CIERRE_MINIMO_CANDIDATO) return;
-    const areaNormalizada = areas[i] / areaMax; // 0..1, relativo al trazo más grande del set
-    // Pesamos más el cierre que el área: preferimos un contorno más
-    // chico pero bien cerrado a uno grande pero muy abierto, que
-    // probablemente ni sea el contorno real.
-    const puntaje = 0.65 * cierre + 0.35 * areaNormalizada;
-    if (puntaje > mejorPuntaje) {
-      mejorPuntaje = puntaje;
+    if (!estaCerrado(trazo)) return;
+    const area = areaAproximada(trazo);
+    if (area > mejorArea) {
+      mejorArea = area;
       mejorIndice = i;
     }
   });
-
   return mejorIndice;
 }
 
@@ -224,92 +170,15 @@ function muestrearRadioPorAngulo(
  *
  * Círculo: el radio es ~constante en todos los ángulos (baja desviación
  * relativa). Polígono regular de N lados: el radio tiene exactamente N
- * máximos locales (los vértices, más lejos del centro que sus vecinos
- * inmediatos) — se cuentan directamente esos máximos sobre la señal
- * suavizada, en vez de cruces por el promedio global (ver comentario
- * en detectarFormaContorno: contar por promedio es sensible a que el
- * muestreo entre lados sea desparejo, algo común con mouse/dedo real).
+ * mínimos locales (los puntos medios de cada lado, más cerca del
+ * centro) y N máximos locales (los vértices, más lejos) — se cuentan
+ * los mínimos vía cruces de la señal suavizada por debajo de su propio
+ * promedio, ya que contar picos crudos es muy sensible al ruido de un
+ * trazo a mano.
  */
 const UMBRAL_DESVIACION_CIRCULO = 0.09; // desviación relativa (std/mean) por debajo de esto = círculo
 const MIN_LADOS_DETECTABLES = 3;
 const MAX_LADOS_DETECTABLES = 10;
-
-/**
- * Cuenta lados de un polígono a partir del perfil radio(ángulo) ya
- * muestreado, contando MÁXIMOS LOCALES (vértices) en vez de cruces por
- * el promedio global — el conteo por cruces depende de dónde cae ese
- * promedio, y con mousemove real (dispara según tiempo, no distancia)
- * el muestreo entre lados queda desparejo, lo que puede fusionar dos
- * valles en una sola racha por debajo del promedio y perder un lado
- * entero.
- *
- * Contar máximos locales es local por definición: un vértice es, sin
- * importar el resto de la figura, un punto más lejos del centro que
- * sus vecinos inmediatos. Se suaviza antes para no contar micro-picos
- * de ruido, y se fusionan picos vecinos separados por un valle poco
- * profundo (mismo vértice partido en dos por ruido residual) — el
- * umbral de fusión es deliberadamente bajo para no fusionar vértices
- * *reales* que están angularmente cerca (posible en un rectángulo
- * angosto, donde los lados cortos generan vértices con poco ángulo
- * entre sí).
- */
-function contarLadosPorGiro(muestras: number[]): number {
-  const n = muestras.length;
-  const media = muestras.reduce((s, r) => s + r, 0) / n;
-
-  // Suavizado moderado para no perder de vista vértices reales que
-  // están angularmente cerca (ej. los lados cortos de un rectángulo
-  // angosto) — un suavizado más fuerte los erosiona antes de que
-  // lleguen a analizarse.
-  const suavizado = suavizarSenal(muestras, 2);
-
-  const picos: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const anterior = suavizado[(i - 1 + n) % n];
-    const actual = suavizado[i];
-    const siguiente = suavizado[(i + 1) % n];
-    if (actual > anterior && actual >= siguiente) picos.push(i);
-  }
-  if (picos.length === 0) return MIN_LADOS_DETECTABLES;
-
-  // Prominencia de cada pico: cuánto sobresale por encima del punto
-  // más bajo de la señal en TODO su entorno (hasta el valle más
-  // profundo antes de toparse con un pico igual o mayor a cada lado),
-  // en vez de comparar solo contra el vecino inmediato de al lado —
-  // eso es lo que distingue un vértice real (que domina un tramo
-  // entero del contorno) de una micro-oscilación de ruido residual que
-  // el suavizado no terminó de aplanar (esas quedan "ahogadas" dentro
-  // del entorno de un pico vecino más alto, con prominencia baja).
-  function prominencia(idx: number): number {
-    let minIzq = suavizado[idx];
-    let i = idx;
-    for (let pasos = 0; pasos < n; pasos++) {
-      i = (i - 1 + n) % n;
-      if (suavizado[i] > suavizado[idx]) break;
-      if (suavizado[i] < minIzq) minIzq = suavizado[i];
-    }
-    let minDer = suavizado[idx];
-    let j = idx;
-    for (let pasos = 0; pasos < n; pasos++) {
-      j = (j + 1) % n;
-      if (suavizado[j] > suavizado[idx]) break;
-      if (suavizado[j] < minDer) minDer = suavizado[j];
-    }
-    return suavizado[idx] - Math.max(minIzq, minDer);
-  }
-
-  // Umbral relativo al radio promedio: un vértice real de un polígono
-  // de hasta MAX_LADOS_DETECTABLES lados sobresale bastante más que el
-  // ruido residual típico de un trazo a mano/mouse (que ronda 1-3% del
-  // radio); 2.5% separa cómodamente ruido de vértice real sin perder
-  // los lados cortos de figuras no regulares.
-  const UMBRAL_PROMINENCIA_RELATIVA = 0.025;
-  const picosValidos = picos.filter(
-    (idx) => prominencia(idx) / (media || 1) >= UMBRAL_PROMINENCIA_RELATIVA,
-  );
-
-  return picosValidos.length > 0 ? picosValidos.length : MIN_LADOS_DETECTABLES;
-}
 
 function detectarFormaContorno(muestras: number[]): { forma: FormaLimite; confianzaForma: number } {
   const media = muestras.reduce((s, r) => s + r, 0) / muestras.length;
@@ -322,12 +191,25 @@ function detectarFormaContorno(muestras: number[]): { forma: FormaLimite; confia
     return { forma: FORMA_CIRCULO, confianzaForma };
   }
 
-  const lados = contarLadosPorGiro(muestras);
-  const confianzaForma = lados >= MIN_LADOS_DETECTABLES && lados <= MAX_LADOS_DETECTABLES ? 0.7 : 0.4;
-  return {
-    forma: { tipo: "poligono", lados: Math.min(MAX_LADOS_DETECTABLES, Math.max(MIN_LADOS_DETECTABLES, lados)) },
-    confianzaForma,
-  };
+  // Suavizado simple (media móvil) para no contar mínimos espurios por
+  // el temblor del trazo, antes de contar cuántas veces la señal cruza
+  // por debajo de su propio promedio (cada cruce descendente = un lado).
+  const suavizado = suavizarSenal(muestras, 3);
+  const promedioSuavizado = suavizado.reduce((s, r) => s + r, 0) / suavizado.length;
+
+  let cruces = 0;
+  for (let i = 0; i < suavizado.length; i++) {
+    const actual = suavizado[i];
+    const siguiente = suavizado[(i + 1) % suavizado.length];
+    if (actual >= promedioSuavizado && siguiente < promedioSuavizado) cruces++;
+  }
+
+  const lados = Math.min(MAX_LADOS_DETECTABLES, Math.max(MIN_LADOS_DETECTABLES, cruces));
+  // Confianza más floja acá: contar lados de un polígono dibujado a mano
+  // es más ruidoso que distinguir "es o no es círculo". Si `cruces` cayó
+  // fuera del rango detectable, ya perdimos precisión.
+  const confianzaForma = cruces >= MIN_LADOS_DETECTABLES && cruces <= MAX_LADOS_DETECTABLES ? 0.7 : 0.4;
+  return { forma: { tipo: "poligono", lados }, confianzaForma };
 }
 
 function suavizarSenal(valores: number[], radioVentana: number): number[] {
@@ -356,55 +238,18 @@ function suavizarSenal(valores: number[], radioVentana: number): number[] {
  * mal interpretado como línea.
  */
 const TOLERANCIA_CERCA_CENTRO = 0.35; // qué tan cerca del centro cuenta como "empieza/pasa por el centro", relativo al radio
+const TOLERANCIA_RECTITUD = 0.85; // longitud recta (extremo a extremo) / longitud recorrida del trazo — 1.0 = perfectamente recta
 
-// La tolerancia de rectitud escala con el largo del trazo relativo al
-// radio del tablero: una línea corta (dedo en mobile, trazo breve)
-// acumula más error relativo de captura por el mismo temblor de mano
-// que una línea larga, así que exigirle 0.85 fijo la descarta seguido
-// aunque la intención sea clara. Trazos largos (>=80% del radio) se
-// quedan con el umbral estricto original; trazos cortos (<=25% del
-// radio) toleran hasta 0.65; en el medio, interpola.
-const RECTITUD_ESTRICTA = 0.85; // para líneas largas (>= UMBRAL_LARGO_ALTO * radio)
-const RECTITUD_LAXA = 0.65; // para líneas cortas (<= UMBRAL_LARGO_BAJO * radio)
-const UMBRAL_LARGO_BAJO = 0.25;
-const UMBRAL_LARGO_ALTO = 0.8;
-
-function toleranciaRectitudPara(largoRecorrido: number, radio: number): number {
-  if (radio < 1e-6) return RECTITUD_ESTRICTA;
-  const proporcion = largoRecorrido / radio;
-  if (proporcion <= UMBRAL_LARGO_BAJO) return RECTITUD_LAXA;
-  if (proporcion >= UMBRAL_LARGO_ALTO) return RECTITUD_ESTRICTA;
-  const t = (proporcion - UMBRAL_LARGO_BAJO) / (UMBRAL_LARGO_ALTO - UMBRAL_LARGO_BAJO);
-  return RECTITUD_LAXA + t * (RECTITUD_ESTRICTA - RECTITUD_LAXA);
-}
-
-/**
- * Clasifica un trazo candidato a "línea de sección": ¿es una línea recta
- * que pasa cerca del centro? Y si lo es, ¿de qué tipo?
- *   - "centro-borde": un extremo está en el centro, el otro en el borde
- *     (media cuña — el jugador dibujó cada línea radial por separado).
- *   - "borde-borde": ambos extremos están en el borde, pasando cerca del
- *     centro en el medio (diámetro completo — el jugador partió la forma
- *     de un solo trazo). Geométricamente ESTA es una sola línea recta,
- *     pero representa DOS radios en ángulos opuestos (dos cuñas), no uno.
- * Devuelve `null` si no califica como línea de sección en absoluto.
- */
-type TipoLineaRadial = "centro-borde" | "borde-borde";
-
-function clasificarLineaRadial(
-  trazo: TrazoLibre,
-  centro: Punto,
-  radio: number,
-): TipoLineaRadial | null {
-  if (trazo.length < 2) return null;
+function esLineaRadial(trazo: TrazoLibre, centro: Punto, radio: number): boolean {
+  if (trazo.length < 2) return false;
   const inicio = trazo[0];
   const fin = trazo[trazo.length - 1];
   const largoRecorrido = longitud(trazo);
   const largoRecto = distancia(inicio, fin);
-  if (largoRecorrido < 1e-6) return null;
+  if (largoRecorrido < 1e-6) return false;
 
   const rectitud = largoRecto / largoRecorrido;
-  if (rectitud < toleranciaRectitudPara(largoRecorrido, radio)) return null;
+  if (rectitud < TOLERANCIA_RECTITUD) return false;
 
   const distInicioCentro = distancia(inicio, centro);
   const distFinCentro = distancia(fin, centro);
@@ -415,16 +260,14 @@ function clasificarLineaRadial(
   const centroABorde =
     (distInicioCentro <= umbralCentro && distFinCentro > umbralCentro) ||
     (distFinCentro <= umbralCentro && distInicioCentro > umbralCentro);
-  if (centroABorde) return "centro-borde";
+  if (centroABorde) return true;
 
   // Caso "borde a borde pasando por el centro": el punto del trazo más
   // cercano al centro está efectivamente cerca, y ambos extremos están
   // lejos (son los dos bordes).
   const distanciaMinAlCentro = Math.min(...trazo.map((p) => distancia(p, centro)));
   const ambosLejos = distInicioCentro > umbralCentro && distFinCentro > umbralCentro;
-  if (ambosLejos && distanciaMinAlCentro <= umbralCentro) return "borde-borde";
-
-  return null;
+  return ambosLejos && distanciaMinAlCentro <= umbralCentro;
 }
 
 /**
@@ -433,30 +276,13 @@ function clasificarLineaRadial(
  */
 const TOLERANCIA_ANGULO_DUPLICADO = (10 * Math.PI) / 180; // 10°
 
-/**
- * Ángulo(s) que aporta esta línea a la lista de "cortes" de sección.
- *   - "centro-borde": un solo ángulo, el del extremo sobre el borde.
- *   - "borde-borde": DOS ángulos (opuestos entre sí, ~180°), uno por
- *     cada extremo — una línea-diámetro dibujada de un solo trazo
- *     equivale a dos líneas radiales independientes, y debe contar
- *     como tal para no perder una de las dos mitades (ver bug: antes
- *     solo se tomaba "el extremo más lejano", perdiendo el otro y
- *     subcontando `secciones` en exactamente este caso — el más común,
- *     "partir el círculo a la mitad de un solo trazo").
- */
-function angulosDeLinea(trazo: TrazoLibre, centro: Punto, tipo: TipoLineaRadial): number[] {
-  const anguloDe = (p: Punto) => Math.atan2(p.y - centro.y, p.x - centro.x);
-
-  if (tipo === "centro-borde") {
-    const inicio = trazo[0];
-    const fin = trazo[trazo.length - 1];
-    const extremoLejano = distancia(fin, centro) > distancia(inicio, centro) ? fin : inicio;
-    return [anguloDe(extremoLejano)];
-  }
-
-  // "borde-borde": los dos extremos son los dos bordes — cada uno aporta
-  // su propio ángulo, no hay que elegir "el más lejano" (ambos lo son).
-  return [anguloDe(trazo[0]), anguloDe(trazo[trazo.length - 1])];
+function anguloLinea(trazo: TrazoLibre, centro: Punto): number {
+  // Ángulo del extremo más lejano al centro (el que está "sobre el
+  // borde"), que es más estable que promediar todo el trazo.
+  const extremoLejano = trazo.reduce((mejor, p) =>
+    distancia(p, centro) > distancia(mejor, centro) ? p : mejor,
+  );
+  return Math.atan2(extremoLejano.y - centro.y, extremoLejano.x - centro.x);
 }
 
 function agruparAngulosCercanos(angulos: number[]): number {
@@ -492,8 +318,7 @@ export function detectarFormaLibre(trazos: TrazoLibre[]): FormaDetectada | null 
   if (indiceContorno === null) return null;
 
   const contorno = trazosValidos[indiceContorno];
-  const cierreContorno = scoreCierre(contorno);
-  const centro = centroBoundingBox(contorno);
+  const centro = centroide(contorno);
   const radioPromedio = contorno.reduce((s, p) => s + distancia(p, centro), 0) / contorno.length;
 
   const muestras = muestrearRadioPorAngulo(contorno, centro, NUM_MUESTRAS_RADIO);
@@ -505,10 +330,9 @@ export function detectarFormaLibre(trazos: TrazoLibre[]): FormaDetectada | null 
 
   trazosValidos.forEach((trazo, i) => {
     if (i === indiceContorno) return;
-    const tipoLinea = clasificarLineaRadial(trazo, centro, radioPromedio);
-    if (tipoLinea) {
+    if (esLineaRadial(trazo, centro, radioPromedio)) {
       indicesSecciones.push(i);
-      angulosLineas.push(...angulosDeLinea(trazo, centro, tipoLinea));
+      angulosLineas.push(anguloLinea(trazo, centro));
     } else {
       indicesIgnorados.push(i);
     }
@@ -519,16 +343,14 @@ export function detectarFormaLibre(trazos: TrazoLibre[]): FormaDetectada | null 
     Math.min(MAX_SECCIONES_DETECTABLES, agruparAngulosCercanos(angulosLineas)),
   );
 
-  // Confianza global: combina qué tan clara fue la forma del contorno,
-  // qué tan bien cerrado estaba el contorno elegido (nuevo — antes esto
-  // era implícitamente 1 o "no existe", ahora es continuo), y qué tan
-  // "limpias" fueron las líneas de sección (menos trazos ignorados =
-  // más limpio). Es una heurística para UI, no una medida estadística
-  // — ver FormaDetectada.confianza.
+  // Confianza global: promedio pesado entre qué tan clara fue la forma
+  // del contorno y qué tan "limpias" fueron las líneas de sección
+  // (menos trazos ignorados = más limpio). Es una heurística para UI,
+  // no una medida estadística — ver FormaDetectada.confianza.
   const totalNoContorno = trazosValidos.length - 1;
   const proporcionLimpia =
     totalNoContorno === 0 ? 1 : indicesSecciones.length / totalNoContorno;
-  const confianza = 0.45 * confianzaForma + 0.25 * cierreContorno + 0.3 * proporcionLimpia;
+  const confianza = 0.6 * confianzaForma + 0.4 * proporcionLimpia;
 
   return {
     forma,

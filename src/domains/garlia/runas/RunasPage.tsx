@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Maximize2, Plus, ScrollText, Sparkles, Waypoints, X } from "lucide-react";
+import { Plus, ScrollText } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -26,10 +26,10 @@ import {
 } from "./BloqueProbadorYCombinaciones";
 import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
-import { PanelConfigRunas, type PreviewCombinacion } from "./PanelConfigRunas";
-import { PanelDetectorUnificado } from "./PanelDetectorUnificado";
+import type { PreviewCombinacion } from "./PanelConfigRunas";
+import { PanelRunaSeleccionada } from "./PanelRunaSeleccionada";
 import { RunaThumbnail } from "./RunaThumbnail";
-import type { EntidadMagica } from "./types";
+import type { EntidadMagica, GrupoMin } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
 import { useSubsistemasMagia } from "./useSubsistemasMagia";
 
@@ -43,7 +43,9 @@ interface Props {
   runas: EntidadMagicaMin[];
   loading?: boolean;
   onOpen: (section: SectionKey, id: string) => void;
-  onCreate?: () => void;
+  // Crea una nueva runa; si devuelve su id, RunasPage la selecciona
+  // automáticamente para abrir el panel inline recién creada.
+  onCreate?: () => void | string | Promise<string | void>;
   creating?: boolean;
   // Abre un ensayo (tab "notas-gos") — mismo patrón que EnsayosGosWidget
   // en el home. Si no se pasa, el bloque de ensayos no se muestra.
@@ -52,16 +54,25 @@ interface Props {
   // (probador + editor de combinaciones), movido acá desde el editor
   // interno de una runa individual.
   todasLasRunas?: EntidadMagica[];
+  // Grupos de runas y su estado de carga — para el panel inline de la
+  // runa seleccionada (antes vivían en el editor de runa a pantalla
+  // completa, FormularioRuna, ya eliminado).
+  gruposRunas?: GrupoMin[];
+  loadingGruposRunas?: boolean;
+  onSavedRuna?: (i: EntidadMagica) => void;
+  onDeletedRuna?: (id: string) => void;
 }
 
 function BloqueRunas({
   entidades,
-  onOpen,
+  seleccionadaId,
+  onToggleSeleccion,
   onCreate,
   creating,
 }: {
   entidades: EntidadMagicaMin[];
-  onOpen: (section: SectionKey, id: string) => void;
+  seleccionadaId: string | null;
+  onToggleSeleccion: (id: string) => void;
   onCreate?: () => void;
   creating?: boolean;
 }) {
@@ -103,7 +114,8 @@ function BloqueRunas({
                 imageUrl={null}
                 Icon={ScrollText}
                 visual={<RunaThumbnail patronTrazos={e.patron_trazos} />}
-                onClick={() => onOpen("runas", e.id)}
+                selected={seleccionadaId === e.id}
+                onClick={() => onToggleSeleccion(e.id)}
               />
             ))}
           </div>
@@ -171,46 +183,6 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
   );
 }
 
-// ─── Toggle "Sistema" / "Runas" ─────────────────────────────────────────────
-// Sistema: ensayo (Energías) a la izquierda + subsistemas a la derecha,
-// nada más. Runas: el bloque de herramientas de runas (probador, lista,
-// config), sin ensayo ni subsistemas.
-type SeccionMagia = "sistema" | "runas";
-
-const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
-  { key: "sistema", label: "Sistema", Icon: Sparkles },
-  { key: "runas", label: "Runas", Icon: Waypoints },
-];
-
-function SelectorSeccionMagia({
-  seccion,
-  onCambiarSeccion,
-}: {
-  seccion: SeccionMagia;
-  onCambiarSeccion: (seccion: SeccionMagia) => void;
-}) {
-  return (
-    <div className="flex items-center justify-center gap-1 px-2 py-2">
-      {SECCIONES_MAGIA.map(({ key, label, Icon }) => {
-        const activa = seccion === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onCambiarSeccion(key)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-micro font-bold uppercase tracking-[0.12em] transition-colors ${
-              activa ? "bg-primary/10 text-primary" : "text-primary/40 hover:text-primary/70"
-            }`}
-          >
-            <Icon size={13} />
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export function RunasPage({
   runas,
   loading,
@@ -219,6 +191,10 @@ export function RunasPage({
   creating,
   onOpenEnsayo,
   todasLasRunas,
+  gruposRunas,
+  loadingGruposRunas,
+  onSavedRuna,
+  onDeletedRuna,
 }: Props) {
   const {
     subsistemas,
@@ -246,37 +222,68 @@ export function RunasPage({
   // tablero de la columna 1.
   const [previewCombinacion, setPreviewCombinacion] = useState<PreviewCombinacion>(null);
 
-  const [seccionMagia, setSeccionMagia] = useState<SeccionMagia>("sistema");
+  // Runa seleccionada al clickear su tarjeta en el grid — reemplaza al
+  // viejo editor a pantalla completa (FormularioRuna). Clickear la misma
+  // runa de nuevo deselecciona (toggle) y el panel se cierra. Mientras
+  // hay selección, este panel ocupa el lugar del probador/config en la
+  // columna 1 (ver más abajo).
+  const [runaSeleccionadaId, setRunaSeleccionadaId] = useState<string | null>(null);
+  const runaSeleccionada =
+    (todasLasRunas ?? runas).find((r) => r.id === runaSeleccionadaId) ?? null;
+  const toggleRunaSeleccionada = (id: string) =>
+    setRunaSeleccionadaId((prev) => (prev === id ? null : id));
 
-  // Modo pantalla completa: "probador" agranda el Probador de
-  // reconocimiento solo; "combinaciones" agranda el render (preview) y
-  // el editor de combinaciones lado a lado. null = layout normal.
-  const [pantallaCompleta, setPantallaCompleta] = useState<
-    "probador" | "combinaciones" | null
-  >(null);
+  const handleCreate = onCreate
+    ? async () => {
+        const nuevoId = await onCreate();
+        if (typeof nuevoId === "string") setRunaSeleccionadaId(nuevoId);
+      }
+    : undefined;
 
   if (loading && runas.length === 0) {
     return <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>;
   }
 
-  // Sin onOpenEnsayo: comportamiento anterior, un solo bloque apilado
-  // (no hay toggle Sistema/Runas porque no hay ensayo/subsistemas que
-  // mostrar en "Sistema").
+  const panelRunaProps = runaSeleccionada && (
+    <PanelRunaSeleccionada
+      key={runaSeleccionada.id}
+      item={runaSeleccionada}
+      grupos={gruposRunas ?? []}
+      loadingGrupos={!!loadingGruposRunas}
+      onCerrar={() => setRunaSeleccionadaId(null)}
+      onDeleted={(id) => {
+        onDeletedRuna?.(id);
+        setRunaSeleccionadaId(null);
+      }}
+      onNavigateGrupo={(id) => onOpen("grupos", id)}
+      onSaved={(updated) => onSavedRuna?.(updated)}
+    />
+  );
+
+  // Sin onOpenEnsayo: comportamiento anterior, un solo bloque apilado.
   if (!onOpenEnsayo) {
     return (
       <div>
-        <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
+        <BloqueRunas
+          entidades={runas}
+          creating={creating}
+          seleccionadaId={runaSeleccionadaId}
+          onCreate={handleCreate}
+          onToggleSeleccion={toggleRunaSeleccionada}
+        />
         {todasLasRunas && (
           <div className="mt-6 space-y-6">
-            <SelectorProbadorConfig
-              seccion={seccionProbadorConfig}
-              onCambiarSeccion={setSeccionProbadorConfig}
-              runas={todasLasRunas}
-              configRunas={configRunas}
-              onActualizarConfigRunas={actualizarConfigRunas}
-              previewCombinacion={previewCombinacion}
-            />
-            {seccionProbadorConfig === "config" && (
+            {panelRunaProps ?? (
+              <SelectorProbadorConfig
+                seccion={seccionProbadorConfig}
+                onCambiarSeccion={setSeccionProbadorConfig}
+                runas={todasLasRunas}
+                configRunas={configRunas}
+                onActualizarConfigRunas={actualizarConfigRunas}
+                previewCombinacion={previewCombinacion}
+              />
+            )}
+            {!runaSeleccionada && seccionProbadorConfig === "config" && (
               <PanelCombinacionesRunas
                 runas={todasLasRunas}
                 onCambiarPreview={setPreviewCombinacion}
@@ -288,169 +295,79 @@ export function RunasPage({
     );
   }
 
-  // Vista con toggle "Sistema" / "Runas":
+  // Vista con dos grandes columnas (Runas | Sistemas):
   //
-  //   [Sistema | Runas]  ← toggle
-  //
-  //   Sistema:
-  //     [Ensayo (izquierda)] [Subsistemas (derecha)]
-  //     — nada más.
-  //
-  //   Runas:
-  //     [Probador (cuadrado 1:1) + panel lateral Forma/Runa] [Config/preview]
-  //     [Lista de runas                                    ] [   (arriba)  ]
+  //   [tarjetas de Runas — fila superior, full width]
+  //   [columna 1                ] [columna 2                    ]
+  //   [Probador / Config (tabs) ] [chips de Subsistemas         ]
+  //   [contenido del tab activo ] [contenido: subsistema, o el
+  //                                editor de combinaciones si el
+  //                                tab activo es "config", o si no
+  //                                hay nada seleccionado el ensayo
+  //                                de Energías]
+  const mostrarCombinacionesEnCol2 = seccionProbadorConfig === "config";
+
   return (
     <div>
-      <SelectorSeccionMagia seccion={seccionMagia} onCambiarSeccion={setSeccionMagia} />
+      <BloqueRunas
+        entidades={runas}
+        creating={creating}
+        seleccionadaId={runaSeleccionadaId}
+        onCreate={handleCreate}
+        onToggleSeleccion={toggleRunaSeleccionada}
+      />
 
-      {seccionMagia === "sistema" ? (
-        <div className="mt-4 flex flex-col lg:flex-row gap-6">
-          <div className="flex-1 min-w-0">
-            <BloqueEnsayoEnergias />
-          </div>
+      {/* Con una runa seleccionada, su panel (patrón | explicación+grupos)
+          ocupa el ancho completo, reemplazando el layout de dos columnas
+          de Probador/Config y Subsistemas. */}
+      {panelRunaProps && <div className="mt-6">{panelRunaProps}</div>}
 
-          <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-            <BloqueSubsistemasMagia
-              subsistemas={subsistemas}
-              loading={loadingSubsistemas}
-              creating={creandoSubsistema}
-              crear={crearSubsistema}
-              subsistemaSeleccionadoId={subsistemaSeleccionadoId}
-              onSelect={setSubsistemaSeleccionadoId}
+      <div className={`mt-6 flex flex-col lg:flex-row gap-6 ${runaSeleccionada ? "hidden" : ""}`}>
+        <div className="flex-1 min-w-0">
+          {todasLasRunas && (
+            <SelectorProbadorConfig
+              seccion={seccionProbadorConfig}
+              onCambiarSeccion={setSeccionProbadorConfig}
+              runas={todasLasRunas}
+              configRunas={configRunas}
+              onActualizarConfigRunas={actualizarConfigRunas}
+              previewCombinacion={previewCombinacion}
             />
-
-            {subsistemaSeleccionado && (
-              <PanelEditorSubsistema
-                key={subsistemaSeleccionado.id}
-                subsistema={subsistemaSeleccionado}
-                onVolver={() => setSubsistemaSeleccionadoId(null)}
-                onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
-                onDelete={() => {
-                  void eliminarSubsistema(subsistemaSeleccionado.id);
-                  setSubsistemaSeleccionadoId(null);
-                }}
-                onSelectCriatura={(id) => onOpen("criaturas", id)}
-              />
-            )}
-          </div>
+          )}
         </div>
-      ) : (
-        <div className="mt-4 flex flex-col lg:flex-row gap-6">
-          {/* Columna izquierda: Probador (arriba) + Lista de runas (abajo) */}
-          <div className="flex-1 min-w-0 space-y-6">
-            {todasLasRunas && (
-              <div className="rounded-2xl border border-primary/15 bg-white-custom/60 p-4 relative">
-                <button
-                  type="button"
-                  onClick={() => setPantallaCompleta("probador")}
-                  className="absolute top-3 right-3 p-1.5 rounded-lg text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
-                  title="Ver probador en pantalla completa"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
-                <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
-                  Probador
-                </p>
-                <PanelDetectorUnificado runas={todasLasRunas} plantillasSeparadores={configRunas.plantillas_separadores} />
-              </div>
-            )}
 
-            <BloqueRunas entidades={runas} creating={creating} onCreate={onCreate} onOpen={onOpen} />
-          </div>
+        <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+          <BloqueSubsistemasMagia
+            subsistemas={subsistemas}
+            loading={loadingSubsistemas}
+            creating={creandoSubsistema}
+            crear={crearSubsistema}
+            subsistemaSeleccionadoId={subsistemaSeleccionadoId}
+            onSelect={setSubsistemaSeleccionadoId}
+          />
 
-          {/* Columna derecha: bloque de config (previsualización) + editor de combinaciones, lado a lado */}
-          <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-            {todasLasRunas && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setPantallaCompleta("combinaciones")}
-                  className="absolute -top-1 right-0 z-10 p-1.5 rounded-lg text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
-                  title="Ver render y combinaciones en pantalla completa"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
-                <div className="flex flex-col md:flex-row gap-6">
-                  <div className="flex-1 min-w-0">
-                    <PanelConfigRunas
-                      config={configRunas}
-                      onActualizar={actualizarConfigRunas}
-                      runas={todasLasRunas}
-                      previewCombinacion={previewCombinacion}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <PanelCombinacionesRunas
-                      runas={todasLasRunas}
-                      onCambiarPreview={setPreviewCombinacion}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          {mostrarCombinacionesEnCol2 && todasLasRunas ? (
+            <PanelCombinacionesRunas
+              runas={todasLasRunas}
+              onCambiarPreview={setPreviewCombinacion}
+            />
+          ) : subsistemaSeleccionado ? (
+            <PanelEditorSubsistema
+              key={subsistemaSeleccionado.id}
+              subsistema={subsistemaSeleccionado}
+              onVolver={() => setSubsistemaSeleccionadoId(null)}
+              onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
+              onDelete={() => {
+                void eliminarSubsistema(subsistemaSeleccionado.id);
+                setSubsistemaSeleccionadoId(null);
+              }}
+              onSelectCriatura={(id) => onOpen("criaturas", id)}
+            />
+          ) : (
+            <BloqueEnsayoEnergias />
+          )}
         </div>
-      )}
-
-      {/* Pantalla completa: Probador solo, usando todo el espacio */}
-      {pantallaCompleta === "probador" && todasLasRunas && (
-        <div className="fixed inset-0 z-50 bg-white-custom flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-primary/10">
-            <p className="text-micro font-black uppercase tracking-widest text-primary/30">
-              Probador
-            </p>
-            <button
-              type="button"
-              onClick={() => setPantallaCompleta(null)}
-              className="p-1.5 rounded-lg text-primary/40 hover:text-primary/70 hover:bg-primary/5 transition-colors"
-              title="Cerrar pantalla completa"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-6">
-            <PanelDetectorUnificado runas={todasLasRunas} plantillasSeparadores={configRunas.plantillas_separadores} />
-          </div>
-        </div>
-      )}
-
-      {/* Pantalla completa: render (preview) y editor de combinaciones,
-          uno al lado del otro usando todo el espacio disponible */}
-      {pantallaCompleta === "combinaciones" && todasLasRunas && (
-        <div className="fixed inset-0 z-50 bg-white-custom flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-primary/10">
-            <p className="text-micro font-black uppercase tracking-widest text-primary/30">
-              Render y combinaciones
-            </p>
-            <button
-              type="button"
-              onClick={() => setPantallaCompleta(null)}
-              className="p-1.5 rounded-lg text-primary/40 hover:text-primary/70 hover:bg-primary/5 transition-colors"
-              title="Cerrar pantalla completa"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-6">
-            <div className="flex flex-col md:flex-row gap-6 h-full">
-              <div className="flex-1 min-w-0">
-                <PanelConfigRunas
-                  config={configRunas}
-                  onActualizar={actualizarConfigRunas}
-                  runas={todasLasRunas}
-                  previewCombinacion={previewCombinacion}
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <PanelCombinacionesRunas
-                  runas={todasLasRunas}
-                  onCambiarPreview={setPreviewCombinacion}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

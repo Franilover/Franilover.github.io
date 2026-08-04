@@ -59,18 +59,7 @@ export const LABEL_SEPARADOR: Record<TipoSeparador, string> = {
  * — inicio ⟩⟩: doble flecha, dos trazos en V encadenados
  * — continua ⟩: una sola flecha en V apuntando a la derecha
  * — continua_inv ⟨: una sola flecha en V apuntando a la izquierda
- * — corta ⊥: una línea vertical con un travesaño en la base (forma de T
- *   invertida), no una línea recta simple.
- *
- * Nota sobre "corta": antes era solo 2 puntos, una línea perfectamente
- * recta. El $1 recognizer normaliza todo trazo a un cuadrado 250×250
- * antes de comparar — una línea recta pura no tiene ninguna geometría
- * interna distintiva contra la que rotar/matchear, así que terminaba
- * confundida con cualquier trazo corto y recto en cualquier ángulo
- * (incluida media línea radial mal dibujada, o el tramo inicial de
- * "continua"/"continua_inv" antes de que el jugador llegara al quiebre
- * de la V). Agregarle el travesaño le da una forma con esquina real,
- * igual que los otros tres símbolos, y la vuelve distinguible.
+ * — corta |: una línea vertical simple
  */
 export const PLANTILLAS_SEPARADOR_DEFAULT: Record<TipoSeparador, Punto[]> = {
   inicio: [
@@ -94,8 +83,6 @@ export const PLANTILLAS_SEPARADOR_DEFAULT: Record<TipoSeparador, Punto[]> = {
   corta: [
     { x: 50, y: 10 },
     { x: 50, y: 90 },
-    { x: 30, y: 90 },
-    { x: 70, y: 90 },
   ],
 };
 

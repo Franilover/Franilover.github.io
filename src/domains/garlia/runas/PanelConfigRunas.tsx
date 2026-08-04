@@ -172,8 +172,9 @@ function PlantillaSeparadorItem({
 
   return (
     <div className="rounded-xl border border-primary/15 p-2 space-y-2">
-      <p className="text-micro font-black text-center text-primary/50">
-        {SIMBOLO_SEPARADOR[tipo]} {LABEL_SEPARADOR[tipo]}
+      <p className="text-micro font-black text-primary/50 flex items-center justify-center gap-1.5 whitespace-nowrap">
+        <span>{SIMBOLO_SEPARADOR[tipo]}</span>
+        <span>{LABEL_SEPARADOR[tipo]}</span>
       </p>
       <CanvasDibujoRuna
         height={140}

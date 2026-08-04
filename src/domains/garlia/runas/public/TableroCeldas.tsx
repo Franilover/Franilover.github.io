@@ -166,18 +166,14 @@ export function TableroCeldas({
           );
         })}
 
-        {gaps.map((gap) => {
-          const activo = gap.id === gapActivoId;
-          const tipo = separadorPorGap?.[gap.id];
-          const { interior, exterior } = puntosGap(gap, forma, centro, radio);
-          return (
-            <g key={gap.id}>
-              {/* Línea invisible más gruesa solo para agrandar el área
-                  clickeable. Solo tiene sentido cuando el tablero es
-                  interactivo (se pasó onSeleccionarGap); en modo preview
-                  de solo lectura se omite, pero el glifo del separador
-                  (más abajo) se sigue dibujando siempre. */}
-              {onSeleccionarGap && (
+        {onSeleccionarGap &&
+          gaps.map((gap) => {
+            const activo = gap.id === gapActivoId;
+            const tipo = separadorPorGap?.[gap.id];
+            const { interior, exterior } = puntosGap(gap, forma, centro, radio);
+            return (
+              <g key={gap.id}>
+                {/* Línea invisible más gruesa solo para agrandar el área clickeable */}
                 <line
                   x1={interior.x}
                   y1={interior.y}
@@ -191,25 +187,24 @@ export function TableroCeldas({
                     onSeleccionarGap(gap);
                   }}
                 />
-              )}
-              {onSeleccionarGap && activo && (
-                <line
-                  x1={interior.x}
-                  y1={interior.y}
-                  x2={exterior.x}
-                  y2={exterior.y}
-                  stroke="var(--primary)"
-                  strokeWidth={4}
-                  strokeLinecap="round"
-                  className="cursor-pointer pointer-events-none"
-                />
-              )}
-              {tipo && (
-                <GlifoSeparador tipo={tipo} interior={interior} exterior={exterior} />
-              )}
-            </g>
-          );
-        })}
+                {activo && (
+                  <line
+                    x1={interior.x}
+                    y1={interior.y}
+                    x2={exterior.x}
+                    y2={exterior.y}
+                    stroke="var(--primary)"
+                    strokeWidth={4}
+                    strokeLinecap="round"
+                    className="cursor-pointer pointer-events-none"
+                  />
+                )}
+                {tipo && (
+                  <GlifoSeparador tipo={tipo} interior={interior} exterior={exterior} />
+                )}
+              </g>
+            );
+          })}
       </svg>
 
       {celdaActivaId && (
@@ -247,7 +242,7 @@ function GlifoSeparador({
   const dx = exterior.x - interior.x;
   const dy = exterior.y - interior.y;
   const largo = Math.hypot(dx, dy);
-  const anguloGrados = (Math.atan2(dy, dx) * 180) / Math.PI + 90; // +90: alinea el vértice del chevron con el sentido horario (s creciente)
+  const anguloGrados = (Math.atan2(dy, dx) * 180) / Math.PI - 90; // -90: el glifo local apunta "hacia arriba" en Y-
   const medio = { x: (interior.x + exterior.x) / 2, y: (interior.y + exterior.y) / 2 };
 
   const mitadLargo = largo / 2;
@@ -291,14 +286,12 @@ function GlifoSeparador({
  *   continua_inv: chevron "⟨" — el vértice se abre hacia la izquierda,
  *                 exactamente invertido respecto a "continua".
  *   inicio:       doble chevron "⟩⟩", mismo sentido que "continua",
- *                 dos vértices independientes, uno seguido del otro a lo
- *                 largo del eje Y con un pequeño hueco entre ambos (no
- *                 comparten el punto x=0 del medio, para que se lean
- *                 como dos chevrones separados y no como un rombo).
+ *                 dos vértices consecutivos a lo largo del eje Y, con
+ *                 el punto de unión entre ambos también en x=0.
  */
 const GLIFO_PATH: Record<TipoSeparador, string> = {
   corta: "M 0 -1 L 0 1",
   continua: "M 0 -1 L 0.85 0 L 0 1",
   continua_inv: "M 0 -1 L -0.85 0 L 0 1",
-  inicio: "M 0 -1 L 0.85 -0.65 L 0 -0.3 M 0 0.3 L 0.85 0.65 L 0 1",
+  inicio: "M 0 -1 L 0.85 -0.5 L 0 0 L 0.85 0.5 L 0 1",
 };

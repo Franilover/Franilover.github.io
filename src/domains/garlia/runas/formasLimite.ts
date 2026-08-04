@@ -271,7 +271,7 @@ export function pathCelda(
   const arcoExterior: Punto[] = [];
   const arcoInterior: Punto[] = [];
   for (let i = 0; i <= segmentos; i++) {
-    const t = i / segmentos;
+    const t = i / SEGMENTOS_POR_CELDA;
     const ang = celda.anguloInicio + t * (celda.anguloFin - celda.anguloInicio);
     arcoExterior.push(puntoEnBorde(ang, celda.radioFinFrac));
     if (celda.radioInicioFrac > 0) arcoInterior.push(puntoEnBorde(ang, celda.radioInicioFrac));
