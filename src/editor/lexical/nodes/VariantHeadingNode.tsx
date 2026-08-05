@@ -190,7 +190,7 @@ const HEADING_TRANSFORMER: ElementTransformer = {
     const text = node.getTextContent();
     return "#".repeat(level) + " " + appendVariantSuffix(text, node.getVariant());
   },
-  regExp: /^(#{1,6})\s/,
+  regExp: /^(#{1,6}) /,
   replace: (parentNode, children, match) => {
     const tag = `h${match[1].length}` as HeadingTagType;
     const heading = $createVariantHeadingNode(tag);

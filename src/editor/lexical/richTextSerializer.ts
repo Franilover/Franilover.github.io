@@ -540,7 +540,50 @@ export function serializeRootToRaw(): string {
     if ($isLineBreakNode(node)) return "\n";
 
     if (node.getType() === "text") {
-      return (node as any).getTextContent();
+      const textNode = node as any;
+      const text = textNode.getTextContent();
+      if (!text) return text;
+
+      // getTextContent() devuelve el texto plano — el formato (bold,
+      // italic, code, strikethrough) vive aparte como bitmask en
+      // getFormat()/hasFormat(), y $convertFromMarkdownString (usado en
+      // rawTextToLexicalTree) sí lo interpreta al cargar ("**x**" → nodo
+      // con flag bold). Sin reconstruir la sintaxis acá, el round-trip
+      // era asimétrico: el texto entraba formateado pero salía plano,
+      // perdiendo "**", "*", "`", "~~" en cada guardado.
+      let out = text;
+      const hasFormat = (f: string) => textNode.hasFormat?.(f) ?? false;
+      const isFormatted =
+        hasFormat("bold") ||
+        hasFormat("italic") ||
+        hasFormat("code") ||
+        hasFormat("strikethrough");
+
+      if (!isFormatted) return out;
+
+      // Los delimitadores markdown (**, *, `, ~~) no toleran espacio
+      // pegado por dentro ("** x **" no es válido) — se recortan los
+      // bordes y los espacios se mueven fuera de los delimitadores.
+      const leading = out.match(/^\s*/)?.[0] ?? "";
+      const trailing = out.match(/\s*$/)?.[0] ?? "";
+      const core = out.slice(leading.length, out.length - trailing.length || undefined);
+      if (!core) return out; // solo espacios/vacío: nada que envolver
+
+      let wrapped = core;
+
+      // Code primero: si el segmento es code, el resto de delimitadores
+      // markdown dentro de "`...`" no deben interpretarse como formato.
+      if (hasFormat("code")) {
+        return leading + "`" + wrapped + "`" + trailing;
+      }
+
+      if (hasFormat("bold") && hasFormat("italic")) wrapped = `***${wrapped}***`;
+      else if (hasFormat("bold")) wrapped = `**${wrapped}**`;
+      else if (hasFormat("italic")) wrapped = `*${wrapped}*`;
+
+      if (hasFormat("strikethrough")) wrapped = `~~${wrapped}~~`;
+
+      return leading + wrapped + trailing;
     }
 
     // Para párrafos y otros nodos contenedores, concatenamos sus hijos
