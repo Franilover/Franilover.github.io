@@ -18,7 +18,7 @@
  * muestra sin lógica extra acá.
  */
 
-import { Music, Plus, StickyNote } from "lucide-react";
+import { Music, Plus, Search, StickyNote, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
@@ -210,36 +210,65 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
   const [showNuevaCancion, setShowNuevaCancion] = useState(false);
 
-  // Filtros por Emoción / Tema (chips, selección única por campo — igual
-  // que los selectores del sidebar de edición). Los valores disponibles
-  // salen de las propias canciones cargadas, no de una lista fija.
+  // Filtros por Emoción / Tema (chips, selección única por campo). Ya no
+  // salen de columnas de la tabla `canciones` (esas quedaron sin usar) sino
+  // de los grupos de tipo "canciones" con subtipo "Emoción" / "Tema" —
+  // cada grupo es un valor posible y sus miembro_ids son las canciones que
+  // caen en ese valor (ver useGrupos / grupos_mundo).
   const [filtroEmocion, setFiltroEmocion] = useState<string>("");
   const [filtroTema, setFiltroTema] = useState<string>("");
+  const [busquedaCancion, setBusquedaCancion] = useState<string>("");
+
+  const gruposEmocionCancion = useMemo(
+    () =>
+      grupos
+        .filter((g) => g.tipo === "canciones" && g.subtipo?.trim().toLocaleLowerCase("es") === "emoción")
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    [grupos],
+  );
+  const gruposTemaCancion = useMemo(
+    () =>
+      grupos
+        .filter((g) => g.tipo === "canciones" && g.subtipo?.trim().toLocaleLowerCase("es") === "tema")
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    [grupos],
+  );
 
   const emocionesDisponibles = useMemo(
-    () =>
-      Array.from(
-        new Set(canciones.map((c) => c.emocion?.trim()).filter(Boolean)),
-      ).sort((a, b) => a!.localeCompare(b!, "es")) as string[],
-    [canciones],
+    () => gruposEmocionCancion.map((g) => g.nombre),
+    [gruposEmocionCancion],
   );
   const temasDisponibles = useMemo(
-    () =>
-      Array.from(
-        new Set(canciones.map((c) => c.tema?.trim()).filter(Boolean)),
-      ).sort((a, b) => a!.localeCompare(b!, "es")) as string[],
-    [canciones],
+    () => gruposTemaCancion.map((g) => g.nombre),
+    [gruposTemaCancion],
   );
 
-  const cancionesFiltradas = useMemo(
-    () =>
-      canciones.filter((c) => {
-        if (filtroEmocion && c.emocion?.trim() !== filtroEmocion) return false;
-        if (filtroTema && c.tema?.trim() !== filtroTema) return false;
-        return true;
-      }),
-    [canciones, filtroEmocion, filtroTema],
-  );
+  // Sets de ids de canción para el grupo seleccionado — O(1) al filtrar.
+  const idsCancionEmocionActiva = useMemo(() => {
+    if (!filtroEmocion) return null;
+    const g = gruposEmocionCancion.find((g) => g.nombre === filtroEmocion);
+    return g ? new Set(g.miembro_ids) : new Set<string>();
+  }, [filtroEmocion, gruposEmocionCancion]);
+  const idsCancionTemaActivo = useMemo(() => {
+    if (!filtroTema) return null;
+    const g = gruposTemaCancion.find((g) => g.nombre === filtroTema);
+    return g ? new Set(g.miembro_ids) : new Set<string>();
+  }, [filtroTema, gruposTemaCancion]);
+
+  const cancionesFiltradas = useMemo(() => {
+    const q = busquedaCancion.trim().toLocaleLowerCase("es");
+    return canciones.filter((c) => {
+      if (idsCancionEmocionActiva && !idsCancionEmocionActiva.has(c.id)) return false;
+      if (idsCancionTemaActivo && !idsCancionTemaActivo.has(c.id)) return false;
+      if (q) {
+        const enTitulo = c.titulo?.toLocaleLowerCase("es").includes(q);
+        const enCantante = c.cantante?.toLocaleLowerCase("es").includes(q);
+        const enCompositor = c.compositor?.toLocaleLowerCase("es").includes(q);
+        if (!enTitulo && !enCantante && !enCompositor) return false;
+      }
+      return true;
+    });
+  }, [canciones, idsCancionEmocionActiva, idsCancionTemaActivo, busquedaCancion]);
 
   /** Agrupa canciones por Idioma → Cantante → Compositor, en ese orden.
    *  Los valores vacíos caen en un balde "Sin …" que siempre queda al final. */
@@ -405,6 +434,29 @@ export function EntidadesPage({ section, selectedId }: Props) {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="flex items-center gap-2 mb-4 px-1">
+          <div className="relative flex-1 max-w-xs">
+            <Search
+              size={12}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-primary/30"
+            />
+            <input
+              type="text"
+              value={busquedaCancion}
+              onChange={(e) => setBusquedaCancion(e.target.value)}
+              placeholder="Buscar por canción, cantante o compositor…"
+              className="w-full bg-primary/[0.04] border border-primary/10 rounded-lg pl-8 pr-7 py-1.5 text-micro font-semibold text-primary outline-none focus:border-primary/25 placeholder:text-primary/30 placeholder:font-normal placeholder:normal-case"
+            />
+            {busquedaCancion && (
+              <button
+                type="button"
+                onClick={() => setBusquedaCancion("")}
+                title="Limpiar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-primary/30 hover:text-primary/60 transition-colors"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
           <div className="flex-1" />
           <button
             type="button"
@@ -473,7 +525,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
           <div className="py-6 text-xs text-primary/25 text-center">Sin canciones todavía</div>
         ) : cancionesFiltradas.length === 0 ? (
           <div className="py-6 text-xs text-primary/25 text-center">
-            Sin canciones con estos filtros
+            {busquedaCancion
+              ? `Sin resultados para "${busquedaCancion}"`
+              : "Sin canciones con estos filtros"}
           </div>
         ) : (
           cancionesAgrupadas.map(({ idioma, cantantes }) => (
