@@ -21,6 +21,8 @@ import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic"
 import { SubBloqueSelector } from "@/editor/sub-bloques/SubBloqueSelector";
 import { useSubBloquesDeEnsayo } from "@/editor/sub-bloques/useSubBloquesDeEnsayo";
 import { supabase } from "@/infra/supabase/supabase";
+import { SaveDot } from "@/ui/SaveDot";
+import type { SaveStatus } from "@/ui/saveStatus";
 
 import {
   PanelCombinacionesRunas,
@@ -264,7 +266,7 @@ function DetalleRunaSeleccionada({
 const TITULO_ENSAYO_ENERGIAS = "Energias";
 
 function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
-  const { ensayos, loading, crearNotaPendiente, actualizarLocal } = useEnsayoEditorLogic(null);
+  const { ensayos, loading, crearNotaPendiente, actualizarLocal, saveStatus } = useEnsayoEditorLogic(null);
   const creandoRef = useRef(false);
   const [creando, setCreando] = useState(false);
 
@@ -307,6 +309,7 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
       <BloqueEnsayoConSubBloques
         ensayo={ensayoEnergias}
         actualizarLocal={actualizarLocal}
+        saveStatus={saveStatus}
       />
     </div>
   );
@@ -321,7 +324,7 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
 const TITULO_ENSAYO_RUNAS = "Runas";
 
 function BloqueEnsayoRunas(_props: { onOpenEnsayo?: (id: string) => void }) {
-  const { ensayos, loading, crearNotaPendiente, actualizarLocal } = useEnsayoEditorLogic(null);
+  const { ensayos, loading, crearNotaPendiente, actualizarLocal, saveStatus } = useEnsayoEditorLogic(null);
   const creandoRef = useRef(false);
   const [creando, setCreando] = useState(false);
 
@@ -364,6 +367,7 @@ function BloqueEnsayoRunas(_props: { onOpenEnsayo?: (id: string) => void }) {
       <BloqueEnsayoConSubBloques
         ensayo={ensayoRunas}
         actualizarLocal={actualizarLocal}
+        saveStatus={saveStatus}
       />
     </div>
   );
@@ -379,9 +383,11 @@ function BloqueEnsayoRunas(_props: { onOpenEnsayo?: (id: string) => void }) {
 function BloqueEnsayoConSubBloques({
   ensayo,
   actualizarLocal,
+  saveStatus,
 }: {
   ensayo: any;
   actualizarLocal: (id: string, field: string, value: any, extra?: any) => void;
+  saveStatus?: SaveStatus;
 }) {
   const {
     subBloques,
@@ -407,6 +413,7 @@ function BloqueEnsayoConSubBloques({
   return (
     <div>
       <div className="flex items-center gap-2 pb-2">
+        <SaveDot status={saveStatus ?? "idle"} />
         <SubBloqueSelector
           activeId={activeBloqueId}
           bloques={subBloques}
