@@ -14,6 +14,8 @@
 import { NotebookPen } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
+import { RichEditor } from "@/editor/lexical";
+
 const CLAVE_NOTAS = "garlia_runas_notas_jugador";
 
 export function PanelNotasJugador() {
@@ -51,14 +53,15 @@ export function PanelNotasJugador() {
       <div className="flex items-center gap-1.5 text-micro font-black uppercase tracking-widest text-primary/40">
         <NotebookPen size={12} /> Mis notas
       </div>
-      <textarea
-        value={texto}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Anotá acá lo que vayas descubriendo…"
-        disabled={!cargado}
-        rows={8}
-        className="w-full resize-y min-h-[140px] rounded-xl border border-primary/10 bg-white-custom p-2.5 text-sm text-primary placeholder:text-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
-      />
+      <div className="w-full rounded-xl border border-primary/10 bg-white-custom p-2.5 text-sm text-primary focus-within:ring-2 focus-within:ring-primary/20">
+        <RichEditor
+          value={texto}
+          onChange={onChange}
+          placeholder="Anotá acá lo que vayas descubriendo…"
+          editable={cargado}
+          minHeight="140px"
+        />
+      </div>
       <p className="text-micro text-primary/25 text-right">
         Se guarda solo en este dispositivo
       </p>

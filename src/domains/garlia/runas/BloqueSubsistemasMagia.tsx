@@ -19,6 +19,7 @@ import { ArrowLeft, Bug, Plus, Search, Sparkle, Trash2, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { useCriaturasCatalogoMin } from "./useCriaturasCatalogoMin";
@@ -254,12 +255,11 @@ export function PanelEditorSubsistema({
         <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
           Reglas / Info
         </span>
-        <textarea
-          className="w-full min-h-[100px] bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-2 text-xs text-primary/80 outline-none placeholder:text-primary/25 focus:border-primary/25 resize-y leading-relaxed"
+        <RichEditor
+          minHeight="6.25rem"
           placeholder="Descripción libre: qué canaliza, cómo funciona, reglas particulares…"
           value={descripcion}
-          onChange={(e) => setDescripcion(e.target.value)}
-          onBlur={guardar}
+          onChange={setDescripcion}
         />
       </div>
 

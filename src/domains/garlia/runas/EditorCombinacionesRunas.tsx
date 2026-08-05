@@ -32,6 +32,8 @@ import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
+import { RichEditor } from "@/editor/lexical";
+
 import { supabase } from "@/infra/supabase/supabase";
 
 import {
@@ -343,12 +345,11 @@ function EditorUnaCombinacion({
         </div>
       )}
 
-      <textarea
-        className="w-full bg-primary/3 rounded-lg p-2 text-xs text-primary/70 outline-none resize-none placeholder:text-primary/25"
+      <RichEditor
+        minHeight="3rem"
         placeholder="Explicación del resultado compuesto…"
-        rows={2}
         value={form.explicacion ?? ""}
-        onChange={(e) => setForm((f) => ({ ...f, explicacion: e.target.value }))}
+        onChange={(v) => setForm((f) => ({ ...f, explicacion: v }))}
       />
 
       <div className="space-y-2 border-t border-primary/10 pt-2">
