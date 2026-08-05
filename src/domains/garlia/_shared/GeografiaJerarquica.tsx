@@ -194,10 +194,6 @@ export function GeografiaJerarquica({
   const reinosBase = grupoReinoSeleccionado
     ? reinos.filter((r) => grupoReinoSeleccionado.miembro_ids.includes(r.id))
     : reinos;
-  const qReino = busqueda.trim().toLocaleLowerCase("es");
-  const reinosVisibles = qReino
-    ? reinosBase.filter((r) => r.nombre?.toLocaleLowerCase("es").includes(qReino))
-    : reinosBase;
 
   const ciudadesDe = (reinoId: string) =>
     ciudades
@@ -211,11 +207,34 @@ export function GeografiaJerarquica({
   const personajesSinCiudadDeReino = (reinoNombre: string) =>
     personajesBase.filter((p) => !p.ciudad_id && p.reino === reinoNombre);
 
+  // La búsqueda matchea reino, cualquiera de sus ciudades, o cualquiera de
+  // sus personajes (con o sin ciudad) — se muestra el reino completo, no
+  // solo la parte que hizo match.
+  const qReino = busqueda.trim().toLocaleLowerCase("es");
+  const reinosVisibles = qReino
+    ? reinosBase.filter((r) => {
+        if (r.nombre?.toLocaleLowerCase("es").includes(qReino)) return true;
+        if (ciudadesDe(r.id).some((c) => c.nombre?.toLocaleLowerCase("es").includes(qReino))) return true;
+        if (
+          personajesSinCiudadDeReino(r.nombre).some((p) =>
+            p.nombre?.toLocaleLowerCase("es").includes(qReino),
+          )
+        )
+          return true;
+        return ciudadesDe(r.id).some((c) =>
+          personajesDe(c.id).some((p) => p.nombre?.toLocaleLowerCase("es").includes(qReino)),
+        );
+      })
+    : reinosBase;
+
   // Solo quedan huérfanos globales los que no tienen ni ciudad ni un reino
   // válido asociado.
-  const personajesSinCiudad = personajesBase.filter(
+  const personajesSinCiudadBase = personajesBase.filter(
     (p) => !p.ciudad_id && !reinosBase.some((r) => r.nombre === p.reino)
   );
+  const personajesSinCiudad = qReino
+    ? personajesSinCiudadBase.filter((p) => p.nombre?.toLocaleLowerCase("es").includes(qReino))
+    : personajesSinCiudadBase;
 
   const reinosOrdenados = [...reinosVisibles].sort(
     (a, b) =>
@@ -430,7 +449,7 @@ export function GeografiaJerarquica({
             <BuscadorInline
               value={busqueda}
               onChange={onBusquedaChange}
-              placeholder="Buscar reino por nombre…"
+              placeholder="Buscar reino, ciudad o personaje…"
             />
           )}
           <GrupoFiltroBarra

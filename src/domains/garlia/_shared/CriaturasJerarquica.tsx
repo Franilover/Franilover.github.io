@@ -145,12 +145,19 @@ export function CriaturasJerarquica({
     ? criaturas.filter((c) => grupoSeleccionado.miembro_ids.includes(c.id))
     : criaturas;
   const qCriatura = busqueda.trim().toLocaleLowerCase("es");
-  const criaturasVisibles = qCriatura
-    ? criaturasBase.filter((c) => c.nombre?.toLocaleLowerCase("es").includes(qCriatura))
-    : criaturasBase;
-
   const personajesDe = (criaturaNombre: string) =>
     personajes.filter((p) => p.especie === criaturaNombre);
+
+  // La búsqueda matchea si el nombre de la criatura coincide, o si alguno
+  // de sus personajes coincide (mostramos la criatura completa, con todos
+  // sus personajes, no solo el que hizo match).
+  const criaturasVisibles = qCriatura
+    ? criaturasBase.filter(
+        (c) =>
+          c.nombre?.toLocaleLowerCase("es").includes(qCriatura) ||
+          personajesDe(c.nombre).some((p) => p.nombre?.toLocaleLowerCase("es").includes(qCriatura)),
+      )
+    : criaturasBase;
 
   const totalDe = (criatura: Criatura) =>
     personajesDe(criatura.nombre).length;
@@ -203,9 +210,12 @@ export function CriaturasJerarquica({
   const columnasCriaturas = distribuirEnColumnas(criaturasConVinculosBase);
 
   const criaturasNombres = new Set(criaturasBase.map((c) => c.nombre));
-  const personajesSinCriatura = personajes.filter(
+  const personajesSinCriaturaBase = personajes.filter(
     (p) => !p.especie || !criaturasNombres.has(p.especie)
   );
+  const personajesSinCriatura = qCriatura
+    ? personajesSinCriaturaBase.filter((p) => p.nombre?.toLocaleLowerCase("es").includes(qCriatura))
+    : personajesSinCriaturaBase;
   const totalSinCriatura = personajesSinCriatura.length;
 
   return (
@@ -216,7 +226,7 @@ export function CriaturasJerarquica({
             <BuscadorInline
               value={busqueda}
               onChange={onBusquedaChange}
-              placeholder="Buscar criatura por nombre…"
+              placeholder="Buscar criatura o personaje…"
             />
           )}
           <GrupoFiltroBarra
