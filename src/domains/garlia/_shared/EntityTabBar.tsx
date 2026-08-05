@@ -61,7 +61,7 @@ function EntityTab({
   id: string;
   active: boolean;
   onActivate: () => void;
-  onClose: (e: React.MouseEvent) => void;
+  onClose: (e: React.SyntheticEvent) => void;
 }) {
   const label = useEntityTabLabel(section, id);
   const Icon = SECTION_ICON[section] ?? Users;
@@ -71,6 +71,14 @@ function EntityTab({
       role="tab"
       aria-selected={active}
       onClick={onActivate}
+      onMouseDown={(e) => {
+        // Click central (botón del medio del mouse) cierra la pestaña,
+        // igual que en las tabs de un navegador — sin activarla primero.
+        if (e.button === 1) {
+          e.preventDefault();
+          onClose(e);
+        }
+      }}
       className={`group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-lg cursor-pointer select-none transition-colors shrink-0 max-w-[180px] ${
         active
           ? "bg-primary/10 text-primary"
