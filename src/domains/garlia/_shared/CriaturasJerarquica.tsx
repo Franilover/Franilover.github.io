@@ -28,6 +28,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
+import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 interface Criatura {
@@ -58,6 +59,10 @@ interface Props {
   /** Abre el editor completo de un grupo — botón a la derecha de cada
    *  opción en los dropdowns de filtro. */
   onOpenGrupo?: (grupoId: string) => void;
+  /** Texto de búsqueda por nombre de criatura — controlado por el padre,
+   *  se combina (AND) con el filtro de grupo activo. */
+  busqueda?: string;
+  onBusquedaChange?: (value: string) => void;
 }
 
 function NodoCriatura({
@@ -109,6 +114,8 @@ export function CriaturasJerarquica({
   grupoSeleccionadoId,
   onSeleccionarGrupo,
   onOpenGrupo,
+  busqueda = "",
+  onBusquedaChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -137,6 +144,10 @@ export function CriaturasJerarquica({
   const criaturasBase = grupoSeleccionado
     ? criaturas.filter((c) => grupoSeleccionado.miembro_ids.includes(c.id))
     : criaturas;
+  const qCriatura = busqueda.trim().toLocaleLowerCase("es");
+  const criaturasVisibles = qCriatura
+    ? criaturasBase.filter((c) => c.nombre?.toLocaleLowerCase("es").includes(qCriatura))
+    : criaturasBase;
 
   const personajesDe = (criaturaNombre: string) =>
     personajes.filter((p) => p.especie === criaturaNombre);
@@ -144,7 +155,7 @@ export function CriaturasJerarquica({
   const totalDe = (criatura: Criatura) =>
     personajesDe(criatura.nombre).length;
 
-  const criaturasOrdenadas = [...criaturasBase].sort((a, b) => totalDe(b) - totalDe(a));
+  const criaturasOrdenadas = [...criaturasVisibles].sort((a, b) => totalDe(b) - totalDe(a));
   const criaturasConVinculosBase = criaturasOrdenadas.filter((c) => totalDe(c) > 0);
   const criaturasVacias = criaturasOrdenadas.filter((c) => totalDe(c) === 0);
 
@@ -199,8 +210,15 @@ export function CriaturasJerarquica({
 
   return (
     <div className="mb-8 last:mb-0">
-      <div className="flex items-center gap-2 mb-4 px-1">
-        <div className="flex-1">
+      <div className="flex items-center gap-2 mb-4 px-1 flex-wrap">
+        <div className="flex-1 flex items-center gap-2 flex-wrap">
+          {onBusquedaChange && (
+            <BuscadorInline
+              value={busqueda}
+              onChange={onBusquedaChange}
+              placeholder="Buscar criatura por nombre…"
+            />
+          )}
           <GrupoFiltroBarra
             bloques={gruposCriaturasPorSubtipo}
             grupoSeleccionadoId={grupoSeleccionadoId}

@@ -18,7 +18,7 @@
  * muestra sin lógica extra acá.
  */
 
-import { Music, Plus, Search, StickyNote, X } from "lucide-react";
+import { Music, Plus, StickyNote } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
@@ -43,6 +43,7 @@ import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GeografiaJerarquica, type GrupoPersonajeSubtipo } from "@/domains/garlia/_shared/GeografiaJerarquica";
 import { GrupoFiltroBarra, GrupoFiltroDropdown, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import { CriaturasJerarquica } from "@/domains/garlia/_shared/CriaturasJerarquica";
+import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { TABLA_TO_SECTION } from "@/domains/garlia/_shared/useExternalCommandBridge";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
@@ -204,6 +205,13 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const [grupoCriaturaSeleccionadoId, setGrupoCriaturaSeleccionadoId] = useState<string | null>(null);
   const [grupoItemSeleccionadoId, setGrupoItemSeleccionadoId] = useState<string | null>(null);
   const [grupoReinoSeleccionadoId, setGrupoReinoSeleccionadoId] = useState<string | null>(null);
+
+  // Búsqueda por nombre — una por sección, todas filtran sobre el nombre
+  // de la entidad (case/acento-insensible), combinándose (AND) con el
+  // filtro de grupo activo de cada vista.
+  const [busquedaCriatura, setBusquedaCriatura] = useState<string>("");
+  const [busquedaReino, setBusquedaReino] = useState<string>("");
+  const [busquedaItem, setBusquedaItem] = useState<string>("");
 
   // ── Canciones ─────────────────────────────────────────────────────────
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
@@ -423,31 +431,42 @@ export function EntidadesPage({ section, selectedId }: Props) {
   if (section === "letras") {
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <div className="flex items-center gap-2 mb-4 px-1">
-          <div className="relative flex-1 max-w-xs">
-            <Search
-              size={12}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-primary/30"
+        <div className="flex items-center gap-2 mb-4 px-1 flex-wrap">
+          <BuscadorInline
+            value={busquedaCancion}
+            onChange={setBusquedaCancion}
+            placeholder="Buscar por canción, cantante o compositor…"
+          />
+          {gruposEmocionCancion.length > 0 && (
+            <GrupoFiltroDropdown
+              subtipo="Emoción"
+              grupos={gruposEmocionCancion}
+              selectedId={filtroEmocionId}
+              onSelect={setFiltroEmocionId}
+              onOpenGrupo={(id) => openEntity("grupos", id)}
             />
-            <input
-              type="text"
-              value={busquedaCancion}
-              onChange={(e) => setBusquedaCancion(e.target.value)}
-              placeholder="Buscar por canción, cantante o compositor…"
-              className="w-full bg-primary/[0.04] border border-primary/10 rounded-lg pl-8 pr-7 py-1.5 text-micro font-semibold text-primary outline-none focus:border-primary/25 placeholder:text-primary/30 placeholder:font-normal placeholder:normal-case"
+          )}
+          {gruposTemaCancion.length > 0 && (
+            <GrupoFiltroDropdown
+              subtipo="Tema"
+              grupos={gruposTemaCancion}
+              selectedId={filtroTemaId}
+              onSelect={setFiltroTemaId}
+              onOpenGrupo={(id) => openEntity("grupos", id)}
             />
-            {busquedaCancion && (
-              <button
-                type="button"
-                onClick={() => setBusquedaCancion("")}
-                title="Limpiar búsqueda"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-primary/30 hover:text-primary/60 transition-colors"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-          <div className="flex-1" />
+          )}
+          {(filtroEmocionId || filtroTemaId) && (
+            <button
+              type="button"
+              className="text-micro font-black uppercase tracking-widest text-primary/30 hover:text-primary/60 transition-colors"
+              onClick={() => {
+                setFiltroEmocionId(null);
+                setFiltroTemaId(null);
+              }}
+            >
+              ✕ Limpiar
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowNuevaCancion(true)}
@@ -457,41 +476,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
             Añadir
           </button>
         </div>
-
-        {(gruposEmocionCancion.length > 0 || gruposTemaCancion.length > 0) && (
-          <div className="flex items-center gap-2 flex-wrap mb-4 px-1">
-            {gruposEmocionCancion.length > 0 && (
-              <GrupoFiltroDropdown
-                subtipo="Emoción"
-                grupos={gruposEmocionCancion}
-                selectedId={filtroEmocionId}
-                onSelect={setFiltroEmocionId}
-                onOpenGrupo={(id) => openEntity("grupos", id)}
-              />
-            )}
-            {gruposTemaCancion.length > 0 && (
-              <GrupoFiltroDropdown
-                subtipo="Tema"
-                grupos={gruposTemaCancion}
-                selectedId={filtroTemaId}
-                onSelect={setFiltroTemaId}
-                onOpenGrupo={(id) => openEntity("grupos", id)}
-              />
-            )}
-            {(filtroEmocionId || filtroTemaId) && (
-              <button
-                type="button"
-                className="text-micro font-black uppercase tracking-widest text-primary/30 hover:text-primary/60 transition-colors"
-                onClick={() => {
-                  setFiltroEmocionId(null);
-                  setFiltroTemaId(null);
-                }}
-              >
-                ✕ Limpiar
-              </button>
-            )}
-          </div>
-        )}
 
         {loadingCanciones && canciones.length === 0 ? (
           <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
@@ -593,6 +577,8 @@ export function EntidadesPage({ section, selectedId }: Props) {
           grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
           onSeleccionarGrupo={setGrupoCriaturaSeleccionadoId}
           onOpenGrupo={(id) => openEntity("grupos", id)}
+          busqueda={busquedaCriatura}
+          onBusquedaChange={setBusquedaCriatura}
           onCreateCriatura={async () => {
             const { data } = await addCriatura({ nombre: "Nueva criatura" });
             if (data?.id) openEntity("criaturas", data.id);
@@ -617,13 +603,22 @@ export function EntidadesPage({ section, selectedId }: Props) {
     const grupoItemSeleccionado = grupoItemSeleccionadoId
       ? gruposItemsPorSubtipo.flatMap((b) => b.grupos).find((g) => g.id === grupoItemSeleccionadoId)
       : null;
-    const itemsFiltrados = grupoItemSeleccionado
+    const itemsDelGrupo = grupoItemSeleccionado
       ? items.filter((i) => grupoItemSeleccionado.miembro_ids.includes(i.id))
       : items;
+    const qItem = busquedaItem.trim().toLocaleLowerCase("es");
+    const itemsFiltrados = qItem
+      ? itemsDelGrupo.filter((i) => i.nombre?.toLocaleLowerCase("es").includes(qItem))
+      : itemsDelGrupo;
 
     return (
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <div className="flex items-center gap-2 mb-3 px-1">
+        <div className="flex items-center gap-2 mb-3 px-1 flex-wrap">
+          <BuscadorInline
+            value={busquedaItem}
+            onChange={setBusquedaItem}
+            placeholder="Buscar item por nombre…"
+          />
           <GrupoFiltroBarra
             bloques={gruposItemsPorSubtipo}
             grupoSeleccionadoId={grupoItemSeleccionadoId}
@@ -788,6 +783,8 @@ export function EntidadesPage({ section, selectedId }: Props) {
         grupoReinoSeleccionadoId={grupoReinoSeleccionadoId}
         onSeleccionarGrupoReino={setGrupoReinoSeleccionadoId}
         onOpenGrupo={(id) => openEntity("grupos", id)}
+        busqueda={busquedaReino}
+        onBusquedaChange={setBusquedaReino}
         onCreateReino={async () => {
           const { data } = await addReino({ nombre: "Nuevo reino" });
           if (data?.id) openEntity("reinos", data.id);

@@ -35,6 +35,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "./EntityCard";
 import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "./GrupoFiltroDropdown";
+import { BuscadorInline } from "./BuscadorInline";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 export type GrupoPersonajeSubtipo = GrupoFiltroSubtipo;
@@ -78,6 +79,10 @@ interface Props {
   /** Abre el editor completo de un grupo (openEntity("grupos", id)) — se
    *  muestra como botón a la derecha de cada opción en los dropdowns. */
   onOpenGrupo?: (grupoId: string) => void;
+  /** Texto de búsqueda por nombre de reino — controlado por el padre, se
+   *  combina (AND) con el filtro de grupo activo. */
+  busqueda?: string;
+  onBusquedaChange?: (value: string) => void;
 }
 
 function NodoTitulo({
@@ -148,6 +153,8 @@ export function GeografiaJerarquica({
   grupoReinoSeleccionadoId,
   onSeleccionarGrupoReino,
   onOpenGrupo,
+  busqueda = "",
+  onBusquedaChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -187,6 +194,10 @@ export function GeografiaJerarquica({
   const reinosBase = grupoReinoSeleccionado
     ? reinos.filter((r) => grupoReinoSeleccionado.miembro_ids.includes(r.id))
     : reinos;
+  const qReino = busqueda.trim().toLocaleLowerCase("es");
+  const reinosVisibles = qReino
+    ? reinosBase.filter((r) => r.nombre?.toLocaleLowerCase("es").includes(qReino))
+    : reinosBase;
 
   const ciudadesDe = (reinoId: string) =>
     ciudades
@@ -206,7 +217,7 @@ export function GeografiaJerarquica({
     (p) => !p.ciudad_id && !reinosBase.some((r) => r.nombre === p.reino)
   );
 
-  const reinosOrdenados = [...reinosBase].sort(
+  const reinosOrdenados = [...reinosVisibles].sort(
     (a, b) =>
       ciudadesDe(b.id).length +
       personajesSinCiudadDeReino(b.nombre).length -
@@ -413,8 +424,15 @@ export function GeografiaJerarquica({
 
   return (
     <div className="mb-8 last:mb-0">
-      <div className="flex items-center gap-2 mb-4 px-1">
+      <div className="flex items-center gap-2 mb-4 px-1 flex-wrap">
         <div className="flex-1 flex items-center gap-2 flex-wrap">
+          {onBusquedaChange && (
+            <BuscadorInline
+              value={busqueda}
+              onChange={onBusquedaChange}
+              placeholder="Buscar reino por nombre…"
+            />
+          )}
           <GrupoFiltroBarra
             bloques={gruposPersonajesPorSubtipo}
             grupoSeleccionadoId={grupoSeleccionadoId}
