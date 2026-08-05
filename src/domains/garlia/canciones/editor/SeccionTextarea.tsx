@@ -35,9 +35,10 @@ function contarSilabas(s: string): number {
   return total;
 }
 
-function contar(linea: string, modo: CountMode) {
+export function contar(linea: string, modo: CountMode) {
   return modo === "vocales" ? contarVocales(linea) : contarSilabas(linea);
 }
+export type { CountMode };
 
 // ── Constantes de layout ─────────────────────────────────────────────────────
 const FONT_SIZE_PX = 11;

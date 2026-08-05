@@ -21,7 +21,7 @@ import type {
   EditorTab,
 } from "@/domains/garlia/canciones/types";
 
-import { SeccionTextarea } from "./SeccionTextarea";
+import { SeccionTextarea, SyllableColumn } from "./SeccionTextarea";
 import { ModalLectorLetras } from "../modals/ModalLectorLetras";
 import { PanelGuionMV } from "../panels/PanelGuionMV";
 import { PanelInfoSidebar } from "../panels/PanelInfoSidebar";
@@ -372,10 +372,21 @@ export const PanelEditor = ({
                     idioma="es"
                     refIdioma={idioma !== "es" ? idioma : undefined}
                     sec={bloque}
-                    showSyllableColumn
+                    showSyllableColumn={idioma === "es"}
                     onSave={handleSaveField}
                     onTextoChange={setTexto}
                   />
+
+                  {/* Columna central: un solo indicador de sílabas/vocales,
+                      compartido entre Español y el idioma de la canción —
+                      antes cada bloque tenía su propia columna (duplicado). */}
+                  {idioma !== "es" && (
+                    <SyllableColumn
+                      countMode={countMode}
+                      refLineas={texto.split("\n")}
+                      texto={textoDerecha}
+                    />
+                  )}
 
                   {/* Columna derecha: idioma de la canción (sidebar), solo si
                       no es Español — evita duplicar la misma columna. */}
@@ -385,7 +396,7 @@ export const PanelEditor = ({
                       idioma={idioma}
                       refIdioma="es"
                       sec={bloque}
-                      showSyllableColumn
+                      showSyllableColumn={false}
                       onSave={handleSaveField}
                       onTextoChange={setTextoDerecha}
                     />
