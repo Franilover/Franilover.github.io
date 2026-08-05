@@ -1541,8 +1541,16 @@ function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
     if (bloqueActivo.id) {
       // Quita el sufijo " — Reino" del título para dejar solo el título
       // real (el reino no se edita desde aquí, se preserva del original).
+      // Luego quita cualquier delimitador markdown de formato (bold,
+      // italic, strikethrough) que haya quedado en el título — si el
+      // usuario le dio formato al heading completo, cortar el sufijo de
+      // reino puede dejar un delimitador de apertura o cierre huérfano
+      // (ej. "**Titulo — Reino**" → "**Titulo" tras cortar el sufijo).
+      // El título de este bloque de datos siempre es texto plano, así
+      // que no hace falta preservar el formato — solo limpiarlo del todo.
       const tituloSinReino = bloqueActivo.tituloCrudo
         .replace(/\s+—\s+[^—]+$/, "")
+        .replace(/\*{1,3}|~~/g, "")
         .trim();
       bloques.push({
         id: bloqueActivo.id,
@@ -1579,9 +1587,17 @@ function parsearMarkdownHistoriaCompleta(markdown: string): ParseResultado {
     if (linea.startsWith("### ")) {
       cerrarBloque();
       const contenido = linea.slice(4);
-      const idMatch = contenido.match(/<!--tl:([a-zA-Z0-9-]+)-->\s*$/);
+      // El id embebido puede quedar envuelto en delimitadores markdown
+      // (**, *, ~~) si el usuario le dio formato a todo el título del
+      // evento, incluyendo el marcador oculto — ej. "...<!--tl:abc-->**"
+      // en vez de "...<!--tl:abc-->". Los toleramos entre el comentario
+      // y el fin de línea para no perder el id solo porque el heading
+      // tiene negrita/cursiva/tachado aplicado.
+      const idMatch = contenido.match(
+        /<!--tl:([a-zA-Z0-9-]+)-->[*~]*\s*$/,
+      );
       const tituloCrudo = contenido
-        .replace(/<!--tl:[a-zA-Z0-9-]+-->\s*$/, "")
+        .replace(/<!--tl:[a-zA-Z0-9-]+-->[*~]*\s*$/, "")
         .trim();
       bloqueActivo = {
         id: idMatch ? idMatch[1] : null,
