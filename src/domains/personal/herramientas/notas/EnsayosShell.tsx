@@ -23,20 +23,8 @@ import { useToast } from "@/hooks/ui/useToast";
 import { eventosQueries } from "@/lib/api/queries/personal/eventos";
 import { useAuth } from "@/providers/AuthProvider";
 
-type SaveStatus = "idle" | "saving" | "saved" | "error";
-
-function setSaveIndicator(el: HTMLElement | null, status: SaveStatus) {
-  if (!el) return;
-  if (status === "idle") { el.style.opacity = "0"; return; }
-  el.style.opacity = "1";
-  el.textContent =
-    status === "saving" ? "guardando…" :
-    status === "saved"  ? "✓ guardado" : "error";
-  el.style.color =
-    status === "saving" ? "color-mix(in srgb, var(--foreground) 20%, transparent)" :
-    status === "saved"  ? "color-mix(in srgb, var(--accent) 70%, transparent)" :
-                          "color-mix(in srgb, var(--primary) 70%, transparent)";
-}
+import type { SaveStatus } from "@/ui/saveStatus";
+import { SaveDot } from "@/ui/SaveDot";
 
 const LS_ACTIVE = "ensayos-active-id";
 const LS_HOME   = "ensayos-at-home";
@@ -142,7 +130,7 @@ function EnsayosInner() {
 
   const pendingUpdatesRef  = useRef<Record<string, Record<string, any>>>({});
   const saveTimerRef       = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const saveIndicatorRef   = useRef<HTMLSpanElement | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
 
   // ── FIX: guard para no tocar el DOM después de desmontar ──────────────────
   const isMountedRef = useRef(true);
@@ -309,7 +297,7 @@ function EnsayosInner() {
       delete pendingUpdatesRef.current[id];
       delete saveTimerRef.current[id];
 
-      setSaveIndicator(saveIndicatorRef.current, "saving");
+      setSaveStatus("saving");
 
       const now     = new Date().toISOString();
       const payload = { ...batch, updated_at: now };
@@ -331,20 +319,12 @@ function EnsayosInner() {
         // ── FIX 3: guard post-await por si el usuario navegó mientras guardaba
         if (!isMountedRef.current) return;
 
-        setSaveIndicator(saveIndicatorRef.current, "saved");
-        setTimeout(() => {
-          if (isMountedRef.current) setSaveIndicator(saveIndicatorRef.current, "idle");
-        }, 2000);
+        setSaveStatus("saved");
 
       } catch (err: any) {
         if (!isMountedRef.current) return;
 
-        setSaveIndicator(saveIndicatorRef.current, "error");
-
-        // ── FIX 4: auto-limpiar el error para no quedar atascado en "error" ──
-        setTimeout(() => {
-          if (isMountedRef.current) setSaveIndicator(saveIndicatorRef.current, "idle");
-        }, 4000);
+        setSaveStatus("error");
 
         console.warn("[scheduleSave] error al guardar:", err?.message ?? err);
       }
@@ -931,12 +911,9 @@ function EnsayosInner() {
             </div>
           </div>
 
-          {/* Indicador guardado — derecha */}
-          <div className="shrink-0" style={{ minWidth: 64, textAlign: "right" }}>
-            <span
-              ref={saveIndicatorRef}
-              style={{ fontSize: 9, fontFamily: "var(--font-mono)", opacity: 0, transition: "opacity 0.3s", letterSpacing: "0.1em", textTransform: "uppercase" }}
-            />
+          {/* Indicador guardado — derecha (punto verde/amarillo/rojo, se oculta solo a los 5s) */}
+          <div className="shrink-0 flex items-center justify-end" style={{ minWidth: 24 }}>
+            <SaveDot status={saveStatus} />
           </div>
         </div>
 
@@ -1038,6 +1015,7 @@ function EnsayosInner() {
                   onTocToggle={() => setTocOpen(p => !p)}
                   onToggleEditMode={() => setEditMode(p => !p)}
                   onUpdateField={actualizarLocal}
+                  saveStatus={saveStatus}
                 />
               ) : (
                 <HomeDashboard 

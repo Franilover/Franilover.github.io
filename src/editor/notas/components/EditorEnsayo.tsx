@@ -20,6 +20,8 @@ import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
 import { SubBloqueSelector } from "@/editor/sub-bloques/SubBloqueSelector";
 import { makeSubBloque, parseSubBloques, type SubBloque } from "@/editor/sub-bloques/types";
 import { MotionDiv } from "@/ui/Motion";
+import { SaveDot } from "@/ui/SaveDot";
+import type { SaveStatus } from "@/ui/saveStatus";
 
 import { CitePopup } from "./citePopup";
 import { LibroPanel } from "./LibroPanel";
@@ -64,6 +66,10 @@ interface EditorProps {
   onTocEntriesChange?: (
     entries: { level: number; text: string; id: string }[],
   ) => void;
+  /** Estado global de guardado (contenido, título, layout_boxes, sub_bloques
+   *  — todos pasan por el mismo scheduleSave del shell/hook), para el punto
+   *  verde/amarillo/rojo. Ver EnsayosShell / useEnsayoEditorLogic. */
+  saveStatus?: SaveStatus;
 }
 
 // ─── Editor principal ─────────────────────────────────────────────────────────
@@ -81,6 +87,7 @@ export function Editor({
   tocOpen: tocOpenProp,
   onTocToggle,
   onTocEntriesChange,
+  saveStatus = "idle",
 }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tituloOriginalRef = useRef<string | null>(null);
@@ -104,29 +111,27 @@ export function Editor({
   const [layoutBoxes, setLayoutBoxes] = useState<LayoutBox[]>(() =>
     parseLayoutBoxes(ensayo.layout_boxes),
   );
-  const layoutSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const layoutCanvasRef = useRef<LayoutCanvasHandle | null>(null);
 
+  // NOTA sobre guardado: antes este componente tenía SU PROPIO debounce
+  // (setTimeout de 600ms) que llamaba a onUpdateField por separado del de
+  // `contenido`/`sub_bloques`, cada uno disparando su propio updateRow()
+  // en paralelo. Eso causaba guardados que "a veces sí, a veces no" —
+  // varios requests concurrentes al mismo row, sin ningún indicador que
+  // reflejara si alguno fallaba. Ahora todos los campos (contenido, título,
+  // layout_boxes, sub_bloques) pasan por el ÚNICO scheduleSave centralizado
+  // del shell/hook (ver onUpdateField → useEnsayoEditorLogic /
+  // EnsayosShell), que ya agrupa updates pendientes por id en un solo
+  // batch/timer y expone `saveStatus`. Acá solo actualizamos el estado
+  // local al vuelo (sin red) y delegamos el guardado real, sin debounce
+  // propio — el debounce ya vive en scheduleSave.
   const handleLayoutBoxesChange = useCallback(
     (boxes: LayoutBox[]) => {
       setLayoutBoxes(boxes);
-      // Debounce propio en vez de disparar onUpdateField en cada pixel de
-      // drag/resize — el mismo patrón que ya usa el shell para `contenido`,
-      // pero acá lo hacemos local porque los cambios de posición durante un
-      // arrastre son mucho más frecuentes que un onChange de texto normal.
-      if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
-      layoutSaveTimerRef.current = setTimeout(() => {
-        onUpdateField(ensayo.id, "layout_boxes", boxes);
-      }, 600);
+      onUpdateField(ensayo.id, "layout_boxes", boxes);
     },
     [ensayo.id, onUpdateField],
   );
-
-  useEffect(() => {
-    return () => {
-      if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
-    };
-  }, []);
 
   // ── Sub-bloques ("pestañas" de contenido dentro del mismo ensayo) ────────
   // Documentos de texto independientes del `contenido` principal — cada uno
@@ -138,17 +143,13 @@ export function Editor({
     parseSubBloques(ensayo.sub_bloques),
   );
   const [activeBloqueId, setActiveBloqueId] = useState<string | null>(null);
-  const subBloqueSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
 
+  // Mismo criterio que layout_boxes arriba: sin debounce propio, se delega
+  // en el scheduleSave centralizado (onUpdateField) para evitar guardados
+  // concurrentes que compitan entre sí.
   const scheduleSubBloquesSave = useCallback(
     (bloques: SubBloque[]) => {
-      if (subBloqueSaveTimerRef.current)
-        clearTimeout(subBloqueSaveTimerRef.current);
-      subBloqueSaveTimerRef.current = setTimeout(() => {
-        onUpdateField(ensayo.id, "sub_bloques", bloques);
-      }, 600);
+      onUpdateField(ensayo.id, "sub_bloques", bloques);
     },
     [ensayo.id, onUpdateField],
   );
@@ -201,13 +202,6 @@ export function Editor({
     },
     [scheduleSubBloquesSave],
   );
-
-  useEffect(() => {
-    return () => {
-      if (subBloqueSaveTimerRef.current)
-        clearTimeout(subBloqueSaveTimerRef.current);
-    };
-  }, []);
 
   const activeSubBloque = subBloques.find((b) => b.id === activeBloqueId) || null;
 
@@ -270,11 +264,9 @@ export function Editor({
       onUpdateField(ensayo.id, "contenido", cleaned);
     }
     // Cambiar de ensayo: recargar las cajas de texto flotantes del nuevo ensayo.
-    if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
     setLayoutBoxes(parseLayoutBoxes(ensayo.layout_boxes));
     // Cambiar de ensayo: recargar sus sub-bloques y volver al documento principal
     // (el bloque activo era del ensayo anterior, ya no aplica acá).
-    if (subBloqueSaveTimerRef.current) clearTimeout(subBloqueSaveTimerRef.current);
     setSubBloques(parseSubBloques(ensayo.sub_bloques));
     setActiveBloqueId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -565,6 +557,7 @@ export function Editor({
                 >
                   {tituloInput}
                   <div className="flex items-center gap-1.5 mt-2">
+                    <SaveDot status={saveStatus} />
                     <Save
                       size={9}
                       style={{
@@ -742,6 +735,7 @@ export function Editor({
                       <div style={{ flex: 1 }}>
                         {tituloInput}
                         <div className="flex items-center gap-1.5 mt-2">
+                          <SaveDot status={saveStatus} />
                           <Save
                             size={9}
                             style={{
@@ -910,6 +904,7 @@ export function Editor({
                       </>
                     )}
                     <div className="flex items-center gap-1.5">
+                      <SaveDot status={saveStatus} />
                       <Save
                         size={9}
                         style={{

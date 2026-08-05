@@ -40,6 +40,7 @@ export function EnsayoGosScreen({ ensayoId, onClose }: Props) {
     loading,
     ensayoActivo,
     setEnsayoActivoId,
+    saveStatus,
     actualizarLocal,
     navigateToPage,
     pendingNoteTitle,
@@ -92,6 +93,7 @@ export function EnsayoGosScreen({ ensayoId, onClose }: Props) {
             onTocToggle={() => setTocOpen((p) => !p)}
             onToggleEditMode={() => setEditMode((p) => !p)}
             onUpdateField={actualizarLocal}
+            saveStatus={saveStatus}
           />
         )}
       </div>
