@@ -25,7 +25,6 @@ import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
 import { ModalNuevaCancion } from "@/domains/garlia/canciones/modals/ModalNuevaCancion";
 import { useCanciones } from "@/domains/garlia/canciones/useCanciones";
 import type { Cancion } from "@/domains/garlia/canciones/types";
-import { Chip } from "@/ui/Chip";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
 import { useRunas } from "@/domains/garlia/runas/useRunas";
 import { RunasPage } from "@/domains/garlia/runas/RunasPage";
@@ -42,7 +41,7 @@ import { ReinoEditor } from "@garlia/reinos";
 import { CiudadEditor } from "@garlia/ciudades";
 import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GeografiaJerarquica, type GrupoPersonajeSubtipo } from "@/domains/garlia/_shared/GeografiaJerarquica";
-import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
+import { GrupoFiltroBarra, GrupoFiltroDropdown, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import { CriaturasJerarquica } from "@/domains/garlia/_shared/CriaturasJerarquica";
 import { TABLA_TO_SECTION } from "@/domains/garlia/_shared/useExternalCommandBridge";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
@@ -215,8 +214,8 @@ export function EntidadesPage({ section, selectedId }: Props) {
   // de los grupos de tipo "canciones" con subtipo "Emoción" / "Tema" —
   // cada grupo es un valor posible y sus miembro_ids son las canciones que
   // caen en ese valor (ver useGrupos / grupos_mundo).
-  const [filtroEmocion, setFiltroEmocion] = useState<string>("");
-  const [filtroTema, setFiltroTema] = useState<string>("");
+  const [filtroEmocionId, setFiltroEmocionId] = useState<string | null>(null);
+  const [filtroTemaId, setFiltroTemaId] = useState<string | null>(null);
   const [busquedaCancion, setBusquedaCancion] = useState<string>("");
 
   const gruposEmocionCancion = useMemo(
@@ -234,26 +233,17 @@ export function EntidadesPage({ section, selectedId }: Props) {
     [grupos],
   );
 
-  const emocionesDisponibles = useMemo(
-    () => gruposEmocionCancion.map((g) => g.nombre),
-    [gruposEmocionCancion],
-  );
-  const temasDisponibles = useMemo(
-    () => gruposTemaCancion.map((g) => g.nombre),
-    [gruposTemaCancion],
-  );
-
   // Sets de ids de canción para el grupo seleccionado — O(1) al filtrar.
   const idsCancionEmocionActiva = useMemo(() => {
-    if (!filtroEmocion) return null;
-    const g = gruposEmocionCancion.find((g) => g.nombre === filtroEmocion);
+    if (!filtroEmocionId) return null;
+    const g = gruposEmocionCancion.find((g) => g.id === filtroEmocionId);
     return g ? new Set(g.miembro_ids) : new Set<string>();
-  }, [filtroEmocion, gruposEmocionCancion]);
+  }, [filtroEmocionId, gruposEmocionCancion]);
   const idsCancionTemaActivo = useMemo(() => {
-    if (!filtroTema) return null;
-    const g = gruposTemaCancion.find((g) => g.nombre === filtroTema);
+    if (!filtroTemaId) return null;
+    const g = gruposTemaCancion.find((g) => g.id === filtroTemaId);
     return g ? new Set(g.miembro_ids) : new Set<string>();
-  }, [filtroTema, gruposTemaCancion]);
+  }, [filtroTemaId, gruposTemaCancion]);
 
   const cancionesFiltradas = useMemo(() => {
     const q = busquedaCancion.trim().toLocaleLowerCase("es");
@@ -468,49 +458,33 @@ export function EntidadesPage({ section, selectedId }: Props) {
           </button>
         </div>
 
-        {(emocionesDisponibles.length > 0 || temasDisponibles.length > 0) && (
-          <div className="flex flex-wrap items-start gap-x-5 gap-y-2 mb-4 px-1">
-            {emocionesDisponibles.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-micro font-black uppercase tracking-widest text-primary/30">
-                  Emoción
-                </span>
-                {emocionesDisponibles.map((e) => (
-                  <Chip
-                    key={e}
-                    active={filtroEmocion === e}
-                    onClick={() =>
-                      setFiltroEmocion((prev) => (prev === e ? "" : e))
-                    }
-                  >
-                    {e}
-                  </Chip>
-                ))}
-              </div>
+        {(gruposEmocionCancion.length > 0 || gruposTemaCancion.length > 0) && (
+          <div className="flex items-center gap-2 flex-wrap mb-4 px-1">
+            {gruposEmocionCancion.length > 0 && (
+              <GrupoFiltroDropdown
+                subtipo="Emoción"
+                grupos={gruposEmocionCancion}
+                selectedId={filtroEmocionId}
+                onSelect={setFiltroEmocionId}
+                onOpenGrupo={(id) => openEntity("grupos", id)}
+              />
             )}
-            {temasDisponibles.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-micro font-black uppercase tracking-widest text-primary/30">
-                  Tema
-                </span>
-                {temasDisponibles.map((t) => (
-                  <Chip
-                    key={t}
-                    active={filtroTema === t}
-                    onClick={() => setFiltroTema((prev) => (prev === t ? "" : t))}
-                  >
-                    {t}
-                  </Chip>
-                ))}
-              </div>
+            {gruposTemaCancion.length > 0 && (
+              <GrupoFiltroDropdown
+                subtipo="Tema"
+                grupos={gruposTemaCancion}
+                selectedId={filtroTemaId}
+                onSelect={setFiltroTemaId}
+                onOpenGrupo={(id) => openEntity("grupos", id)}
+              />
             )}
-            {(filtroEmocion || filtroTema) && (
+            {(filtroEmocionId || filtroTemaId) && (
               <button
                 type="button"
                 className="text-micro font-black uppercase tracking-widest text-primary/30 hover:text-primary/60 transition-colors"
                 onClick={() => {
-                  setFiltroEmocion("");
-                  setFiltroTema("");
+                  setFiltroEmocionId(null);
+                  setFiltroTemaId(null);
                 }}
               >
                 ✕ Limpiar
