@@ -645,6 +645,9 @@ function EnsayosInner() {
             />
           )}
 
+          {/* Indicador de guardado — siempre a la izquierda del botón de índice */}
+          {ensayoActivo && <SaveDot status={saveStatus} />}
+
           {/* TOC (solo cuando hay nota activa con headings) */}
           {ensayoActivo && tocEntries.length > 0 && (
             <button
@@ -909,11 +912,6 @@ function EnsayosInner() {
                 )}
               </AnimatePresence>
             </div>
-          </div>
-
-          {/* Indicador guardado — derecha (punto verde/amarillo/rojo, se oculta solo a los 5s) */}
-          <div className="shrink-0 flex items-center justify-end" style={{ minWidth: 24 }}>
-            <SaveDot status={saveStatus} />
           </div>
         </div>
 

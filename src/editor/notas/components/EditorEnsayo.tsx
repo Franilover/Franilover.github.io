@@ -904,7 +904,6 @@ export function Editor({
                       </>
                     )}
                     <div className="flex items-center gap-1.5">
-                      <SaveDot status={saveStatus} />
                       <Save
                         size={9}
                         style={{
@@ -928,29 +927,32 @@ export function Editor({
                     </div>
                     {/* Botón panel lateral — solo en mobile */}
                     {isMobile && (
-                      <button
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 4,
-                          padding: "3px 8px",
-                          borderRadius: 5,
-                          border:
-                            "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
-                          background:
-                            "color-mix(in srgb, var(--foreground) 4%, transparent)",
-                          color:
-                            "color-mix(in srgb, var(--foreground) 45%, transparent)",
-                          cursor: "pointer",
-                          ...monoStyle,
-                          fontSize: 9,
-                        }}
-                        title="Índice, tags y menciones"
-                        onClick={() => setNotaPanelOpen(true)}
-                      >
-                        <PanelRight size={9} />
-                        panel
-                      </button>
+                      <>
+                        <SaveDot status={saveStatus} />
+                        <button
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "3px 8px",
+                            borderRadius: 5,
+                            border:
+                              "1px solid color-mix(in srgb, var(--foreground) 10%, transparent)",
+                            background:
+                              "color-mix(in srgb, var(--foreground) 4%, transparent)",
+                            color:
+                              "color-mix(in srgb, var(--foreground) 45%, transparent)",
+                            cursor: "pointer",
+                            ...monoStyle,
+                            fontSize: 9,
+                          }}
+                          title="Índice, tags y menciones"
+                          onClick={() => setNotaPanelOpen(true)}
+                        >
+                          <PanelRight size={9} />
+                          panel
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
