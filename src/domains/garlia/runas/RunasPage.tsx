@@ -18,6 +18,8 @@ import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { RichEditor } from "@/editor/lexical";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
+import { SubBloqueSelector } from "@/editor/sub-bloques/SubBloqueSelector";
+import { useSubBloquesDeEnsayo } from "@/editor/sub-bloques/useSubBloquesDeEnsayo";
 import { supabase } from "@/infra/supabase/supabase";
 
 import {
@@ -302,12 +304,9 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
 
   return (
     <div className="mb-6">
-      <RichEditor
-        key={ensayoEnergias.id}
-        value={ensayoEnergias.contenido || ""}
-        onChange={(value) => actualizarLocal(ensayoEnergias.id, "contenido", value)}
-        placeholder="Escribe aquí…"
-        minHeight={220}
+      <BloqueEnsayoConSubBloques
+        ensayo={ensayoEnergias}
+        actualizarLocal={actualizarLocal}
       />
     </div>
   );
@@ -362,13 +361,71 @@ function BloqueEnsayoRunas(_props: { onOpenEnsayo?: (id: string) => void }) {
       <p className="text-micro font-black uppercase tracking-widest text-primary/30 text-center mb-3">
         Ensayo
       </p>
-      <RichEditor
-        key={ensayoRunas.id}
-        value={ensayoRunas.contenido || ""}
-        onChange={(value) => actualizarLocal(ensayoRunas.id, "contenido", value)}
-        placeholder="Escribe aquí…"
-        minHeight={220}
+      <BloqueEnsayoConSubBloques
+        ensayo={ensayoRunas}
+        actualizarLocal={actualizarLocal}
       />
+    </div>
+  );
+}
+
+// ─── Wrapper compartido: RichEditor + selector de sub-bloques ──────────────
+// Ambos bloques de ensayo de arriba (Energías, Runas) tienen la misma
+// necesidad — alternar entre el documento principal y sus sub-bloques —
+// así que la lógica vive una sola vez acá en vez de duplicarse en cada
+// función. Mismo patrón que markdownBlock en EditorEnsayo.tsx, pero sin
+// el resto del shell (TOC, layout boxes, citas) que no aplica en este
+// contexto lateral de RunasPage.
+function BloqueEnsayoConSubBloques({
+  ensayo,
+  actualizarLocal,
+}: {
+  ensayo: any;
+  actualizarLocal: (id: string, field: string, value: any, extra?: any) => void;
+}) {
+  const {
+    subBloques,
+    activeBloqueId,
+    setActiveBloqueId,
+    activeSubBloque,
+    handleCreateSubBloque,
+    handleRenameSubBloque,
+    handleDeleteSubBloque,
+    handleSubBloqueContenidoChange,
+  } = useSubBloquesDeEnsayo(ensayo.id, ensayo.sub_bloques, actualizarLocal);
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 pb-2">
+        <SubBloqueSelector
+          activeId={activeBloqueId}
+          bloques={subBloques}
+          onCreate={handleCreateSubBloque}
+          onDelete={handleDeleteSubBloque}
+          onRename={handleRenameSubBloque}
+          onSelect={setActiveBloqueId}
+        />
+      </div>
+
+      {activeSubBloque ? (
+        <RichEditor
+          key={`${ensayo.id}-${activeSubBloque.id}`}
+          value={activeSubBloque.contenido}
+          onChange={(value) =>
+            handleSubBloqueContenidoChange(activeSubBloque.id, value)
+          }
+          placeholder={`escribiendo en "${activeSubBloque.nombre}"...`}
+          minHeight={220}
+        />
+      ) : (
+        <RichEditor
+          key={ensayo.id}
+          value={ensayo.contenido || ""}
+          onChange={(value) => actualizarLocal(ensayo.id, "contenido", value)}
+          placeholder="Escribe aquí…"
+          minHeight={220}
+        />
+      )}
     </div>
   );
 }
