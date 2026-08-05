@@ -115,6 +115,63 @@ export function looksLikeMarkdown(text: string): boolean {
   return false;
 }
 
+// ── Normalización de saltos de línea sueltos ──────────────────────────
+// $convertFromMarkdownString sigue la regla estándar de CommonMark: un
+// solo "\n" NO separa párrafos, hace falta línea en blanco ("\n\n") entre
+// bloques. La mayoría de fuentes de las que la gente copia texto (notas,
+// documentos, un mensaje de chat, un README escrito a mano) usan un solo
+// salto de línea entre "párrafos" — eso hace que $convertFromMarkdownString
+// fusione todo en un único <p> gigante (o, peor, deje que la primera línea
+// de una lista "se coma" el resto del texto hasta la próxima línea en
+// blanco real, como pasaba con las líneas "- Manifestaciones:" /
+// "- Límites:" seguidas de texto plano sin blank line). El síntoma que
+// reporta el usuario ("pega pero no se muestra nada") es justo esto:
+// el contenido no se pierde de verdad, queda comprimido/mezclado dentro
+// de uno o dos nodos y visualmente parece que desapareció.
+//
+// Estrategia: insertamos una línea en blanco entre dos líneas no-vacías
+// consecutivas, EXCEPTO cuando eso rompería una construcción real que
+// depende de saltos simples contiguos:
+//   - dos líneas de lista del mismo estilo (ambas empiezan con "-"/"*"/
+//     "+"/"1.") → se dejan pegadas, así siguen formando una sola lista.
+//   - dentro de un bloque ``` ``` → no se toca nada (el contenido es
+//     literal, insertar blank lines ahí lo rompería).
+//   - dentro de un bloque de tabla ("| ... |" en líneas consecutivas,
+//     incluida la fila separadora "---|---") → no se toca, una tabla
+//     markdown depende de que sus filas queden una debajo de la otra
+//     sin línea en blanco.
+//   - si el texto YA usa líneas en blanco entre bloques (markdown más
+//     "formal", pegado desde otro editor markdown) esto es un no-op:
+//     nunca insertamos una segunda línea en blanco donde ya hay una.
+function normalizeLooseLineBreaks(text: string): string {
+  const lines = text.split("\n");
+  const isListLine = (l: string) => /^\s*([-*+]|\d+\.)\s+\S/.test(l);
+  const isTableLine = (l: string) => /^\s*\|.*\|\s*$/.test(l.trim()) || /^\s*\|?[\s:-]+\|[\s:|-]+$/.test(l);
+  let inCodeFence = false;
+
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    out.push(line);
+
+    if (/^\s*```/.test(line)) inCodeFence = !inCodeFence;
+    if (inCodeFence) continue; // nunca insertar blank lines dentro de ```
+
+    const next = lines[i + 1];
+    if (next === undefined) continue;
+    if (line.trim() === "" || next.trim() === "") continue; // ya hay blank line, o es el final
+
+    // Lista contigua del mismo estilo: no separar.
+    if (isListLine(line) && isListLine(next)) continue;
+    // Tabla contigua: no separar (rompería la tabla).
+    if (isTableLine(line) && isTableLine(next)) continue;
+    // Encabezado ATX ("# algo") seguido de texto: sí separar (caso normal).
+
+    out.push("");
+  }
+  return out.join("\n");
+}
+
 export function MarkdownPastePlugin() {
   const [editor] = useLexicalComposerContext();
 
@@ -136,6 +193,13 @@ export function MarkdownPastePlugin() {
 
         event.preventDefault();
 
+        // -1) Saltos de línea sueltos → líneas en blanco reales entre
+        // bloques (ver normalizeLooseLineBreaks arriba). Sin esto,
+        // $convertFromMarkdownString fusiona párrafos separados por un
+        // solo "\n" en uno solo, o deja que una lista se coma texto
+        // plano subsecuente — el bug de "pega pero no se ve nada".
+        const normalizedText = normalizeLooseLineBreaks(text);
+
         // 0) "$$formula$$" en bloque es multilinea (puede contener \n
         // propios del LaTeX, ej: \begin{aligned}...) — igual que las
         // tablas en rawTextToLexicalTree, lo sacamos ANTES de que
@@ -143,7 +207,7 @@ export function MarkdownPastePlugin() {
         // por un token ASCII de una sola palabra que no colisiona con
         // ninguna sintaxis markdown real.
         const mathBlocks: string[] = [];
-        const textWithMathTokens = text.replace(MATH_BLOCK_RE, (_m, formula: string) => {
+        const textWithMathTokens = normalizedText.replace(MATH_BLOCK_RE, (_m, formula: string) => {
           const idx = mathBlocks.push(formula.trim()) - 1;
           return `xMathBlockTokenxx${idx}xx`;
         });
