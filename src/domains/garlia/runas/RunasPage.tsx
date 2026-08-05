@@ -394,6 +394,16 @@ function BloqueEnsayoConSubBloques({
     handleSubBloqueContenidoChange,
   } = useSubBloquesDeEnsayo(ensayo.id, ensayo.sub_bloques, actualizarLocal);
 
+  // Mismo propósito que en EditorEnsayo.tsx: alimentar la opción "todas
+  // las secciones" del menú de exportar de RichEditor.
+  const allSections = useMemo(
+    () => [
+      { nombre: ensayo.titulo || "Documento principal", contenido: ensayo.contenido || "" },
+      ...subBloques.map((b) => ({ nombre: b.nombre, contenido: b.contenido })),
+    ],
+    [ensayo.titulo, ensayo.contenido, subBloques],
+  );
+
   return (
     <div>
       <div className="flex items-center gap-2 pb-2">
@@ -410,6 +420,7 @@ function BloqueEnsayoConSubBloques({
       {activeSubBloque ? (
         <RichEditor
           key={`${ensayo.id}-${activeSubBloque.id}`}
+          allSections={allSections}
           value={activeSubBloque.contenido}
           onChange={(value) =>
             handleSubBloqueContenidoChange(activeSubBloque.id, value)
@@ -420,6 +431,7 @@ function BloqueEnsayoConSubBloques({
       ) : (
         <RichEditor
           key={ensayo.id}
+          allSections={allSections}
           value={ensayo.contenido || ""}
           onChange={(value) => actualizarLocal(ensayo.id, "contenido", value)}
           placeholder="Escribe aquí…"

@@ -229,6 +229,17 @@ export interface RichEditorProps {
    * se muestra siempre — usa directamente `value` (markdown crudo).
    */
   exportFileName?: string;
+  /**
+   * Lista de TODAS las secciones del ensayo (documento principal +
+   * sub-bloques), para que el menú de exportar pueda ofrecer "solo esta
+   * sección" vs "todas las secciones" en vez de exportar siempre
+   * únicamente `value` (la sección actualmente abierta). RichEditor no
+   * conoce los sub-bloques por su cuenta — viven en el padre
+   * (EditorEnsayo) — así que se los pasamos ya armados. Opcional: si no
+   * se pasa (o solo hay una sección), el menú se comporta como antes,
+   * sin la opción de alcance.
+   */
+  allSections?: { nombre: string; contenido: string }[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -718,6 +729,15 @@ function downloadTextFile(filename: string, mime: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+// Combina el documento principal + sub-bloques en un solo string markdown,
+// separando cada sección con un heading "## Nombre" — así queda legible y
+// navegable como un único documento al exportar "todas las secciones".
+function combineSections(sections: { nombre: string; contenido: string }[]): string {
+  return sections
+    .map((s) => `## ${s.nombre}\n\n${s.contenido}`)
+    .join("\n\n---\n\n");
+}
+
 function exportMarkdownAsPdf(title: string, markdown: string) {
   // Sin librerías de PDF: abrimos una ventana nueva con el markdown crudo
   // formateado como texto preformateado y disparamos window.print() — el
@@ -766,12 +786,18 @@ function exportMarkdownAsPdf(title: string, markdown: string) {
 function ExportMenuButton({
   markdown,
   fileName,
+  allSections,
 }: {
   markdown: string;
   fileName: string;
+  allSections?: { nombre: string; contenido: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Submenú de alcance abierto: qué acción (md/pdf/copy) está esperando
+  // que el usuario elija "solo esta sección" o "todas las secciones".
+  // null = ningún submenú abierto (vista de acciones normal).
+  const [scopeFor, setScopeFor] = useState<"md" | "pdf" | "copy" | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -790,21 +816,28 @@ function ExportMenuButton({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) setScopeFor(null);
+  }, [open]);
+
   const slug = slugifyFileName(fileName);
+  // Solo tiene sentido preguntar el alcance si hay más de una sección —
+  // con una sola (o sin sub-bloques), "todas" y "esta" son lo mismo.
+  const hasMultipleSections = (allSections?.length ?? 0) > 1;
 
-  const handleDownloadMd = () => {
-    downloadTextFile(`${slug}.md`, "text/markdown;charset=utf-8", markdown);
+  const runDownloadMd = (content: string, name: string) => {
+    downloadTextFile(`${slugifyFileName(name)}.md`, "text/markdown;charset=utf-8", content);
     setOpen(false);
   };
 
-  const handleDownloadPdf = () => {
-    exportMarkdownAsPdf(fileName, markdown);
+  const runDownloadPdf = (content: string, title: string) => {
+    exportMarkdownAsPdf(title, content);
     setOpen(false);
   };
 
-  const handleCopy = async () => {
+  const runCopy = async (content: string) => {
     try {
-      await navigator.clipboard.writeText(markdown);
+      await navigator.clipboard.writeText(content);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -812,6 +845,42 @@ function ExportMenuButton({
       // (permiso denegado, contexto no seguro), no rompemos nada más.
     }
     setOpen(false);
+  };
+
+  // Cada acción: si hay múltiples secciones, abre el submenú de alcance
+  // en vez de ejecutar directo. Con una sola sección, se comporta exactamente
+  // como antes (usa `markdown`/`fileName` de la sección actual sin preguntar).
+  const handleDownloadMd = () => {
+    if (hasMultipleSections) {
+      setScopeFor("md");
+      return;
+    }
+    runDownloadMd(markdown, fileName);
+  };
+
+  const handleDownloadPdf = () => {
+    if (hasMultipleSections) {
+      setScopeFor("pdf");
+      return;
+    }
+    runDownloadPdf(markdown, fileName);
+  };
+
+  const handleCopy = () => {
+    if (hasMultipleSections) {
+      setScopeFor("copy");
+      return;
+    }
+    void runCopy(markdown);
+  };
+
+  const chooseScope = (scope: "current" | "all") => {
+    if (!scopeFor) return;
+    const content = scope === "all" ? combineSections(allSections!) : markdown;
+    if (scopeFor === "md") runDownloadMd(content, fileName);
+    else if (scopeFor === "pdf") runDownloadPdf(content, fileName);
+    else void runCopy(content);
+    setScopeFor(null);
   };
 
   const menuItems: {
@@ -824,6 +893,12 @@ function ExportMenuButton({
     { key: "pdf", label: "Descargar como PDF", Icon: FileText, onClick: handleDownloadPdf },
     { key: "copy", label: copied ? "¡Copiado!" : "Copiar Markdown", Icon: copied ? Check : Copy, onClick: handleCopy },
   ];
+
+  const scopeLabels: Record<"md" | "pdf" | "copy", string> = {
+    md: "Descargar Markdown",
+    pdf: "Descargar como PDF",
+    copy: "Copiar Markdown",
+  };
 
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
@@ -865,38 +940,112 @@ function ExportMenuButton({
             zIndex: 50,
           }}
         >
-          {menuItems.map(({ key, label, Icon, onClick }) => (
-            <button
-              key={key}
-              role="menuitem"
-              type="button"
-              onClick={onClick}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "6px 8px",
-                background: "transparent",
-                border: "none",
-                borderRadius: 5,
-                cursor: "pointer",
-                fontSize: 12,
-                color: "var(--foreground)",
-                textAlign: "left",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background =
-                  "color-mix(in srgb, var(--foreground) 8%, transparent)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              <Icon size={13} />
-              {label}
-            </button>
-          ))}
+          {scopeFor ? (
+            <>
+              <div
+                style={{
+                  padding: "6px 8px 4px",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                }}
+              >
+                {scopeLabels[scopeFor]}
+              </div>
+              {[
+                { key: "current" as const, label: "Solo esta sección" },
+                { key: "all" as const, label: "Todas las secciones" },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => chooseScope(key)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    width: "100%",
+                    padding: "6px 8px",
+                    background: "transparent",
+                    border: "none",
+                    borderRadius: 5,
+                    cursor: "pointer",
+                    fontSize: 12,
+                    color: "var(--foreground)",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background =
+                      "color-mix(in srgb, var(--foreground) 8%, transparent)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                role="menuitem"
+                type="button"
+                onClick={() => setScopeFor(null)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  width: "100%",
+                  padding: "6px 8px",
+                  marginTop: 2,
+                  borderTop: "1px solid color-mix(in srgb, var(--foreground) 7%, transparent)",
+                  background: "transparent",
+                  border: "none",
+                  borderTopWidth: 1,
+                  borderTopStyle: "solid",
+                  borderTopColor: "color-mix(in srgb, var(--foreground) 7%, transparent)",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  color: "color-mix(in srgb, var(--foreground) 45%, transparent)",
+                  textAlign: "left",
+                }}
+              >
+                ← Volver
+              </button>
+            </>
+          ) : (
+            menuItems.map(({ key, label, Icon, onClick }) => (
+              <button
+                key={key}
+                role="menuitem"
+                type="button"
+                onClick={onClick}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  width: "100%",
+                  padding: "6px 8px",
+                  background: "transparent",
+                  border: "none",
+                  borderRadius: 5,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  color: "var(--foreground)",
+                  textAlign: "left",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background =
+                    "color-mix(in srgb, var(--foreground) 8%, transparent)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <Icon size={13} />
+                {label}
+              </button>
+            ))
+          )}
         </div>
       )}
     </div>
@@ -926,6 +1075,7 @@ export function RichEditor({
   onWikilinkNavigate,
   extraToolbarAction,
   exportFileName,
+  allSections,
 }: RichEditorProps) {
   const [hasSections, setHasSections] = useState(false);
   // Toggle de corrector ortográfico nativo del navegador (spellCheck de
@@ -1397,6 +1547,7 @@ export function RichEditor({
           <ExportMenuButton
             markdown={value}
             fileName={exportFileName || "documento"}
+            allSections={allSections}
           />
           {extraToolbarAction}
         </div>

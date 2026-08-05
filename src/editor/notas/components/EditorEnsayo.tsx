@@ -422,6 +422,19 @@ export function Editor({
   // `localContenido`) — mismo componente, distinto storage. Citas (@) y
   // wikilinks siguen operando sobre el documento principal únicamente: no
   // tiene sentido citar/enlazar desde dentro de, por ejemplo, una receta.
+  // Todas las secciones del ensayo (documento principal + sub-bloques),
+  // para el selector "solo esta sección / todas las secciones" del menú
+  // de exportar en RichEditor. El documento principal va primero, con el
+  // título del ensayo como nombre — mismo orden en que aparecen en
+  // SubBloqueSelector (Documento principal arriba, bloques debajo).
+  const allSections = useMemo(
+    () => [
+      { nombre: localTitulo || ensayo.titulo || "Documento principal", contenido: localContenido },
+      ...subBloques.map((b) => ({ nombre: b.nombre, contenido: b.contenido })),
+    ],
+    [localTitulo, ensayo.titulo, localContenido, subBloques],
+  );
+
   const markdownBlock = (
     <div
       className="flex-1 overflow-y-auto relative pb-8"
@@ -443,6 +456,7 @@ export function Editor({
 
       {activeSubBloque ? (
         <RichEditor
+          allSections={allSections}
           exportFileName={activeSubBloque.nombre}
           formatCommandRef={formatCommandRef}
           placeholder={`escribiendo en "${activeSubBloque.nombre}"...`}
@@ -453,6 +467,7 @@ export function Editor({
         />
       ) : (
         <RichEditor
+          allSections={allSections}
           exportFileName={localTitulo || ensayo.titulo}
           extraToolbarAction={
             <AddLayoutBoxButton
