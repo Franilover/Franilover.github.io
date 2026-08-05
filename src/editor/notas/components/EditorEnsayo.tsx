@@ -17,6 +17,8 @@ import {
 import { parseLayoutBoxes, type LayoutBox } from "@/editor/layout-boxes/types";
 import { RichEditor, type RichEditorFormatCommand } from "@/editor/lexical";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
+import { SubBloqueSelector } from "@/editor/sub-bloques/SubBloqueSelector";
+import { makeSubBloque, parseSubBloques, type SubBloque } from "@/editor/sub-bloques/types";
 import { MotionDiv } from "@/ui/Motion";
 
 import { CitePopup } from "./citePopup";
@@ -126,6 +128,89 @@ export function Editor({
     };
   }, []);
 
+  // ── Sub-bloques ("pestañas" de contenido dentro del mismo ensayo) ────────
+  // Documentos de texto independientes del `contenido` principal — cada uno
+  // editado por el MISMO RichEditor, alternando qué `value`/`onChange` recibe
+  // según cuál esté activo (ver SubBloqueSelector + markdownBlock más abajo).
+  // Se guardan en su propio campo (`sub_bloques`, JSON), mismo mecanismo de
+  // autosave con debounce que ya usa `layout_boxes`.
+  const [subBloques, setSubBloques] = useState<SubBloque[]>(() =>
+    parseSubBloques(ensayo.sub_bloques),
+  );
+  const [activeBloqueId, setActiveBloqueId] = useState<string | null>(null);
+  const subBloqueSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  const scheduleSubBloquesSave = useCallback(
+    (bloques: SubBloque[]) => {
+      if (subBloqueSaveTimerRef.current)
+        clearTimeout(subBloqueSaveTimerRef.current);
+      subBloqueSaveTimerRef.current = setTimeout(() => {
+        onUpdateField(ensayo.id, "sub_bloques", bloques);
+      }, 600);
+    },
+    [ensayo.id, onUpdateField],
+  );
+
+  const handleCreateSubBloque = useCallback(
+    (nombre?: string) => {
+      setSubBloques((prev) => {
+        const nuevo = makeSubBloque(prev, nombre);
+        const next = [...prev, nuevo];
+        scheduleSubBloquesSave(next);
+        setActiveBloqueId(nuevo.id);
+        return next;
+      });
+    },
+    [scheduleSubBloquesSave],
+  );
+
+  const handleRenameSubBloque = useCallback(
+    (id: string, nombre: string) => {
+      setSubBloques((prev) => {
+        const next = prev.map((b) => (b.id === id ? { ...b, nombre } : b));
+        scheduleSubBloquesSave(next);
+        return next;
+      });
+    },
+    [scheduleSubBloquesSave],
+  );
+
+  const handleDeleteSubBloque = useCallback(
+    (id: string) => {
+      setSubBloques((prev) => {
+        const next = prev.filter((b) => b.id !== id);
+        scheduleSubBloquesSave(next);
+        return next;
+      });
+      setActiveBloqueId((prev) => (prev === id ? null : prev));
+    },
+    [scheduleSubBloquesSave],
+  );
+
+  const handleSubBloqueContenidoChange = useCallback(
+    (id: string, value: string) => {
+      setSubBloques((prev) => {
+        const next = prev.map((b) =>
+          b.id === id ? { ...b, contenido: value } : b,
+        );
+        scheduleSubBloquesSave(next);
+        return next;
+      });
+    },
+    [scheduleSubBloquesSave],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (subBloqueSaveTimerRef.current)
+        clearTimeout(subBloqueSaveTimerRef.current);
+    };
+  }, []);
+
+  const activeSubBloque = subBloques.find((b) => b.id === activeBloqueId) || null;
+
   const [newTagInput, setNewTagInput] = useState("");
   const [_addingTag, setAddingTag] = useState(false);
   const _newTagRef = React.useRef<HTMLInputElement>(null);
@@ -187,6 +272,11 @@ export function Editor({
     // Cambiar de ensayo: recargar las cajas de texto flotantes del nuevo ensayo.
     if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
     setLayoutBoxes(parseLayoutBoxes(ensayo.layout_boxes));
+    // Cambiar de ensayo: recargar sus sub-bloques y volver al documento principal
+    // (el bloque activo era del ensayo anterior, ya no aplica acá).
+    if (subBloqueSaveTimerRef.current) clearTimeout(subBloqueSaveTimerRef.current);
+    setSubBloques(parseSubBloques(ensayo.sub_bloques));
+    setActiveBloqueId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ensayo.id]);
 
@@ -328,6 +418,10 @@ export function Editor({
   );
 
   // ── Bloque del editor markdown reutilizable ───────────────────────────────
+  // Cuando hay un sub-bloque activo, el RichEditor edita SU contenido (no
+  // `localContenido`) — mismo componente, distinto storage. Citas (@) y
+  // wikilinks siguen operando sobre el documento principal únicamente: no
+  // tiene sentido citar/enlazar desde dentro de, por ejemplo, una receta.
   const markdownBlock = (
     <div
       className="flex-1 overflow-y-auto relative pb-8"
@@ -336,22 +430,46 @@ export function Editor({
         paddingRight: isLibro ? 20 : 32,
       }}
     >
-      <RichEditor
-        exportFileName={localTitulo || ensayo.titulo}
-        extraToolbarAction={
-          <AddLayoutBoxButton
-            onClick={() => layoutCanvasRef.current?.addBox()}
-          />
-        }
-        formatCommandRef={formatCommandRef}
-        placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"
-        value={localContenido}
-        wikiEntities={wikiEntities}
-        onChange={handleContenidoChange}
-        onWikilinkNavigate={onNavigateToPage}
-      />
+      <div className="flex items-center gap-2 pt-2 pb-1">
+        <SubBloqueSelector
+          activeId={activeBloqueId}
+          bloques={subBloques}
+          onCreate={handleCreateSubBloque}
+          onDelete={handleDeleteSubBloque}
+          onRename={handleRenameSubBloque}
+          onSelect={setActiveBloqueId}
+        />
+      </div>
+
+      {activeSubBloque ? (
+        <RichEditor
+          exportFileName={activeSubBloque.nombre}
+          formatCommandRef={formatCommandRef}
+          placeholder={`escribiendo en "${activeSubBloque.nombre}"...`}
+          value={activeSubBloque.contenido}
+          onChange={(v) =>
+            handleSubBloqueContenidoChange(activeSubBloque.id, v)
+          }
+        />
+      ) : (
+        <RichEditor
+          exportFileName={localTitulo || ensayo.titulo}
+          extraToolbarAction={
+            <AddLayoutBoxButton
+              onClick={() => layoutCanvasRef.current?.addBox()}
+            />
+          }
+          formatCommandRef={formatCommandRef}
+          placeholder="empieza a escribir... (usa @ para citar · [[ para enlazar notas)"
+          value={localContenido}
+          wikiEntities={wikiEntities}
+          onChange={handleContenidoChange}
+          onWikilinkNavigate={onNavigateToPage}
+        />
+      )}
+
       <AnimatePresence>
-        {citePopup && sources.length > 0 && (
+        {!activeSubBloque && citePopup && sources.length > 0 && (
           <div
             style={{
               position: "fixed",
@@ -373,14 +491,16 @@ export function Editor({
       </AnimatePresence>
 
       {/* ── Capa de cajas de texto flotantes ──────────────────────────────
-          Siempre visible, superpuesta al documento de arriba. El fondo
-          sigue siempre editable — la capa no bloquea clicks en el área
-          vacía, solo las cajas mismas capturan sus propios eventos. */}
-      <LayoutCanvas
-        ref={layoutCanvasRef}
-        boxes={layoutBoxes}
-        onBoxesChange={handleLayoutBoxesChange}
-      />
+          Siempre visible, superpuesta al documento de arriba, solo cuando
+          se está editando el documento principal (las cajas pertenecen a
+          `contenido`, no a los sub-bloques — ver layout-boxes/types.ts). */}
+      {!activeSubBloque && (
+        <LayoutCanvas
+          ref={layoutCanvasRef}
+          boxes={layoutBoxes}
+          onBoxesChange={handleLayoutBoxesChange}
+        />
+      )}
     </div>
   );
 
