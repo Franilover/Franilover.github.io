@@ -276,14 +276,36 @@ const RICH_EDITOR_NODES = [
 function InitialContentPlugin({
   initialRaw,
   skipNextChangeRef,
+  lastEmittedRawRef,
 }: {
   initialRaw: string;
   skipNextChangeRef: React.MutableRefObject<boolean>;
+  /**
+   * Último raw que ESTE editor emitió vía onChange (ver handleChange más
+   * abajo). Si initialRaw coincide con esto, sabemos sin serializar nada
+   * que es el eco de vuelta del propio editor (el padre hizo
+   * setState(raw) con el mismo raw que le acabamos de mandar) — no hace
+   * falta comparar contra el árbol.
+   *
+   * Antes de esto, CADA tecla escrita disparaba una serialización
+   * completa del árbol acá (editor.read(() => serializeRootToRaw()))
+   * solo para descubrir que no había cambiado nada — además de la
+   * serialización que ya hacía handleChange para guardar. En documentos
+   * grandes (Historia completa, Documento del libro: miles de líneas)
+   * eso duplicaba el costo de serializar por cada letra tipeada y era
+   * la causa principal de la lentitud al escribir/cargar esas vistas.
+   */
+  lastEmittedRawRef: React.MutableRefObject<string | null>;
 }) {
   const [editor] = useLexicalComposerContext();
   const isFirstRun = useRef(true);
 
   useEffect(() => {
+    // Eco del propio editor: no re-serializamos, sabemos que coincide.
+    if (!isFirstRun.current && lastEmittedRawRef.current === initialRaw) {
+      return;
+    }
+
     // En vez de rastrear "quién emitió este valor" con una ref que puede
     // desincronizarse entre cambios de capítulo (causaba que el editor
     // quedara vacío al seleccionar un capítulo con contenido real),
@@ -315,7 +337,7 @@ function InitialContentPlugin({
     editor.update(() => {
       rawTextToLexicalTree(initialRaw);
     });
-  }, [editor, initialRaw, skipNextChangeRef]);
+  }, [editor, initialRaw, skipNextChangeRef, lastEmittedRawRef]);
 
   return null;
 }
@@ -1387,6 +1409,11 @@ export function RichEditor({
   );
 
   const skipNextChangeRef = useRef(false);
+  // Ver InitialContentPlugin — guarda el último raw que este editor emitió
+  // para que, cuando el padre nos lo devuelva vía prop `value`, sepamos que
+  // es nuestro propio eco sin tener que re-serializar el árbol para
+  // comprobarlo.
+  const lastEmittedRawRef = useRef<string | null>(null);
 
   const handleChange = useCallback(
     (_state: EditorState, editor: LexicalEditor) => {
@@ -1400,6 +1427,7 @@ export function RichEditor({
       }
       editor.read(() => {
         const raw = serializeRootToRaw();
+        lastEmittedRawRef.current = raw;
         onChange(raw);
       });
     },
@@ -1619,6 +1647,7 @@ export function RichEditor({
               {autoFocus && <AutoFocusPlugin />}
               <InitialContentPlugin
                 initialRaw={value}
+                lastEmittedRawRef={lastEmittedRawRef}
                 skipNextChangeRef={skipNextChangeRef}
               />
               <InsertSnippetPlugin
