@@ -11,11 +11,11 @@
  *   - "tiles": EditorMapa — gestión de los tiles del mapa global (crear,
  *     borrar, poner imagen, mover reinos entre celdas).
  *   - "reino": el mismo componente que usa la vista pública
- *     (MapaInteractivo), pero con allowEdit=true — habilita ahí mismo el
- *     panel de edición de nombre/descripción/coordenadas de un reino o
- *     ciudad, exactamente igual que antes se hacía "prestado" desde la
- *     ruta pública. Antes esto navegaba a /garlia/mapa y activaba edición
- *     ahí vía evento; ahora se renderiza directo acá.
+ *     (MapaInteractivo), pero con allowEdit=true e initialEditReinoId
+ *     apuntando al reino clickeado — arranca directo en editMode con el
+ *     panel de nombre/descripción/coordenadas abierto, en vez de requerir
+ *     un click extra en "Editar Mapa". Antes esto navegaba a /garlia/mapa
+ *     y activaba edición ahí vía evento; ahora se renderiza directo acá.
  */
 
 import { useState } from "react";
@@ -45,7 +45,7 @@ export function MapaSection() {
         >
           <ArrowLeft size={14} /> Tiles
         </button>
-        <MapaInteractivo allowEdit />
+        <MapaInteractivo allowEdit initialEditReinoId={reinoAEditar} />
       </div>
     );
   }

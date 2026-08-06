@@ -2272,6 +2272,7 @@ function CanvasMap({
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MapaInteractivo({
   allowEdit = false,
+  initialEditReinoId = null,
 }: {
   /**
    * Habilita la UI y lógica de edición (botón "Editar Mapa", drag de
@@ -2281,6 +2282,14 @@ export default function MapaInteractivo({
    * allowEdit=true.
    */
   allowEdit?: boolean;
+  /**
+   * Si se pasa (junto con allowEdit), el componente arranca directo con
+   * ese reino seleccionado, el panel abierto y editMode activo — en vez
+   * de arrancar en modo lectura y requerir un click extra en "Editar
+   * Mapa". Lo usa MapaSection al entrar a editar un reino puntual desde
+   * EditorMapa.
+   */
+  initialEditReinoId?: string | null;
 }) {
   const isAdminAccount = useIsAdmin();
   // Aun siendo admin, sin allowEdit no hay edición: esto es lo que saca
@@ -2586,13 +2595,10 @@ export default function MapaInteractivo({
 
   // Ref para detectar si el usuario cambió de reino antes de que lleguen los datos
 
-  const handleReinoClick = async (reino: any) => {
-    if (editMode) {
-      setReinoSeleccionado(reino);
-      setPanelOpen(true);
-      return;
-    }
-
+  // Carga datos del reino (ciudades, personajes, libros, capítulos) y entra
+  // a su vista de detalle. Compartida por el click normal (navegación) y
+  // por el arranque directo en modo edición (initialEditReinoId más abajo).
+  const abrirVistaDeReino = async (reino: any) => {
     // Marcar qué reino estamos cargando — cualquier respuesta async va a chequear esto
     currentReinoIdRef.current = reino.id;
 
@@ -2727,6 +2733,15 @@ export default function MapaInteractivo({
     if (currentReinoIdRef.current === reino.id) setLoadingLibros(false);
   };
 
+  const handleReinoClick = async (reino: any) => {
+    if (editMode) {
+      setReinoSeleccionado(reino);
+      setPanelOpen(true);
+      return;
+    }
+    await abrirVistaDeReino(reino);
+  };
+
   // Abrir un reino o ciudad ya desbloqueados cuando lo pide el
   // GlobalCommandPalette (evento "mapa-open-entity" o buzón en
   // sessionStorage si la navegación llegó recién).
@@ -2842,6 +2857,27 @@ export default function MapaInteractivo({
     return () => window.removeEventListener("mapa-open-entity", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reinos, isAdmin]);
+
+  // ── initialEditReinoId: entrar directo en modo edición con un reino ──────
+  // puntual ya seleccionado (MapaSection → EditorMapa → "editar este
+  // reino"). Sin esto, el componente arranca en modo lectura y el primer
+  // click sobre el reino navega a su vista normal en vez de abrir el panel
+  // editable — hacen falta dos clicks. Usamos abrirVistaDeReino (la misma
+  // carga de datos que el click normal) para entrar directo a la vista de
+  // detalle del reino (ReinoTileCanvas, con sus ciudades editables) en vez
+  // de quedarnos en el mapa global — si no, se ve el mapa/visor global de
+  // solo lectura con el panel encima, no el editor de tiles del reino.
+  const initialEditAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialEditAppliedRef.current) return;
+    if (!allowEdit || !initialEditReinoId) return;
+    if (!isAdmin) return; // isAdmin se resuelve async; esperamos a que esté confirmado
+    const reino = reinos.find((r) => r.id === initialEditReinoId);
+    if (!reino) return; // esperamos a que "reinos" cargue
+    initialEditAppliedRef.current = true;
+    setEditMode(true);
+    void abrirVistaDeReino(reino);
+  }, [allowEdit, initialEditReinoId, isAdmin, reinos]);
 
   const handlePersonajeClick = async (p: any) => {
     setCancionesPersonaje([]);
