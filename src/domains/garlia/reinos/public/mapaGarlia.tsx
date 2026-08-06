@@ -4,7 +4,6 @@ import {
   X,
   ArrowLeft,
   Save,
-  Move,
   CheckCircle2,
   AlertCircle,
   UserX,
@@ -414,75 +413,7 @@ function PanelContenido({
             }}
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label
-            className="text-micro font-bold uppercase tracking-widest ml-1 flex items-center gap-1"
-            style={{
-              color: "color-mix(in srgb, var(--foreground) 60%, transparent)",
-            }}
-          >
-            <Move size={9} /> Coordenadas
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              [
-                "X",
-                puntoSeleccionado
-                  ? puntoSeleccionado.coord_x
-                  : reinoSeleccionado.coord_x,
-              ],
-              [
-                "Y",
-                puntoSeleccionado
-                  ? puntoSeleccionado.coord_y
-                  : reinoSeleccionado.coord_y,
-              ],
-            ].map(([label, val]) => (
-              <div
-                key={label}
-                className="p-3 text-center border"
-                style={{
-                  background:
-                    "color-mix(in srgb, var(--bg-main) 70%, transparent)",
-                  borderColor:
-                    "color-mix(in srgb, var(--primary) 20%, transparent)",
-                }}
-              >
-                <span
-                  className="block text-micro font-bold uppercase"
-                  style={{
-                    color:
-                      "color-mix(in srgb, var(--foreground) 40%, transparent)",
-                  }}
-                >
-                  {label}
-                </span>
-                <span
-                  className="text-sm font-black"
-                  style={{ color: "var(--accent)" }}
-                >
-                  {val}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        {!puntoSeleccionado && (
-          <div
-            className="flex items-center gap-2 px-3 py-2.5 border text-micro font-bold uppercase tracking-wide"
-            style={{
-              borderColor:
-                "color-mix(in srgb, var(--primary) 15%, transparent)",
-              background: "color-mix(in srgb, var(--primary) 6%, transparent)",
-              color: "color-mix(in srgb, var(--foreground) 55%, transparent)",
-            }}
-          >
-            <Move className="shrink-0" size={11} />
-            Click en un espacio vacío del mapa para crear un tile, o doble-click
-            en un tile para elegir su imagen.
-          </div>
-        )}
         <button
           className="btn-brand w-full justify-center text-micro uppercase py-4 mt-auto disabled:opacity-50"
           disabled={isSaving}
@@ -3347,40 +3278,6 @@ export default function MapaInteractivo({
             )}
           </div>
         )}
-
-        <AnimatePresence>
-          {editMode && (reinoSeleccionado || puntoSeleccionado) && (
-            <MotionDiv
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute left-1/2 -translate-x-1/2 z-50 text-micro font-semibold uppercase px-4 py-2 shadow-md flex items-center gap-2 bottom-[calc(56px+1rem)] md:bottom-16"
-              exit={{ opacity: 0, y: 10 }}
-              initial={{ opacity: 0, y: 10 }}
-              style={{
-                background:
-                  "color-mix(in srgb, var(--bg-menu) 92%, transparent)",
-                color: "var(--accent)",
-                border:
-                  "1px solid color-mix(in srgb, var(--primary) 30%, transparent)",
-                borderRadius: "2px",
-                letterSpacing: "0.1em",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-              }}
-            >
-              <Move size={12} /> Clickeá para mover el marcador
-              {modifiedDetalles.size > 1 && (
-                <span
-                  className="px-1.5 py-0.5 text-micro"
-                  style={{
-                    background:
-                      "color-mix(in srgb, var(--bg-main) 20%, transparent)",
-                  }}
-                >
-                  {modifiedDetalles.size} pendientes
-                </span>
-              )}
-            </MotionDiv>
-          )}
-        </AnimatePresence>
 
         <AnimatePresence>
           {vistaActual === "reino" && (
