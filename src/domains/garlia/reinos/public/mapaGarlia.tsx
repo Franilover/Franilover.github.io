@@ -2273,6 +2273,7 @@ function CanvasMap({
 export default function MapaInteractivo({
   allowEdit = false,
   initialEditReinoId = null,
+  onExitReino,
 }: {
   /**
    * Habilita la UI y lógica de edición (botón "Editar Mapa", drag de
@@ -2290,6 +2291,13 @@ export default function MapaInteractivo({
    * EditorMapa.
    */
   initialEditReinoId?: string | null;
+  /**
+   * Se llama cuando el usuario sale de la vista de reino con el botón
+   * "Volver" nativo (volverAlGlobal), justo después de limpiar el estado
+   * interno. MapaSection lo usa para volver a su propia vista de tiles,
+   * en vez de mostrar un segundo botón de volver propio.
+   */
+  onExitReino?: () => void;
 }) {
   const isAdminAccount = useIsAdmin();
   // Aun siendo admin, sin allowEdit no hay edición: esto es lo que saca
@@ -3046,6 +3054,7 @@ export default function MapaInteractivo({
     setModifiedDetalles(new Set());
     setEditMode(false);
     setPanelOpen(false);
+    onExitReino?.();
   };
 
   // Visible markers: admins ven todos los reinos; usuarios solo los que desbloquearon
