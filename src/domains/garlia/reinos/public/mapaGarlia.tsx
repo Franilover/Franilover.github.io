@@ -3693,7 +3693,7 @@ export default function MapaInteractivo({
                   ? [...visibleMarkers, ...hiddenMarkers]
                   : visibleMarkers
               }
-              selectedMarkerId={reinoParaMover ?? reinoSeleccionado?.id ?? null}
+              selectedMarkerId={editMode ? (reinoParaMover ?? null) : null}
               tiles={mapTiles}
               onEyedropperPick={handleFondoColorChange}
               onMapClick={handleMapClick}
@@ -3741,7 +3741,7 @@ export default function MapaInteractivo({
             hiddenMarkers={editMode ? [] : hiddenMarkers}
             isFirstOpen={isFirstOpen}
             reinoId={reinoSeleccionado.id}
-            selectedMarkerId={puntoSeleccionado?.id ?? null}
+            selectedMarkerId={editMode ? (puntoSeleccionado?.id ?? null) : null}
             onDetallesChange={(nuevos) => {
               setDetallesReino(nuevos);
               // Marcamos como modificados los que cambiaron de posición, para

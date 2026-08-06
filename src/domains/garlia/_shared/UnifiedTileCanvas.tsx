@@ -914,7 +914,10 @@ export function UnifiedTileCanvas<
       }
 
       // ── Si hay pin seleccionado esperando ser movido → depositarlo ──────────
-      if (selectedMarkerId) {
+      // (solo en editMode: fuera de edición, selectedMarkerId puede venir
+      // seteado por el panel de detalle abierto, y no debe interpretarse
+      // como "listo para moverse".)
+      if (editMode && selectedMarkerId) {
         const info = canvasToTileInfo(clientX, clientY);
         if (info) {
           onMarkerMove(selectedMarkerId, {
