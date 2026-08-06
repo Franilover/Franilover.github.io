@@ -17,6 +17,7 @@ import React from "react";
 
 export type SnippetKind =
   | "drop"
+  | "dialogo"
   | "img"
   | "float"
   | "sound"

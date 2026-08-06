@@ -16,6 +16,7 @@ import {
   Quote,
   AlignRight,
   Pilcrow,
+  MessageCircle,
 } from "lucide-react";
 
 import { fetchEntidades } from "@/lib/api/queries/entidades";
@@ -40,6 +41,7 @@ import { parseSnippetRaw } from "@/domains/garlia/libros/capitulos/types";
 
 type SnippetType =
   | "drop"
+  | "dialogo"
   | "choice"
   | "use"
   | "condicion"
@@ -93,6 +95,13 @@ const CATS: {
     Icon: Swords,
     group: "narrativa",
     keywords: ["drop", "entidad", "personaje", "criatura", "item"],
+  },
+  {
+    id: "dialogo",
+    label: "Diálogo",
+    Icon: MessageCircle,
+    group: "narrativa",
+    keywords: ["dialogo", "diálogo", "habla", "personaje", "retrato", "conversacion"],
   },
   {
     id: "choice",
@@ -681,6 +690,219 @@ function FormDrop({
             </div>
           );
         })}
+      </div>
+    </>
+  );
+}
+
+// ── Form Diálogo ─────────────────────────────────────────────────────────────
+// Elige un Personaje real (búsqueda vía fetchEntidades, igual patrón que
+// FormDrop pero acotado a personajes) y el texto que dice. El raw final
+// solo guarda personaje_id + texto — nombre/retrato se resuelven SIEMPRE
+// contra la ficha real al leer (ver DialogoBlock en SegmentRenderers.tsx),
+// nunca se congelan acá.
+function FormDialogo({
+  initialRaw,
+  onInsert,
+  onBack,
+  query,
+}: {
+  initialRaw?: string;
+  onInsert: (s: string) => void;
+  onBack: () => void;
+  query?: string;
+}) {
+  const init = parseSnippetRaw(initialRaw);
+  const initialId = init?.kind === "dialogo" ? init.personajeId : undefined;
+  const [texto, setTexto] = useState<string>(
+    init?.kind === "dialogo" ? init.texto : "",
+  );
+
+  type Pers = { id: string; nombre: string; imagen_url?: string; subtipo?: string };
+
+  const [all, setAll] = useState<Pers[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState(query ?? "");
+  const [active, setActive] = useState(0);
+  const [selected, setSelected] = useState<Pers | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollActiveIntoView(listRef.current, active);
+  }, [active]);
+
+  useEffect(() => {
+    void fetchEntidades()
+      .then((d) => {
+        if (!d.ok) return;
+        const list: Pers[] = (d.data?.personajes ?? [])
+          .map((x: any) => ({
+            id: x.id,
+            nombre: x.nombre,
+            subtipo: x.ocupacion,
+            imagen_url: x.img_url || x.imagen_url,
+          }))
+          .sort((a: Pers, b: Pers) => a.nombre.localeCompare(b.nombre));
+        setAll(list);
+        if (initialId) {
+          const found = list.find((e) => e.id === initialId);
+          if (found) setSelected(found);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [initialId]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    setActive(0);
+  }, [q]);
+
+  const filtered = useMemo(
+    () => (q ? all.filter((e) => e.nombre.toLowerCase().includes(q.toLowerCase())) : all),
+    [all, q],
+  );
+
+  if (selected) {
+    return (
+      <>
+        <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} />
+        <div
+          style={{
+            padding: "10px 12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <div style={S.selectedPill()}>
+            {selected.imagen_url ? (
+              <Image
+                alt=""
+                src={selected.imagen_url}
+                style={{
+                  width: 36,
+                  height: 36,
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <span style={S.iconBox()}>
+                <User size={13} />
+              </span>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={S.label}>{selected.nombre}</div>
+              <div style={S.sublabel}>Personaje</div>
+            </div>
+            <button
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "color-mix(in srgb,var(--foreground) 35%,transparent)",
+                fontSize: 14,
+              }}
+              onClick={() => setSelected(null)}
+            >
+              ✕
+            </button>
+          </div>
+          <div>
+            <div style={S.fieldLabel}>Qué dice</div>
+            <textarea
+              ref={textRef}
+              placeholder="ej: No deberíamos estar aquí…"
+              rows={3}
+              style={{ ...S.fieldInput, resize: "vertical" as const }}
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+            />
+          </div>
+          <button
+            disabled={!texto.trim()}
+            style={S.insertBtn("#a09af0")}
+            onClick={() =>
+              onInsert(`[[dialogo|${selected.id}|${texto.trim()}]]`)
+            }
+          >
+            <MessageCircle size={12} /> Insertar Diálogo
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} />
+      <div style={{ padding: "10px 12px 6px" }}>
+        <input
+          ref={inputRef}
+          placeholder="Buscar personaje…"
+          style={S.fieldInput}
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setActive(0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActive((v) => Math.min(v + 1, filtered.length - 1));
+            }
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActive((v) => Math.max(v - 1, 0));
+            }
+            if (e.key === "Enter" && filtered[active]) {
+              setSelected(filtered[active]);
+            }
+          }}
+        />
+      </div>
+      <div ref={listRef} style={S.list}>
+        {loading && <div style={S.empty}>Cargando…</div>}
+        {!loading && filtered.length === 0 && (
+          <div style={S.empty}>Sin resultados</div>
+        )}
+        {filtered.map((e, i) => (
+          <div
+            key={e.id}
+            data-idx={i}
+            style={S.row(i === active || e.id === initialId)}
+            onClick={() => setSelected(e)}
+            onMouseEnter={() => setActive(i)}
+          >
+            {e.imagen_url ? (
+              <Image
+                alt=""
+                src={e.imagen_url}
+                style={{
+                  width: 28,
+                  height: 28,
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <span style={S.iconBox()}>
+                <User size={13} />
+              </span>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={S.label}>{e.nombre}</div>
+              {e.subtipo && <div style={S.sublabel}>{e.subtipo}</div>}
+            </div>
+            {e.id === initialId && <span style={S.kbd}>actual</span>}
+          </div>
+        ))}
       </div>
     </>
   );
@@ -2284,6 +2506,14 @@ export function SnippetCommandPalette({
 
       {selectedType === "drop" && (
         <FormDrop
+          initialRaw={initialRaw}
+          query={childQuery}
+          onBack={handleBack}
+          onInsert={handleInsert}
+        />
+      )}
+      {selectedType === "dialogo" && (
+        <FormDialogo
           initialRaw={initialRaw}
           query={childQuery}
           onBack={handleBack}

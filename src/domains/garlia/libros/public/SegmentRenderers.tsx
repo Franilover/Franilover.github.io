@@ -38,8 +38,10 @@ import { useConfirm } from "@/ui/ConfirmModal";
 import { MotionDiv, MotionSpan, MotionButton } from "@/ui/Motion";
 import { ToastContainer } from "@/ui/ToastContainer";
 import { useToast } from "@/hooks/ui/useToast";
+import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { cn } from "@/lib/utils/index";
+import { renderInlineMarkdownSafe } from "@/ui/Markdown/inlineMarkdown";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CitaVisual
@@ -695,6 +697,103 @@ export function DropWord({
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DialogoBlock — [[dialogo|personaje_id|texto]]
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque de diálogo con nombre + retrato del personaje. A propósito NO
+// guarda nombre/retrato en el raw — solo el personaje_id — y los resuelve
+// acá en cada lectura contra la ficha REAL (Dexie primero, offline-first,
+// igual patrón que usePersonajes en hooks/useEditorShared.tsx; Supabase
+// como refresh en segundo plano). Así, si el usuario cambia el nombre o
+// sube un retrato nuevo al personaje, TODOS los diálogos ya escritos en
+// cualquier capítulo se actualizan solos — nunca quedan desincronizados.
+interface DialogoPersonaje {
+  nombre: string;
+  img_url?: string;
+}
+
+const dialogoPersonajeCache = new Map<string, DialogoPersonaje>();
+
+export function DialogoBlock({
+  personajeId,
+  texto,
+}: {
+  personajeId: string;
+  texto: string;
+}) {
+  const [personaje, setPersonaje] = useState<DialogoPersonaje | null>(
+    dialogoPersonajeCache.get(personajeId) ?? null,
+  );
+
+  useEffect(() => {
+    let cancelado = false;
+    if (!personajeId) return;
+
+    void (async () => {
+      // 1) Dexie (cache local, instantáneo si ya se sincronizó alguna vez)
+      try {
+        const local = await db.personajes.get(personajeId);
+        if (local && !cancelado) {
+          const p = { nombre: local.nombre, img_url: local.img_url };
+          dialogoPersonajeCache.set(personajeId, p);
+          setPersonaje(p);
+        }
+      } catch {}
+
+      if (!navigator.onLine) return;
+
+      // 2) Supabase — refresco en segundo plano por si Dexie está viejo
+      try {
+        const { data } = await supabase
+          .from("personajes")
+          .select("nombre, img_url")
+          .eq("id", personajeId)
+          .maybeSingle();
+        if (data && !cancelado) {
+          const p = { nombre: data.nombre, img_url: data.img_url ?? undefined };
+          dialogoPersonajeCache.set(personajeId, p);
+          setPersonaje(p);
+        }
+      } catch {}
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [personajeId]);
+
+  const nombre = personaje?.nombre?.trim() || "???";
+
+  return (
+    <div className="flex items-start gap-3 my-4">
+      <div className="shrink-0 w-11 h-11 rounded-full overflow-hidden bg-surface-1 border border-primary/15 flex items-center justify-center">
+        {personaje?.img_url ? (
+          <Image
+            alt={nombre}
+            className="w-full h-full object-cover"
+            height={44}
+            src={personaje.img_url}
+            width={44}
+          />
+        ) : (
+          <User className="text-primary/40" size={18} />
+        )}
+      </div>
+      <div className="min-w-0 flex-1 pt-0.5">
+        <div className="text-xs font-semibold text-primary/70 mb-0.5">
+          {nombre}
+        </div>
+        <div
+          className="text-[0.95em] leading-relaxed"
+          dangerouslySetInnerHTML={{
+            __html: renderInlineMarkdownSafe(texto),
+          }}
+        />
+      </div>
+    </div>
   );
 }
 

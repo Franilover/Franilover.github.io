@@ -81,6 +81,7 @@ import {
 } from "./plugins/MarkdownCommandPalette";
 import { ChoiceNode } from "./nodes/ChoiceNode";
 import { DropNode } from "./nodes/DropNode";
+import { DialogoNode } from "./nodes/DialogoNode";
 import { FlagNode } from "./nodes/FlagNode";
 import { CondicionNode } from "./nodes/CondicionNode";
 import { ImgNode } from "./nodes/ImgNode";
@@ -263,6 +264,7 @@ const RICH_EDITOR_NODES = [
   HorizontalRuleNode,
   LinkNode,
   DropNode,
+  DialogoNode,
   SoundNode,
   ImgNode,
   ChoiceNode,

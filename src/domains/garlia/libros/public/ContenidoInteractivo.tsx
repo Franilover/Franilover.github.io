@@ -19,6 +19,7 @@ import {
   ChoiceButton,
   UseWord,
   UseWordPortal,
+  DialogoBlock,
 } from "./SegmentRenderers";
 import { renderInlineMarkdownSafe, splitMarkdownBlocks } from "@/ui/Markdown/inlineMarkdown";
 
@@ -306,6 +307,14 @@ export function RenderSegmentos({
           );
         if (seg.type === "sound")
           return <SoundInline key={i} url={seg.url} volume={seg.volume} />;
+        if (seg.type === "dialogo")
+          return (
+            <DialogoBlock
+              key={i}
+              personajeId={seg.personajeId}
+              texto={seg.texto}
+            />
+          );
         if (seg.type === "drop")
           return (
             <DropWord

@@ -59,6 +59,12 @@ import {
   dropRawToPayload,
 } from "./nodes/DropNode";
 import {
+  $createDialogoNode,
+  $isDialogoNode,
+  dialogoPayloadToRaw,
+  dialogoRawToPayload,
+} from "./nodes/DialogoNode";
+import {
   $createFlagNode,
   $isFlagNode,
   flagPayloadToRaw,
@@ -124,14 +130,14 @@ const GATE_RE = /\[\[gate\|[^\|]+\|[\s\S]+?\]\]/g;
 // single-line y cae en SNIPPET_RE junto a los demás snippets simples.
 const FLAG_IF_RE = /\[\[flag\|if\|[^\|]+\|[^\|]*\|[\s\S]+?\]\]/g;
 const SNIPPET_RE =
-  /\[\[(?:drop|img|float|sound|choice|use|section|cita|flag\|set)[^\]]*\]\]/g;
+  /\[\[(?:drop|dialogo|img|float|sound|choice|use|section|cita|flag\|set)[^\]]*\]\]/g;
 // Wikilinks: [[Nombre]] o [[Nombre|Alias]] SIN "kind|" — debe evaluarse
 // por separado porque el resto de snippets usa "[[palabra|...]]" con un
 // kind reservado como primer segmento. Excluye explícitamente los kind
 // conocidos para no capturar snippets malformados como si fueran
 // wikilinks; el segundo segmento (alias), si existe, es libre.
 const WIKILINK_RE =
-  /\[\[(?!(?:drop|img|float|sound|choice|use|section|cita|condicion|gate|flag)\|)([^\[\]|]+)(?:\|([^\[\]|]*))?\]\]/g;
+  /\[\[(?!(?:drop|dialogo|img|float|sound|choice|use|section|cita|condicion|gate|flag)\|)([^\[\]|]+)(?:\|([^\[\]|]*))?\]\]/g;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Convierte un raw [[kind|...]] string → LexicalNode
@@ -146,6 +152,10 @@ export function rawSnippetToNode(raw: string): LexicalNode | null {
     case "drop": {
       const p = dropRawToPayload(raw);
       return p ? $createDropNode(p) : null;
+    }
+    case "dialogo": {
+      const p = dialogoRawToPayload(raw);
+      return p ? $createDialogoNode(p) : null;
     }
     case "img": {
       const p = imgRawToPayload(raw);
@@ -528,6 +538,7 @@ export function serializeRootToRaw(): string {
 
   function walkNode(node: LexicalNode): string {
     if ($isDropNode(node)) return dropPayloadToRaw(node.getPayload());
+    if ($isDialogoNode(node)) return dialogoPayloadToRaw(node.getPayload());
     if ($isImgNode(node)) return imgPayloadToRaw(node.getPayload());
     if ($isSoundNode(node)) return soundPayloadToRaw(node.getPayload());
     if ($isChoiceNode(node)) return choicePayloadToRaw(node.getPayload());

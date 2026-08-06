@@ -53,6 +53,7 @@ export type Segment =
   | { type: "img"; url: string; caption?: string }
   | { type: "float"; word: string; url: string; caption?: string }
   | { type: "sound"; url: string; volume: number }
+  | { type: "dialogo"; personajeId: string; texto: string }
   | {
       type: "drop";
       word: string;
@@ -313,6 +314,16 @@ export function parseContenido(texto: string): Segment[] {
         url: parts[0],
         volume: parseFloat(parts[1] ?? "0.5"),
       });
+    else if (kind === "dialogo")
+      // parts[0] = personaje_id, resto = texto del diálogo. El texto se
+      // reúne con join("|") en vez de tomar solo parts[1] porque puede
+      // contener "|" real (diálogo con guiones, citas, etc.) — solo el
+      // primer "|" (id | texto) es estructural.
+      segs.push({
+        type: "dialogo",
+        personajeId: parts[0] ?? "",
+        texto: parts.slice(1).join("|"),
+      });
     else if (kind === "drop")
       segs.push({
         type: "drop",
@@ -365,6 +376,7 @@ export type ParsedSnippet =
   | { kind: "img"; url: string; alt: string; float: boolean }
   | { kind: "float"; url: string; alt: string; float: true }
   | { kind: "choice"; texto: string; target: string }
+  | { kind: "dialogo"; personajeId: string; texto: string }
   | {
       kind: "use";
       itemId: string;
@@ -405,6 +417,13 @@ export function parseSnippetRaw(raw: string | undefined): ParsedSnippet | null {
         label: parts[1] ?? "",
         entidadTipo: parts[2] ?? "",
         entidadId: parts[3] ?? "",
+      };
+    case "dialogo":
+      // [[dialogo|personaje_id|texto]] — texto puede contener "|" real.
+      return {
+        kind: "dialogo",
+        personajeId: parts[1] ?? "",
+        texto: parts.slice(2).join("|"),
       };
     case "img":
       return {
