@@ -405,6 +405,7 @@ export type ParsedSnippet =
   | { kind: "section"; id: string; label: string }
   | { kind: "sound"; src: string; label: string }
   | { kind: "epigrafe"; texto: string; atribucion: string }
+  | { kind: "nota"; texto: string }
   | { kind: "flag-set"; flagId: string; valor: string }
   | { kind: "unknown"; parts: string[] };
 
@@ -544,6 +545,15 @@ export function parseSnippetRaw(raw: string | undefined): ParsedSnippet | null {
         kind: "epigrafe",
         texto: parts[1] ?? "",
         atribucion: parts[2] ?? "",
+      };
+    case "nota":
+      // [[nota|Texto de la nota]] — el texto puede contener "|" libremente
+      // (ej. markdown, o simplemente prosa con guiones), así que el split
+      // naive por "|" no sirve acá — re-derivamos del raw completo, mismo
+      // criterio que "dialogo" arriba.
+      return {
+        kind: "nota",
+        texto: parts.slice(1).join("|"),
       };
     case "sound":
       return { kind: "sound", src: parts[1] ?? "", label: parts[2] ?? "" };

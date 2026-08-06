@@ -31,7 +31,7 @@ import {
   Feather,
 } from "lucide-react";
 import Image from "next/image";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext, createContext, useCallback, useMemo } from "react";
 
 import { BtnIcon } from "@/ui";
 import { useConfirm } from "@/ui/ConfirmModal";
@@ -914,5 +914,153 @@ export function UseWord({
     >
       <span style={{ borderBottom: "2px dotted currentColor" }}>{word}</span>
     </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notas al pie
+// ─────────────────────────────────────────────────────────────────────────────
+// Sintaxis inline: [[nota|Texto de la nota]] en cualquier párrafo del
+// capítulo. NotasProvider recolecta las notas en orden de aparición y les
+// asigna número correlativo (1, 2, 3…) consistente en todo el capítulo,
+// incluyendo texto revelado dentro de secciones condicionales. El marcador
+// es un <sup> clickeable; el listado real vive al final del capítulo
+// (NotasAlPie), no en el margen — mejor soporte mobile: no depende de tener
+// espacio lateral, y evita el problema de reflow de notas flotantes cuando
+// cambia el ancho de columna.
+
+interface NotaEntry {
+  id: string;
+  texto: string;
+}
+
+interface NotasContextValue {
+  registrar: (id: string, texto: string) => number;
+  irANota: (numero: number) => void;
+}
+
+const NotasContext = createContext<NotasContextValue | null>(null);
+
+/** Envuelve el capítulo entero. Mantiene el registro de notas en orden de
+ * aparición y expone `registrar` para que MarcadorNota asigne su número. */
+export function NotasProvider({ children }: { children: React.ReactNode }) {
+  const [notas, setNotas] = useState<NotaEntry[]>([]);
+  const idxRef = useRef(new Map<string, number>());
+
+  const registrar = useCallback((id: string, texto: string): number => {
+    const existente = idxRef.current.get(id);
+    if (existente !== undefined) return existente + 1;
+
+    // Nuevo — se agrega al final del registro (orden de renderizado, que
+    // en un documento top-to-bottom coincide con orden de aparición).
+    let numero = -1;
+    setNotas((prev) => {
+      const next = [...prev, { id, texto }];
+      numero = next.length;
+      idxRef.current.set(id, next.length - 1);
+      return next;
+    });
+    // idxRef se actualiza sync arriba pero numero puede no estar listo si
+    // React batchea — usamos el tamaño actual + 1 como valor de retorno
+    // inmediato, consistente porque cada id solo se registra una vez.
+    return idxRef.current.size;
+  }, []);
+
+  const irANota = useCallback((numero: number) => {
+    const el = document.getElementById(`nota-fin-${numero}`);
+    const container = document.getElementById("lector-scroll-container");
+    if (el && container) {
+      const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 80;
+      container.scrollTo({ top, behavior: "smooth" });
+      el.classList.add("nota-highlight");
+      setTimeout(() => el.classList.remove("nota-highlight"), 1600);
+    }
+  }, []);
+
+  const value = useMemo(() => ({ registrar, irANota }), [registrar, irANota]);
+
+  return (
+    <NotasContext.Provider value={value}>
+      {children}
+      <NotasAlPie notas={notas} />
+    </NotasContext.Provider>
+  );
+}
+
+/** Marcador superíndice inline. `id` debe ser estable para el mismo texto
+ * de nota (se usa el propio texto como id — dos notas con texto idéntico
+ * comparten número, que es el comportamiento esperado).
+ *
+ * Nota anidada no soportada a propósito: si el texto de una nota contiene
+ * a su vez [[nota|...]], NotasAlPie lo renderiza como texto literal (no
+ * se interpreta ni se registra) — renderInlineMarkdownSafe no reconoce esa
+ * sintaxis. Evita recursión y no tiene mucho sentido de todos modos que
+ * una nota al pie tenga su propia nota al pie. */
+export function MarcadorNota({ texto }: { texto: string }) {
+  const ctx = useContext(NotasContext);
+  const [numero, setNumero] = useState<number | null>(null);
+  const idRef = useRef(texto);
+
+  useEffect(() => {
+    if (!ctx) return;
+    setNumero(ctx.registrar(idRef.current, texto));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx]);
+
+  if (!ctx || numero === null) return null;
+
+  return (
+    <sup>
+      <button
+        aria-label={`Ver nota ${numero}`}
+        className="font-sans font-bold no-underline px-0.5 transition-colors"
+        style={{ color: "var(--accent, var(--primary))", fontSize: "0.72em" }}
+        onClick={(e) => {
+          e.preventDefault();
+          ctx.irANota(numero);
+        }}
+      >
+        {numero}
+      </button>
+    </sup>
+  );
+}
+
+/** Listado numerado al final del capítulo. Se renderiza automáticamente
+ * por NotasProvider — no hace falta montarlo a mano. */
+function NotasAlPie({ notas }: { notas: NotaEntry[] }) {
+  if (notas.length === 0) return null;
+
+  return (
+    <div
+      className="mt-14 pt-8"
+      style={{ borderTop: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)" }}
+    >
+      <span className="block mb-4 text-micro font-black uppercase tracking-widest text-primary/30">
+        Notas
+      </span>
+      <ol className="flex flex-col gap-2.5 list-none p-0 m-0">
+        {notas.map((nota, i) => (
+          <li
+            key={nota.id}
+            className="flex gap-2.5 items-baseline lector-texto text-primary-dark/70 transition-colors rounded"
+            id={`nota-fin-${i + 1}`}
+            style={{ fontSize: "0.9em", lineHeight: 1.6, scrollMarginTop: 80 }}
+          >
+            <span
+              className="font-sans font-bold shrink-0"
+              style={{ color: "var(--accent, var(--primary))", fontSize: "0.85em" }}
+            >
+              {i + 1}.
+            </span>
+            <span
+              dangerouslySetInnerHTML={{
+                __html: renderInlineMarkdownSafe(nota.texto),
+              }}
+            />
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

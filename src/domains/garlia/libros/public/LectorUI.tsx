@@ -126,6 +126,49 @@ export function FinCapituloSeparador({ cap, onVisible, ocultar = false }: {
 }
 
 /* ─────────────────────────────────────────────
+   Ornamento de apertura de capítulo
+   Contraparte de FinCapituloSeparador — no necesita IntersectionObserver
+   porque siempre está en la parte superior del capítulo, ya visible al
+   montar. Se anima una sola vez al aparecer (aparición del capítulo).
+   ───────────────────────────────────────────── */
+export function InicioCapituloSeparador() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="mb-8 flex items-center justify-center gap-4 w-full max-w-[140px] mx-auto" aria-hidden>
+      <motion.div
+        animate={visible ? { scaleX: 1 } : { scaleX: 0 }}
+        className="flex-1 h-px"
+        initial={{ scaleX: 0, originX: 1 }}
+        style={{ background: "linear-gradient(to left, transparent, color-mix(in srgb, var(--primary) 20%, transparent))" }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      />
+      <motion.span
+        animate={visible ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.7 }}
+        className="font-serif text-sm select-none"
+        initial={{ opacity: 0, scale: 0.7 }}
+        style={{ color: "color-mix(in srgb, var(--accent) 70%, transparent)" }}
+        transition={{ duration: 0.45, ease: "easeOut", delay: 0.15 }}
+      >
+        ❧
+      </motion.span>
+      <motion.div
+        animate={visible ? { scaleX: 1 } : { scaleX: 0 }}
+        className="flex-1 h-px"
+        initial={{ scaleX: 0, originX: 0 }}
+        style={{ background: "linear-gradient(to right, transparent, color-mix(in srgb, var(--primary) 20%, transparent))" }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      />
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    AjustesLectura — control de tamaño de fuente persistente
    ───────────────────────────────────────────────────────────────────────────
    Popover chico con A- / A+ / reset. El valor se guarda en localStorage vía
@@ -139,8 +182,10 @@ export function AjustesLectura({
   /** Versión compacta (solo ícono) para la topbar mobile. */
   compact?: boolean;
 }) {
-  const { fontScale, incrementarFuente, decrementarFuente, resetFuente, minScale, maxScale } =
-    useLectorAjustes();
+  const {
+    fontScale, incrementarFuente, decrementarFuente, resetFuente, minScale, maxScale,
+    texturaPapel, toggleTexturaPapel,
+  } = useLectorAjustes();
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -240,14 +285,43 @@ export function AjustesLectura({
             </div>
 
             <div
-              className="lector-article-inner mt-4 pt-3 text-primary/70 italic"
+              className="mt-4 pt-3 text-primary/70 italic"
               style={{
                 borderTop: "1px solid color-mix(in srgb, var(--primary) 8%, transparent)",
+                fontFamily: "var(--lector-font-family, ui-serif, Georgia, 'Times New Roman', serif)",
                 fontSize: `calc(var(--lector-font-scale, 1) * 0.95rem)`,
               }}
             >
               Así se ve el texto.
             </div>
+
+            <button
+              aria-pressed={texturaPapel}
+              className="flex items-center justify-between w-full mt-4 pt-3"
+              style={{ borderTop: "1px solid color-mix(in srgb, var(--primary) 8%, transparent)" }}
+              onClick={toggleTexturaPapel}
+            >
+              <span className="text-micro font-black uppercase tracking-widest text-primary/50">
+                Textura de papel
+              </span>
+              <span
+                className="relative inline-flex items-center rounded-full transition-colors"
+                style={{
+                  width: 32,
+                  height: 18,
+                  background: texturaPapel
+                    ? "var(--accent, var(--primary))"
+                    : "color-mix(in srgb, var(--primary) 15%, transparent)",
+                }}
+              >
+                <motion.span
+                  animate={{ x: texturaPapel ? 15 : 2 }}
+                  className="absolute rounded-full"
+                  style={{ width: 14, height: 14, background: "var(--bg-main)" }}
+                  transition={{ duration: 0.15 }}
+                />
+              </span>
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

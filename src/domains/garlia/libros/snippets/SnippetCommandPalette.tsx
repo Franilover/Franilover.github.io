@@ -17,6 +17,7 @@ import {
   AlignRight,
   Pilcrow,
   MessageCircle,
+  Superscript,
 } from "lucide-react";
 
 import { fetchEntidades } from "@/lib/api/queries/entidades";
@@ -50,6 +51,7 @@ type SnippetType =
   | "imagen"
   | "sound"
   | "epigrafe"
+  | "nota"
   // Los siguientes tres nunca abren selectedType (ver directAction en
   // CATS) — existen como id solo para que la key de React sea única.
   | "cita"
@@ -158,6 +160,13 @@ const CATS: {
     Icon: Quote,
     group: "estructura",
     keywords: ["epigrafe", "epígrafe", "cita literaria", "atribución"],
+  },
+  {
+    id: "nota",
+    label: "Nota al pie",
+    Icon: Superscript,
+    group: "estructura",
+    keywords: ["nota", "footnote", "aclaración", "aclaracion", "pie de página", "pie de pagina"],
   },
   {
     // "cita" bibliográfica ya existente ([[cita|Texto — Fuente]]), se
@@ -1094,6 +1103,70 @@ function FormEpigrafe({
           onClick={() => snippet && onInsert(snippet)}
         >
           <Quote size={12} /> Insertar Epígrafe
+        </button>
+      </div>
+    </>
+  );
+}
+
+// ── Form Nota al pie ─────────────────────────────────────────────────────────
+// Texto plano (con markdown inline propio, resuelto por el lector) que se
+// inserta donde está el cursor. El lector lo numera automáticamente en
+// orden de aparición y lo muestra como marcador superíndice + entrada al
+// final del capítulo. Ver [[nota|...]] en ContenidoInteractivo.tsx.
+
+function FormNota({
+  initialRaw,
+  onInsert,
+  onBack,
+}: {
+  initialRaw?: string;
+  onInsert: (s: string) => void;
+  onBack: () => void;
+}) {
+  const init = parseSnippetRaw(initialRaw);
+  const [texto, setTexto] = useState(
+    init?.kind === "nota" ? (init as any).texto : "",
+  );
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const snippet = texto.trim() ? `[[nota|${texto.trim()}]]` : "";
+
+  return (
+    <>
+      <FormHeader Icon={Superscript} label="Nota al pie" onBack={onBack} />
+      <div
+        style={{
+          padding: "10px 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        <div>
+          <div style={S.fieldLabel}>Texto de la nota</div>
+          <textarea
+            ref={inputRef}
+            placeholder="ej: El término original en garlio antiguo era distinto…"
+            rows={3}
+            style={{ ...S.fieldInput, resize: "vertical" }}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+          />
+        </div>
+        <span style={{ ...S.sublabel, fontSize: 10 }}>
+          Se inserta donde está el cursor. El lector la numera sola y la
+          muestra al final del capítulo.
+        </span>
+        <button
+          disabled={!texto.trim()}
+          style={S.insertBtn("#8b83e8")}
+          onClick={() => snippet && onInsert(snippet)}
+        >
+          <Superscript size={12} /> Insertar Nota
         </button>
       </div>
     </>
@@ -2537,6 +2610,13 @@ export function SnippetCommandPalette({
       )}
       {selectedType === "epigrafe" && (
         <FormEpigrafe
+          initialRaw={initialRaw}
+          onBack={handleBack}
+          onInsert={handleInsert}
+        />
+      )}
+      {selectedType === "nota" && (
+        <FormNota
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}

@@ -713,7 +713,7 @@ export default function Lector({
   }, []);
 
   const router = useRouter();
-  const { fontScale } = useLectorAjustes();
+  const { fontScale, texturaPapel } = useLectorAjustes();
 
   // ── Estado de navegación/datos: leído del store, no de useState local ──────
   // Selectores granulares — cada uno solo re-renderiza el componente cuando
@@ -1359,7 +1359,7 @@ export default function Lector({
 
       {/* ── Columna derecha: texto scrolleable ── */}
       <div
-        className="bg-bg-main text-primary-dark"
+        className={`bg-bg-main text-primary-dark${texturaPapel ? " lector-textura-papel" : ""}`}
         id="lector-scroll-container"
         style={{
           flex: 1,

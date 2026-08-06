@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from "react";
  */
 
 const STORAGE_KEY = "lector-font-scale-v1";
+const TEXTURA_STORAGE_KEY = "lector-textura-papel-v1";
 const MIN_SCALE = 0.85;
 const MAX_SCALE = 1.35;
 const DEFAULT_SCALE = 1;
@@ -27,6 +28,7 @@ function clampScale(v: number): number {
 
 export function useLectorAjustes() {
   const [fontScale, setFontScaleState] = useState<number>(DEFAULT_SCALE);
+  const [texturaPapel, setTexturaPapelState] = useState<boolean>(false);
   const [loaded, setLoaded] = useState(false);
 
   // Cargar valor guardado al montar (cliente only — localStorage no existe en SSR).
@@ -37,12 +39,25 @@ export function useLectorAjustes() {
         const parsed = parseFloat(saved);
         if (!isNaN(parsed)) setFontScaleState(clampScale(parsed));
       }
+      const savedTextura = localStorage.getItem(TEXTURA_STORAGE_KEY);
+      if (savedTextura) setTexturaPapelState(savedTextura === "1");
     } catch {
       // localStorage puede fallar en modo privado — no es crítico, se
       // queda con DEFAULT_SCALE para esta sesión.
     }
     setLoaded(true);
   }, []);
+
+  const setTexturaPapel = useCallback((value: boolean) => {
+    setTexturaPapelState(value);
+    try {
+      localStorage.setItem(TEXTURA_STORAGE_KEY, value ? "1" : "0");
+    } catch {}
+  }, []);
+
+  const toggleTexturaPapel = useCallback(() => {
+    setTexturaPapel(!texturaPapel);
+  }, [texturaPapel, setTexturaPapel]);
 
   const setFontScale = useCallback((value: number) => {
     const clamped = clampScale(value);
@@ -70,6 +85,9 @@ export function useLectorAjustes() {
     incrementarFuente,
     decrementarFuente,
     resetFuente,
+    texturaPapel,
+    setTexturaPapel,
+    toggleTexturaPapel,
     loaded,
     minScale: MIN_SCALE,
     maxScale: MAX_SCALE,

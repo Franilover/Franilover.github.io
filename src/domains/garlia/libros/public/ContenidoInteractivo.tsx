@@ -20,8 +20,49 @@ import {
   UseWord,
   UseWordPortal,
   DialogoBlock,
+  NotasProvider,
+  MarcadorNota,
 } from "./SegmentRenderers";
 import { renderInlineMarkdownSafe, splitMarkdownBlocks } from "@/ui/Markdown/inlineMarkdown";
+
+// Nota al pie inline: [[nota|Texto de la nota]]. Se extrae ANTES de pasar
+// la línea por renderInlineMarkdownSafe (que no sabe nada de notas) y se
+// renderiza aparte como <MarcadorNota>, intercalado entre los tramos de
+// HTML ya sanitizado. El texto de la nota en sí puede llevar markdown
+// inline propio (se resuelve en NotasAlPie, no acá).
+const NOTA_RE = /\[\[nota\|([\s\S]+?)\]\]/g;
+
+function renderLineaConNotas(linea: string, keyBase: string): React.ReactNode {
+  const partes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  NOTA_RE.lastIndex = 0;
+  while ((m = NOTA_RE.exec(linea)) !== null) {
+    const antes = linea.slice(lastIndex, m.index);
+    if (antes) {
+      partes.push(
+        <span
+          key={`${keyBase}-t${i}`}
+          dangerouslySetInnerHTML={{ __html: renderInlineMarkdownSafe(antes) }}
+        />,
+      );
+    }
+    partes.push(<MarcadorNota key={`${keyBase}-n${i}`} texto={m[1].trim()} />);
+    lastIndex = m.index + m[0].length;
+    i++;
+  }
+  const resto = linea.slice(lastIndex);
+  if (resto || partes.length === 0) {
+    partes.push(
+      <span
+        key={`${keyBase}-t${i}`}
+        dangerouslySetInnerHTML={{ __html: renderInlineMarkdownSafe(resto) }}
+      />,
+    );
+  }
+  return partes;
+}
 
 /* Renderiza texto respetando saltos de línea: una línea en blanco separa
  * párrafos reales; un solo "\n" dentro de un bloque es un salto de línea
@@ -77,11 +118,7 @@ function TextoMarkdown({
             {lineas.map((linea, li) => (
               <React.Fragment key={li}>
                 {li > 0 && <br />}
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: renderInlineMarkdownSafe(linea),
-                  }}
-                />
+                {renderLineaConNotas(linea, `${bi}-${li}`)}
               </React.Fragment>
             ))}
           </p>
@@ -448,29 +485,29 @@ export function ContenidoInteractivo({
     <div
       className="text-primary-dark/90 lector-texto"
       style={{
-        fontSize: "clamp(1rem, 2.5vw, 1.125rem)",
-        lineHeight: 1.85,
         letterSpacing: "0.01em",
         fontFeatureSettings: '"kern" 1, "liga" 1, "onum" 1',
       }}
     >
       <UseWordPortal />
 
-      <RenderSegmentos
-        isFirst
-        esExtra={esExtra}
-        segs={sectionMap[""]}
-        onNavigate={handleNavigate}
-      />
-
-      {revealed.map((id) => (
-        <RevealedSection
-          key={id}
-          id={id}
-          segs={sectionMap[id] ?? []}
+      <NotasProvider>
+        <RenderSegmentos
+          isFirst
+          esExtra={esExtra}
+          segs={sectionMap[""]}
           onNavigate={handleNavigate}
         />
-      ))}
+
+        {revealed.map((id) => (
+          <RevealedSection
+            key={id}
+            id={id}
+            segs={sectionMap[id] ?? []}
+            onNavigate={handleNavigate}
+          />
+        ))}
+      </NotasProvider>
     </div>
   );
 }

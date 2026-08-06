@@ -10,7 +10,7 @@ import { useDesbloquearReinos, ReinosDesbloqueadosToast } from "@/domains/garlia
 import { supabase } from "@/infra/supabase/supabase";
 
 import { ContenidoInteractivo } from "./ContenidoInteractivo";
-import { FinCapituloSeparador } from "./LectorUI";
+import { FinCapituloSeparador, InicioCapituloSeparador } from "./LectorUI";
 
 
 /**
@@ -30,15 +30,16 @@ const FLUID_FONT_STYLES = `
 
   @container lector (min-width: 0px) {
     .lector-article-inner {
+      font-family: var(--lector-font-family, ui-serif, Georgia, "Times New Roman", serif);
       font-size: calc(var(--lector-font-scale, 1) * clamp(1rem, 2.2cqi, 1.22rem));
-      line-height: 1.85;
+      line-height: 1.7;
     }
   }
 
   @container lector (min-width: 600px) {
     .lector-article-inner {
       font-size: calc(var(--lector-font-scale, 1) * clamp(1.06rem, 1.9cqi, 1.28rem));
-      line-height: 1.9;
+      line-height: 1.75;
     }
   }
 
@@ -52,6 +53,35 @@ const FLUID_FONT_STYLES = `
     .lector-seccion {
       font-size: calc(var(--lector-font-scale, 1) * clamp(2rem, 7cqi, 3rem));
     }
+  }
+
+  /* Textura de papel — toggle opcional en Ajustes de Lectura.
+     SVG noise sutilísimo vía feTurbulence, aplicado como overlay encima
+     del fondo sin tocar el color base (funciona en claro y oscuro). */
+  .lector-textura-papel::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.05;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    background-repeat: repeat;
+  }
+
+  .dark .lector-textura-papel::before {
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+  }
+
+  /* Resalte breve al saltar a una nota al pie desde su marcador. */
+  .nota-highlight {
+    animation: nota-flash 1.6s ease-out;
+  }
+  @keyframes nota-flash {
+    0%   { background: color-mix(in srgb, var(--accent, var(--primary)) 16%, transparent); }
+    100% { background: transparent; }
   }
 `;
 
@@ -235,7 +265,7 @@ export function CapituloScrollBlock({ cap, onNavigate, esExtra = false, haySegSi
 
       <article
         className="lector-article-inner mx-auto px-6 py-16 md:py-24"
-        style={{ maxWidth: "min(680px, 92%)" }}
+        style={{ maxWidth: "min(640px, 92%)" }}
       >
         <header className="mb-12 text-center">
           {!esExtra && (
@@ -253,6 +283,8 @@ export function CapituloScrollBlock({ cap, onNavigate, esExtra = false, haySegSi
             </div>
           )}
         </header>
+
+        <InicioCapituloSeparador />
 
         <div className="min-h-[20vh]">
           <ContenidoInteractivo
