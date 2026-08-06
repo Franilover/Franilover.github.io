@@ -2911,11 +2911,6 @@ export default function MapaInteractivo({
   };
 
   const handleReinoClick = async (reino: any) => {
-    if (editMode) {
-      setReinoSeleccionado(reino);
-      setPanelOpen(true);
-      return;
-    }
     await abrirVistaDeReino(reino);
   };
 
