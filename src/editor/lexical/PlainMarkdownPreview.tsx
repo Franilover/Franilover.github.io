@@ -15,6 +15,7 @@
  * de editor/lexical/, igual que el fallback que reemplaza.
  */
 import React from "react";
+import { renderInlineMarkdownSafe } from "@/ui/Markdown/inlineMarkdown";
 
 const ACCENT = "var(--color-primary, #7c6af7)";
 
@@ -22,25 +23,12 @@ const ACCENT = "var(--color-primary, #7c6af7)";
 // ContenidoInteractivo/TextoMarkdown): una línea en blanco separa párrafos
 // reales; un solo "\n" dentro de un bloque es un salto de línea suave (<br/>),
 // no un párrafo nuevo.
+//
+// El parser en sí vive en ui/Markdown/inlineMarkdown.ts (única fuente de
+// verdad, compartida con ContenidoInteractivo/TextoMarkdown) y ya sanitiza
+// con DOMPurify antes de devolver el HTML.
 function applyInlinePlainMarkdown(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(
-      /\[\[([^\]|#]+?)(?:\|([^\]]+))?\]\]/g,
-      (_, target: string, alias?: string) => {
-        const label = (alias?.trim() || target.trim()).replace(/"/g, "&quot;");
-        const safeTarget = target.trim().replace(/"/g, "&quot;");
-        return `<a class="wikilink" data-wikilink="${safeTarget}" href="javascript:void(0)" title="Ir a: ${safeTarget}">${label}</a>`;
-      },
-    )
-    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/~~(.+?)~~/g, "<del>$1</del>")
-    .replace(/==(.+?)==/g, '<mark class="md-mark">$1</mark>');
+  return renderInlineMarkdownSafe(text, { withWikilinks: true });
 }
 
 // Detecta "# ".."#### " al inicio de un bloque (1 a 4 "#", con espacio) —

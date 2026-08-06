@@ -20,22 +20,7 @@ import {
   UseWord,
   UseWordPortal,
 } from "./SegmentRenderers";
-
-/* ─────────────────────────────────────────────
-   Markdown inline — bold, italic, code, etc.
-   ───────────────────────────────────────────── */
-function applyInlineMarkdown(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/~~(.+?)~~/g, "<del>$1</del>")
-    .replace(/==(.+?)==/g, '<mark class="md-mark">$1</mark>');
-}
+import { renderInlineMarkdownSafe } from "@/ui/Markdown/inlineMarkdown";
 
 /* Renderiza texto respetando saltos de línea: una línea en blanco separa
  * párrafos reales; un solo "\n" dentro de un bloque es un salto de línea
@@ -66,7 +51,7 @@ function TextoMarkdown({
                 {li > 0 && <br />}
                 <span
                   dangerouslySetInnerHTML={{
-                    __html: applyInlineMarkdown(linea),
+                    __html: renderInlineMarkdownSafe(linea),
                   }}
                 />
               </React.Fragment>
