@@ -2718,9 +2718,21 @@ export default function MapaInteractivo() {
   // sessionStorage si la navegación llegó recién).
   const buzonMapaProcesadoRef = useRef(false);
   useEffect(() => {
-    const abrirReino = async (reinoId: string) => {
+    // editar: cuando viene de un pedido de edición (p.ej. click en un reino
+    // desde el editor de mapa del panel admin) reproducimos exactamente lo
+    // que hace handleReinoClick cuando editMode ya está activo: seleccionar
+    // el reino y abrir el panel lateral editable, sin navegar a su vista de
+    // ciudades. Requiere ser admin.
+    const abrirReino = async (reinoId: string, editar?: boolean) => {
       const reino = reinos.find((r) => r.id === reinoId);
       if (!reino) return false;
+      if (editar && isAdmin) {
+        setEditMode(true);
+        setReinoSeleccionado(reino);
+        setPuntoSeleccionado(null);
+        setPanelOpen(true);
+        return true;
+      }
       await handleReinoClick(reino);
       return true;
     };
@@ -2759,10 +2771,12 @@ export default function MapaInteractivo() {
             tipo: "reino" | "ciudad";
             entidad_id: string;
             reino_id?: string | null;
+            editar?: boolean;
           }
         | undefined;
       if (!detail) return;
-      if (detail.tipo === "reino") void abrirReino(detail.entidad_id);
+      if (detail.tipo === "reino")
+        void abrirReino(detail.entidad_id, detail.editar);
       else if (detail.tipo === "ciudad")
         void abrirCiudad(detail.entidad_id, detail.reino_id);
     };
@@ -2773,30 +2787,46 @@ export default function MapaInteractivo() {
     // mismo reino/ciudad cada vez que "reinos" se actualiza por otro motivo
     // (por ejemplo, mientras handleReinoClick va seteando datos) — eso era
     // lo que causaba el parpadeo entre vista global y vista de reino.
+    // Si el pedido es de edición (pending.editar) esperamos también a que
+    // isAdmin se resuelva (arranca en false y se confirma async), para no
+    // perder el flag "editar" por una carrera con useIsAdmin.
     if (!buzonMapaProcesadoRef.current && reinos.length) {
-      buzonMapaProcesadoRef.current = true;
-      void (async () => {
+      let raw: string | null = null;
+      try {
+        raw = sessionStorage.getItem("mapa-pending-open-entity");
+      } catch {}
+      let pendingEditar = false;
+      if (raw) {
         try {
-          const raw = sessionStorage.getItem("mapa-pending-open-entity");
-          if (!raw) return;
-          const pending = JSON.parse(raw) as {
-            tipo: "reino" | "ciudad";
-            entidad_id: string;
-            reino_id?: string | null;
-            ts: number;
-          };
-          sessionStorage.removeItem("mapa-pending-open-entity");
-          // Ignorar solicitudes viejas (>10s) para no reabrir algo obsoleto
-          if (Date.now() - pending.ts >= 10000) return;
-          if (pending.tipo === "reino") await abrirReino(pending.entidad_id);
-          else await abrirCiudad(pending.entidad_id, pending.reino_id);
+          pendingEditar = !!JSON.parse(raw).editar;
         } catch {}
-      })();
+      }
+      if (!pendingEditar || isAdmin) {
+        buzonMapaProcesadoRef.current = true;
+        void (async () => {
+          try {
+            if (!raw) return;
+            const pending = JSON.parse(raw) as {
+              tipo: "reino" | "ciudad";
+              entidad_id: string;
+              reino_id?: string | null;
+              editar?: boolean;
+              ts: number;
+            };
+            sessionStorage.removeItem("mapa-pending-open-entity");
+            // Ignorar solicitudes viejas (>10s) para no reabrir algo obsoleto
+            if (Date.now() - pending.ts >= 10000) return;
+            if (pending.tipo === "reino")
+              await abrirReino(pending.entidad_id, pending.editar);
+            else await abrirCiudad(pending.entidad_id, pending.reino_id);
+          } catch {}
+        })();
+      }
     }
 
     return () => window.removeEventListener("mapa-open-entity", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reinos]);
+  }, [reinos, isAdmin]);
 
   const handlePersonajeClick = async (p: any) => {
     setCancionesPersonaje([]);
