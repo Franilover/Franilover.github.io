@@ -18,6 +18,7 @@ import { parseLayoutBoxes, type LayoutBox } from "@/editor/layout-boxes/types";
 import { RichEditor, type RichEditorFormatCommand } from "@/editor/lexical";
 import type { ZoteroSource } from "@/editor/notas/hooks/useZotero";
 import { SubBloqueSelector } from "@/editor/sub-bloques/SubBloqueSelector";
+import { TagsDropdown, MencionesDropdown } from "@/editor/notas/components/EnsayoLinkDropdowns";
 import { makeSubBloque, parseSubBloques, type SubBloque } from "@/editor/sub-bloques/types";
 import { MotionDiv } from "@/ui/Motion";
 import { SaveDot } from "@/ui/SaveDot";
@@ -444,6 +445,25 @@ export function Editor({
           onRename={handleRenameSubBloque}
           onSelect={setActiveBloqueId}
         />
+        {/* Tags y menciones son del ensayo entero (no de un sub-bloque
+            puntual), así que solo se muestran junto al selector cuando
+            estamos en el documento principal — igual criterio que
+            citePopup/wikiEntities más abajo. Ver EnsayoLinkDropdowns.tsx. */}
+        {!activeSubBloque && (
+          <>
+            <TagsDropdown
+              ensayo={ensayo}
+              ensayos={ensayos}
+              onTagClick={onTagClick ?? onNavigateToPage}
+              onUpdateField={onUpdateField}
+            />
+            <MencionesDropdown
+              ensayo={ensayo}
+              ensayos={ensayos}
+              onNavigateToPage={onNavigateToPage}
+            />
+          </>
+        )}
       </div>
 
       {activeSubBloque ? (

@@ -1683,6 +1683,7 @@ export function RichEditor({
               <VariantSuffixTransformPlugin />
               <SlashCommandPlugin
                 isMenuOpen={mdPalette.open}
+                keepReadingWhileOpen={!onOpenPalette && !onClosePalette}
                 notifyClosedRef={notifyClosedRef}
                 removeMatchRef={slashRemoveRef}
                 onArrowDown={mdArrowDown}

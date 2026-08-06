@@ -72,6 +72,20 @@ interface SlashCommandPluginProps {
   onArrowDown?: () => void;
   onArrowUp?: () => void;
   onConfirmSelection?: () => void;
+  /**
+   * true cuando el panel que muestra los resultados NO tiene su propio
+   * <input> de búsqueda — el usuario sigue escribiendo directo en el
+   * contenteditable de Lexical después del "/" (caso: MarkdownCommandPalette,
+   * modo normal). En ese caso el plugin debe seguir releyendo el documento
+   * en cada tecleo para refinar la query, aunque el panel ya esté abierto.
+   *
+   * Si el panel SÍ tiene su propio input (caso: SnippetCommandPalette, modo
+   * libro — mueve el foco a su <input> al abrirse), dejar esto en false
+   * (default): una vez matcheado el "/", el plugin deja de releer el
+   * documento para no competir por el foco con ese input mientras el
+   * usuario escribe ahí. Ver activeRef más abajo.
+   */
+  keepReadingWhileOpen?: boolean;
 }
 
 // Sólo dispara dentro de la palabra actual: "/" seguido de texto sin
@@ -86,6 +100,7 @@ export function SlashCommandPlugin({
   onArrowDown,
   onArrowUp,
   onConfirmSelection,
+  keepReadingWhileOpen = false,
 }: SlashCommandPluginProps) {
   const [editor] = useLexicalComposerContext();
   const activeRef = useRef(false);
@@ -131,13 +146,13 @@ export function SlashCommandPlugin({
 
   const checkForSlashMatch = useCallback(
     (editorState: EditorState) => {
-      // Si la palette ya está abierta, no seguimos re-evaluando el
-      // documento en cada update. Una vez que el usuario "entra" al
-      // popover (foco se mueve a su <input>), Lexical deja de ser la
-      // fuente de verdad de lo que se está escribiendo — seguir leyendo
-      // window.getSelection() acá competía con el popover por el foco
-      // y dejaba al usuario sin poder escribir en ninguno de los dos.
-      if (activeRef.current) return;
+      // Con panel SIN input propio (keepReadingWhileOpen, ver prop): hay
+      // que seguir releyendo el documento en cada tecleo aunque el panel
+      // ya esté abierto — es la única fuente de la query. Con panel CON
+      // input propio (modo libro, default): una vez matcheado el primer
+      // "/", dejamos de releer para no competir por el foco con ese
+      // input mientras el usuario escribe ahí.
+      if (activeRef.current && !keepReadingWhileOpen) return;
 
       editorState.read(() => {
         const selection = $getSelection();
@@ -155,6 +170,16 @@ export function SlashCommandPlugin({
         const match = SLASH_RE.exec(textBeforeCursor);
 
         if (!match) {
+          // El "/" dejó de matchear (se borró, o se escribió un espacio
+          // después de la query) — si el panel estaba abierto por este
+          // plugin, hay que cerrarlo explícitamente. Sin esto, con
+          // keepReadingWhileOpen el panel se quedaba mostrando la última
+          // lista filtrada para siempre, ya que activeRef.current nunca
+          // se resetea acá abajo.
+          if (activeRef.current) {
+            activeRef.current = false;
+            onMatch(null);
+          }
           return;
         }
 
@@ -213,7 +238,7 @@ export function SlashCommandPlugin({
         });
       });
     },
-    [onMatch],
+    [onMatch, keepReadingWhileOpen],
   );
 
   // Expone al padre cómo borrar el "/query" actual del documento.
