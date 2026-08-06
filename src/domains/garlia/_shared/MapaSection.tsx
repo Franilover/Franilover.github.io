@@ -1,42 +1,58 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+/**
+ * MapaSection
+ * ───────────────────────────────────────────────────────────────────────────
+ * Toda la edición del mapa vive acá adentro, dentro de editorGarlia — nada
+ * de esto toca la ruta pública (/garlia/mapa), que se renderiza siempre en
+ * modo solo-lectura (ver src/app/(public)/garlia/mapa/page.tsx).
+ *
+ * Dos sub-modos, alternables sin salir de la sección:
+ *   - "tiles": EditorMapa — gestión de los tiles del mapa global (crear,
+ *     borrar, poner imagen, mover reinos entre celdas).
+ *   - "reino": el mismo componente que usa la vista pública
+ *     (MapaInteractivo), pero con allowEdit=true — habilita ahí mismo el
+ *     panel de edición de nombre/descripción/coordenadas de un reino o
+ *     ciudad, exactamente igual que antes se hacía "prestado" desde la
+ *     ruta pública. Antes esto navegaba a /garlia/mapa y activaba edición
+ *     ahí vía evento; ahora se renderiza directo acá.
+ */
+
+import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 
 import { EditorMapa } from "@/domains/garlia/_shared/EditorMapa";
-
-const DESTINO_MAPA = "/garlia/mapa";
+import MapaInteractivo from "@/domains/garlia/reinos/public/mapaGarlia";
 
 export function MapaSection() {
-  const router = useRouter();
+  const [reinoAEditar, setReinoAEditar] = useState<string | null>(null);
 
-  // Al hacer click en un reino desde el editor de mapa, en vez de abrir el
-  // editor de entidad genérico, navegamos al mapa público y le pedimos —vía
-  // el mismo "buzón" que usa el GlobalCommandPalette (sessionStorage +
-  // evento "mapa-open-entity")— que abra el panel lateral de ese reino en
-  // modo edición (editMode activo + panel abierto), igual que si un admin
-  // hubiese hecho click ahí estando en modo edición.
-  const editarReinoEnMapa = (reinoId: string) => {
-    const detail = { tipo: "reino" as const, entidad_id: reinoId, editar: true };
-
-    if (window.location.pathname === DESTINO_MAPA) {
-      window.dispatchEvent(
-        new CustomEvent("mapa-open-entity", { detail }),
-      );
-      return;
-    }
-
-    try {
-      sessionStorage.setItem(
-        "mapa-pending-open-entity",
-        JSON.stringify({ ...detail, ts: Date.now() }),
-      );
-    } catch {}
-    router.push(DESTINO_MAPA);
-  };
+  if (reinoAEditar) {
+    return (
+      <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
+        <button
+          className="absolute top-4 left-4 z-50 flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest transition-colors"
+          style={{
+            background: "color-mix(in srgb, var(--bg-menu) 88%, transparent)",
+            border:
+              "1px solid color-mix(in srgb, var(--primary) 30%, transparent)",
+            color: "var(--accent)",
+            borderRadius: "2px",
+            letterSpacing: "0.12em",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+          }}
+          onClick={() => setReinoAEditar(null)}
+        >
+          <ArrowLeft size={14} /> Tiles
+        </button>
+        <MapaInteractivo allowEdit />
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
-      <EditorMapa onSelectReino={editarReinoEnMapa} />
+      <EditorMapa onSelectReino={setReinoAEditar} />
     </div>
   );
 }

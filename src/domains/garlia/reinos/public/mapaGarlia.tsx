@@ -2270,8 +2270,22 @@ function CanvasMap({
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function MapaInteractivo() {
-  const isAdmin = useIsAdmin();
+export default function MapaInteractivo({
+  allowEdit = false,
+}: {
+  /**
+   * Habilita la UI y lógica de edición (botón "Editar Mapa", drag de
+   * markers, guardado, etc). El mapa público (/garlia/mapa) SIEMPRE la
+   * pasa en false — la edición vive únicamente en editorGarlia
+   * (ver MapaSection), que renderiza este mismo componente con
+   * allowEdit=true.
+   */
+  allowEdit?: boolean;
+}) {
+  const isAdminAccount = useIsAdmin();
+  // Aun siendo admin, sin allowEdit no hay edición: esto es lo que saca
+  // toda la lógica de edición del mapa público.
+  const isAdmin = allowEdit && isAdminAccount;
 
   // reinos con caché Dexie automático — instantáneo en visitas posteriores
   const {
@@ -2718,11 +2732,12 @@ export default function MapaInteractivo() {
   // sessionStorage si la navegación llegó recién).
   const buzonMapaProcesadoRef = useRef(false);
   useEffect(() => {
-    // editar: cuando viene de un pedido de edición (p.ej. click en un reino
-    // desde el editor de mapa del panel admin) reproducimos exactamente lo
-    // que hace handleReinoClick cuando editMode ya está activo: seleccionar
-    // el reino y abrir el panel lateral editable, sin navegar a su vista de
-    // ciudades. Requiere ser admin.
+    // editar: soporte legacy del flag "editar" del evento — hoy nadie lo
+    // dispara (la edición vive enteramente en editorGarlia, ver
+    // MapaSection, que renderiza este componente in-place con
+    // allowEdit=true en vez de navegar hasta acá). Se mantiene por si algún
+    // llamador externo lo vuelve a usar; sin allowEdit, isAdmin es false y
+    // esta rama nunca se activa.
     const abrirReino = async (reinoId: string, editar?: boolean) => {
       const reino = reinos.find((r) => r.id === reinoId);
       if (!reino) return false;
