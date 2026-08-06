@@ -23,6 +23,7 @@
 import { $isCodeNode } from "@lexical/code";
 import { $isListNode, $isListItemNode } from "@lexical/list";
 import { $convertFromMarkdownString } from "@lexical/markdown";
+import { $isHorizontalRuleNode } from "@lexical/react/LexicalHorizontalRuleNode";
 import { $isQuoteNode } from "@lexical/rich-text";
 import {
   RICH_TRANSFORMERS,
@@ -623,6 +624,10 @@ export function serializeRootToRaw(): string {
     if ($isCodeNode(child)) {
       const lang = (child as any).getLanguage?.() || "";
       return "```" + lang + "\n" + inlineText(child) + "\n```";
+    }
+
+    if ($isHorizontalRuleNode(child)) {
+      return "---";
     }
 
     if ($isListNode(child)) {

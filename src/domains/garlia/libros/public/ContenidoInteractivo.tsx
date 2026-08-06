@@ -20,13 +20,19 @@ import {
   UseWord,
   UseWordPortal,
 } from "./SegmentRenderers";
-import { renderInlineMarkdownSafe } from "@/ui/Markdown/inlineMarkdown";
+import { renderInlineMarkdownSafe, splitMarkdownBlocks } from "@/ui/Markdown/inlineMarkdown";
 
 /* Renderiza texto respetando saltos de línea: una línea en blanco separa
  * párrafos reales; un solo "\n" dentro de un bloque es un salto de línea
  * suave (<br/>), no un párrafo nuevo — mismo criterio que usa el editor
  * (RichEditor/Lexical) y el renderer de markdown estándar, para que lo
- * que el usuario ve al escribir coincida con lo que ve el lector. */
+ * que el usuario ve al escribir coincida con lo que ve el lector.
+ *
+ * También reconoce dos bloques de nivel superior (ver splitMarkdownBlocks
+ * en ui/Markdown/inlineMarkdown.ts, compartido con PlainMarkdownPreview):
+ *   - ```código``` → bloque monoespaciado
+ *   - --- (o ***, ___) en su propia línea → separador horizontal
+ */
 function TextoMarkdown({
   value,
   className,
@@ -34,10 +40,31 @@ function TextoMarkdown({
   value: string;
   className?: string;
 }) {
-  const bloques = value.split(/\n{2,}/);
+  const blocks = splitMarkdownBlocks(value);
   return (
     <>
-      {bloques.map((bloque, bi) => {
+      {blocks.map((block, bi) => {
+        if (block.type === "hr") {
+          return (
+            <hr
+              key={bi}
+              className="my-6 border-0 border-t border-primary/15"
+            />
+          );
+        }
+
+        if (block.type === "code") {
+          return (
+            <pre
+              key={bi}
+              className="my-4 overflow-x-auto rounded-lg border border-primary/8 bg-primary/[0.03] px-4 py-3 font-mono text-[0.875em] leading-relaxed whitespace-pre"
+            >
+              <code>{block.code}</code>
+            </pre>
+          );
+        }
+
+        const bloque = block.raw;
         if (bloque.trim() === "") {
           return (
             <p key={bi} aria-hidden style={{ margin: 0, minHeight: "1em" }} />

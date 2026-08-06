@@ -23,6 +23,10 @@
 import { CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import { ListNode, ListItemNode } from "@lexical/list";
+import {
+  HorizontalRuleNode,
+  $isHorizontalRuleNode,
+} from "@lexical/react/LexicalHorizontalRuleNode";
 
 import { AutoFocusPlugin } from "@lexical/react/LexicalAutoFocusPlugin";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
@@ -30,6 +34,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
+import { HorizontalRulePlugin } from "@lexical/react/LexicalHorizontalRulePlugin";
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
@@ -255,6 +260,7 @@ const RICH_EDITOR_NODES = [
   ListNode,
   ListItemNode,
   CodeNode,
+  HorizontalRuleNode,
   LinkNode,
   DropNode,
   SoundNode,
@@ -1383,7 +1389,14 @@ export function RichEditor({
           // <LexicalComposer> (ver más abajo en el JSX de este componente).
         },
         quote: "border-l-2 border-primary/30 pl-4 italic opacity-75 my-4",
-        code: "font-mono text-[0.875em] bg-surface-1 px-1.5 py-0.5 rounded",
+        // theme.code es el CodeNode de BLOQUE (```código```) — distinto de
+        // theme.text.code, que es el código INLINE (`código`) de más abajo.
+        // Antes compartían prácticamente el mismo estilo achicado (mismo
+        // padding chico, sin salto de línea propio), así que un bloque de
+        // código se veía igual que un fragmento inline. Bloque real: fondo
+        // más marcado, padding de bloque, ancho completo, scroll horizontal
+        // si una línea es muy larga (en vez de romper el layout).
+        code: "block font-mono text-[0.875em] leading-relaxed whitespace-pre overflow-x-auto bg-surface-1 border border-[color-mix(in_srgb,var(--foreground)_8%,transparent)] rounded-lg px-4 py-3 my-4",
         list: {
           ul: "list-disc pl-6 my-2",
           ol: "list-decimal pl-6 my-2",
@@ -1402,6 +1415,7 @@ export function RichEditor({
           "border border-[color-mix(in_srgb,var(--foreground)_12%,transparent)] px-2 py-1 align-top",
         tableCellHeader:
           "border border-[color-mix(in_srgb,var(--foreground)_12%,transparent)] px-2 py-1 align-top font-bold bg-[color-mix(in_srgb,var(--foreground)_4%,transparent)]",
+        hr: "border-0 border-t border-[color-mix(in_srgb,var(--foreground)_15%,transparent)] my-6",
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1644,6 +1658,12 @@ export function RichEditor({
               <MarkdownShortcutPlugin transformers={RICH_TRANSFORMERS} />
               <MarkdownPastePlugin />
               <HistoryPlugin />
+              {/* Habilita el nodo HorizontalRuleNode que ya registra el
+                  transformer HR estándar de @lexical/markdown (incluido en
+                  RICH_TRANSFORMERS vía TRANSFORMERS) — sin este plugin, el
+                  transformer intenta crear el nodo pero Lexical no sabe
+                  cómo montarlo/seleccionarlo en el DOM. */}
+              <HorizontalRulePlugin />
               {autoFocus && <AutoFocusPlugin />}
               <InitialContentPlugin
                 initialRaw={value}

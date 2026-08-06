@@ -94,3 +94,80 @@ export function renderInlineMarkdownSafe(
 ): string {
   return toSafeHtml(applyInlineMarkdown(text, options));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloques de nivel superior compartidos: código (```) y separador (---).
+// Antes cada renderer de lectura (TextoMarkdown en ContenidoInteractivo.tsx,
+// PlainMarkdownPreview.tsx) partía el texto en párrafos con su propio
+// value.split(/\n{2,}/) y no reconocía ninguno de los dos — un ``` o un ---
+// se mostraba como texto plano. Se consolida acá el reconocimiento de
+// bloques para que ambos renderers los soporten sin duplicar la lógica,
+// igual que ya se hizo con el parser inline arriba.
+export type MarkdownBlock =
+  | { type: "code"; lang: string; code: string }
+  | { type: "hr" }
+  | { type: "text"; raw: string };
+
+/**
+ * Parte un documento markdown en bloques de nivel superior, reconociendo
+ * ```code``` y --- antes de caer al criterio de párrafo por defecto (línea
+ * en blanco separa párrafos). El contenido de cada bloque "text" conserva
+ * el criterio previo de líneas — el consumidor decide cómo renderizarlo
+ * (heading, párrafo, etc.), esta función solo aísla code/hr del resto.
+ */
+export function splitMarkdownBlocks(value: string): MarkdownBlock[] {
+  const lineas = value.split("\n");
+  const blocks: MarkdownBlock[] = [];
+  let textoAcumulado: string[] = [];
+
+  const flushTexto = () => {
+    if (textoAcumulado.length === 0) return;
+    // Reparte el texto acumulado en párrafos (línea en blanco = separador),
+    // igual que el criterio previo, preservando bloques vacíos.
+    const raw = textoAcumulado.join("\n");
+    for (const bloque of raw.split(/\n{2,}/)) {
+      blocks.push({ type: "text", raw: bloque });
+    }
+    textoAcumulado = [];
+  };
+
+  // Separador: una línea con SOLO ---, ***, o ___ (3 o más), sin nada más
+  // que espacios alrededor — mismo criterio que el HR estándar de Markdown
+  // (y el que ya reconoce @lexical/markdown al escribir en el editor).
+  const HR_RE = /^ {0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/;
+
+  let i = 0;
+  while (i < lineas.length) {
+    const linea = lineas[i];
+
+    if (linea.trim().startsWith("```")) {
+      const lang = linea.trim().slice(3).trim();
+      const codeLineas: string[] = [];
+      let j = i + 1;
+      while (j < lineas.length && !lineas[j].trim().startsWith("```")) {
+        codeLineas.push(lineas[j]);
+        j++;
+      }
+      // Si no se encontró el cierre, el bloque llega hasta el final del
+      // documento en vez de perderse — mejor mostrar el código sin cerrar
+      // que tragarse todo el resto del texto silenciosamente.
+      flushTexto();
+      blocks.push({ type: "code", lang, code: codeLineas.join("\n") });
+      i = j + 1;
+      continue;
+    }
+
+    if (HR_RE.test(linea)) {
+      flushTexto();
+      blocks.push({ type: "hr" });
+      i++;
+      continue;
+    }
+
+    textoAcumulado.push(linea);
+    i++;
+  }
+
+  flushTexto();
+  return blocks;
+}
