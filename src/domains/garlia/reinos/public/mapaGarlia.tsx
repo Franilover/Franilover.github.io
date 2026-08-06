@@ -4,7 +4,6 @@ import {
   X,
   ArrowLeft,
   Save,
-  Edit3,
   Move,
   CheckCircle2,
   AlertCircle,
@@ -639,7 +638,8 @@ function PanelContenido({
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {personajesCiudad.map((p: any) => {
-                      const desbloqueado = personajesDesbloqueados.has(p.id);
+                      const desbloqueado =
+                        editMode || personajesDesbloqueados.has(p.id);
                       return (
                         <button
                           key={p.id}
@@ -1009,7 +1009,8 @@ function PanelContenido({
             </div>
             <div className="grid grid-cols-2 gap-2">
               {personajesReino.map((p: any) => {
-                const desbloqueado = personajesDesbloqueados.has(p.id);
+                const desbloqueado =
+                  editMode || personajesDesbloqueados.has(p.id);
                 return (
                   <button
                     key={p.id}
@@ -2488,6 +2489,13 @@ export default function MapaInteractivo({
   const [reinoSeleccionado, setReinoSeleccionado] = useState<any>(null);
   const [puntoSeleccionado, setPuntoSeleccionado] = useState<any>(null);
   const [editMode, setEditMode] = useState(false);
+
+  // editorGarlia siempre debe verse en modo edición — no hay vista de
+  // "solo lectura" ahí. isAdmin se resuelve async (arranca false), así
+  // que activamos editMode apenas se confirma.
+  useEffect(() => {
+    if (isAdmin) setEditMode(true);
+  }, [isAdmin]);
   const [isSaving, setIsSaving] = useState(false);
   const [modifiedDetalles, setModifiedDetalles] = useState<Set<string>>(
     new Set(),
@@ -3431,25 +3439,6 @@ export default function MapaInteractivo({
               transition: "top 0.2s ease",
             }}
           >
-            <button
-              className="flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest transition-all border"
-              style={{
-                background: editMode
-                  ? "color-mix(in srgb, #c43030 85%, var(--bg-menu))"
-                  : "color-mix(in srgb, var(--bg-menu) 88%, transparent)",
-                borderColor: editMode
-                  ? "color-mix(in srgb, #c43030 50%, transparent)"
-                  : "color-mix(in srgb, var(--primary) 30%, transparent)",
-                color: editMode ? "var(--btn-text, #fff)" : "var(--accent)",
-                borderRadius: "2px",
-                letterSpacing: "0.12em",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-              }}
-              onClick={() => setEditMode(!editMode)}
-            >
-              {editMode ? <X size={14} /> : <Edit3 size={14} />}
-              {editMode ? "Cancelar" : "Editar Mapa"}
-            </button>
             {editMode && (
               <button
                 className="flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest disabled:opacity-50 transition-all"
