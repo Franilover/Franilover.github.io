@@ -63,6 +63,79 @@ interface NarradorInfo {
 }
 
 /* ─────────────────────────────────────────────
+   useContenidoCapitulo — fetch de contenido bajo demanda
+   ───────────────────────────────────────────────────────────────────────────
+   Reemplaza al viejo modelo de "traer el contenido de todos los capítulos
+   de una". Cada capítulo pide su `contenido` recién cuando:
+     a) el lector lo abre (capId activo sin entrada en contenidoPorCapId), o
+     b) se prefetchea en silencio apenas se resuelve `capSiguiente` (ver
+        efecto de prefetch en el componente Lector más abajo) — así
+        "Siguiente capítulo" se siente instantáneo.
+   En ambos casos: si ya está en el mapa (memoria) o `cargandoContenidoIds`
+   ya lo tiene en vuelo, no repite el fetch. Al resolver, persiste en Dexie
+   (cache por capítulo individual, no el libro entero).
+   ───────────────────────────────────────────── */
+function useCargadorContenido() {
+  const contenidoPorCapId = useLectorStore((s) => s.contenidoPorCapId);
+  const cargandoContenidoIds = useLectorStore((s) => s.cargandoContenidoIds);
+  const setContenidoCap = useLectorStore((s) => s.setContenidoCap);
+  const setCargandoContenido = useLectorStore((s) => s.setCargandoContenido);
+
+  const cargar = useCallback(
+    async (capId: string) => {
+      if (!capId) return;
+      const estado = useLectorStore.getState();
+      if (estado.contenidoPorCapId[capId] !== undefined) return; // ya en memoria
+      if (estado.cargandoContenidoIds[capId]) return; // ya en vuelo
+
+      setCargandoContenido(capId, true);
+      try {
+        // Dexie primero: si el capítulo ya se leyó antes, esto resuelve
+        // instantáneo sin tocar red.
+        try {
+          if (db && (db as any).capitulos) {
+            const local = await (db as any).capitulos.get(capId);
+            if (local?.contenido) {
+              setContenidoCap(capId, local.contenido);
+              return;
+            }
+          }
+        } catch {}
+
+        const { data, error } = await supabase
+          .from("capitulos")
+          .select("contenido")
+          .eq("id", capId)
+          .single();
+
+        if (error || !data) {
+          setCargandoContenido(capId, false);
+          return;
+        }
+
+        const contenido = (data as any).contenido ?? "";
+        setContenidoCap(capId, contenido);
+
+        // Cache individual en Dexie — solo este capítulo, no el libro entero.
+        try {
+          if (db && (db as any).capitulos) {
+            await (db as any).capitulos.update(capId, {
+              contenido,
+              status: "synced",
+            });
+          }
+        } catch {}
+      } catch {
+        setCargandoContenido(capId, false);
+      }
+    },
+    [setContenidoCap, setCargandoContenido],
+  );
+
+  return { contenidoPorCapId, cargandoContenidoIds, cargar };
+}
+
+/* ─────────────────────────────────────────────
    Barra de progreso VERTICAL — rail sobre borde derecho
    ───────────────────────────────────────────── */
 function BarraProgresoVertical({ capId }: { capId: string }) {
@@ -662,6 +735,7 @@ export default function Lector({
   const setCapId = useLectorStore((s) => s.setCapId);
   const setActiveCapTitle = useLectorStore((s) => s.setActiveCapTitle);
   const setShowSidebar = useLectorStore((s) => s.setShowSidebar);
+  const setContenidoCapBatch = useLectorStore((s) => s.setContenidoCapBatch);
 
   const resetEntidades = useLectorEntidadesStore((s) => s.resetEntidades);
   const mergePersonajes = useLectorEntidadesStore((s) => s.mergePersonajes);
@@ -670,11 +744,13 @@ export default function Lector({
 
   const hasScrolled = useRef(false);
 
-  // ── Efecto A: resolver libro + cargar TODOS los capítulos ──────────────────
-  // Depende solo de slugParam (no de ordenParam): cambiar de capítulo NO debe
-  // re-disparar esta carga pesada (Dexie+Supabase) ni el setLoading(true) que
-  // hace parpadear el skeleton del índice y ocultar Personajes/Lugares. Eso es
-  // justamente lo que causaba el parpadeo al cambiar de capítulo.
+  // ── Efecto A: resolver libro + cargar el ÍNDICE de capítulos (liviano) ─────
+  // Trae metadata de TODOS los capítulos del libro (id, orden, título, ids
+  // de entidades) pero NUNCA su `contenido` — eso se pide aparte, capítulo
+  // por capítulo, bajo demanda (ver useCargadorContenido). Depende solo de
+  // slugParam (no de ordenParam): cambiar de capítulo NO debe re-disparar
+  // esta carga (Dexie+Supabase) ni el setLoading(true) que hace parpadear el
+  // skeleton del índice y ocultar Personajes/Lugares.
   useEffect(() => {
     if (!slugParam) return;
     let cancelled = false;
@@ -693,7 +769,11 @@ export default function Lector({
       }
     };
 
-    const cachearEnDexie = async (rows: any[]) => {
+    // Cachea SOLO metadata (sin contenido) — se llama con la lista completa
+    // liviana del libro, una vez, al resolver el índice. No pisa el
+    // `contenido` que ya estuviera guardado de lecturas previas (lo
+    // preserva vía `prev?.contenido`), pero tampoco lo trae de red acá.
+    const cachearMetaEnDexie = async (rows: any[]) => {
       const table = await getDexieTable();
       if (!table || rows.length === 0) return;
       try {
@@ -704,13 +784,13 @@ export default function Lector({
           return {
             ...prev,
             ...row,
-            contenido: row.contenido ?? prev?.contenido ?? "",
+            contenido: prev?.contenido ?? undefined,
             status: "synced",
           };
         });
         await table.bulkPut(merged);
       } catch (e) {
-        console.warn("[Dexie] Error cacheando caps:", e);
+        console.warn("[Dexie] Error cacheando metadata de caps:", e);
       }
     };
 
@@ -887,7 +967,12 @@ export default function Lector({
 
       resolvedLibroId = libroId;
 
-      // ── 2. Dexie-first: render instantáneo si hay caché ───────────────────
+      // ── 2. Dexie-first: render instantáneo del ÍNDICE si hay caché ─────────
+      // Ya no exige `c.contenido` para considerar el capítulo "cacheado" —
+      // el índice (título, orden, ids de entidades) es útil aunque el texto
+      // todavía no se haya leído nunca. De paso, hidrata `contenidoPorCapId`
+      // con lo que sí esté cacheado (capítulos que el usuario ya leyó
+      // antes), para que reabrir un capítulo leído sea instantáneo.
       let yaRenderizoDesdeCache = false;
       try {
         const table = await getDexieTable();
@@ -896,21 +981,34 @@ export default function Lector({
             .where("libro_id")
             .equals(libroId)
             .toArray()) as any[];
-          const capsCached = cached.filter((c) => c.contenido && !c.deleted);
+          const capsCached = cached.filter((c) => !c.deleted);
           if (capsCached.length > 0) {
             aplicarCaps(capsCached, libroId, esExtraLocal, actualSlug);
+            const contenidoCacheado: Record<string, string> = {};
+            for (const c of capsCached) {
+              if (c.contenido) contenidoCacheado[c.id] = c.contenido;
+            }
+            if (Object.keys(contenidoCacheado).length > 0 && !cancelled) {
+              setContenidoCapBatch(contenidoCacheado);
+            }
             if (!cancelled) setLoading(false);
             yaRenderizoDesdeCache = true;
           }
         }
       } catch {}
 
-      // ── 3. Fetch desde Supabase (siempre, para datos frescos) ─────────────
+      // ── 3. Fetch desde Supabase (siempre, para índice fresco) ─────────────
+      // LIVIANO A PROPÓSITO: no pide `contenido`. Esto es solo para armar el
+      // índice/navegación — el texto de cada capítulo se pide aparte, uno
+      // por uno, cuando el lector realmente lo abre (ver
+      // useContenidoCapitulo). Antes este único select traía el `contenido`
+      // completo de TODOS los capítulos del libro; con un libro largo eso
+      // eran decenas de miles de palabras bajadas y guardadas en memoria/
+      // Dexie solo para mostrar un índice.
       type CapRaw = {
         id: string;
         orden: number;
         titulo_capitulo: string;
-        contenido: string;
         fecha_publicacion: string;
         personajes_ids: string[];
         reinos_ids: string[] | null;
@@ -919,10 +1017,10 @@ export default function Lector({
         narrador: any;
       };
 
-      const { data: contenidos, error: capsError } = await supabase
+      const { data: indice, error: capsError } = await supabase
         .from("capitulos")
         .select(
-          `id, orden, titulo_capitulo, contenido, fecha_publicacion, visibilidad, personajes_ids, reinos_ids, ciudades_ids, libros(titulo), narrador:personajes!narrador_id(id, nombre, img_url)`,
+          `id, orden, titulo_capitulo, fecha_publicacion, visibilidad, personajes_ids, reinos_ids, ciudades_ids, libros(titulo), narrador:personajes!narrador_id(id, nombre, img_url)`,
         )
         .eq("libro_id", libroId)
         .or(
@@ -941,12 +1039,12 @@ export default function Lector({
         return Array.isArray(v) ? (v[0] ?? null) : v;
       };
 
-      const rawList = (contenidos as unknown as CapRaw[]) ?? [];
+      const rawList = (indice as unknown as CapRaw[]) ?? [];
       const capsValidas = rawList.map((c) => ({
         id: c.id,
         orden: c.orden,
         titulo_capitulo: c.titulo_capitulo,
-        contenido: c.contenido,
+        // Sin `contenido` a propósito — ver comentario del select de arriba.
         fecha_publicacion: c.fecha_publicacion,
         personajes_ids: c.personajes_ids,
         reinos_ids: c.reinos_ids ?? [],
@@ -956,7 +1054,7 @@ export default function Lector({
         _narrador: normOne(c.narrador),
       }));
 
-      void cachearEnDexie(capsValidas);
+      void cachearMetaEnDexie(capsValidas);
       aplicarCaps(capsValidas, libroId, esExtraLocal, actualSlug);
     };
 
@@ -968,8 +1066,7 @@ export default function Lector({
           if (table && resolvedLibroId) {
             const todos = (await table.toArray()) as any[];
             const cached = todos.filter(
-              (c) =>
-                !c.deleted && c.libro_id === resolvedLibroId && c.contenido,
+              (c) => !c.deleted && c.libro_id === resolvedLibroId,
             );
             if (cached.length > 0) {
               const estadoActual = useLectorStore.getState();
@@ -979,6 +1076,13 @@ export default function Lector({
                 estadoActual.esExtra,
                 estadoActual.slugCanonico,
               );
+              const contenidoCacheado: Record<string, string> = {};
+              for (const c of cached) {
+                if (c.contenido) contenidoCacheado[c.id] = c.contenido;
+              }
+              if (Object.keys(contenidoCacheado).length > 0) {
+                setContenidoCapBatch(contenidoCacheado);
+              }
               return;
             }
           }
@@ -1039,10 +1143,14 @@ export default function Lector({
       const cap = capitulos.find((c) => c.id === targetCapId);
       if (!cap) return;
       const url = rutaLeer(slugParam, cap.orden);
-      // IMPORTANTE: el lector solo monta un capítulo a la vez (nunca todos),
-      // así que el capítulo destino ya está disponible en `capitulos`
-      // (cargado por el Efecto A) sin necesidad de una navegación completa.
-      // Usamos history.pushState directo — NO router.push/replace — porque
+      // IMPORTANTE: el lector solo monta un capítulo a la vez (nunca todos).
+      // El destino ya está disponible como METADATA en `capitulos` (cargado
+      // por el Efecto A), sin necesidad de una navegación completa — pero su
+      // `contenido` puede no estarlo todavía: el efecto de carga más abajo
+      // (useCargadorContenido, disparado por el cambio de capId) se encarga
+      // de pedirlo si hace falta (normalmente ya llegó vía el prefetch del
+      // capítulo siguiente). Usamos history.pushState directo — NO
+      // router.push/replace — porque
       // esta ruta usa `orden` como segmento de path dinámico ([orden]), y
       // cualquier navegación vía el router de Next hace que vuelva a
       // resolverse el Server Component de la página (aunque sea con
@@ -1071,22 +1179,54 @@ export default function Lector({
     ? capVecino(capitulos, capActual.orden, 1)
     : null;
   const libroTitulo = capitulos[0]?.libros?.titulo;
+
+  // ── Contenido bajo demanda ──────────────────────────────────────────────
+  const { contenidoPorCapId, cargar: cargarContenido } = useCargadorContenido();
+
+  // Cargar el contenido del capítulo activo apenas se resuelve capId.
+  useEffect(() => {
+    if (capId) void cargarContenido(capId);
+  }, [capId, cargarContenido]);
+
+  // Prefetch silencioso del capítulo siguiente — así "Siguiente" se siente
+  // instantáneo aunque el lector nunca haya estado ahí. Se dispara junto
+  // con el capítulo activo (no espera a que el lector llegue al final);
+  // es un único fetch liviano por chapter-open, no una descarga masiva.
+  useEffect(() => {
+    if (capSiguiente) void cargarContenido(capSiguiente.id);
+  }, [capSiguiente, cargarContenido]);
+
+  // El objeto que le pasamos a CapituloScrollBlock necesita el contenido
+  // "inyectado" desde el mapa — capActual (que viene de `capitulos`) nunca
+  // lo trae.
+  const capActualConContenido = capActual
+    ? { ...capActual, contenido: contenidoPorCapId[capActual.id] ?? "" }
+    : null;
+  const contenidoListo =
+    !!capActual && contenidoPorCapId[capActual.id] !== undefined;
   const _personajesIds = Array.from(new Set(capActual?.personajes_ids ?? []));
 
-  // Scroll inicial al cap activo
+  // Scroll inicial al cap activo — espera a `contenidoListo`: el elemento
+  // `cap-${capId}` recién existe en el DOM una vez que CapituloScrollBlock
+  // se monta (que ahora ocurre después del fetch puntual de contenido, no
+  // apenas resuelve el índice).
   useEffect(() => {
-    if (loading || hasScrolled.current || !capId) return;
+    if (loading || hasScrolled.current || !capId || !contenidoListo) return;
     hasScrolled.current = true;
     setTimeout(() => {
       document
         .getElementById(`cap-${capId}`)
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 180);
-  }, [loading, capId]);
+  }, [loading, capId, contenidoListo]);
 
-  // Observar qué capítulo es visible para actualizar el título
+  // Observar qué capítulo es visible para actualizar el título.
+  // Depende también de `contenidoListo`: el elemento `cap-${capId}` recién
+  // existe una vez que CapituloScrollBlock se monta (después del fetch
+  // puntual de contenido) — sin esta dependencia, si el contenido tardaba
+  // en cargar, el observer nunca se registraba.
   useEffect(() => {
-    if (!capId) return;
+    if (!capId || !contenidoListo) return;
     const container = document.getElementById("lector-scroll-container");
     const el = document.getElementById(`cap-${capId}`);
     if (!el) return;
@@ -1106,7 +1246,7 @@ export default function Lector({
       clearTimeout(t);
       obs.disconnect();
     };
-  }, [capId, capitulos]);
+  }, [capId, capitulos, contenidoListo]);
 
   if (!loading && (error || capitulos.length === 0))
     return (
@@ -1252,11 +1392,38 @@ export default function Lector({
         {/* Padding top en móvil */}
         <div className="md:hidden h-12" />
 
-        {/* Capítulo activo — uno solo a la vez */}
-        {!loading && capActual && (
+        {/* Capítulo activo — uno solo a la vez.
+            Mientras su `contenido` puntual está en vuelo (fetch bajo
+            demanda, ver useCargadorContenido), mostramos un skeleton chico
+            en vez de montar ContenidoInteractivo con texto vacío. */}
+        {!loading && capActual && !contenidoListo && (
+          <div
+            className="max-w-2xl mx-auto px-6 py-24 flex flex-col gap-3"
+            aria-hidden
+          >
+            {[95, 88, 92, 60, 0, 90, 85, 70].map((w, i) =>
+              w === 0 ? (
+                <div key={i} className="h-4" />
+              ) : (
+                <div
+                  key={i}
+                  style={{
+                    height: 14,
+                    width: `${w}%`,
+                    borderRadius: 4,
+                    background:
+                      "color-mix(in srgb, var(--primary) 6%, transparent)",
+                  }}
+                />
+              ),
+            )}
+          </div>
+        )}
+
+        {!loading && capActual && contenidoListo && capActualConContenido && (
           <CapituloScrollBlock
             key={capActual.id}
-            cap={capActual}
+            cap={capActualConContenido}
             esExtra={esExtra}
             haySegSiguiente={!!capSiguiente}
             onNavigate={handleNavigate}
@@ -1264,7 +1431,7 @@ export default function Lector({
         )}
 
         {/* Footer de navegación */}
-        {!loading && capActual && (
+        {!loading && capActual && contenidoListo && (
           <footer className="max-w-2xl mx-auto px-6 pb-20 pt-4 flex flex-col items-center gap-6">
             <div className="flex items-center gap-4 w-full max-w-xs">
               <div

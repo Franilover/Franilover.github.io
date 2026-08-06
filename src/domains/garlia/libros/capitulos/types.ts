@@ -19,7 +19,15 @@ export interface CapituloScrollItem {
   id: string;
   orden: number;
   titulo_capitulo: string;
-  contenido: string;
+  /**
+   * Opcional a propósito: el fetch de índice (todos los capítulos del
+   * libro) YA NO trae `contenido` — solo metadata. El texto real vive en
+   * `useLectorStore.contenidoPorCapId[cap.id]`, cargado bajo demanda por
+   * `useContenidoCapitulo`. Este campo puede seguir presente en objetos
+   * armados a mano (ej. tests, o el editor que sí carga todo junto), pero
+   * el lector no debe depender de que esté seteado acá.
+   */
+  contenido?: string;
   fecha_publicacion: string;
   libros?: { titulo?: string };
   personajes_ids?: string[];

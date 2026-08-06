@@ -23,6 +23,22 @@
  * Lector (PanelLateral, BarraProgresoVertical, etc.) — solo los componentes
  * que de verdad leen ese campo.
  *
+ * ─── `capitulos` es LIVIANO (sin `contenido`) ─────────────────────────────
+ * IMPORTANTE — `capitulos` (y por ende `CapituloScrollItem`) NO trae
+ * `contenido`. Es solo metadata (id, orden, título, ids de entidades, etc.)
+ * para armar el índice, navegar anterior/siguiente y precargar los mapas de
+ * entidades del libro entero. Se arma con un único `select` liviano de TODOS
+ * los capítulos del libro.
+ *
+ * El texto de cada capítulo vive aparte, en `contenidoPorCapId` — un mapa
+ * `capId -> contenido` que se va llenando bajo demanda (un fetch puntual por
+ * capítulo, solo cuando el lector lo abre, o se prefetchea el siguiente), no
+ * de una sola vez para todo el libro. Antes `capitulos` traía el `contenido`
+ * de los N capítulos en un solo fetch — para un libro largo eso eran decenas
+ * de miles de palabras descargadas y guardadas en memoria/Dexie solo para
+ * mostrar una. Ver `cargarContenidoCap` en leerLibro.tsx para el fetch
+ * puntual por capítulo.
+ *
  * Uso en componentes — seleccioná solo lo que necesitás:
  *
  *   const capId = useLectorStore((s) => s.capId);
@@ -48,10 +64,24 @@ interface LectorState {
   /** true si es poemario/extra: sin navegación lineal anterior/siguiente. */
   esExtra: boolean;
 
-  /** Capítulos completos (con contenido) del libro activo, ordenados por `orden`. */
+  /** Capítulos del libro activo — LIVIANOS, sin `contenido` (ver nota de
+   *  arriba). Ordenados por `orden`. Usado para índice, navegación y mapas
+   *  de entidades. */
   capitulos: CapituloScrollItem[];
-  /** Versión liviana (sin contenido) usada por el índice/selector. */
+  /** Versión liviana (sin contenido) usada por el índice/selector. Hoy es
+   *  redundante con `capitulos` (que ya no trae contenido), se mantiene por
+   *  compatibilidad con quien ya la consuma. */
   listaCapitulos: CapituloLista[];
+
+  /** Texto completo de cada capítulo, cargado bajo demanda. Clave: capId.
+   *  Un capítulo puede estar en `capitulos` (metadata) sin estar acá
+   *  todavía — el componente debe mostrar un estado de carga hasta que
+   *  aparezca su entrada. */
+  contenidoPorCapId: Record<string, string>;
+  /** Ids de capítulo cuyo fetch de contenido está en vuelo — evita disparar
+   *  el mismo fetch dos veces (ej. prefetch + apertura manual casi
+   *  simultáneos). */
+  cargandoContenidoIds: Record<string, boolean>;
 
   /** ID del capítulo actualmente activo/visible. */
   capId: string;
@@ -87,6 +117,12 @@ interface LectorState {
   setCapId: (capId: string) => void;
   setActiveCapTitle: (titulo: string | null) => void;
   setShowSidebar: (show: boolean) => void;
+
+  /** Guarda el contenido ya cargado de un capítulo (fetch puntual o Dexie). */
+  setContenidoCap: (capId: string, contenido: string) => void;
+  /** Precarga varios de una — usado al hidratar desde Dexie al abrir el libro. */
+  setContenidoCapBatch: (entries: Record<string, string>) => void;
+  setCargandoContenido: (capId: string, cargando: boolean) => void;
 }
 
 const initialState = {
@@ -95,6 +131,8 @@ const initialState = {
   esExtra: false,
   capitulos: [] as CapituloScrollItem[],
   listaCapitulos: [] as CapituloLista[],
+  contenidoPorCapId: {} as Record<string, string>,
+  cargandoContenidoIds: {} as Record<string, boolean>,
   capId: "",
   activeCapTitle: null as string | null,
   loading: true,
@@ -121,6 +159,22 @@ export const useLectorStore = create<LectorState>()((set) => ({
   setActiveCapTitle: (activeCapTitle) => set({ activeCapTitle }),
 
   setShowSidebar: (showSidebar) => set({ showSidebar }),
+
+  setContenidoCap: (capId, contenido) =>
+    set((state) => ({
+      contenidoPorCapId: { ...state.contenidoPorCapId, [capId]: contenido },
+      cargandoContenidoIds: { ...state.cargandoContenidoIds, [capId]: false },
+    })),
+
+  setContenidoCapBatch: (entries) =>
+    set((state) => ({
+      contenidoPorCapId: { ...state.contenidoPorCapId, ...entries },
+    })),
+
+  setCargandoContenido: (capId, cargando) =>
+    set((state) => ({
+      cargandoContenidoIds: { ...state.cargandoContenidoIds, [capId]: cargando },
+    })),
 }));
 
 // ── Selectores derivados ────────────────────────────────────────────────────
