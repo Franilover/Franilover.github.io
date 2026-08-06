@@ -16,6 +16,8 @@ import {
   BookMarked,
   Bug,
   Package,
+  ImageIcon,
+  Plus,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -33,6 +35,8 @@ import { useIsAdmin } from "@/domains/plataforma/auth/useIsAdmin";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
+import SimpleImagePicker from "@/ui/SimpleImagePicker";
+import { invalidateMapTiles } from "@/infra/sync/syncEngine";
 
 // ─── Hourglass — reemplaza Loader2 en todos los indicadores de carga ──────────
 function Hourglass({ size = 14 }: { size?: number }) {
@@ -91,6 +95,163 @@ function Hourglass({ size = 14 }: { size?: number }) {
         strokeWidth="0.8"
       />
     </svg>
+  );
+}
+
+// ─── Modal para añadir tile en posición custom (portado de EditorMapa) ────────
+function ModalNuevoTile({
+  existingPositions,
+  onClose,
+  onCreated,
+}: {
+  existingPositions: { col: number; row: number }[];
+  onClose: () => void;
+  onCreated: (tile: MapTile) => void;
+}) {
+  const [col, setCol] = useState(0);
+  const [row, setRow] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const isOccupied = existingPositions.some(
+    (p) => p.col === col && p.row === row,
+  );
+
+  const handleCreate = async () => {
+    if (isOccupied) {
+      setError("Ya existe un tile en esa posición");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const maxOrder = existingPositions.length;
+      const { data, error: err } = await supabase
+        .from("map_tiles")
+        .insert({ world_id: "garlia", col, row, order: maxOrder })
+        .select()
+        .single();
+      if (err) throw err;
+      onCreated(data as MapTile);
+    } catch (e: any) {
+      setError(e.message || "Error al crear el tile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-200 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-80 p-6 flex flex-col gap-4"
+        style={{
+          background: "var(--white-custom)",
+          border:
+            "1px solid color-mix(in srgb, var(--primary) 20%, transparent)",
+          borderRadius: "2px",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          className="absolute top-3 right-3 opacity-50 hover:opacity-100"
+          onClick={onClose}
+        >
+          <X size={14} />
+        </button>
+
+        <h3
+          className="font-black uppercase text-sm tracking-[0.15em]"
+          style={{ fontFamily: "'Cinzel', serif", color: "var(--foreground)" }}
+        >
+          Nuevo Tile
+        </h3>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            ["Columna (col)", col, setCol],
+            ["Fila (row)", row, setRow],
+          ].map(([lbl, val, setter]: any) => (
+            <div key={lbl as string} className="flex flex-col gap-1">
+              <label
+                className="text-micro font-bold uppercase tracking-[0.15em]"
+                style={{
+                  color:
+                    "color-mix(in srgb, var(--foreground) 50%, transparent)",
+                }}
+              >
+                {lbl as string}
+              </label>
+              <input
+                className="input-brand text-center font-black text-sm py-1.5"
+                min={0}
+                style={{ borderRadius: "1px" }}
+                type="number"
+                value={val as number}
+                onChange={(e) =>
+                  setter(Math.max(0, parseInt(e.target.value) || 0))
+                }
+              />
+            </div>
+          ))}
+        </div>
+
+        {isOccupied && (
+          <p className="text-micro font-bold text-red-400">
+            ⚠ [{col},{row}] ya existe
+          </p>
+        )}
+        {error && <p className="text-micro font-bold text-red-400">{error}</p>}
+
+        <button
+          className="btn-brand w-full justify-center py-2.5 text-micro uppercase disabled:opacity-50"
+          disabled={saving || isOccupied}
+          onClick={handleCreate}
+        >
+          {saving ? <Hourglass size={11} /> : <Plus size={11} />}
+          Crear
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── ImagePickerModal para tiles (portado de EditorMapa) ──────────────────────
+function TileImagePickerModal({
+  title,
+  onSelect,
+  onClose,
+}: {
+  title?: string;
+  onSelect: (url: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-200 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white-custom rounded-xl shadow-2xl border border-primary/15 w-full max-w-lg p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-micro font-black uppercase tracking-[0.15em] text-primary/50 flex items-center gap-2">
+            <ImageIcon size={11} /> {title ?? "Imagen del tile"}
+          </h3>
+          <button
+            className="text-primary/30 hover:text-primary transition-colors"
+            onClick={onClose}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <SimpleImagePicker onClose={onClose} onSelect={onSelect} />
+      </div>
+    </div>
   );
 }
 
@@ -2409,6 +2570,111 @@ export default function MapaInteractivo({
     };
   }, []);
 
+  // ── Gestión de tiles del mapa global (portado de EditorMapa) ─────────────────
+  const [showNuevoTileModal, setShowNuevoTileModal] = useState(false);
+  const [tilePickerTarget, setTilePickerTarget] = useState<MapTile | null>(
+    null,
+  );
+  const [reinoParaMover, setReinoParaMover] = useState<string | null>(null);
+
+  const handleTileCreated = useCallback((tile: MapTile) => {
+    setMapTiles((prev) => [...prev, tile]);
+    setShowNuevoTileModal(false);
+    void invalidateMapTiles("garlia");
+    showToast("Tile creado", "success");
+  }, []);
+
+  const handleTileCreateAt = useCallback(
+    async (col: number, row: number) => {
+      try {
+        const { data, error } = await supabase
+          .from("map_tiles")
+          .insert({ world_id: "garlia", col, row, order: mapTiles.length })
+          .select()
+          .single();
+        if (error) throw error;
+        setMapTiles((prev) => [...prev, data as MapTile]);
+        await invalidateMapTiles("garlia");
+        showToast("Tile creado", "success");
+      } catch {
+        showToast("Error al crear tile", "error");
+      }
+    },
+    [mapTiles.length],
+  );
+
+  const handleTileDelete = useCallback(async (tileId: string) => {
+    if (!confirm("¿Eliminar este tile? Se perderá la referencia a la imagen."))
+      return;
+    try {
+      await supabase.from("map_tiles").delete().eq("id", tileId);
+      setMapTiles((prev) => prev.filter((t) => t.id !== tileId));
+      await invalidateMapTiles("garlia");
+      showToast("Tile eliminado", "success");
+    } catch {
+      showToast("Error al eliminar", "error");
+    }
+  }, []);
+
+  const handleTileImageSelect = useCallback(
+    async (tileId: string, image_url: string) => {
+      setMapTiles((prev) =>
+        prev.map((t) => (t.id === tileId ? { ...t, image_url } : t)),
+      );
+      try {
+        const { error } = await supabase
+          .from("map_tiles")
+          .update({ image_url })
+          .eq("id", tileId);
+        if (error) throw error;
+        await invalidateMapTiles("garlia");
+        showToast("Imagen actualizada", "success");
+      } catch {
+        showToast("Error al guardar la imagen", "error");
+      } finally {
+        setTilePickerTarget(null);
+      }
+    },
+    [],
+  );
+
+  // Mover un reino en el mapa global: seleccionar con onMarkerSelect
+  // (Ctrl+click), luego onMarkerMove al soltar en la celda destino.
+  const handleReinoMarkerMove = useCallback(
+    (
+      markerId: string,
+      coord: { x: number; y: number; tile_col: number; tile_row: number },
+    ) => {
+      setReinos((prev) =>
+        prev.map((r) =>
+          r.id === markerId
+            ? {
+                ...r,
+                coord_x: coord.x,
+                coord_y: coord.y,
+                tile_col: coord.tile_col,
+                tile_row: coord.tile_row,
+              }
+            : r,
+        ),
+      );
+      supabase
+        .from("reinos")
+        .update({
+          coord_x: coord.x,
+          coord_y: coord.y,
+          tile_col: coord.tile_col,
+          tile_row: coord.tile_row,
+        })
+        .eq("id", markerId)
+        .then(({ error }) => {
+          if (error) showToast("Error al guardar posición", "error");
+        });
+      setReinoParaMover(null);
+    },
+    [],
+  );
+
   // ── Fondo color (color del mar) ──────────────────────────────────────────────
   // fondoColorGlobal: color del mapa del continente (guardado en config_mapa)
   // fondoColorReino: color del mapa del reino activo (guardado en reinos.fondo_color)
@@ -3425,32 +3691,55 @@ export default function MapaInteractivo({
         )}
 
         {vistaActual === "global" ? (
-          <UnifiedTileCanvas
-            className="absolute inset-0"
-            editMode={editMode}
-            eyedropperActive={eyedropperActive}
-            fondoColor={fondoColor}
-            hiddenMarkers={hiddenMarkers}
-            isFirstOpen={isFirstOpen}
-            markers={
-              editMode ? [...visibleMarkers, ...hiddenMarkers] : visibleMarkers
-            }
-            selectedMarkerId={reinoSeleccionado?.id ?? null}
-            tiles={mapTiles}
-            onEyedropperPick={handleFondoColorChange}
-            onMapClick={handleMapClick}
-            onMarkerClick={handleReinoClick}
-            onMarkerMove={() => {}}
-            onMarkerSelect={() => {}}
-            onOpenPanel={
-              isMobile && reinoSeleccionado
-                ? () => setPanelOpen(true)
-                : undefined
-            }
-            onTileCreate={() => {}}
-            onTileDelete={() => {}}
-            onTilePick={() => {}}
-          />
+          <>
+            <UnifiedTileCanvas
+              className="absolute inset-0"
+              editMode={editMode}
+              eyedropperActive={eyedropperActive}
+              fondoColor={fondoColor}
+              hiddenMarkers={hiddenMarkers}
+              isFirstOpen={isFirstOpen}
+              markers={
+                editMode
+                  ? [...visibleMarkers, ...hiddenMarkers]
+                  : visibleMarkers
+              }
+              selectedMarkerId={reinoParaMover ?? reinoSeleccionado?.id ?? null}
+              tiles={mapTiles}
+              onEyedropperPick={handleFondoColorChange}
+              onMapClick={handleMapClick}
+              onMarkerClick={handleReinoClick}
+              onMarkerMove={handleReinoMarkerMove}
+              onMarkerSelect={setReinoParaMover}
+              onOpenPanel={
+                isMobile && reinoSeleccionado
+                  ? () => setPanelOpen(true)
+                  : undefined
+              }
+              onTileCreate={handleTileCreateAt}
+              onTileDelete={(tile) => void handleTileDelete(tile.id)}
+              onTilePick={(tile) => setTilePickerTarget(tile)}
+            />
+
+            {editMode && (
+              <button
+                className="absolute bottom-3 left-3 z-10 w-9 h-9 flex items-center justify-center transition-opacity hover:opacity-80"
+                style={{
+                  borderRadius: "6px",
+                  background:
+                    "color-mix(in srgb, var(--accent) 18%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--accent) 25%, transparent)",
+                  color: "color-mix(in srgb, var(--accent) 80%, transparent)",
+                  backdropFilter: "blur(10px)",
+                }}
+                title="Nuevo tile en posición personalizada"
+                onClick={() => setShowNuevoTileModal(true)}
+              >
+                <Plus size={14} />
+              </button>
+            )}
+          </>
         ) : (
           <ReinoTileCanvas
             className="absolute inset-0"
@@ -3605,6 +3894,24 @@ export default function MapaInteractivo({
           </MotionDiv>
         )}
       </AnimatePresence>
+
+      {showNuevoTileModal && (
+        <ModalNuevoTile
+          existingPositions={mapTiles.map((t) => ({
+            col: t.col,
+            row: t.row,
+          }))}
+          onClose={() => setShowNuevoTileModal(false)}
+          onCreated={handleTileCreated}
+        />
+      )}
+
+      {tilePickerTarget && (
+        <TileImagePickerModal
+          onClose={() => setTilePickerTarget(null)}
+          onSelect={(url) => void handleTileImageSelect(tilePickerTarget.id, url)}
+        />
+      )}
     </div>
   );
 }
