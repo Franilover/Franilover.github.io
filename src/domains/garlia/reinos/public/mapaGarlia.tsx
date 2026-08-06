@@ -3202,7 +3202,6 @@ export default function MapaInteractivo({
         );
       }
       showToast("Cambios guardados", "success");
-      setEditMode(false);
     } catch {
       showToast("No se pudieron guardar los cambios", "error");
     } finally {
@@ -3221,7 +3220,6 @@ export default function MapaInteractivo({
     setCapitulosReino([]);
     setLoadingLibros(false);
     setModifiedDetalles(new Set());
-    setEditMode(false);
     setPanelOpen(false);
     onExitReino?.();
   };
