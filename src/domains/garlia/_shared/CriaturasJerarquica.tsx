@@ -63,6 +63,9 @@ interface Props {
    *  se combina (AND) con el filtro de grupo activo. */
   busqueda?: string;
   onBusquedaChange?: (value: string) => void;
+  /** Elemento opcional pegado a la izquierda del buscador — usado por
+   *  EntidadesPage para el dropdown de agrupación (Reino/Criatura). */
+  agrupacionSelector?: React.ReactNode;
 }
 
 function NodoCriatura({
@@ -116,6 +119,7 @@ export function CriaturasJerarquica({
   onOpenGrupo,
   busqueda = "",
   onBusquedaChange,
+  agrupacionSelector,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -222,6 +226,7 @@ export function CriaturasJerarquica({
     <div className="mb-8 last:mb-0">
       <div className="flex items-center gap-2 mb-4 px-1 flex-wrap">
         <div className="flex-1 flex items-center gap-2 flex-wrap">
+          {agrupacionSelector}
           {onBusquedaChange && (
             <BuscadorInline
               value={busqueda}

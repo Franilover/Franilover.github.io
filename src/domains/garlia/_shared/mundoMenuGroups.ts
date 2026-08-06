@@ -17,7 +17,6 @@
  */
 
 import {
-  Bug,
   Clock,
   Map,
   Mountain,
@@ -48,7 +47,6 @@ export const MUNDO_MENU_GROUPS: MenuGroup[] = [
     title: "Entidades",
     items: [
       { key: "personajes", label: "Personajes", Icon: Users },
-      { key: "criaturas", label: "Criaturas", Icon: Bug },
       { key: "items", label: "Items", Icon: Package },
     ],
   },

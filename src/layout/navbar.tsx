@@ -2,7 +2,6 @@
 import { AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
-  Bug,
   CircleUser,
   Clock,
   Flower2,
@@ -772,21 +771,25 @@ const Navbar = () => {
   // ── Submenú admin (desktop) ──────────────────────────────────────────────
   // Reemplaza a <MundoTabs /> (que vivía arriba del editor): toda la
   // navegación entre secciones de /myself/garlia pasa a vivir acá.
-  // "Criaturas" e "Items" salieron de "Entidades" y tienen su propio estado
-  // activo, igual que ya pasaba con "letras" (Canciones) y
-  // "runas" (Magia). "Organización" (Grupos/Notas) ya NO
-  // vive acá — se sacó del submenú y ahora es un botón propio en el Home
-  // del editor de mundo (ver MundoHomeContent), en vez de una sección más
-  // de navegación global.
+  // "Items" salió de "Entidades" y tiene su propio estado activo, igual
+  // que ya pasaba con "letras" (Canciones) y "runas" (Magia).
+  // "Criaturas" ya NO es una sección propia del submenú: la vista de
+  // Personajes ahora tiene un dropdown para agrupar por Reino o por
+  // Criatura (ver EntidadesPage/AgrupacionPersonajesDropdown), así que
+  // "criaturas" solo sigue existiendo como SectionKey transitoria cuando se
+  // abre el editor puntual de una criatura desde ese dropdown — por eso
+  // sigue contando como "Entidades" acá (no tiene entrada de menú propia).
+  // "Organización" (Grupos/Notas) ya NO vive acá — se sacó del submenú y
+  // ahora es un botón propio en el Home del editor de mundo (ver
+  // MundoHomeContent), en vez de una sección más de navegación global.
   const ENTIDADES_SECTIONS = new Set<SectionKey>([
     "personajes",
+    "criaturas",
     "reinos",
     "ciudades",
   ]);
 
   const ITEMS_SECTIONS = new Set<SectionKey>(["items"]);
-
-  const CRIATURAS_SECTIONS = new Set<SectionKey>(["criaturas"]);
 
   // "Magia" agrupa Runas — antes vivía dentro de "Entidades", pero al
   // tener su propio editor (FormularioMagico) tiene más sentido como
@@ -834,16 +837,6 @@ const Navbar = () => {
         mundoSection !== null &&
         ENTIDADES_SECTIONS.has(mundoSection),
       onSelect: () => mundoSelectSection("personajes"),
-    },
-    {
-      key: "criaturas",
-      label: "Criaturas",
-      icon: Bug,
-      active:
-        isGarliaeditor &&
-        mundoSection !== null &&
-        CRIATURAS_SECTIONS.has(mundoSection),
-      onSelect: () => mundoSelectSection("criaturas"),
     },
     {
       key: "magia",

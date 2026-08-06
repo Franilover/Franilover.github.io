@@ -43,6 +43,10 @@ import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GeografiaJerarquica, type GrupoPersonajeSubtipo } from "@/domains/garlia/_shared/GeografiaJerarquica";
 import { GrupoFiltroBarra, GrupoFiltroDropdown, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import { CriaturasJerarquica } from "@/domains/garlia/_shared/CriaturasJerarquica";
+import {
+  AgrupacionPersonajesDropdown,
+  type AgrupacionPersonajes,
+} from "@/domains/garlia/_shared/AgrupacionPersonajesDropdown";
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { TABLA_TO_SECTION } from "@/domains/garlia/_shared/useExternalCommandBridge";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
@@ -200,6 +204,13 @@ export function EntidadesPage({ section, selectedId }: Props) {
     () => agruparPorSubtipo("reinos"),
     [gruposPorTipo],
   );
+
+  // Agrupación activa de la vista "Personajes": por Reino (jerarquía
+  // Reino→Ciudad→Personaje) o por Criatura (Criatura→Personaje). El
+  // dropdown que la controla vive pegado al buscador de esa vista; al
+  // cambiarla, los dropdowns de filtro por grupo debajo cambian a los
+  // correspondientes (Reinos vs Criaturas) — ver más abajo.
+  const [agrupacionPersonajes, setAgrupacionPersonajes] = useState<AgrupacionPersonajes>("reino");
 
   const [grupoPersonajeSeleccionadoId, setGrupoPersonajeSeleccionadoId] = useState<string | null>(null);
   const [grupoCriaturaSeleccionadoId, setGrupoCriaturaSeleccionadoId] = useState<string | null>(null);
@@ -563,39 +574,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
     );
   }
 
-  // ── Criaturas ────────────────────────────────────────────────────────
-  // Sección propia de la navbar (antes vivía adentro de Entidades → sub-tab
-  // "Criaturas"). Agrupa Personajes por criatura de origen.
-  if (section === "criaturas") {
-    return (
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <CriaturasJerarquica
-          criaturas={criaturas}
-          personajes={personajes}
-          loading={loadingC || loadingP}
-          gruposCriaturasPorSubtipo={gruposCriaturasPorSubtipo}
-          grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
-          onSeleccionarGrupo={setGrupoCriaturaSeleccionadoId}
-          onOpenGrupo={(id) => openEntity("grupos", id)}
-          busqueda={busquedaCriatura}
-          onBusquedaChange={setBusquedaCriatura}
-          onCreateCriatura={async () => {
-            const { data } = await addCriatura({ nombre: "Nueva criatura" });
-            if (data?.id) openEntity("criaturas", data.id);
-          }}
-          onCreatePersonaje={async (criatura) => {
-            const { data } = await addPersonaje({
-              nombre: "Nuevo personaje",
-              ...(criatura ? { especie: criatura.nombre } : {}),
-            });
-            if (data?.id) openEntity("personajes", data.id);
-          }}
-          onOpen={(section, id) => openEntity(section, id)}
-        />
-      </div>
-    );
-  }
-
   // ── Items ────────────────────────────────────────────────────────
   // Sección propia de la navbar (antes vivía adentro de Criaturas).
   // Grid simple de items sin agrupación, con dropdowns de filtro por grupo.
@@ -764,43 +742,77 @@ export function EntidadesPage({ section, selectedId }: Props) {
     );
   }
 
-  // ── Entidades (Personajes/Items + Geografía) ─────────────────────────
-  // Sin sub-tabs: Criaturas y Organización ahora son secciones propias de
-  // la navbar (ver arriba), así que acá solo queda Geografía (Reinos +
-  // Ciudades + Personajes).
+  // ── Entidades (Personajes + Geografía/Criaturas) ─────────────────────
+  // Sin sub-tabs: Organización ahora es sección propia de la navbar.
+  // "Personajes" absorbe también la vista antes llamada "Criaturas": el
+  // dropdown de agrupación (junto al buscador) alterna entre agrupar por
+  // Reino (GeografiaJerarquica) o por Criatura (CriaturasJerarquica), y los
+  // dropdowns de filtro por grupo debajo cambian según cuál esté activa.
+  const agrupacionSelector = (
+    <AgrupacionPersonajesDropdown value={agrupacionPersonajes} onChange={setAgrupacionPersonajes} />
+  );
+
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4">
-      <GeografiaJerarquica
-        reinos={reinos}
-        ciudades={ciudades}
-        personajes={personajes}
-        loading={loadingR || loadingCd || loadingP}
-        onOpen={(section, id) => openEntity(section, id)}
-        gruposPersonajesPorSubtipo={gruposPersonajesPorSubtipo}
-        grupoSeleccionadoId={grupoPersonajeSeleccionadoId}
-        onSeleccionarGrupo={setGrupoPersonajeSeleccionadoId}
-        gruposReinosPorSubtipo={gruposReinosPorSubtipo}
-        grupoReinoSeleccionadoId={grupoReinoSeleccionadoId}
-        onSeleccionarGrupoReino={setGrupoReinoSeleccionadoId}
-        onOpenGrupo={(id) => openEntity("grupos", id)}
-        busqueda={busquedaReino}
-        onBusquedaChange={setBusquedaReino}
-        onCreateReino={async () => {
-          const { data } = await addReino({ nombre: "Nuevo reino" });
-          if (data?.id) openEntity("reinos", data.id);
-        }}
-        onCreateCiudad={async (reinoId) => {
-          const { data } = await addCiudad({ nombre: "Nueva ciudad", reino_id: reinoId });
-          if (data?.id) openEntity("ciudades", data.id);
-        }}
-        onCreatePersonaje={async (ciudadId) => {
-          const { data } = await addPersonaje({
-            nombre: "Nuevo personaje",
-            ciudad_id: ciudadId,
-          });
-          if (data?.id) openEntity("personajes", data.id);
-        }}
-      />
+      {agrupacionPersonajes === "criatura" ? (
+        <CriaturasJerarquica
+          criaturas={criaturas}
+          personajes={personajes}
+          loading={loadingC || loadingP}
+          gruposCriaturasPorSubtipo={gruposCriaturasPorSubtipo}
+          grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
+          onSeleccionarGrupo={setGrupoCriaturaSeleccionadoId}
+          onOpenGrupo={(id) => openEntity("grupos", id)}
+          busqueda={busquedaCriatura}
+          onBusquedaChange={setBusquedaCriatura}
+          agrupacionSelector={agrupacionSelector}
+          onCreateCriatura={async () => {
+            const { data } = await addCriatura({ nombre: "Nueva criatura" });
+            if (data?.id) openEntity("criaturas", data.id);
+          }}
+          onCreatePersonaje={async (criatura) => {
+            const { data } = await addPersonaje({
+              nombre: "Nuevo personaje",
+              ...(criatura ? { especie: criatura.nombre } : {}),
+            });
+            if (data?.id) openEntity("personajes", data.id);
+          }}
+          onOpen={(section, id) => openEntity(section, id)}
+        />
+      ) : (
+        <GeografiaJerarquica
+          reinos={reinos}
+          ciudades={ciudades}
+          personajes={personajes}
+          loading={loadingR || loadingCd || loadingP}
+          onOpen={(section, id) => openEntity(section, id)}
+          gruposPersonajesPorSubtipo={gruposPersonajesPorSubtipo}
+          grupoSeleccionadoId={grupoPersonajeSeleccionadoId}
+          onSeleccionarGrupo={setGrupoPersonajeSeleccionadoId}
+          gruposReinosPorSubtipo={gruposReinosPorSubtipo}
+          grupoReinoSeleccionadoId={grupoReinoSeleccionadoId}
+          onSeleccionarGrupoReino={setGrupoReinoSeleccionadoId}
+          onOpenGrupo={(id) => openEntity("grupos", id)}
+          busqueda={busquedaReino}
+          onBusquedaChange={setBusquedaReino}
+          agrupacionSelector={agrupacionSelector}
+          onCreateReino={async () => {
+            const { data } = await addReino({ nombre: "Nuevo reino" });
+            if (data?.id) openEntity("reinos", data.id);
+          }}
+          onCreateCiudad={async (reinoId) => {
+            const { data } = await addCiudad({ nombre: "Nueva ciudad", reino_id: reinoId });
+            if (data?.id) openEntity("ciudades", data.id);
+          }}
+          onCreatePersonaje={async (ciudadId) => {
+            const { data } = await addPersonaje({
+              nombre: "Nuevo personaje",
+              ciudad_id: ciudadId,
+            });
+            if (data?.id) openEntity("personajes", data.id);
+          }}
+        />
+      )}
     </div>
   );
 }
