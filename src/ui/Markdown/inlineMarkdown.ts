@@ -66,7 +66,15 @@ export function applyInlineMarkdown(
 // Config de DOMPurify: solo las etiquetas/atributos que el parser puede
 // producir. Todo lo demás (scripts, on*, iframes, etc.) queda fuera aunque
 // el regex de arriba algún día lo generara por error.
-const PURIFY_CONFIG: DOMPurify.Config = {
+//
+// Tipado con Parameters<typeof DOMPurify.sanitize>[1] en vez de
+// DOMPurify.Config directamente: la versión de "dompurify" instalada en
+// Vercel resolvía un tipo Config distinto al del namespace importado acá
+// (choque de tipos entre dos declaraciones de la misma librería), lo que
+// rompía el build con "No overload matches this call" en PARSER_MEDIA_TYPE.
+// Derivar el tipo desde la firma real de la función instalada evita ese
+// desajuste sin importar qué versión termine resolviendo cada entorno.
+const PURIFY_CONFIG: Parameters<typeof DOMPurify.sanitize>[1] = {
   ALLOWED_TAGS: ["strong", "em", "code", "del", "mark", "a", "br"],
   ALLOWED_ATTR: ["class", "href", "title", "data-wikilink"],
   // Bloquea cualquier esquema de URL que no sea http(s), mailto o el
@@ -83,6 +91,7 @@ const PURIFY_CONFIG: DOMPurify.Config = {
 export function toSafeHtml(html: string): string {
   return DOMPurify.sanitize(html, PURIFY_CONFIG) as unknown as string;
 }
+
 
 /**
  * Atajo: parsea y sanitiza en un solo paso. Es lo que deberían usar la
