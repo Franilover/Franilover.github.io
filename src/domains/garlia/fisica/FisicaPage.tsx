@@ -142,26 +142,28 @@ function GrupoOrisPorFamilia({
   activoId?: string | null;
   onSeleccionar: (id: string) => void;
 }) {
-  if (items.length === 0) return null;
   const Icon = ORIS_FAMILIA_ICON[familia];
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 min-w-0">
       <div className="flex items-center gap-1.5 text-primary/40">
         <Icon size={12} />
         <p className="text-micro font-black uppercase tracking-widest">{familia}</p>
       </div>
-      <div
-        className="grid gap-1"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}
-      >
-        {items.map((o) => (
-          <OrisCasilla
-            key={o.id}
-            oris={o}
-            seleccionado={o.id === activoId}
-            onClick={() => onSeleccionar(o.id)}
-          />
-        ))}
+      <div className="flex flex-col gap-1">
+        {items.length === 0 ? (
+          <div className="py-3 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
+            Sin Oris
+          </div>
+        ) : (
+          items.map((o) => (
+            <OrisCasilla
+              key={o.id}
+              oris={o}
+              seleccionado={o.id === activoId}
+              onClick={() => onSeleccionar(o.id)}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -303,26 +305,27 @@ export function FisicaPage({
           </div>
         </div>
 
-        {/* Bloque 2: Oris por familia */}
+        {/* Bloque 2: Oris por familia — 3 columnas lado a lado (Mecánica |
+            Energética | Biológica), cada una con sus Oris apilados
+            verticalmente adentro. En pantallas angostas colapsa a 1
+            columna para no aplastar el contenido. */}
         <div className="flex flex-col gap-2">
           {loadingOris && oris.length === 0 ? (
             <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
-          ) : oris.length === 0 ? (
-            <div className="py-6 text-micro text-primary/25 text-center">
-              Todavía no hay Oris cargados.
-            </div>
           ) : (
-            ORIS_FAMILIAS.map((familia) => (
-              <GrupoOrisPorFamilia
-                key={familia}
-                familia={familia}
-                items={orisPorFamilia.get(familia) ?? []}
-                activoId={activoId}
-                onSeleccionar={(id) =>
-                  setSeleccionadoId((actual) => (actual === id ? null : id))
-                }
-              />
-            ))
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+              {ORIS_FAMILIAS.map((familia) => (
+                <GrupoOrisPorFamilia
+                  key={familia}
+                  familia={familia}
+                  items={orisPorFamilia.get(familia) ?? []}
+                  activoId={activoId}
+                  onSeleccionar={(id) =>
+                    setSeleccionadoId((actual) => (actual === id ? null : id))
+                  }
+                />
+              ))}
+            </div>
           )}
         </div>
 
@@ -346,18 +349,19 @@ export function FisicaPage({
         </div>
       </div>
 
-      {/* Panel lateral: overlay + drawer a la derecha con el detalle del
-          Oris seleccionado. El grid queda visible detrás, para poder
-          seguir eligiendo otros Oris sin perder contexto. */}
+      {/* Panel flotante centrado: overlay clickeable + tarjeta con margen a
+          los lados (no ocupa toda la pantalla) para poder salir tocando
+          afuera sin sensación de estar atrapado. El grid queda debajo,
+          visible detrás del overlay. */}
       {activo && (
-        <>
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 md:p-12">
           <div
-            className="absolute inset-0 z-30 md:hidden"
-            style={{ background: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
+            className="absolute inset-0"
+            style={{ background: "color-mix(in srgb, var(--primary) 25%, transparent)" }}
             onClick={() => setSeleccionadoId(null)}
           />
           <div
-            className="absolute md:sticky md:top-0 inset-y-0 right-0 z-40 flex flex-col w-full sm:w-[380px] md:w-[420px] shrink-0 border-l shadow-2xl md:shadow-none md:h-full md:self-start"
+            className="relative z-10 flex flex-col w-full max-w-xl max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] rounded-[var(--radius-card)] border shadow-2xl overflow-hidden"
             style={{
               background: "var(--white-custom, var(--bg-main))",
               borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
@@ -377,7 +381,7 @@ export function FisicaPage({
               }
             />
           </div>
-        </>
+        </div>
       )}
     </div>
   );
