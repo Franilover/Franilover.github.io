@@ -12,17 +12,27 @@
  * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
  */
 
-import { Atom, Download, Info, Loader2, Plus, X } from "lucide-react";
+import { Atom, Download, Info, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { ElementoEditor } from "./ElementoEditor";
+import {
+  useInfoTablaQuimica,
+  type SeccionInfoTablaQuimica,
+} from "./useInfoTablaQuimica";
 import { formatLayer, type Elemento } from "./types";
 
 // ─── Descarga: todos los elementos de la Tabla Química en un solo JSON ─────
-function descargarDatosElementos(elementos: Elemento[]) {
+// Incluye también el contenido del modal de info (editable desde Supabase),
+// para que el JSON exportado quede autocontenido con la tabla + su explicación.
+function descargarDatosElementos(
+  elementos: Elemento[],
+  infoTabla: SeccionInfoTablaQuimica[],
+) {
   const payload = {
     exportado_en: new Date().toISOString(),
     elementos,
+    info_tabla_quimica: infoTabla,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
@@ -110,18 +120,77 @@ function ElementoCasilla({
   );
 }
 
-// ─── Info: reglas de la Tabla Química, resumidas ───────────────────────────
+// ─── Info: reglas de la Tabla Química, editable desde Supabase ────────────
 // Solo lo propio de acá (estructura de capas, estabilidad/familias,
 // manifestaciones) — la jerarquía Partícula Base→Partículas→Iums y la
 // resonancia con Iums ya se explican en la sección Física, no se repiten.
-function InfoTablaQuimica() {
+//
+// El contenido (lista de secciones título+texto) ya no está hardcodeado:
+// vive en la tabla `config_info_tabla_quimica` (useInfoTablaQuimica) y es
+// editable inline desde el propio modal con el botón de lápiz.
+function InfoTablaQuimica({
+  info,
+  loading,
+  guardarSecciones,
+}: {
+  info: { secciones: SeccionInfoTablaQuimica[] };
+  loading: boolean;
+  guardarSecciones: (secciones: SeccionInfoTablaQuimica[]) => Promise<void>;
+}) {
   const [abierto, setAbierto] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [borrador, setBorrador] = useState<SeccionInfoTablaQuimica[]>([]);
+
+  function abrir() {
+    setAbierto(true);
+    setEditando(false);
+  }
+
+  function empezarEdicion() {
+    setBorrador(info.secciones.map((s) => ({ ...s })));
+    setEditando(true);
+  }
+
+  function cancelarEdicion() {
+    setEditando(false);
+    setBorrador([]);
+  }
+
+  async function guardar() {
+    setSaving(true);
+    try {
+      // Descarta secciones vacías (título y contenido en blanco) al guardar.
+      const limpio = borrador.filter(
+        (s) => s.titulo.trim() || s.contenido.trim(),
+      );
+      await guardarSecciones(limpio);
+      setEditando(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function actualizarSeccion(id: string, cambios: Partial<SeccionInfoTablaQuimica>) {
+    setBorrador((prev) => prev.map((s) => (s.id === id ? { ...s, ...cambios } : s)));
+  }
+
+  function eliminarSeccion(id: string) {
+    setBorrador((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  function agregarSeccion() {
+    setBorrador((prev) => [
+      ...prev,
+      { id: `seccion-${Date.now()}`, titulo: "", contenido: "" },
+    ]);
+  }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setAbierto(true)}
+        onClick={abrir}
         title="Cómo funciona la Tabla Química"
         className="shrink-0 flex items-center justify-center w-4 h-4 rounded-full border border-primary/25 text-primary/40 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
       >
@@ -149,6 +218,18 @@ function InfoTablaQuimica() {
               <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary/70">
                 Cómo funciona la Tabla Química
               </p>
+
+              {!editando && (
+                <button
+                  type="button"
+                  onClick={empezarEdicion}
+                  title="Editar contenido"
+                  className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+                >
+                  <Pencil size={11} />
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setAbierto(false)}
@@ -158,73 +239,97 @@ function InfoTablaQuimica() {
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto text-micro text-primary/70 leading-relaxed">
-              <div className="flex flex-col gap-1">
-                <p className="font-black uppercase tracking-[0.2em] text-primary/40">
-                  Número atómico
-                </p>
-                <p>
-                  Es el total de partículas del elemento. Se reparten en 3 capas de
-                  capacidad creciente (2 / 4 / 6). En los elementos #1 y #2, Percepción y
-                  Voluntad ocupan temporalmente el núcleo — desde el #3 el núcleo se
-                  estabiliza con Masa/Cinética/Equilibrio.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <p className="font-black uppercase tracking-[0.2em] text-primary/40">
-                  Las 3 capas
-                </p>
-                <div className="rounded-lg border border-primary/10 overflow-hidden">
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/[0.03] border-b border-primary/10">
-                    <span className="w-14 shrink-0 font-bold text-primary/60">Núcleo</span>
-                    <span className="text-primary/50">
-                      Identidad y ancla gravitacional — Masa, Cinética, Equilibrio.
-                    </span>
+            {loading ? (
+              <div className="p-6 text-micro text-primary/30 text-center">Cargando…</div>
+            ) : editando ? (
+              <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto">
+                {borrador.map((seccion) => (
+                  <div
+                    key={seccion.id}
+                    className="flex flex-col gap-1.5 p-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        value={seccion.titulo}
+                        onChange={(e) =>
+                          actualizarSeccion(seccion.id, { titulo: e.target.value })
+                        }
+                        placeholder="Título de la sección"
+                        className="flex-1 min-w-0 bg-primary/5 rounded-md px-2 py-1 text-micro font-black uppercase tracking-wide text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => eliminarSeccion(seccion.id)}
+                        title="Eliminar sección"
+                        className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                    <textarea
+                      value={seccion.contenido}
+                      onChange={(e) =>
+                        actualizarSeccion(seccion.id, { contenido: e.target.value })
+                      }
+                      placeholder="Contenido…"
+                      rows={4}
+                      className="bg-primary/5 rounded-md px-2 py-1.5 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25 leading-relaxed"
+                    />
                   </div>
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/[0.03] border-b border-primary/10">
-                    <span className="w-14 shrink-0 font-bold text-primary/60">Media</span>
-                    <span className="text-primary/50">
-                      Motor energético — Potencial, Información, Ciclo, Entropía.
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/[0.03]">
-                    <span className="w-14 shrink-0 font-bold text-primary/60">Externa</span>
-                    <span className="text-primary/50">
-                      Reactividad y resonancia — Voluntad, Percepción, Transición, Catálisis.
-                    </span>
-                  </div>
-                </div>
-              </div>
+                ))}
 
-              <div className="flex flex-col gap-1">
-                <p className="font-black uppercase tracking-[0.2em] text-primary/40">
-                  Estabilidad y familias
-                </p>
-                <p>
-                  Capa externa completa → elemento <span className="font-bold text-primary/70">Noble</span> (inerte,
-                  raro, resistente a interferencia mágica). Incompleta → elemento{" "}
-                  <span className="font-bold text-primary/70">Inestable</span>, forma compuestos.
-                  Los <span className="font-bold text-primary/70">Sensibles</span> (Percepción/Transición) cambian
-                  fácil ante estímulos; los <span className="font-bold text-primary/70">Reactivos</span>{" "}
-                  (Voluntad/Catálisis) se combinan activamente.
-                </p>
+                <button
+                  type="button"
+                  onClick={agregarSeccion}
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
+                >
+                  <Plus size={10} />
+                  Agregar sección
+                </button>
               </div>
+            ) : (
+              <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto text-micro text-primary/70 leading-relaxed">
+                {info.secciones.length === 0 ? (
+                  <p className="text-primary/30 text-center py-4">
+                    Todavía no hay contenido cargado. Tocá el lápiz para agregarlo.
+                  </p>
+                ) : (
+                  info.secciones.map((seccion) => (
+                    <div key={seccion.id} className="flex flex-col gap-1">
+                      <p className="font-black uppercase tracking-[0.2em] text-primary/40">
+                        {seccion.titulo}
+                      </p>
+                      <p className="whitespace-pre-line">{seccion.contenido}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
 
-              <div className="flex flex-col gap-1">
-                <p className="font-black uppercase tracking-[0.2em] text-primary/40">
-                  Manifestaciones naturales
-                </p>
-                <p>
-                  <span className="font-bold text-primary/70">Cristalio</span> (sólido): núcleo pesado, externa
-                  inerte. <span className="font-bold text-primary/70">Fluxio</span> (fluido): núcleo balanceado,
-                  externa dinámica. <span className="font-bold text-primary/70">Nebulio</span> (gaseoso): núcleo
-                  ligero, externa con Entropía/Transición.{" "}
-                  <span className="font-bold text-primary/70">Plasmio</span> (energético): externa saturada de
-                  Catálisis/Transición, reacciona violento a estímulos.
-                </p>
+            {editando && (
+              <div
+                style={{ background: "var(--bg-main)" }}
+                className="shrink-0 flex items-center justify-end gap-1.5 px-2.5 py-1.5 border-t border-primary/10"
+              >
+                <button
+                  type="button"
+                  onClick={cancelarEdicion}
+                  disabled={saving}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={guardar}
+                  disabled={saving}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? <Loader2 className="animate-spin" size={10} /> : <Save size={10} />}
+                  {saving ? "…" : "Guardar"}
+                </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -242,6 +347,11 @@ export function ElementosPage({
   seleccionarId,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const {
+    info: infoTabla,
+    loading: loadingInfoTabla,
+    guardarSecciones,
+  } = useInfoTablaQuimica();
 
   const activoId = seleccionadoId ?? seleccionarId ?? null;
   const activo = useMemo(
@@ -258,12 +368,16 @@ export function ElementosPage({
             <p className="text-micro font-black uppercase tracking-widest">
               Tabla Química · {elementos.length} elementos
             </p>
-            <InfoTablaQuimica />
+            <InfoTablaQuimica
+              info={infoTabla}
+              loading={loadingInfoTabla}
+              guardarSecciones={guardarSecciones}
+            />
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => descargarDatosElementos(elementos)}
+              onClick={() => descargarDatosElementos(elementos, infoTabla.secciones)}
               title="Descargar todos los datos de la Tabla Química como JSON"
               className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
             >
