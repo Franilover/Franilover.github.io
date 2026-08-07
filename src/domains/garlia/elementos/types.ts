@@ -89,6 +89,28 @@ export const FAMILY_ICON: Record<ElementFamily, React.ElementType> = {
   Puente: Atom,
 };
 
+// ─── Estado (manifestación natural) ────────────────────────────────────────
+// Los 4 "estados de la materia" del sistema — mismo espíritu que
+// sólido/líquido/gaseoso/plasma del mundo real, ya mencionados como texto
+// en la info de la Tabla Química. Ahora es un campo real del elemento, para
+// poder calcular afinidad/reactividad entre compuestos (ver afinidad.ts).
+export type EstadoElemento = "Cristalio" | "Fluxio" | "Nebulio" | "Plasmio";
+
+export const ESTADOS_ELEMENTO: EstadoElemento[] = [
+  "Cristalio",
+  "Fluxio",
+  "Nebulio",
+  "Plasmio",
+];
+
+/** Equivalente real de cada estado, para mostrar en la UI. */
+export const ESTADO_EQUIVALENTE_REAL: Record<EstadoElemento, string> = {
+  Cristalio: "Sólido",
+  Fluxio: "Líquido",
+  Nebulio: "Gaseoso",
+  Plasmio: "Plasma/Energético",
+};
+
 /** Fila cruda tal cual vive en Supabase (tabla "elementos"). */
 export interface Elemento {
   id: string;
@@ -97,6 +119,8 @@ export interface Elemento {
   simbolo: string;
   familia: ElementFamily;
   es_noble: boolean;
+  /** Manifestación natural — opcional por compatibilidad con filas viejas. */
+  estado?: EstadoElemento | null;
   notas?: string | null;
   nucleo: ParticleMap;
   media: ParticleMap;
@@ -106,7 +130,7 @@ export interface Elemento {
 export const CONFIG = {
   tabla: "elementos",
   select:
-    "id, numero_atomico, nombre, simbolo, familia, es_noble, notas, nucleo, media, externa",
+    "id, numero_atomico, nombre, simbolo, familia, es_noble, estado, notas, nucleo, media, externa",
 };
 
 // ─── Compuestos: combinaciones de elementos de la Tabla Química ───────────
@@ -149,4 +173,41 @@ export function formatLayer(layer: ParticleMap | null | undefined): string {
 export function layerTotal(layer: ParticleMap | null | undefined): number {
   if (!layer) return 0;
   return Object.values(layer).reduce((a, b) => a + (b ?? 0), 0);
+}
+
+// ─── Afinidad entre compuestos ─────────────────────────────────────────────
+// Basada en estructura atómica real, no en reglas arbitrarias tipo "agua
+// apaga fuego": cada capa (núcleo/media/externa) tiene una capacidad fija
+// (2/4/6, ver CAPACIDAD_CAPA) — igual que la valencia química real, donde
+// el carbono "necesita" 4 electrones más para completar su capa externa y
+// por eso se enlaza con otros átomos que se los aportan.
+//
+// Acá: sumamos las partículas de todos los elementos de un compuesto, capa
+// por capa. Si una capa queda por debajo de su capacidad, el compuesto
+// tiene un "déficit" en esa capa — literalmente le faltan partículas de
+// ese tipo para estabilizarse. Dos compuestos tienen afinidad si el
+// déficit de uno se resuelve con el superávit (sobrante) del otro: se
+// "atraen" porque uno completa lo que al otro le falta, igual que dos
+// elementos que se enlazan para completar su capa de valencia.
+export const CAPACIDAD_CAPA: Record<LayerName, number> = {
+  nucleo: 2,
+  media: 4,
+  externa: 6,
+};
+
+export type TipoAfinidad = "complementa" | "compite" | "saturado" | "estable";
+
+export const AFINIDAD_LABEL: Record<TipoAfinidad, string> = {
+  complementa: "Se complementan",
+  compite: "Compiten por las mismas partículas",
+  saturado: "Sobrecarga (ambos ya están completos o sobrantes)",
+  estable: "Sin interacción relevante",
+};
+
+export interface ResultadoAfinidad {
+  tipo: TipoAfinidad;
+  /** Explicación corta y en lenguaje natural de por qué. */
+  motivo: string;
+  /** Partículas que un compuesto le aporta al otro para completarlo. */
+  aportes: { particula: ParticleType; cantidad: number }[];
 }

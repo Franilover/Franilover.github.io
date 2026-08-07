@@ -12,13 +12,26 @@
  * elementos por id con una cantidad cada uno (componentes: jsonb).
  */
 
-import { Beaker, ChevronLeft, Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import { Beaker, ChevronLeft, Loader2, Plus, Save, Sparkles, Trash2, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
-import type { ComponenteCompuesto, Compuesto, Elemento } from "./types";
+import {
+  calcularBalancePorCapa,
+  calcularPerfilAtomico,
+  ordenarPorAfinidad,
+} from "./afinidad";
+import {
+  AFINIDAD_LABEL,
+  LAYER_LABEL,
+  type ComponenteCompuesto,
+  type Compuesto,
+  type Elemento,
+  type LayerName,
+  type TipoAfinidad,
+} from "./types";
 
 interface Props {
   compuestos: Compuesto[];
@@ -48,6 +61,13 @@ function CompuestoCasilla({
   seleccionado?: boolean;
   onClick: () => void;
 }) {
+  const perfil = useMemo(
+    () => calcularPerfilAtomico(compuesto, elementos),
+    [compuesto, elementos],
+  );
+  const balance = useMemo(() => calcularBalancePorCapa(perfil), [perfil]);
+  const estable = balance.every((b) => b.balance === 0);
+
   return (
     <button
       type="button"
@@ -62,7 +82,15 @@ function CompuestoCasilla({
         <span className="text-micro font-black text-primary/30 tabular-nums">
           {compuesto.componentes?.length ?? 0}×
         </span>
-        <Beaker size={10} className="text-accent/60 shrink-0 mt-0.5" />
+        <div className="flex items-center gap-0.5">
+          {estable && (
+            <span
+              title="Estructura atómica completa"
+              className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 shrink-0 mt-0.5"
+            />
+          )}
+          <Beaker size={10} className="text-accent/60 shrink-0 mt-0.5" />
+        </div>
       </div>
 
       <span className="text-base font-black text-primary text-center leading-none py-0.5">
@@ -196,16 +224,125 @@ function SelectorElementosCompuesto({
   );
 }
 
+/**
+ * Balance atómico del compuesto: suma de partículas por capa contra su
+ * capacidad fija (2/4/6) — misma lógica que valencia química real. Muestra
+ * dónde le sobra ("superávit", disponible para prestar) y dónde le falta
+ * ("déficit", lo que necesita de otro compuesto para estabilizarse).
+ */
+function BalanceAtomico({
+  compuesto,
+  elementos,
+}: {
+  compuesto: Compuesto;
+  elementos: Elemento[];
+}) {
+  const perfil = useMemo(
+    () => calcularPerfilAtomico(compuesto, elementos),
+    [compuesto, elementos],
+  );
+  const balance = useMemo(() => calcularBalancePorCapa(perfil), [perfil]);
+
+  return (
+    <div className="rounded-lg border border-primary/10 overflow-hidden">
+      {balance.map((b, i) => (
+        <div
+          key={b.layer}
+          className={`flex items-center gap-1.5 px-2 py-1 bg-primary/[0.02] ${
+            i > 0 ? "border-t border-primary/10" : ""
+          }`}
+        >
+          <span className="w-14 shrink-0 text-micro font-bold text-primary/60">
+            {LAYER_LABEL[b.layer as LayerName]}
+          </span>
+          <span className="flex-1 text-micro text-primary/40 tabular-nums">
+            {b.total} / {b.capacidad}
+          </span>
+          <span
+            className={`shrink-0 text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded ${
+              b.balance === 0
+                ? "text-primary/30"
+                : b.balance > 0
+                  ? "text-emerald-500 bg-emerald-500/10"
+                  : "text-amber-500 bg-amber-500/10"
+            }`}
+          >
+            {b.balance === 0 ? "Completa" : b.balance > 0 ? `+${b.balance} sobra` : `${b.balance} falta`}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
+  complementa: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+  compite: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+  saturado: "text-primary/40 bg-primary/5 border-primary/10",
+  estable: "text-primary/30 bg-primary/[0.02] border-primary/10",
+};
+
+/**
+ * Lista de afinidad del compuesto activo contra todos los demás del
+ * catálogo, ordenada por complementariedad — los que mejor "encajan"
+ * (cubren su déficit) primero.
+ */
+function PanelAfinidad({
+  compuesto,
+  todosLosCompuestos,
+  elementos,
+}: {
+  compuesto: Compuesto;
+  todosLosCompuestos: Compuesto[];
+  elementos: Elemento[];
+}) {
+  const resultados = useMemo(
+    () => ordenarPorAfinidad(compuesto, todosLosCompuestos, elementos),
+    [compuesto, todosLosCompuestos, elementos],
+  );
+
+  if (todosLosCompuestos.length <= 1) {
+    return (
+      <p className="text-micro text-primary/25">
+        Creá otro compuesto para ver con cuáles tiene afinidad.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {resultados.map(({ compuesto: otro, afinidad }) => (
+        <div
+          key={otro.id}
+          className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${AFINIDAD_COLOR[afinidad.tipo]}`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-micro font-black truncate">
+              {otro.simbolo || "??"} · {otro.nombre}
+            </span>
+            <span className="shrink-0 text-micro font-black uppercase tracking-wide">
+              {AFINIDAD_LABEL[afinidad.tipo]}
+            </span>
+          </div>
+          <p className="text-micro opacity-80 leading-snug">{afinidad.motivo}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Detalle editable de un compuesto — mismo criterio que ElementoEditor. */
 function CompuestoEditor({
   compuesto,
   elementos,
+  todosLosCompuestos,
   onBack,
   onActualizar,
   onEliminar,
 }: {
   compuesto: Compuesto;
   elementos: Elemento[];
+  todosLosCompuestos: Compuesto[];
   onBack: () => void;
   onActualizar: (id: string, cambios: Partial<Compuesto>) => void;
   onEliminar?: (id: string) => void;
@@ -325,6 +462,25 @@ function CompuestoEditor({
             }}
           />
         </div>
+
+        <div className="flex flex-col gap-1.5">
+          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+            Balance atómico
+          </p>
+          <BalanceAtomico compuesto={local} elementos={elementos} />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <p className="flex items-center gap-1 text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+            <Sparkles size={10} />
+            Afinidad con otros compuestos
+          </p>
+          <PanelAfinidad
+            compuesto={local}
+            todosLosCompuestos={todosLosCompuestos}
+            elementos={elementos}
+          />
+        </div>
       </div>
     </div>
   );
@@ -421,6 +577,7 @@ export function CompuestosPage({
             <CompuestoEditor
               compuesto={activo}
               elementos={elementos}
+              todosLosCompuestos={compuestos}
               onBack={() => setSeleccionadoId(null)}
               onActualizar={onActualizar}
               onEliminar={

@@ -20,10 +20,12 @@ import { useConfirm } from "@/ui/ConfirmModal";
 
 import {
   ELEMENT_FAMILIES,
+  ESTADOS_ELEMENTO,
   LAYER_LABEL,
   PARTICLE_TYPES,
   type Elemento,
   type ElementFamily,
+  type EstadoElemento,
   type LayerName,
   type ParticleMap,
 } from "./types";
@@ -124,6 +126,7 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
                 nombre: local.nombre,
                 simbolo: local.simbolo,
                 familia: local.familia,
+                estado: local.estado,
                 es_noble: local.es_noble,
                 notas: local.notas,
                 nucleo: local.nucleo,
@@ -142,7 +145,7 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
         {/* Metadatos */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-0.5">
             <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
               N° atómico
@@ -174,6 +177,28 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
               {ELEMENT_FAMILIES.map((f) => (
                 <option key={f} value={f}>
                   {f}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-0.5">
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Estado
+            </label>
+            <select
+              value={local.estado ?? ""}
+              onChange={(e) => {
+                const estado = (e.target.value || null) as EstadoElemento | null;
+                setLocal((p) => ({ ...p, estado }));
+                persist({ estado });
+              }}
+              className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+            >
+              <option value="">—</option>
+              {ESTADOS_ELEMENTO.map((e) => (
+                <option key={e} value={e}>
+                  {e}
                 </option>
               ))}
             </select>
