@@ -12,7 +12,7 @@
  * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
  */
 
-import { Atom, Download, Loader2, Plus } from "lucide-react";
+import { Atom, Download, Info, Loader2, Plus, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { ElementoEditor } from "./ElementoEditor";
@@ -110,6 +110,128 @@ function ElementoCasilla({
   );
 }
 
+// ─── Info: reglas de la Tabla Química, resumidas ───────────────────────────
+// Solo lo propio de acá (estructura de capas, estabilidad/familias,
+// manifestaciones) — la jerarquía Partícula Base→Partículas→Iums y la
+// resonancia con Iums ya se explican en la sección Física, no se repiten.
+function InfoTablaQuimica() {
+  const [abierto, setAbierto] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        title="Cómo funciona la Tabla Química"
+        className="shrink-0 flex items-center justify-center w-4 h-4 rounded-full border border-primary/25 text-primary/40 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
+      >
+        <Info size={10} />
+      </button>
+
+      {abierto && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 md:p-12">
+          <div
+            className="absolute inset-0 bg-primary/10 backdrop-blur-sm"
+            onClick={() => setAbierto(false)}
+          />
+          <div
+            className="relative z-10 flex flex-col w-full max-w-lg max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] rounded-[var(--radius-card)] border shadow-2xl overflow-hidden"
+            style={{
+              background: "var(--white-custom, var(--bg-main))",
+              borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
+            }}
+          >
+            <div
+              style={{ background: "var(--bg-main)" }}
+              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+            >
+              <Info size={12} className="text-primary/40" />
+              <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary/70">
+                Cómo funciona la Tabla Química
+              </p>
+              <button
+                type="button"
+                onClick={() => setAbierto(false)}
+                className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+              >
+                <X size={12} />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto text-micro text-primary/70 leading-relaxed">
+              <div className="flex flex-col gap-1">
+                <p className="font-black uppercase tracking-[0.2em] text-primary/40">
+                  Número atómico
+                </p>
+                <p>
+                  Es el total de partículas del elemento. Se reparten en 3 capas de
+                  capacidad creciente (2 / 4 / 6). En los elementos #1 y #2, Percepción y
+                  Voluntad ocupan temporalmente el núcleo — desde el #3 el núcleo se
+                  estabiliza con Masa/Cinética/Equilibrio.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <p className="font-black uppercase tracking-[0.2em] text-primary/40">
+                  Las 3 capas
+                </p>
+                <div className="rounded-lg border border-primary/10 overflow-hidden">
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/[0.03] border-b border-primary/10">
+                    <span className="w-14 shrink-0 font-bold text-primary/60">Núcleo</span>
+                    <span className="text-primary/50">
+                      Identidad y ancla gravitacional — Masa, Cinética, Equilibrio.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/[0.03] border-b border-primary/10">
+                    <span className="w-14 shrink-0 font-bold text-primary/60">Media</span>
+                    <span className="text-primary/50">
+                      Motor energético — Potencial, Información, Ciclo, Entropía.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/[0.03]">
+                    <span className="w-14 shrink-0 font-bold text-primary/60">Externa</span>
+                    <span className="text-primary/50">
+                      Reactividad y resonancia — Voluntad, Percepción, Transición, Catálisis.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <p className="font-black uppercase tracking-[0.2em] text-primary/40">
+                  Estabilidad y familias
+                </p>
+                <p>
+                  Capa externa completa → elemento <span className="font-bold text-primary/70">Noble</span> (inerte,
+                  raro, resistente a interferencia mágica). Incompleta → elemento{" "}
+                  <span className="font-bold text-primary/70">Inestable</span>, forma compuestos.
+                  Los <span className="font-bold text-primary/70">Sensibles</span> (Percepción/Transición) cambian
+                  fácil ante estímulos; los <span className="font-bold text-primary/70">Reactivos</span>{" "}
+                  (Voluntad/Catálisis) se combinan activamente.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <p className="font-black uppercase tracking-[0.2em] text-primary/40">
+                  Manifestaciones naturales
+                </p>
+                <p>
+                  <span className="font-bold text-primary/70">Cristalio</span> (sólido): núcleo pesado, externa
+                  inerte. <span className="font-bold text-primary/70">Fluxio</span> (fluido): núcleo balanceado,
+                  externa dinámica. <span className="font-bold text-primary/70">Nebulio</span> (gaseoso): núcleo
+                  ligero, externa con Entropía/Transición.{" "}
+                  <span className="font-bold text-primary/70">Plasmio</span> (energético): externa saturada de
+                  Catálisis/Transición, reacciona violento a estímulos.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function ElementosPage({
   elementos,
   loading,
@@ -136,6 +258,7 @@ export function ElementosPage({
             <p className="text-micro font-black uppercase tracking-widest">
               Tabla Química · {elementos.length} elementos
             </p>
+            <InfoTablaQuimica />
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
             <button
