@@ -2737,7 +2737,11 @@ export default function MapaInteractivo({
               .toArray()
               .catch(() => []) ?? [],
             db.personajes
-              .filter((p: any) => p.reino === reino.nombre)
+              .filter(
+                (p: any) =>
+                  typeof p.reino === "string" &&
+                  p.reino.toLowerCase().includes(reino.nombre.toLowerCase()),
+              )
               .toArray()
               .catch(() => []),
             db.libros
@@ -2772,7 +2776,7 @@ export default function MapaInteractivo({
         supabase
           .from("personajes")
           .select("id, nombre, img_url, especie, reino, sobre, fecha_nacimiento")
-          .eq("reino", reino.nombre),
+          .ilike("reino", reino.nombre),
         supabase
           .from("libros")
           .select("id, titulo, portada_url, estado, categoria, sinopsis")
