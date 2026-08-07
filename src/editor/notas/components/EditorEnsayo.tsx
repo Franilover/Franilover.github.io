@@ -468,6 +468,26 @@ export function Editor({
 
       {activeSubBloque ? (
         <RichEditor
+          // key: fuerza a React a desmontar/remontar el LexicalComposer al
+          // cambiar de sub-bloque (o volver al documento principal). Sin
+          // esto, RichEditor es el MISMO componente en la misma posición
+          // del árbol para todas las secciones, así que React lo reconcilia
+          // en vez de recrearlo — y los refs internos (lastEmittedRawRef,
+          // skipNextChangeRef, historial de undo/redo, estado de selección)
+          // quedan pisados entre secciones. InitialContentPlugin compara
+          // `lastEmittedRawRef.current === initialRaw` para decidir si
+          // recargar el árbol: si el sub-bloque nuevo "coincide" con el
+          // último raw emitido por la sección anterior (ej: ambos vacíos,
+          // o texto plano igual antes de aplicarle formato), el plugin
+          // asume que es un eco propio y NO recarga — el usuario termina
+          // escribiendo/formateando sobre el árbol de Lexical de la
+          // sección anterior, que luego se serializa y guarda contra el
+          // id del sub-bloque equivocado (o se pierde silenciosamente el
+          // formato aplicado, porque el handleChange que dispara viene
+          // con el onChange de la sección vieja). Cambiar la `key` por
+          // sección elimina esa clase entera de bug: cada sección obtiene
+          // su propio LexicalComposer, su propio árbol, sus propios refs.
+          key={`${ensayo.id}-${activeSubBloque.id}`}
           allSections={allSections}
           exportFileName={activeSubBloque.nombre}
           formatCommandRef={formatCommandRef}
@@ -479,6 +499,10 @@ export function Editor({
         />
       ) : (
         <RichEditor
+          // Ver comentario arriba: misma razón, "documento principal" es
+          // su propia sección (id lógico "principal") y necesita su propio
+          // remount al volver a ella desde un sub-bloque.
+          key={ensayo.id}
           allSections={allSections}
           exportFileName={localTitulo || ensayo.titulo}
           extraToolbarAction={
