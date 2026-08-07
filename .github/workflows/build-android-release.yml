@@ -74,6 +74,20 @@ jobs:
         # el chequeo de "hay actualización disponible" en la app: getVersion()
         # siempre reportaba una versión vieja y el banner de update nunca
         # se apagaba, aunque ya tuvieras la última versión instalada.
+        #
+        # Además de "version" en la raíz (usado por desktop: macOS/Windows/
+        # Linux), se setea EXPLÍCITAMENTE bundle.android.versionCode y
+        # bundle.android.versionName. Motivo: Android no deriva su
+        # versionName/versionCode de "version" de forma confiable — Tauri
+        # normalmente los calcula a partir de ahí vía un archivo intermedio
+        # (tauri.properties) generado en tiempo de build, pero hay un bug
+        # conocido (https://github.com/tauri-apps/tauri/issues/14413) donde
+        # ese archivo no se regenera en CI y el build cae al default
+        # versionName=1.0 / versionCode=1, sin importar lo que diga
+        # tauri.conf.json > version. Setear bundle.android.* a mano evita
+        # depender de ese mecanismo.
+        # versionCode sigue la fórmula que usa el propio Tauri internamente:
+        # major*1000000 + minor*1000 + patch (ver docs de Google Play de Tauri).
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"  # quita el prefijo "v" -> "0.4.28"
@@ -85,13 +99,28 @@ jobs:
           path, version = sys.argv[1], sys.argv[2]
           with open(path) as f:
               conf = json.load(f)
+
           conf["version"] = version
+
+          partes = version.split(".")
+          major = int(partes[0]) if len(partes) > 0 and partes[0].isdigit() else 0
+          minor = int(partes[1]) if len(partes) > 1 and partes[1].isdigit() else 0
+          patch = int(partes[2]) if len(partes) > 2 and partes[2].isdigit() else 0
+          version_code = major * 1000000 + minor * 1000 + patch
+
+          conf.setdefault("bundle", {}).setdefault("android", {})
+          conf["bundle"]["android"]["versionCode"] = version_code
+          conf["bundle"]["android"]["versionName"] = version
+
           with open(path, "w") as f:
               json.dump(conf, f, indent=2)
               f.write("\n")
+
+          print(f"bundle.android.versionCode = {version_code}")
+          print(f"bundle.android.versionName = {version}")
           PYEOF
 
-          grep -n "\"version\"" "$CONF"
+          grep -n "\"version\"\|versionCode\|versionName" "$CONF"
 
       - name: Quitar rutas dinámicas web-only (no compatibles con output:export)
         # /garlia/libros/[slug] (y su subruta anidada [slug]/leer/[orden]) usan
@@ -117,7 +146,20 @@ jobs:
 
 
       - name: Instalar Tauri CLI
-        run: npm install -g @tauri-apps/cli@latest
+        # Pinneado a una versión fija (no @latest) para evitar romper de un
+        # build a otro sin haber cambiado nada del repo. Motivo concreto:
+        # Tauri tiene un bug conocido en versiones 2.9.2+ donde
+        # tauri.properties no se regenera bien en CI/CD y el build de
+        # Android termina usando los defaults versionName=1.0 /
+        # versionCode=1, IGNORANDO por completo el "version" que el paso
+        # "Sincronizar version en tauri.conf.json con el tag" ya había
+        # dejado bien seteado (ver https://github.com/tauri-apps/tauri/issues/14413).
+        # Como defensa adicional (no solo confiar en pinnear la versión),
+        # el paso "Forzar versionCode/versionName de Android" más abajo
+        # setea bundle.android.versionCode/versionName explícitamente en
+        # tauri.conf.json, que es la ruta que Tauri lee sin pasar por
+        # tauri.properties.
+        run: npm install -g @tauri-apps/cli@2.8.0
 
       - name: Optimizar tamaño del binario Rust (strip + LTO + opt-level=s)
         # Verificado con adb: el APK de v0.4.8 SÍ instala bien (probado por
