@@ -198,11 +198,7 @@ jobs:
           if grep -q '":android-installer"' "$SETTINGS"; then
             echo "El módulo android-installer ya estaba registrado, no se toca."
           else
-            cat >> "$SETTINGS" << 'EOF'
-
-include(":android-installer")
-project(":android-installer").projectDir = File("../../android-installer/android")
-EOF
+            printf '\ninclude(":android-installer")\nproject(":android-installer").projectDir = File("../../android-installer/android")\n' >> "$SETTINGS"
             echo "Módulo android-installer registrado en $SETTINGS:"
             tail -4 "$SETTINGS"
           fi
