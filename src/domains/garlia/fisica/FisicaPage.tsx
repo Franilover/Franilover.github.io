@@ -18,8 +18,8 @@
  * "oris" y "fisica_conceptos", separadas de "elementos".
  */
 
-import { Atom, Download, Loader2, Plus } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { Atom, ChevronLeft, Download, Loader2, Plus } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
@@ -169,16 +169,92 @@ function GrupoOrisPorFamilia({
   );
 }
 
-// ─── Bloque 3: conceptos, agrupados y editables inline ─────────────────────
+// ─── Bloque 3: conceptos, agrupados por bloque; editables en modal ─────────
 
-function ConceptoCard({
+/**
+ * Casilla resumen: título + preview del contenido truncado. Ya no es
+ * editable inline — al hacer click abre el detalle en el panel flotante
+ * centrado (mismo patrón que Oris), para no perder el contexto de la
+ * grilla al editar un texto largo.
+ */
+function ConceptoCasilla({
   concepto,
+  seleccionado,
+  onClick,
+}: {
+  concepto: FisicaConcepto;
+  seleccionado?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex flex-col items-stretch gap-1 p-2 rounded-lg border text-left transition-colors ${
+        seleccionado
+          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
+          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+      }`}
+    >
+      <span className="text-micro font-black text-primary/80 truncate">
+        {concepto.titulo || "Sin título"}
+      </span>
+      <span className="text-micro text-primary/45 leading-relaxed line-clamp-2">
+        {concepto.contenido || "Sin contenido…"}
+      </span>
+    </button>
+  );
+}
+
+function BloqueConceptos({
+  bloque,
+  items,
+  activoId,
+  onSeleccionar,
+}: {
+  bloque: string;
+  items: FisicaConcepto[];
+  activoId?: string | null;
+  onSeleccionar: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-micro font-black uppercase tracking-widest text-primary/40">{bloque}</p>
+      <div
+        className="grid gap-2"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
+      >
+        {items.map((c) => (
+          <ConceptoCasilla
+            key={c.id}
+            concepto={c}
+            seleccionado={c.id === activoId}
+            onClick={() => onSeleccionar(c.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Detalle editable de un concepto, para el panel flotante centrado.
+ * Mismo patrón de header que OrisEditor/ElementoEditor (volver + guardado
+ * al perder foco), pero sin fila de metadatos — un concepto es solo
+ * título + contenido largo.
+ */
+function ConceptoEditor({
+  concepto,
+  onBack,
   onActualizar,
 }: {
   concepto: FisicaConcepto;
+  onBack: () => void;
   onActualizar: (id: string, cambios: Partial<FisicaConcepto>) => void;
 }) {
   const [local, setLocal] = useState(concepto);
+
+  useEffect(() => setLocal(concepto), [concepto]);
 
   async function persist(cambios: Partial<FisicaConcepto>) {
     const { error } = await supabase
@@ -189,43 +265,41 @@ function ConceptoCard({
   }
 
   return (
-    <div className="rounded-lg border border-primary/10 bg-primary/[0.02] p-2 flex flex-col gap-1">
-      <input
-        value={local.titulo}
-        onChange={(e) => setLocal((p) => ({ ...p, titulo: e.target.value }))}
-        onBlur={() => persist({ titulo: local.titulo })}
-        className="bg-transparent text-micro font-black text-primary/80 outline-none"
-      />
-      <textarea
-        value={local.contenido}
-        onChange={(e) => setLocal((p) => ({ ...p, contenido: e.target.value }))}
-        onBlur={() => persist({ contenido: local.contenido })}
-        rows={4}
-        className="bg-transparent text-micro text-primary/55 leading-relaxed outline-none resize-none"
-      />
-    </div>
-  );
-}
-
-function BloqueConceptos({
-  bloque,
-  items,
-  onActualizar,
-}: {
-  bloque: string;
-  items: FisicaConcepto[];
-  onActualizar: (id: string, cambios: Partial<FisicaConcepto>) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <p className="text-micro font-black uppercase tracking-widest text-primary/40">{bloque}</p>
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div
-        className="grid gap-2"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}
+        style={{ background: "var(--bg-main)" }}
+        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
       >
-        {items.map((c) => (
-          <ConceptoCard key={c.id} concepto={c} onActualizar={onActualizar} />
-        ))}
+        <button
+          type="button"
+          onClick={onBack}
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <ChevronLeft size={12} />
+        </button>
+
+        <span className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/30 px-1.5 py-0.5 rounded border border-primary/15">
+          {concepto.bloque}
+        </span>
+
+        <input
+          value={local.titulo}
+          onChange={(e) => setLocal((p) => ({ ...p, titulo: e.target.value }))}
+          onBlur={() => persist({ titulo: local.titulo })}
+          placeholder="Título del concepto"
+          className="flex-1 min-w-0 bg-transparent text-micro font-black text-primary outline-none placeholder:text-primary/25"
+        />
+      </div>
+
+      <div className="flex-1 min-h-0 p-2.5 overflow-y-auto">
+        <textarea
+          value={local.contenido}
+          onChange={(e) => setLocal((p) => ({ ...p, contenido: e.target.value }))}
+          onBlur={() => persist({ contenido: local.contenido })}
+          rows={12}
+          placeholder="Contenido del concepto…"
+          className="w-full bg-primary/5 rounded-md px-2 py-1.5 text-micro text-primary leading-relaxed outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
+        />
       </div>
     </div>
   );
@@ -246,9 +320,15 @@ export function FisicaPage({
   onActualizarConcepto,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [conceptoSeleccionadoId, setConceptoSeleccionadoId] = useState<string | null>(null);
 
   const activoId = seleccionadoId ?? seleccionarOrisId ?? null;
   const activo = useMemo(() => oris.find((o) => o.id === activoId) ?? null, [oris, activoId]);
+
+  const conceptoActivo = useMemo(
+    () => conceptos.find((c) => c.id === conceptoSeleccionadoId) ?? null,
+    [conceptos, conceptoSeleccionadoId],
+  );
 
   const orisPorFamilia = useMemo(() => {
     const map = new Map<OrisFamilia, Oris[]>();
@@ -342,7 +422,10 @@ export function FisicaPage({
                 key={bloque}
                 bloque={bloque}
                 items={items}
-                onActualizar={onActualizarConcepto}
+                activoId={conceptoSeleccionadoId}
+                onSeleccionar={(id) =>
+                  setConceptoSeleccionadoId((actual) => (actual === id ? null : id))
+                }
               />
             ))
           )}
@@ -356,8 +439,7 @@ export function FisicaPage({
       {activo && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 md:p-12">
           <div
-            className="absolute inset-0"
-            style={{ background: "color-mix(in srgb, var(--primary) 25%, transparent)" }}
+            className="absolute inset-0 bg-primary/10 backdrop-blur-sm"
             onClick={() => setSeleccionadoId(null)}
           />
           <div
@@ -379,6 +461,30 @@ export function FisicaPage({
                     }
                   : undefined
               }
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Panel flotante centrado del concepto — mismo patrón que el de
+          Oris arriba (overlay clickeable + tarjeta con margen). */}
+      {conceptoActivo && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 md:p-12">
+          <div
+            className="absolute inset-0 bg-primary/10 backdrop-blur-sm"
+            onClick={() => setConceptoSeleccionadoId(null)}
+          />
+          <div
+            className="relative z-10 flex flex-col w-full max-w-xl max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] rounded-[var(--radius-card)] border shadow-2xl overflow-hidden"
+            style={{
+              background: "var(--white-custom, var(--bg-main))",
+              borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
+            }}
+          >
+            <ConceptoEditor
+              concepto={conceptoActivo}
+              onBack={() => setConceptoSeleccionadoId(null)}
+              onActualizar={onActualizarConcepto}
             />
           </div>
         </div>
