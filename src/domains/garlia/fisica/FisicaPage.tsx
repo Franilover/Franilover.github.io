@@ -105,12 +105,24 @@ function CatalogoCard({ titulo, filas }: { titulo: string; filas: FilaCatalogo[]
 
 // ─── Bloque 2: grid de Oris ─────────────────────────────────────────────────
 
-function OrisCasilla({ oris, onClick }: { oris: Oris; onClick: () => void }) {
+function OrisCasilla({
+  oris,
+  seleccionado,
+  onClick,
+}: {
+  oris: Oris;
+  seleccionado?: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col items-stretch gap-1 p-2.5 rounded-lg border border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25 transition-colors text-left"
+      className={`group flex flex-col items-stretch gap-1 p-2.5 rounded-lg border transition-colors text-left ${
+        seleccionado
+          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
+          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+      }`}
     >
       <span className="text-sm font-black text-primary truncate">{oris.nombre}</span>
       <span className="text-[10px] font-bold text-primary/45 truncate">{oris.formula}</span>
@@ -122,10 +134,12 @@ function OrisCasilla({ oris, onClick }: { oris: Oris; onClick: () => void }) {
 function GrupoOrisPorFamilia({
   familia,
   items,
+  activoId,
   onSeleccionar,
 }: {
   familia: OrisFamilia;
   items: Oris[];
+  activoId?: string | null;
   onSeleccionar: (id: string) => void;
 }) {
   if (items.length === 0) return null;
@@ -141,7 +155,12 @@ function GrupoOrisPorFamilia({
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}
       >
         {items.map((o) => (
-          <OrisCasilla key={o.id} oris={o} onClick={() => onSeleccionar(o.id)} />
+          <OrisCasilla
+            key={o.id}
+            oris={o}
+            seleccionado={o.id === activoId}
+            onClick={() => onSeleccionar(o.id)}
+          />
         ))}
       </div>
     </div>
@@ -238,107 +257,128 @@ export function FisicaPage({
 
   const bloquesConceptos = useMemo(() => agruparPorBloque(conceptos), [conceptos]);
 
-  if (activo) {
-    return (
-      <OrisEditor
-        oris={activo}
-        onBack={() => setSeleccionadoId(null)}
-        onActualizar={onActualizarOris}
-        onEliminar={
-          onEliminarOris
-            ? (id) => {
-                onEliminarOris(id);
-                setSeleccionadoId(null);
-              }
-            : undefined
-        }
-      />
-    );
-  }
-
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-primary/40">
-          <Atom size={13} />
-          <p className="text-micro font-black uppercase tracking-widest">
-            Física · {oris.length} Oris
-          </p>
-        </div>
-        <div className="shrink-0 flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => descargarDatosFisica(oris, conceptos)}
-            title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-          >
-            <Download size={11} />
-            <span className="hidden sm:inline">Descargar datos</span>
-          </button>
-          {onCreateOris && (
+    <div className="flex-1 min-h-0 flex overflow-hidden relative">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-primary/40">
+            <Atom size={13} />
+            <p className="text-micro font-black uppercase tracking-widest">
+              Física · {oris.length} Oris
+            </p>
+          </div>
+          <div className="shrink-0 flex items-center gap-1.5">
             <button
               type="button"
-              disabled={creatingOris}
-              onClick={onCreateOris}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              onClick={() => descargarDatosFisica(oris, conceptos)}
+              title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
             >
-              {creatingOris ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
-              Nuevo Oris
+              <Download size={11} />
+              <span className="hidden sm:inline">Descargar datos</span>
             </button>
+            {onCreateOris && (
+              <button
+                type="button"
+                disabled={creatingOris}
+                onClick={onCreateOris}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {creatingOris ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
+                Nuevo Oris
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bloque 1: catálogos fijos */}
+        <div className="flex flex-col gap-3">
+          <p className="text-micro font-black uppercase tracking-[0.28em] text-primary/25">
+            Jerarquía · Partícula Base → Partículas → Ium → Oris
+          </p>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+            <CatalogoCard titulo="Partícula Base" filas={PARTICULAS_BASE} />
+            <CatalogoCard titulo="Partículas" filas={PARTICULAS} />
+            <CatalogoCard titulo="Iums" filas={IUMS} />
+          </div>
+        </div>
+
+        {/* Bloque 2: Oris por familia */}
+        <div className="flex flex-col gap-3">
+          {loadingOris && oris.length === 0 ? (
+            <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
+          ) : oris.length === 0 ? (
+            <div className="py-6 text-xs text-primary/25 text-center">
+              Todavía no hay Oris cargados.
+            </div>
+          ) : (
+            ORIS_FAMILIAS.map((familia) => (
+              <GrupoOrisPorFamilia
+                key={familia}
+                familia={familia}
+                items={orisPorFamilia.get(familia) ?? []}
+                activoId={activoId}
+                onSeleccionar={(id) =>
+                  setSeleccionadoId((actual) => (actual === id ? null : id))
+                }
+              />
+            ))
+          )}
+        </div>
+
+        {/* Bloque 3: conceptos */}
+        <div className="flex flex-col gap-4">
+          <p className="text-micro font-black uppercase tracking-[0.28em] text-primary/25">
+            Conceptos
+          </p>
+          {loadingConceptos && conceptos.length === 0 ? (
+            <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
+          ) : (
+            bloquesConceptos.map(({ bloque, items }) => (
+              <BloqueConceptos
+                key={bloque}
+                bloque={bloque}
+                items={items}
+                onActualizar={onActualizarConcepto}
+              />
+            ))
           )}
         </div>
       </div>
 
-      {/* Bloque 1: catálogos fijos */}
-      <div className="flex flex-col gap-3">
-        <p className="text-micro font-black uppercase tracking-[0.28em] text-primary/25">
-          Jerarquía · Partícula Base → Partículas → Ium → Oris
-        </p>
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-          <CatalogoCard titulo="Partícula Base" filas={PARTICULAS_BASE} />
-          <CatalogoCard titulo="Partículas" filas={PARTICULAS} />
-          <CatalogoCard titulo="Iums" filas={IUMS} />
-        </div>
-      </div>
-
-      {/* Bloque 2: Oris por familia */}
-      <div className="flex flex-col gap-3">
-        {loadingOris && oris.length === 0 ? (
-          <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
-        ) : oris.length === 0 ? (
-          <div className="py-6 text-xs text-primary/25 text-center">
-            Todavía no hay Oris cargados.
+      {/* Panel lateral: overlay + drawer a la derecha con el detalle del
+          Oris seleccionado. El grid queda visible detrás, para poder
+          seguir eligiendo otros Oris sin perder contexto. */}
+      {activo && (
+        <>
+          <div
+            className="absolute inset-0 z-30 md:hidden"
+            style={{ background: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
+            onClick={() => setSeleccionadoId(null)}
+          />
+          <div
+            className="absolute md:relative inset-y-0 right-0 z-40 flex flex-col w-full sm:w-[380px] md:w-[420px] shrink-0 border-l shadow-2xl md:shadow-none"
+            style={{
+              background: "var(--white-custom, var(--bg-main))",
+              borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
+            }}
+          >
+            <OrisEditor
+              oris={activo}
+              onBack={() => setSeleccionadoId(null)}
+              onActualizar={onActualizarOris}
+              onEliminar={
+                onEliminarOris
+                  ? (id) => {
+                      onEliminarOris(id);
+                      setSeleccionadoId(null);
+                    }
+                  : undefined
+              }
+            />
           </div>
-        ) : (
-          ORIS_FAMILIAS.map((familia) => (
-            <GrupoOrisPorFamilia
-              key={familia}
-              familia={familia}
-              items={orisPorFamilia.get(familia) ?? []}
-              onSeleccionar={setSeleccionadoId}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Bloque 3: conceptos */}
-      <div className="flex flex-col gap-4">
-        <p className="text-micro font-black uppercase tracking-[0.28em] text-primary/25">
-          Conceptos
-        </p>
-        {loadingConceptos && conceptos.length === 0 ? (
-          <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
-        ) : (
-          bloquesConceptos.map(({ bloque, items }) => (
-            <BloqueConceptos
-              key={bloque}
-              bloque={bloque}
-              items={items}
-              onActualizar={onActualizarConcepto}
-            />
-          ))
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

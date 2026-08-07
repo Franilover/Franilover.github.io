@@ -56,12 +56,24 @@ interface Props {
  * imagen-o-ícono + una sola línea de subtítulo, insuficiente para lo que
  * se quiere mostrar por elemento.
  */
-function ElementoCasilla({ elemento, onClick }: { elemento: Elemento; onClick: () => void }) {
+function ElementoCasilla({
+  elemento,
+  seleccionado,
+  onClick,
+}: {
+  elemento: Elemento;
+  seleccionado?: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex flex-col items-stretch gap-1 p-2 rounded-lg border border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25 transition-colors text-left"
+      className={`group flex flex-col items-stretch gap-1 p-2 rounded-lg border transition-colors text-left ${
+        seleccionado
+          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
+          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+      }`}
     >
       <div className="flex items-start justify-between">
         <span className="text-micro font-black text-primary/30 tabular-nums">
@@ -115,76 +127,97 @@ export function ElementosPage({
     [elementos, activoId],
   );
 
-  if (activo) {
-    return (
-      <ElementoEditor
-        elemento={activo}
-        onBack={() => setSeleccionadoId(null)}
-        onActualizar={onActualizar}
-        onEliminar={
-          onEliminar
-            ? (id) => {
-                onEliminar(id);
-                setSeleccionadoId(null);
-              }
-            : undefined
-        }
-      />
-    );
-  }
-
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-primary/40">
-          <Atom size={13} />
-          <p className="text-micro font-black uppercase tracking-widest">
-            Tabla Química · {elementos.length} elementos
-          </p>
-        </div>
-        <div className="shrink-0 flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => descargarDatosElementos(elementos)}
-            title="Descargar todos los datos de la Tabla Química como JSON"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-          >
-            <Download size={11} />
-            <span className="hidden sm:inline">Descargar datos</span>
-          </button>
-          {onCreate && (
+    <div className="flex-1 min-h-0 flex overflow-hidden relative">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-primary/40">
+            <Atom size={13} />
+            <p className="text-micro font-black uppercase tracking-widest">
+              Tabla Química · {elementos.length} elementos
+            </p>
+          </div>
+          <div className="shrink-0 flex items-center gap-1.5">
             <button
               type="button"
-              disabled={creating}
-              onClick={onCreate}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              onClick={() => descargarDatosElementos(elementos)}
+              title="Descargar todos los datos de la Tabla Química como JSON"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
             >
-              {creating ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
-              Nuevo elemento
+              <Download size={11} />
+              <span className="hidden sm:inline">Descargar datos</span>
             </button>
-          )}
+            {onCreate && (
+              <button
+                type="button"
+                disabled={creating}
+                onClick={onCreate}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {creating ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
+                Nuevo elemento
+              </button>
+            )}
+          </div>
         </div>
+
+        {loading && elementos.length === 0 ? (
+          <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
+        ) : elementos.length === 0 ? (
+          <div className="py-6 text-xs text-primary/25 text-center">
+            Todavía no hay elementos cargados.
+          </div>
+        ) : (
+          <div
+            className="grid gap-1.5"
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))" }}
+          >
+            {elementos.map((el) => (
+              <ElementoCasilla
+                key={el.id}
+                elemento={el}
+                seleccionado={el.id === activoId}
+                onClick={() =>
+                  setSeleccionadoId((actual) => (actual === el.id ? null : el.id))
+                }
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {loading && elementos.length === 0 ? (
-        <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
-      ) : elementos.length === 0 ? (
-        <div className="py-6 text-xs text-primary/25 text-center">
-          Todavía no hay elementos cargados.
-        </div>
-      ) : (
-        <div
-          className="grid gap-1.5"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))" }}
-        >
-          {elementos.map((el) => (
-            <ElementoCasilla
-              key={el.id}
-              elemento={el}
-              onClick={() => setSeleccionadoId(el.id)}
+      {/* Panel lateral: overlay + drawer a la derecha con el detalle del
+          elemento seleccionado. No reemplaza el grid — queda visible
+          detrás, para poder seguir eligiendo otros elementos. */}
+      {activo && (
+        <>
+          <div
+            className="absolute inset-0 z-30 md:hidden"
+            style={{ background: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
+            onClick={() => setSeleccionadoId(null)}
+          />
+          <div
+            className="absolute md:relative inset-y-0 right-0 z-40 flex flex-col w-full sm:w-[380px] md:w-[420px] shrink-0 border-l shadow-2xl md:shadow-none"
+            style={{
+              background: "var(--white-custom, var(--bg-main))",
+              borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
+            }}
+          >
+            <ElementoEditor
+              elemento={activo}
+              onBack={() => setSeleccionadoId(null)}
+              onActualizar={onActualizar}
+              onEliminar={
+                onEliminar
+                  ? (id) => {
+                      onEliminar(id);
+                      setSeleccionadoId(null);
+                    }
+                  : undefined
+              }
             />
-          ))}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
