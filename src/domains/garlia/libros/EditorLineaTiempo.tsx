@@ -2405,6 +2405,7 @@ function EventoDetallePanel({
   onAddRasgoEraPersonaje,
   onRemoveRasgoEraPersonaje,
   onDeleteEraPersonaje,
+  onDelete,
   onSelectCapitulo,
   onSelectCancion,
   onSelectPersonaje,
@@ -2435,6 +2436,8 @@ function EventoDetallePanel({
   onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onDeleteEraPersonaje?: (id: string) => void;
+  /** Elimina un evento "mundo"/"reino" (tabla `eventos_mundo`). */
+  onDelete?: (id: string) => void;
   /** Navega al capítulo/libro — se dispara solo con este botón, nunca con
    * el click que abre el panel. */
   onSelectCapitulo?: (capituloId: string, libroId: string) => void;
@@ -2470,6 +2473,8 @@ function EventoDetallePanel({
   const [nuevoRasgo, setNuevoRasgo] = useState("");
   const labelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notasDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Resincronizar campos locales al cambiar de evento seleccionado
   useEffect(() => {
@@ -2559,6 +2564,13 @@ function EventoDetallePanel({
     setNuevoRasgo("");
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    await onDelete?.(evt.id);
+    setDeleting(false);
+    onClose?.();
+  };
+
   const Icon = iconoPorSource(evt.source);
 
   return (
@@ -2616,6 +2628,50 @@ function EventoDetallePanel({
           >
             <Trash2 size={9} />
           </button>
+        )}
+        {editable && onDelete && (
+          !confirmDel ? (
+            <button
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-black uppercase tracking-widest transition-all hover:opacity-100"
+              style={{
+                color: "color-mix(in srgb, #ef4444 60%, transparent)",
+                opacity: 0.7,
+              }}
+              title="Eliminar evento"
+              type="button"
+              onClick={() => setConfirmDel(true)}
+            >
+              <Trash2 size={9} />
+            </button>
+          ) : (
+            <div className="flex items-center gap-1">
+              <span
+                className="text-micro font-black uppercase tracking-widest"
+                style={{ color: "color-mix(in srgb, #ef4444 60%, transparent)" }}
+              >
+                ¿Seguro?
+              </span>
+              <button
+                className="px-1.5 py-0.5 rounded text-micro font-black uppercase tracking-widest transition-all"
+                disabled={deleting}
+                style={{ background: "#ef444420", color: "#ef4444" }}
+                type="button"
+                onClick={handleDelete}
+              >
+                {deleting ? <Loader2 className="animate-spin" size={9} /> : "Sí"}
+              </button>
+              <button
+                className="px-1.5 py-0.5 rounded text-micro font-black uppercase tracking-widest"
+                style={{
+                  color: "color-mix(in srgb, var(--primary) 35%, transparent)",
+                }}
+                type="button"
+                onClick={() => setConfirmDel(false)}
+              >
+                No
+              </button>
+            </div>
+          )
         )}
         {etiquetaDestino && (
           <button
@@ -2933,6 +2989,7 @@ function ListaEventosConMinimapa({
   onAddRasgoEraPersonaje,
   onRemoveRasgoEraPersonaje,
   onDeleteEraPersonaje,
+  onDelete,
   personajesDisponibles,
   onPersonajesChange,
 }: {
@@ -2970,6 +3027,8 @@ function ListaEventosConMinimapa({
   onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onDeleteEraPersonaje?: (id: string) => void;
+  /** Elimina un evento "mundo"/"reino" (tabla `eventos_mundo`). */
+  onDelete?: (id: string) => void;
   /** Lista completa de personajes (id/nombre/avatar) — para mostrar los
    * personajes vinculados a un evento/capítulo y, en eventos mundo/reino,
    * habilitar el buscador de "añadir personaje". */
@@ -3415,6 +3474,7 @@ function ListaEventosConMinimapa({
           onAddRasgoEraPersonaje={onAddRasgoEraPersonaje}
           onClose={() => setEvtSeleccionado(null)}
           onDeleteEraPersonaje={onDeleteEraPersonaje}
+          onDelete={onDelete}
           onDiaChange={onDiaChange}
           onDiaChangeCancion={onDiaChangeCancion}
           onDiaChangeCumpleanos={onDiaChangeCumpleanos}
@@ -3461,6 +3521,7 @@ function EventoDetalleFlotante({
   onAddRasgoEraPersonaje,
   onRemoveRasgoEraPersonaje,
   onDeleteEraPersonaje,
+  onDelete,
   onSelectCapitulo,
   onSelectCancion,
   onSelectPersonaje,
@@ -3491,6 +3552,8 @@ function EventoDetalleFlotante({
   onAddRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onRemoveRasgoEraPersonaje?: (era: Era, rasgo: string) => void;
   onDeleteEraPersonaje?: (id: string) => void;
+  /** Elimina un evento "mundo"/"reino" (tabla `eventos_mundo`). */
+  onDelete?: (id: string) => void;
   onSelectCapitulo?: (capituloId: string, libroId: string) => void;
   onSelectCancion?: (cancionId: string) => void;
   onSelectPersonaje?: (personajeId: string) => void;
@@ -3546,6 +3609,7 @@ function EventoDetalleFlotante({
           onAddRasgoEraPersonaje={onAddRasgoEraPersonaje}
           onClose={onClose}
           onDeleteEraPersonaje={onDeleteEraPersonaje}
+          onDelete={onDelete}
           onDiaChange={onDiaChange}
           onDiaChangeCancion={onDiaChangeCancion}
           onDiaChangeCumpleanos={onDiaChangeCumpleanos}
@@ -5352,7 +5416,7 @@ export function PanelHistoriaMundo({
     },
     [],
   );
-  const _handleEventoMundoDelete = useCallback(async (id: string) => {
+  const handleEventoMundoDelete = useCallback(async (id: string) => {
     setEventosMundo((prev) => prev.filter((e) => e.id !== id));
     try {
       await supabase.from("eventos_mundo").delete().eq("id", id);
@@ -5972,6 +6036,7 @@ export function PanelHistoriaMundo({
               setEvtSeleccionado={setEvtSeleccionado}
               onAddRasgoEraPersonaje={addRasgoEraPersonaje}
               onDeleteEraPersonaje={deleteEraPersonaje}
+              onDelete={handleEventoMundoDelete}
               onDiaChange={handleEventoMundoDiaChange}
               onDiaChangeCancion={handleCancionDiaChange}
               onDiaChangeCumpleanos={handleCumpleanosDiaChange}
