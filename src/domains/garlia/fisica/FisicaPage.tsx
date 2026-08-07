@@ -18,7 +18,7 @@
  * "oris" y "fisica_conceptos", separadas de "elementos".
  */
 
-import { Atom, Loader2, Plus } from "lucide-react";
+import { Atom, Download, Loader2, Plus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
@@ -49,6 +49,32 @@ interface Props {
   conceptos: FisicaConcepto[];
   loadingConceptos?: boolean;
   onActualizarConcepto: (id: string, cambios: Partial<FisicaConcepto>) => void;
+}
+
+// ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
+// Incluye los catálogos fijos (Partícula Base/Partículas/Iums, que no
+// tienen tabla propia) + los datos de Supabase (Oris, Conceptos), para
+// mandar el archivo completo y editar todo junto de una.
+function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
+  const payload = {
+    exportado_en: new Date().toISOString(),
+    particula_base: PARTICULAS_BASE,
+    particulas: PARTICULAS,
+    iums: IUMS,
+    oris,
+    conceptos,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `fisica-energias-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Bloque 1: catálogos fijos ─────────────────────────────────────────────
@@ -239,17 +265,28 @@ export function FisicaPage({
             Física · {oris.length} Oris
           </p>
         </div>
-        {onCreateOris && (
+        <div className="shrink-0 flex items-center gap-1.5">
           <button
             type="button"
-            disabled={creatingOris}
-            onClick={onCreateOris}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            onClick={() => descargarDatosFisica(oris, conceptos)}
+            title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
           >
-            {creatingOris ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
-            Nuevo Oris
+            <Download size={11} />
+            <span className="hidden sm:inline">Descargar datos</span>
           </button>
-        )}
+          {onCreateOris && (
+            <button
+              type="button"
+              disabled={creatingOris}
+              onClick={onCreateOris}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            >
+              {creatingOris ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
+              Nuevo Oris
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Bloque 1: catálogos fijos */}
