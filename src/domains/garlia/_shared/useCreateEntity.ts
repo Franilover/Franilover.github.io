@@ -23,6 +23,9 @@ const SECTION_TABLE: Partial<Record<SectionKey, string>> = {
   reinos: "reinos",
   ciudades: "ciudades",
   runas: "runas",
+  // "elementos" deliberadamente NO está acá: necesita numero_atomico
+  // (NOT NULL) calculado antes de insertar — ver ElementosSection.handleCreate,
+  // que es el único punto de creación para esta sección.
 };
 
 const PLACEHOLDER_NAME: Partial<Record<SectionKey, string>> = {
@@ -32,6 +35,7 @@ const PLACEHOLDER_NAME: Partial<Record<SectionKey, string>> = {
   reinos: "Nuevo reino",
   ciudades: "Nueva ciudad",
   runas: "Nueva runa",
+  elementos: "Nuevo elemento",
 };
 
 export function useCreateEntity() {

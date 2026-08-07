@@ -31,6 +31,7 @@ const SEARCHABLE: { tabla: string; section: SectionKey }[] = [
   { tabla: "reinos", section: "reinos" },
   { tabla: "ciudades", section: "ciudades" },
   { tabla: "runas", section: "runas" },
+  { tabla: "elementos", section: "elementos" },
 ];
 
 export function useWikilinkNavigate() {

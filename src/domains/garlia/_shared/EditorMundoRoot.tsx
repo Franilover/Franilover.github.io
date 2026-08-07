@@ -69,6 +69,11 @@ const LineaTiempoSection = lazy(() =>
 const AventuraSection = lazy(() =>
   import("@/domains/garlia/aventuras/AventuraSection").then((m) => ({ default: m.AventuraSection })),
 );
+const ElementosSection = lazy(() =>
+  import("@/domains/garlia/elementos/ElementosSection").then((m) => ({
+    default: m.ElementosSection,
+  })),
+);
 
 function SectionFallback() {
   return (
@@ -96,6 +101,11 @@ function ActiveSection() {
     case "notas":
     case "letras":
       return <EntidadesPage section={section} selectedId={selectedId} />;
+    case "elementos":
+      // Tabla Química/Alquímica: fuera de EntidadesPage porque trae su
+      // propio hook de datos (useElementos) — igual que Mapa/Aventura,
+      // no comparte el mega-grid de Entidades/Geografía/Organización.
+      return <ElementosSection selectedId={selectedId} />;
     case "notas-gos":
       // Reusa el mismo editor de ensayos que EnsayosShell (/myself/escritorio),
       // pero ahora como pestaña más dentro de Mundo — igual que runas/personajes.

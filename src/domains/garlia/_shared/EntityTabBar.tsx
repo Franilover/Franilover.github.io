@@ -18,6 +18,7 @@
  */
 
 import {
+  Atom,
   Bug,
   BookMarked,
   Clock,
@@ -42,6 +43,7 @@ const SECTION_ICON: Partial<Record<SectionKey, React.ElementType>> = {
   reinos: Crown,
   ciudades: Landmark,
   runas: ScrollText,
+  elementos: Atom,
   grupos: Users,
   letras: Music,
   notas: StickyNote,

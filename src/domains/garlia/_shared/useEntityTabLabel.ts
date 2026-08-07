@@ -32,6 +32,7 @@ const SECTION_TABLE: Record<SectionKey, string | null> = {
   reinos: "reinos",
   ciudades: "ciudades",
   runas: "runas",
+  elementos: "elementos",
   grupos: "grupos_mundo",
   // "capitulos" ahora sí abre pestañas — pero de LIBROS (el documento
   // completo de un libro, ver LibroDocumentoPanel en EditorCapitulos.tsx),
