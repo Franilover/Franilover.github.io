@@ -82,20 +82,20 @@ function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
 function CatalogoCard({ titulo, filas }: { titulo: string; filas: FilaCatalogo[] }) {
   return (
     <div className="rounded-lg border border-primary/10 overflow-hidden">
-      <div className="px-3 py-1.5 bg-primary/[0.04] border-b border-primary/10">
+      <div className="px-2 py-1 bg-primary/[0.04] border-b border-primary/10">
         <p className="text-micro font-black uppercase tracking-widest text-primary/50">
           {titulo}
         </p>
       </div>
-      <div className="p-2 grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+      <div className="p-1.5 grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))" }}>
         {filas.map((f) => (
           <div
             key={f.nombre}
-            className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md bg-primary/[0.02] border border-primary/5"
+            className="flex flex-col gap-0.5 px-1.5 py-1 rounded-md bg-primary/[0.02] border border-primary/5"
           >
-            <span className="text-xs font-bold text-primary/80 truncate">{f.nombre}</span>
-            <span className="text-[10px] text-primary/45 truncate">{f.detalle}</span>
-            {f.extra && <span className="text-[10px] text-primary/35 truncate">{f.extra}</span>}
+            <span className="text-micro font-bold text-primary/80 truncate">{f.nombre}</span>
+            <span className="text-micro text-primary/45 truncate">{f.detalle}</span>
+            {f.extra && <span className="text-micro text-primary/35 truncate">{f.extra}</span>}
           </div>
         ))}
       </div>
@@ -118,15 +118,15 @@ function OrisCasilla({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex flex-col items-stretch gap-1 p-2.5 rounded-lg border transition-colors text-left ${
+      className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
         seleccionado
           ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
           : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
       }`}
     >
-      <span className="text-sm font-black text-primary truncate">{oris.nombre}</span>
-      <span className="text-[10px] font-bold text-primary/45 truncate">{oris.formula}</span>
-      <span className="text-[10px] text-primary/35 truncate">{oris.dominio}</span>
+      <span className="text-micro font-black text-primary truncate">{oris.nombre}</span>
+      <span className="text-micro font-bold text-primary/45 truncate">{oris.formula}</span>
+      <span className="text-micro text-primary/35 truncate">{oris.dominio}</span>
     </button>
   );
 }
@@ -151,8 +151,8 @@ function GrupoOrisPorFamilia({
         <p className="text-micro font-black uppercase tracking-widest">{familia}</p>
       </div>
       <div
-        className="grid gap-1.5"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}
+        className="grid gap-1"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}
       >
         {items.map((o) => (
           <OrisCasilla
@@ -187,19 +187,19 @@ function ConceptoCard({
   }
 
   return (
-    <div className="rounded-lg border border-primary/10 bg-primary/[0.02] p-2.5 flex flex-col gap-1.5">
+    <div className="rounded-lg border border-primary/10 bg-primary/[0.02] p-2 flex flex-col gap-1">
       <input
         value={local.titulo}
         onChange={(e) => setLocal((p) => ({ ...p, titulo: e.target.value }))}
         onBlur={() => persist({ titulo: local.titulo })}
-        className="bg-transparent text-xs font-black text-primary/80 outline-none"
+        className="bg-transparent text-micro font-black text-primary/80 outline-none"
       />
       <textarea
         value={local.contenido}
         onChange={(e) => setLocal((p) => ({ ...p, contenido: e.target.value }))}
         onBlur={() => persist({ contenido: local.contenido })}
         rows={4}
-        className="bg-transparent text-xs text-primary/55 leading-relaxed outline-none resize-none"
+        className="bg-transparent text-micro text-primary/55 leading-relaxed outline-none resize-none"
       />
     </div>
   );
@@ -259,10 +259,10 @@ export function FisicaPage({
 
   return (
     <div className="flex-1 min-h-0 flex overflow-hidden relative">
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-6">
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-primary/40">
-            <Atom size={13} />
+            <Atom size={12} />
             <p className="text-micro font-black uppercase tracking-widest">
               Física · {oris.length} Oris
             </p>
@@ -272,9 +272,9 @@ export function FisicaPage({
               type="button"
               onClick={() => descargarDatosFisica(oris, conceptos)}
               title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
             >
-              <Download size={11} />
+              <Download size={10} />
               <span className="hidden sm:inline">Descargar datos</span>
             </button>
             {onCreateOris && (
@@ -282,9 +282,9 @@ export function FisicaPage({
                 type="button"
                 disabled={creatingOris}
                 onClick={onCreateOris}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                {creatingOris ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
+                {creatingOris ? <Loader2 className="animate-spin" size={10} /> : <Plus size={10} />}
                 Nuevo Oris
               </button>
             )}
@@ -292,11 +292,11 @@ export function FisicaPage({
         </div>
 
         {/* Bloque 1: catálogos fijos */}
-        <div className="flex flex-col gap-3">
-          <p className="text-micro font-black uppercase tracking-[0.28em] text-primary/25">
+        <div className="flex flex-col gap-2">
+          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
             Jerarquía · Partícula Base → Partículas → Ium → Oris
           </p>
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
             <CatalogoCard titulo="Partícula Base" filas={PARTICULAS_BASE} />
             <CatalogoCard titulo="Partículas" filas={PARTICULAS} />
             <CatalogoCard titulo="Iums" filas={IUMS} />
@@ -304,11 +304,11 @@ export function FisicaPage({
         </div>
 
         {/* Bloque 2: Oris por familia */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {loadingOris && oris.length === 0 ? (
-            <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
+            <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
           ) : oris.length === 0 ? (
-            <div className="py-6 text-xs text-primary/25 text-center">
+            <div className="py-6 text-micro text-primary/25 text-center">
               Todavía no hay Oris cargados.
             </div>
           ) : (
@@ -327,12 +327,12 @@ export function FisicaPage({
         </div>
 
         {/* Bloque 3: conceptos */}
-        <div className="flex flex-col gap-4">
-          <p className="text-micro font-black uppercase tracking-[0.28em] text-primary/25">
+        <div className="flex flex-col gap-3">
+          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
             Conceptos
           </p>
           {loadingConceptos && conceptos.length === 0 ? (
-            <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
+            <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
           ) : (
             bloquesConceptos.map(({ bloque, items }) => (
               <BloqueConceptos
@@ -357,7 +357,7 @@ export function FisicaPage({
             onClick={() => setSeleccionadoId(null)}
           />
           <div
-            className="absolute md:relative inset-y-0 right-0 z-40 flex flex-col w-full sm:w-[380px] md:w-[420px] shrink-0 border-l shadow-2xl md:shadow-none"
+            className="absolute md:sticky md:top-0 inset-y-0 right-0 z-40 flex flex-col w-full sm:w-[380px] md:w-[420px] shrink-0 border-l shadow-2xl md:shadow-none md:h-full md:self-start"
             style={{
               background: "var(--white-custom, var(--bg-main))",
               borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",

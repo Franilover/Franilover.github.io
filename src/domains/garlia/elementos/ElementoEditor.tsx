@@ -68,14 +68,14 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
       {/* Header */}
       <div
         style={{ background: "var(--bg-main)" }}
-        className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-primary/10"
+        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
       >
         <button
           type="button"
           onClick={onBack}
-          className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
         >
-          <ChevronLeft size={14} />
+          <ChevronLeft size={12} />
         </button>
 
         <span className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/30 px-1.5 py-0.5 rounded border border-primary/15">
@@ -87,7 +87,7 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
           onChange={(e) => setLocal((p) => ({ ...p, nombre: e.target.value }))}
           onBlur={() => persist({ nombre: local.nombre })}
           placeholder="Nombre del elemento"
-          className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
+          className="flex-1 min-w-0 bg-transparent text-micro font-black text-primary outline-none placeholder:text-primary/25"
         />
 
         <input
@@ -96,10 +96,10 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
           onBlur={() => persist({ simbolo: local.simbolo })}
           placeholder="Sm"
           maxLength={3}
-          className="shrink-0 w-14 text-center bg-primary/5 rounded-lg px-2 py-1 text-xs font-black text-primary outline-none placeholder:text-primary/25 border border-primary/10"
+          className="shrink-0 w-10 text-center bg-primary/5 rounded-md px-1 py-0.5 text-micro font-black text-primary outline-none placeholder:text-primary/25 border border-primary/10"
         />
 
-        <div className="shrink-0 flex items-center gap-1.5">
+        <div className="shrink-0 flex items-center gap-1">
           {onEliminar && (
             <button
               type="button"
@@ -110,10 +110,10 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
                 });
                 if (ok) onEliminar(elemento.id);
               }}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+              className="flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+              title="Eliminar"
             >
               <Trash2 size={11} />
-              <span className="hidden md:inline">Eliminar</span>
             </button>
           )}
           <button
@@ -131,21 +131,21 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
                 externa: local.externa,
               })
             }
-            className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
-            <Save size={11} />
-            {saving ? "Guardando…" : "Guardar"}
+            <Save size={10} />
+            {saving ? "…" : "Guardar"}
           </button>
         </div>
       </div>
 
       {/* Body */}
-      <div className="flex-1 min-h-0 p-3 flex flex-col gap-4 overflow-y-auto">
+      <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
         {/* Metadatos */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/30">
-              Número atómico
+        <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col gap-0.5">
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              N° atómico
             </label>
             <input
               type="number"
@@ -154,12 +154,12 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
                 setLocal((p) => ({ ...p, numero_atomico: Number(e.target.value) }))
               }
               onBlur={() => persist({ numero_atomico: local.numero_atomico })}
-              className="bg-primary/5 rounded-lg px-2.5 py-1.5 text-sm font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+              className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/30">
+          <div className="flex flex-col gap-0.5">
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
               Familia
             </label>
             <select
@@ -169,7 +169,7 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
                 setLocal((p) => ({ ...p, familia }));
                 persist({ familia });
               }}
-              className="bg-primary/5 rounded-lg px-2.5 py-1.5 text-sm font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+              className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
             >
               {ELEMENT_FAMILIES.map((f) => (
                 <option key={f} value={f}>
@@ -179,8 +179,8 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
             </select>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/30">
+          <div className="flex flex-col gap-0.5">
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
               Noble
             </label>
             <button
@@ -190,20 +190,20 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
                 setLocal((p) => ({ ...p, es_noble }));
                 persist({ es_noble });
               }}
-              className={`rounded-lg px-2.5 py-1.5 text-sm font-bold outline-none border transition-all cursor-pointer ${
+              className={`rounded-md px-2 py-1 text-micro font-bold outline-none border transition-all cursor-pointer truncate ${
                 local.es_noble
                   ? "bg-primary text-btn-text border-primary"
                   : "bg-primary/5 text-primary/50 border-primary/10 hover:border-primary/30"
               }`}
             >
-              {local.es_noble ? "Sí, es noble" : "No es noble"}
+              {local.es_noble ? "Sí" : "No"}
             </button>
           </div>
         </div>
 
         {/* Notas */}
-        <div className="flex flex-col gap-1">
-          <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/30">
+        <div className="flex flex-col gap-0.5">
+          <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
             Notas
           </label>
           <textarea
@@ -212,30 +212,37 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
             onBlur={() => persist({ notas: local.notas })}
             rows={2}
             placeholder="Descripción del elemento…"
-            className="bg-primary/5 rounded-lg px-2.5 py-1.5 text-sm text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
+            className="bg-primary/5 rounded-md px-2 py-1 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
           />
         </div>
 
-        {/* Capas */}
-        <div className="flex flex-col gap-3">
-          <p className="text-micro font-black uppercase tracking-[0.28em] text-primary/25">
+        {/* Capas: filas apiladas en vez de 3 tarjetas con borde propio —
+            un solo contenedor con separadores finos entre filas, para
+            aprovechar mejor el ancho del panel lateral. */}
+        <div className="flex flex-col gap-1.5">
+          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
             Capas atómicas
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {(["nucleo", "media", "externa"] as LayerName[]).map((layer) => (
+          <div className="rounded-lg border border-primary/10 overflow-hidden">
+            {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
               <div
                 key={layer}
-                className="rounded-xl border border-primary/10 bg-primary/[0.03] p-3 flex flex-col gap-2"
+                className={`flex items-center gap-1.5 px-2 py-1.5 ${
+                  i > 0 ? "border-t border-primary/10" : ""
+                } bg-primary/[0.02]`}
               >
-                <p className="text-micro font-black uppercase tracking-widest text-primary/40">
-                  {LAYER_LABEL[layer]}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
+                <span className="shrink-0 w-6 text-micro font-black text-primary/35">
+                  {LAYER_LABEL[layer].slice(0, 1)}
+                </span>
+                <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
                   {PARTICLE_TYPES.map((particle) => {
                     const value = local[layer]?.[particle] ?? 0;
                     return (
-                      <div key={particle} className="flex items-center gap-1.5">
-                        <span className="flex-1 min-w-0 truncate text-[10px] font-bold text-primary/50">
+                      <div
+                        key={particle}
+                        className="shrink-0 flex items-center gap-1 bg-primary/5 rounded-md pl-1.5 pr-0.5 py-0.5 border border-primary/10 focus-within:border-primary/30"
+                      >
+                        <span className="text-micro font-bold text-primary/45 whitespace-nowrap">
                           {particle}
                         </span>
                         <input
@@ -246,7 +253,7 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
                             setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
                           }
                           onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
-                          className="w-12 shrink-0 text-center bg-primary/5 rounded-md px-1 py-0.5 text-xs font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+                          className="w-7 shrink-0 text-center bg-transparent text-micro font-bold text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </div>
                     );

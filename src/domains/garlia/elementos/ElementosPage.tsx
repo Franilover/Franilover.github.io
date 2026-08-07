@@ -69,7 +69,7 @@ function ElementoCasilla({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex flex-col items-stretch gap-1 p-2 rounded-lg border transition-colors text-left ${
+      className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
         seleccionado
           ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
           : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
@@ -87,22 +87,22 @@ function ElementoCasilla({
         )}
       </div>
 
-      <span className="text-xl font-black text-primary text-center leading-none py-1">
+      <span className="text-base font-black text-primary text-center leading-none py-0.5">
         {elemento.simbolo || "??"}
       </span>
 
-      <span className="text-xs font-bold text-primary/80 truncate text-center leading-tight">
+      <span className="text-micro font-bold text-primary/80 truncate text-center leading-tight">
         {elemento.nombre}
       </span>
 
-      <div className="mt-1 pt-1 border-t border-primary/10 flex flex-col gap-0.5">
-        <span className="text-[9px] text-primary/40 truncate leading-tight">
+      <div className="mt-0.5 pt-0.5 border-t border-primary/10 flex flex-col gap-0.5">
+        <span className="text-micro text-primary/40 truncate leading-tight">
           <span className="text-primary/25">N</span> {formatLayer(elemento.nucleo)}
         </span>
-        <span className="text-[9px] text-primary/40 truncate leading-tight">
+        <span className="text-micro text-primary/40 truncate leading-tight">
           <span className="text-primary/25">M</span> {formatLayer(elemento.media)}
         </span>
-        <span className="text-[9px] text-primary/40 truncate leading-tight">
+        <span className="text-micro text-primary/40 truncate leading-tight">
           <span className="text-primary/25">E</span> {formatLayer(elemento.externa)}
         </span>
       </div>
@@ -129,10 +129,10 @@ export function ElementosPage({
 
   return (
     <div className="flex-1 min-h-0 flex overflow-hidden relative">
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-primary/40">
-            <Atom size={13} />
+            <Atom size={12} />
             <p className="text-micro font-black uppercase tracking-widest">
               Tabla Química · {elementos.length} elementos
             </p>
@@ -142,9 +142,9 @@ export function ElementosPage({
               type="button"
               onClick={() => descargarDatosElementos(elementos)}
               title="Descargar todos los datos de la Tabla Química como JSON"
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
             >
-              <Download size={11} />
+              <Download size={10} />
               <span className="hidden sm:inline">Descargar datos</span>
             </button>
             {onCreate && (
@@ -152,9 +152,9 @@ export function ElementosPage({
                 type="button"
                 disabled={creating}
                 onClick={onCreate}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                {creating ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
+                {creating ? <Loader2 className="animate-spin" size={10} /> : <Plus size={10} />}
                 Nuevo elemento
               </button>
             )}
@@ -162,15 +162,15 @@ export function ElementosPage({
         </div>
 
         {loading && elementos.length === 0 ? (
-          <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
+          <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
         ) : elementos.length === 0 ? (
-          <div className="py-6 text-xs text-primary/25 text-center">
+          <div className="py-6 text-micro text-primary/25 text-center">
             Todavía no hay elementos cargados.
           </div>
         ) : (
           <div
-            className="grid gap-1.5"
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))" }}
+            className="grid gap-1"
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
           >
             {elementos.map((el) => (
               <ElementoCasilla
@@ -197,7 +197,7 @@ export function ElementosPage({
             onClick={() => setSeleccionadoId(null)}
           />
           <div
-            className="absolute md:relative inset-y-0 right-0 z-40 flex flex-col w-full sm:w-[380px] md:w-[420px] shrink-0 border-l shadow-2xl md:shadow-none"
+            className="absolute md:sticky md:top-0 inset-y-0 right-0 z-40 flex flex-col w-full sm:w-[380px] md:w-[420px] shrink-0 border-l shadow-2xl md:shadow-none md:h-full md:self-start"
             style={{
               background: "var(--white-custom, var(--bg-main))",
               borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
