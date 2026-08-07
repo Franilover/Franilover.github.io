@@ -2210,7 +2210,7 @@ function PersonajesEventoPicker({
           {vinculados.map((p) => (
             <span
               key={p.id}
-              className="flex items-center gap-1 pl-1 pr-1.5 py-0.5 rounded-full text-micro font-bold transition-all"
+              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full text-xs font-bold transition-all"
               style={{
                 background: "color-mix(in srgb, var(--primary) 6%, transparent)",
                 color: "color-mix(in srgb, var(--primary) 60%, transparent)",
@@ -2221,11 +2221,11 @@ function PersonajesEventoPicker({
               {p.img_url ? (
                 <img
                   alt=""
-                  className="w-4 h-4 rounded-full object-cover"
+                  className="w-7 h-7 rounded-full object-cover"
                   src={p.img_url}
                 />
               ) : (
-                <User size={9} className="opacity-50" />
+                <User size={14} className="opacity-50" />
               )}
               <button
                 className="hover:underline"
@@ -2244,7 +2244,7 @@ function PersonajesEventoPicker({
                 if (edad == null) return null;
                 return (
                   <span
-                    className="text-micro font-black tabular-nums opacity-60"
+                    className="text-xs font-black tabular-nums opacity-60"
                     title="Edad en este momento"
                   >
                     {edad}a
@@ -2258,7 +2258,7 @@ function PersonajesEventoPicker({
                   type="button"
                   onClick={() => quitar(p.id)}
                 >
-                  <X size={8} />
+                  <X size={11} />
                 </button>
               )}
             </span>
