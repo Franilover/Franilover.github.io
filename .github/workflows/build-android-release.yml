@@ -172,37 +172,6 @@ jobs:
           rm -rf src-tauri/gen/android
           npx tauri android init
 
-      - name: Registrar el módulo android-installer en settings.gradle.kts
-        # `tauri android init` regenera gen/android desde cero (ver paso de
-        # arriba), así que cualquier registro manual del módulo nativo
-        # android-installer que se haya hecho antes en una máquina local se
-        # pierde en cada corrida de CI. Sin este include, Gradle nunca
-        # compila ni mergea el AndroidManifest.xml del plugin (el que
-        # declara REQUEST_INSTALL_PACKAGES y el <provider> de FileProvider
-        # — ver src-tauri/android-installer/MANIFEST_CAMBIOS.md), y el APK
-        # queda sin el FileProvider declarado. Síntoma en la app instalada:
-        # la descarga de la actualización funciona bien (corre en el
-        # DownloadManager nativo, no depende de este plugin), pero al tocar
-        # "Instalar" el panel flotante muestra "Error al abrir el
-        # actualizador" porque FileProvider.getUriForFile() explota con
-        # "Couldn't find meta-data for provider with authority
-        # <applicationId>.fileprovider".
-        run: |
-          SETTINGS="src-tauri/gen/android/settings.gradle.kts"
-
-          if [ ! -f "$SETTINGS" ]; then
-            echo "::error::No se encontró $SETTINGS — ¿cambió la estructura que genera tauri android init?"
-            exit 1
-          fi
-
-          if grep -q '":android-installer"' "$SETTINGS"; then
-            echo "El módulo android-installer ya estaba registrado, no se toca."
-          else
-            printf '\ninclude(":android-installer")\nproject(":android-installer").projectDir = File("../../android-installer/android")\n' >> "$SETTINGS"
-            echo "Módulo android-installer registrado en $SETTINGS:"
-            tail -4 "$SETTINGS"
-          fi
-
       - name: Restaurar el keystore de firma
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -697,9 +666,10 @@ jobs:
 
       - name: Verificar que el FileProvider del actualizador quedó mergeado
         # Chequea el AndroidManifest.xml final que Gradle produce mergeando
-        # el de la app con el de todos los módulos (incluido
-        # android-installer). Si el include(":android-installer") de
-        # settings.gradle.kts se rompiera de nuevo, este paso corta el
+        # el de la app con el de todos los módulos, incluido el plugin
+        # nativo android-installer (Tauri lo linkea solo a partir de la
+        # dependencia en Cargo.toml + su build.rs, sin tocar nada a mano).
+        # Si por lo que sea ese merge no ocurriera, este paso corta el
         # build acá en vez de dejar pasar un APK donde el botón
         # "Actualizar" termina en "Error al abrir el actualizador".
         run: |
@@ -711,11 +681,11 @@ jobs:
           echo "Manifest mergeado: $MERGED"
 
           grep -q "REQUEST_INSTALL_PACKAGES" "$MERGED" || {
-            echo "::error::Falta REQUEST_INSTALL_PACKAGES en el manifest mergeado — el módulo android-installer no se compiló/mergeó (revisar settings.gradle.kts)."
+            echo "::error::Falta REQUEST_INSTALL_PACKAGES en el manifest mergeado — el plugin android-installer no se compiló/mergeó."
             exit 1
           }
           grep -q "fileprovider" "$MERGED" || {
-            echo "::error::Falta el <provider> de FileProvider en el manifest mergeado — el módulo android-installer no se compiló/mergeó (revisar settings.gradle.kts)."
+            echo "::error::Falta el <provider> de FileProvider en el manifest mergeado — el plugin android-installer no se compiló/mergeó."
             exit 1
           }
           echo "FileProvider y REQUEST_INSTALL_PACKAGES OK — el actualizador va a poder abrir el instalador."
