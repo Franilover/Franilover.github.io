@@ -12,11 +12,30 @@
  * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
  */
 
-import { Atom, Loader2, Plus } from "lucide-react";
+import { Atom, Download, Loader2, Plus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { ElementoEditor } from "./ElementoEditor";
 import { formatLayer, type Elemento } from "./types";
+
+// ─── Descarga: todos los elementos de la Tabla Química en un solo JSON ─────
+function descargarDatosElementos(elementos: Elemento[]) {
+  const payload = {
+    exportado_en: new Date().toISOString(),
+    elementos,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tabla-elementos-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 interface Props {
   elementos: Elemento[];
@@ -123,17 +142,28 @@ export function ElementosPage({
             Tabla Química · {elementos.length} elementos
           </p>
         </div>
-        {onCreate && (
+        <div className="shrink-0 flex items-center gap-1.5">
           <button
             type="button"
-            disabled={creating}
-            onClick={onCreate}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            onClick={() => descargarDatosElementos(elementos)}
+            title="Descargar todos los datos de la Tabla Química como JSON"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
           >
-            {creating ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
-            Nuevo elemento
+            <Download size={11} />
+            <span className="hidden sm:inline">Descargar datos</span>
           </button>
-        )}
+          {onCreate && (
+            <button
+              type="button"
+              disabled={creating}
+              onClick={onCreate}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            >
+              {creating ? <Loader2 className="animate-spin" size={11} /> : <Plus size={11} />}
+              Nuevo elemento
+            </button>
+          )}
+        </div>
       </div>
 
       {loading && elementos.length === 0 ? (
