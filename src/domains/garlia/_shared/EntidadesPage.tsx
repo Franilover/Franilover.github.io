@@ -28,6 +28,8 @@ import type { Cancion } from "@/domains/garlia/canciones/types";
 import { useGruposCriaturas } from "@/domains/garlia/grupos/useGruposCriaturas";
 import { useRunas } from "@/domains/garlia/runas/useRunas";
 import { RunasPage } from "@/domains/garlia/runas/RunasPage";
+import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import type { Elemento } from "@/domains/garlia/elementos/types";
 import { useNotas } from "@/editor/notas/useNotas";
 import { type Nota } from "@/domains/garlia/_shared/types";
 import { EditorGrupo, GRUPO_TIPO_CONFIG, useGrupos, type GrupoTipo } from "@/domains/garlia/grupos/EditorGrupo";
@@ -115,6 +117,58 @@ export function EntidadesPage({ section, selectedId }: Props) {
   // Runa a dejar seleccionada dentro de RunasPage tras crearla — ya no
   // navegamos a un editor aparte (FormularioRuna, eliminado).
   const [runaRecienCreadaId, setRunaRecienCreadaId] = useState<string | null>(null);
+
+  // ── Tabla Química (Elementos) ────────────────────────────────────────────
+  // Vive dentro de "Magia", como tab hermana de Runas (toggle Sistema/
+  // Runas/Tabla en RunasPage) — no como sección propia de navegación.
+  const {
+    items: elementos,
+    setItems: setElementos,
+    loading: loadingElementos,
+  } = useElementos();
+  const [creatingElemento, setCreatingElemento] = useState(false);
+  const [elementoRecienCreadoId, setElementoRecienCreadoId] = useState<string | null>(null);
+
+  async function handleCreateElemento() {
+    setCreatingElemento(true);
+    try {
+      const siguienteNumero =
+        elementos.reduce((max, e) => Math.max(max, e.numero_atomico ?? 0), 0) + 1;
+      const { data, error } = await supabase
+        .from("elementos")
+        .insert([
+          {
+            nombre: "Nuevo elemento",
+            simbolo: "??",
+            numero_atomico: siguienteNumero,
+            familia: "Sensibles",
+            es_noble: false,
+            nucleo: {},
+            media: {},
+            externa: {},
+          },
+        ])
+        .select()
+        .single();
+      if (error) throw error;
+      setElementos((prev) => [...prev, data as Elemento]);
+      setElementoRecienCreadoId((data as Elemento).id);
+    } catch (e) {
+      console.error("[EntidadesPage] error creando elemento:", e);
+    } finally {
+      setCreatingElemento(false);
+    }
+  }
+
+  async function handleEliminarElemento(id: string) {
+    try {
+      const { error } = await supabase.from("elementos").delete().eq("id", id);
+      if (error) throw error;
+      setElementos((prev) => prev.filter((e) => e.id !== id));
+    } catch (e) {
+      console.error("[EntidadesPage] error eliminando elemento:", e);
+    }
+  }
 
   // ── Organización (Grupos + Notas) ────────────────────────────────────────
   const { grupos, loaded: loadedGrupos, crearGrupo, actualizarGrupo, eliminarGrupo } = useGrupos();
@@ -569,6 +623,15 @@ export function EntidadesPage({ section, selectedId }: Props) {
             }
           }}
           onOpen={(section, id) => openEntity(section, id)}
+          elementos={elementos}
+          loadingElementos={loadingElementos}
+          creatingElemento={creatingElemento}
+          onCreateElemento={handleCreateElemento}
+          onActualizarElemento={(id, cambios) =>
+            setElementos((prev) => prev.map((e) => (e.id === id ? { ...e, ...cambios } : e)))
+          }
+          onEliminarElemento={handleEliminarElemento}
+          seleccionarElementoId={elementoRecienCreadoId}
         />
       </div>
     );

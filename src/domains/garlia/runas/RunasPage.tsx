@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Maximize2, Plus, ScrollText, Sparkles, Waypoints, X } from "lucide-react";
+import { Atom, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -23,6 +23,9 @@ import { useSubBloquesDeEnsayo } from "@/editor/sub-bloques/useSubBloquesDeEnsay
 import { supabase } from "@/infra/supabase/supabase";
 import { SaveDot } from "@/ui/SaveDot";
 import type { SaveStatus } from "@/ui/saveStatus";
+
+import { ElementosPage } from "@/domains/garlia/elementos/ElementosPage";
+import type { Elemento } from "@/domains/garlia/elementos/types";
 
 import {
   PanelCombinacionesRunas,
@@ -70,6 +73,18 @@ interface Props {
   // el resto de la página no queden desincronizados hasta el próximo
   // refetch.
   onActualizarRuna?: (id: string, cambios: Partial<EntidadMagica>) => void;
+
+  // ── Tabla Química (Elementos) ──────────────────────────────────────
+  // Tercera pill del toggle Sistema/Runas/Tabla. Todas opcionales: si no
+  // se pasa `elementos`, la pill "Tabla" ni se muestra (mismo criterio
+  // que onOpenEnsayo/subsistemas para "Sistema").
+  elementos?: Elemento[];
+  loadingElementos?: boolean;
+  creatingElemento?: boolean;
+  onCreateElemento?: () => void;
+  onActualizarElemento?: (id: string, cambios: Partial<Elemento>) => void;
+  onEliminarElemento?: (id: string) => void;
+  seleccionarElementoId?: string | null;
 }
 
 /**
@@ -449,27 +464,34 @@ function BloqueEnsayoConSubBloques({
   );
 }
 
-// ─── Toggle "Sistema" / "Runas" ─────────────────────────────────────────────
+// ─── Toggle "Sistema" / "Runas" / "Tabla" ────────────────────────────────────
 // Sistema: ensayo (Energías) a la izquierda + subsistemas a la derecha,
 // nada más. Runas: el bloque de herramientas de runas (probador, lista,
-// config), sin ensayo ni subsistemas.
-type SeccionMagia = "sistema" | "runas";
+// config), sin ensayo ni subsistemas. Tabla: grid de Elementos (Tabla
+// Química/Alquímica) + detalle, solo si se pasan props de elementos.
+type SeccionMagia = "sistema" | "runas" | "tabla";
 
 const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
   { key: "sistema", label: "Sistema", Icon: Sparkles },
   { key: "runas", label: "Runas", Icon: Waypoints },
+  { key: "tabla", label: "Tabla", Icon: Atom },
 ];
 
 function SelectorSeccionMagia({
   seccion,
   onCambiarSeccion,
+  mostrarTabla,
 }: {
   seccion: SeccionMagia;
   onCambiarSeccion: (seccion: SeccionMagia) => void;
+  mostrarTabla?: boolean;
 }) {
+  const opciones = mostrarTabla
+    ? SECCIONES_MAGIA
+    : SECCIONES_MAGIA.filter((s) => s.key !== "tabla");
   return (
     <div className="flex items-center justify-center gap-1 px-2 py-2">
-      {SECCIONES_MAGIA.map(({ key, label, Icon }) => {
+      {opciones.map(({ key, label, Icon }) => {
         const activa = seccion === key;
         return (
           <button
@@ -499,6 +521,13 @@ export function RunasPage({
   todasLasRunas,
   seleccionarRunaId,
   onActualizarRuna,
+  elementos,
+  loadingElementos,
+  creatingElemento,
+  onCreateElemento,
+  onActualizarElemento,
+  onEliminarElemento,
+  seleccionarElementoId,
 }: Props) {
   const {
     subsistemas,
@@ -674,9 +703,25 @@ export function RunasPage({
   //     [Lista de runas                                    ] [   (arriba)  ]
   return (
     <div>
-      <SelectorSeccionMagia seccion={seccionMagia} onCambiarSeccion={setSeccionMagia} />
+      <SelectorSeccionMagia
+        seccion={seccionMagia}
+        onCambiarSeccion={setSeccionMagia}
+        mostrarTabla={!!elementos}
+      />
 
-      {seccionMagia === "sistema" ? (
+      {seccionMagia === "tabla" && elementos ? (
+        <div className="mt-4">
+          <ElementosPage
+            elementos={elementos}
+            loading={loadingElementos}
+            creating={creatingElemento}
+            onCreate={onCreateElemento}
+            onActualizar={onActualizarElemento ?? (() => {})}
+            onEliminar={onEliminarElemento}
+            seleccionarId={seleccionarElementoId}
+          />
+        </div>
+      ) : seccionMagia === "sistema" ? (
         <div className="mt-4 flex flex-col lg:flex-row gap-6">
           <div className="flex-1 min-w-0">
             <BloqueEnsayoEnergias />
