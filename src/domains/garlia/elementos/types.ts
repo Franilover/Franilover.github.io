@@ -109,6 +109,32 @@ export const CONFIG = {
     "id, numero_atomico, nombre, simbolo, familia, es_noble, notas, nucleo, media, externa",
 };
 
+// ─── Compuestos: combinaciones de elementos de la Tabla Química ───────────
+// Ej. Agua = Fluxio + Cristalio, Fuego = Plasmio + Reactivo, etc. Cada
+// compuesto referencia 2+ elementos por id (componentes) y tiene su propio
+// nombre/símbolo/notas — mismo espíritu que EditorCombinacionesRunas pero
+// para Elementos en vez de Runas.
+export interface ComponenteCompuesto {
+  elemento_id: string;
+  /** Cuántas "partes" de este elemento entran en el compuesto (default 1). */
+  cantidad: number;
+}
+
+/** Fila cruda tal cual vive en Supabase (tabla "compuestos"). */
+export interface Compuesto {
+  id: string;
+  nombre: string;
+  simbolo?: string | null;
+  notas?: string | null;
+  componentes: ComponenteCompuesto[];
+  created_at?: string;
+}
+
+export const CONFIG_COMPUESTOS = {
+  tabla: "compuestos",
+  select: "id, nombre, simbolo, notas, componentes, created_at",
+};
+
 /** Compacta un ParticleMap en algo tipo "2M 1P" para tarjetas/resúmenes. */
 export function formatLayer(layer: ParticleMap | null | undefined): string {
   if (!layer) return "—";

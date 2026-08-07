@@ -12,27 +12,34 @@
  * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
  */
 
-import { Atom, Download, Info, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { Atom, Beaker, Download, Info, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
+import { supabase } from "@/infra/supabase/supabase";
+
+import { CompuestosPage } from "./CompuestosPage";
 import { ElementoEditor } from "./ElementoEditor";
+import { useCompuestos } from "./useCompuestos";
 import {
   useInfoTablaQuimica,
   type SeccionInfoTablaQuimica,
 } from "./useInfoTablaQuimica";
-import { formatLayer, type Elemento } from "./types";
+import { formatLayer, type Compuesto, type Elemento } from "./types";
 
 // ─── Descarga: todos los elementos de la Tabla Química en un solo JSON ─────
-// Incluye también el contenido del modal de info (editable desde Supabase),
-// para que el JSON exportado quede autocontenido con la tabla + su explicación.
+// Incluye también el contenido del modal de info y los compuestos
+// (editables desde Supabase), para que el JSON exportado quede
+// autocontenido con la tabla + su explicación + las combinaciones.
 function descargarDatosElementos(
   elementos: Elemento[],
   infoTabla: SeccionInfoTablaQuimica[],
+  compuestos: Compuesto[],
 ) {
   const payload = {
     exportado_en: new Date().toISOString(),
     elementos,
     info_tabla_quimica: infoTabla,
+    compuestos,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
@@ -353,14 +360,74 @@ export function ElementosPage({
     guardarSecciones,
   } = useInfoTablaQuimica();
 
+  // ── Compuestos: sub-tab hermana de Elementos, mismo bloque "Tabla" ──────
+  const [subTab, setSubTab] = useState<"elementos" | "compuestos">("elementos");
+  const {
+    items: compuestos,
+    setItems: setCompuestos,
+    loading: loadingCompuestos,
+  } = useCompuestos();
+  const [creatingCompuesto, setCreatingCompuesto] = useState(false);
+  const [compuestoRecienCreadoId, setCompuestoRecienCreadoId] = useState<string | null>(null);
+
+  async function handleCreateCompuesto() {
+    setCreatingCompuesto(true);
+    try {
+      const { data, error } = await supabase
+        .from("compuestos")
+        .insert([{ nombre: "Nuevo compuesto", simbolo: "??", componentes: [] }])
+        .select()
+        .single();
+      if (error) throw error;
+      setCompuestos((prev) => [...prev, data as Compuesto]);
+      setCompuestoRecienCreadoId((data as Compuesto).id);
+    } catch (e) {
+      console.error("[ElementosPage] error creando compuesto:", e);
+    } finally {
+      setCreatingCompuesto(false);
+    }
+  }
+
+  async function handleEliminarCompuesto(id: string) {
+    try {
+      const { error } = await supabase.from("compuestos").delete().eq("id", id);
+      if (error) throw error;
+      setCompuestos((prev) => prev.filter((c) => c.id !== id));
+    } catch (e) {
+      console.error("[ElementosPage] error eliminando compuesto:", e);
+    }
+  }
+
   const activoId = seleccionadoId ?? seleccionarId ?? null;
   const activo = useMemo(
     () => elementos.find((e) => e.id === activoId) ?? null,
     [elementos, activoId],
   );
 
+  if (subTab === "compuestos") {
+    return (
+      <div className="flex-1 min-h-0 flex flex-col">
+        <SubTabsElementos subTab={subTab} onCambiar={setSubTab} />
+        <CompuestosPage
+          compuestos={compuestos}
+          elementos={elementos}
+          loading={loadingCompuestos}
+          creating={creatingCompuesto}
+          onCreate={handleCreateCompuesto}
+          onActualizar={(id, cambios) =>
+            setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
+          }
+          onEliminar={handleEliminarCompuesto}
+          seleccionarId={compuestoRecienCreadoId}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 min-h-0 flex overflow-hidden relative">
+    <div className="flex-1 min-h-0 flex flex-col">
+      <SubTabsElementos subTab={subTab} onCambiar={setSubTab} />
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
       <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-primary/40">
@@ -377,7 +444,7 @@ export function ElementosPage({
           <div className="shrink-0 flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => descargarDatosElementos(elementos, infoTabla.secciones)}
+              onClick={() => descargarDatosElementos(elementos, infoTabla.secciones, compuestos)}
               title="Descargar todos los datos de la Tabla Química como JSON"
               className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
             >
@@ -456,6 +523,47 @@ export function ElementosPage({
           </div>
         </>
       )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Sub-tabs "Elementos" / "Compuestos" ───────────────────────────────────
+// Mini toggle propio del bloque Tabla, independiente del toggle grande
+// Sistema/Runas/Tabla/Física de RunasPage. Compuestos combina elementos de
+// esta misma tabla, así que vive como pestaña hermana acá adentro.
+function SubTabsElementos({
+  subTab,
+  onCambiar,
+}: {
+  subTab: "elementos" | "compuestos";
+  onCambiar: (tab: "elementos" | "compuestos") => void;
+}) {
+  return (
+    <div className="shrink-0 flex items-center gap-1 px-3 pt-2">
+      {(
+        [
+          { key: "elementos" as const, label: "Elementos", Icon: Atom },
+          { key: "compuestos" as const, label: "Compuestos", Icon: Beaker },
+        ]
+      ).map(({ key, label, Icon }) => {
+        const activo = subTab === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onCambiar(key)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
+              activo
+                ? "bg-primary/10 text-primary"
+                : "text-primary/40 hover:text-primary/70 hover:bg-primary/5"
+            }`}
+          >
+            <Icon size={11} />
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
