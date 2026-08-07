@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Atom, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X } from "lucide-react";
+import { Atom, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X, Zap } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -26,6 +26,9 @@ import type { SaveStatus } from "@/ui/saveStatus";
 
 import { ElementosPage } from "@/domains/garlia/elementos/ElementosPage";
 import type { Elemento } from "@/domains/garlia/elementos/types";
+import { FisicaPage } from "@/domains/garlia/fisica/FisicaPage";
+import { ORIS_CONFIG, type Oris } from "@/domains/garlia/fisica/types";
+import { useFisicaConceptos, useOris } from "@/domains/garlia/fisica/useFisica";
 
 import {
   PanelCombinacionesRunas,
@@ -330,6 +333,65 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
   );
 }
 
+// ─── Bloque "Física" (Oris + catálogos + conceptos) ────────────────────────
+// Self-contained: trae sus propios datos (useOris/useFisicaConceptos) desde
+// Supabase, igual que ElementosPage recibe los suyos por props desde
+// RunasPage — pero acá se resuelve todo adentro para no ensuciar más la
+// firma de Props de RunasPage con otro bloque de campos opcionales.
+function BloqueFisica({ seleccionarOrisId }: { seleccionarOrisId?: string | null }) {
+  const { items: oris, setItems: setOris, loading: loadingOris } = useOris();
+  const { items: conceptos, setItems: setConceptos, loading: loadingConceptos } =
+    useFisicaConceptos();
+  const [creating, setCreating] = useState(false);
+
+  async function handleCreate() {
+    setCreating(true);
+    try {
+      const siguienteOrden = oris.reduce((max, o) => Math.max(max, o.orden ?? 0), 0) + 1;
+      const { data, error } = await supabase
+        .from(ORIS_CONFIG.tabla)
+        .insert([{ orden: siguienteOrden, nombre: "Nuevo Oris", familia: "Mecánica", formula: "", dominio: "" }])
+        .select()
+        .single();
+      if (error) throw error;
+      setOris((prev) => [...prev, data as Oris]);
+    } catch (e) {
+      console.error("[BloqueFisica] error creando Oris:", e);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleEliminar(id: string) {
+    try {
+      const { error } = await supabase.from(ORIS_CONFIG.tabla).delete().eq("id", id);
+      if (error) throw error;
+      setOris((prev) => prev.filter((o) => o.id !== id));
+    } catch (e) {
+      console.error("[BloqueFisica] error eliminando Oris:", e);
+    }
+  }
+
+  return (
+    <FisicaPage
+      oris={oris}
+      loadingOris={loadingOris}
+      creatingOris={creating}
+      onCreateOris={handleCreate}
+      onActualizarOris={(id, cambios) =>
+        setOris((prev) => prev.map((o) => (o.id === id ? { ...o, ...cambios } : o)))
+      }
+      onEliminarOris={handleEliminar}
+      seleccionarOrisId={seleccionarOrisId}
+      conceptos={conceptos}
+      loadingConceptos={loadingConceptos}
+      onActualizarConcepto={(id, cambios) =>
+        setConceptos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
+      }
+    />
+  );
+}
+
 // ─── Bloque de ensayo "Runas" (tag GOS + tag Runas) ─────────────────────────
 // Mismo patrón que BloqueEnsayoEnergias: un ensayo único y fijo, buscado
 // por título+tags, que se crea automáticamente la primera vez que se abre
@@ -464,17 +526,21 @@ function BloqueEnsayoConSubBloques({
   );
 }
 
-// ─── Toggle "Sistema" / "Runas" / "Tabla" ────────────────────────────────────
+// ─── Toggle "Sistema" / "Runas" / "Tabla" / "Física" ─────────────────────────
 // Sistema: ensayo (Energías) a la izquierda + subsistemas a la derecha,
 // nada más. Runas: el bloque de herramientas de runas (probador, lista,
 // config), sin ensayo ni subsistemas. Tabla: grid de Elementos (Tabla
 // Química/Alquímica) + detalle, solo si se pasan props de elementos.
-type SeccionMagia = "sistema" | "runas" | "tabla";
+// Física: grid de Oris + catálogos fijos + conceptos, siempre visible (no
+// depende de props opcionales — trae sus propios datos de Supabase, ver
+// BloqueFisica más abajo).
+type SeccionMagia = "sistema" | "runas" | "tabla" | "fisica";
 
 const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
   { key: "sistema", label: "Sistema", Icon: Sparkles },
   { key: "runas", label: "Runas", Icon: Waypoints },
   { key: "tabla", label: "Tabla", Icon: Atom },
+  { key: "fisica", label: "Física", Icon: Zap },
 ];
 
 function SelectorSeccionMagia({
@@ -720,6 +786,10 @@ export function RunasPage({
             onEliminar={onEliminarElemento}
             seleccionarId={seleccionarElementoId}
           />
+        </div>
+      ) : seccionMagia === "fisica" ? (
+        <div className="mt-4">
+          <BloqueFisica />
         </div>
       ) : seccionMagia === "sistema" ? (
         <div className="mt-4 flex flex-col lg:flex-row gap-6">

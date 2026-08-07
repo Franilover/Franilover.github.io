@@ -791,10 +791,14 @@ const Navbar = () => {
 
   const ITEMS_SECTIONS = new Set<SectionKey>(["items"]);
 
-  // "Magia" agrupa Runas — antes vivía dentro de "Entidades", pero al
-  // tener su propio editor (FormularioMagico) tiene más sentido como
-  // sección propia.
-  const MAGIA_SECTIONS = new Set<SectionKey>(["runas"]);
+  // "Magia" agrupa Runas + Tabla (elementos) — antes vivía dentro de
+  // "Entidades", pero al tener su propio editor (FormularioMagico) tiene
+  // más sentido como sección propia. "elementos" faltaba acá (bug
+  // preexistente): el botón del navbar no se marcaba activo al entrar a
+  // "Tabla", aunque la sección sí funcionara. "Física" NO es un SectionKey
+  // de ruta — vive como 4ta pill del toggle interno de RunasPage (ver
+  // SeccionMagia en RunasPage.tsx), así que no corresponde acá.
+  const MAGIA_SECTIONS = new Set<SectionKey>(["runas", "elementos"]);
 
   type AdminSubmenuItem = {
     key: string;
