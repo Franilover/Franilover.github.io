@@ -29,6 +29,7 @@ const SECTION_TABLE: Record<SectionKey, string | null> = {
   personajes: "personajes",
   criaturas: "criaturas",
   ecosistemas: "ecosistemas",
+  biomas: "biomas",
   flora: "flora",
   minerales: "minerales",
   items: "items",
