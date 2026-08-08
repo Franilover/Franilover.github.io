@@ -23,6 +23,9 @@
  *  - Ecosistema.criatura_ids → agrupa criaturas bajo cada ecosistema que
  *    las contiene. Una criatura sin ecosistema, o cuyo ecosistema no está
  *    en la lista, cae en el bloque "Sin ecosistema".
+ *  - Ecosistema.flora_ids / mineral_ids → se muestran como chips dentro de
+ *    la misma tarjeta de ecosistema, al mismo nivel que sus criaturas —
+ *    solo lectura acá, la edición del vínculo vive en PanelEcosistema.
  *  - Personaje.especie (nombre de la criatura, no FK) → agrupa personajes
  *    bajo la criatura cuyo nombre coincide con su especie.
  * Las entidades sin vínculo caen en el bloque final global "Sin criatura".
@@ -51,6 +54,15 @@ interface Ecosistema {
   id: string;
   nombre: string;
   criatura_ids: string[];
+  /** Flora presente en este ecosistema — opcional para no romper usos previos. */
+  flora_ids?: string[];
+  /** Minerales presentes en este ecosistema — opcional idem. */
+  mineral_ids?: string[];
+}
+interface EntidadMin {
+  id: string;
+  nombre: string;
+  imagen_url?: string | null;
 }
 
 interface Props {
@@ -59,6 +71,12 @@ interface Props {
   /** Ecosistemas — agrupan criaturas por encima de ellas (Ecosistema →
    *  Criatura → Personajes), opcional para no romper usos previos. */
   ecosistemas?: Ecosistema[];
+  /** Catálogo mínimo de Flora (id/nombre/imagen) — para resolver los
+   *  flora_ids de cada ecosistema y mostrarlos como chips dentro de su
+   *  tarjeta, al mismo nivel que las criaturas. */
+  flora?: EntidadMin[];
+  /** Catálogo mínimo de Minerales — mismo propósito que `flora`. */
+  minerales?: EntidadMin[];
   loading?: boolean;
   /** Si es false, oculta las grillas de personajes dentro de cada criatura
    *  (y el bloque "Sin criatura") — deja ver solo la estructura de
@@ -110,14 +128,18 @@ function NodoTitulo({
   label: string;
   onClick: () => void;
   onCreate?: () => void;
-  variant?: "ecosistema" | "criatura";
+  variant?: "ecosistema" | "criatura" | "flora" | "mineral";
   maxWidthPx?: number;
   fill?: boolean;
 }) {
   const chipStyles =
     variant === "ecosistema"
       ? "bg-primary/10 hover:bg-primary/20 text-primary/70 border border-primary/15"
-      : "bg-accent/10 hover:bg-accent/20 text-accent/80 border border-accent/15";
+      : variant === "flora"
+        ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/15"
+        : variant === "mineral"
+          ? "bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 border border-sky-500/15"
+          : "bg-accent/10 hover:bg-accent/20 text-accent/80 border border-accent/15";
 
   return (
     <div className={`flex items-center gap-1 max-w-full ${fill ? "w-full" : ""}`}>
@@ -150,6 +172,8 @@ export function CriaturasJerarquica({
   criaturas,
   personajes,
   ecosistemas = [],
+  flora = [],
+  minerales = [],
   loading,
   mostrarPersonajes = true,
   onOpen,
@@ -209,6 +233,18 @@ export function CriaturasJerarquica({
         ecosistemas.find((e) => e.id === ecosistemaId)?.criatura_ids.includes(c.id),
       )
       .sort((a, b) => personajesDe(b.nombre).length - personajesDe(a.nombre).length);
+
+  // Flora / Minerales del ecosistema — solo lectura acá, edición vive en
+  // PanelEcosistema. Mismo patrón que criaturasDe pero resolviendo contra
+  // el catálogo mínimo pasado por el padre.
+  const floraDe = (ecosistemaId: string) => {
+    const ids = ecosistemas.find((e) => e.id === ecosistemaId)?.flora_ids ?? [];
+    return flora.filter((f) => ids.includes(f.id));
+  };
+  const mineralesDe = (ecosistemaId: string) => {
+    const ids = ecosistemas.find((e) => e.id === ecosistemaId)?.mineral_ids ?? [];
+    return minerales.filter((m) => ids.includes(m.id));
+  };
 
   // Una criatura "tiene ecosistema" si algún ecosistema de la base la lista.
   const criaturaTieneEcosistema = (criaturaId: string) =>
@@ -502,6 +538,28 @@ export function CriaturasJerarquica({
                     <div className="px-3 pb-3 flex flex-wrap gap-6">
                       {criaturasDe(eco.id).map((c) =>
                         renderCriaturaCard(c, disponibleColumna),
+                      )}
+                      {(floraDe(eco.id).length > 0 || mineralesDe(eco.id).length > 0) && (
+                        <div className="w-fit shrink-0 flex flex-col gap-1.5">
+                          {floraDe(eco.id).map((f) => (
+                            <NodoTitulo
+                              key={f.id}
+                              label={f.nombre}
+                              variant="flora"
+                              maxWidthPx={140}
+                              onClick={() => onOpen("flora", f.id)}
+                            />
+                          ))}
+                          {mineralesDe(eco.id).map((m) => (
+                            <NodoTitulo
+                              key={m.id}
+                              label={m.nombre}
+                              variant="mineral"
+                              maxWidthPx={140}
+                              onClick={() => onOpen("minerales", m.id)}
+                            />
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>

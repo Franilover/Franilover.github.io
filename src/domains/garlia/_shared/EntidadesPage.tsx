@@ -934,6 +934,8 @@ export function EntidadesPage({ section, selectedId }: Props) {
           criaturas={criaturas}
           personajes={personajes}
           ecosistemas={ecosistemas}
+          flora={flora}
+          minerales={minerales}
           mostrarPersonajes={mostrarPersonajes}
           loading={loadingC || loadingP || loadingEco}
           gruposCriaturasPorSubtipo={gruposCriaturasPorSubtipo}
