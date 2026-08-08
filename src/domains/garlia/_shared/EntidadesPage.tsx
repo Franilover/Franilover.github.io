@@ -107,7 +107,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { data: items, loading: loadingI, addRow: addItem } =
     useSupabaseData<Item>("items");
   const { ecosistemas, loading: loadingEco, creating: creatingEco, crear: crearEcosistema } = useEcosistemas();
-  const { biomas, loading: loadingBiomas, creating: creatingBiomas, crear: crearBioma } = useBiomas();
+  const { biomas, loading: loadingBiomas, creating: creatingBiomas, crear: crearBioma, actualizar: actualizarBioma } = useBiomas();
   const { flora, loading: loadingFlora, creating: creatingFlora, crear: crearFlora } = useFlora();
   const { minerales, loading: loadingMinerales, creating: creatingMinerales, crear: crearMineral } = useMinerales();
 
@@ -1028,6 +1028,13 @@ export function EntidadesPage({ section, selectedId }: Props) {
               ciudad_id: ciudadId,
             });
             if (data?.id) openEntity("personajes", data.id);
+          }}
+          onAsignarReinoAEcosistema={async (reinoId, ecosistemaId) => {
+            const eco = ecosistemas.find((e) => e.id === ecosistemaId);
+            if (!eco?.bioma_id) return;
+            const bioma = biomas.find((b) => b.id === eco.bioma_id);
+            if (!bioma || bioma.reino_ids.includes(reinoId)) return;
+            await actualizarBioma(bioma.id, { reino_ids: [...bioma.reino_ids, reinoId] });
           }}
         />
       )}

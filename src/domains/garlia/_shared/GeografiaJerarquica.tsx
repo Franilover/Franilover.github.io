@@ -98,6 +98,12 @@ interface Props {
   onCreateReino?: () => void;
   onCreateCiudad?: (reinoId: string | null) => void;
   onCreatePersonaje?: (ciudadId: string | null) => void;
+  /** Asigna un reino a un ecosistema (drag & drop de un chip de reino sobre
+   *  una card de ecosistema en modo "ojo apagado") — internamente agrega el
+   *  reino a Bioma.reino_ids del bioma que contiene ese ecosistema, ya que
+   *  no hay FK directa Ecosistema→Reino. Solo aplica cuando el ecosistema
+   *  tiene un bioma asignado; si no, el drop no hace nada. */
+  onAsignarReinoAEcosistema?: (reinoId: string, ecosistemaId: string) => void;
   creatingReino?: boolean;
   gruposPersonajesPorSubtipo?: GrupoPersonajeSubtipo[];
   grupoSeleccionadoId?: string | null;
@@ -128,6 +134,7 @@ function NodoTitulo({
   variant = "reino",
   maxWidthPx,
   fill,
+  draggableId,
 }: {
   label: string;
   onClick: () => void;
@@ -137,6 +144,10 @@ function NodoTitulo({
   maxWidthPx?: number;
   /** Si es true, el chip ocupa el 100% del ancho de su contenedor (uso en grid dinámico) */
   fill?: boolean;
+  /** Si se provee, el chip se vuelve arrastrable (drag & drop nativo) y
+   *  transporta este id como payload — usado por los chips de "reino" en
+   *  modo "ojo apagado" para poder soltarlos sobre una card de ecosistema. */
+  draggableId?: string;
 }) {
   const chipStyles =
     variant === "reino"
@@ -150,9 +161,18 @@ function NodoTitulo({
         onClick={onClick}
         title={label}
         style={maxWidthPx ? { maxWidth: maxWidthPx } : undefined}
+        draggable={!!draggableId}
+        onDragStart={
+          draggableId
+            ? (e) => {
+                e.dataTransfer.setData("application/x-reino-id", draggableId);
+                e.dataTransfer.effectAllowed = "link";
+              }
+            : undefined
+        }
         className={`px-2.5 py-0.5 rounded-full text-micro font-bold tracking-wide transition-colors truncate ${chipStyles} ${
           fill ? "flex-1 min-w-0 text-center" : ""
-        }`}
+        } ${draggableId ? "cursor-grab active:cursor-grabbing" : ""}`}
       >
         {label}
       </button>
@@ -183,6 +203,7 @@ export function GeografiaJerarquica({
   onCreateReino,
   onCreateCiudad,
   onCreatePersonaje,
+  onAsignarReinoAEcosistema,
   creatingReino,
   gruposPersonajesPorSubtipo,
   grupoSeleccionadoId,
@@ -197,6 +218,9 @@ export function GeografiaJerarquica({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  // Id del ecosistema sobre el que se está arrastrando un chip de reino —
+  // solo feedback visual (resalte del borde), no afecta datos hasta el drop.
+  const [dragOverEcoId, setDragOverEcoId] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -583,7 +607,39 @@ export function GeografiaJerarquica({
   const hayEcosistemasConReinos = ecosistemasOrdenadosOjoOff.length > 0;
 
   const renderTarjetaEcosistemaOjoOff = (eco: Ecosistema) => (
-    <div key={eco.id} className="w-full rounded-lg border border-primary/10 overflow-hidden">
+    <div
+      key={eco.id}
+      onDragOver={
+        onAsignarReinoAEcosistema
+          ? (e) => {
+              if (!e.dataTransfer.types.includes("application/x-reino-id")) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "link";
+              if (dragOverEcoId !== eco.id) setDragOverEcoId(eco.id);
+            }
+          : undefined
+      }
+      onDragLeave={
+        onAsignarReinoAEcosistema
+          ? () => setDragOverEcoId((cur) => (cur === eco.id ? null : cur))
+          : undefined
+      }
+      onDrop={
+        onAsignarReinoAEcosistema
+          ? (e) => {
+              e.preventDefault();
+              setDragOverEcoId(null);
+              const reinoId = e.dataTransfer.getData("application/x-reino-id");
+              if (reinoId) onAsignarReinoAEcosistema(reinoId, eco.id);
+            }
+          : undefined
+      }
+      className={`w-full rounded-lg border overflow-hidden transition-colors ${
+        dragOverEcoId === eco.id
+          ? "border-accent/50 bg-accent/5"
+          : "border-primary/10"
+      }`}
+    >
       <div className="px-3 py-3 flex items-center gap-2">
         <button
           type="button"
@@ -595,12 +651,18 @@ export function GeografiaJerarquica({
         </button>
       </div>
       <div className="px-3 pb-3 flex flex-wrap gap-2">
+        {reinosDeEcosistema(eco.id).length === 0 && (
+          <div className="text-micro text-primary/25">
+            {onAsignarReinoAEcosistema ? "Soltá un reino acá" : "Sin reinos"}
+          </div>
+        )}
         {reinosDeEcosistema(eco.id).map((r) => (
           <NodoTitulo
             key={r.id}
             label={r.nombre}
             variant="reino"
             maxWidthPx={160}
+            draggableId={r.id}
             onClick={() => onOpen("reinos", r.id)}
           />
         ))}
@@ -934,6 +996,7 @@ export function GeografiaJerarquica({
                     label={r.nombre}
                     variant="reino"
                     maxWidthPx={160}
+                    draggableId={r.id}
                     onClick={() => onOpen("reinos", r.id)}
                   />
                 ))}
