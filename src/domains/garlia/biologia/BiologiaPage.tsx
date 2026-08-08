@@ -4,7 +4,7 @@
  * BiologiaPage.tsx
  * ───────────────────────────────────────────────────────────────────────────
  * Sección Biología, hermana de Física en el toggle superior de RunasPage.
- * Ahora muestra directamente el cladograma (Taxonomía) sin sub-tabs:
+ * Ahora muestra directamente el cladograma (Cladística) sin sub-tabs:
  *   - Ecosistemas se manejan desde Entidades → Criaturas (ver
  *     CriaturasJerarquica / EcosistemaEditor), ya no vive acá.
  *   - Perfiles atómicos de criatura (afinidad.ts de Elementos + Oris de
@@ -19,7 +19,7 @@ import { Download } from "lucide-react";
 import React from "react";
 
 import { CladisticaPage } from "./CladisticaPage";
-import { useBiologiaConfig, useTaxones } from "./useBiologia";
+import { useClados } from "./useBiologia";
 
 interface Props {
   /** El padre decide qué hacer al clickear una criatura (ej. abrir su editor). */
@@ -30,13 +30,11 @@ interface Props {
 // Mismo patrón que descargarDatosElementos/descargarDatosFisica — un solo
 // archivo autocontenido con taxones + config de rangos.
 function descargarDatosBiologia(datos: {
-  rangos: string[];
-  taxones: ReturnType<typeof useTaxones>["taxones"];
+  clados: ReturnType<typeof useClados>["clados"];
 }) {
   const payload = {
     exportado_en: new Date().toISOString(),
-    rangos_taxonomicos: datos.rangos,
-    taxones: datos.taxones,
+    clados: datos.clados,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
@@ -52,19 +50,18 @@ function descargarDatosBiologia(datos: {
 }
 
 export function BiologiaPage({ onSelectCriatura }: Props) {
-  // Traído acá solo para armar el JSON de descarga — Taxonomía sigue
+  // Traído acá solo para armar el JSON de descarga — Cladística sigue
   // manejando sus propios datos internamente (self-contained), esto no le
   // saca esa responsabilidad.
-  const { rangos } = useBiologiaConfig();
-  const { taxones } = useTaxones();
+  const { clados } = useClados();
 
   return (
     <div>
       <div className="flex items-center justify-end px-2 mb-1">
         <button
           type="button"
-          onClick={() => descargarDatosBiologia({ rangos, taxones })}
-          title="Descargar el cladograma de Biología (taxones + rangos) como JSON"
+          onClick={() => descargarDatosBiologia({ clados })}
+          title="Descargar el cladograma de Biología (clados) como JSON"
           className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
         >
           <Download size={10} />
