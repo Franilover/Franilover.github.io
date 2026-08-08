@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Atom, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X, Zap } from "lucide-react";
+import { Atom, Dna, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X, Zap } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -26,6 +26,7 @@ import type { SaveStatus } from "@/ui/saveStatus";
 
 import { ElementosPage } from "@/domains/garlia/elementos/ElementosPage";
 import type { Elemento } from "@/domains/garlia/elementos/types";
+import { BiologiaPage } from "@/domains/garlia/biologia/BiologiaPage";
 import { FisicaPage } from "@/domains/garlia/fisica/FisicaPage";
 import { ORIS_CONFIG, type Oris } from "@/domains/garlia/fisica/types";
 import { useFisicaConceptos, useOris } from "@/domains/garlia/fisica/useFisica";
@@ -534,13 +535,14 @@ function BloqueEnsayoConSubBloques({
 // Física: grid de Oris + catálogos fijos + conceptos, siempre visible (no
 // depende de props opcionales — trae sus propios datos de Supabase, ver
 // BloqueFisica más abajo).
-type SeccionMagia = "sistema" | "runas" | "tabla" | "fisica";
+type SeccionMagia = "sistema" | "runas" | "tabla" | "fisica" | "biologia";
 
 const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
   { key: "sistema", label: "Sistema", Icon: Sparkles },
   { key: "runas", label: "Runas", Icon: Waypoints },
   { key: "tabla", label: "Tabla", Icon: Atom },
   { key: "fisica", label: "Física", Icon: Zap },
+  { key: "biologia", label: "Biología", Icon: Dna },
 ];
 
 function SelectorSeccionMagia({
@@ -790,6 +792,10 @@ export function RunasPage({
       ) : seccionMagia === "fisica" ? (
         <div className="mt-4">
           <BloqueFisica />
+        </div>
+      ) : seccionMagia === "biologia" ? (
+        <div className="mt-4">
+          <BiologiaPage onSelectCriatura={(id) => onOpen("criaturas", id)} />
         </div>
       ) : seccionMagia === "sistema" ? (
         <div className="mt-4 flex flex-col lg:flex-row gap-6">
