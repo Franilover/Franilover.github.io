@@ -608,7 +608,7 @@ function SelectorSeccionMagia({
     ? SECCIONES_MAGIA
     : SECCIONES_MAGIA.filter((s) => s.key !== "tabla");
   return (
-    <div className="flex items-center justify-center gap-1 px-2 py-2">
+    <div className="flex items-center justify-center gap-0.5">
       {opciones.map(({ key, label, Icon }) => {
         const activa = seccion === key;
         return (
@@ -616,11 +616,11 @@ function SelectorSeccionMagia({
             key={key}
             type="button"
             onClick={() => onCambiarSeccion(key)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-micro font-bold uppercase tracking-[0.12em] transition-colors ${
-              activa ? "bg-primary/10 text-primary" : "text-primary/40 hover:text-primary/70"
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.1em] transition-colors ${
+              activa ? "bg-primary/10 text-primary" : "text-primary/35 hover:text-primary/60"
             }`}
           >
-            <Icon size={13} />
+            <Icon size={11} />
             {label}
           </button>
         );
