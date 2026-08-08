@@ -125,12 +125,19 @@ export interface Elemento {
   nucleo: ParticleMap;
   media: ParticleMap;
   externa: ParticleMap;
+  /**
+   * Catalizador: reduce la "energía de activación" (déficit) de un compuesto
+   * sin aportar sus partículas a las capas y sin consumirse en la reacción —
+   * mismo espíritu que un catalizador real. Opcional por compatibilidad con
+   * filas viejas; default false si no está seteado.
+   */
+  es_catalizador?: boolean | null;
 }
 
 export const CONFIG = {
   tabla: "elementos",
   select:
-    "id, numero_atomico, nombre, simbolo, familia, es_noble, estado, notas, nucleo, media, externa",
+    "id, numero_atomico, nombre, simbolo, familia, es_noble, estado, notas, nucleo, media, externa, es_catalizador",
 };
 
 // ─── Compuestos: combinaciones de elementos de la Tabla Química ───────────
@@ -210,4 +217,47 @@ export interface ResultadoAfinidad {
   motivo: string;
   /** Partículas que un compuesto le aporta al otro para completarlo. */
   aportes: { particula: ParticleType; cantidad: number }[];
+}
+
+// ─── Reactividad ("energía de activación") ─────────────────────────────────
+// Cuanto más déficit acumulado tiene un compuesto (más lejos está de
+// completar sus 3 capas), menos "energía" hace falta para que reaccione —
+// es literalmente inestable, como un átomo lejos de la regla del octeto.
+// Un compuesto saturado (déficit 0) es inerte: cuesta mucho romper su
+// estructura para que participe en algo nuevo.
+export type NivelReactividad = "muy_inestable" | "inestable" | "moderado" | "inerte";
+
+export const REACTIVIDAD_LABEL: Record<NivelReactividad, string> = {
+  muy_inestable: "Muy inestable",
+  inestable: "Inestable",
+  moderado: "Moderadamente reactivo",
+  inerte: "Inerte",
+};
+
+export interface ResultadoReactividad {
+  /** Déficit total sumado en las 3 capas (0 = ninguna capa incompleta). */
+  deficitTotal: number;
+  /** Capacidad total de las 3 capas — techo teórico del déficit. */
+  capacidadTotal: number;
+  nivel: NivelReactividad;
+}
+
+// ─── Peso molecular ─────────────────────────────────────────────────────────
+export interface ResultadoPeso {
+  /** Suma de todas las partículas de todos los componentes (masa total). */
+  pesoTotal: number;
+  categoria: "liviano" | "medio" | "pesado";
+}
+
+// ─── Estequiometría exacta ──────────────────────────────────────────────────
+// Múltiplo mínimo de cada elemento del compuesto que deja las 3 capas
+// exactamente en 0 (sin déficit ni sobrante) — el equivalente a balancear
+// una ecuación química real (2H₂ + O₂ → 2H₂O).
+export interface ResultadoEstequiometria {
+  /** true si existe una combinación entera de multiplicadores que balancea exacto. */
+  balanceado: boolean;
+  /** Componentes con la cantidad mínima balanceada (solo si balanceado = true). */
+  componentes: ComponenteCompuesto[];
+  /** Factor por el que se multiplicó la mezcla original para llegar al balance. */
+  factor: number;
 }

@@ -17,7 +17,7 @@ import React, { useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
-import { calcularParticulaDominante } from "./afinidad";
+import { calcularParticulaDominante, calcularReactividadElemento } from "./afinidad";
 import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
 import { ElementoEditor } from "./ElementoEditor";
@@ -26,7 +26,15 @@ import {
   useInfoTablaQuimica,
   type SeccionInfoTablaQuimica,
 } from "./useInfoTablaQuimica";
-import { formatLayer, ELEMENT_FAMILIES, type Compuesto, type Elemento, type ElementFamily } from "./types";
+import {
+  formatLayer,
+  ELEMENT_FAMILIES,
+  REACTIVIDAD_LABEL,
+  CAPACIDAD_CAPA,
+  type Compuesto,
+  type Elemento,
+  type ElementFamily,
+} from "./types";
 
 // ─── Descarga: todos los elementos de la Tabla Química en un solo JSON ─────
 // Incluye también el contenido del modal de info y los compuestos
@@ -67,6 +75,40 @@ interface Props {
   seleccionarId?: string | null;
 }
 
+// ─── Grupo (columna) tipo tabla periódica real ─────────────────────────────
+// En la tabla real, la columna (grupo) predice comportamiento: elementos
+// del mismo grupo se comportan parecido porque les falta/sobra la misma
+// cantidad de electrones de valencia. Acá usamos el balance de la capa
+// externa (falta/sobra) como equivalente directo — mismo espíritu que
+// balanceExterna en generarDescripcionElemento (afinidad.ts).
+function grupoDeElemento(elemento: Elemento): number {
+  const totalExterna = Object.values(elemento.externa ?? {}).reduce(
+    (a, b) => a + (b ?? 0),
+    0,
+  );
+  // balance: negativo = falta, positivo = sobra, 0 = completa (Noble).
+  return totalExterna - CAPACIDAD_CAPA.externa;
+}
+
+/** Agrupa y ordena elementos por su "grupo" (déficit/superávit de capa externa),
+ * de más incompleto a más sobrecargado, con los completos (Nobles) al medio —
+ * mismo criterio visual que una tabla periódica real, donde los gases nobles
+ * cierran la fila de la derecha. */
+function agruparComoTablaPeriodica(elementos: Elemento[]): { grupo: number; elementos: Elemento[] }[] {
+  const porGrupo = new Map<number, Elemento[]>();
+  for (const el of elementos) {
+    const g = grupoDeElemento(el);
+    if (!porGrupo.has(g)) porGrupo.set(g, []);
+    porGrupo.get(g)!.push(el);
+  }
+  return Array.from(porGrupo.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([grupo, els]) => ({
+      grupo,
+      elementos: els.sort((x, y) => x.numero_atomico - y.numero_atomico),
+    }));
+}
+
 /**
  * Casilla tipo tabla periódica: símbolo (abreviatura) grande y centrado en
  * vez de imagen/ícono genérico, con número atómico arriba y las 3 capas
@@ -91,6 +133,7 @@ function ElementoCasilla({
       : dominantes.length === 1
         ? dominantes[0].particula
         : `${dominantes.length} empatadas`;
+  const reactividad = useMemo(() => calcularReactividadElemento(elemento), [elemento]);
 
   return (
     <button
@@ -142,6 +185,21 @@ function ElementoCasilla({
           <span className="text-primary/25">E</span> {formatLayer(elemento.externa)}
         </span>
       </div>
+
+      <span
+        title={`Reactividad: ${REACTIVIDAD_LABEL[reactividad.nivel]}`}
+        className={`mt-0.5 self-center text-micro font-black uppercase tracking-wide px-1 rounded leading-tight ${
+          reactividad.nivel === "inerte"
+            ? "text-primary/30 bg-primary/5"
+            : reactividad.nivel === "moderado"
+              ? "text-sky-500 bg-sky-500/10"
+              : reactividad.nivel === "inestable"
+                ? "text-amber-500 bg-amber-500/10"
+                : "text-red-500 bg-red-500/10"
+        }`}
+      >
+        {REACTIVIDAD_LABEL[reactividad.nivel]}
+      </span>
     </button>
   );
 }
@@ -455,6 +513,14 @@ export function ElementosPage({
     [elementos, filtroFamilia],
   );
 
+  // Vista "Lista" (orden por número atómico, como hoy) vs "Tabla periódica"
+  // (agrupada por columnas de déficit/superávit de capa externa).
+  const [vista, setVista] = useState<"lista" | "periodica">("lista");
+  const gruposPeriodicos = useMemo(
+    () => (vista === "periodica" ? agruparComoTablaPeriodica(elementosFiltrados) : []),
+    [vista, elementosFiltrados],
+  );
+
   if (subTab === "compuestos") {
     return (
       <div className="flex-1 min-h-0 flex flex-col">
@@ -491,6 +557,32 @@ export function ElementosPage({
             />
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
+            <div className="flex items-center rounded-md border border-primary/15 overflow-hidden">
+              {(
+                [
+                  { key: "lista" as const, label: "Lista" },
+                  { key: "periodica" as const, label: "Tabla periódica" },
+                ]
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setVista(key)}
+                  title={
+                    key === "periodica"
+                      ? "Agrupar por columnas según déficit/superávit de capa externa, como grupos de la tabla periódica real"
+                      : "Orden simple por número atómico"
+                  }
+                  className={`px-2 py-1 text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
+                    vista === key
+                      ? "bg-primary/10 text-primary"
+                      : "text-primary/40 hover:text-primary/70 hover:bg-primary/5"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <select
               value={filtroFamilia}
               onChange={(e) => setFiltroFamilia(e.target.value as ElementFamily | "todas")}
@@ -546,6 +638,35 @@ export function ElementosPage({
         ) : elementosFiltrados.length === 0 ? (
           <div className="py-6 text-micro text-primary/25 text-center">
             Ningún elemento en la familia "{filtroFamilia}".
+          </div>
+        ) : vista === "periodica" ? (
+          <div className="flex flex-col gap-3">
+            {gruposPeriodicos.map(({ grupo, elementos: elsDelGrupo }) => (
+              <div key={grupo} className="flex flex-col gap-1">
+                <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                  {grupo === 0
+                    ? "Capa completa (Nobles y estables)"
+                    : grupo < 0
+                      ? `Grupo ${grupo} · faltan ${-grupo} partícula(s) en capa externa`
+                      : `Grupo +${grupo} · sobran ${grupo} partícula(s) en capa externa`}
+                </p>
+                <div
+                  className="grid gap-1"
+                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
+                >
+                  {elsDelGrupo.map((el) => (
+                    <ElementoCasilla
+                      key={el.id}
+                      elemento={el}
+                      seleccionado={el.id === activoId}
+                      onClick={() =>
+                        setSeleccionadoId((actual) => (actual === el.id ? null : el.id))
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div

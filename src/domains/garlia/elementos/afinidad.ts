@@ -32,9 +32,13 @@ import {
   type Elemento,
   type ElementFamily,
   type LayerName,
+  type NivelReactividad,
   type ParticleMap,
   type ParticleType,
   type ResultadoAfinidad,
+  type ResultadoEstequiometria,
+  type ResultadoPeso,
+  type ResultadoReactividad,
 } from "./types";
 
 const LAYERS: LayerName[] = ["nucleo", "media", "externa"];
@@ -479,4 +483,149 @@ export function combinarComponentes(
     elemento_id,
     cantidad,
   }));
+}
+
+// ─── Catalizadores: reducen déficit sin sumar a las capas ─────────────────
+// Un elemento marcado es_catalizador aporta "presencia" que reduce cuánta
+// energía hace falta para estabilizar un compuesto, pero — a diferencia de
+// un componente normal — sus partículas NO se suman al perfil atómico de
+// las capas y no se "consume" en la mezcla (no cuenta para estequiometría
+// ni para peso molecular). Efecto: cada catalizador presente reduce el
+// déficit total en una cantidad fija (su propio total de partículas, como
+// medida de "cuánta energía de activación ahorra").
+const REDUCCION_POR_CATALIZADOR = 1;
+
+/** Total de déficit de un perfil, antes de aplicar catalizadores. */
+function deficitTotalDePerfil(perfil: PerfilAtomico): number {
+  return calcularBalancePorCapa(perfil)
+    .filter((b) => b.balance < 0)
+    .reduce((s, b) => s + -b.balance, 0);
+}
+
+/**
+ * Déficit total de un compuesto ya con el efecto de catalizadores
+ * aplicado: por cada catalizador entre los componentes (sin importar su
+ * cantidad — no se "consume", solo tiene que estar presente), se resta
+ * REDUCCION_POR_CATALIZADOR del déficit total, sin bajar de 0.
+ */
+export function calcularDeficitConCatalizadores(
+  compuesto: Compuesto,
+  elementos: Elemento[],
+): { deficitBase: number; deficitFinal: number; catalizadoresActivos: Elemento[] } {
+  const catalizadoresActivos = (compuesto.componentes ?? [])
+    .map((c) => elementos.find((e) => e.id === c.elemento_id))
+    .filter((e): e is Elemento => !!e && !!e.es_catalizador);
+
+  // Perfil sin contar a los catalizadores (sus partículas no entran a las capas).
+  const compuestoSinCatalizadores: Compuesto = {
+    ...compuesto,
+    componentes: (compuesto.componentes ?? []).filter((c) => {
+      const el = elementos.find((e) => e.id === c.elemento_id);
+      return !el?.es_catalizador;
+    }),
+  };
+  const perfil = calcularPerfilAtomico(compuestoSinCatalizadores, elementos);
+  const deficitBase = deficitTotalDePerfil(perfil);
+  const deficitFinal = Math.max(
+    0,
+    deficitBase - catalizadoresActivos.length * REDUCCION_POR_CATALIZADOR,
+  );
+
+  return { deficitBase, deficitFinal, catalizadoresActivos };
+}
+
+// ─── Reactividad ("energía de activación") ─────────────────────────────────
+// Cuanto más déficit total (sumando las 3 capas), menos energía hace falta
+// para que el compuesto reaccione — es más inestable/reactivo. Un compuesto
+// con déficit 0 (o negativo, saturado) es inerte. Los catalizadores del
+// propio compuesto ya reducen el déficit antes de clasificar el nivel.
+export function calcularReactividad(
+  compuesto: Compuesto,
+  elementos: Elemento[],
+): ResultadoReactividad {
+  const capacidadTotal = Object.values(CAPACIDAD_CAPA).reduce((a, b) => a + b, 0);
+  const { deficitFinal } = calcularDeficitConCatalizadores(compuesto, elementos);
+
+  const proporcion = capacidadTotal > 0 ? deficitFinal / capacidadTotal : 0;
+  let nivel: NivelReactividad;
+  if (deficitFinal === 0) nivel = "inerte";
+  else if (proporcion <= 0.25) nivel = "moderado";
+  else if (proporcion <= 0.6) nivel = "inestable";
+  else nivel = "muy_inestable";
+
+  return { deficitTotal: deficitFinal, capacidadTotal, nivel };
+}
+
+/** Misma clasificación de reactividad, pero para un Elemento suelto. */
+export function calcularReactividadElemento(elemento: Elemento): ResultadoReactividad {
+  const compuestoTemporal: Compuesto = {
+    id: elemento.id,
+    nombre: elemento.nombre,
+    componentes: [{ elemento_id: elemento.id, cantidad: 1 }],
+  };
+  return calcularReactividad(compuestoTemporal, [elemento]);
+}
+
+// ─── Peso molecular ─────────────────────────────────────────────────────────
+// Proxy simple: suma de TODAS las partículas de todos los componentes
+// (multiplicadas por su cantidad), sin importar de qué capa vienen. Los
+// catalizadores no suman peso: no forman parte de la estructura resultante.
+export function calcularPeso(
+  compuesto: Compuesto,
+  elementos: Elemento[],
+): ResultadoPeso {
+  let pesoTotal = 0;
+  for (const componente of compuesto.componentes ?? []) {
+    const elemento = elementos.find((e) => e.id === componente.elemento_id);
+    if (!elemento || elemento.es_catalizador) continue;
+    const veces = Math.max(1, componente.cantidad ?? 1);
+    const totalElemento =
+      Object.values(elemento.nucleo ?? {}).reduce((a, b) => a + (b ?? 0), 0) +
+      Object.values(elemento.media ?? {}).reduce((a, b) => a + (b ?? 0), 0) +
+      Object.values(elemento.externa ?? {}).reduce((a, b) => a + (b ?? 0), 0);
+    pesoTotal += totalElemento * veces;
+  }
+
+  const categoria: ResultadoPeso["categoria"] =
+    pesoTotal <= 6 ? "liviano" : pesoTotal <= 14 ? "medio" : "pesado";
+
+  return { pesoTotal, categoria };
+}
+
+// ─── Estequiometría exacta ──────────────────────────────────────────────────
+// Busca el múltiplo entero mínimo de la mezcla completa (multiplicar TODAS
+// las cantidades por el mismo factor k) tal que las 3 capas queden
+// exactamente en 0 — equivalente a balancear 2H₂ + O₂ → 2H₂O escalando la
+// ecuación entera. Si con ningún factor entero razonable se llega a 0 exacto
+// (por ej. porque sobra un tipo de partícula que ningún elemento "consume"),
+// no hay balance posible con esta mezcla y se devuelve balanceado: false.
+export function calcularEstequiometriaExacta(
+  compuesto: Compuesto,
+  elementos: Elemento[],
+  maxFactor = 12,
+): ResultadoEstequiometria {
+  const componentesBase = (compuesto.componentes ?? []).filter((c) => {
+    const el = elementos.find((e) => e.id === c.elemento_id);
+    return !el?.es_catalizador; // catalizadores no entran en la proporción
+  });
+
+  if (componentesBase.length === 0) {
+    return { balanceado: false, componentes: [], factor: 0 };
+  }
+
+  for (let k = 1; k <= maxFactor; k++) {
+    const escalados = componentesBase.map((c) => ({
+      elemento_id: c.elemento_id,
+      cantidad: c.cantidad * k,
+    }));
+    const compuestoEscalado: Compuesto = { ...compuesto, componentes: escalados };
+    const perfil = calcularPerfilAtomico(compuestoEscalado, elementos);
+    const balance = calcularBalancePorCapa(perfil);
+    const exacto = balance.every((b) => b.balance === 0);
+    if (exacto) {
+      return { balanceado: true, componentes: escalados, factor: k };
+    }
+  }
+
+  return { balanceado: false, componentes: [], factor: 0 };
 }

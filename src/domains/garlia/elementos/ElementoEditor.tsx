@@ -165,6 +165,7 @@ export function ElementoEditor({
                 familia: local.familia,
                 estado: local.estado,
                 es_noble: local.es_noble,
+                es_catalizador: local.es_catalizador,
                 notas: local.notas,
                 nucleo: local.nucleo,
                 media: local.media,
@@ -259,6 +260,30 @@ export function ElementoEditor({
               }`}
             >
               {local.es_noble ? "Sí" : "No"}
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-0.5">
+            <label
+              title="Reduce el déficit/energía de activación de un compuesto sin sumar sus partículas a las capas y sin consumirse — igual que un catalizador real."
+              className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
+            >
+              Catalizador
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                const es_catalizador = !local.es_catalizador;
+                setLocal((p) => ({ ...p, es_catalizador }));
+                persist({ es_catalizador });
+              }}
+              className={`rounded-md px-2 py-1 text-micro font-bold outline-none border transition-all cursor-pointer truncate ${
+                local.es_catalizador
+                  ? "bg-primary text-btn-text border-primary"
+                  : "bg-primary/5 text-primary/50 border-primary/10 hover:border-primary/30"
+              }`}
+            >
+              {local.es_catalizador ? "Sí" : "No"}
             </button>
           </div>
         </div>

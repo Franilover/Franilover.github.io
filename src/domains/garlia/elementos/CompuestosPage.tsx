@@ -34,7 +34,11 @@ import {
   autocompletarHastaEstable,
   calcularAfinidad,
   calcularBalancePorCapa,
+  calcularDeficitConCatalizadores,
+  calcularEstequiometriaExacta,
   calcularPerfilAtomico,
+  calcularPeso,
+  calcularReactividad,
   combinarComponentes,
   encontrarCompuestoDuplicado,
   generarSimboloCompuesto,
@@ -44,6 +48,7 @@ import {
 import {
   AFINIDAD_LABEL,
   LAYER_LABEL,
+  REACTIVIDAD_LABEL,
   type ComponenteCompuesto,
   type Compuesto,
   type Elemento,
@@ -367,6 +372,112 @@ function BalanceAtomico({
   );
 }
 
+/**
+ * Reactividad ("energía de activación") + peso molecular de un compuesto —
+ * derivados directos del perfil atómico, sin datos nuevos que cargar. Los
+ * catalizadores presentes en la mezcla ya están descontados del déficit
+ * (ver calcularDeficitConCatalizadores en afinidad.ts).
+ */
+function AnalisisReactivoPeso({
+  compuesto,
+  elementos,
+}: {
+  compuesto: Compuesto;
+  elementos: Elemento[];
+}) {
+  const reactividad = useMemo(
+    () => calcularReactividad(compuesto, elementos),
+    [compuesto, elementos],
+  );
+  const { catalizadoresActivos, deficitBase } = useMemo(
+    () => calcularDeficitConCatalizadores(compuesto, elementos),
+    [compuesto, elementos],
+  );
+  const peso = useMemo(() => calcularPeso(compuesto, elementos), [compuesto, elementos]);
+
+  const colorReactividad =
+    reactividad.nivel === "inerte"
+      ? "text-primary/40 bg-primary/5 border-primary/10"
+      : reactividad.nivel === "moderado"
+        ? "text-sky-500 bg-sky-500/10 border-sky-500/20"
+        : reactividad.nivel === "inestable"
+          ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
+          : "text-red-500 bg-red-500/10 border-red-500/20";
+
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      <div className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${colorReactividad}`}>
+        <span className="text-micro font-black uppercase tracking-wide">
+          {REACTIVIDAD_LABEL[reactividad.nivel]}
+        </span>
+        <span className="text-micro opacity-70">
+          Déficit {reactividad.deficitTotal}/{reactividad.capacidadTotal}
+          {catalizadoresActivos.length > 0 && (
+            <> · reducido de {deficitBase} por {catalizadoresActivos.length} catalizador(es)</>
+          )}
+        </span>
+      </div>
+      <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/[0.02]">
+        <span className="text-micro font-black uppercase tracking-wide text-primary/60">
+          {peso.pesoTotal} · peso {peso.categoria}
+        </span>
+        <span className="text-micro text-primary/40">Suma total de partículas</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Estequiometría exacta: busca el múltiplo entero mínimo de toda la mezcla
+ * que deja las 3 capas en 0 sin sobras — como balancear 2H₂ + O₂ → 2H₂O.
+ * Muestra el resultado solo si difiere de la mezcla actual (si ya está
+ * balanceado tal cual, no hace falta mostrar nada extra).
+ */
+function PanelEstequiometria({
+  compuesto,
+  elementos,
+}: {
+  compuesto: Compuesto;
+  elementos: Elemento[];
+}) {
+  const resultado = useMemo(
+    () => calcularEstequiometriaExacta(compuesto, elementos),
+    [compuesto, elementos],
+  );
+
+  if (!resultado.balanceado) {
+    return (
+      <p className="text-micro text-primary/25">
+        No hay una proporción entera (hasta ×12) que balancee las 3 capas exactamente en 0
+        con estos elementos.
+      </p>
+    );
+  }
+
+  const yaBalanceado = resultado.factor === 1;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 text-emerald-600">
+        <span className="text-micro font-bold leading-snug">
+          {yaBalanceado
+            ? "Esta mezcla ya está balanceada exacta (sin sobras)."
+            : `Multiplicando toda la mezcla ×${resultado.factor} se balancea exacto, sin sobras.`}
+        </span>
+      </div>
+      {!yaBalanceado && (
+        <div className="flex flex-col gap-0.5">
+          {resultado.componentes.map((c) => (
+            <span key={c.elemento_id} className="text-micro text-primary/50">
+              {nombreElemento(elementos, c.elemento_id)} × {c.cantidad}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
   complementa: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
   compite: "text-amber-500 bg-amber-500/10 border-amber-500/20",
@@ -619,6 +730,20 @@ function CompuestoEditor({
         </div>
 
         <div className="flex flex-col gap-1.5">
+          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+            Reactividad y peso
+          </p>
+          <AnalisisReactivoPeso compuesto={local} elementos={elementos} />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+            Estequiometría exacta
+          </p>
+          <PanelEstequiometria compuesto={local} elementos={elementos} />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
           <p className="flex items-center gap-1 text-micro font-black uppercase tracking-[0.2em] text-primary/25">
             <Sparkles size={10} />
             Afinidad con otros compuestos
@@ -675,6 +800,25 @@ function LaboratorioModal({
         ? generarSimboloCompuesto(componentesCombinados, elementos)
         : "",
     [componentesCombinados, elementos],
+  );
+
+  // Vista "probeta": balance y reactividad del resultado de la mezcla en
+  // vivo, antes de confirmar la combinación — mismo cálculo que el editor
+  // de un compuesto ya creado, aplicado acá a la mezcla en curso.
+  const compuestoPreview: Compuesto | null =
+    componentesCombinados.length > 0
+      ? { id: "__preview__", nombre: nombreNuevo || "Mezcla", componentes: componentesCombinados }
+      : null;
+  const balancePreview = useMemo(
+    () =>
+      compuestoPreview
+        ? calcularBalancePorCapa(calcularPerfilAtomico(compuestoPreview, elementos))
+        : [],
+    [compuestoPreview, elementos],
+  );
+  const reactividadPreview = useMemo(
+    () => (compuestoPreview ? calcularReactividad(compuestoPreview, elementos) : null),
+    [compuestoPreview, elementos],
   );
 
   function crear() {
@@ -771,6 +915,50 @@ function LaboratorioModal({
                     <p className="text-micro opacity-80 leading-snug">{afinidad.motivo}</p>
                   </div>
                 )
+              )}
+
+              {!mismosElegidos && componentesCombinados.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                    Vista de probeta · resultado de la mezcla
+                  </label>
+                  <div className="rounded-lg border border-primary/10 overflow-hidden">
+                    {balancePreview.map((b, i) => (
+                      <div
+                        key={b.layer}
+                        className={`flex items-center gap-1.5 px-2 py-1 bg-primary/[0.02] ${
+                          i > 0 ? "border-t border-primary/10" : ""
+                        }`}
+                      >
+                        <span className="w-14 shrink-0 text-micro font-bold text-primary/60">
+                          {LAYER_LABEL[b.layer as LayerName]}
+                        </span>
+                        <span className="flex-1 text-micro text-primary/40 tabular-nums">
+                          {b.total} / {b.capacidad}
+                        </span>
+                        <span
+                          className={`shrink-0 text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                            b.balance === 0
+                              ? "text-primary/30"
+                              : b.balance > 0
+                                ? "text-emerald-500 bg-emerald-500/10"
+                                : "text-amber-500 bg-amber-500/10"
+                          }`}
+                        >
+                          {b.balance === 0 ? "Completa" : b.balance > 0 ? `+${b.balance} sobra` : `${b.balance} falta`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {reactividadPreview && (
+                    <p className="text-micro text-primary/40">
+                      Reactividad resultante:{" "}
+                      <span className="font-black text-primary/70">
+                        {REACTIVIDAD_LABEL[reactividadPreview.nivel]}
+                      </span>
+                    </p>
+                  )}
+                </div>
               )}
 
               {!mismosElegidos && componentesCombinados.length > 0 && (
