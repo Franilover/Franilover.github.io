@@ -4,9 +4,8 @@
  * useBiologia.ts
  * ───────────────────────────────────────────────────────────────────────────
  * CRUD directo (mismo molde simple que useSubsistemasMagia — sin
- * Dexie/offline-sync) para las tablas del módulo Biología: taxones,
- * ecosistemas, cadenas_alimenticias, perfiles_atomicos_criatura y la fila
- * única de config de rangos taxonómicos.
+ * Dexie/offline-sync) para las tablas del módulo Biología: clados,
+ * ecosistemas, cadenas_alimenticias y perfiles_atomicos_criatura.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -14,86 +13,32 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 
 import {
-  RANGOS_TAXONOMICOS_DEFAULT,
-  type BiologiaConfig,
   type CadenaAlimenticia,
   type CadenaAlimenticiaInput,
+  type Clado,
+  type CladoInput,
   type Ecosistema,
   type EcosistemaInput,
   type PerfilAtomicoCriatura,
   type PerfilAtomicoCriaturaInput,
-  type Taxon,
-  type TaxonInput,
 } from "./types";
 
-// ─── Config de rangos taxonómicos ───────────────────────────────────────────
+// ─── Clados (cladograma / árbol filogenético) ──────────────────────────────
 
-export function useBiologiaConfig() {
-  const [config, setConfig] = useState<BiologiaConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("biologia_config")
-      .select("*")
-      .limit(1)
-      .maybeSingle();
-
-    if (!error && data) {
-      setConfig(data as BiologiaConfig);
-    } else {
-      // No existe fila todavía — la creamos con los rangos por defecto.
-      const { data: creada } = await supabase
-        .from("biologia_config")
-        .insert([{ rangos: RANGOS_TAXONOMICOS_DEFAULT }])
-        .select()
-        .single();
-      if (creada) setConfig(creada as BiologiaConfig);
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const actualizarRangos = useCallback(
-    async (rangos: string[]) => {
-      if (!config) return;
-      setConfig((prev) => (prev ? { ...prev, rangos } : prev));
-      const { error } = await supabase
-        .from("biologia_config")
-        .update({ rangos })
-        .eq("id", config.id);
-      if (error) void load();
-    },
-    [config, load],
-  );
-
-  return {
-    rangos: config?.rangos ?? RANGOS_TAXONOMICOS_DEFAULT,
-    loading,
-    actualizarRangos,
-  };
-}
-
-// ─── Taxones (árbol filogenético) ───────────────────────────────────────────
-
-export function useTaxones() {
-  const [taxones, setTaxones] = useState<Taxon[]>([]);
+export function useClados() {
+  const [clados, setClados] = useState<Clado[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("taxones")
+      .from("clados")
       .select("*")
       .order("orden", { ascending: true })
       .order("created_at", { ascending: true });
 
-    if (!error && data) setTaxones(data as Taxon[]);
+    if (!error && data) setClados(data as Clado[]);
     setLoading(false);
   }, []);
 
@@ -102,25 +47,25 @@ export function useTaxones() {
   }, [load]);
 
   const crear = useCallback(
-    async (nombre: string, rango: string, padre_id: string | null = null) => {
+    async (nombre: string, padre_id: string | null = null) => {
       setCreating(true);
       const { data, error } = await supabase
-        .from("taxones")
-        .insert([{ nombre, rango, padre_id, descripcion: "", criatura_ids: [] }])
+        .from("clados")
+        .insert([{ nombre, sinapomorfia: "", padre_id, descripcion: "", criatura_ids: [] }])
         .select()
         .single();
       setCreating(false);
       if (error || !data) return null;
-      setTaxones((prev) => [...prev, data as Taxon]);
-      return data as Taxon;
+      setClados((prev) => [...prev, data as Clado]);
+      return data as Clado;
     },
     [],
   );
 
   const actualizar = useCallback(
-    async (id: string, updates: TaxonInput) => {
-      setTaxones((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
-      const { error } = await supabase.from("taxones").update(updates).eq("id", id);
+    async (id: string, updates: CladoInput) => {
+      setClados((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+      const { error } = await supabase.from("clados").update(updates).eq("id", id);
       if (error) void load();
     },
     [load],
@@ -130,16 +75,16 @@ export function useTaxones() {
     // Reasignar hijos directos a raíz (padre_id null) para no dejar el
     // árbol con referencias colgantes, mismo criterio conservador que
     // usaríamos para cualquier borrado de nodo intermedio.
-    setTaxones((prev) =>
+    setClados((prev) =>
       prev
-        .filter((t) => t.id !== id)
-        .map((t) => (t.padre_id === id ? { ...t, padre_id: null } : t)),
+        .filter((c) => c.id !== id)
+        .map((c) => (c.padre_id === id ? { ...c, padre_id: null } : c)),
     );
-    await supabase.from("taxones").update({ padre_id: null }).eq("padre_id", id);
-    await supabase.from("taxones").delete().eq("id", id);
+    await supabase.from("clados").update({ padre_id: null }).eq("padre_id", id);
+    await supabase.from("clados").delete().eq("id", id);
   }, []);
 
-  return { taxones, loading, creating, crear, actualizar, eliminar };
+  return { clados, loading, creating, crear, actualizar, eliminar };
 }
 
 // ─── Ecosistemas ────────────────────────────────────────────────────────────

@@ -5,7 +5,8 @@
  * ───────────────────────────────────────────────────────────────────────────
  * Orquestador de la sección Biología, hermana de Física en el toggle
  * superior de RunasPage. Sub-tabs internas:
- *   - Taxonomía: árbol filogenético (rangos configurables) + criaturas.
+ *   - Cladística: cladograma (grupos monofiléticos por sinapomorfía, sin
+ *     rangos linneanos fijos) + criaturas.
  *   - Ecosistemas: biomas + cadenas alimenticias.
  *   - Perfiles: perfil atómico de criatura (reusa afinidad.ts de Elementos)
  *     + vínculo con Oris de Física.
@@ -17,16 +18,15 @@
 import { Download } from "lucide-react";
 import React, { useState } from "react";
 
+import { CladisticaPage } from "./CladisticaPage";
 import { EcosistemasPage } from "./EcosistemasPage";
 import { PerfilesAtomicosPage } from "./PerfilAtomicoCriaturaPanel";
-import { TaxonomiaPage } from "./TaxonomiaPage";
 import { SECCIONES_BIOLOGIA, type SeccionBiologia } from "./types";
 import {
-  useBiologiaConfig,
   useCadenasAlimenticias,
+  useClados,
   useEcosistemas,
   usePerfilesAtomicosCriatura,
-  useTaxones,
 } from "./useBiologia";
 
 interface Props {
@@ -36,19 +36,17 @@ interface Props {
 
 // ─── Descarga: todo el contenido de Biología en un solo JSON ──────────────
 // Mismo patrón que descargarDatosElementos/descargarDatosFisica — un solo
-// archivo autocontenido con taxones + config de rangos, ecosistemas,
-// cadenas alimenticias y perfiles atómicos de criatura.
+// archivo autocontenido con clados, ecosistemas, cadenas alimenticias y
+// perfiles atómicos de criatura.
 function descargarDatosBiologia(datos: {
-  rangos: string[];
-  taxones: ReturnType<typeof useTaxones>["taxones"];
+  clados: ReturnType<typeof useClados>["clados"];
   ecosistemas: ReturnType<typeof useEcosistemas>["ecosistemas"];
   cadenas: ReturnType<typeof useCadenasAlimenticias>["cadenas"];
   perfiles: ReturnType<typeof usePerfilesAtomicosCriatura>["perfiles"];
 }) {
   const payload = {
     exportado_en: new Date().toISOString(),
-    rangos_taxonomicos: datos.rangos,
-    taxones: datos.taxones,
+    clados: datos.clados,
     ecosistemas: datos.ecosistemas,
     cadenas_alimenticias: datos.cadenas,
     perfiles_atomicos_criatura: datos.perfiles,
@@ -96,13 +94,12 @@ function SelectorSeccionBiologia({
 }
 
 export function BiologiaPage({ onSelectCriatura }: Props) {
-  const [seccion, setSeccion] = useState<SeccionBiologia>("taxonomia");
+  const [seccion, setSeccion] = useState<SeccionBiologia>("cladistica");
 
-  // Traídos acá solo para armar el JSON de descarga — Taxonomía,
+  // Traídos acá solo para armar el JSON de descarga — Cladística,
   // Ecosistemas y Perfiles siguen manejando sus propios datos
   // internamente (self-contained), esto no les saca esa responsabilidad.
-  const { rangos } = useBiologiaConfig();
-  const { taxones } = useTaxones();
+  const { clados } = useClados();
   const { ecosistemas } = useEcosistemas();
   const { cadenas } = useCadenasAlimenticias();
   const { perfiles } = usePerfilesAtomicosCriatura();
@@ -113,9 +110,9 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
         <button
           type="button"
           onClick={() =>
-            descargarDatosBiologia({ rangos, taxones, ecosistemas, cadenas, perfiles })
+            descargarDatosBiologia({ clados, ecosistemas, cadenas, perfiles })
           }
-          title="Descargar todos los datos de Biología (taxonomía, ecosistemas, cadenas y perfiles) como JSON"
+          title="Descargar todos los datos de Biología (cladística, ecosistemas, cadenas y perfiles) como JSON"
           className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
         >
           <Download size={10} />
@@ -125,7 +122,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
 
       <SelectorSeccionBiologia seccion={seccion} onCambiarSeccion={setSeccion} />
 
-      {seccion === "taxonomia" && <TaxonomiaPage onSelectCriatura={onSelectCriatura} />}
+      {seccion === "cladistica" && <CladisticaPage onSelectCriatura={onSelectCriatura} />}
       {seccion === "ecosistemas" && <EcosistemasPage onSelectCriatura={onSelectCriatura} />}
       {seccion === "perfiles" && <PerfilesAtomicosPage />}
     </div>

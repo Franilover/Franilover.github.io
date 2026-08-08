@@ -6,9 +6,13 @@
  * id — mismo criterio que subsistemas_magia.criatura_ids.
  *
  * Piezas:
- *   1. Taxón (árbol filogenético) — jerarquía de rangos CONFIGURABLE (no
- *      hardcodeada a Reino/Filo/Clase reales), con padre_id para el árbol.
- *      Cada taxón puede tener 0+ criaturas asignadas.
+ *   1. Clado (cladograma) — árbol filogenético SIN rangos fijos (nada de
+ *      Reino/Filo/Clase). Cada nodo es un grupo monofilético definido por
+ *      una sinapomorfía (carácter derivado compartido por todos sus
+ *      descendientes) — el criterio real de la cladística moderna, no la
+ *      jerarquía linneana. padre_id arma el árbol; profundidad libre.
+ *      Cada clado puede tener 0+ criaturas asignadas (típicamente en las
+ *      hojas, pero nada lo obliga).
  *   2. Ecosistema — bioma/región con criaturas que lo habitan (multi,
  *      mismo patrón que subsistemas_magia.criatura_ids).
  *   3. Cadena alimenticia — eslabones ordenados, cada uno con un rol
@@ -24,44 +28,33 @@ import { Dna, Leaf, Salad, Atom } from "lucide-react";
 
 import type { ComponenteCompuesto } from "@/domains/garlia/elementos/types";
 
-// ─── Taxonomía (árbol filogenético) ────────────────────────────────────────
+// ─── Cladística (cladograma / árbol filogenético) ──────────────────────────
 
-/** Rangos por defecto — editables/renombrables/extendibles, no fijos. */
-export const RANGOS_TAXONOMICOS_DEFAULT: string[] = [
-  "Reino",
-  "Filo",
-  "Clase",
-  "Orden",
-  "Familia",
-  "Género",
-  "Especie",
-];
-
-/** Fila cruda tal cual vive en Supabase (tabla "taxones"). */
-export interface Taxon {
+/** Fila cruda tal cual vive en Supabase (tabla "clados"). */
+export interface Clado {
   id: string;
   nombre: string;
-  /** Rango dentro de la jerarquía configurable (ej. "Reino", "Filo"...). */
-  rango: string;
-  /** Taxón padre en el árbol — null si es raíz. */
+  /**
+   * Sinapomorfía: el carácter derivado compartido por todos los
+   * descendientes de este clado, lo que lo define como grupo monofilético
+   * (ej. "Presencia de vejiga de veneno dorsal"). Es el corazón del
+   * criterio cladístico — a diferencia de un "rango" linneano, no es una
+   * etiqueta de nivel sino la evidencia evolutiva del agrupamiento.
+   */
+  sinapomorfia: string;
+  /** Clado padre en el árbol — null si es raíz (ancestro común más lejano registrado). */
   padre_id: string | null;
   descripcion: string;
-  /** Criaturas (por id) que pertenecen exactamente a este taxón (nivel hoja o intermedio). */
+  /** Criaturas (por id) que pertenecen exactamente a este clado. */
   criatura_ids: string[];
   orden: number;
   created_at: string;
   updated_at: string;
 }
 
-export type TaxonInput = Partial<
-  Pick<Taxon, "nombre" | "rango" | "padre_id" | "descripcion" | "criatura_ids" | "orden">
+export type CladoInput = Partial<
+  Pick<Clado, "nombre" | "sinapomorfia" | "padre_id" | "descripcion" | "criatura_ids" | "orden">
 >;
-
-/** Config de rangos del árbol — una sola fila viva en "biologia_config". */
-export interface BiologiaConfig {
-  id: string;
-  rangos: string[];
-}
 
 // ─── Ecosistemas ────────────────────────────────────────────────────────────
 
@@ -188,14 +181,14 @@ export type PerfilAtomicoCriaturaInput = Partial<
 
 // ─── Sub-tabs de Biología ───────────────────────────────────────────────────
 
-export type SeccionBiologia = "taxonomia" | "ecosistemas" | "perfiles";
+export type SeccionBiologia = "cladistica" | "ecosistemas" | "perfiles";
 
 export const SECCIONES_BIOLOGIA: {
   key: SeccionBiologia;
   label: string;
   Icon: React.ElementType;
 }[] = [
-  { key: "taxonomia", label: "Taxonomía", Icon: Dna },
+  { key: "cladistica", label: "Cladística", Icon: Dna },
   { key: "ecosistemas", label: "Ecosistemas", Icon: Leaf },
   { key: "perfiles", label: "Perfiles", Icon: Atom },
 ];
