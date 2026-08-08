@@ -14,16 +14,56 @@
  * NO toca EditorCriatura.tsx — solo referencia criaturas por id.
  */
 
+import { Download } from "lucide-react";
 import React, { useState } from "react";
 
 import { EcosistemasPage } from "./EcosistemasPage";
 import { PerfilesAtomicosPage } from "./PerfilAtomicoCriaturaPanel";
 import { TaxonomiaPage } from "./TaxonomiaPage";
 import { SECCIONES_BIOLOGIA, type SeccionBiologia } from "./types";
+import {
+  useBiologiaConfig,
+  useCadenasAlimenticias,
+  useEcosistemas,
+  usePerfilesAtomicosCriatura,
+  useTaxones,
+} from "./useBiologia";
 
 interface Props {
   /** El padre decide qué hacer al clickear una criatura (ej. abrir su editor). */
   onSelectCriatura?: (id: string) => void;
+}
+
+// ─── Descarga: todo el contenido de Biología en un solo JSON ──────────────
+// Mismo patrón que descargarDatosElementos/descargarDatosFisica — un solo
+// archivo autocontenido con taxones + config de rangos, ecosistemas,
+// cadenas alimenticias y perfiles atómicos de criatura.
+function descargarDatosBiologia(datos: {
+  rangos: string[];
+  taxones: ReturnType<typeof useTaxones>["taxones"];
+  ecosistemas: ReturnType<typeof useEcosistemas>["ecosistemas"];
+  cadenas: ReturnType<typeof useCadenasAlimenticias>["cadenas"];
+  perfiles: ReturnType<typeof usePerfilesAtomicosCriatura>["perfiles"];
+}) {
+  const payload = {
+    exportado_en: new Date().toISOString(),
+    rangos_taxonomicos: datos.rangos,
+    taxones: datos.taxones,
+    ecosistemas: datos.ecosistemas,
+    cadenas_alimenticias: datos.cadenas,
+    perfiles_atomicos_criatura: datos.perfiles,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `biologia-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function SelectorSeccionBiologia({
@@ -34,7 +74,7 @@ function SelectorSeccionBiologia({
   onCambiarSeccion: (s: SeccionBiologia) => void;
 }) {
   return (
-    <div className="flex items-center justify-center gap-1 px-2 py-2 mb-2">
+    <div className="flex items-center justify-center gap-0.5 mb-2">
       {SECCIONES_BIOLOGIA.map(({ key, label, Icon }) => {
         const activa = seccion === key;
         return (
@@ -42,11 +82,11 @@ function SelectorSeccionBiologia({
             key={key}
             type="button"
             onClick={() => onCambiarSeccion(key)}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-micro font-bold uppercase tracking-[0.1em] transition-colors ${
-              activa ? "bg-primary/10 text-primary" : "text-primary/40 hover:text-primary/70"
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.1em] transition-colors ${
+              activa ? "bg-primary/10 text-primary" : "text-primary/35 hover:text-primary/60"
             }`}
           >
-            <Icon size={12} />
+            <Icon size={11} />
             {label}
           </button>
         );
@@ -58,8 +98,31 @@ function SelectorSeccionBiologia({
 export function BiologiaPage({ onSelectCriatura }: Props) {
   const [seccion, setSeccion] = useState<SeccionBiologia>("taxonomia");
 
+  // Traídos acá solo para armar el JSON de descarga — Taxonomía,
+  // Ecosistemas y Perfiles siguen manejando sus propios datos
+  // internamente (self-contained), esto no les saca esa responsabilidad.
+  const { rangos } = useBiologiaConfig();
+  const { taxones } = useTaxones();
+  const { ecosistemas } = useEcosistemas();
+  const { cadenas } = useCadenasAlimenticias();
+  const { perfiles } = usePerfilesAtomicosCriatura();
+
   return (
     <div>
+      <div className="flex items-center justify-end px-2 mb-1">
+        <button
+          type="button"
+          onClick={() =>
+            descargarDatosBiologia({ rangos, taxones, ecosistemas, cadenas, perfiles })
+          }
+          title="Descargar todos los datos de Biología (taxonomía, ecosistemas, cadenas y perfiles) como JSON"
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <Download size={10} />
+          <span className="hidden sm:inline">Descargar datos</span>
+        </button>
+      </div>
+
       <SelectorSeccionBiologia seccion={seccion} onCambiarSeccion={setSeccion} />
 
       {seccion === "taxonomia" && <TaxonomiaPage onSelectCriatura={onSelectCriatura} />}
