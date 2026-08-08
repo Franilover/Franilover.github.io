@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Atom, Dna, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X, Zap } from "lucide-react";
+import { Atom, Dna, Maximize2, Plus, ScrollText, Waypoints, X, Zap } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -579,17 +579,16 @@ function BloqueEnsayoConSubBloques({
   );
 }
 
-// ─── Toggle "Sistema" / "Runas" / "Tabla" / "Física" / "Biología" ───────────
-// Sistema: solo el ensayo (Energías), ancho completo. Runas: el bloque de
-// herramientas de runas (probador, lista, config), sin ensayo. Tabla: grid
-// de Elementos (Tabla Química/Alquímica) + detalle, solo si se pasan props
-// de elementos. Física: grid de Oris + catálogos fijos + conceptos, y al
-// final los Subsistemas de Magia (chips que abren en modal flotante) — ver
-// BloqueFisica más abajo. Biología: taxonomía/ecosistemas/perfiles.
-type SeccionMagia = "sistema" | "runas" | "tabla" | "fisica" | "biologia";
+// ─── Toggle "Runas" / "Tabla" / "Física" / "Biología" ───────────────────────
+// Runas: el bloque de herramientas de runas (probador, lista, config), sin
+// ensayo. Tabla: grid de Elementos (Tabla Química/Alquímica) + detalle,
+// solo si se pasan props de elementos. Física: grid de Oris + catálogos
+// fijos + conceptos, y al final los Subsistemas de Magia (chips que abren
+// en modal flotante) — ver BloqueFisica más abajo. Biología:
+// taxonomía/ecosistemas/perfiles.
+type SeccionMagia = "runas" | "tabla" | "fisica" | "biologia";
 
 const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
-  { key: "sistema", label: "Sistema", Icon: Sparkles },
   { key: "runas", label: "Runas", Icon: Waypoints },
   { key: "tabla", label: "Tabla", Icon: Atom },
   { key: "fisica", label: "Física", Icon: Zap },
@@ -729,7 +728,7 @@ export function RunasPage({
   // tablero de la columna 1.
   const [previewCombinacion, setPreviewCombinacion] = useState<PreviewCombinacion>(null);
 
-  const [seccionMagia, setSeccionMagia] = useState<SeccionMagia>("sistema");
+  const [seccionMagia, setSeccionMagia] = useState<SeccionMagia>("runas");
 
   // Modo pantalla completa: "probador" agranda el Probador de
   // reconocimiento solo; "combinaciones" agranda el render (preview) y
@@ -796,17 +795,12 @@ export function RunasPage({
     );
   }
 
-  // Vista con toggle "Sistema" / "Runas":
+  // Vista con toggle "Runas" / "Tabla" / "Física" / "Biología" (ver
+  // SelectorSeccionMagia más arriba). El bloque de abajo (fuera de
+  // tabla/física/biología) es la vista "Runas":
   //
-  //   [Sistema | Runas]  ← toggle
-  //
-  //   Sistema:
-  //     [Ensayo (Energías), ancho completo]
-  //     — Subsistemas de Magia se movieron a Física (chips + modal).
-  //
-  //   Runas:
-  //     [Probador (cuadrado 1:1) + panel lateral Forma/Runa] [Config/preview]
-  //     [Lista de runas                                    ] [   (arriba)  ]
+  //   [Probador (cuadrado 1:1) + panel lateral Forma/Runa] [Config/preview]
+  //   [Lista de runas                                    ] [   (arriba)  ]
   return (
     <div>
       <SelectorSeccionMagia
@@ -834,10 +828,6 @@ export function RunasPage({
       ) : seccionMagia === "biologia" ? (
         <div className="mt-4">
           <BiologiaPage onSelectCriatura={(id) => onOpen("criaturas", id)} />
-        </div>
-      ) : seccionMagia === "sistema" ? (
-        <div className="mt-4">
-          <BloqueEnsayoEnergias />
         </div>
       ) : (
         <div className="mt-4 flex flex-col lg:flex-row gap-6">
