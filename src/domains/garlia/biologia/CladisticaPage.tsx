@@ -14,9 +14,9 @@
  * nodo interno, hojas alineadas a la derecha), no una lista anidada tipo
  * carpeta. Layout calculado en SVG a partir del árbol.
  *
- * Panel de detalle del clado seleccionado a la derecha (nombre,
- * sinapomorfía, descripción, criaturas asignadas) — mismo patrón
- * "diagrama + editor lateral" que el resto de Física/Runas.
+ * Panel de detalle del clado seleccionado como sidebar angosta a la
+ * derecha (patrón "lienzo central + barra lateral compacta" — el
+ * cladograma es el protagonista, la edición queda secundaria y a mano).
  */
 
 import { Dna, Plus, Trash2 } from "lucide-react";
@@ -38,11 +38,11 @@ interface Props {
 // el promedio de sus hijos — así las bifurcaciones quedan centradas, como en
 // cualquier cladograma real.
 
-const ROW_H = 34;
-const COL_W = 150;
-const PAD_X = 16;
-const PAD_Y = 20;
-const LEAF_LABEL_W = 210;
+const ROW_H = 38;
+const COL_W = 170;
+const PAD_X = 20;
+const PAD_Y = 24;
+const LEAF_LABEL_W = 220;
 
 interface NodoLayout {
   clado: Clado;
@@ -106,8 +106,8 @@ function DiagramaCladograma({
   if (clados.length === 0) return null;
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-primary/10 bg-white-custom/60 p-2">
-      <svg width={ancho} height={alturaTotal} className="block">
+    <div className="overflow-auto rounded-2xl border border-primary/10 bg-white-custom/60 p-3">
+      <svg width={ancho} height={alturaTotal} className="block" style={{ minWidth: "100%" }}>
         {/* Ramas: para cada nodo con hijos, un tronco horizontal hasta la
             columna del hijo + una barra vertical que conecta las Y de todos
             los hijos + un horizontal corto desde la barra hasta cada hijo. */}
@@ -232,61 +232,58 @@ function PanelClado({
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          <Dna size={12} className="text-accent/60 shrink-0" />
-          <input
-            className="flex-1 min-w-0 bg-transparent text-sm font-black uppercase italic tracking-tight text-primary truncate outline-none placeholder:text-primary/25 px-1 py-0.5 rounded hover:bg-primary/5 focus:bg-primary/8"
-            placeholder="Nombre del clado…"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            onBlur={guardar}
-          />
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={onDelete}
-            title="Eliminar clado"
-            className="p-1.5 rounded-lg text-primary/25 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-          >
-            <Trash2 size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={guardar}
-            className="text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity"
-          >
-            Guardar
-          </button>
-        </div>
+      <div className="flex items-center gap-1.5 mb-3">
+        <Dna size={12} className="text-accent/60 shrink-0" />
+        <input
+          className="flex-1 min-w-0 bg-transparent text-xs font-black uppercase italic tracking-tight text-primary truncate outline-none placeholder:text-primary/25 px-1 py-0.5 rounded hover:bg-primary/5 focus:bg-primary/8"
+          placeholder="Nombre del clado…"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          onBlur={guardar}
+        />
       </div>
 
-      <div className="mb-4">
-        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
-          Sinapomorfía (carácter derivado)
+      <div className="flex items-center gap-1.5 mb-4">
+        <button
+          type="button"
+          onClick={guardar}
+          className="flex-1 text-micro font-black uppercase tracking-widest px-2 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity"
+        >
+          Guardar
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          title="Eliminar clado"
+          className="shrink-0 p-1.5 rounded-lg text-primary/25 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      <div className="mb-3.5">
+        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+          Sinapomorfía
         </span>
-        <p className="text-micro text-primary/35 mb-1.5">
-          El rasgo compartido por todos los descendientes de este clado — lo
-          que lo define como grupo monofilético. Ej. &quot;Presencia de
-          vejiga de veneno dorsal&quot;.
+        <p className="text-micro text-primary/35 mb-1.5 leading-snug">
+          Carácter derivado compartido por todos los descendientes.
         </p>
         <input
-          className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs font-bold text-primary/80 outline-none placeholder:text-primary/30 placeholder:font-normal focus:border-primary/25"
-          placeholder="¿Qué carácter derivado comparten todos los descendientes?"
+          className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2 py-1.5 text-xs font-bold text-primary/80 outline-none placeholder:text-primary/30 placeholder:font-normal focus:border-primary/25"
+          placeholder="Ej. vejiga de veneno dorsal…"
           value={sinapomorfia}
           onChange={(e) => setSinapomorfia(e.target.value)}
           onBlur={guardar}
         />
       </div>
 
-      <div className="mb-4">
-        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+      <div className="mb-3.5">
+        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
           Descripción
         </span>
         <RichEditor
-          minHeight="6.25rem"
-          placeholder="Notas evolutivas, contexto del linaje, cómo se diferencia de clados hermanos…"
+          minHeight="4.5rem"
+          placeholder="Notas evolutivas, contexto del linaje…"
           value={descripcion}
           onChange={setDescripcion}
         />
@@ -295,7 +292,7 @@ function PanelClado({
       <button
         type="button"
         onClick={onCrearHijo}
-        className="flex items-center gap-1.5 mb-4 px-2.5 py-1.5 rounded-lg border border-dashed text-micro font-black uppercase tracking-widest transition-all"
+        className="w-full flex items-center justify-center gap-1.5 mb-3.5 px-2 py-1.5 rounded-lg border border-dashed text-micro font-black uppercase tracking-widest transition-all"
         style={{
           borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
           color: "color-mix(in srgb, var(--primary) 35%, transparent)",
@@ -333,7 +330,7 @@ export function CladisticaPage({ onSelectCriatura }: Props) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
+    <div className="flex flex-col lg:flex-row gap-4">
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-2">
           <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
@@ -365,7 +362,7 @@ export function CladisticaPage({ onSelectCriatura }: Props) {
         )}
       </div>
 
-      <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+      <div className="w-full lg:w-[300px] xl:w-[330px] shrink-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto rounded-2xl border border-primary/10 bg-white-custom/40 p-3.5">
         {seleccionado ? (
           <PanelClado
             key={seleccionado.id}
@@ -379,8 +376,9 @@ export function CladisticaPage({ onSelectCriatura }: Props) {
             onSelectCriatura={onSelectCriatura}
           />
         ) : (
-          <div className="rounded-2xl border border-dashed border-primary/15 p-6 text-center">
-            <p className="text-xs text-primary/30">
+          <div className="py-8 text-center">
+            <Dna size={16} className="mx-auto mb-2 text-primary/15" />
+            <p className="text-micro text-primary/30 leading-snug px-2">
               Seleccioná un clado del cladograma para ver o editar su
               detalle.
             </p>
