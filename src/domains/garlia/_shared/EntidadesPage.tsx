@@ -18,7 +18,7 @@
  * muestra sin lógica extra acá.
  */
 
-import { Eye, EyeOff, Music, Plus, StickyNote } from "lucide-react";
+import { Eye, EyeOff, Gem, Leaf, Music, Plus, StickyNote } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
@@ -39,6 +39,10 @@ import { supabase } from "@/infra/supabase/supabase";
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { EcosistemaEditor } from "@/domains/garlia/biologia/EcosistemaEditor";
 import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
+import { FloraEditor } from "@/domains/garlia/flora/FloraEditor";
+import { useFlora } from "@/domains/garlia/flora/useFlora";
+import { MineralEditor } from "@/domains/garlia/minerales/MineralEditor";
+import { useMinerales } from "@/domains/garlia/minerales/useMinerales";
 import { ItemEditor } from "@/domains/garlia/items/ItemEditor";
 import { PersonajeEditor } from "@garlia/personajes";
 import { ReinoEditor } from "@garlia/reinos";
@@ -102,6 +106,8 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { data: items, loading: loadingI, addRow: addItem } =
     useSupabaseData<Item>("items");
   const { ecosistemas, loading: loadingEco, creating: creatingEco, crear: crearEcosistema } = useEcosistemas();
+  const { flora, loading: loadingFlora, creating: creatingFlora, crear: crearFlora } = useFlora();
+  const { minerales, loading: loadingMinerales, creating: creatingMinerales, crear: crearMineral } = useMinerales();
 
   // ── Geografía ──────────────────────────────────────────────────────────
   const { data: reinos, loading: loadingR, addRow: addReino } =
@@ -386,6 +392,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   }, [cancionesFiltradas]);
 
   const openEntity = useMundoNavigation((s) => s.openEntity);
+  const clearSelection = useMundoNavigation((s) => s.clearSelection);
 
   const selectedPersonaje = useMemo(
     () => (section === "personajes" ? personajes.find((p) => p.id === selectedId) : null),
@@ -402,6 +409,14 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const selectedEcosistema = useMemo(
     () => (section === "ecosistemas" ? ecosistemas.find((e) => e.id === selectedId) ?? null : null),
     [section, ecosistemas, selectedId],
+  );
+  const selectedFlora = useMemo(
+    () => (section === "flora" ? flora.find((f) => f.id === selectedId) ?? null : null),
+    [section, flora, selectedId],
+  );
+  const selectedMineral = useMemo(
+    () => (section === "minerales" ? minerales.find((m) => m.id === selectedId) ?? null : null),
+    [section, minerales, selectedId],
   );
   const selectedReino = useMemo(
     () => (section === "reinos" ? reinos.find((r) => r.id === selectedId) : null),
@@ -486,7 +501,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   }
 
   const selected =
-    selectedPersonaje ?? selectedCriatura ?? selectedItem ?? selectedReino ?? selectedCiudad ?? selectedEcosistema ?? null;
+    selectedPersonaje ?? selectedCriatura ?? selectedItem ?? selectedReino ?? selectedCiudad ?? selectedEcosistema ?? selectedFlora ?? selectedMineral ?? null;
 
   if (selected) {
     return (
@@ -497,6 +512,20 @@ export function EntidadesPage({ section, selectedId }: Props) {
         {selectedReino && <ReinoEditor reino={selectedReino} />}
         {selectedCiudad && <CiudadEditor ciudad={selectedCiudad} />}
         {selectedEcosistema && <EcosistemaEditor ecosistema={selectedEcosistema} />}
+        {selectedFlora && (
+          <FloraEditor
+            key={selectedFlora.id}
+            flora={selectedFlora}
+            onDeleted={() => clearSelection()}
+          />
+        )}
+        {selectedMineral && (
+          <MineralEditor
+            key={selectedMineral.id}
+            mineral={selectedMineral}
+            onDeleted={() => clearSelection()}
+          />
+        )}
       </div>
     );
   }
@@ -644,6 +673,62 @@ export function EntidadesPage({ section, selectedId }: Props) {
           }
           onEliminarElemento={handleEliminarElemento}
           seleccionarElementoId={elementoRecienCreadoId}
+        />
+      </div>
+    );
+  }
+
+  // ── Flora ────────────────────────────────────────────────────────
+  // Sección propia de la navbar, dentro de Entidades como Criaturas.
+  // Grid simple sin agrupación (mismo molde que Items).
+  if (section === "flora") {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        <EntityCardGrid
+          Icon={Leaf}
+          title="Flora"
+          section="flora"
+          variant="grid"
+          loading={loadingFlora}
+          creating={creatingFlora}
+          items={flora.map((f) => ({
+            id: f.id,
+            nombre: f.nombre,
+            imageUrl: f.imagen_url || undefined,
+          }))}
+          onItemClick={(id) => openEntity("flora", id)}
+          onCreate={async () => {
+            const nueva = await crearFlora("Nueva planta");
+            if (nueva?.id) openEntity("flora", nueva.id);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Minerales ────────────────────────────────────────────────────
+  // Sección propia de la navbar, dentro de Entidades como Criaturas.
+  // Grid simple sin agrupación (mismo molde que Items/Flora).
+  if (section === "minerales") {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+        <EntityCardGrid
+          Icon={Gem}
+          title="Minerales"
+          section="minerales"
+          variant="grid"
+          loading={loadingMinerales}
+          creating={creatingMinerales}
+          items={minerales.map((m) => ({
+            id: m.id,
+            nombre: m.nombre,
+            imageUrl: m.imagen_url || undefined,
+          }))}
+          onItemClick={(id) => openEntity("minerales", id)}
+          onCreate={async () => {
+            const nuevo = await crearMineral("Nuevo mineral");
+            if (nuevo?.id) openEntity("minerales", nuevo.id);
+          }}
         />
       </div>
     );

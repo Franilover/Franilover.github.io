@@ -29,6 +29,9 @@ import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/us
 const ENTIDADES_SECTIONS: SectionKey[] = [
   "personajes",
   "criaturas",
+  "ecosistemas",
+  "flora",
+  "minerales",
   "items",
   "reinos",
   "ciudades",

@@ -94,6 +94,8 @@ function ActiveSection() {
     case "personajes":
     case "criaturas":
     case "ecosistemas":
+    case "flora":
+    case "minerales":
     case "items":
     case "reinos":
     case "ciudades":
