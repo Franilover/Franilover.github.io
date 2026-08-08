@@ -28,6 +28,7 @@ interface EntityRow {
 const SECTION_TABLE: Record<SectionKey, string | null> = {
   personajes: "personajes",
   criaturas: "criaturas",
+  ecosistemas: "ecosistemas",
   items: "items",
   reinos: "reinos",
   ciudades: "ciudades",

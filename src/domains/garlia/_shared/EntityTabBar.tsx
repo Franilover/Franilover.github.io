@@ -27,6 +27,7 @@ import {
   Clock,
   Crown,
   Landmark,
+  Leaf,
   Music,
   ScrollText,
   StickyNote,
@@ -42,6 +43,7 @@ import { useMundoNavigation, type SectionKey } from "./useMundoNavigationStore";
 const SECTION_ICON: Partial<Record<SectionKey, React.ElementType>> = {
   personajes: Users,
   criaturas: Bug,
+  ecosistemas: Leaf,
   items: Swords,
   reinos: Crown,
   ciudades: Landmark,
