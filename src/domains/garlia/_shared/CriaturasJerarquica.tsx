@@ -133,13 +133,9 @@ function NodoTitulo({
   fill?: boolean;
 }) {
   const chipStyles =
-    variant === "ecosistema"
-      ? "bg-primary/10 hover:bg-primary/20 text-primary/70 border border-primary/15"
-      : variant === "flora"
-        ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/15"
-        : variant === "mineral"
-          ? "bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 border border-sky-500/15"
-          : "bg-accent/10 hover:bg-accent/20 text-accent/80 border border-accent/15";
+    variant === "criatura"
+      ? "bg-accent/10 hover:bg-accent/20 text-accent/80 border border-accent/15"
+      : "bg-primary/10 hover:bg-primary/20 text-primary/70 border border-primary/15";
 
   return (
     <div className={`flex items-center gap-1 max-w-full ${fill ? "w-full" : ""}`}>
