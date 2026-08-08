@@ -93,6 +93,7 @@ function ActiveSection() {
       return <MundoHomeContent />;
     case "personajes":
     case "criaturas":
+    case "ecosistemas":
     case "items":
     case "reinos":
     case "ciudades":
