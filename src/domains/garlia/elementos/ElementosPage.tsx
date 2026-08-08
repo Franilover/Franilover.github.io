@@ -12,11 +12,13 @@
  * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
  */
 
-import { Atom, Beaker, Download, Info, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { Atom, Beaker, Download, GitCompare, Info, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
+import { calcularParticulaDominante } from "./afinidad";
+import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
 import { ElementoEditor } from "./ElementoEditor";
 import { useCompuestos } from "./useCompuestos";
@@ -82,6 +84,14 @@ function ElementoCasilla({
   seleccionado?: boolean;
   onClick: () => void;
 }) {
+  const dominantes = useMemo(() => calcularParticulaDominante(elemento), [elemento]);
+  const nombreDominante =
+    dominantes.length === 0
+      ? null
+      : dominantes.length === 1
+        ? dominantes[0].particula
+        : `${dominantes.length} empatadas`;
+
   return (
     <button
       type="button"
@@ -111,6 +121,15 @@ function ElementoCasilla({
       <span className="text-micro font-bold text-primary/80 truncate text-center leading-tight">
         {elemento.nombre}
       </span>
+
+      {nombreDominante && (
+        <span
+          title="Partícula dominante"
+          className="self-center text-micro font-bold text-accent/70 bg-accent/10 rounded px-1 truncate max-w-full leading-tight"
+        >
+          {nombreDominante}
+        </span>
+      )}
 
       <div className="mt-0.5 pt-0.5 border-t border-primary/10 flex flex-col gap-0.5">
         <span className="text-micro text-primary/40 truncate leading-tight">
@@ -354,6 +373,7 @@ export function ElementosPage({
   seleccionarId,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [comparadorAbierto, setComparadorAbierto] = useState(false);
   const {
     info: infoTabla,
     loading: loadingInfoTabla,
@@ -486,6 +506,16 @@ export function ElementosPage({
             </select>
             <button
               type="button"
+              disabled={elementos.length < 2}
+              onClick={() => setComparadorAbierto(true)}
+              title="Comparar 2-3 elementos lado a lado"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <GitCompare size={10} />
+              <span className="hidden sm:inline">Comparar</span>
+            </button>
+            <button
+              type="button"
               onClick={() => descargarDatosElementos(elementos, infoTabla.secciones, compuestos)}
               title="Descargar todos los datos de la Tabla Química como JSON"
               className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
@@ -555,6 +585,7 @@ export function ElementosPage({
           >
             <ElementoEditor
               elemento={activo}
+              todosLosElementos={elementos}
               onBack={() => setSeleccionadoId(null)}
               onActualizar={onActualizar}
               onEliminar={
@@ -570,6 +601,13 @@ export function ElementosPage({
         </>
       )}
       </div>
+
+      {comparadorAbierto && (
+        <ComparadorElementosModal
+          elementos={elementos}
+          onCerrar={() => setComparadorAbierto(false)}
+        />
+      )}
     </div>
   );
 }

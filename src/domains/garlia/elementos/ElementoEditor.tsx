@@ -12,13 +12,19 @@
  * a Supabase + propagación al estado del padre via onActualizar.
  */
 
-import { ChevronLeft, Save, Trash2 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { ChevronLeft, Save, Sparkles, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
 import {
+  calcularParticulaDominante,
+  generarDescripcionElemento,
+  ordenarElementosPorAfinidad,
+} from "./afinidad";
+import {
+  AFINIDAD_LABEL,
   ELEMENT_FAMILIES,
   ESTADOS_ELEMENTO,
   LAYER_LABEL,
@@ -28,16 +34,31 @@ import {
   type EstadoElemento,
   type LayerName,
   type ParticleMap,
+  type TipoAfinidad,
 } from "./types";
 
 interface Props {
   elemento: Elemento;
+  todosLosElementos?: Elemento[];
   onBack: () => void;
   onActualizar: (id: string, cambios: Partial<Elemento>) => void;
   onEliminar?: (id: string) => void;
 }
 
-export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: Props) {
+const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
+  complementa: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+  compite: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+  saturado: "text-primary/40 bg-primary/5 border-primary/10",
+  estable: "text-primary/30 bg-primary/[0.02] border-primary/10",
+};
+
+export function ElementoEditor({
+  elemento,
+  todosLosElementos,
+  onBack,
+  onActualizar,
+  onEliminar,
+}: Props) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
   const [local, setLocal] = useState(elemento);
@@ -63,6 +84,22 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
     else delete current[particle as keyof ParticleMap];
     setLocal((prev) => ({ ...prev, [layer]: current }));
   }
+
+  // Descripción auto-generada: se recalcula sola a partir de familia +
+  // capas + estado, no hay campo manual que mantener.
+  const descripcion = useMemo(() => generarDescripcionElemento(local), [local]);
+
+  // Partícula(s) dominante(s): la(s) de mayor cantidad sumando las 3 capas.
+  const dominantes = useMemo(() => calcularParticulaDominante(local), [local]);
+
+  // Afinidad con el resto de la tabla — misma lógica que compuestos, pero
+  // comparando elementos sueltos entre sí (sirve antes de armar un
+  // compuesto, para saber qué pareja tiene sentido combinar).
+  const afinidades = useMemo(
+    () =>
+      todosLosElementos ? ordenarElementosPorAfinidad(local, todosLosElementos) : [],
+    [local, todosLosElementos],
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -226,6 +263,28 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
           </div>
         </div>
 
+        {/* Descripción auto-generada: se recalcula sola a partir de
+            familia + capas + estado, sin campo manual que mantener. */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+              Rol
+            </p>
+            {dominantes.length > 0 && (
+              <span
+                title="Partícula(s) dominante(s)"
+                className="text-micro font-bold text-accent/70 bg-accent/10 rounded px-1.5 py-0.5"
+              >
+                {dominantes.map((d) => d.particula).join(" / ")}
+              </span>
+            )}
+          </div>
+          <div className="rounded-lg border border-primary/10 bg-primary/[0.02] px-2 py-1.5 flex flex-col gap-1">
+            <p className="text-micro font-black text-primary/70">{descripcion.rol}</p>
+            <p className="text-micro text-primary/50 leading-relaxed">{descripcion.texto}</p>
+          </div>
+        </div>
+
         {/* Notas */}
         <div className="flex flex-col gap-0.5">
           <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
@@ -288,6 +347,35 @@ export function ElementoEditor({ elemento, onBack, onActualizar, onEliminar }: P
             ))}
           </div>
         </div>
+
+        {/* Afinidad con el resto de la tabla — mismo cálculo que entre
+            compuestos, pero comparando elementos sueltos entre sí. */}
+        {todosLosElementos && todosLosElementos.length > 1 && (
+          <div className="flex flex-col gap-1.5">
+            <p className="flex items-center gap-1 text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+              <Sparkles size={10} />
+              Afinidad con otros elementos
+            </p>
+            <div className="flex flex-col gap-1">
+              {afinidades.map(({ elemento: otro, afinidad }) => (
+                <div
+                  key={otro.id}
+                  className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${AFINIDAD_COLOR[afinidad.tipo]}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-micro font-black truncate">
+                      {otro.simbolo || "??"} · {otro.nombre}
+                    </span>
+                    <span className="shrink-0 text-micro font-black uppercase tracking-wide">
+                      {AFINIDAD_LABEL[afinidad.tipo]}
+                    </span>
+                  </div>
+                  <p className="text-micro opacity-80 leading-snug">{afinidad.motivo}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

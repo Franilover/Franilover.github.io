@@ -26,9 +26,11 @@
 
 import {
   CAPACIDAD_CAPA,
+  ESTADO_EQUIVALENTE_REAL,
   type ComponenteCompuesto,
   type Compuesto,
   type Elemento,
+  type ElementFamily,
   type LayerName,
   type ParticleMap,
   type ParticleType,
@@ -327,6 +329,137 @@ export function encontrarCompuestoDuplicado(
       (c) => c.id !== excluirId && firmaComponentes(c.componentes ?? []) === firma,
     ) ?? null
   );
+}
+
+// ─── Descripción auto-generada de un Elemento ──────────────────────────────
+// Lee directamente familia + capas + es_noble/estado y arma un texto en
+// lenguaje natural — no hay campo manual que mantener, se recalcula solo
+// si se editan las capas. Misma idea que la afinidad: sale de la
+// estructura real, no de una regla aparte.
+export interface DescripcionElemento {
+  /** Frase corta tipo "rol" (para badges/subtítulos). */
+  rol: string;
+  /** Párrafo explicando qué hace y para qué sirve. */
+  texto: string;
+}
+
+/** Partícula(s) con mayor cantidad total sumando las 3 capas de un elemento. */
+export function calcularParticulaDominante(
+  elemento: Pick<Elemento, "nucleo" | "media" | "externa">,
+): { particula: ParticleType; cantidad: number }[] {
+  const total: ParticleMap = {};
+  for (const layer of LAYERS) {
+    for (const [tipo, cantidad] of Object.entries(elemento[layer] ?? {})) {
+      if (!cantidad) continue;
+      const k = tipo as ParticleType;
+      total[k] = (total[k] ?? 0) + cantidad;
+    }
+  }
+  const entradas = Object.entries(total) as [ParticleType, number][];
+  if (entradas.length === 0) return [];
+  const max = Math.max(...entradas.map(([, c]) => c));
+  return entradas
+    .filter(([, c]) => c === max)
+    .map(([particula, cantidad]) => ({ particula, cantidad }));
+}
+
+export function generarDescripcionElemento(elemento: Elemento): DescripcionElemento {
+  const perfil: PerfilAtomico = {
+    nucleo: elemento.nucleo ?? {},
+    media: elemento.media ?? {},
+    externa: elemento.externa ?? {},
+  };
+  const balance = calcularBalancePorCapa(perfil);
+  const balanceExterna = balance.find((b) => b.layer === "externa")!;
+  const dominantes = calcularParticulaDominante(elemento);
+  const nombreDominante =
+    dominantes.length === 0
+      ? null
+      : dominantes.length === 1
+        ? dominantes[0].particula
+        : dominantes.map((d) => d.particula).join("/");
+
+  // Rol corto, por familia + si está completo.
+  const completo = balanceExterna.balance === 0;
+  const rolFamilia: Record<ElementFamily, string> = {
+    Sensibles: "sensible a estímulos externos",
+    Reactivos: "propenso a combinarse con otros",
+    Nobles: "estable e inerte",
+    "Base Terrosa": "base estructural, poco reactiva",
+    Puente: "conecta y equilibra otras familias",
+  };
+  const rol = elemento.es_noble
+    ? "Noble — inerte y estable"
+    : `${elemento.familia} — ${rolFamilia[elemento.familia]}`;
+
+  // Párrafo largo, combinando familia + capa externa + dominante.
+  const partesTexto: string[] = [];
+
+  if (elemento.es_noble) {
+    partesTexto.push(
+      `Elemento Noble: su capa externa está completa (${balanceExterna.total}/${balanceExterna.capacidad}), por lo que es raro y resistente a interferencia — no necesita combinarse con otros para estabilizarse.`,
+    );
+  } else if (completo) {
+    partesTexto.push(
+      `Su capa externa está completa (${balanceExterna.total}/${balanceExterna.capacidad}) pero no es Noble — estable por sí solo, aunque puede seguir participando en compuestos.`,
+    );
+  } else if (balanceExterna.balance < 0) {
+    partesTexto.push(
+      `Capa externa incompleta (${balanceExterna.total}/${balanceExterna.capacidad}): le faltan ${-balanceExterna.balance} partículas para estabilizarse — tiende a combinarse con elementos que se las aporten.`,
+    );
+  } else {
+    partesTexto.push(
+      `Capa externa sobrecargada (${balanceExterna.total}/${balanceExterna.capacidad}): tiene partículas de sobra — útil para completar compuestos con déficit en esa capa.`,
+    );
+  }
+
+  if (nombreDominante) {
+    partesTexto.push(
+      `Predominan las partículas de ${nombreDominante}, lo que marca su especialidad dentro de la familia ${elemento.familia}.`,
+    );
+  }
+
+  if (elemento.estado) {
+    partesTexto.push(`Se manifiesta naturalmente como ${elemento.estado} (${ESTADO_EQUIVALENTE_REAL[elemento.estado]}).`);
+  }
+
+  return { rol, texto: partesTexto.join(" ") };
+}
+
+// ─── Afinidad entre dos Elementos sueltos ──────────────────────────────────
+// Misma lógica que calcularAfinidad para Compuestos, pero comparando
+// directamente las capas de dos elementos — útil antes de armar un
+// compuesto, para saber qué pareja de elementos tiene sentido combinar.
+export function calcularAfinidadElementos(
+  a: Elemento,
+  b: Elemento,
+): ResultadoAfinidad {
+  const compuestoA: Compuesto = {
+    id: a.id,
+    nombre: a.nombre,
+    componentes: [{ elemento_id: a.id, cantidad: 1 }],
+  };
+  const compuestoB: Compuesto = {
+    id: b.id,
+    nombre: b.nombre,
+    componentes: [{ elemento_id: b.id, cantidad: 1 }],
+  };
+  return calcularAfinidad(compuestoA, compuestoB, [a, b]);
+}
+
+/**
+ * Ordena una lista de elementos por afinidad descendente respecto de uno
+ * de referencia — misma idea que ordenarPorAfinidad pero para Elementos.
+ */
+export function ordenarElementosPorAfinidad(
+  referencia: Elemento,
+  candidatos: Elemento[],
+): { elemento: Elemento; afinidad: ResultadoAfinidad }[] {
+  const orden: Record<string, number> = { complementa: 0, estable: 1, compite: 2, saturado: 3 };
+  return candidatos
+    .filter((e) => e.id !== referencia.id)
+    .map((e) => ({ elemento: e, afinidad: calcularAfinidadElementos(referencia, e) }))
+    .sort((x, y) => orden[x.afinidad.tipo] - orden[y.afinidad.tipo]);
 }
 
 // ─── Laboratorio: combinar dos compuestos en uno nuevo ─────────────────────
