@@ -391,11 +391,19 @@ export function CriaturasJerarquica({
       })
     : ecosistemas;
 
+  // Un ecosistema "tiene contenido" si tiene al menos una criatura, una
+  // flora o un mineral asociado — antes solo se miraba criaturasDe(e.id),
+  // por lo que un ecosistema con solo flora/minerales (sin criaturas)
+  // caía en "vacío" y se mostraba como chip sin poder ver sus plantas o
+  // minerales hasta que se le agregara una criatura. Bug corregido acá.
+  const tieneContenido = (e: Ecosistema) =>
+    criaturasDe(e.id).length > 0 || floraDe(e.id).length > 0 || mineralesDe(e.id).length > 0;
+
   const ecosistemasOrdenados = [...ecosistemasVisibles].sort(
     (a, b) => criaturasDe(b.id).length - criaturasDe(a.id).length,
   );
-  const ecosistemasConCriaturas = ecosistemasOrdenados.filter((e) => criaturasDe(e.id).length > 0);
-  const ecosistemasVacios = ecosistemasOrdenados.filter((e) => criaturasDe(e.id).length === 0);
+  const ecosistemasConCriaturas = ecosistemasOrdenados.filter(tieneContenido);
+  const ecosistemasVacios = ecosistemasOrdenados.filter((e) => !tieneContenido(e));
 
   // Criaturas sin ecosistema (o cuyo ecosistema quedó fuera de la base) —
   // se muestran con el mismo patrón "solo criatura" que antes.
@@ -446,7 +454,10 @@ export function CriaturasJerarquica({
 
   // Simula el flex-wrap real del contenido de la card de ecosistema (grid
   // de cada criatura) dentro del ancho fijo de columna, para estimar la
-  // altura total de la card sin medir el DOM.
+  // altura total de la card sin medir el DOM. También suma el bloque de
+  // chips de flora/minerales cuando existe (antes se ignoraba, así que un
+  // ecosistema con solo flora/minerales medía altura 0 de contenido y
+  // rompía el layout masonry).
   const altoEcosistema = (ecosistema: Ecosistema) => {
     const conteos = criaturasDe(ecosistema.id).map((c) => totalDe(c)).sort((a, b) => b - a);
     const disponible = anchoColumnaMasonry - 32; // px-3 a ambos lados aprox
@@ -472,7 +483,19 @@ export function CriaturasJerarquica({
     const paddingContenido = 24;
     const alturaFilas = filas.reduce((sum, fila) => sum + Math.max(...fila.map(altoCriaturaCard)), 0);
     const gapEntreFilas = gapInterno * Math.max(filas.length - 1, 0);
-    return alturaBarraTitulo + paddingContenido + alturaFilas + gapEntreFilas;
+
+    // Estimación simple del bloque de chips de flora/minerales: una fila
+    // de ~24px por cada tanda de ~4 chips que entren en el ancho disponible.
+    const totalChips = floraDe(ecosistema.id).length + mineralesDe(ecosistema.id).length;
+    let alturaChips = 0;
+    if (totalChips > 0) {
+      const chipsPorFila = Math.max(1, Math.floor(disponible / 90));
+      const filasChips = Math.ceil(totalChips / chipsPorFila);
+      const gapFilasChips = filas.length > 0 ? 6 : 0;
+      alturaChips = gapFilasChips + filasChips * 24 + (filasChips - 1) * 6;
+    }
+
+    return alturaBarraTitulo + paddingContenido + alturaFilas + gapEntreFilas + alturaChips;
   };
 
   function distribuirEnColumnas(list: Ecosistema[]): Ecosistema[][] {
