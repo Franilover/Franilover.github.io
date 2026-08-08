@@ -24,7 +24,7 @@
  *      componentes (elemento_id + cantidad).
  */
 
-import { Dna, Leaf, Salad, Atom } from "lucide-react";
+import { Dna, Leaf, Salad } from "lucide-react";
 
 import type { ComponenteCompuesto } from "@/domains/garlia/elementos/types";
 
@@ -181,7 +181,7 @@ export type PerfilAtomicoCriaturaInput = Partial<
 
 // ─── Sub-tabs de Biología ───────────────────────────────────────────────────
 
-export type SeccionBiologia = "cladistica" | "ecosistemas" | "perfiles";
+export type SeccionBiologia = "cladistica" | "ecosistemas";
 
 export const SECCIONES_BIOLOGIA: {
   key: SeccionBiologia;
@@ -190,7 +190,6 @@ export const SECCIONES_BIOLOGIA: {
 }[] = [
   { key: "cladistica", label: "Cladística", Icon: Dna },
   { key: "ecosistemas", label: "Ecosistemas", Icon: Leaf },
-  { key: "perfiles", label: "Perfiles", Icon: Atom },
 ];
 
 export const CADENA_ICON = Salad;

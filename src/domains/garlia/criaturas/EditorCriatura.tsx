@@ -73,6 +73,10 @@ import { useCriaturaAsideCatalogs } from "@/domains/garlia/criaturas/useCriatura
 import { useMembresiaSubsistemaCriatura } from "@/domains/garlia/criaturas/useMembresiaSubsistemaCriatura";
 import { usePersonajesDeCriatura } from "@/domains/garlia/criaturas/usePersonajesDeCriatura";
 import { useMembresiaGruposCriatura } from "@/domains/garlia/grupos/useMembresiaGruposCriatura";
+import { PanelPerfilCriatura } from "@/domains/garlia/biologia/PerfilAtomicoCriaturaPanel";
+import { usePerfilesAtomicosCriatura } from "@/domains/garlia/biologia/useBiologia";
+import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import { useOris } from "@/domains/garlia/fisica/useFisica";
 import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete } from "@/lib/utils/dexieHelpers";
 
@@ -107,7 +111,7 @@ export function EditorCriatura({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [showModalDnd, setShowModalDnd] = useState(false);
   const [panelActivo, setPanelActivo] = useState<
-    "clasificacion" | "ilustraciones" | null
+    "clasificacion" | "ilustraciones" | "perfilAtomico" | null
   >(null);
   const { confirm, ConfirmModal } = useConfirm();
   const { onWikilink } = useWikilink();
@@ -134,6 +138,21 @@ export function EditorCriatura({
     saving: savingPersonajes,
     toggle: togglePersonaje,
   } = usePersonajesDeCriatura(form.id, item.nombre);
+
+  // ── Perfil atómico (Biología) ────────────────────────────────────────────
+  // Mismo panel que antes vivía en su propia sub-tab de Biología —
+  // reusado tal cual acá para manejar todo desde el editor de criatura.
+  const { items: elementosPerfil, loading: loadingElementosPerfil } = useElementos();
+  const { items: orisPerfil, loading: loadingOrisPerfil } = useOris();
+  const {
+    loading: loadingPerfilesAtomicos,
+    obtenerOCrear: obtenerOCrearPerfil,
+    actualizar: actualizarPerfil,
+  } = usePerfilesAtomicosCriatura();
+  const orisDisponiblesPerfil = useMemo(
+    () => (orisPerfil ?? []).map((o) => ({ id: o.id, nombre: o.nombre })),
+    [orisPerfil],
+  );
 
   // ── Catálogos del aside ────────────────────────────────────────────────────
   const { allPersonajes, allReinos, allCiudades } = useCriaturaAsideCatalogs();
@@ -335,6 +354,24 @@ export function EditorCriatura({
           </button>
 
           <button
+            className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
+              panelActivo === "perfilAtomico"
+                ? "border-primary/40 text-primary bg-primary/8"
+                : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+            }`}
+            title="Perfil atómico"
+            type="button"
+            onClick={() =>
+              setPanelActivo((p) =>
+                p === "perfilAtomico" ? null : "perfilAtomico",
+              )
+            }
+          >
+            <Atom size={11} />
+            <span className="hidden md:inline">Perfil atómico</span>
+          </button>
+
+          <button
             className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
             title="Reglas D&D 2024"
             type="button"
@@ -436,7 +473,9 @@ export function EditorCriatura({
                   <p className="text-[7.5px] font-black uppercase tracking-[0.28em] text-primary/25">
                     {panelActivo === "clasificacion"
                       ? "Clasificación"
-                      : "Ilustraciones"}
+                      : panelActivo === "ilustraciones"
+                        ? "Ilustraciones"
+                        : "Perfil atómico"}
                   </p>
                   <button
                     className="text-primary/25 hover:text-primary transition-colors"
@@ -498,7 +537,7 @@ export function EditorCriatura({
                       />
                     </div>
                   </div>
-                ) : (
+                ) : panelActivo === "ilustraciones" ? (
                   <div className="flex flex-col gap-2">
                     <p className="text-micro text-primary/35 leading-relaxed px-0.5">
                       Referencias visuales de la criatura (concept art, poses,
@@ -517,6 +556,26 @@ export function EditorCriatura({
                         }
                       />
                     </div>
+                  </div>
+                ) : (
+                  <div className="max-h-[70vh] overflow-y-auto pr-0.5">
+                    {loadingElementosPerfil ||
+                    loadingOrisPerfil ||
+                    loadingPerfilesAtomicos ? (
+                      <div className="py-4 text-xs text-primary/30 text-center">
+                        Cargando…
+                      </div>
+                    ) : (
+                      <PanelPerfilCriatura
+                        key={form.id}
+                        actualizar={actualizarPerfil}
+                        criaturaId={form.id}
+                        criaturaNombre={form.nombre}
+                        elementos={elementosPerfil}
+                        obtenerOCrear={obtenerOCrearPerfil}
+                        orisDisponibles={orisDisponiblesPerfil}
+                      />
+                    )}
                   </div>
                 )}
               </div>

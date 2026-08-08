@@ -8,11 +8,16 @@
  *   - Cladística: cladograma (grupos monofiléticos por sinapomorfía, sin
  *     rangos linneanos fijos) + criaturas.
  *   - Ecosistemas: biomas + cadenas alimenticias.
- *   - Perfiles: perfil atómico de criatura (reusa afinidad.ts de Elementos)
- *     + vínculo con Oris de Física.
+ *
+ * El perfil atómico de criatura (reusa afinidad.ts de Elementos + vínculo
+ * con Oris de Física) se edita ahora desde el propio EditorCriatura.tsx
+ * (botón "Perfil atómico" en el header, mismo patrón que Clasificación/
+ * Ilustraciones) — ya no tiene sub-tab acá, para no duplicar el punto de
+ * entrada. PanelPerfilCriatura sigue viviendo en PerfilAtomicoCriaturaPanel.tsx
+ * y se importa desde ahí.
  *
  * 100% self-contained (trae sus propios datos de Supabase, como Física) y
- * NO toca EditorCriatura.tsx — solo referencia criaturas por id.
+ * NO toca EditorCriatura.tsx salvo por ese import puntual del panel.
  */
 
 import { Download } from "lucide-react";
@@ -20,7 +25,6 @@ import React, { useState } from "react";
 
 import { CladisticaPage } from "./CladisticaPage";
 import { EcosistemasPage } from "./EcosistemasPage";
-import { PerfilesAtomicosPage } from "./PerfilAtomicoCriaturaPanel";
 import { SECCIONES_BIOLOGIA, type SeccionBiologia } from "./types";
 import {
   useCadenasAlimenticias,
@@ -96,9 +100,11 @@ function SelectorSeccionBiologia({
 export function BiologiaPage({ onSelectCriatura }: Props) {
   const [seccion, setSeccion] = useState<SeccionBiologia>("cladistica");
 
-  // Traídos acá solo para armar el JSON de descarga — Cladística,
-  // Ecosistemas y Perfiles siguen manejando sus propios datos
-  // internamente (self-contained), esto no les saca esa responsabilidad.
+  // Traídos acá solo para armar el JSON de descarga — Cladística y
+  // Ecosistemas siguen manejando sus propios datos internamente
+  // (self-contained), esto no les saca esa responsabilidad. Los perfiles
+  // se editan ahora desde EditorCriatura, pero siguen incluidos en la
+  // descarga porque son datos de Biología igual.
   const { clados } = useClados();
   const { ecosistemas } = useEcosistemas();
   const { cadenas } = useCadenasAlimenticias();
@@ -124,7 +130,6 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
 
       {seccion === "cladistica" && <CladisticaPage onSelectCriatura={onSelectCriatura} />}
       {seccion === "ecosistemas" && <EcosistemasPage onSelectCriatura={onSelectCriatura} />}
-      {seccion === "perfiles" && <PerfilesAtomicosPage />}
     </div>
   );
 }

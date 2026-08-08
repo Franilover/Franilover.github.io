@@ -290,7 +290,7 @@ function RasgoEvolutivoRow({
 
 // ─── Panel de una criatura individual ───────────────────────────────────────
 
-function PanelPerfilCriatura({
+export function PanelPerfilCriatura({
   criaturaId,
   criaturaNombre,
   elementos,
