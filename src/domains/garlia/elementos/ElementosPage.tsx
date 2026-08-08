@@ -24,7 +24,7 @@ import {
   useInfoTablaQuimica,
   type SeccionInfoTablaQuimica,
 } from "./useInfoTablaQuimica";
-import { formatLayer, type Compuesto, type Elemento } from "./types";
+import { formatLayer, ELEMENT_FAMILIES, type Compuesto, type Elemento, type ElementFamily } from "./types";
 
 // ─── Descarga: todos los elementos de la Tabla Química en un solo JSON ─────
 // Incluye también el contenido del modal de info y los compuestos
@@ -404,6 +404,15 @@ export function ElementosPage({
     [elementos, activoId],
   );
 
+  const [filtroFamilia, setFiltroFamilia] = useState<ElementFamily | "todas">("todas");
+  const elementosFiltrados = useMemo(
+    () =>
+      filtroFamilia === "todas"
+        ? elementos
+        : elementos.filter((el) => el.familia === filtroFamilia),
+    [elementos, filtroFamilia],
+  );
+
   if (subTab === "compuestos") {
     return (
       <div className="flex-1 min-h-0 flex flex-col">
@@ -432,9 +441,6 @@ export function ElementosPage({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-primary/40">
             <Atom size={12} />
-            <p className="text-micro font-black uppercase tracking-widest">
-              Tabla Química · {elementos.length} elementos
-            </p>
             <InfoTablaQuimica
               info={infoTabla}
               loading={loadingInfoTabla}
@@ -442,6 +448,19 @@ export function ElementosPage({
             />
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
+            <select
+              value={filtroFamilia}
+              onChange={(e) => setFiltroFamilia(e.target.value as ElementFamily | "todas")}
+              title="Filtrar por familia"
+              className="bg-primary/5 rounded-md pl-2 pr-1 py-1 text-micro font-black uppercase tracking-wide text-primary/60 outline-none border border-primary/15 hover:border-primary/35 focus:border-primary/40 transition-all cursor-pointer"
+            >
+              <option value="todas">Todas las familias</option>
+              {ELEMENT_FAMILIES.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={() => descargarDatosElementos(elementos, infoTabla.secciones, compuestos)}
@@ -471,12 +490,16 @@ export function ElementosPage({
           <div className="py-6 text-micro text-primary/25 text-center">
             Todavía no hay elementos cargados.
           </div>
+        ) : elementosFiltrados.length === 0 ? (
+          <div className="py-6 text-micro text-primary/25 text-center">
+            Ningún elemento en la familia "{filtroFamilia}".
+          </div>
         ) : (
           <div
             className="grid gap-1"
             style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
           >
-            {elementos.map((el) => (
+            {elementosFiltrados.map((el) => (
               <ElementoCasilla
                 key={el.id}
                 elemento={el}
