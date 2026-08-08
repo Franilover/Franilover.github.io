@@ -28,7 +28,7 @@
  * Las entidades sin vínculo caen en el bloque final global "Sin criatura".
  */
 
-import { Plus, Users } from "lucide-react";
+import { Leaf, Plus, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -64,6 +64,11 @@ interface Props {
   onCreateCriatura?: () => void;
   onCreatePersonaje?: (criatura: Criatura | null) => void;
   creatingCriatura?: boolean;
+  /** Crea un ecosistema nuevo — botón junto a "Añadir criatura", para
+   *  manejar ecosistemas sin salir de esta vista (antes solo se podían
+   *  crear desde Magia → Biología). */
+  onCreateEcosistema?: () => void;
+  creatingEcosistema?: boolean;
   /** Grupos de tipo "criaturas" agrupados por subtipo, para los dropdowns
    *  de la barra superior — filtran qué criaturas se muestran. */
   gruposCriaturasPorSubtipo?: GrupoFiltroSubtipo[];
@@ -137,6 +142,8 @@ export function CriaturasJerarquica({
   onCreateCriatura,
   onCreatePersonaje,
   creatingCriatura,
+  onCreateEcosistema,
+  creatingEcosistema,
   gruposCriaturasPorSubtipo,
   grupoSeleccionadoId,
   onSeleccionarGrupo,
@@ -386,6 +393,17 @@ export function CriaturasJerarquica({
           >
             <Plus size={11} />
             Añadir criatura
+          </button>
+        )}
+        {onCreateEcosistema && (
+          <button
+            type="button"
+            onClick={onCreateEcosistema}
+            disabled={creatingEcosistema}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors text-micro font-bold uppercase tracking-wide text-accent disabled:opacity-50"
+          >
+            <Leaf size={11} />
+            Añadir ecosistema
           </button>
         )}
       </div>

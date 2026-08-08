@@ -101,7 +101,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
     useSupabaseData<Criatura>("criaturas");
   const { data: items, loading: loadingI, addRow: addItem } =
     useSupabaseData<Item>("items");
-  const { ecosistemas, loading: loadingEco } = useEcosistemas();
+  const { ecosistemas, loading: loadingEco, creating: creatingEco, crear: crearEcosistema } = useEcosistemas();
 
   // ── Geografía ──────────────────────────────────────────────────────────
   const { data: reinos, loading: loadingR, addRow: addReino } =
@@ -841,6 +841,11 @@ export function EntidadesPage({ section, selectedId }: Props) {
           onCreateCriatura={async () => {
             const { data } = await addCriatura({ nombre: "Nueva criatura" });
             if (data?.id) openEntity("criaturas", data.id);
+          }}
+          creatingEcosistema={creatingEco}
+          onCreateEcosistema={async () => {
+            const nuevo = await crearEcosistema("Nuevo ecosistema");
+            if (nuevo?.id) openEntity("ecosistemas", nuevo.id);
           }}
           onCreatePersonaje={async (criatura) => {
             const { data } = await addPersonaje({
