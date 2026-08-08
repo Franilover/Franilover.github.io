@@ -232,13 +232,16 @@ function PanelPerfilCriatura({
   criaturaNombre,
   elementos,
   orisDisponibles,
+  obtenerOCrear,
+  actualizar,
 }: {
   criaturaId: string;
   criaturaNombre: string;
   elementos: Elemento[];
   orisDisponibles: { id: string; nombre: string }[];
+  obtenerOCrear: ReturnType<typeof usePerfilesAtomicosCriatura>["obtenerOCrear"];
+  actualizar: ReturnType<typeof usePerfilesAtomicosCriatura>["actualizar"];
 }) {
-  const { perfiles, obtenerOCrear, actualizar } = usePerfilesAtomicosCriatura();
   const [perfilId, setPerfilId] = useState<string | null>(null);
   const [componentes, setComponentes] = useState<ComponenteCompuesto[]>([]);
   const [orisIds, setOrisIds] = useState<string[]>([]);
@@ -445,6 +448,12 @@ export function PerfilesAtomicosPage() {
   const { items: elementos, loading: loadingElementos } = useElementos();
   const { items: oris, loading: loadingOris } = useOris();
   const { criaturas: catalogo, loading: loadingCatalogo } = useCriaturasCatalogoMin();
+  // Cargado una sola vez acá arriba (no adentro de PanelPerfilCriatura) para
+  // que cambiar de criatura no dispare un select("*") completo de la tabla
+  // perfiles_atomicos_criatura cada vez — con esto el cambio es instantáneo,
+  // ya que obtenerOCrear reusa lo que ya está en memoria.
+  const { loading: loadingPerfiles, obtenerOCrear, actualizar } =
+    usePerfilesAtomicosCriatura();
   const [criaturaId, setCriaturaId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -507,7 +516,7 @@ export function PerfilesAtomicosPage() {
       </div>
 
       <div className="flex-1 min-w-0">
-        {loadingElementos || loadingOris ? (
+        {loadingElementos || loadingOris || loadingPerfiles ? (
           <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
         ) : criaturaSeleccionada ? (
           <PanelPerfilCriatura
@@ -516,6 +525,8 @@ export function PerfilesAtomicosPage() {
             criaturaNombre={criaturaSeleccionada.nombre}
             elementos={elementos}
             orisDisponibles={orisDisponibles}
+            obtenerOCrear={obtenerOCrear}
+            actualizar={actualizar}
           />
         ) : (
           <div className="rounded-2xl border border-dashed border-primary/15 p-6 text-center">
