@@ -62,6 +62,11 @@ interface Props {
   ciudades: Ciudad[];
   personajes: Personaje[];
   loading?: boolean;
+  /** Si es false, oculta las grillas de personajes dentro de cada ciudad
+   *  (y el bloque "Sin ciudad") — deja ver solo la estructura de
+   *  Reino → Ciudad, controlado por el toggle de EntidadesPage. Por
+   *  defecto true (comportamiento previo). */
+  mostrarPersonajes?: boolean;
   onOpen: (section: SectionKey, id: string) => void;
   onCreateReino?: () => void;
   onCreateCiudad?: (reinoId: string | null) => void;
@@ -144,6 +149,7 @@ export function GeografiaJerarquica({
   ciudades,
   personajes,
   loading,
+  mostrarPersonajes = true,
   onOpen,
   onCreateReino,
   onCreateCiudad,
@@ -372,6 +378,30 @@ export function GeografiaJerarquica({
     anchoMaxDisponible?: number;
   }) => {
     const vacia = habitantes.length === 0;
+
+    if (!mostrarPersonajes) {
+      // Vista colapsada: solo el chip de la ciudad + contador, sin grilla
+      // de personajes — el toggle "Mostrar personajes" está apagado.
+      return (
+        <div key={key} className="w-fit shrink-0">
+          <div className="flex items-center gap-1">
+            <NodoTitulo
+              label={nombre}
+              variant="ciudad"
+              maxWidthPx={160}
+              onClick={onClick}
+              onCreate={onCreate}
+            />
+            {!vacia && (
+              <span className="text-micro font-bold text-primary/30 shrink-0">
+                {habitantes.length}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     const itemSize = 52;
     const gapPx = 4;
     const maxColsPorAncho = anchoMaxDisponible
@@ -553,12 +583,12 @@ export function GeografiaJerarquica({
           ))}
         </div>
 
-        {(personajesSinCiudad.length > 0 || reinosVacios.length > 0) && (
+        {((mostrarPersonajes && personajesSinCiudad.length > 0) || reinosVacios.length > 0) && (
           <div>
             <div className="h-px mb-3 bg-primary/10" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* Columna izquierda: Personajes sin ciudad */}
-              {personajesSinCiudad.length > 0 ? (
+              {mostrarPersonajes && personajesSinCiudad.length > 0 ? (
                 <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
                   <div className="px-3 py-3 flex items-center gap-2">
                     <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
@@ -632,7 +662,7 @@ export function GeografiaJerarquica({
 
         {reinosConCiudadesBase.length === 0 &&
           reinosVacios.length === 0 &&
-          personajesSinCiudad.length === 0 && (
+          (!mostrarPersonajes || personajesSinCiudad.length === 0) && (
             <div className="py-6 text-xs text-primary/25 text-center">
               Sin reinos todavía
             </div>

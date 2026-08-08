@@ -60,6 +60,11 @@ interface Props {
    *  Criatura → Personajes), opcional para no romper usos previos. */
   ecosistemas?: Ecosistema[];
   loading?: boolean;
+  /** Si es false, oculta las grillas de personajes dentro de cada criatura
+   *  (y el bloque "Sin criatura") — deja ver solo la estructura de
+   *  Ecosistema → Criatura, controlado por el toggle de EntidadesPage.
+   *  Por defecto true (comportamiento previo). */
+  mostrarPersonajes?: boolean;
   onOpen: (section: SectionKey, id: string) => void;
   onCreateCriatura?: () => void;
   onCreatePersonaje?: (criatura: Criatura | null) => void;
@@ -138,6 +143,7 @@ export function CriaturasJerarquica({
   personajes,
   ecosistemas = [],
   loading,
+  mostrarPersonajes = true,
   onOpen,
   onCreateCriatura,
   onCreatePersonaje,
@@ -315,6 +321,30 @@ export function CriaturasJerarquica({
   const renderCriaturaCard = (criatura: Criatura, anchoMaxDisponible?: number) => {
     const habitantes = personajesDe(criatura.nombre);
     const vacia = habitantes.length === 0;
+
+    if (!mostrarPersonajes) {
+      // Vista colapsada: solo el chip de la criatura + contador, sin grilla
+      // de personajes — el toggle "Mostrar personajes" está apagado.
+      return (
+        <div key={criatura.id} className="w-fit shrink-0">
+          <div className="flex items-center gap-1">
+            <NodoTitulo
+              label={criatura.nombre}
+              variant="criatura"
+              maxWidthPx={160}
+              onClick={() => onOpen("criaturas", criatura.id)}
+              onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
+            />
+            {!vacia && (
+              <span className="text-micro font-bold text-primary/30 shrink-0">
+                {habitantes.length}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     const maxCols = anchoMaxDisponible
       ? Math.max(1, Math.floor((anchoMaxDisponible + gapPx) / (itemSize + gapPx)))
       : 6;
@@ -459,12 +489,12 @@ export function CriaturasJerarquica({
           </div>
         )}
 
-        {(totalSinCriatura > 0 || criaturasVacias.length > 0 || ecosistemasVacios.length > 0) && (
+        {((mostrarPersonajes && totalSinCriatura > 0) || criaturasVacias.length > 0 || ecosistemasVacios.length > 0) && (
           <div>
             <div className="h-px mb-3 bg-primary/10" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {/* Columna izquierda: Personajes sin criatura */}
-              {totalSinCriatura > 0 ? (
+              {mostrarPersonajes && totalSinCriatura > 0 ? (
                 <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
                   <div className="px-3 py-3 flex items-center gap-2">
                     <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
@@ -577,7 +607,7 @@ export function CriaturasJerarquica({
           criaturasConVinculosBase.length === 0 &&
           criaturasVacias.length === 0 &&
           ecosistemasVacios.length === 0 &&
-          totalSinCriatura === 0 && (
+          (!mostrarPersonajes || totalSinCriatura === 0) && (
             <div className="py-6 text-xs text-primary/25 text-center">
               Sin criaturas todavía
             </div>

@@ -18,7 +18,7 @@
  * muestra sin lógica extra acá.
  */
 
-import { Music, Plus, StickyNote } from "lucide-react";
+import { Eye, EyeOff, Music, Plus, StickyNote } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
@@ -268,6 +268,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
   // cambiarla, los dropdowns de filtro por grupo debajo cambian a los
   // correspondientes (Reinos vs Criaturas) — ver más abajo.
   const [agrupacionPersonajes, setAgrupacionPersonajes] = useState<AgrupacionPersonajes>("reino");
+  // Toggle "mostrar personajes" — al apagarlo, ambas vistas jerárquicas
+  // ocultan la grilla de personajes y solo muestran la estructura de
+  // arriba (Reino/Ciudad o Ecosistema/Criatura), para una vista más limpia.
+  const [mostrarPersonajes, setMostrarPersonajes] = useState(true);
 
   const [grupoPersonajeSeleccionadoId, setGrupoPersonajeSeleccionadoId] = useState<string | null>(null);
   const [grupoCriaturaSeleccionadoId, setGrupoCriaturaSeleccionadoId] = useState<string | null>(null);
@@ -820,7 +824,22 @@ export function EntidadesPage({ section, selectedId }: Props) {
   // Reino (GeografiaJerarquica) o por Criatura (CriaturasJerarquica), y los
   // dropdowns de filtro por grupo debajo cambian según cuál esté activa.
   const agrupacionSelector = (
-    <AgrupacionPersonajesDropdown value={agrupacionPersonajes} onChange={setAgrupacionPersonajes} />
+    <div className="flex items-center gap-1.5">
+      <AgrupacionPersonajesDropdown value={agrupacionPersonajes} onChange={setAgrupacionPersonajes} />
+      <button
+        type="button"
+        onClick={() => setMostrarPersonajes((v) => !v)}
+        title={mostrarPersonajes ? "Ocultar personajes" : "Mostrar personajes"}
+        aria-pressed={mostrarPersonajes}
+        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-colors ${
+          mostrarPersonajes
+            ? "bg-accent/10 border-accent/20 text-accent/80"
+            : "bg-primary/[0.04] border-primary/10 text-primary/40 hover:bg-primary/10"
+        }`}
+      >
+        {mostrarPersonajes ? <Eye size={12} /> : <EyeOff size={12} />}
+      </button>
+    </div>
   );
 
   return (
@@ -830,6 +849,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           criaturas={criaturas}
           personajes={personajes}
           ecosistemas={ecosistemas}
+          mostrarPersonajes={mostrarPersonajes}
           loading={loadingC || loadingP || loadingEco}
           gruposCriaturasPorSubtipo={gruposCriaturasPorSubtipo}
           grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
@@ -861,6 +881,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           reinos={reinos}
           ciudades={ciudades}
           personajes={personajes}
+          mostrarPersonajes={mostrarPersonajes}
           loading={loadingR || loadingCd || loadingP}
           onOpen={(section, id) => openEntity(section, id)}
           gruposPersonajesPorSubtipo={gruposPersonajesPorSubtipo}
