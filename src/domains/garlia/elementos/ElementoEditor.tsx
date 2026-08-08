@@ -26,12 +26,10 @@ import {
 import {
   AFINIDAD_LABEL,
   ELEMENT_FAMILIES,
-  ESTADOS_ELEMENTO,
   LAYER_LABEL,
   PARTICLE_TYPES,
   type Elemento,
   type ElementFamily,
-  type EstadoElemento,
   type LayerName,
   type ParticleMap,
   type TipoAfinidad,
@@ -163,7 +161,6 @@ export function ElementoEditor({
                 nombre: local.nombre,
                 simbolo: local.simbolo,
                 familia: local.familia,
-                estado: local.estado,
                 es_noble: local.es_noble,
                 es_catalizador: local.es_catalizador,
                 notas: local.notas,
@@ -222,28 +219,6 @@ export function ElementoEditor({
 
           <div className="flex flex-col gap-0.5">
             <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Estado
-            </label>
-            <select
-              value={local.estado ?? ""}
-              onChange={(e) => {
-                const estado = (e.target.value || null) as EstadoElemento | null;
-                setLocal((p) => ({ ...p, estado }));
-                persist({ estado });
-              }}
-              className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
-            >
-              <option value="">—</option>
-              {ESTADOS_ELEMENTO.map((e) => (
-                <option key={e} value={e}>
-                  {e}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-0.5">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
               Noble
             </label>
             <button
@@ -289,7 +264,7 @@ export function ElementoEditor({
         </div>
 
         {/* Descripción auto-generada: se recalcula sola a partir de
-            familia + capas + estado, sin campo manual que mantener. */}
+            familia + capas, sin campo manual que mantener. */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between">
             <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">

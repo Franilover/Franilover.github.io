@@ -89,28 +89,6 @@ export const FAMILY_ICON: Record<ElementFamily, React.ElementType> = {
   Puente: Atom,
 };
 
-// ─── Estado (manifestación natural) ────────────────────────────────────────
-// Los 4 "estados de la materia" del sistema — mismo espíritu que
-// sólido/líquido/gaseoso/plasma del mundo real, ya mencionados como texto
-// en la info de la Tabla Química. Ahora es un campo real del elemento, para
-// poder calcular afinidad/reactividad entre compuestos (ver afinidad.ts).
-export type EstadoElemento = "Cristalio" | "Fluxio" | "Nebulio" | "Plasmio";
-
-export const ESTADOS_ELEMENTO: EstadoElemento[] = [
-  "Cristalio",
-  "Fluxio",
-  "Nebulio",
-  "Plasmio",
-];
-
-/** Equivalente real de cada estado, para mostrar en la UI. */
-export const ESTADO_EQUIVALENTE_REAL: Record<EstadoElemento, string> = {
-  Cristalio: "Sólido",
-  Fluxio: "Líquido",
-  Nebulio: "Gaseoso",
-  Plasmio: "Plasma/Energético",
-};
-
 /** Fila cruda tal cual vive en Supabase (tabla "elementos"). */
 export interface Elemento {
   id: string;
@@ -119,8 +97,6 @@ export interface Elemento {
   simbolo: string;
   familia: ElementFamily;
   es_noble: boolean;
-  /** Manifestación natural — opcional por compatibilidad con filas viejas. */
-  estado?: EstadoElemento | null;
   notas?: string | null;
   nucleo: ParticleMap;
   media: ParticleMap;
@@ -137,7 +113,7 @@ export interface Elemento {
 export const CONFIG = {
   tabla: "elementos",
   select:
-    "id, numero_atomico, nombre, simbolo, familia, es_noble, estado, notas, nucleo, media, externa, es_catalizador",
+    "id, numero_atomico, nombre, simbolo, familia, es_noble, notas, nucleo, media, externa, es_catalizador",
 };
 
 // ─── Compuestos: combinaciones de elementos de la Tabla Química ───────────

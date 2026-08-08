@@ -26,7 +26,6 @@
 
 import {
   CAPACIDAD_CAPA,
-  ESTADO_EQUIVALENTE_REAL,
   type ComponenteCompuesto,
   type Compuesto,
   type Elemento,
@@ -336,10 +335,10 @@ export function encontrarCompuestoDuplicado(
 }
 
 // ─── Descripción auto-generada de un Elemento ──────────────────────────────
-// Lee directamente familia + capas + es_noble/estado y arma un texto en
-// lenguaje natural — no hay campo manual que mantener, se recalcula solo
-// si se editan las capas. Misma idea que la afinidad: sale de la
-// estructura real, no de una regla aparte.
+// Lee directamente familia + capas + es_noble y arma un texto en lenguaje
+// natural — no hay campo manual que mantener, se recalcula solo si se
+// editan las capas. Misma idea que la afinidad: sale de la estructura
+// real, no de una regla aparte.
 export interface DescripcionElemento {
   /** Frase corta tipo "rol" (para badges/subtítulos). */
   rol: string;
@@ -421,10 +420,6 @@ export function generarDescripcionElemento(elemento: Elemento): DescripcionEleme
     partesTexto.push(
       `Predominan las partículas de ${nombreDominante}, lo que marca su especialidad dentro de la familia ${elemento.familia}.`,
     );
-  }
-
-  if (elemento.estado) {
-    partesTexto.push(`Se manifiesta naturalmente como ${elemento.estado} (${ESTADO_EQUIVALENTE_REAL[elemento.estado]}).`);
   }
 
   return { rol, texto: partesTexto.join(" ") };
