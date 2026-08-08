@@ -40,6 +40,7 @@ import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UICompon
 
 import { useFlora } from "./useFlora";
 import { type Flora } from "./types";
+import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/SelectorEcosistemasDeEntidad";
 
 const LAYERS: LayerName[] = ["nucleo", "media", "externa"];
 
@@ -290,6 +291,16 @@ export function FloraEditor({
                   </div>
                 </div>
               )}
+
+              {/* Ecosistemas donde crece esta planta — edición inversa de
+                  Ecosistema.flora_ids */}
+              <div className="pt-2 border-t border-primary/10">
+                <SelectorEcosistemasDeEntidad
+                  entidadId={form.id}
+                  campo="flora_ids"
+                  label="Ecosistemas donde crece"
+                />
+              </div>
 
               {/* Notas libres */}
               <div className="space-y-1.5">

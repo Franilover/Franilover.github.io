@@ -40,6 +40,7 @@ import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UICompon
 
 import { useMinerales } from "./useMinerales";
 import { type Mineral } from "./types";
+import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/SelectorEcosistemasDeEntidad";
 
 const LAYERS: LayerName[] = ["nucleo", "media", "externa"];
 
@@ -290,6 +291,16 @@ export function MineralEditor({
                   </div>
                 </div>
               )}
+
+              {/* Ecosistemas donde aparece este mineral — edición inversa de
+                  Ecosistema.mineral_ids */}
+              <div className="pt-2 border-t border-primary/10">
+                <SelectorEcosistemasDeEntidad
+                  entidadId={form.id}
+                  campo="mineral_ids"
+                  label="Ecosistemas donde aparece"
+                />
+              </div>
 
               {/* Notas libres */}
               <div className="space-y-1.5">

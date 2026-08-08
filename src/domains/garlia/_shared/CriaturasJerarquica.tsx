@@ -246,6 +246,20 @@ export function CriaturasJerarquica({
     return minerales.filter((m) => ids.includes(m.id));
   };
 
+  // Flora/Minerales que ningún ecosistema (de la base) lista todavía —
+  // mismo criterio que "criaturas sin ecosistema", para que una entidad
+  // recién creada no desaparezca de la vista hasta asignarle un ecosistema.
+  const floraAsignadaIds = new Set(ecosistemas.flatMap((e) => e.flora_ids ?? []));
+  const mineralesAsignadosIds = new Set(ecosistemas.flatMap((e) => e.mineral_ids ?? []));
+  const floraSinEcosistemaBase = flora.filter((f) => !floraAsignadaIds.has(f.id));
+  const mineralesSinEcosistemaBase = minerales.filter((m) => !mineralesAsignadosIds.has(m.id));
+  const floraSinEcosistema = qCriatura
+    ? floraSinEcosistemaBase.filter((f) => f.nombre?.toLocaleLowerCase("es").includes(qCriatura))
+    : floraSinEcosistemaBase;
+  const mineralesSinEcosistema = qCriatura
+    ? mineralesSinEcosistemaBase.filter((m) => m.nombre?.toLocaleLowerCase("es").includes(qCriatura))
+    : mineralesSinEcosistemaBase;
+
   // Una criatura "tiene ecosistema" si algún ecosistema de la base la lista.
   const criaturaTieneEcosistema = (criaturaId: string) =>
     ecosistemas.some((e) => e.criatura_ids.includes(criaturaId));
@@ -581,6 +595,40 @@ export function CriaturasJerarquica({
           </div>
         )}
 
+        {/* Flora/Minerales sin ecosistema — mismo criterio: una entidad
+            recién creada debe seguir siendo visible/clickeable hasta que se
+            le asigne un ecosistema desde su propio editor. */}
+        {(floraSinEcosistema.length > 0 || mineralesSinEcosistema.length > 0) && (
+          <div>
+            {(hayEcosistemasConCriaturas || criaturasConVinculosBase.length > 0) && (
+              <div className="h-px mb-2 bg-primary/10" />
+            )}
+            <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+              Flora y minerales sin ecosistema
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {floraSinEcosistema.map((f) => (
+                <NodoTitulo
+                  key={f.id}
+                  label={f.nombre}
+                  variant="flora"
+                  maxWidthPx={160}
+                  onClick={() => onOpen("flora", f.id)}
+                />
+              ))}
+              {mineralesSinEcosistema.map((m) => (
+                <NodoTitulo
+                  key={m.id}
+                  label={m.nombre}
+                  variant="mineral"
+                  maxWidthPx={160}
+                  onClick={() => onOpen("minerales", m.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {((mostrarPersonajes && totalSinCriatura > 0) || criaturasVacias.length > 0 || ecosistemasVacios.length > 0) && (
           <div>
             <div className="h-px mb-3 bg-primary/10" />
@@ -699,6 +747,8 @@ export function CriaturasJerarquica({
           criaturasConVinculosBase.length === 0 &&
           criaturasVacias.length === 0 &&
           ecosistemasVacios.length === 0 &&
+          floraSinEcosistema.length === 0 &&
+          mineralesSinEcosistema.length === 0 &&
           (!mostrarPersonajes || totalSinCriatura === 0) && (
             <div className="py-6 text-xs text-primary/25 text-center">
               Sin criaturas todavía
