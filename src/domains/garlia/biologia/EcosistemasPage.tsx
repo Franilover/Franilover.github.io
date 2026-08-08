@@ -230,7 +230,7 @@ function PanelCadena({
 
 // ─── Panel de detalle de ecosistema ──────────────────────────────────────────
 
-function PanelEcosistema({
+export function PanelEcosistema({
   ecosistema,
   cadenas,
   creandoCadena,

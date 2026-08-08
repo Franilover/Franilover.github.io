@@ -27,6 +27,7 @@ import { persist } from "zustand/middleware";
 export type SectionKey =
   | "personajes"
   | "criaturas"
+  | "ecosistemas"
   | "items"
   | "reinos"
   | "ciudades"

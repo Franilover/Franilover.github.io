@@ -37,6 +37,8 @@ import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
+import { EcosistemaEditor } from "@/domains/garlia/biologia/EcosistemaEditor";
+import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import { ItemEditor } from "@/domains/garlia/items/ItemEditor";
 import { PersonajeEditor } from "@garlia/personajes";
 import { ReinoEditor } from "@garlia/reinos";
@@ -99,6 +101,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
     useSupabaseData<Criatura>("criaturas");
   const { data: items, loading: loadingI, addRow: addItem } =
     useSupabaseData<Item>("items");
+  const { ecosistemas, loading: loadingEco } = useEcosistemas();
 
   // ── Geografía ──────────────────────────────────────────────────────────
   const { data: reinos, loading: loadingR, addRow: addReino } =
@@ -392,6 +395,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
     () => (section === "items" ? items.find((i) => i.id === selectedId) : null),
     [section, items, selectedId],
   );
+  const selectedEcosistema = useMemo(
+    () => (section === "ecosistemas" ? ecosistemas.find((e) => e.id === selectedId) ?? null : null),
+    [section, ecosistemas, selectedId],
+  );
   const selectedReino = useMemo(
     () => (section === "reinos" ? reinos.find((r) => r.id === selectedId) : null),
     [section, reinos, selectedId],
@@ -475,7 +482,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   }
 
   const selected =
-    selectedPersonaje ?? selectedCriatura ?? selectedItem ?? selectedReino ?? selectedCiudad ?? null;
+    selectedPersonaje ?? selectedCriatura ?? selectedItem ?? selectedReino ?? selectedCiudad ?? selectedEcosistema ?? null;
 
   if (selected) {
     return (
@@ -485,6 +492,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
         {selectedItem && <ItemEditor item={selectedItem} />}
         {selectedReino && <ReinoEditor reino={selectedReino} />}
         {selectedCiudad && <CiudadEditor ciudad={selectedCiudad} />}
+        {selectedEcosistema && <EcosistemaEditor ecosistema={selectedEcosistema} />}
       </div>
     );
   }
@@ -821,7 +829,8 @@ export function EntidadesPage({ section, selectedId }: Props) {
         <CriaturasJerarquica
           criaturas={criaturas}
           personajes={personajes}
-          loading={loadingC || loadingP}
+          ecosistemas={ecosistemas}
+          loading={loadingC || loadingP || loadingEco}
           gruposCriaturasPorSubtipo={gruposCriaturasPorSubtipo}
           grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
           onSeleccionarGrupo={setGrupoCriaturaSeleccionadoId}

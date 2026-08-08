@@ -38,6 +38,8 @@ export const TABLA_TO_SECTION: Record<string, SectionKey> = {
   grupos_mundo: "grupos",
   runas: "runas",
   elementos: "elementos",
+  ecosistemas: "ecosistemas",
+  ecosistema: "ecosistemas",
   // "libros" es el nombre de tabla que usa GRUPO_TIPO_CONFIG (cfg.tabla) para
   // el tipo de grupo "Libros" — la sección de navegación equivalente es
   // "capitulos" (misma que usa el resto del editor para libros/capítulos).
