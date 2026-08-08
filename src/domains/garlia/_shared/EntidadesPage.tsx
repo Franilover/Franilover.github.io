@@ -952,6 +952,16 @@ export function EntidadesPage({ section, selectedId }: Props) {
             const nuevo = await crearEcosistema("Nuevo ecosistema");
             if (nuevo?.id) openEntity("ecosistemas", nuevo.id);
           }}
+          creatingFlora={creatingFlora}
+          onCreateFlora={async () => {
+            const nueva = await crearFlora("Nueva planta");
+            if (nueva?.id) openEntity("flora", nueva.id);
+          }}
+          creatingMineral={creatingMinerales}
+          onCreateMineral={async () => {
+            const nuevo = await crearMineral("Nuevo mineral");
+            if (nuevo?.id) openEntity("minerales", nuevo.id);
+          }}
           onCreatePersonaje={async (criatura) => {
             const { data } = await addPersonaje({
               nombre: "Nuevo personaje",

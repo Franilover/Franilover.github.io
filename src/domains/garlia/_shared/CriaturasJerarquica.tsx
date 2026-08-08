@@ -28,7 +28,7 @@
  * Las entidades sin vínculo caen en el bloque final global "Sin criatura".
  */
 
-import { Leaf, Plus, Users } from "lucide-react";
+import { Gem, Leaf, Plus, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -74,6 +74,14 @@ interface Props {
    *  crear desde Magia → Biología). */
   onCreateEcosistema?: () => void;
   creatingEcosistema?: boolean;
+  /** Crea una entidad de Flora nueva — botón junto a "Añadir ecosistema",
+   *  misma lógica: no se agrupa jerárquicamente acá, solo un atajo para no
+   *  salir de esta vista para crearla. */
+  onCreateFlora?: () => void;
+  creatingFlora?: boolean;
+  /** Crea una entidad de Mineral nueva — mismo patrón que onCreateFlora. */
+  onCreateMineral?: () => void;
+  creatingMineral?: boolean;
   /** Grupos de tipo "criaturas" agrupados por subtipo, para los dropdowns
    *  de la barra superior — filtran qué criaturas se muestran. */
   gruposCriaturasPorSubtipo?: GrupoFiltroSubtipo[];
@@ -150,6 +158,10 @@ export function CriaturasJerarquica({
   creatingCriatura,
   onCreateEcosistema,
   creatingEcosistema,
+  onCreateFlora,
+  creatingFlora,
+  onCreateMineral,
+  creatingMineral,
   gruposCriaturasPorSubtipo,
   grupoSeleccionadoId,
   onSeleccionarGrupo,
@@ -434,6 +446,28 @@ export function CriaturasJerarquica({
           >
             <Leaf size={11} />
             Añadir ecosistema
+          </button>
+        )}
+        {onCreateFlora && (
+          <button
+            type="button"
+            onClick={onCreateFlora}
+            disabled={creatingFlora}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors text-micro font-bold uppercase tracking-wide text-emerald-600 disabled:opacity-50"
+          >
+            <Leaf size={11} />
+            Añadir flora
+          </button>
+        )}
+        {onCreateMineral && (
+          <button
+            type="button"
+            onClick={onCreateMineral}
+            disabled={creatingMineral}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-micro font-bold uppercase tracking-wide text-primary/70 disabled:opacity-50"
+          >
+            <Gem size={11} />
+            Añadir mineral
           </button>
         )}
       </div>
