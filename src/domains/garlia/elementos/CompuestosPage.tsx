@@ -12,16 +12,34 @@
  * elementos por id con una cantidad cada uno (componentes: jsonb).
  */
 
-import { Beaker, ChevronLeft, Download, Loader2, Plus, Save, Sparkles, Trash2, X } from "lucide-react";
+import {
+  Beaker,
+  ChevronLeft,
+  Combine,
+  Download,
+  Loader2,
+  Plus,
+  Save,
+  Sparkles,
+  Trash2,
+  Wand2,
+  X,
+} from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
 import {
+  autocompletarHastaEstable,
+  calcularAfinidad,
   calcularBalancePorCapa,
   calcularPerfilAtomico,
+  combinarComponentes,
+  encontrarCompuestoDuplicado,
+  generarSimboloCompuesto,
   ordenarPorAfinidad,
+  sugerirElementosParaCompletar,
 } from "./afinidad";
 import {
   AFINIDAD_LABEL,
@@ -76,6 +94,14 @@ interface Props {
   loading?: boolean;
   creating?: boolean;
   onCreate?: () => void;
+  /**
+   * Crea un compuesto ya con componentes definidos (usado por el
+   * Laboratorio al combinar dos compuestos existentes). Opcional: si no se
+   * pasa, el botón "Crear combinación" del laboratorio queda deshabilitado.
+   */
+  onCrearConComponentes?: (
+    datos: Pick<Compuesto, "nombre" | "simbolo" | "componentes">,
+  ) => void;
   onActualizar: (id: string, cambios: Partial<Compuesto>) => void;
   onEliminar?: (id: string) => void;
   seleccionarId?: string | null;
@@ -160,8 +186,10 @@ function CompuestoCasilla({
 
 /**
  * Selector de elementos a combinar: lista de chips clickeables (toggle) con
- * un stepper +/- de cantidad para los ya elegidos. Mismo criterio simple
- * que el resto del panel admin — sin buscador, la tabla es chica (29 max).
+ * un stepper +/- de cantidad para los ya elegidos. Los elementos que más
+ * ayudan a cerrar el déficit actual (sugerirElementosParaCompletar) se
+ * destacan primero y con badge "sugerido" — guía la elección en vez de
+ * dejarla a ciegas, sin ocultar el resto.
  */
 function SelectorElementosCompuesto({
   elementos,
@@ -173,6 +201,15 @@ function SelectorElementosCompuesto({
   onChange: (componentes: ComponenteCompuesto[]) => void;
 }) {
   const idsElegidos = new Set(componentes.map((c) => c.elemento_id));
+
+  const sugerencias = useMemo(
+    () => sugerirElementosParaCompletar(componentes, elementos),
+    [componentes, elementos],
+  );
+  const idsSugeridos = useMemo(
+    () => new Set(sugerencias.slice(0, 3).map((s) => s.elemento.id)),
+    [sugerencias],
+  );
 
   function toggleElemento(id: string) {
     if (idsElegidos.has(id)) {
@@ -189,6 +226,13 @@ function SelectorElementosCompuesto({
       ),
     );
   }
+
+  const disponibles = elementos.filter((el) => !idsElegidos.has(el.id));
+  // Sugeridos primero, después el resto en su orden original.
+  const disponiblesOrdenados = [
+    ...disponibles.filter((el) => idsSugeridos.has(el.id)),
+    ...disponibles.filter((el) => !idsSugeridos.has(el.id)),
+  ];
 
   return (
     <div className="flex flex-col gap-2">
@@ -235,22 +279,33 @@ function SelectorElementosCompuesto({
         </div>
       )}
 
-      {/* Disponibles para agregar */}
+      {/* Disponibles para agregar — los que más cierran el déficit actual
+          van primero, marcados con un puntito. */}
       <div className="flex flex-wrap gap-1">
-        {elementos
-          .filter((el) => !idsElegidos.has(el.id))
-          .map((el) => (
+        {disponiblesOrdenados.map((el) => {
+          const sugerido = idsSugeridos.has(el.id);
+          return (
             <button
               key={el.id}
               type="button"
               onClick={() => toggleElemento(el.id)}
-              title={`Agregar ${el.nombre}`}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-bold border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+              title={
+                sugerido
+                  ? `${el.nombre} — completa parte del déficit actual`
+                  : `Agregar ${el.nombre}`
+              }
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-bold border transition-all cursor-pointer ${
+                sugerido
+                  ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/15"
+                  : "border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+              }`}
             >
+              {sugerido && <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />}
               <span className="font-black">{el.simbolo || "??"}</span>
               <span className="truncate max-w-[80px]">{el.nombre}</span>
             </button>
-          ))}
+          );
+        })}
         {elementos.length === 0 && (
           <p className="text-micro text-primary/25">
             Todavía no hay elementos en la Tabla Química para combinar.
@@ -403,6 +458,31 @@ function CompuestoEditor({
     }
   }
 
+  // Auto-completar hasta estable: agrega, en orden greedy, los elementos
+  // que más déficit cierran con menos desperdicio (ver afinidad.ts) hasta
+  // que las 3 capas queden en 0 o ya no haya candidatos que ayuden.
+  function handleAutoCompletar() {
+    const nuevosComponentes = autocompletarHastaEstable(local.componentes ?? [], elementos);
+    setLocal((p) => ({ ...p, componentes: nuevosComponentes }));
+    persist({ componentes: nuevosComponentes });
+  }
+
+  // Símbolo auto-generado a partir de los símbolos de los elementos
+  // componentes (ej. 2× Fluxio + 1× Cristalio → "Fl2Cr"). Editable después.
+  function handleAutoGenerarSimbolo() {
+    const simbolo = generarSimboloCompuesto(local.componentes ?? [], elementos);
+    setLocal((p) => ({ ...p, simbolo }));
+    persist({ simbolo });
+  }
+
+  // Aviso de duplicado: misma combinación exacta de elementos+cantidades
+  // ya existe en otro compuesto del catálogo.
+  const duplicadoDe = useMemo(
+    () =>
+      encontrarCompuestoDuplicado(local.componentes ?? [], todosLosCompuestos, compuesto.id),
+    [local.componentes, todosLosCompuestos, compuesto.id],
+  );
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <ConfirmModal />
@@ -431,9 +511,19 @@ function CompuestoEditor({
           onChange={(e) => setLocal((p) => ({ ...p, simbolo: e.target.value }))}
           onBlur={() => persist({ simbolo: local.simbolo })}
           placeholder="Sm"
-          maxLength={4}
-          className="shrink-0 w-12 text-center bg-primary/5 rounded-md px-1 py-0.5 text-micro font-black text-primary outline-none placeholder:text-primary/25 border border-primary/10"
+          maxLength={6}
+          className="shrink-0 w-14 text-center bg-primary/5 rounded-md px-1 py-0.5 text-micro font-black text-primary outline-none placeholder:text-primary/25 border border-primary/10"
         />
+
+        <button
+          type="button"
+          onClick={handleAutoGenerarSimbolo}
+          disabled={(local.componentes?.length ?? 0) === 0}
+          title="Auto-generar símbolo a partir de los elementos"
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <Wand2 size={11} />
+        </button>
 
         <div className="shrink-0 flex items-center gap-1">
           {onEliminar && (
@@ -486,10 +576,31 @@ function CompuestoEditor({
           />
         </div>
 
+        {duplicadoDe && (
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-amber-500/25 bg-amber-500/10 text-amber-600">
+            <span className="text-micro font-bold leading-snug">
+              Misma combinación exacta que "{duplicadoDe.simbolo || "??"} · {duplicadoDe.nombre}" —
+              ¿es a propósito?
+            </span>
+          </div>
+        )}
+
         <div className="flex flex-col gap-1.5">
-          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-            Elementos que lo componen
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+              Elementos que lo componen
+            </p>
+            <button
+              type="button"
+              onClick={handleAutoCompletar}
+              disabled={(elementos.length ?? 0) === 0}
+              title="Agregar automáticamente los elementos que faltan para estabilizar las 3 capas"
+              className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Wand2 size={10} />
+              Auto-completar
+            </button>
+          </div>
           <SelectorElementosCompuesto
             elementos={elementos}
             componentes={local.componentes ?? []}
@@ -523,17 +634,208 @@ function CompuestoEditor({
   );
 }
 
+/**
+ * Laboratorio: combinar dos compuestos existentes en uno nuevo. Muestra la
+ * afinidad entre los dos elegidos (misma lógica que PanelAfinidad) y, si el
+ * usuario confirma, arma un compuesto nuevo con la unión de sus componentes
+ * (combinarComponentes) — punto de partida en vez de armar desde cero.
+ */
+function LaboratorioModal({
+  compuestos,
+  elementos,
+  onCerrar,
+  onCrear,
+}: {
+  compuestos: Compuesto[];
+  elementos: Elemento[];
+  onCerrar: () => void;
+  onCrear?: (datos: Pick<Compuesto, "nombre" | "simbolo" | "componentes">) => void;
+}) {
+  const [idA, setIdA] = useState<string>(compuestos[0]?.id ?? "");
+  const [idB, setIdB] = useState<string>(compuestos[1]?.id ?? "");
+  const [nombreNuevo, setNombreNuevo] = useState("");
+
+  const compA = compuestos.find((c) => c.id === idA) ?? null;
+  const compB = compuestos.find((c) => c.id === idB) ?? null;
+  const mismosElegidos = idA && idB && idA === idB;
+
+  const afinidad = useMemo(
+    () => (compA && compB && !mismosElegidos ? calcularAfinidad(compA, compB, elementos) : null),
+    [compA, compB, mismosElegidos, elementos],
+  );
+
+  const componentesCombinados = useMemo(
+    () => (compA && compB && !mismosElegidos ? combinarComponentes(compA, compB) : []),
+    [compA, compB, mismosElegidos],
+  );
+
+  const simboloSugerido = useMemo(
+    () =>
+      componentesCombinados.length > 0
+        ? generarSimboloCompuesto(componentesCombinados, elementos)
+        : "",
+    [componentesCombinados, elementos],
+  );
+
+  function crear() {
+    if (!compA || !compB || mismosElegidos) return;
+    onCrear?.({
+      nombre: nombreNuevo.trim() || `${compA.nombre} + ${compB.nombre}`,
+      simbolo: simboloSugerido || "??",
+      componentes: componentesCombinados,
+    });
+    onCerrar();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+      <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm" onClick={onCerrar} />
+      <div
+        className="relative z-10 flex flex-col w-full max-w-md max-h-[calc(100vh-2rem)] rounded-[var(--radius-card)] border shadow-2xl overflow-hidden"
+        style={{
+          background: "var(--white-custom, var(--bg-main))",
+          borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
+        }}
+      >
+        <div
+          style={{ background: "var(--bg-main)" }}
+          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+        >
+          <Combine size={12} className="text-primary/40" />
+          <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary/70">
+            Laboratorio · combinar compuestos
+          </p>
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+          >
+            <X size={12} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto">
+          {compuestos.length < 2 ? (
+            <p className="text-micro text-primary/25 text-center py-4">
+              Necesitás al menos 2 compuestos creados para combinar.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                    Compuesto A
+                  </label>
+                  <select
+                    value={idA}
+                    onChange={(e) => setIdA(e.target.value)}
+                    className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+                  >
+                    {compuestos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.simbolo || "??"} · {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                    Compuesto B
+                  </label>
+                  <select
+                    value={idB}
+                    onChange={(e) => setIdB(e.target.value)}
+                    className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+                  >
+                    {compuestos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.simbolo || "??"} · {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {mismosElegidos ? (
+                <p className="text-micro text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-1.5">
+                  Elegí dos compuestos distintos.
+                </p>
+              ) : (
+                afinidad && (
+                  <div
+                    className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${AFINIDAD_COLOR[afinidad.tipo]}`}
+                  >
+                    <span className="text-micro font-black uppercase tracking-wide">
+                      {AFINIDAD_LABEL[afinidad.tipo]}
+                    </span>
+                    <p className="text-micro opacity-80 leading-snug">{afinidad.motivo}</p>
+                  </div>
+                )
+              )}
+
+              {!mismosElegidos && componentesCombinados.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                    Nombre del nuevo compuesto
+                  </label>
+                  <input
+                    value={nombreNuevo}
+                    onChange={(e) => setNombreNuevo(e.target.value)}
+                    placeholder={compA && compB ? `${compA.nombre} + ${compB.nombre}` : ""}
+                    className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25 placeholder:font-normal"
+                  />
+                  <p className="text-micro text-primary/40">
+                    Símbolo sugerido: <span className="font-black text-primary/70">{simboloSugerido}</span> ·{" "}
+                    {componentesCombinados.length} elemento(s) combinados
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {compuestos.length >= 2 && (
+          <div
+            style={{ background: "var(--bg-main)" }}
+            className="shrink-0 flex items-center justify-end gap-1.5 px-2.5 py-1.5 border-t border-primary/10"
+          >
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={crear}
+              disabled={!onCrear || mismosElegidos || componentesCombinados.length === 0}
+              title={!onCrear ? "No disponible" : undefined}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <Combine size={10} />
+              Crear combinación
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CompuestosPage({
   compuestos,
   elementos,
   loading,
   creating,
   onCreate,
+  onCrearConComponentes,
   onActualizar,
   onEliminar,
   seleccionarId,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [laboratorioAbierto, setLaboratorioAbierto] = useState(false);
 
   const activoId = seleccionadoId ?? seleccionarId ?? null;
   const activo = useMemo(
@@ -552,6 +854,17 @@ export function CompuestosPage({
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={compuestos.length < 2}
+              onClick={() => setLaboratorioAbierto(true)}
+              title="Combinar dos compuestos existentes en uno nuevo"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <Combine size={10} />
+              <span className="hidden sm:inline">Laboratorio</span>
+            </button>
+
             <button
               type="button"
               disabled={compuestos.length === 0}
@@ -639,6 +952,15 @@ export function CompuestosPage({
             />
           </div>
         </>
+      )}
+
+      {laboratorioAbierto && (
+        <LaboratorioModal
+          compuestos={compuestos}
+          elementos={elementos}
+          onCerrar={() => setLaboratorioAbierto(false)}
+          onCrear={onCrearConComponentes}
+        />
       )}
     </div>
   );

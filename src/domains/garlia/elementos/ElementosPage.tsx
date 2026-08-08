@@ -398,6 +398,28 @@ export function ElementosPage({
     }
   }
 
+  // Laboratorio: crea un compuesto ya con componentes definidos (unión de
+  // los de dos compuestos existentes) — usado por CompuestosPage.
+  async function handleCrearCompuestoConComponentes(
+    datos: Pick<Compuesto, "nombre" | "simbolo" | "componentes">,
+  ) {
+    setCreatingCompuesto(true);
+    try {
+      const { data, error } = await supabase
+        .from("compuestos")
+        .insert([datos])
+        .select()
+        .single();
+      if (error) throw error;
+      setCompuestos((prev) => [...prev, data as Compuesto]);
+      setCompuestoRecienCreadoId((data as Compuesto).id);
+    } catch (e) {
+      console.error("[ElementosPage] error creando compuesto combinado:", e);
+    } finally {
+      setCreatingCompuesto(false);
+    }
+  }
+
   const activoId = seleccionadoId ?? seleccionarId ?? null;
   const activo = useMemo(
     () => elementos.find((e) => e.id === activoId) ?? null,
@@ -423,6 +445,7 @@ export function ElementosPage({
           loading={loadingCompuestos}
           creating={creatingCompuesto}
           onCreate={handleCreateCompuesto}
+          onCrearConComponentes={handleCrearCompuestoConComponentes}
           onActualizar={(id, cambios) =>
             setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
           }

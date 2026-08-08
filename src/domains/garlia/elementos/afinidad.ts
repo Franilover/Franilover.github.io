@@ -26,6 +26,7 @@
 
 import {
   CAPACIDAD_CAPA,
+  type ComponenteCompuesto,
   type Compuesto,
   type Elemento,
   type LayerName,
@@ -193,4 +194,156 @@ export function ordenarPorAfinidad(
     .filter((c) => c.id !== referencia.id)
     .map((c) => ({ compuesto: c, afinidad: calcularAfinidad(referencia, c, elementos) }))
     .sort((x, y) => orden[x.afinidad.tipo] - orden[y.afinidad.tipo]);
+}
+
+// ─── Sugerencias en vivo: "qué elemento agregar para reducir el déficit" ───
+// Mientras se arma un compuesto, para cada elemento candidato calculamos
+// cuánto de su aporte por capa efectivamente se "usaría" (no cuenta lo que
+// se pasa de la capacidad, evita sugerir elementos que sobrecargan). El
+// mejor candidato es el que cubre más déficit total con menos desperdicio.
+export interface SugerenciaElemento {
+  elemento: Elemento;
+  /** Cuánto déficit total cubriría si se agrega una unidad de este elemento. */
+  cubre: number;
+  /** Cuánto excedente generaría (partículas que ya no caben en ninguna capa). */
+  desperdicia: number;
+}
+
+export function sugerirElementosParaCompletar(
+  componentesActuales: ComponenteCompuesto[],
+  elementos: Elemento[],
+): SugerenciaElemento[] {
+  const compuestoParcial: Compuesto = {
+    id: "__preview__",
+    nombre: "",
+    componentes: componentesActuales,
+  };
+  const perfilActual = calcularPerfilAtomico(compuestoParcial, elementos);
+  const balanceActual = calcularBalancePorCapa(perfilActual);
+  const idsElegidos = new Set(componentesActuales.map((c) => c.elemento_id));
+
+  const candidatos: SugerenciaElemento[] = [];
+
+  for (const elemento of elementos) {
+    if (idsElegidos.has(elemento.id)) continue; // ya está en la mezcla
+
+    let cubre = 0;
+    let desperdicia = 0;
+
+    for (const layer of LAYERS) {
+      const aporte = Object.values(elemento[layer] ?? {}).reduce((a, b) => a + (b ?? 0), 0);
+      if (!aporte) continue;
+      const balActual = balanceActual.find((b) => b.layer === layer)!;
+
+      if (balActual.balance < 0) {
+        // Esta capa tiene déficit: el aporte primero lo cubre, el resto se desperdicia/pasa a superávit.
+        const cubierto = Math.min(aporte, -balActual.balance);
+        cubre += cubierto;
+        desperdicia += aporte - cubierto;
+      } else {
+        // Ya está saturada o en superávit: todo lo que aporte acá es excedente.
+        desperdicia += aporte;
+      }
+    }
+
+    if (cubre > 0) {
+      candidatos.push({ elemento, cubre, desperdicia });
+    }
+  }
+
+  return candidatos.sort((a, b) => b.cubre - a.cubre || a.desperdicia - b.desperdicia);
+}
+
+// ─── Auto-completar hasta estable ──────────────────────────────────────────
+// Greedy simple: en cada paso agrega el elemento que más déficit cubre con
+// menos desperdicio, hasta que las 3 capas queden en 0 (o no haya más
+// candidatos que ayuden — evita loop infinito si ningún elemento cierra
+// exactamente el hueco restante).
+export function autocompletarHastaEstable(
+  componentesActuales: ComponenteCompuesto[],
+  elementos: Elemento[],
+  maxIteraciones = 12,
+): ComponenteCompuesto[] {
+  let componentes = componentesActuales.map((c) => ({ ...c }));
+
+  for (let i = 0; i < maxIteraciones; i++) {
+    const compuestoParcial: Compuesto = { id: "__preview__", nombre: "", componentes };
+    const perfil = calcularPerfilAtomico(compuestoParcial, elementos);
+    const balance = calcularBalancePorCapa(perfil);
+    const estable = balance.every((b) => b.balance >= 0);
+    if (estable) break; // ya no hay déficit — puede quedar superávit, pero eso es válido
+
+    const sugerencias = sugerirElementosParaCompletar(componentes, elementos);
+    if (sugerencias.length === 0) break; // nada más puede ayudar, no seguimos
+
+    const mejor = sugerencias[0];
+    const existente = componentes.find((c) => c.elemento_id === mejor.elemento.id);
+    if (existente) {
+      existente.cantidad += 1;
+    } else {
+      componentes = [...componentes, { elemento_id: mejor.elemento.id, cantidad: 1 }];
+    }
+  }
+
+  return componentes;
+}
+
+// ─── Símbolo auto-generado ─────────────────────────────────────────────────
+// Concatena los símbolos de los elementos componentes (orden de agregado),
+// igual que una fórmula química simple (H2O, CO2). Si un elemento se repite
+// más de una vez, agrega el subíndice de cantidad.
+export function generarSimboloCompuesto(
+  componentes: ComponenteCompuesto[],
+  elementos: Elemento[],
+): string {
+  const partes = componentes.map((c) => {
+    const el = elementos.find((e) => e.id === c.elemento_id);
+    const simbolo = el?.simbolo?.trim() || "?";
+    return c.cantidad > 1 ? `${simbolo}${c.cantidad}` : simbolo;
+  });
+  return partes.join("") || "??";
+}
+
+// ─── Detección de duplicados ───────────────────────────────────────────────
+// Dos compuestos son "la misma combinación" si tienen exactamente los
+// mismos elementos con las mismas cantidades (sin importar el orden).
+function firmaComponentes(componentes: ComponenteCompuesto[]): string {
+  return componentes
+    .filter((c) => c.cantidad > 0)
+    .map((c) => `${c.elemento_id}:${c.cantidad}`)
+    .sort()
+    .join("|");
+}
+
+export function encontrarCompuestoDuplicado(
+  componentes: ComponenteCompuesto[],
+  todosLosCompuestos: Compuesto[],
+  excluirId?: string,
+): Compuesto | null {
+  if (componentes.filter((c) => c.cantidad > 0).length === 0) return null;
+  const firma = firmaComponentes(componentes);
+  return (
+    todosLosCompuestos.find(
+      (c) => c.id !== excluirId && firmaComponentes(c.componentes ?? []) === firma,
+    ) ?? null
+  );
+}
+
+// ─── Laboratorio: combinar dos compuestos en uno nuevo ─────────────────────
+// Une los componentes de dos compuestos existentes (sumando cantidades si
+// comparten algún elemento) — punto de partida para un tercer compuesto,
+// en vez de armarlo desde cero. Pensado para usarse solo cuando la afinidad
+// entre ambos es "complementa" (ver calcularAfinidad).
+export function combinarComponentes(
+  a: Compuesto,
+  b: Compuesto,
+): ComponenteCompuesto[] {
+  const mapa = new Map<string, number>();
+  for (const c of [...(a.componentes ?? []), ...(b.componentes ?? [])]) {
+    mapa.set(c.elemento_id, (mapa.get(c.elemento_id) ?? 0) + c.cantidad);
+  }
+  return Array.from(mapa.entries()).map(([elemento_id, cantidad]) => ({
+    elemento_id,
+    cantidad,
+  }));
 }
