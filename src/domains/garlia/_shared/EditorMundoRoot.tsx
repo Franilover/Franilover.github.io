@@ -94,6 +94,7 @@ function ActiveSection() {
     case "personajes":
     case "criaturas":
     case "ecosistemas":
+    case "biomas":
     case "flora":
     case "minerales":
     case "items":
@@ -132,8 +133,16 @@ function ActiveSection() {
       return <LineaTiempoSection />;
     case "aventura":
       return <AventuraSection />;
-    default:
+    default: {
+      // Chequeo de exhaustividad: si TypeScript se queja acá de que
+      // `section` no es `never`, significa que se agregó un SectionKey
+      // nuevo sin sumar su case arriba — mismo bug que causó que "biomas"
+      // abriera la pestaña pero renderizara en blanco (caía silenciosamente
+      // acá, sin error de build).
+      const _exhaustive: never = section;
+      void _exhaustive;
       return null;
+    }
   }
 }
 
