@@ -3,13 +3,15 @@
 /**
  * useEntidadesDeCriatura.ts
  * ───────────────────────────
- * Trae los Ítems vinculados DIRECTAMENTE a una criatura mediante la columna
- * `criatura_id` (relación de origen/pertenencia, 1 criatura → N items).
- * Distinto de las relaciones many-to-many que ya existen — acá la criatura
- * es el "dueño"/origen del item, no una simple asignación.
- *
- * Se usa para armar el agrupador visual "Criatura → Items" dentro del editor
- * de Criatura.
+ * Trae las entidades vinculadas a una criatura para el agrupador visual
+ * "Criatura → Entidades" del editor de Criatura:
+ *   - Ítems: vínculo DIRECTO vía columna `criatura_id` (1 criatura → N items;
+ *     acá la criatura es el "dueño"/origen del item).
+ *   - Flora / Minerales: NO tienen columna directa a criatura_id — viven en
+ *     `Ecosistema.flora_ids` / `Ecosistema.mineral_ids` (jsonb). Se muestran
+ *     acá, al mismo nivel que Items, la Flora/Minerales de todo Ecosistema
+ *     cuyo `criatura_ids` incluya a esta criatura (solo lectura — la edición
+ *     del vínculo vive en PanelEcosistema).
  *
  * Ruta destino:
  *   src/features/editorGarlia/hooks/criaturas/useEntidadesDeCriatura.ts
@@ -27,9 +29,11 @@ export type EntidadDeCriaturaMin = {
 
 type Grupos = {
   items: EntidadDeCriaturaMin[];
+  flora: EntidadDeCriaturaMin[];
+  minerales: EntidadDeCriaturaMin[];
 };
 
-const EMPTY: Grupos = { items: [] };
+const EMPTY: Grupos = { items: [], flora: [], minerales: [] };
 
 export function useEntidadesDeCriatura(criaturaId: string) {
   const [grupos, setGrupos] = useState<Grupos>(EMPTY);
@@ -43,13 +47,39 @@ export function useEntidadesDeCriatura(criaturaId: string) {
     }
     setLoading(true);
     try {
-      const { data: items } = await supabase
-        .from("items")
-        .select("id, nombre, imagen_url")
-        .eq("criatura_id", criaturaId)
-        .order("nombre");
+      const [{ data: items }, { data: ecosistemas }] = await Promise.all([
+        supabase
+          .from("items")
+          .select("id, nombre, imagen_url")
+          .eq("criatura_id", criaturaId)
+          .order("nombre"),
+        // criatura_ids es jsonb array — contains busca por pertenencia.
+        supabase
+          .from("ecosistemas")
+          .select("flora_ids, mineral_ids")
+          .contains("criatura_ids", JSON.stringify([criaturaId])),
+      ]);
+
+      const floraIds = Array.from(
+        new Set((ecosistemas ?? []).flatMap((e: any) => (e.flora_ids ?? []) as string[])),
+      );
+      const mineralIds = Array.from(
+        new Set((ecosistemas ?? []).flatMap((e: any) => (e.mineral_ids ?? []) as string[])),
+      );
+
+      const [{ data: flora }, { data: minerales }] = await Promise.all([
+        floraIds.length
+          ? supabase.from("flora").select("id, nombre, imagen_url").in("id", floraIds).order("nombre")
+          : Promise.resolve({ data: [] as EntidadDeCriaturaMin[] }),
+        mineralIds.length
+          ? supabase.from("minerales").select("id, nombre, imagen_url").in("id", mineralIds).order("nombre")
+          : Promise.resolve({ data: [] as EntidadDeCriaturaMin[] }),
+      ]);
+
       setGrupos({
         items: (items ?? []) as EntidadDeCriaturaMin[],
+        flora: (flora ?? []) as EntidadDeCriaturaMin[],
+        minerales: (minerales ?? []) as EntidadDeCriaturaMin[],
       });
     } finally {
       setLoading(false);
@@ -60,7 +90,7 @@ export function useEntidadesDeCriatura(criaturaId: string) {
     void load();
   }, [load]);
 
-  const total = grupos.items.length;
+  const total = grupos.items.length + grupos.flora.length + grupos.minerales.length;
 
   return { grupos, total, loading, reload: load };
 }

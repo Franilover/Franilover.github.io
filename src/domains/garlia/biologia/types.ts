@@ -66,13 +66,20 @@ export interface Ecosistema {
   clima: string;
   descripcion: string;
   criatura_ids: string[];
+  /** Flora (por id) que crece/habita en este ecosistema. */
+  flora_ids: string[];
+  /** Minerales (por id) presentes como recursos de este ecosistema. */
+  mineral_ids: string[];
   orden: number;
   created_at: string;
   updated_at: string;
 }
 
 export type EcosistemaInput = Partial<
-  Pick<Ecosistema, "nombre" | "bioma" | "clima" | "descripcion" | "criatura_ids" | "orden">
+  Pick<
+    Ecosistema,
+    "nombre" | "bioma" | "clima" | "descripcion" | "criatura_ids" | "flora_ids" | "mineral_ids" | "orden"
+  >
 >;
 
 // ─── Cadenas alimenticias ───────────────────────────────────────────────────
@@ -105,6 +112,8 @@ export interface EslabonTrofico {
   id: string;
   rol: RolTrofico;
   criatura_ids: string[];
+  /** Flora (por id) que ocupa este eslabón — típicamente rol "productor". */
+  flora_ids?: string[];
   nota?: string;
 }
 

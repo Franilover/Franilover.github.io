@@ -114,7 +114,9 @@ export function useEcosistemas() {
     setCreating(true);
     const { data, error } = await supabase
       .from("ecosistemas")
-      .insert([{ nombre, bioma: "", clima: "", descripcion: "", criatura_ids: [] }])
+      .insert([
+        { nombre, bioma: "", clima: "", descripcion: "", criatura_ids: [], flora_ids: [], mineral_ids: [] },
+      ])
       .select()
       .single();
     setCreating(false);

@@ -17,6 +17,9 @@ import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
 
+import { SelectorFloraMulti } from "@/domains/garlia/flora/SelectorFloraMulti";
+import { SelectorMineralesMulti } from "@/domains/garlia/minerales/SelectorMineralesMulti";
+
 import { SelectorCriaturasMulti } from "./SelectorCriaturasMulti";
 import {
   ROL_TROFICO_LABEL,
@@ -75,6 +78,16 @@ function EditorEslabon({
         compacto
         label="Criaturas en este rol"
       />
+      {eslabon.rol === "productor" && (
+        <div className="mt-2">
+          <SelectorFloraMulti
+            ids={eslabon.flora_ids ?? []}
+            onChange={(ids) => onChange({ flora_ids: ids })}
+            compacto
+            label="Flora en este rol"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -116,6 +129,7 @@ function PanelCadena({
       id: crypto.randomUUID(),
       rol: "productor",
       criatura_ids: [],
+      flora_ids: [],
     };
     const next = [...eslabones, nuevo];
     setEslabones(next);
@@ -314,6 +328,22 @@ export function PanelEcosistema({
           onChange={(ids) => onSave({ criatura_ids: ids })}
           onSelectCriatura={onSelectCriatura}
           label="Criaturas que lo habitan"
+        />
+      </div>
+
+      <div className="mb-4">
+        <SelectorFloraMulti
+          ids={ecosistema.flora_ids ?? []}
+          onChange={(ids) => onSave({ flora_ids: ids })}
+          label="Flora del ecosistema"
+        />
+      </div>
+
+      <div className="mb-4">
+        <SelectorMineralesMulti
+          ids={ecosistema.mineral_ids ?? []}
+          onChange={(ids) => onSave({ mineral_ids: ids })}
+          label="Minerales del ecosistema"
         />
       </div>
 
