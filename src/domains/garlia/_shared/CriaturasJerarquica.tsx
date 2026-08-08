@@ -78,10 +78,12 @@ interface Props {
   /** Catálogo mínimo de Minerales — mismo propósito que `flora`. */
   minerales?: EntidadMin[];
   loading?: boolean;
-  /** Si es false, oculta las grillas de personajes dentro de cada criatura
-   *  (y el bloque "Sin criatura") — deja ver solo la estructura de
-   *  Ecosistema → Criatura, controlado por el toggle de EntidadesPage.
-   *  Por defecto true (comportamiento previo). */
+  /** Controla el modo de la vista:
+   *  - true (ojo): Personajes agrupados por especie (Criatura), sin
+   *    Ecosistema por encima — vista plana Criatura → Personajes.
+   *  - false (sin ojo): Criaturas, Flora y Minerales agrupados por
+   *    Ecosistema, sin mostrar personajes en ningún lado.
+   *  Por defecto true. */
   mostrarPersonajes?: boolean;
   onOpen: (section: SectionKey, id: string) => void;
   onCreateCriatura?: () => void;
@@ -486,8 +488,6 @@ export function CriaturasJerarquica({
   const criaturasSinEcoOrdenadas = [...criaturasSinEcosistemaVisibles].sort(
     (a, b) => totalDe(b) - totalDe(a),
   );
-  const criaturasConVinculosBase = criaturasSinEcoOrdenadas.filter((c) => totalDe(c) > 0);
-  const criaturasVacias = criaturasSinEcoOrdenadas.filter((c) => totalDe(c) === 0);
 
   // ── Layout masonry (columnas de igual ancho) para los ecosistemas ─────────
   const GAP = 24;
@@ -638,6 +638,21 @@ export function CriaturasJerarquica({
     );
   };
 
+  // ── Vista "por especie" (ojo ON): todas las criaturas con sus personajes,
+  // sin agrupar por ecosistema. Se recorren todas las criaturas de la base
+  // (con o sin personajes) ordenadas por cantidad de habitantes.
+  const criaturasPorEspecieOrdenadas = [...criaturasBase]
+    .filter((c) => {
+      if (!qCriatura) return true;
+      return (
+        c.nombre?.toLocaleLowerCase("es").includes(qCriatura) ||
+        personajesDe(c.nombre).some((p) => p.nombre?.toLocaleLowerCase("es").includes(qCriatura))
+      );
+    })
+    .sort((a, b) => totalDe(b) - totalDe(a));
+  const criaturasPorEspecieConPersonajes = criaturasPorEspecieOrdenadas.filter((c) => totalDe(c) > 0);
+  const criaturasPorEspecieVacias = criaturasPorEspecieOrdenadas.filter((c) => totalDe(c) === 0);
+
   const criaturasNombres = new Set(criaturasBase.map((c) => c.nombre));
   const personajesSinCriaturaBase = personajes.filter(
     (p) => !p.especie || !criaturasNombres.has(p.especie)
@@ -678,229 +693,238 @@ export function CriaturasJerarquica({
         />
       </div>
 
-      <div className="flex flex-col gap-8">
-        {/* Nivel 1: Ecosistemas con sus criaturas adentro. El ref de medida
-            vive siempre acá (aunque no haya ecosistemas con contenido) para
-            no perder el ancho ya calculado del contenedor. */}
-        <div ref={containerRef} className="flex items-start gap-6 empty:hidden">
-          {hayEcosistemasConCriaturas &&
-            columnasEcosistemas.map((columna, colIdx) => (
-              <div
-                key={colIdx}
-                className="flex flex-col gap-6 min-w-0"
-                style={{ width: anchoColumnaMasonry }}
-              >
-                {columna.map((eco) => (
-                  <div
-                    key={eco.id}
-                    className="w-full rounded-lg border border-primary/10 overflow-hidden"
-                  >
+      {mostrarPersonajes ? (
+        // ── Ojo ON: Personajes agrupados por especie (criatura), sin
+        // ecosistema — vista plana, análoga a antes pero sin el nivel
+        // de Ecosistema por encima.
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-wrap gap-6">
+            {criaturasPorEspecieConPersonajes.map((c) => renderCriaturaCard(c))}
+          </div>
+
+          {(totalSinCriatura > 0 || criaturasPorEspecieVacias.length > 0) && (
+            <div>
+              <div className="h-px mb-3 bg-primary/10" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                {totalSinCriatura > 0 ? (
+                  <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
                     <div className="px-3 py-3 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onOpen("ecosistemas", eco.id)}
-                        title={eco.nombre}
-                        className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
-                      >
-                        {eco.nombre}
-                      </button>
-                      <EcosistemaExtrasIcono
-                        items={floraDe(eco.id)}
-                        Icon={Leaf}
-                        label="Flora"
-                        onOpenItem={(id) => onOpen("flora", id)}
-                      />
-                      <EcosistemaExtrasIcono
-                        items={mineralesDe(eco.id)}
-                        Icon={Gem}
-                        label="Minerales"
-                        onOpenItem={(id) => onOpen("minerales", id)}
-                      />
+                      <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+                        Sin criatura
+                      </span>
                     </div>
-                    <div className="px-3 pb-3 flex flex-wrap gap-6">
-                      {criaturasDe(eco.id).map((c) =>
-                        renderCriaturaCard(c, disponibleColumna),
+                    <div className="px-3 pb-3">
+                      {personajesSinCriatura.length === 0 ? (
+                        <div className="text-micro text-primary/25">Sin personajes</div>
+                      ) : (
+                        <div
+                          className="grid gap-1"
+                          style={{
+                            gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))",
+                          }}
+                        >
+                          {personajesSinCriatura.map((p) => (
+                            <EntityCard
+                              key={p.id}
+                              nombre={p.nombre}
+                              imageUrl={p.img_url}
+                              Icon={Users}
+                              onClick={() => onOpen("personajes", p.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {onCreatePersonaje && (
+                        <button
+                          type="button"
+                          onClick={() => onCreatePersonaje(null)}
+                          title="Añadir personaje"
+                          className="mt-2 p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors text-primary/60"
+                        >
+                          <Plus size={9} />
+                        </button>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            ))}
-        </div>
+                ) : (
+                  <div />
+                )}
 
-        {/* Criaturas sin ecosistema (mismo patrón "solo criatura" que antes) */}
-        {criaturasConVinculosBase.length > 0 && (
-          <div>
-            {hayEcosistemasConCriaturas && <div className="h-px mb-2 bg-primary/10" />}
-            <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
-              Sin ecosistema
-            </div>
-            <div className="flex flex-wrap gap-6">
-              {criaturasConVinculosBase.map((c) => renderCriaturaCard(c, disponibleColumna))}
-            </div>
-          </div>
-        )}
-
-        {/* Flora/Minerales sin ecosistema — mismo criterio: una entidad
-            recién creada debe seguir siendo visible/clickeable hasta que se
-            le asigne un ecosistema desde su propio editor. */}
-        {(floraSinEcosistema.length > 0 || mineralesSinEcosistema.length > 0) && (
-          <div>
-            {(hayEcosistemasConCriaturas || criaturasConVinculosBase.length > 0) && (
-              <div className="h-px mb-2 bg-primary/10" />
-            )}
-            <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
-              Flora y minerales sin ecosistema
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {floraSinEcosistema.map((f) => (
-                <NodoTitulo
-                  key={f.id}
-                  label={f.nombre}
-                  variant="flora"
-                  maxWidthPx={160}
-                  onClick={() => onOpen("flora", f.id)}
-                />
-              ))}
-              {mineralesSinEcosistema.map((m) => (
-                <NodoTitulo
-                  key={m.id}
-                  label={m.nombre}
-                  variant="mineral"
-                  maxWidthPx={160}
-                  onClick={() => onOpen("minerales", m.id)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {((mostrarPersonajes && totalSinCriatura > 0) || criaturasVacias.length > 0 || ecosistemasVacios.length > 0) && (
-          <div>
-            <div className="h-px mb-3 bg-primary/10" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              {/* Columna izquierda: Personajes sin criatura */}
-              {mostrarPersonajes && totalSinCriatura > 0 ? (
-                <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
-                  <div className="px-3 py-3 flex items-center gap-2">
-                    <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
-                      Sin criatura
-                    </span>
-                  </div>
-                  <div className="px-3 pb-3">
-                    {personajesSinCriatura.length === 0 ? (
-                      <div className="text-micro text-primary/25">Sin personajes</div>
-                    ) : (
+                {criaturasPorEspecieVacias.length > 0 ? (
+                  <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+                    <div className="px-3 py-3 flex items-center gap-2">
+                      <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+                        Criaturas sin personajes
+                      </span>
+                    </div>
+                    <div className="px-3 pb-3">
                       <div
-                        className="grid gap-1"
+                        className="grid gap-2"
                         style={{
-                          gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))",
+                          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
                         }}
                       >
-                        {personajesSinCriatura.map((p) => (
-                          <EntityCard
-                            key={p.id}
-                            nombre={p.nombre}
-                            imageUrl={p.img_url}
-                            Icon={Users}
-                            onClick={() => onOpen("personajes", p.id)}
+                        {criaturasPorEspecieVacias.map((criatura) => (
+                          <NodoTitulo
+                            key={criatura.id}
+                            fill
+                            variant="criatura"
+                            label={criatura.nombre}
+                            onClick={() => onOpen("criaturas", criatura.id)}
                           />
                         ))}
                       </div>
-                    )}
-                    {onCreatePersonaje && (
-                      <button
-                        type="button"
-                        onClick={() => onCreatePersonaje(null)}
-                        title="Añadir personaje"
-                        className="mt-2 p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors text-primary/60"
-                      >
-                        <Plus size={9} />
-                      </button>
-                    )}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div />
-              )}
-
-              {/* Columna derecha: Ecosistemas sin criaturas + Criaturas sin personajes,
-                  en sub-bloques propios (separados y rotulados) para no confundirse
-                  entre sí ni con los "Sin criatura" de la columna izquierda. */}
-              {criaturasVacias.length > 0 || ecosistemasVacios.length > 0 ? (
-                <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
-                  <div className="px-3 py-3 flex items-center gap-2">
-                    <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
-                      Sin personajes asignados
-                    </span>
-                  </div>
-                  <div className="px-3 pb-3 flex flex-col gap-3">
-                    {ecosistemasVacios.length > 0 && (
-                      <div>
-                        <div className="mb-1.5 text-micro font-bold text-primary/30">
-                          Ecosistemas sin criaturas
-                        </div>
-                        <div
-                          className="grid gap-2"
-                          style={{
-                            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                          }}
-                        >
-                          {ecosistemasVacios.map((eco) => (
-                            <NodoTitulo
-                              key={eco.id}
-                              fill
-                              label={eco.nombre}
-                              onClick={() => onOpen("ecosistemas", eco.id)}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {criaturasVacias.length > 0 && (
-                      <div>
-                        <div className="mb-1.5 text-micro font-bold text-primary/30">
-                          Criaturas sin personajes
-                        </div>
-                        <div
-                          className="grid gap-2"
-                          style={{
-                            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                          }}
-                        >
-                          {criaturasVacias.map((criatura) => (
-                            <NodoTitulo
-                              key={criatura.id}
-                              fill
-                              variant="criatura"
-                              label={criatura.nombre}
-                              onClick={() => onOpen("criaturas", criatura.id)}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div />
-              )}
+                ) : (
+                  <div />
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {!hayEcosistemasConCriaturas &&
-          criaturasConVinculosBase.length === 0 &&
-          criaturasVacias.length === 0 &&
-          ecosistemasVacios.length === 0 &&
-          floraSinEcosistema.length === 0 &&
-          mineralesSinEcosistema.length === 0 &&
-          (!mostrarPersonajes || totalSinCriatura === 0) && (
+          {criaturasPorEspecieOrdenadas.length === 0 && totalSinCriatura === 0 && (
             <div className="py-6 text-xs text-primary/25 text-center">
               Sin criaturas todavía
             </div>
           )}
-      </div>
+        </div>
+      ) : (
+        // ── Ojo OFF: Criaturas, flora y minerales agrupados por ecosistema,
+        // sin personajes — misma jerarquía Ecosistema → Criatura de antes,
+        // pero las cards de criatura nunca muestran la grilla de habitantes.
+        <div className="flex flex-col gap-8">
+          {/* Nivel 1: Ecosistemas con sus criaturas adentro. El ref de medida
+              vive siempre acá (aunque no haya ecosistemas con contenido) para
+              no perder el ancho ya calculado del contenedor. */}
+          <div ref={containerRef} className="flex items-start gap-6 empty:hidden">
+            {hayEcosistemasConCriaturas &&
+              columnasEcosistemas.map((columna, colIdx) => (
+                <div
+                  key={colIdx}
+                  className="flex flex-col gap-6 min-w-0"
+                  style={{ width: anchoColumnaMasonry }}
+                >
+                  {columna.map((eco) => (
+                    <div
+                      key={eco.id}
+                      className="w-full rounded-lg border border-primary/10 overflow-hidden"
+                    >
+                      <div className="px-3 py-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onOpen("ecosistemas", eco.id)}
+                          title={eco.nombre}
+                          className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
+                        >
+                          {eco.nombre}
+                        </button>
+                        <EcosistemaExtrasIcono
+                          items={floraDe(eco.id)}
+                          Icon={Leaf}
+                          label="Flora"
+                          onOpenItem={(id) => onOpen("flora", id)}
+                        />
+                        <EcosistemaExtrasIcono
+                          items={mineralesDe(eco.id)}
+                          Icon={Gem}
+                          label="Minerales"
+                          onOpenItem={(id) => onOpen("minerales", id)}
+                        />
+                      </div>
+                      <div className="px-3 pb-3 flex flex-wrap gap-6">
+                        {criaturasDe(eco.id).map((c) =>
+                          renderCriaturaCard(c, disponibleColumna),
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+          </div>
+
+          {/* Criaturas sin ecosistema (mismo patrón "solo criatura" que antes) */}
+          {criaturasSinEcoOrdenadas.length > 0 && (
+            <div>
+              {hayEcosistemasConCriaturas && <div className="h-px mb-2 bg-primary/10" />}
+              <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                Sin ecosistema
+              </div>
+              <div className="flex flex-wrap gap-6">
+                {criaturasSinEcoOrdenadas.map((c) => renderCriaturaCard(c, disponibleColumna))}
+              </div>
+            </div>
+          )}
+
+          {/* Flora/Minerales sin ecosistema — mismo criterio: una entidad
+              recién creada debe seguir siendo visible/clickeable hasta que se
+              le asigne un ecosistema desde su propio editor. */}
+          {(floraSinEcosistema.length > 0 || mineralesSinEcosistema.length > 0) && (
+            <div>
+              {(hayEcosistemasConCriaturas || criaturasSinEcoOrdenadas.length > 0) && (
+                <div className="h-px mb-2 bg-primary/10" />
+              )}
+              <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                Flora y minerales sin ecosistema
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {floraSinEcosistema.map((f) => (
+                  <NodoTitulo
+                    key={f.id}
+                    label={f.nombre}
+                    variant="flora"
+                    maxWidthPx={160}
+                    onClick={() => onOpen("flora", f.id)}
+                  />
+                ))}
+                {mineralesSinEcosistema.map((m) => (
+                  <NodoTitulo
+                    key={m.id}
+                    label={m.nombre}
+                    variant="mineral"
+                    maxWidthPx={160}
+                    onClick={() => onOpen("minerales", m.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {ecosistemasVacios.length > 0 && (
+            <div>
+              <div className="h-px mb-3 bg-primary/10" />
+              <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                Ecosistemas sin criaturas
+              </div>
+              <div
+                className="grid gap-2"
+                style={{
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                }}
+              >
+                {ecosistemasVacios.map((eco) => (
+                  <NodoTitulo
+                    key={eco.id}
+                    fill
+                    label={eco.nombre}
+                    onClick={() => onOpen("ecosistemas", eco.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!hayEcosistemasConCriaturas &&
+            criaturasSinEcoOrdenadas.length === 0 &&
+            ecosistemasVacios.length === 0 &&
+            floraSinEcosistema.length === 0 &&
+            mineralesSinEcosistema.length === 0 && (
+              <div className="py-6 text-xs text-primary/25 text-center">
+                Sin criaturas todavía
+              </div>
+            )}
+        </div>
+      )}
     </div>
   );
 }

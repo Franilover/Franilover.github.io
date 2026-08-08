@@ -914,7 +914,15 @@ export function EntidadesPage({ section, selectedId }: Props) {
       <button
         type="button"
         onClick={() => setMostrarPersonajes((v) => !v)}
-        title={mostrarPersonajes ? "Ocultar personajes" : "Mostrar personajes"}
+        title={
+          agrupacionPersonajes === "criatura"
+            ? mostrarPersonajes
+              ? "Ver por ecosistema (criaturas, flora y minerales)"
+              : "Ver por especie (personajes agrupados por criatura)"
+            : mostrarPersonajes
+              ? "Ocultar personajes"
+              : "Mostrar personajes"
+        }
         aria-pressed={mostrarPersonajes}
         className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-colors ${
           mostrarPersonajes
