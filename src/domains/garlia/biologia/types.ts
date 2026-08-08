@@ -6,27 +6,60 @@
  * id — mismo criterio que subsistemas_magia.criatura_ids.
  *
  * Piezas:
- *   1. Clado (cladograma) — árbol filogenético SIN rangos fijos (nada de
+ *   1. Bioma — condición única del mundo (ligada a Oris/elementos), M:N con
+ *      Reino. Contiene 0+ Ecosistemas (subzonas geográficas concretas).
+ *   2. Clado (cladograma) — árbol filogenético SIN rangos fijos (nada de
  *      Reino/Filo/Clase). Cada nodo es un grupo monofilético definido por
  *      una sinapomorfía (carácter derivado compartido por todos sus
  *      descendientes) — el criterio real de la cladística moderna, no la
  *      jerarquía linneana. padre_id arma el árbol; profundidad libre.
  *      Cada clado puede tener 0+ criaturas asignadas (típicamente en las
  *      hojas, pero nada lo obliga).
- *   2. Ecosistema — bioma/región con criaturas que lo habitan (multi,
- *      mismo patrón que subsistemas_magia.criatura_ids).
- *   3. Cadena alimenticia — eslabones ordenados, cada uno con un rol
+ *   3. Ecosistema — subzona concreta dentro de un Bioma, con criaturas que
+ *      la habitan (multi, mismo patrón que subsistemas_magia.criatura_ids).
+ *   4. Cadena alimenticia — eslabones ordenados, cada uno con un rol
  *      (productor/herbívoro/carnívoro/omnívoro/descompositor) y 1+
  *      criaturas en ese rol.
- *   4. Perfil atómico de criatura — "compuesto vivo": reusa el motor de
+ *   5. Perfil atómico de criatura — "compuesto vivo": reusa el motor de
  *      afinidad.ts de Elementos tal cual (mismo shape ComponenteCompuesto),
  *      tratando a la criatura como un compuesto con sus propios
  *      componentes (elemento_id + cantidad).
  */
 
-import { Dna, Leaf, Salad } from "lucide-react";
+import { Compass, Dna, Leaf, Salad } from "lucide-react";
 
 import type { ComponenteCompuesto } from "@/domains/garlia/elementos/types";
+
+// ─── Biomas ─────────────────────────────────────────────────────────────────
+// Nivel jerárquico por ENCIMA de Ecosistema: un Bioma es una condición única
+// del mundo (ligada a la física/elementos de Oris), no un tipo climático
+// intercambiable. Puede extenderse por varios Reinos, y un Reino puede tener
+// territorio en varios Biomas — many-to-many en ambos sentidos.
+//
+//   Bioma "Desierto Mágico de Cristal"   ← único, propio del mundo
+//     ↓ reino_ids (M:N)
+//     Ecosistema "Dunas de Khazir"       ← subzona geográfica concreta
+//     Ecosistema "Oasis de Vael"
+//       ↓
+//       Criaturas, Flora, Minerales
+
+/** Fila cruda tal cual vive en Supabase (tabla "biomas"). */
+export interface Bioma {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  /** Afinidad simple con Oris/elementos del mundo (texto libre por ahora). */
+  afinidad: string;
+  /** Reinos (por id) que tienen territorio en este bioma — M:N. */
+  reino_ids: string[];
+  orden: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BiomaInput = Partial<
+  Pick<Bioma, "nombre" | "descripcion" | "afinidad" | "reino_ids" | "orden">
+>;
 
 // ─── Cladística (cladograma / árbol filogenético) ──────────────────────────
 
@@ -62,7 +95,8 @@ export type CladoInput = Partial<
 export interface Ecosistema {
   id: string;
   nombre: string;
-  bioma: string;
+  /** FK a Bioma (biologia/types.ts → Bioma) — null si no está asignado a ninguno. */
+  bioma_id: string | null;
   clima: string;
   descripcion: string;
   criatura_ids: string[];
@@ -78,7 +112,7 @@ export interface Ecosistema {
 export type EcosistemaInput = Partial<
   Pick<
     Ecosistema,
-    "nombre" | "bioma" | "clima" | "descripcion" | "criatura_ids" | "flora_ids" | "mineral_ids" | "orden"
+    "nombre" | "bioma_id" | "clima" | "descripcion" | "criatura_ids" | "flora_ids" | "mineral_ids" | "orden"
   >
 >;
 
@@ -202,3 +236,4 @@ export const SECCIONES_BIOLOGIA: {
 ];
 
 export const CADENA_ICON = Salad;
+export const BIOMA_ICON = Compass;

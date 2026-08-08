@@ -21,6 +21,7 @@ import { SelectorFloraMulti } from "@/domains/garlia/flora/SelectorFloraMulti";
 import { SelectorMineralesMulti } from "@/domains/garlia/minerales/SelectorMineralesMulti";
 
 import { SelectorCriaturasMulti } from "./SelectorCriaturasMulti";
+import { useBiomas } from "./useBiologia";
 import {
   ROL_TROFICO_LABEL,
   ROLES_TROFICOS,
@@ -214,6 +215,7 @@ export function PanelEcosistema({
   onActualizarCadena,
   onEliminarCadena,
   onSelectCriatura,
+  onSelectBioma,
 }: {
   ecosistema: Ecosistema;
   cadenas: CadenaAlimenticia[];
@@ -225,21 +227,22 @@ export function PanelEcosistema({
   onActualizarCadena: (id: string, updates: Partial<CadenaAlimenticia>) => void;
   onEliminarCadena: (id: string) => void;
   onSelectCriatura?: (id: string) => void;
+  /** Abre el editor completo del bioma actualmente seleccionado. */
+  onSelectBioma?: (id: string) => void;
 }) {
+  const { biomas } = useBiomas();
   const [nombre, setNombre] = useState(ecosistema.nombre);
-  const [bioma, setBioma] = useState(ecosistema.bioma ?? "");
   const [clima, setClima] = useState(ecosistema.clima ?? "");
   const [descripcion, setDescripcion] = useState(ecosistema.descripcion ?? "");
 
   useEffect(() => {
     setNombre(ecosistema.nombre);
-    setBioma(ecosistema.bioma ?? "");
     setClima(ecosistema.clima ?? "");
     setDescripcion(ecosistema.descripcion ?? "");
   }, [ecosistema.id]);
 
   const guardar = () => {
-    onSave({ nombre: nombre.trim() || ecosistema.nombre, bioma, clima, descripcion });
+    onSave({ nombre: nombre.trim() || ecosistema.nombre, clima, descripcion });
   };
 
   return (
@@ -285,16 +288,32 @@ export function PanelEcosistema({
 
       <div className="grid grid-cols-2 gap-2 mb-3">
         <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
-            Bioma
-          </span>
-          <input
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+              Bioma
+            </span>
+            {ecosistema.bioma_id && onSelectBioma && (
+              <button
+                type="button"
+                onClick={() => onSelectBioma(ecosistema.bioma_id!)}
+                className="text-micro font-bold text-accent/60 hover:text-accent transition-colors"
+              >
+                Abrir
+              </button>
+            )}
+          </div>
+          <select
             className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
-            placeholder="Ej. selva luminiscente…"
-            value={bioma}
-            onChange={(e) => setBioma(e.target.value)}
-            onBlur={guardar}
-          />
+            value={ecosistema.bioma_id ?? ""}
+            onChange={(e) => onSave({ bioma_id: e.target.value || null })}
+          >
+            <option value="">Sin bioma</option>
+            {biomas.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">

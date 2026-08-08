@@ -4,7 +4,7 @@
  * useBiologia.ts
  * ───────────────────────────────────────────────────────────────────────────
  * CRUD directo (mismo molde simple que useSubsistemasMagia — sin
- * Dexie/offline-sync) para las tablas del módulo Biología: clados,
+ * Dexie/offline-sync) para las tablas del módulo Biología: biomas, clados,
  * ecosistemas, cadenas_alimenticias y perfiles_atomicos_criatura.
  */
 
@@ -13,6 +13,8 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 
 import {
+  type Bioma,
+  type BiomaInput,
   type CadenaAlimenticia,
   type CadenaAlimenticiaInput,
   type Clado,
@@ -22,6 +24,63 @@ import {
   type PerfilAtomicoCriatura,
   type PerfilAtomicoCriaturaInput,
 } from "./types";
+
+// ─── Biomas ─────────────────────────────────────────────────────────────────
+
+export function useBiomas() {
+  const [biomas, setBiomas] = useState<Bioma[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("biomas")
+      .select("*")
+      .order("orden", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (!error && data) setBiomas(data as Bioma[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const crear = useCallback(async (nombre: string) => {
+    setCreating(true);
+    const { data, error } = await supabase
+      .from("biomas")
+      .insert([{ nombre, descripcion: "", afinidad: "", reino_ids: [] }])
+      .select()
+      .single();
+    setCreating(false);
+    if (error || !data) return null;
+    setBiomas((prev) => [...prev, data as Bioma]);
+    return data as Bioma;
+  }, []);
+
+  const actualizar = useCallback(
+    async (id: string, updates: BiomaInput) => {
+      setBiomas((prev) => prev.map((b) => (b.id === id ? { ...b, ...updates } : b)));
+      const { error } = await supabase.from("biomas").update(updates).eq("id", id);
+      if (error) void load();
+    },
+    [load],
+  );
+
+  const eliminar = useCallback(async (id: string) => {
+    // Los ecosistemas que apuntaban a este bioma quedan huérfanos
+    // (bioma_id: null) en vez de borrarse en cascada — mismo criterio
+    // conservador que el borrado de un Clado intermedio.
+    setBiomas((prev) => prev.filter((b) => b.id !== id));
+    await supabase.from("ecosistemas").update({ bioma_id: null }).eq("bioma_id", id);
+    await supabase.from("biomas").delete().eq("id", id);
+  }, []);
+
+  return { biomas, loading, creating, crear, actualizar, eliminar };
+}
 
 // ─── Clados (cladograma / árbol filogenético) ──────────────────────────────
 
@@ -115,7 +174,7 @@ export function useEcosistemas() {
     const { data, error } = await supabase
       .from("ecosistemas")
       .insert([
-        { nombre, bioma: "", clima: "", descripcion: "", criatura_ids: [], flora_ids: [], mineral_ids: [] },
+        { nombre, bioma_id: null, clima: "", descripcion: "", criatura_ids: [], flora_ids: [], mineral_ids: [] },
       ])
       .select()
       .single();
