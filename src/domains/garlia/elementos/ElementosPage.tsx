@@ -17,7 +17,7 @@ import React, { useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
-import { calcularParticulaDominante, calcularReactividadElemento } from "./afinidad";
+import { calcularParticulaDominante } from "./afinidad";
 import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
 import { ElementoEditor } from "./ElementoEditor";
@@ -29,7 +29,6 @@ import {
 import {
   formatLayer,
   ELEMENT_FAMILIES,
-  REACTIVIDAD_LABEL,
   CAPACIDAD_CAPA,
   type Compuesto,
   type Elemento,
@@ -133,7 +132,6 @@ function ElementoCasilla({
       : dominantes.length === 1
         ? dominantes[0].particula
         : `${dominantes.length} empatadas`;
-  const reactividad = useMemo(() => calcularReactividadElemento(elemento), [elemento]);
 
   return (
     <button
@@ -165,15 +163,6 @@ function ElementoCasilla({
         {elemento.nombre}
       </span>
 
-      {nombreDominante && (
-        <span
-          title="Partícula dominante"
-          className="self-center text-micro font-bold text-accent/70 bg-accent/10 rounded px-1 truncate max-w-full leading-tight"
-        >
-          {nombreDominante}
-        </span>
-      )}
-
       <div className="mt-0.5 pt-0.5 border-t border-primary/10 flex flex-col gap-0.5">
         <span className="text-micro text-primary/40 truncate leading-tight">
           <span className="text-primary/25">N</span> {formatLayer(elemento.nucleo)}
@@ -186,20 +175,14 @@ function ElementoCasilla({
         </span>
       </div>
 
-      <span
-        title={`Reactividad: ${REACTIVIDAD_LABEL[reactividad.nivel]}`}
-        className={`mt-0.5 self-center text-micro font-black uppercase tracking-wide px-1 rounded leading-tight ${
-          reactividad.nivel === "inerte"
-            ? "text-primary/30 bg-primary/5"
-            : reactividad.nivel === "moderado"
-              ? "text-sky-500 bg-sky-500/10"
-              : reactividad.nivel === "inestable"
-                ? "text-amber-500 bg-amber-500/10"
-                : "text-red-500 bg-red-500/10"
-        }`}
-      >
-        {REACTIVIDAD_LABEL[reactividad.nivel]}
-      </span>
+      {nombreDominante && (
+        <span
+          title="Partícula dominante"
+          className="mt-0.5 self-center text-micro font-bold uppercase tracking-wide text-accent/70 bg-accent/10 rounded px-1 truncate max-w-full leading-tight"
+        >
+          {nombreDominante}
+        </span>
+      )}
     </button>
   );
 }
