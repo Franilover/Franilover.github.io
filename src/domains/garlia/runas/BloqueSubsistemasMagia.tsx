@@ -523,6 +523,67 @@ function BuscadorCriaturaParaSubsistema({
   );
 }
 
+// ─── Modal flotante del editor de subsistema ────────────────────────────────
+// Envuelve PanelEditorSubsistema (sin tocar su lógica interna) en un modal
+// centrado con backdrop, para usarlo desde Física (al final, tras el chip
+// grid) en vez del panel inline que usaba Sistema/Energías.
+export function ModalEditorSubsistema({
+  subsistema,
+  onClose,
+  onSave,
+  onDelete,
+  onSelectCriatura,
+}: {
+  subsistema: SubsistemaMagia;
+  onClose: () => void;
+  onSave: (updates: Partial<SubsistemaMagia>) => void;
+  onDelete: () => void;
+  onSelectCriatura?: (id: string) => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 55%, transparent)" }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-2xl border shadow-2xl p-5 relative"
+        style={{
+          background: "var(--bg-main)",
+          borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          title="Cerrar"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-primary/30 hover:text-primary hover:bg-primary/5 transition-colors"
+        >
+          <X size={14} />
+        </button>
+        <PanelEditorSubsistema
+          subsistema={subsistema}
+          onVolver={onClose}
+          onSave={onSave}
+          onDelete={onDelete}
+          onSelectCriatura={onSelectCriatura}
+        />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ─── Chip de subsistema (vista colapsada) ──────────────────────────────────
 
 function ChipSubsistema({

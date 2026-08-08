@@ -36,7 +36,7 @@ import {
   SelectorProbadorConfig,
   type SeccionProbadorConfig,
 } from "./BloqueProbadorYCombinaciones";
-import { BloqueSubsistemasMagia, PanelEditorSubsistema } from "./BloqueSubsistemasMagia";
+import { BloqueSubsistemasMagia, ModalEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
 import { PanelConfigRunas, type PreviewCombinacion } from "./PanelConfigRunas";
 import { PanelDetectorUnificado } from "./PanelDetectorUnificado";
@@ -339,11 +339,32 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
 // Supabase, igual que ElementosPage recibe los suyos por props desde
 // RunasPage — pero acá se resuelve todo adentro para no ensuciar más la
 // firma de Props de RunasPage con otro bloque de campos opcionales.
-function BloqueFisica({ seleccionarOrisId }: { seleccionarOrisId?: string | null }) {
+function BloqueFisica({
+  seleccionarOrisId,
+  onSelectCriatura,
+}: {
+  seleccionarOrisId?: string | null;
+  onSelectCriatura?: (id: string) => void;
+}) {
   const { items: oris, setItems: setOris, loading: loadingOris } = useOris();
   const { items: conceptos, setItems: setConceptos, loading: loadingConceptos } =
     useFisicaConceptos();
   const [creating, setCreating] = useState(false);
+
+  // Subsistemas de Magia — se muestran como chips al final de Física; al
+  // seleccionar uno se abre en un modal flotante (antes vivía inline en
+  // la columna derecha de "Sistema").
+  const {
+    subsistemas,
+    loading: loadingSubsistemas,
+    creating: creandoSubsistema,
+    crear: crearSubsistema,
+    actualizar: actualizarSubsistema,
+    eliminar: eliminarSubsistema,
+  } = useSubsistemasMagia();
+  const [subsistemaSeleccionadoId, setSubsistemaSeleccionadoId] = useState<string | null>(null);
+  const subsistemaSeleccionado =
+    subsistemas.find((s) => s.id === subsistemaSeleccionadoId) ?? null;
 
   async function handleCreate() {
     setCreating(true);
@@ -374,22 +395,53 @@ function BloqueFisica({ seleccionarOrisId }: { seleccionarOrisId?: string | null
   }
 
   return (
-    <FisicaPage
-      oris={oris}
-      loadingOris={loadingOris}
-      creatingOris={creating}
-      onCreateOris={handleCreate}
-      onActualizarOris={(id, cambios) =>
-        setOris((prev) => prev.map((o) => (o.id === id ? { ...o, ...cambios } : o)))
-      }
-      onEliminarOris={handleEliminar}
-      seleccionarOrisId={seleccionarOrisId}
-      conceptos={conceptos}
-      loadingConceptos={loadingConceptos}
-      onActualizarConcepto={(id, cambios) =>
-        setConceptos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
-      }
-    />
+    <div>
+      <FisicaPage
+        oris={oris}
+        loadingOris={loadingOris}
+        creatingOris={creating}
+        onCreateOris={handleCreate}
+        onActualizarOris={(id, cambios) =>
+          setOris((prev) => prev.map((o) => (o.id === id ? { ...o, ...cambios } : o)))
+        }
+        onEliminarOris={handleEliminar}
+        seleccionarOrisId={seleccionarOrisId}
+        conceptos={conceptos}
+        loadingConceptos={loadingConceptos}
+        onActualizarConcepto={(id, cambios) =>
+          setConceptos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
+        }
+      />
+
+      {/* Subsistemas de Magia — al final de Física, abre en modal flotante */}
+      <div className="mt-8 pt-6 border-t border-primary/10">
+        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-2">
+          Subsistemas de Magia
+        </span>
+        <BloqueSubsistemasMagia
+          subsistemas={subsistemas}
+          loading={loadingSubsistemas}
+          creating={creandoSubsistema}
+          crear={crearSubsistema}
+          subsistemaSeleccionadoId={subsistemaSeleccionadoId}
+          onSelect={setSubsistemaSeleccionadoId}
+        />
+      </div>
+
+      {subsistemaSeleccionado && (
+        <ModalEditorSubsistema
+          key={subsistemaSeleccionado.id}
+          subsistema={subsistemaSeleccionado}
+          onClose={() => setSubsistemaSeleccionadoId(null)}
+          onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
+          onDelete={() => {
+            void eliminarSubsistema(subsistemaSeleccionado.id);
+            setSubsistemaSeleccionadoId(null);
+          }}
+          onSelectCriatura={onSelectCriatura}
+        />
+      )}
+    </div>
   );
 }
 
@@ -527,14 +579,13 @@ function BloqueEnsayoConSubBloques({
   );
 }
 
-// ─── Toggle "Sistema" / "Runas" / "Tabla" / "Física" ─────────────────────────
-// Sistema: ensayo (Energías) a la izquierda + subsistemas a la derecha,
-// nada más. Runas: el bloque de herramientas de runas (probador, lista,
-// config), sin ensayo ni subsistemas. Tabla: grid de Elementos (Tabla
-// Química/Alquímica) + detalle, solo si se pasan props de elementos.
-// Física: grid de Oris + catálogos fijos + conceptos, siempre visible (no
-// depende de props opcionales — trae sus propios datos de Supabase, ver
-// BloqueFisica más abajo).
+// ─── Toggle "Sistema" / "Runas" / "Tabla" / "Física" / "Biología" ───────────
+// Sistema: solo el ensayo (Energías), ancho completo. Runas: el bloque de
+// herramientas de runas (probador, lista, config), sin ensayo. Tabla: grid
+// de Elementos (Tabla Química/Alquímica) + detalle, solo si se pasan props
+// de elementos. Física: grid de Oris + catálogos fijos + conceptos, y al
+// final los Subsistemas de Magia (chips que abren en modal flotante) — ver
+// BloqueFisica más abajo. Biología: taxonomía/ecosistemas/perfiles.
 type SeccionMagia = "sistema" | "runas" | "tabla" | "fisica" | "biologia";
 
 const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
@@ -597,19 +648,6 @@ export function RunasPage({
   onEliminarElemento,
   seleccionarElementoId,
 }: Props) {
-  const {
-    subsistemas,
-    loading: loadingSubsistemas,
-    creating: creandoSubsistema,
-    crear: crearSubsistema,
-    actualizar: actualizarSubsistema,
-    eliminar: eliminarSubsistema,
-  } = useSubsistemasMagia();
-  const [subsistemaSeleccionadoId, setSubsistemaSeleccionadoId] = useState<string | null>(null);
-
-  const subsistemaSeleccionado =
-    subsistemas.find((s) => s.id === subsistemaSeleccionadoId) ?? null;
-
   const { config: configRunas, actualizar: actualizarConfigRunas } = useConfigRunas();
 
   // Grupos de runas — antes vivían en el editor externo de una runa
@@ -763,8 +801,8 @@ export function RunasPage({
   //   [Sistema | Runas]  ← toggle
   //
   //   Sistema:
-  //     [Ensayo (izquierda)] [Subsistemas (derecha)]
-  //     — nada más.
+  //     [Ensayo (Energías), ancho completo]
+  //     — Subsistemas de Magia se movieron a Física (chips + modal).
   //
   //   Runas:
   //     [Probador (cuadrado 1:1) + panel lateral Forma/Runa] [Config/preview]
@@ -791,42 +829,15 @@ export function RunasPage({
         </div>
       ) : seccionMagia === "fisica" ? (
         <div className="mt-4">
-          <BloqueFisica />
+          <BloqueFisica onSelectCriatura={(id) => onOpen("criaturas", id)} />
         </div>
       ) : seccionMagia === "biologia" ? (
         <div className="mt-4">
           <BiologiaPage onSelectCriatura={(id) => onOpen("criaturas", id)} />
         </div>
       ) : seccionMagia === "sistema" ? (
-        <div className="mt-4 flex flex-col lg:flex-row gap-6">
-          <div className="flex-1 min-w-0">
-            <BloqueEnsayoEnergias />
-          </div>
-
-          <div className="flex-1 min-w-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-            <BloqueSubsistemasMagia
-              subsistemas={subsistemas}
-              loading={loadingSubsistemas}
-              creating={creandoSubsistema}
-              crear={crearSubsistema}
-              subsistemaSeleccionadoId={subsistemaSeleccionadoId}
-              onSelect={setSubsistemaSeleccionadoId}
-            />
-
-            {subsistemaSeleccionado && (
-              <PanelEditorSubsistema
-                key={subsistemaSeleccionado.id}
-                subsistema={subsistemaSeleccionado}
-                onVolver={() => setSubsistemaSeleccionadoId(null)}
-                onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
-                onDelete={() => {
-                  void eliminarSubsistema(subsistemaSeleccionado.id);
-                  setSubsistemaSeleccionadoId(null);
-                }}
-                onSelectCriatura={(id) => onOpen("criaturas", id)}
-              />
-            )}
-          </div>
+        <div className="mt-4">
+          <BloqueEnsayoEnergias />
         </div>
       ) : (
         <div className="mt-4 flex flex-col lg:flex-row gap-6">
