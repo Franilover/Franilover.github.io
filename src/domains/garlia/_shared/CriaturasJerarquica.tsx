@@ -31,7 +31,7 @@
  * Las entidades sin vínculo caen en el bloque final global "Sin criatura".
  */
 
-import { Gem, Leaf, Plus, Users } from "lucide-react";
+import { Bug, ChevronDown, Gem, Leaf, Plus, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -163,6 +163,118 @@ function NodoTitulo({
         >
           <Plus size={9} className="text-primary/60" />
         </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * AñadirDropdown
+ * ───────────────────────────────────────────────────────────────────────────
+ * Reemplaza los 4 botones "Añadir criatura / ecosistema / flora / mineral"
+ * por un único botón "+" que despliega las mismas 4 opciones en un menú,
+ * siguiendo el mismo patrón visual que AgrupacionPersonajesDropdown.
+ * Solo se muestran las opciones cuyo handler fue provisto por el padre.
+ */
+function AñadirDropdown({
+  onCreateCriatura,
+  creatingCriatura,
+  onCreateEcosistema,
+  creatingEcosistema,
+  onCreateFlora,
+  creatingFlora,
+  onCreateMineral,
+  creatingMineral,
+}: {
+  onCreateCriatura?: () => void;
+  creatingCriatura?: boolean;
+  onCreateEcosistema?: () => void;
+  creatingEcosistema?: boolean;
+  onCreateFlora?: () => void;
+  creatingFlora?: boolean;
+  onCreateMineral?: () => void;
+  creatingMineral?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  const opciones: {
+    key: string;
+    label: string;
+    Icon: React.ElementType;
+    onClick?: () => void;
+    creating?: boolean;
+  }[] = [
+    {
+      key: "criatura",
+      label: "Añadir criatura",
+      Icon: Bug,
+      onClick: onCreateCriatura,
+      creating: creatingCriatura,
+    },
+    {
+      key: "ecosistema",
+      label: "Añadir ecosistema",
+      Icon: Leaf,
+      onClick: onCreateEcosistema,
+      creating: creatingEcosistema,
+    },
+    {
+      key: "flora",
+      label: "Añadir flora",
+      Icon: Leaf,
+      onClick: onCreateFlora,
+      creating: creatingFlora,
+    },
+    {
+      key: "mineral",
+      label: "Añadir mineral",
+      Icon: Gem,
+      onClick: onCreateMineral,
+      creating: creatingMineral,
+    },
+  ].filter((o) => o.onClick);
+
+  if (opciones.length === 0) return null;
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="Añadir…"
+        className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-primary/70"
+      >
+        <Plus size={13} />
+        <ChevronDown size={10} className="shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-20 top-full right-0 mt-1 min-w-[180px] rounded-lg border border-primary/10 bg-[var(--card,_#1a1a1a)] shadow-lg overflow-hidden py-1">
+          {opciones.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              disabled={o.creating}
+              onClick={() => {
+                o.onClick?.();
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-1.5 text-left px-3 py-1.5 text-micro font-bold uppercase tracking-wide truncate transition-colors text-primary/70 hover:bg-primary/5 disabled:opacity-50"
+            >
+              <o.Icon size={11} className="shrink-0" />
+              {o.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -476,50 +588,16 @@ export function CriaturasJerarquica({
             onOpenGrupo={onOpenGrupo}
           />
         </div>
-        {onCreateCriatura && (
-          <button
-            type="button"
-            onClick={onCreateCriatura}
-            disabled={creatingCriatura}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-micro font-bold uppercase tracking-wide text-primary disabled:opacity-50"
-          >
-            <Plus size={11} />
-            Añadir criatura
-          </button>
-        )}
-        {onCreateEcosistema && (
-          <button
-            type="button"
-            onClick={onCreateEcosistema}
-            disabled={creatingEcosistema}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors text-micro font-bold uppercase tracking-wide text-accent disabled:opacity-50"
-          >
-            <Leaf size={11} />
-            Añadir ecosistema
-          </button>
-        )}
-        {onCreateFlora && (
-          <button
-            type="button"
-            onClick={onCreateFlora}
-            disabled={creatingFlora}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors text-micro font-bold uppercase tracking-wide text-emerald-600 disabled:opacity-50"
-          >
-            <Leaf size={11} />
-            Añadir flora
-          </button>
-        )}
-        {onCreateMineral && (
-          <button
-            type="button"
-            onClick={onCreateMineral}
-            disabled={creatingMineral}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-micro font-bold uppercase tracking-wide text-primary/70 disabled:opacity-50"
-          >
-            <Gem size={11} />
-            Añadir mineral
-          </button>
-        )}
+        <AñadirDropdown
+          onCreateCriatura={onCreateCriatura}
+          creatingCriatura={creatingCriatura}
+          onCreateEcosistema={onCreateEcosistema}
+          creatingEcosistema={creatingEcosistema}
+          onCreateFlora={onCreateFlora}
+          creatingFlora={creatingFlora}
+          onCreateMineral={onCreateMineral}
+          creatingMineral={creatingMineral}
+        />
       </div>
 
       <div className="flex flex-col gap-8">
