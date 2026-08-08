@@ -14,7 +14,10 @@
  *
  * Se oculta sola si no hay ninguna pestaña abierta (openTabs.length === 0),
  * para no ocupar espacio en las secciones "de catálogo" (Mapa, Aventura,
- * Línea de tiempo) donde este concepto no aplica.
+ * Línea de tiempo) donde este concepto no aplica. También se oculta
+ * siempre que la sección activa es "runas" (RunasPage: Runas/Tabla/
+ * Física/Biología), que ya trae su propio toggle interno y aprovecha
+ * mejor el espacio vertical sin esta barra encima.
  */
 
 import {
@@ -109,7 +112,11 @@ export function EntityTabBar() {
   const activateTab = useMundoNavigation((s) => s.activateTab);
   const closeTab = useMundoNavigation((s) => s.closeTab);
 
-  if (openTabs.length === 0) return null;
+  // RunasPage (Runas/Tabla/Física/Biología) ya trae su propio toggle de
+  // secciones y aprovecha el espacio vertical al máximo (árboles, grids,
+  // modales) — la barra de pestañas de entidades no aporta ahí y se
+  // oculta, igual que se oculta cuando no hay ninguna pestaña abierta.
+  if (openTabs.length === 0 || section === "runas") return null;
 
   return (
     <div
