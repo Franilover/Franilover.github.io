@@ -1,12 +1,15 @@
 "use client";
 
 /**
- * EcosistemasPage.tsx
+ * PanelEcosistema.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Ecosistemas (bioma/clima + criaturas que lo habitan) y, dentro de cada
- * uno, sus cadenas alimenticias (eslabones ordenados por rol trófico, cada
- * uno con 1+ criaturas). Mismo patrón visual "chips arriba + panel abajo"
- * que BloqueSubsistemasMagia.
+ * Panel de detalle de un ecosistema (bioma/clima + criaturas que lo habitan)
+ * y, dentro de él, sus cadenas alimenticias (eslabones ordenados por rol
+ * trófico, cada uno con 1+ criaturas).
+ *
+ * La página de lista/chips de ecosistemas se eliminó — Ecosistemas ahora se
+ * navegan y editan desde Entidades → EcosistemaEditor.tsx, que renderiza
+ * este panel directamente.
  */
 
 import { ArrowLeft, Leaf, Plus, Salad, Trash2, X } from "lucide-react";
@@ -15,7 +18,6 @@ import React, { useEffect, useState } from "react";
 import { RichEditor } from "@/editor/lexical";
 
 import { SelectorCriaturasMulti } from "./SelectorCriaturasMulti";
-import { useCadenasAlimenticias, useEcosistemas } from "./useBiologia";
 import {
   ROL_TROFICO_LABEL,
   ROLES_TROFICOS,
@@ -24,49 +26,6 @@ import {
   type EslabonTrofico,
   type RolTrofico,
 } from "./types";
-
-interface Props {
-  onSelectCriatura?: (id: string) => void;
-}
-
-// ─── Chip de ecosistema ──────────────────────────────────────────────────────
-
-function ChipEcosistema({
-  ecosistema,
-  activo,
-  onClick,
-}: {
-  ecosistema: Ecosistema;
-  activo?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl border transition-colors text-left min-w-[140px] max-w-[220px] ${
-        activo
-          ? "border-primary/40 bg-primary/8"
-          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
-      }`}
-    >
-      <span className="flex items-center gap-1.5 text-xs font-bold text-primary/80 truncate w-full">
-        <Leaf size={11} className="text-accent/60 shrink-0" />
-        {ecosistema.nombre || "Sin nombre"}
-      </span>
-      {ecosistema.bioma ? (
-        <span className="text-micro text-primary/40 truncate w-full">{ecosistema.bioma}</span>
-      ) : (
-        <span className="text-micro text-primary/25 italic">Sin bioma</span>
-      )}
-      {ecosistema.criatura_ids?.length > 0 && (
-        <span className="text-micro font-bold text-primary/30 uppercase tracking-wide">
-          {ecosistema.criatura_ids.length} criaturas
-        </span>
-      )}
-    </button>
-  );
-}
 
 // ─── Editor de un eslabón trófico ───────────────────────────────────────────
 
@@ -389,117 +348,6 @@ export function PanelEcosistema({
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// ─── Página principal ────────────────────────────────────────────────────────
-
-export function EcosistemasPage({ onSelectCriatura }: Props) {
-  const {
-    ecosistemas,
-    loading,
-    creating,
-    crear,
-    actualizar,
-    eliminar,
-  } = useEcosistemas();
-  const {
-    cadenas,
-    creating: creandoCadena,
-    crear: crearCadena,
-    actualizar: actualizarCadena,
-    eliminar: eliminarCadena,
-  } = useCadenasAlimenticias();
-
-  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
-  const [nombreNuevo, setNombreNuevo] = useState("");
-  const [creandoAbierto, setCreandoAbierto] = useState(false);
-
-  const seleccionado = ecosistemas.find((e) => e.id === seleccionadoId) ?? null;
-  const cadenasDelEcosistema = cadenas.filter((c) => c.ecosistema_id === seleccionadoId);
-
-  const handleCrear = async () => {
-    const nombre = nombreNuevo.trim();
-    if (!nombre) return;
-    const nuevo = await crear(nombre);
-    setNombreNuevo("");
-    setCreandoAbierto(false);
-    if (nuevo) setSeleccionadoId(nuevo.id);
-  };
-
-  if (seleccionado) {
-    return (
-      <PanelEcosistema
-        ecosistema={seleccionado}
-        cadenas={cadenasDelEcosistema}
-        creandoCadena={creandoCadena}
-        onSave={(updates) => void actualizar(seleccionado.id, updates)}
-        onDelete={() => {
-          void eliminar(seleccionado.id);
-          setSeleccionadoId(null);
-        }}
-        onVolver={() => setSeleccionadoId(null)}
-        onCrearCadena={() => void crearCadena("Nueva cadena", seleccionado.id)}
-        onActualizarCadena={(id, updates) => void actualizarCadena(id, updates)}
-        onEliminarCadena={(id) => void eliminarCadena(id)}
-        onSelectCriatura={onSelectCriatura}
-      />
-    );
-  }
-
-  return (
-    <div>
-      {creandoAbierto && (
-        <div className="flex items-center gap-1.5 mb-3">
-          <input
-            autoFocus
-            className="flex-1 min-w-0 bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/80 outline-none placeholder:text-primary/30 focus:border-primary/25"
-            placeholder="Nombre del ecosistema…"
-            value={nombreNuevo}
-            onChange={(e) => setNombreNuevo(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleCrear();
-              if (e.key === "Escape") setCreandoAbierto(false);
-            }}
-          />
-          <button
-            type="button"
-            disabled={!nombreNuevo.trim() || creating}
-            onClick={() => void handleCrear()}
-            className="shrink-0 text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity disabled:opacity-40"
-          >
-            Crear
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="w-full py-6 text-xs text-primary/30 text-center">Cargando…</div>
-      ) : (
-        <div className="flex flex-wrap items-start gap-2">
-          {ecosistemas.map((e) => (
-            <ChipEcosistema
-              key={e.id}
-              ecosistema={e}
-              onClick={() => setSeleccionadoId(e.id)}
-            />
-          ))}
-          {ecosistemas.length === 0 && (
-            <span className="self-center text-xs text-primary/25 py-2">
-              Sin ecosistemas todavía
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => setCreandoAbierto((o) => !o)}
-            title="Añadir ecosistema"
-            className="shrink-0 p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-          >
-            <Plus size={9} className="text-primary/60" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

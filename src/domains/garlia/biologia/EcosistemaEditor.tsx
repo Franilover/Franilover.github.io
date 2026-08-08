@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelEcosistema } from "@/domains/garlia/biologia/EcosistemasPage";
+import { PanelEcosistema } from "@/domains/garlia/biologia/PanelEcosistema";
 import { useCadenasAlimenticias, useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import type { Ecosistema } from "@/domains/garlia/biologia/types";
 

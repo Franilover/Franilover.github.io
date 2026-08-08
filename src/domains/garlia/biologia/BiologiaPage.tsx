@@ -18,7 +18,7 @@
 import { Download } from "lucide-react";
 import React from "react";
 
-import { TaxonomiaPage } from "./TaxonomiaPage";
+import { CladisticaPage } from "./CladisticaPage";
 import { useBiologiaConfig, useTaxones } from "./useBiologia";
 
 interface Props {
@@ -72,7 +72,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
         </button>
       </div>
 
-      <TaxonomiaPage onSelectCriatura={onSelectCriatura} />
+      <CladisticaPage onSelectCriatura={onSelectCriatura} />
     </div>
   );
 }
