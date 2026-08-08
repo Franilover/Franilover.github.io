@@ -278,7 +278,7 @@ export function usePerfilesAtomicosCriatura() {
 
       const { data, error } = await supabase
         .from("perfiles_atomicos_criatura")
-        .insert([{ criatura_id: criaturaId, componentes: [], oris_ids: [], notas: "" }])
+        .insert([{ criatura_id: criaturaId, componentes: [], oris_ids: [], rasgos_evolutivos: [], notas: "" }])
         .select()
         .single();
       if (error || !data) return null;

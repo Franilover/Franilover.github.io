@@ -3,32 +3,36 @@
 /**
  * PerfilAtomicoCriaturaPanel.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * "Perfil atómico" de una criatura, tratada como un compuesto vivo: reusa
- * TAL CUAL el motor de afinidad.ts de Elementos (calcularPerfilAtomico,
- * calcularBalancePorCapa, calcularReactividad, calcularPeso) — la criatura
- * es un Compuesto más (mismo shape ComponenteCompuesto: elemento_id +
- * cantidad), solo que sus "componentes" se guardan en
- * perfiles_atomicos_criatura en vez de en la tabla compuestos.
+ * Perfil de una criatura, en 3 bloques con semántica distinta (ver types.ts
+ * para el detalle de diseño):
  *
- * También vincula qué Oris (Física) canaliza/metaboliza la criatura —
- * enlace simple por id, sin motor propio (Oris no tiene capas como
- * Elementos).
+ *   1. Canalización: qué Oris puede usar activamente si es mágica —
+ *      afinidad de USO. Los Oris son leyes externas al universo, no algo
+ *      de lo que la criatura "está hecha".
+ *   2. Rasgos evolutivos: marca física permanente por Fantasía evolutiva/
+ *      residual — exposición ambiental acumulada a un Oris concreto.
+ *   3. Composición material: de qué está hecho el tejido duro/mineral
+ *      (huesos, caparazón, escamas) — reusa TAL CUAL el motor de
+ *      afinidad.ts de Elementos (calcularPerfilAtomico, calcularBalance-
+ *      PorCapa, calcularReactividad, calcularPeso). NO representa a la
+ *      criatura entera: hoy la Tabla Química es geología/minerales, sin
+ *      elementos orgánicos todavía.
  */
 
-import { Atom, Bug, Plus, Search, X, Zap } from "lucide-react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Atom, Bug, Plus, Search, Wand2, X, Zap } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
+  autocompletarHastaEstable,
   calcularBalancePorCapa,
   calcularPerfilAtomico,
   calcularPeso,
   calcularReactividad,
+  sugerirElementosParaCompletar,
 } from "@/domains/garlia/elementos/afinidad";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import {
   LAYER_LABEL,
-  PARTICLE_INITIAL,
   REACTIVIDAD_LABEL,
   formatLayer,
   type Compuesto,
@@ -38,11 +42,19 @@ import {
 } from "@/domains/garlia/elementos/types";
 import { useOris } from "@/domains/garlia/fisica/useFisica";
 import { useCriaturasCatalogoMin } from "@/domains/garlia/runas/useCriaturasCatalogoMin";
-import { useCriaturasPorIds } from "@/domains/garlia/runas/useCriaturasPorIds";
 
 import { usePerfilesAtomicosCriatura } from "./useBiologia";
+import { TIPO_RASGO_EVOLUTIVO_LABEL, type RasgoEvolutivo } from "./types";
 
 const LAYERS: LayerName[] = ["nucleo", "media", "externa"];
+
+/**
+ * Nombre corto de un elemento por id — usado en los chips de "elegidos"
+ * del selector rico. Mismo helper que nombreElemento en CompuestosPage.
+ */
+function nombreElemento(elementos: Elemento[], id: string): string {
+  return elementos.find((e) => e.id === id)?.nombre ?? "??";
+}
 
 // ─── Barra de balance de una capa ───────────────────────────────────────────
 
@@ -84,144 +96,195 @@ function BarraCapa({
   );
 }
 
-// ─── Selector de elementos componentes (mismo patrón buscador que criaturas) ─
-
-function BuscadorElemento({
+// ─── Selector rico de elementos componentes ─────────────────────────────────
+// Mismo patrón que SelectorElementosCompuesto en CompuestosPage: chips
+// toggle con stepper +/- para los ya elegidos, y los que más ayudan a
+// cerrar el déficit actual (sugerirElementosParaCompletar) destacados
+// primero con badge — guía la elección de qué "materia dura" tiene la
+// criatura en vez de un buscador a ciegas.
+function SelectorElementosCriatura({
   elementos,
-  excluirIds,
-  onSelect,
+  componentes,
+  onChange,
 }: {
   elementos: Elemento[];
-  excluirIds: string[];
-  onSelect: (id: string) => void;
+  componentes: ComponenteCompuesto[];
+  onChange: (componentes: ComponenteCompuesto[]) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const idsElegidos = new Set(componentes.map((c) => c.elemento_id));
 
-  const disponibles = useMemo(
-    () =>
-      elementos.filter(
-        (e) => !excluirIds.includes(e.id) && e.nombre.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [elementos, excluirIds, search],
+  const sugerencias = useMemo(
+    () => sugerirElementosParaCompletar(componentes, elementos),
+    [componentes, elementos],
+  );
+  const idsSugeridos = useMemo(
+    () => new Set(sugerencias.slice(0, 3).map((s) => s.elemento.id)),
+    [sugerencias],
   );
 
-  useEffect(() => {
-    if (!open) return;
-    const update = () => {
-      const r = triggerRef.current?.getBoundingClientRect();
-      if (!r) return;
-      const width = Math.max(r.width, 224);
-      const espacioAbajo = window.innerHeight - r.bottom;
-      const abreHaciaArriba = espacioAbajo < 260 && r.top > espacioAbajo;
-      setPos({
-        left: Math.min(r.left, window.innerWidth - width - 8),
-        top: abreHaciaArriba ? r.top - 4 : r.bottom + 4,
-        width,
-      });
-    };
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [open]);
+  function toggleElemento(id: string) {
+    if (idsElegidos.has(id)) {
+      onChange(componentes.filter((c) => c.elemento_id !== id));
+    } else {
+      onChange([...componentes, { elemento_id: id, cantidad: 1 }]);
+    }
+  }
 
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (triggerRef.current?.contains(target)) return;
-      if (dropdownRef.current?.contains(target)) return;
-      setOpen(false);
-      setSearch("");
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
+  function setCantidad(id: string, cantidad: number) {
+    onChange(
+      componentes.map((c) =>
+        c.elemento_id === id ? { ...c, cantidad: Math.max(1, cantidad) } : c,
+      ),
+    );
+  }
 
-  const abreHaciaArriba =
-    pos != null && triggerRef.current ? pos.top < triggerRef.current.getBoundingClientRect().top : false;
+  const disponibles = elementos.filter((el) => !idsElegidos.has(el.id));
+  const disponiblesOrdenados = [
+    ...disponibles.filter((el) => idsSugeridos.has(el.id)),
+    ...disponibles.filter((el) => !idsSugeridos.has(el.id)),
+  ];
 
   return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-dashed text-micro font-black uppercase tracking-widest transition-all"
-        style={{
-          borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
-          color: "color-mix(in srgb, var(--primary) 35%, transparent)",
-        }}
-      >
-        <Plus size={8} /> Añadir elemento
-      </button>
-
-      {open &&
-        pos &&
-        createPortal(
-          <div
-            ref={dropdownRef}
-            className="fixed z-[9999] rounded-xl border shadow-xl overflow-hidden"
-            style={{
-              top: pos.top,
-              left: pos.left,
-              width: pos.width,
-              transform: abreHaciaArriba ? "translateY(-100%)" : undefined,
-              maxHeight: "min(320px, calc(100vh - 16px))",
-              background: "var(--bg-main)",
-              borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
-            }}
-          >
+    <div className="flex flex-col gap-2">
+      {/* Elegidos, con stepper de cantidad */}
+      {componentes.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {componentes.map((c) => (
             <div
-              className="flex items-center gap-2 px-3 py-2"
-              style={{ borderBottom: "1px solid color-mix(in srgb, var(--primary) 8%, transparent)" }}
+              key={c.elemento_id}
+              className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2 pr-1 py-1 border border-primary/10"
             >
-              <Search size={11} style={{ color: "color-mix(in srgb, var(--primary) 30%, transparent)", flexShrink: 0 }} />
-              <input
-                autoFocus
-                className="flex-1 bg-transparent outline-none text-micro font-bold uppercase tracking-wide placeholder:normal-case placeholder:font-medium placeholder:tracking-normal"
-                placeholder="Buscar elemento…"
-                style={{ color: "var(--primary)", caretColor: "var(--primary)" }}
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Escape" && (setOpen(false), setSearch(""))}
-              />
+              <span className="flex-1 min-w-0 truncate text-micro font-bold text-primary/80">
+                {nombreElemento(elementos, c.elemento_id)}
+              </span>
+              <div className="shrink-0 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCantidad(c.elemento_id, c.cantidad - 1)}
+                  className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
+                >
+                  −
+                </button>
+                <span className="w-4 text-center text-micro font-black text-primary tabular-nums">
+                  {c.cantidad}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCantidad(c.elemento_id, c.cantidad + 1)}
+                  className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleElemento(c.elemento_id)}
+                  title="Quitar"
+                  className="w-5 h-5 flex items-center justify-center rounded border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 transition-all cursor-pointer"
+                >
+                  <X size={10} />
+                </button>
+              </div>
             </div>
-            <div className="max-h-52 overflow-y-auto p-1">
-              {disponibles.length === 0 ? (
-                <p className="text-micro text-primary/25 italic text-center py-3">
-                  {search ? "Sin resultados" : "No hay más elementos"}
-                </p>
-              ) : (
-                disponibles.map((e) => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-micro font-bold text-primary/75 hover:bg-primary/6 hover:text-primary transition-colors truncate"
-                    onMouseDown={() => {
-                      onSelect(e.id);
-                      setOpen(false);
-                      setSearch("");
-                    }}
-                  >
-                    <span className="shrink-0 text-primary/30">{e.simbolo}</span>
-                    <span className="truncate">{e.nombre}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>,
-          document.body,
+          ))}
+        </div>
+      )}
+
+      {/* Disponibles para agregar — los que más cierran el déficit actual
+          van primero, marcados con un puntito. */}
+      <div className="flex flex-wrap gap-1">
+        {disponiblesOrdenados.map((el) => {
+          const sugerido = idsSugeridos.has(el.id);
+          return (
+            <button
+              key={el.id}
+              type="button"
+              onClick={() => toggleElemento(el.id)}
+              title={
+                sugerido
+                  ? `${el.nombre} — completa parte del déficit actual`
+                  : `Agregar ${el.nombre}`
+              }
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-bold border transition-all cursor-pointer ${
+                sugerido
+                  ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/15"
+                  : "border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+              }`}
+            >
+              {sugerido && <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />}
+              <span className="font-black">{el.simbolo || "??"}</span>
+              <span className="truncate max-w-[80px]">{el.nombre}</span>
+            </button>
+          );
+        })}
+        {elementos.length === 0 && (
+          <p className="text-micro text-primary/25">
+            Todavía no hay elementos en la Tabla Química para asignar.
+          </p>
         )}
-    </>
+      </div>
+    </div>
+  );
+}
+
+// ─── Rasgos evolutivos (Fantasía evolutiva/residual) ───────────────────────
+// Marca física permanente por exposición ambiental acumulada a un Oris/-ium
+// concreto — distinto de "canaliza este Oris": acá la criatura no controla
+// nada, solo quedó marcada por vivir expuesta a esa fuerza (ver conceptos
+// "Las tres fuentes de fantasía" en Física).
+function RasgoEvolutivoRow({
+  rasgo,
+  orisDisponibles,
+  onChange,
+  onEliminar,
+}: {
+  rasgo: RasgoEvolutivo;
+  orisDisponibles: { id: string; nombre: string }[];
+  onChange: (cambios: Partial<RasgoEvolutivo>) => void;
+  onEliminar: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 p-2 rounded-lg border border-primary/10 bg-primary/[0.02]">
+      <div className="flex items-center gap-1.5">
+        <select
+          value={rasgo.oris_id}
+          onChange={(e) => onChange({ oris_id: e.target.value })}
+          className="min-w-0 bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+        >
+          <option value="">Oris de origen…</option>
+          {orisDisponibles.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.nombre}
+            </option>
+          ))}
+        </select>
+        <select
+          value={rasgo.tipo}
+          onChange={(e) => onChange({ tipo: e.target.value as RasgoEvolutivo["tipo"] })}
+          className="shrink-0 bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary/70 outline-none border border-primary/10 focus:border-primary/30"
+        >
+          {(Object.keys(TIPO_RASGO_EVOLUTIVO_LABEL) as RasgoEvolutivo["tipo"][]).map((t) => (
+            <option key={t} value={t}>
+              {t === "evolutiva" ? "Evolutiva" : "Residual"}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={onEliminar}
+          title="Eliminar rasgo"
+          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+        >
+          <X size={11} />
+        </button>
+      </div>
+      <input
+        value={rasgo.descripcion}
+        onChange={(e) => onChange({ descripcion: e.target.value })}
+        placeholder="Ej. Piel resistente al calor por exposición residual a Thermoris…"
+        className="w-full bg-transparent text-xs text-primary/80 outline-none placeholder:text-primary/30 border-b border-primary/10 pb-1 focus:border-primary/30"
+      />
+      <p className="text-micro text-primary/30">{TIPO_RASGO_EVOLUTIVO_LABEL[rasgo.tipo]}</p>
+    </div>
   );
 }
 
@@ -245,6 +308,7 @@ function PanelPerfilCriatura({
   const [perfilId, setPerfilId] = useState<string | null>(null);
   const [componentes, setComponentes] = useState<ComponenteCompuesto[]>([]);
   const [orisIds, setOrisIds] = useState<string[]>([]);
+  const [rasgosEvolutivos, setRasgosEvolutivos] = useState<RasgoEvolutivo[]>([]);
   const [notas, setNotas] = useState("");
 
   useEffect(() => {
@@ -254,6 +318,7 @@ function PanelPerfilCriatura({
       setPerfilId(p.id);
       setComponentes(p.componentes ?? []);
       setOrisIds(p.oris_ids ?? []);
+      setRasgosEvolutivos(p.rasgos_evolutivos ?? []);
       setNotas(p.notas ?? "");
     });
     return () => {
@@ -264,6 +329,7 @@ function PanelPerfilCriatura({
   const guardar = (patch: {
     componentes?: ComponenteCompuesto[];
     oris_ids?: string[];
+    rasgos_evolutivos?: RasgoEvolutivo[];
     notas?: string;
   }) => {
     if (!perfilId) return;
@@ -286,22 +352,17 @@ function PanelPerfilCriatura({
   );
   const peso = useMemo(() => calcularPeso(compuestoTemporal, elementos), [compuestoTemporal, elementos]);
 
-  const agregarElemento = (elementoId: string) => {
-    const next = [...componentes, { elemento_id: elementoId, cantidad: 1 }];
+  const cambiarComponentes = (next: ComponenteCompuesto[]) => {
     setComponentes(next);
     guardar({ componentes: next });
   };
-  const quitarElemento = (elementoId: string) => {
-    const next = componentes.filter((c) => c.elemento_id !== elementoId);
-    setComponentes(next);
-    guardar({ componentes: next });
-  };
-  const cambiarCantidad = (elementoId: string, cantidad: number) => {
-    const next = componentes.map((c) =>
-      c.elemento_id === elementoId ? { ...c, cantidad: Math.max(1, cantidad) } : c,
-    );
-    setComponentes(next);
-    guardar({ componentes: next });
+
+  // Auto-completar hasta estable — mismo motor que CompuestosPage: agrega
+  // en orden greedy los elementos que más déficit cierran hasta que las 3
+  // capas queden en 0 o no haya más candidatos que ayuden.
+  const autocompletar = () => {
+    const next = autocompletarHastaEstable(componentes, elementos);
+    cambiarComponentes(next);
   };
 
   const toggleOris = (orisId: string) => {
@@ -312,93 +373,42 @@ function PanelPerfilCriatura({
     guardar({ oris_ids: next });
   };
 
+  const agregarRasgo = () => {
+    const next: RasgoEvolutivo[] = [
+      ...rasgosEvolutivos,
+      { id: `rasgo-${Date.now()}`, oris_id: "", descripcion: "", tipo: "residual" },
+    ];
+    setRasgosEvolutivos(next);
+    guardar({ rasgos_evolutivos: next });
+  };
+  const cambiarRasgo = (id: string, cambios: Partial<RasgoEvolutivo>) => {
+    const next = rasgosEvolutivos.map((r) => (r.id === id ? { ...r, ...cambios } : r));
+    setRasgosEvolutivos(next);
+    guardar({ rasgos_evolutivos: next });
+  };
+  const eliminarRasgo = (id: string) => {
+    const next = rasgosEvolutivos.filter((r) => r.id !== id);
+    setRasgosEvolutivos(next);
+    guardar({ rasgos_evolutivos: next });
+  };
+
   if (!perfilId) {
     return <div className="py-4 text-xs text-primary/30 text-center">Cargando perfil…</div>;
   }
 
   return (
     <div>
-      {/* Componentes elementales */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-            Composición elemental
-          </span>
-          <BuscadorElemento
-            elementos={elementos}
-            excluirIds={componentes.map((c) => c.elemento_id)}
-            onSelect={agregarElemento}
-          />
-        </div>
-
-        {componentes.length === 0 ? (
-          <p className="text-micro text-primary/25 italic py-1">Sin elementos asignados todavía</p>
-        ) : (
-          <div className="space-y-1.5">
-            {componentes.map((c) => {
-              const el = elementos.find((e) => e.id === c.elemento_id);
-              if (!el) return null;
-              return (
-                <div
-                  key={c.elemento_id}
-                  className="flex items-center gap-2 p-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
-                >
-                  <span className="text-xs font-bold text-primary/80 flex-1 truncate">
-                    {el.nombre} <span className="text-primary/30">({el.simbolo})</span>
-                  </span>
-                  <input
-                    type="number"
-                    min={1}
-                    className="w-14 bg-transparent text-xs text-center text-primary/70 outline-none border border-primary/10 rounded px-1 py-0.5"
-                    value={c.cantidad}
-                    onChange={(e) => cambiarCantidad(c.elemento_id, Number(e.target.value) || 1)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => quitarElemento(c.elemento_id)}
-                    className="shrink-0 p-1 rounded-md text-primary/25 hover:text-red-400 hover:bg-red-400/10"
-                  >
-                    <X size={11} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Balance por capa */}
-      {componentes.length > 0 && (
-        <div className="mb-4 p-3 rounded-xl border border-primary/10 bg-primary/[0.02]">
-          {LAYERS.map((layer) => {
-            const b = balance.find((x) => x.layer === layer)!;
-            return (
-              <BarraCapa
-                key={layer}
-                layer={layer}
-                perfil={perfilAtomico[layer]}
-                total={b.total}
-                capacidad={b.capacidad}
-              />
-            );
-          })}
-
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary/10">
-            <span className="text-micro font-bold text-primary/50">
-              Reactividad: <span className="text-primary/80">{REACTIVIDAD_LABEL[reactividad.nivel]}</span>
-            </span>
-            <span className="text-micro font-bold text-primary/50">
-              Peso: <span className="text-primary/80">{peso.pesoTotal} ({peso.categoria})</span>
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Oris que canaliza/metaboliza */}
+      {/* Bloque 1: Canalización — qué Oris puede canalizar activamente si
+          es mágica. Afinidad de USO, no de composición: un Oris es una
+          ley externa al universo, no algo de lo que la criatura "está
+          hecha". */}
       <div className="mb-4">
         <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
-          Oris que metaboliza (Física)
+          Canalización — Oris que puede usar
         </span>
+        <p className="text-micro text-primary/30 mb-1.5 -mt-1">
+          Solo si es mágica. Los Oris son leyes externas al universo; esto marca qué fuerzas puede dirigir, no de qué está hecha.
+        </p>
         {orisDisponibles.length === 0 ? (
           <p className="text-micro text-primary/25 italic py-1">No hay Oris cargados todavía</p>
         ) : (
@@ -425,6 +435,100 @@ function PanelPerfilCriatura({
         )}
       </div>
 
+      {/* Bloque 2: Rasgos evolutivos — marca física permanente por
+          Fantasía evolutiva (adaptación generacional) o residual
+          (exposición acumulada sin canalización activa). */}
+      <div className="mb-4 pt-4 border-t border-primary/10">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+            Rasgos evolutivos
+          </span>
+          <button
+            type="button"
+            onClick={agregarRasgo}
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
+          >
+            <Plus size={9} /> Agregar rasgo
+          </button>
+        </div>
+        <p className="text-micro text-primary/30 mb-1.5 -mt-1">
+          Marca física permanente por exposición ambiental a un Oris — distinto de canalizarlo.
+        </p>
+        {rasgosEvolutivos.length === 0 ? (
+          <p className="text-micro text-primary/25 italic py-1">Sin rasgos evolutivos todavía</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {rasgosEvolutivos.map((r) => (
+              <RasgoEvolutivoRow
+                key={r.id}
+                rasgo={r}
+                orisDisponibles={orisDisponibles}
+                onChange={(cambios) => cambiarRasgo(r.id, cambios)}
+                onEliminar={() => eliminarRasgo(r.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Bloque 3: Composición material — de qué está hecho el tejido
+          duro/mineral (huesos, caparazón, escamas), reusando el motor de
+          afinidad.ts de Elementos. NO representa a la criatura entera. */}
+      <div className="mb-4 pt-4 border-t border-primary/10">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+            Composición material (tejido duro)
+          </span>
+          {componentes.length > 0 && (
+            <button
+              type="button"
+              onClick={autocompletar}
+              title="Agregar elementos hasta cerrar el déficit de las 3 capas"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+            >
+              <Wand2 size={10} /> Autocompletar
+            </button>
+          )}
+        </div>
+        <p className="text-micro text-primary/30 mb-1.5 -mt-1">
+          Elementos de la Tabla Química que forman huesos, caparazón, escamas u otro tejido duro/mineral — no representa al organismo entero (hoy la Tabla es geología/minerales, sin elementos orgánicos).
+        </p>
+
+        <SelectorElementosCriatura
+          elementos={elementos}
+          componentes={componentes}
+          onChange={cambiarComponentes}
+        />
+      </div>
+
+      {/* Balance por capa */}
+      {componentes.length > 0 && (
+        <div className="mb-4 p-3 rounded-xl border border-primary/10 bg-primary/[0.02]">
+          {LAYERS.map((layer) => {
+            const b = balance.find((x) => x.layer === layer)!;
+            return (
+              <BarraCapa
+                key={layer}
+                layer={layer}
+                perfil={perfilAtomico[layer]}
+                total={b.total}
+                capacidad={b.capacidad}
+              />
+            );
+          })}
+
+
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary/10">
+            <span className="text-micro font-bold text-primary/50">
+              Reactividad: <span className="text-primary/80">{REACTIVIDAD_LABEL[reactividad.nivel]}</span>
+            </span>
+            <span className="text-micro font-bold text-primary/50">
+              Peso: <span className="text-primary/80">{peso.pesoTotal} ({peso.categoria})</span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Notas libres */}
       <div>
         <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
@@ -432,7 +536,7 @@ function PanelPerfilCriatura({
         </span>
         <textarea
           className="w-full min-h-[4.5rem] bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/70 outline-none placeholder:text-primary/30 resize-y"
-          placeholder="Cómo metaboliza estos elementos, comportamiento resultante…"
+          placeholder="Comportamiento general, dieta, hábitat, cualquier otra nota libre…"
           value={notas}
           onChange={(e) => setNotas(e.target.value)}
           onBlur={() => guardar({ notas })}

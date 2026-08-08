@@ -134,26 +134,56 @@ export type CadenaAlimenticiaInput = Partial<
   >
 >;
 
-// ─── Perfil atómico de criatura ("compuesto vivo") ─────────────────────────
-// Reusa exactamente el motor de afinidad.ts de Elementos: la criatura se
-// trata como un Compuesto más (mismo shape de componentes), así todas las
-// funciones (calcularPerfilAtomico, calcularAfinidad, calcularReactividad,
-// calcularPeso...) funcionan sin modificarlas.
+// ─── Perfil de criatura ─────────────────────────────────────────────────────
+// Tres bloques independientes y con semántica distinta (ver discusión de
+// diseño): los Oris son leyes externas al universo, no algo que "compone"
+// a la criatura — que un Oris tenga dominio "Biológica" no le da a las
+// criaturas ninguna relación especial con él. Lo real:
+//
+//   1. Canalización: qué Oris puede canalizar activamente si es mágica —
+//      afinidad de uso, no de composición (oris_ids).
+//   2. Rasgos evolutivos: marca física permanente por Fantasía evolutiva/
+//      residual — exposición ambiental acumulada a un -ium/Oris concreto
+//      (ver conceptos "Las tres fuentes de fantasía" en Física). Nuevo.
+//   3. Composición material: de qué está hecho el tejido duro/mineral del
+//      cuerpo (huesos, caparazón, escamas) — reusa tal cual el motor de
+//      afinidad.ts de Elementos, la única tabla de materia que existe hoy.
+//      No representa "toda la criatura", solo sus partes minerales/duras.
+
+/** Un rasgo adquirido por exposición ambiental prolongada a un Oris/-ium
+ * concreto — marca física permanente, distinta de canalización activa. */
+export interface RasgoEvolutivo {
+  id: string;
+  /** Oris cuya exposición ambiental originó el rasgo. */
+  oris_id: string;
+  /** Ej. "Piel resistente al calor por exposición residual a Thermoris". */
+  descripcion: string;
+  /** evolutiva = generaciones de adaptación; residual = exposición acumulada sin canalización. */
+  tipo: "evolutiva" | "residual";
+}
+
+export const TIPO_RASGO_EVOLUTIVO_LABEL: Record<RasgoEvolutivo["tipo"], string> = {
+  evolutiva: "Fantasía evolutiva (adaptación generacional)",
+  residual: "Fantasía residual (exposición acumulada)",
+};
 
 /** Fila cruda tal cual vive en Supabase (tabla "perfiles_atomicos_criatura"). */
 export interface PerfilAtomicoCriatura {
   id: string;
   criatura_id: string;
+  /** Composición material — solo tejido duro/mineral (ver nota arriba). */
   componentes: ComponenteCompuesto[];
-  /** Oris (Física) que la criatura canaliza/metaboliza — vínculo simple por id. */
+  /** Oris que la criatura puede canalizar activamente (si es mágica). */
   oris_ids: string[];
+  /** Rasgos físicos permanentes heredados de exposición ambiental. */
+  rasgos_evolutivos: RasgoEvolutivo[];
   notas: string;
   created_at: string;
   updated_at: string;
 }
 
 export type PerfilAtomicoCriaturaInput = Partial<
-  Pick<PerfilAtomicoCriatura, "componentes" | "oris_ids" | "notas">
+  Pick<PerfilAtomicoCriatura, "componentes" | "oris_ids" | "rasgos_evolutivos" | "notas">
 >;
 
 // ─── Sub-tabs de Biología ───────────────────────────────────────────────────
