@@ -12,7 +12,7 @@
  * elementos por id con una cantidad cada uno (componentes: jsonb).
  */
 
-import { Beaker, ChevronLeft, Loader2, Plus, Save, Sparkles, Trash2, X } from "lucide-react";
+import { Beaker, ChevronLeft, Download, Loader2, Plus, Save, Sparkles, Trash2, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
@@ -32,6 +32,43 @@ import {
   type LayerName,
   type TipoAfinidad,
 } from "./types";
+
+// ─── Descarga: todos los compuestos en un solo JSON ────────────────────────
+// Autocontenido: además de nombre/símbolo/notas/componentes crudos, incluye
+// el perfil atómico calculado (suma de partículas por capa) y el balance
+// (déficit/superávit) de cada uno, para no depender de recalcularlo al
+// volver a importar el archivo.
+function descargarDatosCompuestos(compuestos: Compuesto[], elementos: Elemento[]) {
+  const compuestosConAnalisis = compuestos.map((c) => {
+    const perfil = calcularPerfilAtomico(c, elementos);
+    const balance = calcularBalancePorCapa(perfil);
+    return {
+      ...c,
+      componentes_detalle: (c.componentes ?? []).map((comp) => ({
+        ...comp,
+        elemento: elementos.find((e) => e.id === comp.elemento_id) ?? null,
+      })),
+      perfil_atomico: perfil,
+      balance_por_capa: balance,
+    };
+  });
+
+  const payload = {
+    exportado_en: new Date().toISOString(),
+    compuestos: compuestosConAnalisis,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `compuestos-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 interface Props {
   compuestos: Compuesto[];
@@ -515,6 +552,17 @@ export function CompuestosPage({
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={compuestos.length === 0}
+              onClick={() => descargarDatosCompuestos(compuestos, elementos)}
+              title="Descargar todos los compuestos como JSON"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <Download size={10} />
+              <span className="hidden sm:inline">Descargar datos</span>
+            </button>
+
             {onCreate && (
               <button
                 type="button"

@@ -30,7 +30,7 @@ import { formatLayer, type Compuesto, type Elemento } from "./types";
 // Incluye también el contenido del modal de info y los compuestos
 // (editables desde Supabase), para que el JSON exportado quede
 // autocontenido con la tabla + su explicación + las combinaciones.
-function descargarDatosElementos(
+export function descargarDatosElementos(
   elementos: Elemento[],
   infoTabla: SeccionInfoTablaQuimica[],
   compuestos: Compuesto[],
