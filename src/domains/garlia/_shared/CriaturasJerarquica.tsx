@@ -276,6 +276,76 @@ function AñadirDropdown({
   );
 }
 
+/**
+ * EcosistemaExtrasIcono
+ * ───────────────────────────────────────────────────────────────────────────
+ * Reemplaza la columna lateral de chips de flora/minerales dentro de cada
+ * card de ecosistema por un solo ícono (Leaf o Gem) en la esquina superior
+ * derecha de la card. Al hacer click despliega un dropdown con la lista de
+ * nombres — click en un nombre abre su editor (onOpen). No se renderiza si
+ * la lista está vacía.
+ */
+function EcosistemaExtrasIcono({
+  items,
+  Icon,
+  label,
+  onOpenItem,
+}: {
+  items: EntidadMin[];
+  Icon: React.ElementType;
+  label: string;
+  onOpenItem: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        title={`${label} (${items.length})`}
+        className="flex items-center gap-1 p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors text-primary/60"
+      >
+        <Icon size={11} />
+      </button>
+      {open && (
+        <div className="absolute z-20 top-full right-0 mt-1 min-w-[160px] max-h-64 overflow-y-auto rounded-lg border border-primary/10 bg-[var(--card,_#1a1a1a)] shadow-lg py-1">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenItem(item.id);
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-1.5 text-left px-3 py-1.5 text-micro font-semibold truncate text-primary/70 hover:bg-primary/5 transition-colors"
+            >
+              <Icon size={10} className="shrink-0 text-primary/40" />
+              <span className="truncate">{item.nombre}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CriaturasJerarquica({
   criaturas,
   personajes,
@@ -480,18 +550,7 @@ export function CriaturasJerarquica({
     const alturaFilas = filas.reduce((sum, fila) => sum + Math.max(...fila.map(altoCriaturaCard)), 0);
     const gapEntreFilas = gapInterno * Math.max(filas.length - 1, 0);
 
-    // Estimación simple del bloque de chips de flora/minerales: una fila
-    // de ~24px por cada tanda de ~4 chips que entren en el ancho disponible.
-    const totalChips = floraDe(ecosistema.id).length + mineralesDe(ecosistema.id).length;
-    let alturaChips = 0;
-    if (totalChips > 0) {
-      const chipsPorFila = Math.max(1, Math.floor(disponible / 90));
-      const filasChips = Math.ceil(totalChips / chipsPorFila);
-      const gapFilasChips = filas.length > 0 ? 6 : 0;
-      alturaChips = gapFilasChips + filasChips * 24 + (filasChips - 1) * 6;
-    }
-
-    return alturaBarraTitulo + paddingContenido + alturaFilas + gapEntreFilas + alturaChips;
+    return alturaBarraTitulo + paddingContenido + alturaFilas + gapEntreFilas;
   };
 
   function distribuirEnColumnas(list: Ecosistema[]): Ecosistema[][] {
@@ -645,32 +704,22 @@ export function CriaturasJerarquica({
                       >
                         {eco.nombre}
                       </button>
+                      <EcosistemaExtrasIcono
+                        items={floraDe(eco.id)}
+                        Icon={Leaf}
+                        label="Flora"
+                        onOpenItem={(id) => onOpen("flora", id)}
+                      />
+                      <EcosistemaExtrasIcono
+                        items={mineralesDe(eco.id)}
+                        Icon={Gem}
+                        label="Minerales"
+                        onOpenItem={(id) => onOpen("minerales", id)}
+                      />
                     </div>
                     <div className="px-3 pb-3 flex flex-wrap gap-6">
                       {criaturasDe(eco.id).map((c) =>
                         renderCriaturaCard(c, disponibleColumna),
-                      )}
-                      {(floraDe(eco.id).length > 0 || mineralesDe(eco.id).length > 0) && (
-                        <div className="w-fit shrink-0 flex flex-col gap-1.5">
-                          {floraDe(eco.id).map((f) => (
-                            <NodoTitulo
-                              key={f.id}
-                              label={f.nombre}
-                              variant="flora"
-                              maxWidthPx={140}
-                              onClick={() => onOpen("flora", f.id)}
-                            />
-                          ))}
-                          {mineralesDe(eco.id).map((m) => (
-                            <NodoTitulo
-                              key={m.id}
-                              label={m.nombre}
-                              variant="mineral"
-                              maxWidthPx={140}
-                              onClick={() => onOpen("minerales", m.id)}
-                            />
-                          ))}
-                        </div>
                       )}
                     </div>
                   </div>
