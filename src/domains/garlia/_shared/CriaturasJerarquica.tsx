@@ -490,7 +490,9 @@ export function CriaturasJerarquica({
                 <div />
               )}
 
-              {/* Columna derecha: Criaturas sin personajes + ecosistemas vacíos */}
+              {/* Columna derecha: Ecosistemas sin criaturas + Criaturas sin personajes,
+                  en sub-bloques propios (separados y rotulados) para no confundirse
+                  entre sí ni con los "Sin criatura" de la columna izquierda. */}
               {criaturasVacias.length > 0 || ecosistemasVacios.length > 0 ? (
                 <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
                   <div className="px-3 py-3 flex items-center gap-2">
@@ -498,29 +500,52 @@ export function CriaturasJerarquica({
                       Sin personajes asignados
                     </span>
                   </div>
-                  <div
-                    className="px-3 pb-3 grid gap-2"
-                    style={{
-                      gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                    }}
-                  >
-                    {ecosistemasVacios.map((eco) => (
-                      <NodoTitulo
-                        key={eco.id}
-                        fill
-                        label={eco.nombre}
-                        onClick={() => onOpen("ecosistemas", eco.id)}
-                      />
-                    ))}
-                    {criaturasVacias.map((criatura) => (
-                      <NodoTitulo
-                        key={criatura.id}
-                        fill
-                        variant="criatura"
-                        label={criatura.nombre}
-                        onClick={() => onOpen("criaturas", criatura.id)}
-                      />
-                    ))}
+                  <div className="px-3 pb-3 flex flex-col gap-3">
+                    {ecosistemasVacios.length > 0 && (
+                      <div>
+                        <div className="mb-1.5 text-micro font-bold text-primary/30">
+                          Ecosistemas sin criaturas
+                        </div>
+                        <div
+                          className="grid gap-2"
+                          style={{
+                            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                          }}
+                        >
+                          {ecosistemasVacios.map((eco) => (
+                            <NodoTitulo
+                              key={eco.id}
+                              fill
+                              label={eco.nombre}
+                              onClick={() => onOpen("ecosistemas", eco.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {criaturasVacias.length > 0 && (
+                      <div>
+                        <div className="mb-1.5 text-micro font-bold text-primary/30">
+                          Criaturas sin personajes
+                        </div>
+                        <div
+                          className="grid gap-2"
+                          style={{
+                            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                          }}
+                        >
+                          {criaturasVacias.map((criatura) => (
+                            <NodoTitulo
+                              key={criatura.id}
+                              fill
+                              variant="criatura"
+                              label={criatura.nombre}
+                              onClick={() => onOpen("criaturas", criatura.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
