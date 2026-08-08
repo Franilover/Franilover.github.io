@@ -927,8 +927,8 @@ export function EntidadesPage({ section, selectedId }: Props) {
               ? "Ver por ecosistema (criaturas, flora y minerales)"
               : "Ver por especie (personajes agrupados por criatura)"
             : mostrarPersonajes
-              ? "Ocultar personajes"
-              : "Mostrar personajes"
+              ? "Ver por bioma y ecosistema (reinos)"
+              : "Ver por reino (ciudades y personajes)"
         }
         aria-pressed={mostrarPersonajes}
         className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-colors ${
@@ -999,8 +999,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
           reinos={reinos}
           ciudades={ciudades}
           personajes={personajes}
+          ecosistemas={ecosistemas}
+          biomas={biomas}
           mostrarPersonajes={mostrarPersonajes}
-          loading={loadingR || loadingCd || loadingP}
+          loading={loadingR || loadingCd || loadingP || loadingEco || loadingBiomas}
           onOpen={(section, id) => openEntity(section, id)}
           gruposPersonajesPorSubtipo={gruposPersonajesPorSubtipo}
           grupoSeleccionadoId={grupoPersonajeSeleccionadoId}

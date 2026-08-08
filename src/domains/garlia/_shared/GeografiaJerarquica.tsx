@@ -28,9 +28,17 @@
  * hacen wrap horizontal cuando no caben; los títulos largos se truncan para
  * no sobreponerse a los nodos vecinos. Solo caen en el bloque final global
  * "Sin ciudad" los personajes sin ciudad_id y sin reino válido asociado.
+ *
+ * Modo "ojo apagado" (mostrarPersonajes=false): análogo a CriaturasJerarquica
+ * en su modo equivalente — en vez de Reino → Ciudad → Personajes, se muestra
+ * Bioma → Ecosistema → Reinos (Ecosistema en el rol de Ciudad, Reino en el
+ * rol de Criatura). Usa Ecosistema.bioma_id para agrupar por Bioma y
+ * Bioma.reino_ids (M:N) para resolver qué reinos tienen territorio en cada
+ * bioma — no hay Ecosistema.reino_id directo, la relación pasa por el Bioma
+ * contenedor. Un reino sin ningún bioma que lo liste cae en "Sin bioma".
  */
 
-import { Plus, Users } from "lucide-react";
+import { Compass, Plus, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "./EntityCard";
@@ -56,16 +64,35 @@ interface Personaje {
   ciudad_id?: string | null;
   reino?: string | null;
 }
+interface Ecosistema {
+  id: string;
+  nombre: string;
+  /** FK al Bioma que contiene este ecosistema. */
+  bioma_id?: string | null;
+}
+interface Bioma {
+  id: string;
+  nombre: string;
+  /** Reinos (por id) que tienen territorio en este bioma — M:N. */
+  reino_ids: string[];
+}
 
 interface Props {
   reinos: Reino[];
   ciudades: Ciudad[];
   personajes: Personaje[];
+  /** Ecosistemas — usados solo en modo "ojo apagado" para agrupar reinos
+   *  por Bioma → Ecosistema, opcional para no romper usos previos. */
+  ecosistemas?: Ecosistema[];
+  /** Biomas — nivel jerárquico por encima de Ecosistema en modo "ojo
+   *  apagado", opcional idem. */
+  biomas?: Bioma[];
   loading?: boolean;
-  /** Si es false, oculta las grillas de personajes dentro de cada ciudad
-   *  (y el bloque "Sin ciudad") — deja ver solo la estructura de
-   *  Reino → Ciudad, controlado por el toggle de EntidadesPage. Por
-   *  defecto true (comportamiento previo). */
+  /** Controla el modo de la vista:
+   *  - true (ojo): Reino → Ciudad → Personajes (comportamiento previo).
+   *  - false (sin ojo): Bioma → Ecosistema → Reinos, sin ciudades ni
+   *    personajes en ningún lado — mismo patrón que CriaturasJerarquica.
+   *  Por defecto true. */
   mostrarPersonajes?: boolean;
   onOpen: (section: SectionKey, id: string) => void;
   onCreateReino?: () => void;
@@ -148,6 +175,8 @@ export function GeografiaJerarquica({
   reinos,
   ciudades,
   personajes,
+  ecosistemas = [],
+  biomas = [],
   loading,
   mostrarPersonajes = true,
   onOpen,
@@ -360,6 +389,38 @@ export function GeografiaJerarquica({
   }
   const columnasReinos = distribuirEnColumnas(reinosConCiudadesBase);
 
+  // Altura estimada de una card de ecosistema en modo "ojo apagado": solo
+  // chips de reino en flex-wrap, sin grillas de personajes — mucho más
+  // simple que altoReino, misma lógica que altoEcosistema en
+  // CriaturasJerarquica pero con chips de ancho fijo aproximado.
+  const altoEcosistemaOjoOff = (eco: Ecosistema) => {
+    const cantidadReinos = reinosDeEcosistema(eco.id).length;
+    const disponible = anchoColumnaMasonry - 32;
+    const anchoChipAprox = 100;
+    const gapInterno = 8;
+    const porFila = Math.max(1, Math.floor((disponible + gapInterno) / (anchoChipAprox + gapInterno)));
+    const filas = Math.max(1, Math.ceil(cantidadReinos / porFila));
+    const alturaBarraTitulo = 38;
+    const paddingContenido = 24;
+    const alturaChip = 24;
+    const gapEntreFilas = 8 * Math.max(filas - 1, 0);
+    return alturaBarraTitulo + paddingContenido + filas * alturaChip + gapEntreFilas;
+  };
+
+  function distribuirEnColumnasEco(list: Ecosistema[]): Ecosistema[][] {
+    const columnas: Ecosistema[][] = Array.from({ length: numColumnas }, () => []);
+    const alturas = new Array(numColumnas).fill(0);
+    for (const eco of list) {
+      let idxMin = 0;
+      for (let i = 1; i < numColumnas; i++) {
+        if (alturas[i] < alturas[idxMin]) idxMin = i;
+      }
+      columnas[idxMin].push(eco);
+      alturas[idxMin] += altoEcosistemaOjoOff(eco) + GAP;
+    }
+    return columnas;
+  }
+
   const renderColumna = ({
     key,
     nombre,
@@ -475,6 +536,78 @@ export function GeografiaJerarquica({
       anchoMaxDisponible: disponibleColumna,
     });
 
+  // ── Modo "ojo apagado": Bioma → Ecosistema → Reinos ───────────────────────
+  // Reinos con territorio en un ecosistema dado, resuelto vía el Bioma que
+  // contiene ese ecosistema (Ecosistema.bioma_id → Bioma.reino_ids), ya que
+  // no hay FK directa Ecosistema→Reino. Se calcula solo cuando hace falta
+  // (mostrarPersonajes=false) para no afectar el modo normal.
+  const qReinoOjoOff = busqueda.trim().toLocaleLowerCase("es");
+  const biomaDe = (ecosistemaId: string) =>
+    biomas.find((b) => b.id === ecosistemas.find((e) => e.id === ecosistemaId)?.bioma_id);
+  const reinosDeEcosistema = (ecosistemaId: string) => {
+    const bioma = biomaDe(ecosistemaId);
+    if (!bioma) return [];
+    return reinos.filter((r) => bioma.reino_ids.includes(r.id));
+  };
+
+  const ecosistemasVisiblesOjoOff = qReinoOjoOff
+    ? ecosistemas.filter((e) => {
+        if (e.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff)) return true;
+        return reinosDeEcosistema(e.id).some((r) =>
+          r.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff),
+        );
+      })
+    : ecosistemas;
+
+  const ecosistemasConReinos = ecosistemasVisiblesOjoOff.filter(
+    (e) => reinosDeEcosistema(e.id).length > 0,
+  );
+  const ecosistemasVaciosOjoOff = ecosistemasVisiblesOjoOff.filter(
+    (e) => reinosDeEcosistema(e.id).length === 0,
+  );
+
+  // Reinos que ningún ecosistema (vía su bioma) lista todavía — mismo
+  // criterio que "criaturas sin ecosistema" en CriaturasJerarquica.
+  const reinosConEcosistemaIds = new Set(
+    ecosistemas.flatMap((e) => reinosDeEcosistema(e.id).map((r) => r.id)),
+  );
+  const reinosSinEcosistemaBase = reinos.filter((r) => !reinosConEcosistemaIds.has(r.id));
+  const reinosSinEcosistema = qReinoOjoOff
+    ? reinosSinEcosistemaBase.filter((r) => r.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff))
+    : reinosSinEcosistemaBase;
+
+  const ecosistemasOrdenadosOjoOff = [...ecosistemasConReinos].sort(
+    (a, b) => reinosDeEcosistema(b.id).length - reinosDeEcosistema(a.id).length,
+  );
+  const columnasEcosistemasOjoOff = distribuirEnColumnasEco(ecosistemasOrdenadosOjoOff);
+  const hayEcosistemasConReinos = ecosistemasOrdenadosOjoOff.length > 0;
+
+  const renderTarjetaEcosistemaOjoOff = (eco: Ecosistema) => (
+    <div key={eco.id} className="w-full rounded-lg border border-primary/10 overflow-hidden">
+      <div className="px-3 py-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onOpen("ecosistemas", eco.id)}
+          title={eco.nombre}
+          className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
+        >
+          {eco.nombre}
+        </button>
+      </div>
+      <div className="px-3 pb-3 flex flex-wrap gap-2">
+        {reinosDeEcosistema(eco.id).map((r) => (
+          <NodoTitulo
+            key={r.id}
+            label={r.nombre}
+            variant="reino"
+            maxWidthPx={160}
+            onClick={() => onOpen("reinos", r.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="mb-8 last:mb-0">
       <div className="flex items-center gap-2 mb-4 px-1 flex-wrap">
@@ -516,158 +649,281 @@ export function GeografiaJerarquica({
         )}
       </div>
 
-      <div className="flex flex-col gap-8">
-        <div ref={containerRef} className="flex items-start gap-6">
-          {columnasReinos.map((columna, colIdx) => (
-            <div
-              key={colIdx}
-              className="flex flex-col gap-6 min-w-0"
-              style={{ width: anchoColumnaMasonry }}
-            >
-              {columna.map((reino) => (
-                <div
-                  key={reino.id}
-                  className="w-full rounded-lg border border-primary/10 overflow-hidden"
-                >
-                  <div className="px-3 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                    <span />
-                    <button
-                      type="button"
-                      onClick={() => onOpen("reinos", reino.id)}
-                      title={reino.nombre}
-                      className="min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors text-center justify-self-center max-w-full"
-                    >
-                      {reino.nombre}
-                    </button>
-                    <div className="justify-self-end">
-                      {onCreateCiudad && (
+      {mostrarPersonajes ? (
+        <div className="flex flex-col gap-8">
+          <div ref={containerRef} className="flex items-start gap-6">
+            {columnasReinos.map((columna, colIdx) => (
+              <div
+                key={colIdx}
+                className="flex flex-col gap-6 min-w-0"
+                style={{ width: anchoColumnaMasonry }}
+              >
+                {columna.map((reino) => (
+                  <div
+                    key={reino.id}
+                    className="w-full rounded-lg border border-primary/10 overflow-hidden"
+                  >
+                    <div className="px-3 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <span />
+                      <button
+                        type="button"
+                        onClick={() => onOpen("reinos", reino.id)}
+                        title={reino.nombre}
+                        className="min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors text-center justify-self-center max-w-full"
+                      >
+                        {reino.nombre}
+                      </button>
+                      <div className="justify-self-end">
+                        {onCreateCiudad && (
+                          <button
+                            type="button"
+                            onClick={() => onCreateCiudad(reino.id)}
+                            title="Añadir ciudad"
+                            className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
+                          >
+                            <Plus size={9} className="text-primary/60" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="px-3 pb-3 flex flex-wrap gap-6">
+                      {[
+                        ...ciudadesDe(reino.id).map((c) => ({
+                          tipo: "ciudad" as const,
+                          ciudad: c,
+                          count: personajesDe(c.id).length,
+                        })),
+                        ...(personajesSinCiudadDeReino(reino.nombre).length > 0
+                          ? [
+                              {
+                                tipo: "sinCiudad" as const,
+                                ciudad: null,
+                                count: personajesSinCiudadDeReino(reino.nombre)
+                                  .length,
+                              },
+                            ]
+                          : []),
+                      ]
+                        .sort((a, b) => b.count - a.count)
+                        .map((item) =>
+                          item.tipo === "ciudad"
+                            ? renderCiudad(item.ciudad)
+                            : renderSinCiudadDeReino(reino)
+                        )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {(personajesSinCiudad.length > 0 || reinosVacios.length > 0) && (
+            <div>
+              <div className="h-px mb-3 bg-primary/10" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                {/* Columna izquierda: Personajes sin ciudad */}
+                {personajesSinCiudad.length > 0 ? (
+                  <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+                    <div className="px-3 py-3 flex items-center gap-2">
+                      <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+                        Sin ciudad
+                      </span>
+                      {onCreatePersonaje && (
                         <button
                           type="button"
-                          onClick={() => onCreateCiudad(reino.id)}
-                          title="Añadir ciudad"
+                          onClick={() => onCreatePersonaje(null)}
+                          title="Añadir personaje"
                           className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
                         >
                           <Plus size={9} className="text-primary/60" />
                         </button>
                       )}
                     </div>
+                    <div
+                      className="px-3 pb-3 grid gap-1"
+                      style={{
+                        gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))",
+                      }}
+                    >
+                      {personajesSinCiudad.map((p) => (
+                        <EntityCard
+                          key={p.id}
+                          nombre={p.nombre}
+                          imageUrl={p.img_url}
+                          Icon={Users}
+                          onClick={() => onOpen("personajes", p.id)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div className="px-3 pb-3 flex flex-wrap gap-6">
-                    {[
-                      ...ciudadesDe(reino.id).map((c) => ({
-                        tipo: "ciudad" as const,
-                        ciudad: c,
-                        count: personajesDe(c.id).length,
-                      })),
-                      ...(personajesSinCiudadDeReino(reino.nombre).length > 0
-                        ? [
-                            {
-                              tipo: "sinCiudad" as const,
-                              ciudad: null,
-                              count: personajesSinCiudadDeReino(reino.nombre)
-                                .length,
-                            },
-                          ]
-                        : []),
-                    ]
-                      .sort((a, b) => b.count - a.count)
-                      .map((item) =>
-                        item.tipo === "ciudad"
-                          ? renderCiudad(item.ciudad)
-                          : renderSinCiudadDeReino(reino)
-                      )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+                ) : (
+                  <div />
+                )}
 
-        {((mostrarPersonajes && personajesSinCiudad.length > 0) || reinosVacios.length > 0) && (
-          <div>
-            <div className="h-px mb-3 bg-primary/10" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              {/* Columna izquierda: Personajes sin ciudad */}
-              {mostrarPersonajes && personajesSinCiudad.length > 0 ? (
-                <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
-                  <div className="px-3 py-3 flex items-center gap-2">
-                    <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
-                      Sin ciudad
-                    </span>
-                    {onCreatePersonaje && (
-                      <button
-                        type="button"
-                        onClick={() => onCreatePersonaje(null)}
-                        title="Añadir personaje"
-                        className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors shrink-0"
-                      >
-                        <Plus size={9} className="text-primary/60" />
-                      </button>
-                    )}
+                {/* Columna derecha: Reinos sin ciudades */}
+                {reinosVacios.length > 0 ? (
+                  <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+                    <div className="px-3 py-3 flex items-center gap-2">
+                      <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
+                        Sin ciudades asignadas
+                      </span>
+                    </div>
+                    <div
+                      className="px-3 pb-3 grid gap-2"
+                      style={{
+                        gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                      }}
+                    >
+                      {reinosVacios.map((reino) => (
+                        <NodoTitulo
+                          key={reino.id}
+                          fill
+                          label={reino.nombre}
+                          onClick={() => onOpen("reinos", reino.id)}
+                          onCreate={
+                            onCreateCiudad ? () => onCreateCiudad(reino.id) : undefined
+                          }
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div
-                    className="px-3 pb-3 grid gap-1"
-                    style={{
-                      gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))",
-                    }}
-                  >
-                    {personajesSinCiudad.map((p) => (
-                      <EntityCard
-                        key={p.id}
-                        nombre={p.nombre}
-                        imageUrl={p.img_url}
-                        Icon={Users}
-                        onClick={() => onOpen("personajes", p.id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div />
-              )}
-
-              {/* Columna derecha: Reinos sin ciudades */}
-              {reinosVacios.length > 0 ? (
-                <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
-                  <div className="px-3 py-3 flex items-center gap-2">
-                    <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
-                      Sin ciudades asignadas
-                    </span>
-                  </div>
-                  <div
-                    className="px-3 pb-3 grid gap-2"
-                    style={{
-                      gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                    }}
-                  >
-                    {reinosVacios.map((reino) => (
-                      <NodoTitulo
-                        key={reino.id}
-                        fill
-                        label={reino.nombre}
-                        onClick={() => onOpen("reinos", reino.id)}
-                        onCreate={
-                          onCreateCiudad ? () => onCreateCiudad(reino.id) : undefined
-                        }
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div />
-              )}
-            </div>
-          </div>
-        )}
-
-        {reinosConCiudadesBase.length === 0 &&
-          reinosVacios.length === 0 &&
-          (!mostrarPersonajes || personajesSinCiudad.length === 0) && (
-            <div className="py-6 text-xs text-primary/25 text-center">
-              Sin reinos todavía
+                ) : (
+                  <div />
+                )}
+              </div>
             </div>
           )}
-      </div>
+
+          {reinosConCiudadesBase.length === 0 &&
+            reinosVacios.length === 0 &&
+            personajesSinCiudad.length === 0 && (
+              <div className="py-6 text-xs text-primary/25 text-center">
+                Sin reinos todavía
+              </div>
+            )}
+        </div>
+      ) : (
+        // ── Ojo OFF: Reinos agrupados por Ecosistema, y ecosistemas
+        // agrupados por Bioma — misma jerarquía Bioma → Ecosistema →
+        // (Reino en vez de Criatura) que usa CriaturasJerarquica.
+        <div className="flex flex-col gap-8">
+          <div ref={containerRef} className="h-0 overflow-hidden" aria-hidden />
+
+          {hayEcosistemasConReinos &&
+            (biomas.length > 0
+              ? [
+                  ...biomas.map((bioma) => ({
+                    key: bioma.id,
+                    label: bioma.nombre,
+                    columnas: distribuirEnColumnasEco(
+                      ecosistemasOrdenadosOjoOff.filter((e) => e.bioma_id === bioma.id),
+                    ),
+                  })),
+                  {
+                    key: "__sin_bioma__",
+                    label: "Sin bioma",
+                    columnas: distribuirEnColumnasEco(
+                      ecosistemasOrdenadosOjoOff.filter(
+                        (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
+                      ),
+                    ),
+                  },
+                ]
+                  .filter((grupo) => grupo.columnas.some((c) => c.length > 0))
+                  .map((grupo) => (
+                    <div key={grupo.key} className="flex flex-col gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
+                        }
+                        disabled={grupo.key === "__sin_bioma__"}
+                        title={grupo.label}
+                        className="self-start flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
+                      >
+                        <Compass size={11} className="shrink-0 text-accent/50" />
+                        {grupo.label}
+                      </button>
+                      <div className="flex items-start gap-6">
+                        {grupo.columnas.map((columna, colIdx) => (
+                          <div
+                            key={colIdx}
+                            className="flex flex-col gap-6 min-w-0"
+                            style={{ width: anchoColumnaMasonry }}
+                          >
+                            {columna.map((eco) => renderTarjetaEcosistemaOjoOff(eco))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+              : [
+                  <div key="__flat__" className="flex items-start gap-6">
+                    {columnasEcosistemasOjoOff.map((columna, colIdx) => (
+                      <div
+                        key={colIdx}
+                        className="flex flex-col gap-6 min-w-0"
+                        style={{ width: anchoColumnaMasonry }}
+                      >
+                        {columna.map((eco) => renderTarjetaEcosistemaOjoOff(eco))}
+                      </div>
+                    ))}
+                  </div>,
+                ])}
+
+          {reinosSinEcosistema.length > 0 && (
+            <div>
+              {hayEcosistemasConReinos && <div className="h-px mb-2 bg-primary/10" />}
+              <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                Sin ecosistema
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {reinosSinEcosistema.map((r) => (
+                  <NodoTitulo
+                    key={r.id}
+                    label={r.nombre}
+                    variant="reino"
+                    maxWidthPx={160}
+                    onClick={() => onOpen("reinos", r.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {ecosistemasVaciosOjoOff.length > 0 && (
+            <div>
+              <div className="h-px mb-3 bg-primary/10" />
+              <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                Ecosistemas sin reinos
+              </div>
+              <div
+                className="grid gap-2"
+                style={{
+                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                }}
+              >
+                {ecosistemasVaciosOjoOff.map((eco) => (
+                  <NodoTitulo
+                    key={eco.id}
+                    fill
+                    label={eco.nombre}
+                    onClick={() => onOpen("ecosistemas", eco.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!hayEcosistemasConReinos &&
+            reinosSinEcosistema.length === 0 &&
+            ecosistemasVaciosOjoOff.length === 0 && (
+              <div className="py-6 text-xs text-primary/25 text-center">
+                Sin reinos todavía
+              </div>
+            )}
+        </div>
+      )}
     </div>
   );
 }
