@@ -38,8 +38,7 @@ import { supabase } from "@/infra/supabase/supabase";
 
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { EcosistemaEditor } from "@/domains/garlia/biologia/EcosistemaEditor";
-import { BiomaEditor } from "@/domains/garlia/biologia/BiomaEditor";
-import { useEcosistemas, useBiomas } from "@/domains/garlia/biologia/useBiologia";
+import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import { FloraEditor } from "@/domains/garlia/flora/FloraEditor";
 import { useFlora } from "@/domains/garlia/flora/useFlora";
 import { MineralEditor } from "@/domains/garlia/minerales/MineralEditor";
@@ -107,7 +106,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { data: items, loading: loadingI, addRow: addItem } =
     useSupabaseData<Item>("items");
   const { ecosistemas, loading: loadingEco, creating: creatingEco, crear: crearEcosistema } = useEcosistemas();
-  const { biomas, loading: loadingBiomas, creating: creatingBiomas, crear: crearBioma } = useBiomas();
   const { flora, loading: loadingFlora, creating: creatingFlora, crear: crearFlora } = useFlora();
   const { minerales, loading: loadingMinerales, creating: creatingMinerales, crear: crearMineral } = useMinerales();
 
@@ -412,10 +410,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
     () => (section === "ecosistemas" ? ecosistemas.find((e) => e.id === selectedId) ?? null : null),
     [section, ecosistemas, selectedId],
   );
-  const selectedBioma = useMemo(
-    () => (section === "biomas" ? biomas.find((b) => b.id === selectedId) ?? null : null),
-    [section, biomas, selectedId],
-  );
   const selectedFlora = useMemo(
     () => (section === "flora" ? flora.find((f) => f.id === selectedId) ?? null : null),
     [section, flora, selectedId],
@@ -507,7 +501,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   }
 
   const selected =
-    selectedPersonaje ?? selectedCriatura ?? selectedItem ?? selectedReino ?? selectedCiudad ?? selectedBioma ?? selectedEcosistema ?? selectedFlora ?? selectedMineral ?? null;
+    selectedPersonaje ?? selectedCriatura ?? selectedItem ?? selectedReino ?? selectedCiudad ?? selectedEcosistema ?? selectedFlora ?? selectedMineral ?? null;
 
   if (selected) {
     return (
@@ -517,7 +511,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
         {selectedItem && <ItemEditor item={selectedItem} />}
         {selectedReino && <ReinoEditor reino={selectedReino} />}
         {selectedCiudad && <CiudadEditor ciudad={selectedCiudad} />}
-        {selectedBioma && <BiomaEditor bioma={selectedBioma} />}
         {selectedEcosistema && <EcosistemaEditor ecosistema={selectedEcosistema} />}
         {selectedFlora && (
           <FloraEditor
@@ -949,11 +942,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
           criaturas={criaturas}
           personajes={personajes}
           ecosistemas={ecosistemas}
-          biomas={biomas}
           flora={flora}
           minerales={minerales}
           mostrarPersonajes={mostrarPersonajes}
-          loading={loadingC || loadingP || loadingEco || loadingBiomas}
+          loading={loadingC || loadingP || loadingEco}
           gruposCriaturasPorSubtipo={gruposCriaturasPorSubtipo}
           grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
           onSeleccionarGrupo={setGrupoCriaturaSeleccionadoId}
@@ -969,11 +961,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
           onCreateEcosistema={async () => {
             const nuevo = await crearEcosistema("Nuevo ecosistema");
             if (nuevo?.id) openEntity("ecosistemas", nuevo.id);
-          }}
-          creatingBioma={creatingBiomas}
-          onCreateBioma={async () => {
-            const nuevo = await crearBioma("Nuevo bioma");
-            if (nuevo?.id) openEntity("biomas", nuevo.id);
           }}
           creatingFlora={creatingFlora}
           onCreateFlora={async () => {

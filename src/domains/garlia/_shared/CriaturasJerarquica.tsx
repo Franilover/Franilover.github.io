@@ -31,7 +31,7 @@
  * Las entidades sin vínculo caen en el bloque final global "Sin criatura".
  */
 
-import { Bug, ChevronDown, Compass, Gem, Leaf, Plus, Users } from "lucide-react";
+import { Bug, ChevronDown, Gem, Leaf, Plus, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -58,12 +58,6 @@ interface Ecosistema {
   flora_ids?: string[];
   /** Minerales presentes en este ecosistema — opcional idem. */
   mineral_ids?: string[];
-  /** FK al Bioma que contiene este ecosistema — opcional idem. */
-  bioma_id?: string | null;
-}
-interface Bioma {
-  id: string;
-  nombre: string;
 }
 interface EntidadMin {
   id: string;
@@ -77,10 +71,6 @@ interface Props {
   /** Ecosistemas — agrupan criaturas por encima de ellas (Ecosistema →
    *  Criatura → Personajes), opcional para no romper usos previos. */
   ecosistemas?: Ecosistema[];
-  /** Biomas — nivel jerárquico por encima de Ecosistema (Bioma → Ecosistema
-   *  → Criatura → Personajes), opcional idem. Solo se usa en modo "ojo
-   *  apagado"; en modo "ojo prendido" no aplica (vista plana por especie). */
-  biomas?: Bioma[];
   /** Catálogo mínimo de Flora (id/nombre/imagen) — para resolver los
    *  flora_ids de cada ecosistema y mostrarlos como chips dentro de su
    *  tarjeta, al mismo nivel que las criaturas. */
@@ -104,10 +94,6 @@ interface Props {
    *  crear desde Magia → Biología). */
   onCreateEcosistema?: () => void;
   creatingEcosistema?: boolean;
-  /** Crea un Bioma nuevo — botón junto a "Añadir ecosistema", mismo criterio
-   *  de atajo sin salir de esta vista. */
-  onCreateBioma?: () => void;
-  creatingBioma?: boolean;
   /** Crea una entidad de Flora nueva — botón junto a "Añadir ecosistema",
    *  misma lógica: no se agrupa jerárquicamente acá, solo un atajo para no
    *  salir de esta vista para crearla. */
@@ -191,8 +177,6 @@ function NodoTitulo({
 function AñadirDropdown({
   onCreateCriatura,
   creatingCriatura,
-  onCreateBioma,
-  creatingBioma,
   onCreateEcosistema,
   creatingEcosistema,
   onCreateFlora,
@@ -202,8 +186,6 @@ function AñadirDropdown({
 }: {
   onCreateCriatura?: () => void;
   creatingCriatura?: boolean;
-  onCreateBioma?: () => void;
-  creatingBioma?: boolean;
   onCreateEcosistema?: () => void;
   creatingEcosistema?: boolean;
   onCreateFlora?: () => void;
@@ -236,13 +218,6 @@ function AñadirDropdown({
       Icon: Bug,
       onClick: onCreateCriatura,
       creating: creatingCriatura,
-    },
-    {
-      key: "bioma",
-      label: "Añadir bioma",
-      Icon: Compass,
-      onClick: onCreateBioma,
-      creating: creatingBioma,
     },
     {
       key: "ecosistema",
@@ -377,7 +352,6 @@ export function CriaturasJerarquica({
   criaturas,
   personajes,
   ecosistemas = [],
-  biomas = [],
   flora = [],
   minerales = [],
   loading,
@@ -388,8 +362,6 @@ export function CriaturasJerarquica({
   creatingCriatura,
   onCreateEcosistema,
   creatingEcosistema,
-  onCreateBioma,
-  creatingBioma,
   onCreateFlora,
   creatingFlora,
   onCreateMineral,
@@ -666,38 +638,6 @@ export function CriaturasJerarquica({
     );
   };
 
-  // ── Card de ecosistema individual (idéntica a la de antes, extraída para
-  // poder repetirla dentro de cada bloque de bioma sin duplicar el JSX) ────
-  const renderTarjetaEcosistema = (eco: Ecosistema) => (
-    <div key={eco.id} className="w-full rounded-lg border border-primary/10 overflow-hidden">
-      <div className="px-3 py-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onOpen("ecosistemas", eco.id)}
-          title={eco.nombre}
-          className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
-        >
-          {eco.nombre}
-        </button>
-        <EcosistemaExtrasIcono
-          items={floraDe(eco.id)}
-          Icon={Leaf}
-          label="Flora"
-          onOpenItem={(id) => onOpen("flora", id)}
-        />
-        <EcosistemaExtrasIcono
-          items={mineralesDe(eco.id)}
-          Icon={Gem}
-          label="Minerales"
-          onOpenItem={(id) => onOpen("minerales", id)}
-        />
-      </div>
-      <div className="px-3 pb-3 flex flex-wrap gap-6">
-        {criaturasDe(eco.id).map((c) => renderCriaturaCard(c, disponibleColumna))}
-      </div>
-    </div>
-  );
-
   // ── Vista "por especie" (ojo ON): todas las criaturas con sus personajes,
   // sin agrupar por ecosistema. Se recorren todas las criaturas de la base
   // (con o sin personajes) ordenadas por cantidad de habitantes.
@@ -746,8 +686,6 @@ export function CriaturasJerarquica({
           creatingCriatura={creatingCriatura}
           onCreateEcosistema={onCreateEcosistema}
           creatingEcosistema={creatingEcosistema}
-          onCreateBioma={onCreateBioma}
-          creatingBioma={creatingBioma}
           onCreateFlora={onCreateFlora}
           creatingFlora={creatingFlora}
           onCreateMineral={onCreateMineral}
@@ -856,82 +794,54 @@ export function CriaturasJerarquica({
         // sin personajes — misma jerarquía Ecosistema → Criatura de antes,
         // pero las cards de criatura nunca muestran la grilla de habitantes.
         <div className="flex flex-col gap-8">
-          {/* Nivel 1 (medida): el ref de medida de ancho vive siempre acá,
-              en un contenedor invisible de altura 0, para no perder el
-              ancho ya calculado del contenedor sin importar si el masonry
-              de ecosistemas se renderiza agrupado por bioma o no. */}
-          <div ref={containerRef} className="h-0 overflow-hidden" aria-hidden />
-
-          {/* Bloque de masonry de un conjunto de ecosistemas — misma lógica
-              de columnas para todos los casos, solo cambia el subconjunto
-              de `columna` de entrada. Extraído para poder repetirlo una vez
-              por Bioma sin duplicar el JSX de cada card de ecosistema. */}
-          {hayEcosistemasConCriaturas &&
-            (biomas.length > 0
-              ? // Agrupado por Bioma: un bloque de masonry por bioma que
-                // tenga al menos un ecosistema con contenido, en el mismo
-                // orden en que vienen los biomas, + "Sin bioma" al final.
-                [
-                  ...biomas.map((bioma) => ({
-                    key: bioma.id,
-                    label: bioma.nombre,
-                    columnas: distribuirEnColumnas(
-                      ecosistemasConCriaturas.filter((e) => e.bioma_id === bioma.id),
-                    ),
-                  })),
-                  {
-                    key: "__sin_bioma__",
-                    label: "Sin bioma",
-                    columnas: distribuirEnColumnas(
-                      ecosistemasConCriaturas.filter(
-                        (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
-                      ),
-                    ),
-                  },
-                ]
-                  .filter((grupo) => grupo.columnas.some((c) => c.length > 0))
-                  .map((grupo) => (
-                    <div key={grupo.key} className="flex flex-col gap-3">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
-                        }
-                        disabled={grupo.key === "__sin_bioma__"}
-                        title={grupo.label}
-                        className="self-start flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
-                      >
-                        <Compass size={11} className="shrink-0 text-accent/50" />
-                        {grupo.label}
-                      </button>
-                      <div className="flex items-start gap-6">
-                        {grupo.columnas.map((columna, colIdx) => (
-                          <div
-                            key={colIdx}
-                            className="flex flex-col gap-6 min-w-0"
-                            style={{ width: anchoColumnaMasonry }}
-                          >
-                            {columna.map((eco) => renderTarjetaEcosistema(eco))}
-                          </div>
-                        ))}
+          {/* Nivel 1: Ecosistemas con sus criaturas adentro. El ref de medida
+              vive siempre acá (aunque no haya ecosistemas con contenido) para
+              no perder el ancho ya calculado del contenedor. */}
+          <div ref={containerRef} className="flex items-start gap-6 empty:hidden">
+            {hayEcosistemasConCriaturas &&
+              columnasEcosistemas.map((columna, colIdx) => (
+                <div
+                  key={colIdx}
+                  className="flex flex-col gap-6 min-w-0"
+                  style={{ width: anchoColumnaMasonry }}
+                >
+                  {columna.map((eco) => (
+                    <div
+                      key={eco.id}
+                      className="w-full rounded-lg border border-primary/10 overflow-hidden"
+                    >
+                      <div className="px-3 py-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onOpen("ecosistemas", eco.id)}
+                          title={eco.nombre}
+                          className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
+                        >
+                          {eco.nombre}
+                        </button>
+                        <EcosistemaExtrasIcono
+                          items={floraDe(eco.id)}
+                          Icon={Leaf}
+                          label="Flora"
+                          onOpenItem={(id) => onOpen("flora", id)}
+                        />
+                        <EcosistemaExtrasIcono
+                          items={mineralesDe(eco.id)}
+                          Icon={Gem}
+                          label="Minerales"
+                          onOpenItem={(id) => onOpen("minerales", id)}
+                        />
+                      </div>
+                      <div className="px-3 pb-3 flex flex-wrap gap-6">
+                        {criaturasDe(eco.id).map((c) =>
+                          renderCriaturaCard(c, disponibleColumna),
+                        )}
                       </div>
                     </div>
-                  ))
-              : // Sin biomas cargados: comportamiento anterior, un único
-                // masonry plano de todos los ecosistemas con contenido.
-                [
-                  <div key="__flat__" className="flex items-start gap-6">
-                    {columnasEcosistemas.map((columna, colIdx) => (
-                      <div
-                        key={colIdx}
-                        className="flex flex-col gap-6 min-w-0"
-                        style={{ width: anchoColumnaMasonry }}
-                      >
-                        {columna.map((eco) => renderTarjetaEcosistema(eco))}
-                      </div>
-                    ))}
-                  </div>,
-                ])}
+                  ))}
+                </div>
+              ))}
+          </div>
 
           {/* Criaturas sin ecosistema (mismo patrón "solo criatura" que antes) */}
           {criaturasSinEcoOrdenadas.length > 0 && (
