@@ -809,67 +809,117 @@ export function GeografiaJerarquica({
         <div className="flex flex-col gap-8">
           <div ref={containerRef} className="h-0 overflow-hidden" aria-hidden />
 
-          {hayEcosistemasConReinos &&
-            (biomas.length > 0
-              ? [
-                  ...biomas.map((bioma) => ({
-                    key: bioma.id,
-                    label: bioma.nombre,
-                    columnas: distribuirEnColumnasEco(
-                      ecosistemasOrdenadosOjoOff.filter((e) => e.bioma_id === bioma.id),
+          {biomas.length > 0
+            ? // Agrupado por Bioma: un bloque por cada bioma que tenga AL
+              // MENOS un ecosistema (con o sin reinos) — antes solo se
+              // listaban los biomas cuyos ecosistemas tenían reinos, así que
+              // un bioma sin ecosistemas con reinos (aunque tuviera
+              // ecosistemas vacíos, o incluso ningún ecosistema) desaparecía
+              // por completo. Ahora:
+              //  - Un bioma con ecosistemas (con o sin reinos) muestra su
+              //    masonry de cards + los ecosistemas vacíos como chips.
+              //  - Un bioma sin ningún ecosistema se muestra igual, con
+              //    aviso de "Sin ecosistemas" debajo de su título.
+              // + "Sin bioma" al final para ecosistemas huérfanos.
+              [
+                ...biomas.map((bioma) => ({
+                  key: bioma.id,
+                  label: bioma.nombre,
+                  esBioma: true,
+                  todosEcosistemas: ecosistemasVisiblesOjoOff.filter((e) => e.bioma_id === bioma.id),
+                  columnas: distribuirEnColumnasEco(
+                    ecosistemasOrdenadosOjoOff.filter((e) => e.bioma_id === bioma.id),
+                  ),
+                  vacios: ecosistemasVaciosOjoOff.filter((e) => e.bioma_id === bioma.id),
+                })),
+                {
+                  key: "__sin_bioma__",
+                  label: "Sin bioma",
+                  esBioma: false,
+                  todosEcosistemas: ecosistemasVisiblesOjoOff.filter(
+                    (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
+                  ),
+                  columnas: distribuirEnColumnasEco(
+                    ecosistemasOrdenadosOjoOff.filter(
+                      (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
                     ),
-                  })),
-                  {
-                    key: "__sin_bioma__",
-                    label: "Sin bioma",
-                    columnas: distribuirEnColumnasEco(
-                      ecosistemasOrdenadosOjoOff.filter(
-                        (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
-                      ),
-                    ),
-                  },
-                ]
-                  .filter((grupo) => grupo.columnas.some((c) => c.length > 0))
-                  .map((grupo) => (
-                    <div key={grupo.key} className="flex flex-col gap-3">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
-                        }
-                        disabled={grupo.key === "__sin_bioma__"}
-                        title={grupo.label}
-                        className="self-start flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
-                      >
-                        <Compass size={11} className="shrink-0 text-accent/50" />
-                        {grupo.label}
-                      </button>
-                      <div className="flex items-start gap-6">
-                        {grupo.columnas.map((columna, colIdx) => (
-                          <div
-                            key={colIdx}
-                            className="flex flex-col gap-6 min-w-0"
-                            style={{ width: anchoColumnaMasonry }}
-                          >
-                            {columna.map((eco) => renderTarjetaEcosistemaOjoOff(eco))}
+                  ),
+                  vacios: ecosistemasVaciosOjoOff.filter(
+                    (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
+                  ),
+                },
+              ]
+                // Se descarta un grupo solo si ni siquiera tiene ecosistemas
+                // (ni con reinos ni vacíos) — un bioma sin ecosistemas
+                // todavía debe verse como chip de bioma vacío.
+                .filter((grupo) => grupo.esBioma || grupo.todosEcosistemas.length > 0)
+                .map((grupo) => (
+                  <div key={grupo.key} className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
+                      }
+                      disabled={grupo.key === "__sin_bioma__"}
+                      title={grupo.label}
+                      className="self-start flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
+                    >
+                      <Compass size={11} className="shrink-0 text-accent/50" />
+                      {grupo.label}
+                    </button>
+                    {grupo.todosEcosistemas.length === 0 ? (
+                      <div className="text-micro text-primary/25 px-1">Sin ecosistemas</div>
+                    ) : (
+                      <>
+                        {grupo.columnas.some((c) => c.length > 0) && (
+                          <div className="flex items-start gap-6">
+                            {grupo.columnas.map((columna, colIdx) => (
+                              <div
+                                key={colIdx}
+                                className="flex flex-col gap-6 min-w-0"
+                                style={{ width: anchoColumnaMasonry }}
+                              >
+                                {columna.map((eco) => renderTarjetaEcosistemaOjoOff(eco))}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        )}
+                        {grupo.vacios.length > 0 && (
+                          <div
+                            className="grid gap-2"
+                            style={{
+                              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                            }}
+                          >
+                            {grupo.vacios.map((eco) => (
+                              <NodoTitulo
+                                key={eco.id}
+                                fill
+                                label={eco.nombre}
+                                onClick={() => onOpen("ecosistemas", eco.id)}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))
+            : // Sin biomas cargados: comportamiento anterior, un único
+              // masonry plano de todos los ecosistemas con reinos.
+              hayEcosistemasConReinos && (
+                <div className="flex items-start gap-6">
+                  {columnasEcosistemasOjoOff.map((columna, colIdx) => (
+                    <div
+                      key={colIdx}
+                      className="flex flex-col gap-6 min-w-0"
+                      style={{ width: anchoColumnaMasonry }}
+                    >
+                      {columna.map((eco) => renderTarjetaEcosistemaOjoOff(eco))}
                     </div>
-                  ))
-              : [
-                  <div key="__flat__" className="flex items-start gap-6">
-                    {columnasEcosistemasOjoOff.map((columna, colIdx) => (
-                      <div
-                        key={colIdx}
-                        className="flex flex-col gap-6 min-w-0"
-                        style={{ width: anchoColumnaMasonry }}
-                      >
-                        {columna.map((eco) => renderTarjetaEcosistemaOjoOff(eco))}
-                      </div>
-                    ))}
-                  </div>,
-                ])}
+                  ))}
+                </div>
+              )}
 
           {reinosSinEcosistema.length > 0 && (
             <div>
@@ -891,33 +941,10 @@ export function GeografiaJerarquica({
             </div>
           )}
 
-          {ecosistemasVaciosOjoOff.length > 0 && (
-            <div>
-              <div className="h-px mb-3 bg-primary/10" />
-              <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
-                Ecosistemas sin reinos
-              </div>
-              <div
-                className="grid gap-2"
-                style={{
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                }}
-              >
-                {ecosistemasVaciosOjoOff.map((eco) => (
-                  <NodoTitulo
-                    key={eco.id}
-                    fill
-                    label={eco.nombre}
-                    onClick={() => onOpen("ecosistemas", eco.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
           {!hayEcosistemasConReinos &&
+            ecosistemasVaciosOjoOff.length === 0 &&
             reinosSinEcosistema.length === 0 &&
-            ecosistemasVaciosOjoOff.length === 0 && (
+            biomas.length === 0 && (
               <div className="py-6 text-xs text-primary/25 text-center">
                 Sin reinos todavía
               </div>

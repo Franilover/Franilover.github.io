@@ -866,61 +866,108 @@ export function CriaturasJerarquica({
               de columnas para todos los casos, solo cambia el subconjunto
               de `columna` de entrada. Extraído para poder repetirlo una vez
               por Bioma sin duplicar el JSX de cada card de ecosistema. */}
-          {hayEcosistemasConCriaturas &&
-            (biomas.length > 0
-              ? // Agrupado por Bioma: un bloque de masonry por bioma que
-                // tenga al menos un ecosistema con contenido, en el mismo
-                // orden en que vienen los biomas, + "Sin bioma" al final.
-                [
-                  ...biomas.map((bioma) => ({
-                    key: bioma.id,
-                    label: bioma.nombre,
-                    columnas: distribuirEnColumnas(
-                      ecosistemasConCriaturas.filter((e) => e.bioma_id === bioma.id),
+          {biomas.length > 0
+            ? // Agrupado por Bioma: un bloque por cada bioma que tenga AL
+              // MENOS un ecosistema (con o sin contenido) — antes solo se
+              // listaban los biomas cuyos ecosistemas tenían criaturas, así
+              // que un bioma sin ecosistemas con criaturas (aunque tuviera
+              // ecosistemas vacíos, o incluso ningún ecosistema) desaparecía
+              // por completo de la vista. Ahora:
+              //  - Un bioma con ecosistemas (con o sin contenido) muestra su
+              //    masonry de cards + los ecosistemas vacíos como chips.
+              //  - Un bioma sin ningún ecosistema se muestra igual, como
+              //    chip de bioma sin contenido debajo.
+              // + "Sin bioma" al final para ecosistemas huérfanos.
+              [
+                ...biomas.map((bioma) => ({
+                  key: bioma.id,
+                  label: bioma.nombre,
+                  esBioma: true,
+                  todosEcosistemas: ecosistemasOrdenados.filter((e) => e.bioma_id === bioma.id),
+                  columnas: distribuirEnColumnas(
+                    ecosistemasConCriaturas.filter((e) => e.bioma_id === bioma.id),
+                  ),
+                  vacios: ecosistemasVacios.filter((e) => e.bioma_id === bioma.id),
+                })),
+                {
+                  key: "__sin_bioma__",
+                  label: "Sin bioma",
+                  esBioma: false,
+                  todosEcosistemas: ecosistemasOrdenados.filter(
+                    (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
+                  ),
+                  columnas: distribuirEnColumnas(
+                    ecosistemasConCriaturas.filter(
+                      (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
                     ),
-                  })),
-                  {
-                    key: "__sin_bioma__",
-                    label: "Sin bioma",
-                    columnas: distribuirEnColumnas(
-                      ecosistemasConCriaturas.filter(
-                        (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
-                      ),
-                    ),
-                  },
-                ]
-                  .filter((grupo) => grupo.columnas.some((c) => c.length > 0))
-                  .map((grupo) => (
-                    <div key={grupo.key} className="flex flex-col gap-3">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
-                        }
-                        disabled={grupo.key === "__sin_bioma__"}
-                        title={grupo.label}
-                        className="self-start flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
-                      >
-                        <Compass size={11} className="shrink-0 text-accent/50" />
-                        {grupo.label}
-                      </button>
-                      <div className="flex items-start gap-6">
-                        {grupo.columnas.map((columna, colIdx) => (
-                          <div
-                            key={colIdx}
-                            className="flex flex-col gap-6 min-w-0"
-                            style={{ width: anchoColumnaMasonry }}
-                          >
-                            {columna.map((eco) => renderTarjetaEcosistema(eco))}
+                  ),
+                  vacios: ecosistemasVacios.filter(
+                    (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
+                  ),
+                },
+              ]
+                // Se descarta un grupo solo si ni siquiera tiene ecosistemas
+                // (ni con contenido ni vacíos) — un bioma sin ecosistemas
+                // todavía debe verse como chip de bioma vacío, no desaparecer.
+                .filter((grupo) => grupo.esBioma || grupo.todosEcosistemas.length > 0)
+                .map((grupo) => (
+                  <div key={grupo.key} className="flex flex-col gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
+                      }
+                      disabled={grupo.key === "__sin_bioma__"}
+                      title={grupo.label}
+                      className="self-start flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
+                    >
+                      <Compass size={11} className="shrink-0 text-accent/50" />
+                      {grupo.label}
+                    </button>
+                    {grupo.todosEcosistemas.length === 0 ? (
+                      <div className="text-micro text-primary/25 px-1">Sin ecosistemas</div>
+                    ) : (
+                      <>
+                        {grupo.columnas.some((c) => c.length > 0) && (
+                          <div className="flex items-start gap-6">
+                            {grupo.columnas.map((columna, colIdx) => (
+                              <div
+                                key={colIdx}
+                                className="flex flex-col gap-6 min-w-0"
+                                style={{ width: anchoColumnaMasonry }}
+                              >
+                                {columna.map((eco) => renderTarjetaEcosistema(eco))}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))
-              : // Sin biomas cargados: comportamiento anterior, un único
-                // masonry plano de todos los ecosistemas con contenido.
-                [
-                  <div key="__flat__" className="flex items-start gap-6">
+                        )}
+                        {grupo.vacios.length > 0 && (
+                          <div
+                            className="grid gap-2"
+                            style={{
+                              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                            }}
+                          >
+                            {grupo.vacios.map((eco) => (
+                              <NodoTitulo
+                                key={eco.id}
+                                fill
+                                label={eco.nombre}
+                                onClick={() => onOpen("ecosistemas", eco.id)}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))
+            : // Sin biomas cargados: comportamiento anterior, un único
+              // masonry plano de todos los ecosistemas con contenido, más
+              // los vacíos como chips.
+              <>
+                {hayEcosistemasConCriaturas && (
+                  <div className="flex items-start gap-6">
                     {columnasEcosistemas.map((columna, colIdx) => (
                       <div
                         key={colIdx}
@@ -930,8 +977,9 @@ export function CriaturasJerarquica({
                         {columna.map((eco) => renderTarjetaEcosistema(eco))}
                       </div>
                     ))}
-                  </div>,
-                ])}
+                  </div>
+                )}
+              </>}
 
           {/* Criaturas sin ecosistema (mismo patrón "solo criatura" que antes) */}
           {criaturasSinEcoOrdenadas.length > 0 && (
@@ -980,35 +1028,12 @@ export function CriaturasJerarquica({
             </div>
           )}
 
-          {ecosistemasVacios.length > 0 && (
-            <div>
-              <div className="h-px mb-3 bg-primary/10" />
-              <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
-                Ecosistemas sin criaturas
-              </div>
-              <div
-                className="grid gap-2"
-                style={{
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                }}
-              >
-                {ecosistemasVacios.map((eco) => (
-                  <NodoTitulo
-                    key={eco.id}
-                    fill
-                    label={eco.nombre}
-                    onClick={() => onOpen("ecosistemas", eco.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
           {!hayEcosistemasConCriaturas &&
-            criaturasSinEcoOrdenadas.length === 0 &&
             ecosistemasVacios.length === 0 &&
+            criaturasSinEcoOrdenadas.length === 0 &&
             floraSinEcosistema.length === 0 &&
-            mineralesSinEcosistema.length === 0 && (
+            mineralesSinEcosistema.length === 0 &&
+            biomas.length === 0 && (
               <div className="py-6 text-xs text-primary/25 text-center">
                 Sin criaturas todavía
               </div>
