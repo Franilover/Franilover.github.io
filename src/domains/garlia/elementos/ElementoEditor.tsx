@@ -406,7 +406,6 @@ export function ElementoEditor({
                       {AFINIDAD_LABEL[afinidad.tipo]}
                     </span>
                   </div>
-                  <p className="text-micro opacity-80 leading-snug">{afinidad.motivo}</p>
                 </div>
               ))}
             </div>

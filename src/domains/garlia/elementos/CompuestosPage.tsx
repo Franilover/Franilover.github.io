@@ -527,7 +527,6 @@ function PanelAfinidad({
               {AFINIDAD_LABEL[afinidad.tipo]}
             </span>
           </div>
-          <p className="text-micro opacity-80 leading-snug">{afinidad.motivo}</p>
         </div>
       ))}
     </div>
@@ -912,7 +911,6 @@ function LaboratorioModal({
                     <span className="text-micro font-black uppercase tracking-wide">
                       {AFINIDAD_LABEL[afinidad.tipo]}
                     </span>
-                    <p className="text-micro opacity-80 leading-snug">{afinidad.motivo}</p>
                   </div>
                 )
               )}
