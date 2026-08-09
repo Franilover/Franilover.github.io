@@ -290,116 +290,238 @@ export function PanelEcosistema({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-              Bioma
-            </span>
-            {ecosistema.bioma_id && onSelectBioma && (
+      {modoPopover ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+                    Bioma
+                  </span>
+                  {ecosistema.bioma_id && onSelectBioma && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectBioma(ecosistema.bioma_id!)}
+                      className="text-micro font-bold text-accent/60 hover:text-accent transition-colors"
+                    >
+                      Abrir
+                    </button>
+                  )}
+                </div>
+                <select
+                  className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
+                  value={ecosistema.bioma_id ?? ""}
+                  onChange={(e) => onSave({ bioma_id: e.target.value || null })}
+                >
+                  <option value="">Sin bioma</option>
+                  {biomas.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+                  Clima
+                </span>
+                <input
+                  className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
+                  placeholder="Ej. húmedo templado…"
+                  value={clima}
+                  onChange={(e) => setClima(e.target.value)}
+                  onBlur={guardar}
+                />
+              </div>
+            </div>
+
+            <div>
+              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+                Descripción
+              </span>
+              <RichEditor
+                minHeight="5rem"
+                placeholder="Cómo es el ecosistema, particularidades, peligros…"
+                value={descripcion}
+                onChange={setDescripcion}
+              />
+            </div>
+
+            <SelectorCriaturasMulti
+              ids={ecosistema.criatura_ids ?? []}
+              onChange={(ids) => onSave({ criatura_ids: ids })}
+              onSelectCriatura={onSelectCriatura}
+              label="Criaturas que lo habitan"
+              compacto
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <SelectorFloraMulti
+                ids={ecosistema.flora_ids ?? []}
+                onChange={(ids) => onSave({ flora_ids: ids })}
+                label="Flora"
+                compacto
+              />
+              <SelectorMineralesMulti
+                ids={ecosistema.mineral_ids ?? []}
+                onChange={(ids) => onSave({ mineral_ids: ids })}
+                label="Minerales"
+                compacto
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+                Cadenas alimenticias
+              </span>
               <button
                 type="button"
-                onClick={() => onSelectBioma(ecosistema.bioma_id!)}
-                className="text-micro font-bold text-accent/60 hover:text-accent transition-colors"
+                disabled={creandoCadena}
+                onClick={onCrearCadena}
+                className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
               >
-                Abrir
+                <Plus size={10} /> Nueva cadena
               </button>
+            </div>
+
+            {cadenas.length === 0 ? (
+              <p className="text-micro text-primary/25 italic py-1">Sin cadenas todavía</p>
+            ) : (
+              <div className="space-y-2.5">
+                {cadenas.map((c) => (
+                  <PanelCadena
+                    key={c.id}
+                    cadena={c}
+                    onSave={(updates) => onActualizarCadena(c.id, updates)}
+                    onDelete={() => onEliminarCadena(c.id)}
+                    onSelectCriatura={onSelectCriatura}
+                  />
+                ))}
+              </div>
             )}
           </div>
-          <select
-            className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
-            value={ecosistema.bioma_id ?? ""}
-            onChange={(e) => onSave({ bioma_id: e.target.value || null })}
-          >
-            <option value="">Sin bioma</option>
-            {biomas.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </select>
         </div>
-        <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
-            Clima
-          </span>
-          <input
-            className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
-            placeholder="Ej. húmedo templado…"
-            value={clima}
-            onChange={(e) => setClima(e.target.value)}
-            onBlur={guardar}
-          />
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
-          Descripción
-        </span>
-        <RichEditor
-          minHeight="6.25rem"
-          placeholder="Cómo es el ecosistema, particularidades, peligros…"
-          value={descripcion}
-          onChange={setDescripcion}
-        />
-      </div>
-
-      <div className="mb-4">
-        <SelectorCriaturasMulti
-          ids={ecosistema.criatura_ids ?? []}
-          onChange={(ids) => onSave({ criatura_ids: ids })}
-          onSelectCriatura={onSelectCriatura}
-          label="Criaturas que lo habitan"
-        />
-      </div>
-
-      <div className="mb-4">
-        <SelectorFloraMulti
-          ids={ecosistema.flora_ids ?? []}
-          onChange={(ids) => onSave({ flora_ids: ids })}
-          label="Flora del ecosistema"
-        />
-      </div>
-
-      <div className="mb-4">
-        <SelectorMineralesMulti
-          ids={ecosistema.mineral_ids ?? []}
-          onChange={(ids) => onSave({ mineral_ids: ids })}
-          label="Minerales del ecosistema"
-        />
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-            Cadenas alimenticias
-          </span>
-          <button
-            type="button"
-            disabled={creandoCadena}
-            onClick={onCrearCadena}
-            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
-          >
-            <Plus size={10} /> Nueva cadena
-          </button>
-        </div>
-
-        {cadenas.length === 0 ? (
-          <p className="text-micro text-primary/25 italic py-1">Sin cadenas todavía</p>
-        ) : (
-          <div className="space-y-2.5">
-            {cadenas.map((c) => (
-              <PanelCadena
-                key={c.id}
-                cadena={c}
-                onSave={(updates) => onActualizarCadena(c.id, updates)}
-                onDelete={() => onEliminarCadena(c.id)}
-                onSelectCriatura={onSelectCriatura}
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+                  Bioma
+                </span>
+                {ecosistema.bioma_id && onSelectBioma && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectBioma(ecosistema.bioma_id!)}
+                    className="text-micro font-bold text-accent/60 hover:text-accent transition-colors"
+                  >
+                    Abrir
+                  </button>
+                )}
+              </div>
+              <select
+                className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
+                value={ecosistema.bioma_id ?? ""}
+                onChange={(e) => onSave({ bioma_id: e.target.value || null })}
+              >
+                <option value="">Sin bioma</option>
+                {biomas.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+                Clima
+              </span>
+              <input
+                className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
+                placeholder="Ej. húmedo templado…"
+                value={clima}
+                onChange={(e) => setClima(e.target.value)}
+                onBlur={guardar}
               />
-            ))}
+            </div>
           </div>
-        )}
+
+          <div className="mb-4">
+            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+              Descripción
+            </span>
+            <RichEditor
+              minHeight="6.25rem"
+              placeholder="Cómo es el ecosistema, particularidades, peligros…"
+              value={descripcion}
+              onChange={setDescripcion}
+            />
+          </div>
+
+          <div className="mb-4">
+            <SelectorCriaturasMulti
+              ids={ecosistema.criatura_ids ?? []}
+              onChange={(ids) => onSave({ criatura_ids: ids })}
+              onSelectCriatura={onSelectCriatura}
+              label="Criaturas que lo habitan"
+            />
+          </div>
+
+          <div className="mb-4">
+            <SelectorFloraMulti
+              ids={ecosistema.flora_ids ?? []}
+              onChange={(ids) => onSave({ flora_ids: ids })}
+              label="Flora del ecosistema"
+            />
+          </div>
+
+          <div className="mb-4">
+            <SelectorMineralesMulti
+              ids={ecosistema.mineral_ids ?? []}
+              onChange={(ids) => onSave({ mineral_ids: ids })}
+              label="Minerales del ecosistema"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+                Cadenas alimenticias
+              </span>
+              <button
+                type="button"
+                disabled={creandoCadena}
+                onClick={onCrearCadena}
+                className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
+              >
+                <Plus size={10} /> Nueva cadena
+              </button>
+            </div>
+
+            {cadenas.length === 0 ? (
+              <p className="text-micro text-primary/25 italic py-1">Sin cadenas todavía</p>
+            ) : (
+              <div className="space-y-2.5">
+                {cadenas.map((c) => (
+                  <PanelCadena
+                    key={c.id}
+                    cadena={c}
+                    onSave={(updates) => onActualizarCadena(c.id, updates)}
+                    onDelete={() => onEliminarCadena(c.id)}
+                    onSelectCriatura={onSelectCriatura}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
       </div>
     </div>
   );

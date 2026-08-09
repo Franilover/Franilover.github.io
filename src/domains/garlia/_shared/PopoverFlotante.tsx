@@ -24,8 +24,8 @@ export function PopoverFlotante({
   anchor,
   onClose,
   children,
-  width = 380,
-  maxHeight = 520,
+  width = 560,
+  maxHeight = 460,
 }: {
   /** Elemento al que se ancla el popover. Si es null, no se renderiza nada. */
   anchor: HTMLElement | null;
@@ -35,7 +35,9 @@ export function PopoverFlotante({
   maxHeight?: number;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; openUp: boolean } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!anchor) {
@@ -44,12 +46,15 @@ export function PopoverFlotante({
     }
     const update = () => {
       const r = anchor.getBoundingClientRect();
+      // Ancho efectivo: el pedido, acotado al viewport (con margen), para que
+      // el layout horizontal no se corte en pantallas angostas.
+      const effectiveWidth = Math.min(width, window.innerWidth - 16);
       const espacioAbajo = window.innerHeight - r.bottom;
       const espacioArriba = r.top;
-      const openUp = espacioAbajo < Math.min(maxHeight, 320) && espacioArriba > espacioAbajo;
-      const left = Math.min(Math.max(r.left, 8), window.innerWidth - width - 8);
+      const openUp = espacioAbajo < Math.min(maxHeight, 280) && espacioArriba > espacioAbajo;
+      const left = Math.min(Math.max(r.left, 8), window.innerWidth - effectiveWidth - 8);
       const top = openUp ? r.top - 8 : r.bottom + 8;
-      setPos({ top, left, openUp });
+      setPos({ top, left, width: effectiveWidth, openUp });
     };
     update();
     window.addEventListener("resize", update);
@@ -88,7 +93,7 @@ export function PopoverFlotante({
       style={{
         top: pos.top,
         left: pos.left,
-        width,
+        width: pos.width,
         maxHeight: `min(${maxHeight}px, calc(100vh - 16px))`,
         transform: pos.openUp ? "translateY(-100%)" : undefined,
         background: "var(--bg-main)",

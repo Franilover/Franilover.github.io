@@ -99,76 +99,156 @@ export function PanelBioma({
         </div>
       </div>
 
-      <div className="mb-3">
-        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
-          Afinidad con Oris / elementos
-        </span>
-        <input
-          className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
-          placeholder="Ej. Tierra + Fuego dominantes, Runa ambiental que satura el aire…"
-          value={afinidad}
-          onChange={(e) => setAfinidad(e.target.value)}
-          onBlur={guardar}
-        />
-      </div>
+      {modoPopover ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-3">
+            <div>
+              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+                Afinidad con Oris / elementos
+              </span>
+              <input
+                className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
+                placeholder="Ej. Tierra + Fuego dominantes, Runa ambiental que satura el aire…"
+                value={afinidad}
+                onChange={(e) => setAfinidad(e.target.value)}
+                onBlur={guardar}
+              />
+            </div>
 
-      <div className="mb-4">
-        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
-          Descripción
-        </span>
-        <RichEditor
-          minHeight="6.25rem"
-          placeholder="Cómo es el bioma, su relación con la física del mundo, particularidades…"
-          value={descripcion}
-          onChange={setDescripcion}
-        />
-      </div>
-
-      <div className="mb-4">
-        <SelectorReinosMulti
-          ids={bioma.reino_ids ?? []}
-          onChange={(ids) => onSave({ reino_ids: ids })}
-          onSelectReino={onSelectReino}
-          label="Reinos con territorio en este bioma"
-        />
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-            Ecosistemas de este bioma
-          </span>
-          {onCrearEcosistema && (
-            <button
-              type="button"
-              disabled={creandoEcosistema}
-              onClick={onCrearEcosistema}
-              className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
-            >
-              <Plus size={10} /> Nuevo ecosistema
-            </button>
-          )}
-        </div>
-
-        {ecosistemas.length === 0 ? (
-          <p className="text-micro text-primary/25 italic py-1">Sin ecosistemas todavía</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {ecosistemas.map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => onSelectEcosistema?.(e.id)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-micro font-bold bg-primary/10 hover:bg-primary/20 text-primary/70 border border-primary/15 transition-colors truncate max-w-[200px]"
-                title={e.nombre}
-              >
-                <Leaf size={9} className="text-accent/60 shrink-0" />
-                <span className="truncate">{e.nombre}</span>
-              </button>
-            ))}
+            <SelectorReinosMulti
+              ids={bioma.reino_ids ?? []}
+              onChange={(ids) => onSave({ reino_ids: ids })}
+              onSelectReino={onSelectReino}
+              label="Reinos con territorio en este bioma"
+              compacto
+            />
           </div>
-        )}
-      </div>
+
+          <div className="flex flex-col gap-3">
+            <div>
+              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+                Descripción
+              </span>
+              <RichEditor
+                minHeight="5rem"
+                placeholder="Cómo es el bioma, su relación con la física del mundo, particularidades…"
+                value={descripcion}
+                onChange={setDescripcion}
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+                  Ecosistemas de este bioma
+                </span>
+                {onCrearEcosistema && (
+                  <button
+                    type="button"
+                    disabled={creandoEcosistema}
+                    onClick={onCrearEcosistema}
+                    className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
+                  >
+                    <Plus size={10} /> Nuevo ecosistema
+                  </button>
+                )}
+              </div>
+
+              {ecosistemas.length === 0 ? (
+                <p className="text-micro text-primary/25 italic py-1">Sin ecosistemas todavía</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {ecosistemas.map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => onSelectEcosistema?.(e.id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-micro font-bold bg-primary/10 hover:bg-primary/20 text-primary/70 border border-primary/15 transition-colors truncate max-w-[200px]"
+                      title={e.nombre}
+                    >
+                      <Leaf size={9} className="text-accent/60 shrink-0" />
+                      <span className="truncate">{e.nombre}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="mb-3">
+            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+              Afinidad con Oris / elementos
+            </span>
+            <input
+              className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
+              placeholder="Ej. Tierra + Fuego dominantes, Runa ambiental que satura el aire…"
+              value={afinidad}
+              onChange={(e) => setAfinidad(e.target.value)}
+              onBlur={guardar}
+            />
+          </div>
+
+          <div className="mb-4">
+            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+              Descripción
+            </span>
+            <RichEditor
+              minHeight="6.25rem"
+              placeholder="Cómo es el bioma, su relación con la física del mundo, particularidades…"
+              value={descripcion}
+              onChange={setDescripcion}
+            />
+          </div>
+
+          <div className="mb-4">
+            <SelectorReinosMulti
+              ids={bioma.reino_ids ?? []}
+              onChange={(ids) => onSave({ reino_ids: ids })}
+              onSelectReino={onSelectReino}
+              label="Reinos con territorio en este bioma"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+                Ecosistemas de este bioma
+              </span>
+              {onCrearEcosistema && (
+                <button
+                  type="button"
+                  disabled={creandoEcosistema}
+                  onClick={onCrearEcosistema}
+                  className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
+                >
+                  <Plus size={10} /> Nuevo ecosistema
+                </button>
+              )}
+            </div>
+
+            {ecosistemas.length === 0 ? (
+              <p className="text-micro text-primary/25 italic py-1">Sin ecosistemas todavía</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {ecosistemas.map((e) => (
+                  <button
+                    key={e.id}
+                    type="button"
+                    onClick={() => onSelectEcosistema?.(e.id)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-micro font-bold bg-primary/10 hover:bg-primary/20 text-primary/70 border border-primary/15 transition-colors truncate max-w-[200px]"
+                    title={e.nombre}
+                  >
+                    <Leaf size={9} className="text-accent/60 shrink-0" />
+                    <span className="truncate">{e.nombre}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

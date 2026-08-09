@@ -1220,8 +1220,8 @@ export function CriaturasJerarquica({
           <PopoverFlotante
             anchor={ecosistemaAbierto.anchor}
             onClose={() => setEcosistemaAbierto(null)}
-            width={420}
-            maxHeight={620}
+            width={640}
+            maxHeight={480}
           >
             <EcosistemaPopoverContent
               ecosistemaId={ecosistemaAbierto.id}
