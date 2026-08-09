@@ -999,6 +999,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
               criatura_ids: [...eco.criatura_ids, criaturaId],
             });
           }}
+          onAsignarEcosistemaABioma={async (ecosistemaId, biomaId) => {
+            await actualizarEcosistema(ecosistemaId, { bioma_id: biomaId || null });
+          }}
           onMoverPersonaje={async (personajeId, criaturaNombre) => {
             await updatePersonaje(personajeId, { especie: criaturaNombre ?? undefined });
           }}
@@ -1045,6 +1048,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
             const bioma = biomas.find((b) => b.id === eco.bioma_id);
             if (!bioma || bioma.reino_ids.includes(reinoId)) return;
             await actualizarBioma(bioma.id, { reino_ids: [...bioma.reino_ids, reinoId] });
+          }}
+          onAsignarEcosistemaABioma={async (ecosistemaId, biomaId) => {
+            await actualizarEcosistema(ecosistemaId, { bioma_id: biomaId || null });
           }}
           onMoverPersonaje={async (personajeId, ciudadId, reinoNombre) => {
             await updatePersonaje(personajeId, {

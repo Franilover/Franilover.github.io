@@ -116,6 +116,12 @@ interface Props {
    *  no hay FK directa Ecosistema→Reino. Solo aplica cuando el ecosistema
    *  tiene un bioma asignado; si no, el drop no hace nada. */
   onAsignarReinoAEcosistema?: (reinoId: string, ecosistemaId: string) => void;
+  /** Mueve un ecosistema a otro bioma (arrastre por click derecho de una
+   *  card/chip de ecosistema sobre el título de un bioma, modo "ojo
+   *  apagado") — setea Ecosistema.bioma_id directamente (FK simple, a
+   *  diferencia de reino que va por M:N vía Bioma.reino_ids). Si el
+   *  elemento no acepta esta prop, los ecosistemas no son arrastrables. */
+  onAsignarEcosistemaABioma?: (ecosistemaId: string, biomaId: string) => void;
   /** Mueve un personaje a otra ciudad (arrastre por click derecho de una
    *  EntityCard de personaje sobre una columna de ciudad, o sobre la card
    *  de un reino para dejarlo en el slot "Sin Ciudad" de ese reino). Si
@@ -225,6 +231,7 @@ export function GeografiaJerarquica({
   onCreateCiudad,
   onCreatePersonaje,
   onAsignarReinoAEcosistema,
+  onAsignarEcosistemaABioma,
   onMoverPersonaje,
   creatingReino,
   gruposPersonajesPorSubtipo,
@@ -250,6 +257,11 @@ export function GeografiaJerarquica({
   // una columna de Ciudad o sobre la card de un Reino en modo "ojo ON".
   const dragPersonaje = useRightClickDrag<string>({
     label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
+  });
+  // Arrastre (click derecho) de chips/cards de Ecosistema → se sueltan
+  // sobre el título de un Bioma en modo "ojo apagado".
+  const dragEcosistema = useRightClickDrag<string>({
+    label: (id) => ecosistemas.find((e) => e.id === id)?.nombre ?? "",
   });
 
   useLayoutEffect(() => {
@@ -683,8 +695,15 @@ export function GeografiaJerarquica({
           <button
             type="button"
             onClick={() => onOpen("ecosistemas", eco.id)}
-            title={eco.nombre}
-            className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
+            title={
+              onAsignarEcosistemaABioma
+                ? `${eco.nombre} — click derecho para mover`
+                : eco.nombre
+            }
+            {...(onAsignarEcosistemaABioma ? dragEcosistema.dragHandlers(eco.id) : {})}
+            className={`flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors ${
+              onAsignarEcosistemaABioma ? "cursor-grab active:cursor-grabbing" : ""
+            }`}
           >
             {eco.nombre}
           </button>
@@ -991,20 +1010,37 @@ export function GeografiaJerarquica({
                 // (ni con reinos ni vacíos) — un bioma sin ecosistemas
                 // todavía debe verse como chip de bioma vacío.
                 .filter((grupo) => grupo.esBioma || grupo.todosEcosistemas.length > 0)
-                .map((grupo) => (
+                .map((grupo) => {
+                  const esSinBioma = grupo.key === "__sin_bioma__";
+                  const zoneIdBioma = `bioma:${grupo.key}`;
+                  const dropActiveBioma =
+                    !!onAsignarEcosistemaABioma && dragEcosistema.esZonaActiva(zoneIdBioma);
+                  const dropHandlersBioma = onAsignarEcosistemaABioma
+                    ? dragEcosistema.dropHandlers(zoneIdBioma, (ecosistemaId) =>
+                        onAsignarEcosistemaABioma(ecosistemaId, esSinBioma ? "" : grupo.key),
+                      )
+                    : {};
+                  return (
                   <div key={grupo.key} className="flex flex-col gap-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
-                      }
-                      disabled={grupo.key === "__sin_bioma__"}
-                      title={grupo.label}
-                      className="self-start flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
+                    <div
+                      {...dropHandlersBioma}
+                      className={`self-start rounded-md transition-colors ${
+                        dropActiveBioma ? "ring-2 ring-accent/60 bg-accent/5" : ""
+                      }`}
                     >
-                      <Compass size={11} className="shrink-0 text-accent/50" />
-                      {grupo.label}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
+                        }
+                        disabled={grupo.key === "__sin_bioma__"}
+                        title={grupo.label}
+                        className="flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
+                      >
+                        <Compass size={11} className="shrink-0 text-accent/50" />
+                        {grupo.label}
+                      </button>
+                    </div>
                     {grupo.todosEcosistemas.length === 0 ? (
                       <div className="text-micro text-primary/25 px-1">Sin ecosistemas</div>
                     ) : (
@@ -1034,6 +1070,11 @@ export function GeografiaJerarquica({
                                 key={eco.id}
                                 fill
                                 label={eco.nombre}
+                                dragProps={
+                                  onAsignarEcosistemaABioma
+                                    ? dragEcosistema.dragHandlers(eco.id)
+                                    : undefined
+                                }
                                 onClick={() => onOpen("ecosistemas", eco.id)}
                               />
                             ))}
@@ -1042,7 +1083,8 @@ export function GeografiaJerarquica({
                       </>
                     )}
                   </div>
-                ))
+                  );
+                })
             : // Sin biomas cargados: comportamiento anterior, un único
               // masonry plano de todos los ecosistemas con reinos.
               hayEcosistemasConReinos && (
@@ -1092,6 +1134,7 @@ export function GeografiaJerarquica({
       )}
       {dragReino.overlay}
       {dragPersonaje.overlay}
+      {dragEcosistema.overlay}
     </div>
   );
 }

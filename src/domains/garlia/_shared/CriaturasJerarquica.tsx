@@ -115,6 +115,11 @@ interface Props {
    *  agrega el id de la criatura a Ecosistema.criatura_ids. Si el elemento
    *  no acepta esta prop, los chips de criatura no son arrastrables. */
   onAsignarCriaturaAEcosistema?: (criaturaId: string, ecosistemaId: string) => void;
+  /** Mueve un ecosistema a otro bioma (arrastre por click derecho de una
+   *  card/chip de ecosistema sobre el título de un bioma, mismo criterio
+   *  que en GeografiaJerarquica) — setea Ecosistema.bioma_id. Si el
+   *  elemento no acepta esta prop, los ecosistemas no son arrastrables. */
+  onAsignarEcosistemaABioma?: (ecosistemaId: string, biomaId: string) => void;
   /** Mueve un personaje a otra criatura (especie) — arrastre por click
    *  derecho de una EntityCard de personaje sobre una card de criatura en
    *  modo "ojo ON". `criaturaNombre` es null para dejarlo sin especie
@@ -420,6 +425,7 @@ export function CriaturasJerarquica({
   onCreatePersonaje,
   creatingCriatura,
   onAsignarCriaturaAEcosistema,
+  onAsignarEcosistemaABioma,
   onMoverPersonaje,
   onCreateEcosistema,
   creatingEcosistema,
@@ -449,6 +455,11 @@ export function CriaturasJerarquica({
   // una card de Criatura en modo "ojo ON" (o "Sin criatura").
   const dragPersonaje = useRightClickDrag<string>({
     label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
+  });
+  // Arrastre (click derecho) de chips/cards de Ecosistema → se sueltan
+  // sobre el título de un Bioma.
+  const dragEcosistema = useRightClickDrag<string>({
+    label: (id) => ecosistemas.find((e) => e.id === id)?.nombre ?? "",
   });
 
   useLayoutEffect(() => {
@@ -755,8 +766,15 @@ export function CriaturasJerarquica({
           <button
             type="button"
             onClick={() => onOpen("ecosistemas", eco.id)}
-            title={eco.nombre}
-            className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
+            title={
+              onAsignarEcosistemaABioma
+                ? `${eco.nombre} — click derecho para mover`
+                : eco.nombre
+            }
+            {...(onAsignarEcosistemaABioma ? dragEcosistema.dragHandlers(eco.id) : {})}
+            className={`flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors ${
+              onAsignarEcosistemaABioma ? "cursor-grab active:cursor-grabbing" : ""
+            }`}
           >
             {eco.nombre}
           </button>
@@ -1021,20 +1039,37 @@ export function CriaturasJerarquica({
                 // (ni con contenido ni vacíos) — un bioma sin ecosistemas
                 // todavía debe verse como chip de bioma vacío, no desaparecer.
                 .filter((grupo) => grupo.esBioma || grupo.todosEcosistemas.length > 0)
-                .map((grupo) => (
+                .map((grupo) => {
+                  const esSinBioma = grupo.key === "__sin_bioma__";
+                  const zoneIdBioma = `bioma:${grupo.key}`;
+                  const dropActiveBioma =
+                    !!onAsignarEcosistemaABioma && dragEcosistema.esZonaActiva(zoneIdBioma);
+                  const dropHandlersBioma = onAsignarEcosistemaABioma
+                    ? dragEcosistema.dropHandlers(zoneIdBioma, (ecosistemaId) =>
+                        onAsignarEcosistemaABioma(ecosistemaId, esSinBioma ? "" : grupo.key),
+                      )
+                    : {};
+                  return (
                   <div key={grupo.key} className="flex flex-col gap-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
-                      }
-                      disabled={grupo.key === "__sin_bioma__"}
-                      title={grupo.label}
-                      className="self-start flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
+                    <div
+                      {...dropHandlersBioma}
+                      className={`self-start rounded-md transition-colors ${
+                        dropActiveBioma ? "ring-2 ring-accent/60 bg-accent/5" : ""
+                      }`}
                     >
-                      <Compass size={11} className="shrink-0 text-accent/50" />
-                      {grupo.label}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
+                        }
+                        disabled={grupo.key === "__sin_bioma__"}
+                        title={grupo.label}
+                        className="flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
+                      >
+                        <Compass size={11} className="shrink-0 text-accent/50" />
+                        {grupo.label}
+                      </button>
+                    </div>
                     {grupo.todosEcosistemas.length === 0 ? (
                       <div className="text-micro text-primary/25 px-1">Sin ecosistemas</div>
                     ) : (
@@ -1064,6 +1099,11 @@ export function CriaturasJerarquica({
                                 key={eco.id}
                                 fill
                                 label={eco.nombre}
+                                dragProps={
+                                  onAsignarEcosistemaABioma
+                                    ? dragEcosistema.dragHandlers(eco.id)
+                                    : undefined
+                                }
                                 onClick={() => onOpen("ecosistemas", eco.id)}
                               />
                             ))}
@@ -1072,7 +1112,8 @@ export function CriaturasJerarquica({
                       </>
                     )}
                   </div>
-                ))
+                  );
+                })
             : // Sin biomas cargados: comportamiento anterior, un único
               // masonry plano de todos los ecosistemas con contenido, más
               // los vacíos como chips.
@@ -1153,6 +1194,7 @@ export function CriaturasJerarquica({
       )}
       {dragCriatura.overlay}
       {dragPersonaje.overlay}
+      {dragEcosistema.overlay}
     </div>
   );
 }
