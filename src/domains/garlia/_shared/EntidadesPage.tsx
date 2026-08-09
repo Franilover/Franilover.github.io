@@ -139,7 +139,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   // ── Entidades ──────────────────────────────────────────────────────────
   const { data: personajes, loading: loadingP, addRow: addPersonaje, updateRow: updatePersonaje } =
     useSupabaseData<Personaje>("personajes");
-  const { data: criaturas, loading: loadingC, addRow: addCriatura } =
+  const { data: criaturas, loading: loadingC, addRow: addCriatura, updateRow: updateCriatura } =
     useSupabaseData<Criatura>("criaturas");
   const { data: items, loading: loadingI, addRow: addItem } =
     useSupabaseData<Item>("items");
@@ -1017,6 +1017,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
           onSelectCancion={(id) => openEntity("letras", id)}
           onNavigateCapitulo={(id) => openEntity("capitulos", id)}
           onUpdatePersonaje={(id, patch) => void updatePersonaje(id, patch)}
+          onSelectGrupo={(id) => openEntity("grupos", id)}
+          onNavigateReino={(id) => openEntity("reinos", id)}
+          onUpdateCriatura={(id, patch) => void updateCriatura(id, patch)}
           busqueda={busquedaCriatura}
           onBusquedaChange={setBusquedaCriatura}
           agrupacionSelector={agrupacionSelector}

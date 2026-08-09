@@ -54,12 +54,14 @@ import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 import { BiomaPopoverContent } from "@/domains/garlia/biologia/BiomaPopoverContent";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PersonajePopoverContent } from "@/domains/garlia/personajes/PersonajePopoverContent";
+import { CriaturaPopoverContent } from "@/domains/garlia/criaturas/CriaturaPopoverContent";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 interface Criatura {
   id: string;
   nombre: string;
   imagen_url?: string | null;
+  descripcion?: string | null;
 }
 interface Personaje {
   id: string;
@@ -172,6 +174,16 @@ interface Props {
    *  esos selectores no aparecen editables (el popover sigue mostrándose,
    *  solo que de solo lectura). */
   onUpdatePersonaje?: (personajeId: string, patch: Partial<Personaje>) => void;
+  /** Abre el editor completo de un grupo de clasificación — usado por el
+   *  popover flotante de Criatura (bloque "Clasificación"). Reutiliza
+   *  onOpenGrupo si no se pasa uno específico. */
+  onSelectGrupo?: (grupoId: string) => void;
+  /** Navega al editor completo de un reino — usado por el popover flotante
+   *  de Criatura (bloque "Territorio"). */
+  onNavigateReino?: (id: string) => void;
+  /** Guarda un patch parcial de una criatura (descripción) — usado por el
+   *  popover flotante de Criatura. */
+  onUpdateCriatura?: (criaturaId: string, patch: Partial<Criatura>) => void;
   /** Texto de búsqueda por nombre de criatura — controlado por el padre,
    *  se combina (AND) con el filtro de grupo activo. */
   busqueda?: string;
@@ -463,6 +475,9 @@ export function CriaturasJerarquica({
   onSelectCancion,
   onNavigateCapitulo,
   onUpdatePersonaje,
+  onSelectGrupo,
+  onNavigateReino,
+  onUpdateCriatura,
   busqueda = "",
   onBusquedaChange,
   agrupacionSelector,
@@ -486,6 +501,15 @@ export function CriaturasJerarquica({
   // completa. El botón "Centrar" del propio popover es el único que llama a
   // onOpen("personajes", id).
   const [personajeAbierto, setPersonajeAbierto] = useState<{
+    id: string;
+    anchor: HTMLElement;
+  } | null>(null);
+  // Popover flotante minimalista de Criatura: click en el chip de una
+  // criatura abre este panel (nombre + Descripción + Clasificación +
+  // Personajes + Territorio) en vez de navegar directo a pantalla completa.
+  // El botón "Centrar" del propio popover es el único que llama a
+  // onOpen("criaturas", id).
+  const [criaturaAbierta, setCriaturaAbierta] = useState<{
     id: string;
     anchor: HTMLElement;
   } | null>(null);
@@ -739,7 +763,7 @@ export function CriaturasJerarquica({
               dragProps={
                 onAsignarCriaturaAEcosistema ? dragCriatura.dragHandlers(criatura.id) : undefined
               }
-              onClick={() => onOpen("criaturas", criatura.id)}
+              onClick={(e) => setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })}
               onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
             />
             {!vacia && (
@@ -774,7 +798,7 @@ export function CriaturasJerarquica({
           dragProps={
             onAsignarCriaturaAEcosistema ? dragCriatura.dragHandlers(criatura.id) : undefined
           }
-          onClick={() => onOpen("criaturas", criatura.id)}
+          onClick={(e) => setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })}
           onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
         />
         {vacia ? (
@@ -1023,7 +1047,9 @@ export function CriaturasJerarquica({
                                 !!onMoverPersonaje &&
                                 dragPersonaje.esZonaActiva(`criatura:${criatura.id}`)
                               }
-                              onClick={() => onOpen("criaturas", criatura.id)}
+                              onClick={(e) =>
+                                setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })
+                              }
                             />
                           </div>
                         ))}
@@ -1319,6 +1345,35 @@ export function CriaturasJerarquica({
                 onOpenGrupo={onOpenGrupo}
                 onSelectCancion={onSelectCancion}
                 onNavigateCapitulo={onNavigateCapitulo}
+              />
+            </PopoverFlotante>
+          );
+        })()}
+
+      {criaturaAbierta &&
+        (() => {
+          const c = criaturas.find((x) => x.id === criaturaAbierta.id);
+          if (!c) return null;
+          return (
+            <PopoverFlotante
+              anchor={criaturaAbierta.anchor}
+              onClose={() => setCriaturaAbierta(null)}
+              width={420}
+              maxHeight={560}
+              centerVertically
+              centerHorizontally
+            >
+              <CriaturaPopoverContent
+                criatura={c}
+                onSave={(patch) => onUpdateCriatura?.(c.id, patch)}
+                onClose={() => setCriaturaAbierta(null)}
+                onAbrirCompleto={() => {
+                  setCriaturaAbierta(null);
+                  onOpen("criaturas", c.id);
+                }}
+                onSelectPersonaje={(id) => onOpen("personajes", id)}
+                onSelectGrupo={onSelectGrupo ?? onOpenGrupo}
+                onNavigateReino={onNavigateReino}
               />
             </PopoverFlotante>
           );

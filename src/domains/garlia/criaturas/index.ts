@@ -6,3 +6,4 @@ export { EditorCriatura } from "./EditorCriatura";
 export { CriaturaEditor } from "./CriaturaEditor";
 export { CriaturaStatsDndEditor } from "./CriaturaStatsDnd";
 export { usePersonajesDeCriatura } from "./usePersonajesDeCriatura";
+export { CriaturaPopoverContent } from "./CriaturaPopoverContent";
