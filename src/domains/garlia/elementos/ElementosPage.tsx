@@ -335,7 +335,7 @@ function ReglasQuimica({
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-3">
-      <div className="shrink-0 flex items-center justify-between pb-2">
+      <div className="shrink-0 flex items-center justify-between pb-3">
         <div className="flex items-center gap-1.5 text-primary/40">
           <Atom size={12} />
           <p className="text-micro font-black uppercase tracking-widest">
@@ -343,32 +343,40 @@ function ReglasQuimica({
             {saving && <Loader2 className="inline-block animate-spin ml-1.5 align-[-2px]" size={10} />}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={agregarSeccion}
+          title="Agregar sección"
+          className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <Plus size={12} />
+        </button>
       </div>
 
       {loading ? (
         <div className="p-6 text-micro text-primary/30 text-center">Cargando…</div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="columns-1 sm:columns-2 lg:columns-4 gap-4">
           {borrador.map((seccion) => (
             <div
               key={seccion.id}
-              className="flex flex-col gap-1.5 p-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
+              className="group break-inside-avoid mb-4 flex flex-col gap-1"
             >
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <input
                   value={seccion.titulo}
                   onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
                   onBlur={() => persistir(borrador)}
-                  placeholder="Título de la sección"
-                  className="flex-1 min-w-0 bg-primary/5 rounded-md px-2 py-1 text-micro font-black uppercase tracking-wide text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
+                  placeholder="Título"
+                  className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-micro font-black uppercase tracking-[0.2em] text-primary/60 outline-none placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
                 />
                 <button
                   type="button"
                   onClick={() => eliminarSeccion(seccion.id)}
                   title="Eliminar sección"
-                  className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+                  className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/0 group-hover:text-primary/30 hover:!text-red-400 transition-all cursor-pointer"
                 >
-                  <Trash2 size={11} />
+                  <Trash2 size={10} />
                 </button>
               </div>
               <textarea
@@ -377,19 +385,20 @@ function ReglasQuimica({
                 onBlur={() => persistir(borrador)}
                 placeholder="Contenido…"
                 rows={4}
-                className="bg-primary/5 rounded-md px-2 py-1.5 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25 leading-relaxed"
+                className="bg-transparent px-0 py-0 text-micro text-primary/70 outline-none resize-none placeholder:text-primary/25 leading-relaxed"
               />
             </div>
           ))}
 
-          <button
-            type="button"
-            onClick={agregarSeccion}
-            className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
-          >
-            <Plus size={10} />
-            Agregar sección
-          </button>
+          {borrador.length === 0 && (
+            <button
+              type="button"
+              onClick={agregarSeccion}
+              className="text-micro text-primary/30 hover:text-primary/60 transition-all cursor-pointer"
+            >
+              + Agregar sección
+            </button>
+          )}
         </div>
       )}
     </div>
