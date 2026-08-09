@@ -61,7 +61,7 @@ type Seleccion =
   | { tipo: "oris"; id: string }
   | { tipo: "concepto"; id: string }
   | { tipo: "todos-oris" }
-  | { tipo: "catalogo"; catalogo: "particula-base" | "particulas" | "iums" }
+  | { tipo: "todas-bases" }
   | null;
 
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
@@ -211,26 +211,19 @@ function BloqueConceptos({
 }
 
 /**
- * Vista de catálogo fijo en la columna derecha. Al hacer click en
- * "Partícula Base" / "Partículas" / "Iums" en la sidebar, se muestra la
- * lista completa acá, con más espacio y detalle que la versión mini
- * colapsada de la barra lateral, y en 3 columnas.
+ * Vista de todas las Bases (Partícula Base / Partículas / Iums) en la
+ * columna derecha. Mismo patrón que TodosLosOrisView: cada catálogo es un
+ * bloque con título y separador horizontal, apilados uno arriba del otro.
  */
-const CATALOGO_TITULOS: Record<"particula-base" | "particulas" | "iums", string> = {
-  "particula-base": "Partícula Base",
-  particulas: "Partículas",
-  iums: "Iums",
-};
+const CATALOGOS_BASES: { key: "particula-base" | "particulas" | "iums"; titulo: string; filas: FilaCatalogo[] }[] =
+  [
+    { key: "particula-base", titulo: "Partícula Base", filas: PARTICULAS_BASE },
+    { key: "particulas", titulo: "Partículas", filas: PARTICULAS },
+    { key: "iums", titulo: "Iums", filas: IUMS },
+  ];
 
-function CatalogoView({
-  catalogo,
-  filas,
-  onBack,
-}: {
-  catalogo: "particula-base" | "particulas" | "iums";
-  filas: FilaCatalogo[];
-  onBack: () => void;
-}) {
+function TodasLasBasesView({ onBack }: { onBack: () => void }) {
+  const total = CATALOGOS_BASES.reduce((acc, c) => acc + c.filas.length, 0);
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div
@@ -245,27 +238,41 @@ function CatalogoView({
           <ChevronLeft size={12} />
         </button>
         <p className="text-micro font-black uppercase tracking-widest text-primary">
-          {CATALOGO_TITULOS[catalogo]} · {filas.length}
+          Bases · {total}
         </p>
       </div>
 
-      <div className="min-h-0 overflow-y-auto p-2.5">
-        <div
-          className={`grid grid-cols-1 sm:grid-cols-2 gap-2 content-start ${
-            catalogo === "particula-base" ? "lg:grid-cols-3" : "lg:grid-cols-4"
-          }`}
-        >
-          {filas.map((f) => (
+      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
+        {CATALOGOS_BASES.map(({ key, titulo, filas }, idx) => (
+          <div key={key} className="flex flex-col gap-2">
             <div
-              key={f.nombre}
-              className="flex flex-col gap-1 px-2.5 py-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
+              className={`flex items-center gap-1.5 text-primary/50 pb-1.5 ${
+                idx > 0 ? "pt-2 border-t border-primary/10" : ""
+              }`}
             >
-              <span className="text-micro font-black text-primary">{f.nombre}</span>
-              <span className="text-xs text-primary/60 leading-snug">{f.detalle}</span>
-              {f.extra && <span className="text-xs text-primary/40 leading-snug">{f.extra}</span>}
+              <p className="text-micro font-black uppercase tracking-[0.2em]">
+                {titulo} · {filas.length}
+              </p>
             </div>
-          ))}
-        </div>
+
+            <div
+              className={`grid grid-cols-1 sm:grid-cols-2 gap-2 items-start ${
+                key === "particula-base" ? "lg:grid-cols-3" : "lg:grid-cols-4"
+              }`}
+            >
+              {filas.map((f) => (
+                <div
+                  key={f.nombre}
+                  className="flex flex-col gap-1 px-2.5 py-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
+                >
+                  <span className="text-micro font-black text-primary">{f.nombre}</span>
+                  <span className="text-xs text-primary/60 leading-snug">{f.detalle}</span>
+                  {f.extra && <span className="text-xs text-primary/40 leading-snug">{f.extra}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -592,30 +599,20 @@ export function FisicaPage({
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-1.5 flex flex-col gap-1.5">
-          {/* Bases — 3 botones únicos (Partícula Base / Partículas / Iums) */}
-          <div className="flex flex-col gap-1">
-            {(
-              [
-                { key: "particula-base" as const, titulo: "Partícula Base", filas: PARTICULAS_BASE },
-                { key: "particulas" as const, titulo: "Partículas", filas: PARTICULAS },
-                { key: "iums" as const, titulo: "Iums", filas: IUMS },
-              ] as const
-            ).map(({ key, titulo, filas }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setSeleccion({ tipo: "catalogo", catalogo: key })}
-                className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
-                  seleccion?.tipo === "catalogo" && seleccion.catalogo === key
-                    ? "border-primary/50 bg-primary/10 text-primary"
-                    : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
-                }`}
-              >
-                <span className="text-micro font-black uppercase tracking-[0.2em]">{titulo}</span>
-                <span className="text-micro text-primary/30">{filas.length}</span>
-              </button>
-            ))}
-          </div>
+          {/* Bases — botón único, abre los 3 catálogos en la columna derecha */}
+          <button
+            type="button"
+            onClick={() => setSeleccion({ tipo: "todas-bases" })}
+            className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
+              seleccion?.tipo === "todas-bases"
+                ? "border-primary/50 bg-primary/10 text-primary"
+                : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
+            }`}
+          >
+            <span className="text-micro font-black uppercase tracking-[0.2em]">
+              Bases · {PARTICULAS_BASE.length + PARTICULAS.length + IUMS.length}
+            </span>
+          </button>
 
           {/* Oris — botón único, abre las 3 familias en la columna derecha */}
           <button
@@ -744,18 +741,8 @@ export function FisicaPage({
             onActualizarOris={onActualizarOris}
             onEliminarOris={onEliminarOris}
           />
-        ) : seleccion?.tipo === "catalogo" ? (
-          <CatalogoView
-            catalogo={seleccion.catalogo}
-            filas={
-              seleccion.catalogo === "particula-base"
-                ? PARTICULAS_BASE
-                : seleccion.catalogo === "particulas"
-                  ? PARTICULAS
-                  : IUMS
-            }
-            onBack={() => setSeleccion(null)}
-          />
+        ) : seleccion?.tipo === "todas-bases" ? (
+          <TodasLasBasesView onBack={() => setSeleccion(null)} />
         ) : conceptoActivo ? (
           <ConceptoEditor
             concepto={conceptoActivo}
