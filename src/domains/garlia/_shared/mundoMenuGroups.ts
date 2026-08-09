@@ -71,7 +71,7 @@ export const MUNDO_MENU_GROUPS: MenuGroup[] = [
     title: "Magia",
     items: [
       { key: "runas", label: "Runas", Icon: Sparkles },
-      { key: "elementos", label: "Tabla", Icon: Atom },
+      { key: "elementos", label: "Química", Icon: Atom },
     ],
   },
 ];

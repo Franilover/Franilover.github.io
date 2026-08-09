@@ -761,19 +761,17 @@ export function ElementosPage({
               disabled={elementos.length < 2}
               onClick={() => setComparadorAbierto(true)}
               title="Comparar 2-3 elementos lado a lado"
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
-              <GitCompare size={10} />
-              <span className="hidden sm:inline">Comparar</span>
+              <GitCompare size={14} />
             </button>
             <button
               type="button"
               onClick={() => descargarDatosElementos(elementos, infoTabla.secciones, compuestos)}
               title="Descargar todos los datos de la Tabla Química como JSON"
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+              className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
             >
-              <Download size={10} />
-              <span className="hidden sm:inline">Descargar datos</span>
+              <Download size={14} />
             </button>
             {onImportarElementos && (
               <>
@@ -789,10 +787,9 @@ export function ElementosPage({
                   disabled={importando}
                   onClick={() => inputArchivoRef.current?.click()}
                   title='Subir un JSON con elementos nuevos (mismo formato que "Descargar datos")'
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
-                  {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}
-                  <span className="hidden sm:inline">Subir JSON</span>
+                  {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
                 </button>
               </>
             )}
@@ -801,10 +798,10 @@ export function ElementosPage({
                 type="button"
                 disabled={creating}
                 onClick={onCreate}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                title="Nuevo elemento"
+                className="flex items-center justify-center p-1.5 rounded-md bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                {creating ? <Loader2 className="animate-spin" size={10} /> : <Plus size={10} />}
-                Nuevo elemento
+                {creating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
               </button>
             )}
           </div>

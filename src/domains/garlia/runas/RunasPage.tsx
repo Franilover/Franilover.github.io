@@ -593,7 +593,7 @@ type SeccionMagia = "runas" | "tabla" | "fisica" | "biologia";
 
 const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
   { key: "runas", label: "Runas", Icon: Waypoints },
-  { key: "tabla", label: "Tabla", Icon: Atom },
+  { key: "tabla", label: "Química", Icon: Atom },
   { key: "fisica", label: "Física", Icon: Zap },
   { key: "biologia", label: "Biología", Icon: Dna },
 ];

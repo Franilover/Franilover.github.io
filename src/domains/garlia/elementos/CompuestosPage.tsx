@@ -1045,10 +1045,9 @@ export function CompuestosPage({
               disabled={compuestos.length < 2}
               onClick={() => setLaboratorioAbierto(true)}
               title="Combinar dos compuestos existentes en uno nuevo"
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
-              <Combine size={10} />
-              <span className="hidden sm:inline">Laboratorio</span>
+              <Combine size={14} />
             </button>
 
             <button
@@ -1056,10 +1055,9 @@ export function CompuestosPage({
               disabled={compuestos.length === 0}
               onClick={() => descargarDatosCompuestos(compuestos, elementos)}
               title="Descargar todos los compuestos como JSON"
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
-              <Download size={10} />
-              <span className="hidden sm:inline">Descargar datos</span>
+              <Download size={14} />
             </button>
 
             {onCreate && (
@@ -1070,12 +1068,11 @@ export function CompuestosPage({
                 title={
                   elementos.length === 0
                     ? "Primero cargá elementos en la Tabla Química"
-                    : undefined
+                    : "Nuevo compuesto"
                 }
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="flex items-center justify-center p-1.5 rounded-md bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                {creating ? <Loader2 className="animate-spin" size={10} /> : <Plus size={10} />}
-                Nuevo compuesto
+                {creating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
               </button>
             )}
           </div>
