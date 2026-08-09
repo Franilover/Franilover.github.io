@@ -19,7 +19,7 @@ interface Props {
   nombre: string;
   imageUrl?: string | null;
   Icon: React.ElementType;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   subtitle?: string | null;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;

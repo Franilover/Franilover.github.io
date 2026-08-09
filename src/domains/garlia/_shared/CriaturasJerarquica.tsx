@@ -53,6 +53,7 @@ import { useRightClickDrag } from "@/domains/garlia/_shared/DragDropReasignable"
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 import { BiomaPopoverContent } from "@/domains/garlia/biologia/BiomaPopoverContent";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
+import { PersonajePopoverContent } from "@/domains/garlia/personajes/PersonajePopoverContent";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 interface Criatura {
@@ -65,6 +66,7 @@ interface Personaje {
   nombre: string;
   img_url?: string | null;
   especie?: string | null;
+  reino?: string | null;
 }
 interface Ecosistema {
   id: string;
@@ -156,8 +158,20 @@ interface Props {
   grupoSeleccionadoId?: string | null;
   onSeleccionarGrupo?: (grupoId: string | null) => void;
   /** Abre el editor completo de un grupo — botón a la derecha de cada
-   *  opción en los dropdowns de filtro. */
+   *  opción en los dropdowns de filtro, y también usado por el popover
+   *  flotante de Personaje (bloque "Grupos"). */
   onOpenGrupo?: (grupoId: string) => void;
+  /** Abre el editor completo de una canción — usado por el popover flotante
+   *  de Personaje (bloque "Canciones"). */
+  onSelectCancion?: (id: string) => void;
+  /** Navega al editor completo de un capítulo — usado por el popover
+   *  flotante de Personaje (bloque "Capítulos"). */
+  onNavigateCapitulo?: (capituloId: string) => void;
+  /** Guarda un patch parcial de un personaje (especie/reino) — usado por los
+   *  selectores rápidos del popover flotante de Personaje. Si no se pasa,
+   *  esos selectores no aparecen editables (el popover sigue mostrándose,
+   *  solo que de solo lectura). */
+  onUpdatePersonaje?: (personajeId: string, patch: Partial<Personaje>) => void;
   /** Texto de búsqueda por nombre de criatura — controlado por el padre,
    *  se combina (AND) con el filtro de grupo activo. */
   busqueda?: string;
@@ -446,6 +460,9 @@ export function CriaturasJerarquica({
   grupoSeleccionadoId,
   onSeleccionarGrupo,
   onOpenGrupo,
+  onSelectCancion,
+  onNavigateCapitulo,
+  onUpdatePersonaje,
   busqueda = "",
   onBusquedaChange,
   agrupacionSelector,
@@ -463,6 +480,15 @@ export function CriaturasJerarquica({
   const [biomaAbierto, setBiomaAbierto] = useState<{ id: string; anchor: HTMLElement } | null>(
     null,
   );
+  // Popover flotante minimalista de Personaje: click en una EntityCard de
+  // personaje abre este panel (nombre + Especie/Reino + Relaciones/
+  // Capítulos/Canciones/Grupos) en vez de navegar directo a pantalla
+  // completa. El botón "Centrar" del propio popover es el único que llama a
+  // onOpen("personajes", id).
+  const [personajeAbierto, setPersonajeAbierto] = useState<{
+    id: string;
+    anchor: HTMLElement;
+  } | null>(null);
 
   // Envuelven las props onCreateBioma/onCreateEcosistema (que crean la
   // entidad y devuelven su id) para además abrir el popover de edición
@@ -766,7 +792,9 @@ export function CriaturasJerarquica({
                   nombre={p.nombre}
                   imageUrl={p.img_url}
                   Icon={Users}
-                  onClick={() => onOpen("personajes", p.id)}
+                  onClick={(e) =>
+                    setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
+                  }
                 />
               </div>
             ))}
@@ -940,7 +968,9 @@ export function CriaturasJerarquica({
                                 nombre={p.nombre}
                                 imageUrl={p.img_url}
                                 Icon={Users}
-                                onClick={() => onOpen("personajes", p.id)}
+                                onClick={(e) =>
+                                  setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
+                                }
                               />
                             </div>
                           ))}
@@ -1263,6 +1293,36 @@ export function CriaturasJerarquica({
             <BiomaPopoverContent biomaId={biomaAbierto.id} onClose={() => setBiomaAbierto(null)} />
           </PopoverFlotante>
         )}
+
+      {personajeAbierto &&
+        (() => {
+          const p = personajes.find((x) => x.id === personajeAbierto.id);
+          if (!p) return null;
+          return (
+            <PopoverFlotante
+              anchor={personajeAbierto.anchor}
+              onClose={() => setPersonajeAbierto(null)}
+              width={360}
+              maxHeight={520}
+              centerVertically
+              centerHorizontally
+            >
+              <PersonajePopoverContent
+                personaje={p}
+                onSave={(patch) => onUpdatePersonaje?.(p.id, patch)}
+                onClose={() => setPersonajeAbierto(null)}
+                onAbrirCompleto={() => {
+                  setPersonajeAbierto(null);
+                  onOpen("personajes", p.id);
+                }}
+                onSelectPersonaje={(id) => onOpen("personajes", id)}
+                onOpenGrupo={onOpenGrupo}
+                onSelectCancion={onSelectCancion}
+                onNavigateCapitulo={onNavigateCapitulo}
+              />
+            </PopoverFlotante>
+          );
+        })()}
     </div>
   );
 }

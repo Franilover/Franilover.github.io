@@ -1014,6 +1014,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
           grupoSeleccionadoId={grupoCriaturaSeleccionadoId}
           onSeleccionarGrupo={setGrupoCriaturaSeleccionadoId}
           onOpenGrupo={(id) => openEntity("grupos", id)}
+          onSelectCancion={(id) => openEntity("letras", id)}
+          onNavigateCapitulo={(id) => openEntity("capitulos", id)}
+          onUpdatePersonaje={(id, patch) => void updatePersonaje(id, patch)}
           busqueda={busquedaCriatura}
           onBusquedaChange={setBusquedaCriatura}
           agrupacionSelector={agrupacionSelector}
@@ -1079,6 +1082,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
           grupoReinoSeleccionadoId={grupoReinoSeleccionadoId}
           onSeleccionarGrupoReino={setGrupoReinoSeleccionadoId}
           onOpenGrupo={(id) => openEntity("grupos", id)}
+          onSelectCancion={(id) => openEntity("letras", id)}
+          onNavigateCapitulo={(id) => openEntity("capitulos", id)}
+          onUpdatePersonaje={(id, patch) => void updatePersonaje(id, patch)}
           busqueda={busquedaReino}
           onBusquedaChange={setBusquedaReino}
           agrupacionSelector={agrupacionSelector}

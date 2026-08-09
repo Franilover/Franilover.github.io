@@ -33,7 +33,10 @@ interface PersonajeSidebarPanelProps {
 }
 
 // ─── Contenido compartido entre inline y drawer ───────────────────────────────
-function SidebarContenido({
+// Exportado además para reutilizarse en PersonajePopoverContent (panel
+// flotante minimalista), sin duplicar los bloques de Relaciones/Capítulos/
+// Canciones/Grupos.
+export function SidebarContenido({
   personajeId,
   nombrePersonaje,
   onSelectPersonaje,
