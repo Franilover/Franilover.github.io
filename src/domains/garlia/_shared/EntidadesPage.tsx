@@ -1012,10 +1012,9 @@ export function EntidadesPage({ section, selectedId }: Props) {
           reinos={reinos}
           ciudades={ciudades}
           personajes={personajes}
-          ecosistemas={ecosistemas}
           biomas={biomas}
           mostrarPersonajes={mostrarPersonajes}
-          loading={loadingR || loadingCd || loadingP || loadingEco || loadingBiomas}
+          loading={loadingR || loadingCd || loadingP || loadingBiomas}
           onOpen={(section, id) => openEntity(section, id)}
           gruposPersonajesPorSubtipo={gruposPersonajesPorSubtipo}
           grupoSeleccionadoId={grupoPersonajeSeleccionadoId}
@@ -1042,15 +1041,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
             });
             if (data?.id) openEntity("personajes", data.id);
           }}
-          onAsignarReinoAEcosistema={async (reinoId, ecosistemaId) => {
-            const eco = ecosistemas.find((e) => e.id === ecosistemaId);
-            if (!eco?.bioma_id) return;
-            const bioma = biomas.find((b) => b.id === eco.bioma_id);
+          onAsignarReinoABioma={async (reinoId, biomaId) => {
+            const bioma = biomas.find((b) => b.id === biomaId);
             if (!bioma || bioma.reino_ids.includes(reinoId)) return;
             await actualizarBioma(bioma.id, { reino_ids: [...bioma.reino_ids, reinoId] });
-          }}
-          onAsignarEcosistemaABioma={async (ecosistemaId, biomaId) => {
-            await actualizarEcosistema(ecosistemaId, { bioma_id: biomaId || null });
           }}
           onMoverPersonaje={async (personajeId, ciudadId, reinoNombre) => {
             await updatePersonaje(personajeId, {

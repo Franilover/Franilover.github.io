@@ -29,20 +29,18 @@
  * no sobreponerse a los nodos vecinos. Solo caen en el bloque final global
  * "Sin ciudad" los personajes sin ciudad_id y sin reino válido asociado.
  *
- * Modo "ojo apagado" (mostrarPersonajes=false): análogo a CriaturasJerarquica
- * en su modo equivalente — en vez de Reino → Ciudad → Personajes, se muestra
- * Bioma → Ecosistema → Reinos (Ecosistema en el rol de Ciudad, Reino en el
- * rol de Criatura). Usa Ecosistema.bioma_id para agrupar por Bioma y
- * Bioma.reino_ids (M:N) para resolver qué reinos tienen territorio en cada
- * bioma — no hay Ecosistema.reino_id directo, la relación pasa por el Bioma
- * contenedor. Un reino sin ningún bioma que lo liste cae en "Sin bioma".
+ * Modo "ojo apagado" (mostrarPersonajes=false): en vez de Reino → Ciudad →
+ * Personajes, se muestra Bioma → Reinos directo, usando Bioma.reino_ids
+ * (M:N) — no pasa por Ecosistema (eso queda exclusivo de CriaturasJerarquica,
+ * donde Ecosistema es el hábitat de Criatura). Un reino que ningún bioma
+ * lista cae en "Sin bioma".
  *
  * Arrastre (click izquierdo abre / click derecho arrastra): usa el hook
  * compartido useRightClickDrag (DragDropReasignable.tsx). Hay dos arrastres
  * independientes activos en esta vista:
- *  - dragReino: chips de Reino → se pueden soltar sobre una card de
- *    Ecosistema (modo ojo OFF) para asignar el reino a ese ecosistema
- *    (onAsignarReinoAEcosistema).
+ *  - dragReino: chips de Reino → se pueden soltar sobre el título de un
+ *    Bioma (modo ojo OFF) para asignar el reino a ese bioma
+ *    (onAsignarReinoABioma).
  *  - dragPersonaje: EntityCard de Personaje → se pueden soltar sobre una
  *    columna de Ciudad o sobre la card de un Reino (modo ojo ON) para
  *    reasignar Personaje.ciudad_id (y opcionalmente Personaje.reino) vía
@@ -76,12 +74,6 @@ interface Personaje {
   ciudad_id?: string | null;
   reino?: string | null;
 }
-interface Ecosistema {
-  id: string;
-  nombre: string;
-  /** FK al Bioma que contiene este ecosistema. */
-  bioma_id?: string | null;
-}
 interface Bioma {
   id: string;
   nombre: string;
@@ -93,35 +85,26 @@ interface Props {
   reinos: Reino[];
   ciudades: Ciudad[];
   personajes: Personaje[];
-  /** Ecosistemas — usados solo en modo "ojo apagado" para agrupar reinos
-   *  por Bioma → Ecosistema, opcional para no romper usos previos. */
-  ecosistemas?: Ecosistema[];
-  /** Biomas — nivel jerárquico por encima de Ecosistema en modo "ojo
-   *  apagado", opcional idem. */
+  /** Biomas — nivel jerárquico usado en modo "ojo apagado" para agrupar
+   *  reinos (Bioma → Reinos, vía Bioma.reino_ids), opcional para no romper
+   *  usos previos. */
   biomas?: Bioma[];
   loading?: boolean;
   /** Controla el modo de la vista:
    *  - true (ojo): Reino → Ciudad → Personajes (comportamiento previo).
-   *  - false (sin ojo): Bioma → Ecosistema → Reinos, sin ciudades ni
-   *    personajes en ningún lado — mismo patrón que CriaturasJerarquica.
+   *  - false (sin ojo): Bioma → Reinos directo, sin ciudades ni
+   *    personajes en ningún lado.
    *  Por defecto true. */
   mostrarPersonajes?: boolean;
   onOpen: (section: SectionKey, id: string) => void;
   onCreateReino?: () => void;
   onCreateCiudad?: (reinoId: string | null) => void;
   onCreatePersonaje?: (ciudadId: string | null) => void;
-  /** Asigna un reino a un ecosistema (drag & drop de un chip de reino sobre
-   *  una card de ecosistema en modo "ojo apagado") — internamente agrega el
-   *  reino a Bioma.reino_ids del bioma que contiene ese ecosistema, ya que
-   *  no hay FK directa Ecosistema→Reino. Solo aplica cuando el ecosistema
-   *  tiene un bioma asignado; si no, el drop no hace nada. */
-  onAsignarReinoAEcosistema?: (reinoId: string, ecosistemaId: string) => void;
-  /** Mueve un ecosistema a otro bioma (arrastre por click derecho de una
-   *  card/chip de ecosistema sobre el título de un bioma, modo "ojo
-   *  apagado") — setea Ecosistema.bioma_id directamente (FK simple, a
-   *  diferencia de reino que va por M:N vía Bioma.reino_ids). Si el
-   *  elemento no acepta esta prop, los ecosistemas no son arrastrables. */
-  onAsignarEcosistemaABioma?: (ecosistemaId: string, biomaId: string) => void;
+  /** Asigna un reino a un bioma (drag & drop de un chip de reino sobre el
+   *  título de un bioma en modo "ojo apagado") — agrega el reino a
+   *  Bioma.reino_ids (M:N). Si el elemento no acepta esta prop, los reinos
+   *  no son arrastrables en este modo. */
+  onAsignarReinoABioma?: (reinoId: string, biomaId: string) => void;
   /** Mueve un personaje a otra ciudad (arrastre por click derecho de una
    *  EntityCard de personaje sobre una columna de ciudad, o sobre la card
    *  de un reino para dejarlo en el slot "Sin Ciudad" de ese reino). Si
@@ -222,7 +205,6 @@ export function GeografiaJerarquica({
   reinos,
   ciudades,
   personajes,
-  ecosistemas = [],
   biomas = [],
   loading,
   mostrarPersonajes = true,
@@ -230,8 +212,7 @@ export function GeografiaJerarquica({
   onCreateReino,
   onCreateCiudad,
   onCreatePersonaje,
-  onAsignarReinoAEcosistema,
-  onAsignarEcosistemaABioma,
+  onAsignarReinoABioma,
   onMoverPersonaje,
   creatingReino,
   gruposPersonajesPorSubtipo,
@@ -248,8 +229,8 @@ export function GeografiaJerarquica({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Arrastre (click derecho) de chips de Reino → se sueltan sobre una card
-  // de Ecosistema en modo "ojo apagado".
+  // Arrastre (click derecho) de chips de Reino → se sueltan sobre el título
+  // de un Bioma en modo "ojo apagado".
   const dragReino = useRightClickDrag<string>({
     label: (id) => reinos.find((r) => r.id === id)?.nombre ?? "",
   });
@@ -257,11 +238,6 @@ export function GeografiaJerarquica({
   // una columna de Ciudad o sobre la card de un Reino en modo "ojo ON".
   const dragPersonaje = useRightClickDrag<string>({
     label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
-  });
-  // Arrastre (click derecho) de chips/cards de Ecosistema → se sueltan
-  // sobre el título de un Bioma en modo "ojo apagado".
-  const dragEcosistema = useRightClickDrag<string>({
-    label: (id) => ecosistemas.find((e) => e.id === id)?.nombre ?? "",
   });
 
   useLayoutEffect(() => {
@@ -455,38 +431,6 @@ export function GeografiaJerarquica({
   }
   const columnasReinos = distribuirEnColumnas(reinosConCiudadesBase);
 
-  // Altura estimada de una card de ecosistema en modo "ojo apagado": solo
-  // chips de reino en flex-wrap, sin grillas de personajes — mucho más
-  // simple que altoReino, misma lógica que altoEcosistema en
-  // CriaturasJerarquica pero con chips de ancho fijo aproximado.
-  const altoEcosistemaOjoOff = (eco: Ecosistema) => {
-    const cantidadReinos = reinosDeEcosistema(eco.id).length;
-    const disponible = anchoColumnaMasonry - 32;
-    const anchoChipAprox = 100;
-    const gapInterno = 8;
-    const porFila = Math.max(1, Math.floor((disponible + gapInterno) / (anchoChipAprox + gapInterno)));
-    const filas = Math.max(1, Math.ceil(cantidadReinos / porFila));
-    const alturaBarraTitulo = 38;
-    const paddingContenido = 24;
-    const alturaChip = 24;
-    const gapEntreFilas = 8 * Math.max(filas - 1, 0);
-    return alturaBarraTitulo + paddingContenido + filas * alturaChip + gapEntreFilas;
-  };
-
-  function distribuirEnColumnasEco(list: Ecosistema[]): Ecosistema[][] {
-    const columnas: Ecosistema[][] = Array.from({ length: numColumnas }, () => []);
-    const alturas = new Array(numColumnas).fill(0);
-    for (const eco of list) {
-      let idxMin = 0;
-      for (let i = 1; i < numColumnas; i++) {
-        if (alturas[i] < alturas[idxMin]) idxMin = i;
-      }
-      columnas[idxMin].push(eco);
-      alturas[idxMin] += altoEcosistemaOjoOff(eco) + GAP;
-    }
-    return columnas;
-  }
-
   const renderColumna = ({
     key,
     nombre,
@@ -630,104 +574,36 @@ export function GeografiaJerarquica({
       reinoNombreDestino: reino.nombre,
     });
 
-  // ── Modo "ojo apagado": Bioma → Ecosistema → Reinos ───────────────────────
-  // Reinos con territorio en un ecosistema dado, resuelto vía el Bioma que
-  // contiene ese ecosistema (Ecosistema.bioma_id → Bioma.reino_ids), ya que
-  // no hay FK directa Ecosistema→Reino. Se calcula solo cuando hace falta
-  // (mostrarPersonajes=false) para no afectar el modo normal.
+  // ── Modo "ojo apagado": Bioma → Reinos ─────────────────────────────────────
+  // Reinos con territorio en un bioma dado, vía Bioma.reino_ids (M:N). Se
+  // calcula solo cuando hace falta (mostrarPersonajes=false) para no afectar
+  // el modo normal.
   const qReinoOjoOff = busqueda.trim().toLocaleLowerCase("es");
-  const biomaDe = (ecosistemaId: string) =>
-    biomas.find((b) => b.id === ecosistemas.find((e) => e.id === ecosistemaId)?.bioma_id);
-  const reinosDeEcosistema = (ecosistemaId: string) => {
-    const bioma = biomaDe(ecosistemaId);
+  const reinosDeBioma = (biomaId: string) => {
+    const bioma = biomas.find((b) => b.id === biomaId);
     if (!bioma) return [];
     return reinos.filter((r) => bioma.reino_ids.includes(r.id));
   };
 
-  const ecosistemasVisiblesOjoOff = qReinoOjoOff
-    ? ecosistemas.filter((e) => {
-        if (e.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff)) return true;
-        return reinosDeEcosistema(e.id).some((r) =>
+  // Reinos que ningún bioma lista todavía.
+  const reinosConBiomaIds = new Set(
+    biomas.flatMap((b) => reinosDeBioma(b.id).map((r) => r.id)),
+  );
+  const reinosSinBiomaBase = reinos.filter((r) => !reinosConBiomaIds.has(r.id));
+  const reinosSinBioma = qReinoOjoOff
+    ? reinosSinBiomaBase.filter((r) => r.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff))
+    : reinosSinBiomaBase;
+
+  const biomasVisiblesOjoOff = qReinoOjoOff
+    ? biomas.filter((b) => {
+        if (b.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff)) return true;
+        return reinosDeBioma(b.id).some((r) =>
           r.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff),
         );
       })
-    : ecosistemas;
+    : biomas;
 
-  const ecosistemasConReinos = ecosistemasVisiblesOjoOff.filter(
-    (e) => reinosDeEcosistema(e.id).length > 0,
-  );
-  const ecosistemasVaciosOjoOff = ecosistemasVisiblesOjoOff.filter(
-    (e) => reinosDeEcosistema(e.id).length === 0,
-  );
-
-  // Reinos que ningún ecosistema (vía su bioma) lista todavía — mismo
-  // criterio que "criaturas sin ecosistema" en CriaturasJerarquica.
-  const reinosConEcosistemaIds = new Set(
-    ecosistemas.flatMap((e) => reinosDeEcosistema(e.id).map((r) => r.id)),
-  );
-  const reinosSinEcosistemaBase = reinos.filter((r) => !reinosConEcosistemaIds.has(r.id));
-  const reinosSinEcosistema = qReinoOjoOff
-    ? reinosSinEcosistemaBase.filter((r) => r.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff))
-    : reinosSinEcosistemaBase;
-
-  const ecosistemasOrdenadosOjoOff = [...ecosistemasConReinos].sort(
-    (a, b) => reinosDeEcosistema(b.id).length - reinosDeEcosistema(a.id).length,
-  );
-  const columnasEcosistemasOjoOff = distribuirEnColumnasEco(ecosistemasOrdenadosOjoOff);
-  const hayEcosistemasConReinos = ecosistemasOrdenadosOjoOff.length > 0;
-
-  const renderTarjetaEcosistemaOjoOff = (eco: Ecosistema) => {
-    const zoneId = `eco:${eco.id}`;
-    const dropActive = !!onAsignarReinoAEcosistema && dragReino.esZonaActiva(zoneId);
-    const dropHandlers = onAsignarReinoAEcosistema
-      ? dragReino.dropHandlers(zoneId, (reinoId) => onAsignarReinoAEcosistema(reinoId, eco.id))
-      : {};
-
-    return (
-      <div
-        key={eco.id}
-        {...dropHandlers}
-        className={`w-full rounded-lg border overflow-hidden transition-colors ${
-          dropActive ? "border-accent/50 bg-accent/5" : "border-primary/10"
-        }`}
-      >
-        <div className="px-3 py-3 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onOpen("ecosistemas", eco.id)}
-            {...(onAsignarEcosistemaABioma ? dragEcosistema.dragHandlers(eco.id) : {})}
-            title={
-              onAsignarEcosistemaABioma
-                ? `${eco.nombre} — click derecho para mover`
-                : eco.nombre
-            }
-            className={`flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors ${
-              onAsignarEcosistemaABioma ? "cursor-grab active:cursor-grabbing" : ""
-            }`}
-          >
-            {eco.nombre}
-          </button>
-        </div>
-        <div className="px-3 pb-3 flex flex-wrap gap-2">
-          {reinosDeEcosistema(eco.id).length === 0 && (
-            <div className="text-micro text-primary/25">
-              {onAsignarReinoAEcosistema ? "Soltá un reino acá" : "Sin reinos"}
-            </div>
-          )}
-          {reinosDeEcosistema(eco.id).map((r) => (
-            <NodoTitulo
-              key={r.id}
-              label={r.nombre}
-              variant="reino"
-              maxWidthPx={160}
-              dragProps={dragReino.dragHandlers(r.id)}
-              onClick={() => onOpen("reinos", r.id)}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  };
+  const hayBiomasConReinos = biomasVisiblesOjoOff.some((b) => reinosDeBioma(b.id).length > 0);
 
   return (
     <div className="mb-8 last:mb-0">
@@ -960,155 +836,73 @@ export function GeografiaJerarquica({
             )}
         </div>
       ) : (
-        // ── Ojo OFF: Reinos agrupados por Ecosistema, y ecosistemas
-        // agrupados por Bioma — misma jerarquía Bioma → Ecosistema →
-        // (Reino en vez de Criatura) que usa CriaturasJerarquica.
+        // ── Ojo OFF: Reinos agrupados directo por Bioma (Bioma.reino_ids,
+        // M:N) — sin pasar por Ecosistema, que queda exclusivo de la vista
+        // por Criatura (CriaturasJerarquica).
         <div className="flex flex-col gap-8">
           <div ref={containerRef} className="h-0 overflow-hidden" aria-hidden />
 
-          {biomas.length > 0
-            ? // Agrupado por Bioma: un bloque por cada bioma que tenga AL
-              // MENOS un ecosistema (con o sin reinos) — antes solo se
-              // listaban los biomas cuyos ecosistemas tenían reinos, así que
-              // un bioma sin ecosistemas con reinos (aunque tuviera
-              // ecosistemas vacíos, o incluso ningún ecosistema) desaparecía
-              // por completo. Ahora:
-              //  - Un bioma con ecosistemas (con o sin reinos) muestra su
-              //    masonry de cards + los ecosistemas vacíos como chips.
-              //  - Un bioma sin ningún ecosistema se muestra igual, con
-              //    aviso de "Sin ecosistemas" debajo de su título.
-              // + "Sin bioma" al final para ecosistemas huérfanos.
-              [
-                ...biomas.map((bioma) => ({
-                  key: bioma.id,
-                  label: bioma.nombre,
-                  esBioma: true,
-                  todosEcosistemas: ecosistemasVisiblesOjoOff.filter((e) => e.bioma_id === bioma.id),
-                  columnas: distribuirEnColumnasEco(
-                    ecosistemasOrdenadosOjoOff.filter((e) => e.bioma_id === bioma.id),
-                  ),
-                  vacios: ecosistemasVaciosOjoOff.filter((e) => e.bioma_id === bioma.id),
-                })),
-                {
-                  key: "__sin_bioma__",
-                  label: "Sin bioma",
-                  esBioma: false,
-                  todosEcosistemas: ecosistemasVisiblesOjoOff.filter(
-                    (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
-                  ),
-                  columnas: distribuirEnColumnasEco(
-                    ecosistemasOrdenadosOjoOff.filter(
-                      (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
-                    ),
-                  ),
-                  vacios: ecosistemasVaciosOjoOff.filter(
-                    (e) => !e.bioma_id || !biomas.some((b) => b.id === e.bioma_id),
-                  ),
-                },
-              ]
-                // Se descarta un grupo solo si ni siquiera tiene ecosistemas
-                // (ni con reinos ni vacíos) — un bioma sin ecosistemas
-                // todavía debe verse como chip de bioma vacío.
-                .filter((grupo) => grupo.esBioma || grupo.todosEcosistemas.length > 0)
-                .map((grupo) => {
-                  const esSinBioma = grupo.key === "__sin_bioma__";
-                  const zoneIdBioma = `bioma:${grupo.key}`;
-                  const dropActiveBioma =
-                    !!onAsignarEcosistemaABioma && dragEcosistema.esZonaActiva(zoneIdBioma);
-                  const dropHandlersBioma = onAsignarEcosistemaABioma
-                    ? dragEcosistema.dropHandlers(zoneIdBioma, (ecosistemaId) =>
-                        onAsignarEcosistemaABioma(ecosistemaId, esSinBioma ? "" : grupo.key),
-                      )
-                    : {};
-                  return (
-                  <div key={grupo.key} className="flex flex-col gap-3">
-                    <div
-                      {...dropHandlersBioma}
-                      className={`self-start rounded-md transition-colors ${
-                        dropActiveBioma ? "ring-2 ring-accent/60 bg-accent/5" : ""
-                      }`}
+          {biomasVisiblesOjoOff.length > 0 &&
+            biomasVisiblesOjoOff.map((bioma) => {
+              const reinosDelBioma = reinosDeBioma(bioma.id).filter((r) =>
+                qReinoOjoOff ? r.nombre?.toLocaleLowerCase("es").includes(qReinoOjoOff) : true,
+              );
+              const zoneIdBioma = `bioma:${bioma.id}`;
+              const dropActiveBioma =
+                !!onAsignarReinoABioma && dragReino.esZonaActiva(zoneIdBioma);
+              const dropHandlersBioma = onAsignarReinoABioma
+                ? dragReino.dropHandlers(zoneIdBioma, (reinoId) =>
+                    onAsignarReinoABioma(reinoId, bioma.id),
+                  )
+                : {};
+              return (
+                <div key={bioma.id} className="flex flex-col gap-3">
+                  <div
+                    {...dropHandlersBioma}
+                    className={`self-start rounded-md transition-colors ${
+                      dropActiveBioma ? "ring-2 ring-accent/60 bg-accent/5" : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onOpen("biomas", bioma.id)}
+                      title={bioma.nombre}
+                      className="flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors"
                     >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
-                        }
-                        disabled={grupo.key === "__sin_bioma__"}
-                        title={grupo.label}
-                        className="flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors disabled:hover:text-primary/50 disabled:cursor-default"
-                      >
-                        <Compass size={11} className="shrink-0 text-accent/50" />
-                        {grupo.label}
-                      </button>
-                    </div>
-                    {grupo.todosEcosistemas.length === 0 ? (
-                      <div className="text-micro text-primary/25 px-1">Sin ecosistemas</div>
-                    ) : (
-                      <>
-                        {grupo.columnas.some((c) => c.length > 0) && (
-                          <div className="flex items-start gap-6">
-                            {grupo.columnas.map((columna, colIdx) => (
-                              <div
-                                key={colIdx}
-                                className="flex flex-col gap-6 min-w-0"
-                                style={{ width: anchoColumnaMasonry }}
-                              >
-                                {columna.map((eco) => renderTarjetaEcosistemaOjoOff(eco))}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {grupo.vacios.length > 0 && (
-                          <div
-                            className="grid gap-2"
-                            style={{
-                              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                            }}
-                          >
-                            {grupo.vacios.map((eco) => (
-                              <NodoTitulo
-                                key={eco.id}
-                                fill
-                                label={eco.nombre}
-                                dragProps={
-                                  onAsignarEcosistemaABioma
-                                    ? dragEcosistema.dragHandlers(eco.id)
-                                    : undefined
-                                }
-                                onClick={() => onOpen("ecosistemas", eco.id)}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
+                      <Compass size={11} className="shrink-0 text-accent/50" />
+                      {bioma.nombre}
+                    </button>
                   </div>
-                  );
-                })
-            : // Sin biomas cargados: comportamiento anterior, un único
-              // masonry plano de todos los ecosistemas con reinos.
-              hayEcosistemasConReinos && (
-                <div className="flex items-start gap-6">
-                  {columnasEcosistemasOjoOff.map((columna, colIdx) => (
-                    <div
-                      key={colIdx}
-                      className="flex flex-col gap-6 min-w-0"
-                      style={{ width: anchoColumnaMasonry }}
-                    >
-                      {columna.map((eco) => renderTarjetaEcosistemaOjoOff(eco))}
+                  {reinosDelBioma.length === 0 ? (
+                    <div className="text-micro text-primary/25 px-1">
+                      {onAsignarReinoABioma ? "Soltá un reino acá" : "Sin reinos"}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {reinosDelBioma.map((r) => (
+                        <NodoTitulo
+                          key={r.id}
+                          label={r.nombre}
+                          variant="reino"
+                          maxWidthPx={160}
+                          dragProps={dragReino.dragHandlers(r.id)}
+                          onClick={() => onOpen("reinos", r.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+              );
+            })}
 
-          {reinosSinEcosistema.length > 0 && (
+          {reinosSinBioma.length > 0 && (
             <div>
-              {hayEcosistemasConReinos && <div className="h-px mb-2 bg-primary/10" />}
+              {hayBiomasConReinos && <div className="h-px mb-2 bg-primary/10" />}
               <div className="mb-2 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
-                Sin ecosistema
+                Sin bioma
               </div>
               <div className="flex flex-wrap gap-2">
-                {reinosSinEcosistema.map((r) => (
+                {reinosSinBioma.map((r) => (
                   <NodoTitulo
                     key={r.id}
                     label={r.nombre}
@@ -1122,19 +916,15 @@ export function GeografiaJerarquica({
             </div>
           )}
 
-          {!hayEcosistemasConReinos &&
-            ecosistemasVaciosOjoOff.length === 0 &&
-            reinosSinEcosistema.length === 0 &&
-            biomas.length === 0 && (
-              <div className="py-6 text-xs text-primary/25 text-center">
-                Sin reinos todavía
-              </div>
-            )}
+          {biomasVisiblesOjoOff.length === 0 && reinosSinBioma.length === 0 && (
+            <div className="py-6 text-xs text-primary/25 text-center">
+              Sin reinos todavía
+            </div>
+          )}
         </div>
       )}
       {dragReino.overlay}
       {dragPersonaje.overlay}
-      {dragEcosistema.overlay}
     </div>
   );
 }
