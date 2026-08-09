@@ -473,7 +473,7 @@ export function FisicaPage({
       {/* Columna izquierda: navegación. En mobile se oculta si hay algo
           seleccionado, para dejarle todo el espacio al editor. */}
       <div
-        className={`w-full sm:w-72 md:w-80 shrink-0 sm:flex flex-col min-h-0 border-r border-primary/10 ${
+        className={`w-full sm:w-72 md:w-80 shrink-0 sm:flex flex-col min-h-0 overflow-hidden border-r border-primary/10 ${
           hayAlgoSeleccionado ? "hidden" : "flex"
         }`}
       >
