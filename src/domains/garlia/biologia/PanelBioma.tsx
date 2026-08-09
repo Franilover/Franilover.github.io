@@ -18,6 +18,7 @@ import { useReinosMin } from "@/domains/garlia/reinos/useReinosMin";
 
 import { SelectorReinosMulti } from "./SelectorReinosMulti";
 import { BIOMA_ICON, type Bioma, type Ecosistema } from "./types";
+import { useEcosistemas } from "./useBiologia";
 
 export function PanelBioma({
   bioma,
@@ -76,6 +77,23 @@ export function PanelBioma({
     onSave({ reino_ids: next });
   };
 
+  // ── Ecosistemas (1:N vía ecosistema.bioma_id) — misma sección Entidad,
+  // pero el "toggle" acá vincula/desvincula el ecosistema a ESTE bioma
+  // (add=true → bioma_id = bioma.id, add=false → bioma_id = null). ──
+  const { ecosistemas: catalogoEcosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
+    useEcosistemas();
+  const ecosistemaIds = useMemo(
+    () => catalogoEcosistemas.filter((e) => e.bioma_id === bioma.id).map((e) => e.id),
+    [catalogoEcosistemas, bioma.id],
+  );
+  const allEcosistemasEntidad = useMemo(
+    () => catalogoEcosistemas.map((e) => ({ id: e.id, nombre: e.nombre })),
+    [catalogoEcosistemas],
+  );
+  const handleToggleEcosistema = (id: string, add: boolean) => {
+    void actualizarEcosistema(id, { bioma_id: add ? bioma.id : null });
+  };
+
   const sidebar = (
     <>
       <SeccionEntidad
@@ -97,49 +115,31 @@ export function PanelBioma({
             "1px solid color-mix(in srgb, var(--primary) 7%, transparent)",
         }}
       />
-      <div className="shrink-0 flex flex-col px-2 py-1.5 gap-2">
-        <div className="flex items-center justify-between">
-          <span
-            className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em] leading-none"
-            style={{
-              color: "color-mix(in srgb, var(--primary) 38%, transparent)",
-            }}
+      <SeccionEntidad
+        allEntities={allEcosistemasEntidad}
+        emptyLabel="Sin ecosistemas"
+        fallbackIcon={<Leaf size={14} strokeWidth={1} />}
+        fill={false}
+        icon={<Leaf size={9} />}
+        label="Ecosistemas"
+        loading={loadingEcosistemas}
+        saving={false}
+        selectedIds={ecosistemaIds}
+        onEntityClick={onSelectEcosistema}
+        onToggle={handleToggleEcosistema}
+      />
+      {onCrearEcosistema && (
+        <div className="shrink-0 px-2 pb-1.5">
+          <button
+            type="button"
+            disabled={creandoEcosistema}
+            onClick={onCrearEcosistema}
+            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
           >
-            <Leaf size={9} />
-            Ecosistemas
-          </span>
-          {onCrearEcosistema && (
-            <button
-              type="button"
-              disabled={creandoEcosistema}
-              onClick={onCrearEcosistema}
-              className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
-            >
-              <Plus size={10} />
-            </button>
-          )}
+            <Plus size={10} /> Nuevo ecosistema
+          </button>
         </div>
-        {ecosistemas.length === 0 ? (
-          <p className="text-micro text-primary/25 italic px-0.5">
-            Sin ecosistemas todavía
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {ecosistemas.map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => onSelectEcosistema?.(e.id)}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-micro font-bold bg-primary/[0.03] hover:bg-primary/10 text-primary/70 border border-primary/10 transition-colors truncate"
-                title={e.nombre}
-              >
-                <Leaf size={9} className="text-accent/60 shrink-0" />
-                <span className="truncate">{e.nombre}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </>
   );
 
