@@ -1216,35 +1216,27 @@ export function CriaturasJerarquica({
       {dragEcosistema.overlay}
 
       {ecosistemaAbierto &&
-        (() => {
-          const eco = ecosistemas.find((e) => e.id === ecosistemaAbierto.id);
-          if (!eco) return null;
-          return (
-            <PopoverFlotante
-              anchor={ecosistemaAbierto.anchor}
+        ecosistemas.some((e) => e.id === ecosistemaAbierto.id) && (
+          <PopoverFlotante
+            anchor={ecosistemaAbierto.anchor}
+            onClose={() => setEcosistemaAbierto(null)}
+            width={420}
+            maxHeight={620}
+          >
+            <EcosistemaPopoverContent
+              ecosistemaId={ecosistemaAbierto.id}
               onClose={() => setEcosistemaAbierto(null)}
-              width={420}
-              maxHeight={620}
-            >
-              <EcosistemaPopoverContent
-                ecosistema={eco}
-                onClose={() => setEcosistemaAbierto(null)}
-                onSelectCriatura={(id) => onOpen("criaturas", id)}
-              />
-            </PopoverFlotante>
-          );
-        })()}
+              onSelectCriatura={(id) => onOpen("criaturas", id)}
+            />
+          </PopoverFlotante>
+        )}
 
       {biomaAbierto &&
-        (() => {
-          const bioma = biomas.find((b) => b.id === biomaAbierto.id);
-          if (!bioma) return null;
-          return (
-            <PopoverFlotante anchor={biomaAbierto.anchor} onClose={() => setBiomaAbierto(null)}>
-              <BiomaPopoverContent bioma={bioma} onClose={() => setBiomaAbierto(null)} />
-            </PopoverFlotante>
-          );
-        })()}
+        biomas.some((b) => b.id === biomaAbierto.id) && (
+          <PopoverFlotante anchor={biomaAbierto.anchor} onClose={() => setBiomaAbierto(null)}>
+            <BiomaPopoverContent biomaId={biomaAbierto.id} onClose={() => setBiomaAbierto(null)} />
+          </PopoverFlotante>
+        )}
     </div>
   );
 }

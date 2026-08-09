@@ -939,15 +939,11 @@ export function GeografiaJerarquica({
       {dragPersonaje.overlay}
 
       {biomaAbierto &&
-        (() => {
-          const bioma = biomas.find((b) => b.id === biomaAbierto.id);
-          if (!bioma) return null;
-          return (
-            <PopoverFlotante anchor={biomaAbierto.anchor} onClose={() => setBiomaAbierto(null)}>
-              <BiomaPopoverContent bioma={bioma} onClose={() => setBiomaAbierto(null)} />
-            </PopoverFlotante>
-          );
-        })()}
+        biomas.some((b) => b.id === biomaAbierto.id) && (
+          <PopoverFlotante anchor={biomaAbierto.anchor} onClose={() => setBiomaAbierto(null)}>
+            <BiomaPopoverContent biomaId={biomaAbierto.id} onClose={() => setBiomaAbierto(null)} />
+          </PopoverFlotante>
+        )}
     </div>
   );
 }

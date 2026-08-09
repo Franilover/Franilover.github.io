@@ -9,6 +9,12 @@
  * Pensado para usarse dentro de <PopoverFlotante>, que ya da scroll interno
  * para el contenido más largo (cadenas alimenticias con eslabones).
  *
+ * Recibe solo el ecosistemaId (no el objeto Ecosistema completo): lo
+ * resuelve él mismo vía useEcosistemas(), para no depender del shape
+ * reducido de Ecosistema que usan algunas vistas (p. ej. CriaturasJerarquica
+ * trabaja con un subconjunto de campos vía props, no el tipo completo de
+ * biologia/types).
+ *
  * A propósito no recibe onSelectBioma: abrir el bioma en cascada crearía un
  * popover-dentro-de-popover. El link "Abrir" junto a "Bioma" no se muestra
  * cuando onSelectBioma no está presente (así lo maneja PanelEcosistema).
@@ -18,18 +24,17 @@
 
 import { PanelEcosistema } from "@/domains/garlia/biologia/PanelEcosistema";
 import { useCadenasAlimenticias, useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
-import type { Ecosistema } from "@/domains/garlia/biologia/types";
 
 export function EcosistemaPopoverContent({
-  ecosistema,
+  ecosistemaId,
   onClose,
   onSelectCriatura,
 }: {
-  ecosistema: Ecosistema;
+  ecosistemaId: string;
   onClose: () => void;
   onSelectCriatura?: (id: string) => void;
 }) {
-  const { actualizar, eliminar } = useEcosistemas();
+  const { ecosistemas, actualizar, eliminar } = useEcosistemas();
   const {
     cadenas,
     creating: creandoCadena,
@@ -38,7 +43,10 @@ export function EcosistemaPopoverContent({
     eliminar: eliminarCadena,
   } = useCadenasAlimenticias();
 
-  const cadenasDelEcosistema = cadenas.filter((c) => c.ecosistema_id === ecosistema.id);
+  const ecosistema = ecosistemas.find((e) => e.id === ecosistemaId);
+  const cadenasDelEcosistema = cadenas.filter((c) => c.ecosistema_id === ecosistemaId);
+
+  if (!ecosistema) return null;
 
   return (
     <PanelEcosistema

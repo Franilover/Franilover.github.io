@@ -9,26 +9,29 @@
  * vez de clearSelection, y no navega a pantalla completa. Pensado para
  * usarse dentro de <PopoverFlotante>.
  *
- * A propósito no recibe onSelectEcosistema/onCrearEcosistema: los
- * ecosistemas de este bioma se ven/editan exclusivamente desde la vista de
- * Criaturas (CriaturasJerarquica), no en cascada desde acá.
+ * Recibe solo el biomaId (no el objeto Bioma completo): lo resuelve él mismo
+ * vía useBiomas(), para no depender del shape de Bioma que use cada vista
+ * que lo invoca (algunas, como CriaturasJerarquica, trabajan con un
+ * subconjunto reducido de campos vía props).
  */
 
 import { PanelBioma } from "@/domains/garlia/biologia/PanelBioma";
 import { useBiomas, useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
-import type { Bioma } from "@/domains/garlia/biologia/types";
 
 export function BiomaPopoverContent({
-  bioma,
+  biomaId,
   onClose,
 }: {
-  bioma: Bioma;
+  biomaId: string;
   onClose: () => void;
 }) {
-  const { actualizar, eliminar } = useBiomas();
+  const { biomas, actualizar, eliminar } = useBiomas();
   const { ecosistemas } = useEcosistemas();
 
-  const ecosistemasDelBioma = ecosistemas.filter((e) => e.bioma_id === bioma.id);
+  const bioma = biomas.find((b) => b.id === biomaId);
+  const ecosistemasDelBioma = ecosistemas.filter((e) => e.bioma_id === biomaId);
+
+  if (!bioma) return null;
 
   return (
     <PanelBioma
