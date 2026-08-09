@@ -1240,6 +1240,7 @@ export function CriaturasJerarquica({
             width={640}
             maxHeight={560}
             centerVertically
+            centerHorizontally
           >
             <EcosistemaPopoverContent
               ecosistemaId={ecosistemaAbierto.id}
@@ -1256,6 +1257,8 @@ export function CriaturasJerarquica({
             onClose={() => setBiomaAbierto(null)}
             width={640}
             maxHeight={480}
+            centerVertically
+            centerHorizontally
           >
             <BiomaPopoverContent biomaId={biomaAbierto.id} onClose={() => setBiomaAbierto(null)} />
           </PopoverFlotante>

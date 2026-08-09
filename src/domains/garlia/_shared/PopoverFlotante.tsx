@@ -27,6 +27,7 @@ export function PopoverFlotante({
   width = 560,
   maxHeight = 460,
   centerVertically = false,
+  centerHorizontally = false,
 }: {
   /** Elemento al que se ancla el popover. Si es null, no se renderiza nada. */
   anchor: HTMLElement | null;
@@ -39,20 +40,27 @@ export function PopoverFlotante({
    * y en cambio se centra verticalmente en el viewport — útil para
    * editores con muchas secciones (ej. Ecosistema) que se cortaban contra
    * el borde superior o inferior de la pantalla al abrir cerca de los
-   * extremos. El anclaje horizontal (columna cerca del trigger) se
-   * mantiene igual.
+   * extremos.
    */
   centerVertically?: boolean;
+  /**
+   * Si true, el panel se centra horizontalmente en el viewport en vez de
+   * alinearse a la izquierda del trigger.
+   */
+  centerHorizontally?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{
     top: number;
     left: number;
     width: number;
-    availHeight: number;
+    maxHeight: number;
     openUp: boolean;
   } | null>(null);
 
+  // Fase 1: posicionamiento inicial (estimado) en cuanto aparece el anchor,
+  // usando maxHeight como techo — esto es lo que se ve en el primer frame,
+  // antes de conocer la altura real del contenido ya renderizado.
   useEffect(() => {
     if (!anchor) {
       setPos(null);
@@ -61,37 +69,31 @@ export function PopoverFlotante({
     const MARGIN = 8;
     const update = () => {
       const r = anchor.getBoundingClientRect();
-      // Ancho efectivo: el pedido, acotado al viewport (con margen), para que
-      // el layout horizontal no se corte en pantallas angostas.
       const effectiveWidth = Math.min(width, window.innerWidth - MARGIN * 2);
-      const left = Math.min(Math.max(r.left, MARGIN), window.innerWidth - effectiveWidth - MARGIN);
+      const left = centerHorizontally
+        ? Math.max(MARGIN, (window.innerWidth - effectiveWidth) / 2)
+        : Math.min(Math.max(r.left, MARGIN), window.innerWidth - effectiveWidth - MARGIN);
 
       if (centerVertically) {
-        // Centrado vertical en el viewport: la altura disponible es el
-        // alto de pantalla completo (con márgenes), y el panel se centra
-        // dentro de ese espacio en vez de anclarse arriba/abajo del trigger.
         const espacioVertical = window.innerHeight - MARGIN * 2;
-        const availHeight = Math.min(maxHeight, espacioVertical);
-        const top = Math.max(MARGIN, (window.innerHeight - availHeight) / 2);
-        setPos({ top, left, width: effectiveWidth, availHeight, openUp: false });
+        const cappedMaxHeight = Math.min(maxHeight, espacioVertical);
+        // Estimación inicial: centra asumiendo que el panel va a ocupar el
+        // techo completo. La fase 2 (abajo) corrige esto con la altura real
+        // apenas el contenido termina de renderizar, así que este valor solo
+        // se ve durante un frame.
+        const top = Math.max(MARGIN, (window.innerHeight - cappedMaxHeight) / 2);
+        setPos({ top, left, width: effectiveWidth, maxHeight: cappedMaxHeight, openUp: false });
         return;
       }
 
       const espacioAbajo = window.innerHeight - r.bottom - MARGIN;
       const espacioArriba = r.top - MARGIN;
-      // Abre hacia arriba solo si abajo no entra Y arriba hay más lugar que
-      // abajo — y en ese caso la altura disponible real es espacioArriba,
-      // no un valor fijo: así nunca se corta contra el borde superior.
       const openUp = espacioAbajo < Math.min(maxHeight, 280) && espacioArriba > espacioAbajo;
-      // Techo duro: nunca superamos el espacio real disponible en la
-      // dirección elegida (evita cortes contra cualquier borde), aunque
-      // sea menor a maxHeight — el panel se acota y su scroll interno
-      // absorbe el resto.
       const espacioDisponible = Math.max(120, openUp ? espacioArriba : espacioAbajo);
-      const availHeight = Math.min(maxHeight, espacioDisponible);
+      const cappedMaxHeight = Math.min(maxHeight, espacioDisponible);
 
       const top = openUp ? r.top - MARGIN : r.bottom + MARGIN;
-      setPos({ top, left, width: effectiveWidth, availHeight, openUp });
+      setPos({ top, left, width: effectiveWidth, maxHeight: cappedMaxHeight, openUp });
     };
     update();
     window.addEventListener("resize", update);
@@ -100,7 +102,29 @@ export function PopoverFlotante({
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [anchor, width, maxHeight, centerVertically]);
+  }, [anchor, width, maxHeight, centerVertically, centerHorizontally]);
+
+  // Fase 2: una vez el panel está en el DOM, si centerVertically está
+  // activo, recalcula `top` usando la altura REAL del panel (que puede ser
+  // menor a maxHeight si el contenido es corto) — sin esto, el panel queda
+  // centrado respecto a un techo que nunca ocupa entero y se ve pegado
+  // arriba en vez de centrado.
+  useEffect(() => {
+    if (!anchor || !centerVertically || !pos) return;
+    const el = panelRef.current;
+    if (!el) return;
+    const MARGIN = 8;
+    const recenter = () => {
+      const altura = el.getBoundingClientRect().height;
+      const top = Math.max(MARGIN, (window.innerHeight - altura) / 2);
+      setPos((prev) => (prev && Math.abs(prev.top - top) > 0.5 ? { ...prev, top } : prev));
+    };
+    recenter();
+    const ro = new ResizeObserver(recenter);
+    ro.observe(el);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anchor, centerVertically, pos?.maxHeight, pos?.width]);
 
   useEffect(() => {
     if (!anchor) return;
@@ -131,7 +155,7 @@ export function PopoverFlotante({
         top: pos.top,
         left: pos.left,
         width: pos.width,
-        maxHeight: pos.availHeight,
+        maxHeight: pos.maxHeight,
         transform: pos.openUp ? "translateY(-100%)" : undefined,
         background: "var(--bg-main)",
         borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",

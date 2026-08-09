@@ -945,6 +945,8 @@ export function GeografiaJerarquica({
             onClose={() => setBiomaAbierto(null)}
             width={640}
             maxHeight={480}
+            centerVertically
+            centerHorizontally
           >
             <BiomaPopoverContent biomaId={biomaAbierto.id} onClose={() => setBiomaAbierto(null)} />
           </PopoverFlotante>
