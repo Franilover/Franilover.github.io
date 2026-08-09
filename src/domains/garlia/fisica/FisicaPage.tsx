@@ -61,6 +61,7 @@ type Seleccion =
   | { tipo: "oris"; id: string }
   | { tipo: "concepto"; id: string }
   | { tipo: "todos-oris" }
+  | { tipo: "catalogo"; catalogo: "particula-base" | "particulas" | "iums" }
   | null;
 
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
@@ -84,32 +85,6 @@ function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-}
-
-// ─── Catálogos fijos, versión compacta para la columna angosta ────────────
-
-function CatalogoCardMini({ titulo, filas }: { titulo: string; filas: FilaCatalogo[] }) {
-  return (
-    <details className="rounded-lg border border-primary/10 overflow-hidden group">
-      <summary className="px-2 py-1.5 bg-primary/[0.04] cursor-pointer select-none flex items-center justify-between">
-        <span className="text-micro font-black uppercase tracking-widest text-primary/50">
-          {titulo}
-        </span>
-        <span className="text-micro text-primary/30 group-open:rotate-90 transition-transform">
-          ›
-        </span>
-      </summary>
-      <div className="p-1.5 flex flex-col gap-1 border-t border-primary/10">
-        {filas.map((f) => (
-          <div key={f.nombre} className="flex flex-col gap-0 px-1.5 py-1 rounded-md bg-primary/[0.02]">
-            <span className="text-micro font-bold text-primary/80 truncate">{f.nombre}</span>
-            <span className="text-micro text-primary/45 truncate">{f.detalle}</span>
-            {f.extra && <span className="text-micro text-primary/35 truncate">{f.extra}</span>}
-          </div>
-        ))}
-      </div>
-    </details>
-  );
 }
 
 // ─── Grupo colapsable de nivel superior (Bases / Oris / Conceptos) ────────
@@ -229,6 +204,61 @@ function BloqueConceptos({
             seleccionado={c.id === activoId}
             onClick={() => onSeleccionar(c.id)}
           />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Vista de catálogo fijo en la columna derecha. Al hacer click en
+ * "Partícula Base" / "Partículas" / "Iums" en la sidebar, se muestra la
+ * lista completa acá, con más espacio y detalle que la versión mini
+ * colapsada de la barra lateral, y en 3 columnas.
+ */
+const CATALOGO_TITULOS: Record<"particula-base" | "particulas" | "iums", string> = {
+  "particula-base": "Partícula Base",
+  particulas: "Partículas",
+  iums: "Iums",
+};
+
+function CatalogoView({
+  catalogo,
+  filas,
+  onBack,
+}: {
+  catalogo: "particula-base" | "particulas" | "iums";
+  filas: FilaCatalogo[];
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div
+        style={{ background: "var(--bg-main)" }}
+        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <ChevronLeft size={12} />
+        </button>
+        <p className="text-micro font-black uppercase tracking-widest text-primary">
+          {CATALOGO_TITULOS[catalogo]} · {filas.length}
+        </p>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 grid grid-cols-1 lg:grid-cols-3 gap-2.5 items-start">
+        {filas.map((f) => (
+          <div
+            key={f.nombre}
+            className="flex flex-col gap-1 px-3 py-2.5 rounded-lg border border-primary/10 bg-primary/[0.02]"
+          >
+            <span className="text-sm font-black text-primary">{f.nombre}</span>
+            <span className="text-micro text-primary/60">{f.detalle}</span>
+            {f.extra && <span className="text-micro text-primary/40">{f.extra}</span>}
+          </div>
         ))}
       </div>
     </div>
@@ -556,14 +586,30 @@ export function FisicaPage({
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto p-1.5 flex flex-col gap-1.5">
-          {/* Bases — catálogos fijos (Partícula Base, Partículas, Iums) */}
-          <GrupoColapsable titulo="Bases">
-            <div className="flex flex-col gap-1">
-              <CatalogoCardMini titulo="Partícula Base" filas={PARTICULAS_BASE} />
-              <CatalogoCardMini titulo="Partículas" filas={PARTICULAS} />
-              <CatalogoCardMini titulo="Iums" filas={IUMS} />
-            </div>
-          </GrupoColapsable>
+          {/* Bases — 3 botones únicos (Partícula Base / Partículas / Iums) */}
+          <div className="flex flex-col gap-1">
+            {(
+              [
+                { key: "particula-base" as const, titulo: "Partícula Base", filas: PARTICULAS_BASE },
+                { key: "particulas" as const, titulo: "Partículas", filas: PARTICULAS },
+                { key: "iums" as const, titulo: "Iums", filas: IUMS },
+              ] as const
+            ).map(({ key, titulo, filas }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSeleccion({ tipo: "catalogo", catalogo: key })}
+                className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
+                  seleccion?.tipo === "catalogo" && seleccion.catalogo === key
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
+                }`}
+              >
+                <span className="text-micro font-black uppercase tracking-[0.2em]">{titulo}</span>
+                <span className="text-micro text-primary/30">{filas.length}</span>
+              </button>
+            ))}
+          </div>
 
           {/* Oris — botón único, abre las 3 familias en la columna derecha */}
           <button
@@ -691,6 +737,18 @@ export function FisicaPage({
             onBack={() => setSeleccion(null)}
             onActualizarOris={onActualizarOris}
             onEliminarOris={onEliminarOris}
+          />
+        ) : seleccion?.tipo === "catalogo" ? (
+          <CatalogoView
+            catalogo={seleccion.catalogo}
+            filas={
+              seleccion.catalogo === "particula-base"
+                ? PARTICULAS_BASE
+                : seleccion.catalogo === "particulas"
+                  ? PARTICULAS
+                  : IUMS
+            }
+            onBack={() => setSeleccion(null)}
           />
         ) : conceptoActivo ? (
           <ConceptoEditor
