@@ -338,7 +338,9 @@ function TodosLosConceptosView({
             Sin conceptos todavía
           </div>
         ) : (
-          bloques.map(({ bloque, items }, idx) => (
+          bloques.map(({ bloque, items }, idx) => {
+            const columnasTres = /manifestaciones|base/i.test(bloque);
+            return (
             <div key={bloque} className="flex flex-col gap-2">
               <div
                 className={`flex items-center justify-between gap-1.5 text-primary/50 pb-1.5 ${
@@ -365,7 +367,11 @@ function TodosLosConceptosView({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 items-start">
+              <div
+                className={`grid grid-cols-1 gap-2 items-start ${
+                  columnasTres ? "lg:grid-cols-3" : "lg:grid-cols-2"
+                }`}
+              >
                 {items.map((c) => (
                   <div key={c.id} className="rounded-lg border border-primary/10 overflow-hidden">
                     <ConceptoEditor
@@ -379,7 +385,8 @@ function TodosLosConceptosView({
                 ))}
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
