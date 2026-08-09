@@ -17,6 +17,7 @@ import { useCallback } from "react";
 import { useDataCache } from "@/providers/DataProvider";
 
 import { useMundoNavigation, type SectionKey } from "./useMundoNavigationStore";
+import { usePanelFlotante } from "./usePanelFlotanteStore";
 
 const norm = (s: string | null | undefined) =>
   (s ?? "")
@@ -37,6 +38,7 @@ const SEARCHABLE: { tabla: string; section: SectionKey }[] = [
 export function useWikilinkNavigate() {
   const { cache } = useDataCache();
   const openEntity = useMundoNavigation((s) => s.openEntity);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   return useCallback(
     (target: string) => {
@@ -48,11 +50,19 @@ export function useWikilinkNavigate() {
           items.find((i) => norm(i.nombre)?.startsWith(t)) ??
           items.find((i) => norm(i.nombre)?.includes(t));
         if (found) {
-          openEntity(section, found.id);
+          // Personaje/criatura SIEMPRE en panel flotante (reemplaza el
+          // contenido del panel actual, nunca abre una tab nueva). El resto
+          // de entidades (items, reinos, ciudades, runas, elementos) sigue
+          // navegando a su tab vía openEntity.
+          if (section === "personajes" || section === "criaturas") {
+            abrirPanel(section === "personajes" ? "personaje" : "criatura", found.id);
+          } else {
+            openEntity(section, found.id);
+          }
           return;
         }
       }
     },
-    [cache, openEntity],
+    [cache, openEntity, abrirPanel],
   );
 }
