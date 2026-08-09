@@ -766,12 +766,12 @@ export function CriaturasJerarquica({
           <button
             type="button"
             onClick={() => onOpen("ecosistemas", eco.id)}
+            {...(onAsignarEcosistemaABioma ? dragEcosistema.dragHandlers(eco.id) : {})}
             title={
               onAsignarEcosistemaABioma
                 ? `${eco.nombre} — click derecho para mover`
                 : eco.nombre
             }
-            {...(onAsignarEcosistemaABioma ? dragEcosistema.dragHandlers(eco.id) : {})}
             className={`flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors ${
               onAsignarEcosistemaABioma ? "cursor-grab active:cursor-grabbing" : ""
             }`}
