@@ -28,6 +28,7 @@ export function PopoverFlotante({
   maxHeight = 460,
   centerVertically = false,
   centerHorizontally = false,
+  backdrop = false,
 }: {
   /** Elemento al que se ancla el popover. Si es null, no se renderiza nada. */
   anchor: HTMLElement | null;
@@ -48,6 +49,17 @@ export function PopoverFlotante({
    * alinearse a la izquierda del trigger.
    */
   centerHorizontally?: boolean;
+  /**
+   * Si true, renderiza un fondo oscuro fullscreen detrás del panel y el
+   * cierre por click-afuera escucha ese fondo en vez de depender de
+   * `anchor` (necesario cuando el panel no tiene un elemento DOM de origen
+   * real, ej. el panel flotante global montado una sola vez en la raíz —
+   * ahí `anchor.contains(target)` sería siempre true si se usara
+   * document.body como anchor, porque todo click cae dentro de <body>).
+   * Requiere anchor no-nulo igual (se usa solo para el cálculo de
+   * posición inicial), pero ignora `anchor.contains` en el cierre.
+   */
+  backdrop?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{
@@ -131,6 +143,13 @@ export function PopoverFlotante({
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
       if (panelRef.current?.contains(target)) return;
+      // Modo backdrop: no depende de anchor.contains (sería siempre true
+      // si anchor fuera document.body) — el fondo propio (data-popover-backdrop)
+      // es el único elemento "afuera" que cierra el panel.
+      if (backdrop) {
+        if ((target as HTMLElement)?.dataset?.popoverBackdrop) onClose();
+        return;
+      }
       if (anchor.contains(target)) return;
       onClose();
     };
@@ -143,28 +162,40 @@ export function PopoverFlotante({
       document.removeEventListener("mousedown", onMouseDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [anchor, onClose]);
+  }, [anchor, onClose, backdrop]);
 
   if (!anchor || !pos) return null;
 
   return createPortal(
-    <div
-      ref={panelRef}
-      className="fixed z-[9999] rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
-      style={{
-        top: pos.top,
-        left: pos.left,
-        width: pos.width,
-        maxHeight: pos.maxHeight,
-        transform: pos.openUp ? "translateY(-100%)" : undefined,
-        background: "var(--bg-main)",
-        borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
-      }}
-    >
-      <div className="overflow-y-auto flex-1 min-h-0">
-        <div className="p-4 h-full min-h-0 flex flex-col">{children}</div>
+    <>
+      {backdrop && (
+        <div
+          data-popover-backdrop="true"
+          className="fixed inset-0 z-[9998]"
+          style={{
+            background: "color-mix(in srgb, var(--primary) 35%, transparent)",
+            backdropFilter: "blur(8px)",
+          }}
+        />
+      )}
+      <div
+        ref={panelRef}
+        className="fixed z-[9999] rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
+        style={{
+          top: pos.top,
+          left: pos.left,
+          width: pos.width,
+          maxHeight: pos.maxHeight,
+          transform: pos.openUp ? "translateY(-100%)" : undefined,
+          background: "var(--bg-main)",
+          borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+        }}
+      >
+        <div className="overflow-y-auto flex-1 min-h-0">
+          <div className="p-4 h-full min-h-0 flex flex-col">{children}</div>
+        </div>
       </div>
-    </div>,
+    </>,
     document.body,
   );
 }

@@ -59,6 +59,7 @@ import {
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { TABLA_TO_SECTION } from "@/domains/garlia/_shared/useExternalCommandBridge";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 
 interface Personaje {
   id: string;
@@ -431,6 +432,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
   }, [cancionesFiltradas]);
 
   const openEntity = useMundoNavigation((s) => s.openEntity);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
   const clearSelection = useMundoNavigation((s) => s.clearSelection);
 
   const selectedPersonaje = useMemo(
@@ -510,7 +512,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           cancionId={selectedCancion.id}
           onNavigateCiudad={(id) => openEntity("ciudades", id)}
           onNavigateGrupo={(id) => openEntity("grupos", id)}
-          onNavigatePersonaje={(id) => openEntity("personajes", id)}
+          onNavigatePersonaje={(id) => abrirPanel("personaje", id)}
           onNavigateReino={(id) => openEntity("reinos", id)}
         />
       </div>

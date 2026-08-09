@@ -5,6 +5,7 @@
 // reinos).
 
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 
 import { EditorReino } from "./EditorReino";
 
@@ -16,15 +17,16 @@ interface Reino {
 
 export function ReinoEditor({ reino }: { reino: Reino }) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   return (
     <EditorReino
       item={reino as any}
       onSaved={() => {}}
       onDeleted={() => openEntity("reinos", "")}
-      onSelectPersonaje={(personaje) => openEntity("personajes", personaje.id)}
+      onSelectPersonaje={(personaje) => abrirPanel("personaje", personaje.id)}
       onSelectCiudad={(id) => openEntity("ciudades", id)}
-      onSelectCriatura={(id) => openEntity("criaturas", id)}
+      onSelectCriatura={(id) => abrirPanel("criatura", id)}
       onSelectItem={(id) => openEntity("items", id)}
     />
   );

@@ -5,10 +5,12 @@ import { useCadenasAlimenticias, useEcosistemas } from "@/domains/garlia/biologi
 import type { Ecosistema } from "@/domains/garlia/biologia/types";
 
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 
 export function EcosistemaEditor({ ecosistema }: { ecosistema: Ecosistema }) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
   const clearSelection = useMundoNavigation((s) => s.clearSelection);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   const { actualizar, eliminar } = useEcosistemas();
   const {
@@ -36,7 +38,7 @@ export function EcosistemaEditor({ ecosistema }: { ecosistema: Ecosistema }) {
         onCrearCadena={() => void crearCadena("Nueva cadena", ecosistema.id)}
         onActualizarCadena={(id, updates) => void actualizarCadena(id, updates)}
         onEliminarCadena={(id) => void eliminarCadena(id)}
-        onSelectCriatura={(id) => openEntity("criaturas", id)}
+        onSelectCriatura={(id) => abrirPanel("criatura", id)}
         onSelectBioma={(id) => openEntity("biomas", id)}
       />
     </div>

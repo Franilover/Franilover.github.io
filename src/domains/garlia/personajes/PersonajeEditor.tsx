@@ -14,6 +14,7 @@
 import { EditorPersonaje } from "@/domains/garlia/personajes/EditorPersonaje";
 
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 import { useWikilinkNavigate } from "@/domains/garlia/_shared/useWikilinkNavigate";
 
 interface Personaje {
@@ -24,6 +25,7 @@ interface Personaje {
 
 export function PersonajeEditor({ personaje }: { personaje: Personaje }) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
   // Resuelve nombre → id contra el cache de personajes/criaturas/items/
   // reinos/ciudades y navega. Reusado acá porque
   // onNavigate("criaturas"/"reinos", nombre) de EditorPersonaje solo entrega
@@ -39,7 +41,7 @@ export function PersonajeEditor({ personaje }: { personaje: Personaje }) {
       }}
       onDeleted={() => openEntity("personajes", "")}
       onNavigate={(_tab, nombre) => navigateByName(nombre)}
-      onSelectPersonaje={(id) => openEntity("personajes", id)}
+      onSelectPersonaje={(id) => abrirPanel("personaje", id)}
       onOpenGrupo={(id) => openEntity("grupos", id)}
       onNavigateCiudad={(id) => openEntity("ciudades", id)}
       onNavigateCapitulo={(capituloId) => openEntity("capitulos", capituloId)}

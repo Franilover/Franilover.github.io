@@ -58,9 +58,8 @@ import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "./GrupoFiltroDropdown
 import { BuscadorInline } from "./BuscadorInline";
 import { useRightClickDrag } from "./DragDropReasignable";
 import { PopoverFlotante } from "./PopoverFlotante";
-import { useFullscreenEntityPanel } from "./useFullscreenEntityPanelStore";
+import { usePanelFlotante } from "./usePanelFlotanteStore";
 import { BiomaPopoverContent } from "@/domains/garlia/biologia/BiomaPopoverContent";
-import { PersonajePopoverContent } from "@/domains/garlia/personajes/PersonajePopoverContent";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 export type GrupoPersonajeSubtipo = GrupoFiltroSubtipo;
@@ -342,15 +341,11 @@ export function GeografiaJerarquica({
     null,
   );
 
-  // Popover flotante minimalista de Personaje: click en una EntityCard de
-  // personaje abre este panel (nombre + Especie/Reino + Relaciones/
-  // Capítulos/Canciones/Grupos) en vez de navegar directo a pantalla
-  // completa. El botón "Centrar" del propio popover es el único que llama a
-  // onOpen("personajes", id).
-  const [personajeAbierto, setPersonajeAbierto] = useState<{
-    id: string;
-    anchor: HTMLElement;
-  } | null>(null);
+  // Vista rápida flotante de Personaje: click izquierdo en una EntityCard
+  // de personaje abre el panel flotante global (siempre centrado en
+  // pantalla) — ver PanelFlotanteGlobal, montado una sola vez en
+  // EditorMundoRoot.
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   // Arrastre (click derecho) de chips de Reino → se sueltan sobre el título
   // de un Bioma en modo "ojo apagado".
@@ -362,13 +357,6 @@ export function GeografiaJerarquica({
   const dragPersonaje = useRightClickDrag<string>({
     label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
   });
-
-  // Click del medio en una EntityCard de Personaje → abre el editor
-  // completo en un panel flotante a pantalla completa (por encima de esta
-  // vista, sin navegar fuera) en vez del popover minimalista del click
-  // normal — ver FullscreenEntityPanel, montado una sola vez en
-  // EditorMundoRoot.
-  const openFullscreen = useFullscreenEntityPanel((s) => s.open);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -667,10 +655,7 @@ export function GeografiaJerarquica({
                   nombre={p.nombre}
                   imageUrl={p.img_url}
                   Icon={Users}
-                  onClick={(e) =>
-                    setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
-                  }
-                  onMiddleClick={() => openFullscreen("personaje", p)}
+                  onClick={() => abrirPanel("personaje", p.id)}
                 />
               </div>
             ))}
@@ -901,10 +886,7 @@ export function GeografiaJerarquica({
                             nombre={p.nombre}
                             imageUrl={p.img_url}
                             Icon={Users}
-                            onClick={(e) =>
-                              setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
-                            }
-                            onMiddleClick={() => openFullscreen("personaje", p)}
+                            onClick={() => abrirPanel("personaje", p.id)}
                           />
                         </div>
                       ))}
@@ -1072,35 +1054,6 @@ export function GeografiaJerarquica({
           </PopoverFlotante>
         )}
 
-      {personajeAbierto &&
-        (() => {
-          const p = personajes.find((x) => x.id === personajeAbierto.id);
-          if (!p) return null;
-          return (
-            <PopoverFlotante
-              anchor={personajeAbierto.anchor}
-              onClose={() => setPersonajeAbierto(null)}
-              width={420}
-              maxHeight={520}
-              centerVertically
-              centerHorizontally
-            >
-              <PersonajePopoverContent
-                personaje={p}
-                onSave={(patch) => onUpdatePersonaje?.(p.id, patch)}
-                onClose={() => setPersonajeAbierto(null)}
-                onAbrirCompleto={() => {
-                  setPersonajeAbierto(null);
-                  onOpen("personajes", p.id);
-                }}
-                onSelectPersonaje={(id) => onOpen("personajes", id)}
-                onOpenGrupo={onOpenGrupo}
-                onSelectCancion={onSelectCancion}
-                onNavigateCapitulo={onNavigateCapitulo}
-              />
-            </PopoverFlotante>
-          );
-        })()}
     </div>
   );
 }

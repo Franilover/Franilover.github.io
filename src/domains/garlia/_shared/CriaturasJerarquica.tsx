@@ -51,11 +51,9 @@ import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_sha
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { useRightClickDrag } from "@/domains/garlia/_shared/DragDropReasignable";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
-import { useFullscreenEntityPanel } from "@/domains/garlia/_shared/useFullscreenEntityPanelStore";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 import { BiomaPopoverContent } from "@/domains/garlia/biologia/BiomaPopoverContent";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
-import { PersonajePopoverContent } from "@/domains/garlia/personajes/PersonajePopoverContent";
-import { CriaturaPopoverContent } from "@/domains/garlia/criaturas/CriaturaPopoverContent";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 interface Criatura {
@@ -197,7 +195,6 @@ interface Props {
 function NodoTitulo({
   label,
   onClick,
-  onMiddleClick,
   onCreate,
   variant = "ecosistema",
   maxWidthPx,
@@ -207,9 +204,6 @@ function NodoTitulo({
 }: {
   label: string;
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  /** Click con el botón del medio del mouse — abre el panel flotante en
-   *  pantalla completa (solo usado en chips de Criatura). Opcional. */
-  onMiddleClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onCreate?: () => void;
   variant?: "ecosistema" | "criatura" | "flora" | "mineral";
   maxWidthPx?: number;
@@ -231,17 +225,6 @@ function NodoTitulo({
       <button
         type="button"
         onClick={onClick}
-        onMouseDown={(e) => {
-          if (e.button === 1 && onMiddleClick) {
-            e.preventDefault();
-            onMiddleClick(e);
-          }
-        }}
-        onAuxClick={(e) => {
-          if (e.button === 1 && onMiddleClick) {
-            e.preventDefault();
-          }
-        }}
         title={dragProps?.title ?? label}
         style={maxWidthPx ? { maxWidth: maxWidthPx } : undefined}
         {...dragProps}
@@ -511,24 +494,10 @@ export function CriaturasJerarquica({
   const [biomaAbierto, setBiomaAbierto] = useState<{ id: string; anchor: HTMLElement } | null>(
     null,
   );
-  // Popover flotante minimalista de Personaje: click en una EntityCard de
-  // personaje abre este panel (nombre + Especie/Reino + Relaciones/
-  // Capítulos/Canciones/Grupos) en vez de navegar directo a pantalla
-  // completa. El botón "Centrar" del propio popover es el único que llama a
-  // onOpen("personajes", id).
-  const [personajeAbierto, setPersonajeAbierto] = useState<{
-    id: string;
-    anchor: HTMLElement;
-  } | null>(null);
-  // Popover flotante minimalista de Criatura: click en el chip de una
-  // criatura abre este panel (nombre + Descripción + Clasificación +
-  // Personajes + Territorio) en vez de navegar directo a pantalla completa.
-  // El botón "Centrar" del propio popover es el único que llama a
-  // onOpen("criaturas", id).
-  const [criaturaAbierta, setCriaturaAbierta] = useState<{
-    id: string;
-    anchor: HTMLElement;
-  } | null>(null);
+  // Vista rápida flotante de Personaje/Criatura: click izquierdo abre el
+  // panel flotante global (siempre centrado en pantalla) — ver
+  // PanelFlotanteGlobal, montado una sola vez en EditorMundoRoot.
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   // Envuelven las props onCreateBioma/onCreateEcosistema (que crean la
   // entidad y devuelven su id) para además abrir el popover de edición
@@ -555,12 +524,6 @@ export function CriaturasJerarquica({
   const dragPersonaje = useRightClickDrag<string>({
     label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
   });
-  // Click del medio en una EntityCard de Personaje → abre el editor
-  // completo en un panel flotante a pantalla completa (por encima de esta
-  // vista, sin navegar fuera) en vez del popover minimalista del click
-  // normal — ver FullscreenEntityPanel, montado una sola vez en
-  // EditorMundoRoot.
-  const openFullscreen = useFullscreenEntityPanel((s) => s.open);
   // Arrastre (click derecho) de chips/cards de Ecosistema → se sueltan
   // sobre el título de un Bioma.
   const dragEcosistema = useRightClickDrag<string>({
@@ -785,8 +748,7 @@ export function CriaturasJerarquica({
               dragProps={
                 onAsignarCriaturaAEcosistema ? dragCriatura.dragHandlers(criatura.id) : undefined
               }
-              onClick={(e) => setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })}
-              onMiddleClick={() => openFullscreen("criatura", criatura)}
+              onClick={() => abrirPanel("criatura", criatura.id)}
               onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
             />
             {!vacia && (
@@ -821,8 +783,7 @@ export function CriaturasJerarquica({
           dragProps={
             onAsignarCriaturaAEcosistema ? dragCriatura.dragHandlers(criatura.id) : undefined
           }
-          onClick={(e) => setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })}
-          onMiddleClick={() => openFullscreen("criatura", criatura)}
+          onClick={() => abrirPanel("criatura", criatura.id)}
           onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
         />
         {vacia ? (
@@ -840,10 +801,7 @@ export function CriaturasJerarquica({
                   nombre={p.nombre}
                   imageUrl={p.img_url}
                   Icon={Users}
-                  onClick={(e) =>
-                    setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
-                  }
-                  onMiddleClick={() => openFullscreen("personaje", p)}
+                  onClick={() => abrirPanel("personaje", p.id)}
                 />
               </div>
             ))}
@@ -1017,10 +975,7 @@ export function CriaturasJerarquica({
                                 nombre={p.nombre}
                                 imageUrl={p.img_url}
                                 Icon={Users}
-                                onClick={(e) =>
-                                  setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
-                                }
-                                onMiddleClick={() => openFullscreen("personaje", p)}
+                                onClick={() => abrirPanel("personaje", p.id)}
                               />
                             </div>
                           ))}
@@ -1073,10 +1028,7 @@ export function CriaturasJerarquica({
                                 !!onMoverPersonaje &&
                                 dragPersonaje.esZonaActiva(`criatura:${criatura.id}`)
                               }
-                              onClick={(e) =>
-                                setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })
-                              }
-                              onMiddleClick={() => openFullscreen("criatura", criatura)}
+                              onClick={() => abrirPanel("criatura", criatura.id)}
                             />
                           </div>
                         ))}
@@ -1328,7 +1280,7 @@ export function CriaturasJerarquica({
             <EcosistemaPopoverContent
               ecosistemaId={ecosistemaAbierto.id}
               onClose={() => setEcosistemaAbierto(null)}
-              onSelectCriatura={(id) => onOpen("criaturas", id)}
+              onSelectCriatura={(id) => abrirPanel("criatura", id)}
             />
           </PopoverFlotante>
         )}
@@ -1346,65 +1298,6 @@ export function CriaturasJerarquica({
             <BiomaPopoverContent biomaId={biomaAbierto.id} onClose={() => setBiomaAbierto(null)} />
           </PopoverFlotante>
         )}
-
-      {personajeAbierto &&
-        (() => {
-          const p = personajes.find((x) => x.id === personajeAbierto.id);
-          if (!p) return null;
-          return (
-            <PopoverFlotante
-              anchor={personajeAbierto.anchor}
-              onClose={() => setPersonajeAbierto(null)}
-              width={420}
-              maxHeight={520}
-              centerVertically
-              centerHorizontally
-            >
-              <PersonajePopoverContent
-                personaje={p}
-                onSave={(patch) => onUpdatePersonaje?.(p.id, patch)}
-                onClose={() => setPersonajeAbierto(null)}
-                onAbrirCompleto={() => {
-                  setPersonajeAbierto(null);
-                  onOpen("personajes", p.id);
-                }}
-                onSelectPersonaje={(id) => onOpen("personajes", id)}
-                onOpenGrupo={onOpenGrupo}
-                onSelectCancion={onSelectCancion}
-                onNavigateCapitulo={onNavigateCapitulo}
-              />
-            </PopoverFlotante>
-          );
-        })()}
-
-      {criaturaAbierta &&
-        (() => {
-          const c = criaturas.find((x) => x.id === criaturaAbierta.id);
-          if (!c) return null;
-          return (
-            <PopoverFlotante
-              anchor={criaturaAbierta.anchor}
-              onClose={() => setCriaturaAbierta(null)}
-              width={420}
-              maxHeight={560}
-              centerVertically
-              centerHorizontally
-            >
-              <CriaturaPopoverContent
-                criatura={c}
-                onSave={(patch) => onUpdateCriatura?.(c.id, patch)}
-                onClose={() => setCriaturaAbierta(null)}
-                onAbrirCompleto={() => {
-                  setCriaturaAbierta(null);
-                  onOpen("criaturas", c.id);
-                }}
-                onSelectPersonaje={(id) => onOpen("personajes", id)}
-                onSelectGrupo={onSelectGrupo ?? onOpenGrupo}
-                onNavigateReino={onNavigateReino}
-              />
-            </PopoverFlotante>
-          );
-        })()}
     </div>
   );
 }

@@ -21,12 +21,14 @@ import { PanelHistoriaMundo } from "@/domains/garlia/libros/EditorLineaTiempo";
 
 import { useMundoSecciones } from "@/domains/garlia/_shared/useMundoSecciones";
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 
 export function LineaTiempoSection() {
   const { textos, setTextos, save } = useMundoSecciones();
   const openEntity = useMundoNavigation((s) => s.openEntity);
   const selectedId = useMundoNavigation((s) => s.selectedId);
   const openTabs = useMundoNavigation((s) => s.openTabs);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   // Si hay una pestaña de un personaje abierta (en cualquier orden, no
   // necesariamente la activa), la usamos para preseleccionar el filtro de
@@ -43,7 +45,7 @@ export function LineaTiempoSection() {
         texto={textos.historia}
         onChange={(v) => setTextos((t) => ({ ...t, historia: v }))}
         onSave={() => save("historia", textos.historia)}
-        onSelectPersonaje={(id) => openEntity("personajes", id)}
+        onSelectPersonaje={(id) => abrirPanel("personaje", id)}
         onSelectCapitulo={() => openEntity("capitulos", "")}
         onSelectCancion={(id) => openEntity("letras", id)}
         onOpenHistoriaCompleta={() => openEntity("linea-tiempo", "historia")}

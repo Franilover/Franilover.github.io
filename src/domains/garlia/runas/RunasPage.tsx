@@ -15,6 +15,7 @@ import { Atom, Dna, Maximize2, Plus, ScrollText, Waypoints, X, Zap } from "lucid
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { RichEditor } from "@/editor/lexical";
 import { useEnsayoEditorLogic } from "@/editor/notas/hooks/useEnsayoEditorLogic";
@@ -648,6 +649,7 @@ export function RunasPage({
   seleccionarElementoId,
 }: Props) {
   const { config: configRunas, actualizar: actualizarConfigRunas } = useConfigRunas();
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   // Grupos de runas — antes vivían en el editor externo de una runa
   // individual (FormularioRuna), recibidos por props. Ahora la asignación
@@ -823,11 +825,11 @@ export function RunasPage({
         </div>
       ) : seccionMagia === "fisica" ? (
         <div className="mt-4">
-          <BloqueFisica onSelectCriatura={(id) => onOpen("criaturas", id)} />
+          <BloqueFisica onSelectCriatura={(id) => abrirPanel("criatura", id)} />
         </div>
       ) : seccionMagia === "biologia" ? (
         <div className="mt-4">
-          <BiologiaPage onSelectCriatura={(id) => onOpen("criaturas", id)} />
+          <BiologiaPage onSelectCriatura={(id) => abrirPanel("criatura", id)} />
         </div>
       ) : (
         <div className="mt-4 flex flex-col lg:flex-row gap-6">
