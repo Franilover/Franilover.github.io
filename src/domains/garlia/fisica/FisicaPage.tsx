@@ -62,6 +62,7 @@ type Seleccion =
   | { tipo: "concepto"; id: string }
   | { tipo: "todos-oris" }
   | { tipo: "todas-bases" }
+  | { tipo: "todos-conceptos" }
   | null;
 
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
@@ -87,134 +88,9 @@ function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
   URL.revokeObjectURL(url);
 }
 
-// ─── Grupo colapsable de nivel superior (Bases / Oris / Conceptos) ────────
-// Mismo lenguaje visual que CatalogoCardMini (borde + summary + chevron),
-// para que se note claramente dónde termina un grupo y empieza el otro.
-
-function GrupoColapsable({
-  titulo,
-  accion,
-  children,
-  defaultOpen = true,
-}: {
-  titulo: string;
-  accion?: React.ReactNode;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  return (
-    <details
-      open={defaultOpen}
-      className="rounded-lg border border-primary/10 overflow-hidden group/grupo"
-    >
-      <summary className="px-1.5 py-1 bg-primary/[0.04] cursor-pointer select-none flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-micro text-primary/30 group-open/grupo:rotate-90 transition-transform shrink-0">
-            ›
-          </span>
-          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/50 truncate">
-            {titulo}
-          </span>
-        </div>
-        {accion && (
-          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-            {accion}
-          </div>
-        )}
-      </summary>
-      <div className="p-1 flex flex-col gap-1 border-t border-primary/10">{children}</div>
-    </details>
-  );
-}
-
 // ─── Filas de navegación (columna izquierda) ───────────────────────────────
 
 
-function ConceptoFila({
-  concepto,
-  seleccionado,
-  onClick,
-}: {
-  concepto: FisicaConcepto;
-  seleccionado?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-col items-stretch gap-0 px-1.5 py-1 rounded-md border text-left transition-colors ${
-        seleccionado
-          ? "border-primary/50 bg-primary/10"
-          : "border-transparent hover:bg-primary/5 hover:border-primary/15"
-      }`}
-    >
-      <span className="text-micro font-black text-primary/80 truncate">
-        {concepto.titulo || "Sin título"}
-      </span>
-      <span className="text-micro text-primary/40 truncate">
-        {concepto.contenido?.replace(/<[^>]+>/g, "").slice(0, 60) || "Sin contenido…"}
-      </span>
-    </button>
-  );
-}
-
-function BloqueConceptos({
-  bloque,
-  items,
-  activoId,
-  onSeleccionar,
-  onAgregarConcepto,
-  agregandoConcepto,
-}: {
-  bloque: string;
-  items: FisicaConcepto[];
-  activoId?: string | null;
-  onSeleccionar: (id: string) => void;
-  onAgregarConcepto?: (bloque: string) => void;
-  agregandoConcepto?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <div className="flex items-center justify-between gap-1 px-2 pt-1">
-        <p className="text-micro font-black uppercase tracking-widest text-primary/40 truncate">
-          {bloque}
-        </p>
-        {onAgregarConcepto && (
-          <button
-            type="button"
-            disabled={agregandoConcepto}
-            onClick={() => onAgregarConcepto(bloque)}
-            title={`Añadir concepto en "${bloque}"`}
-            className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
-          >
-            {agregandoConcepto ? (
-              <Loader2 className="animate-spin" size={9} />
-            ) : (
-              <Plus size={10} />
-            )}
-          </button>
-        )}
-      </div>
-      <div className="flex flex-col gap-0.5">
-        {items.map((c) => (
-          <ConceptoFila
-            key={c.id}
-            concepto={c}
-            seleccionado={c.id === activoId}
-            onClick={() => onSeleccionar(c.id)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Vista de todas las Bases (Partícula Base / Partículas / Iums) en la
- * columna derecha. Mismo patrón que TodosLosOrisView: cada catálogo es un
- * bloque con título y separador horizontal, apilados uno arriba del otro.
- */
 const CATALOGOS_BASES: { key: "particula-base" | "particulas" | "iums"; titulo: string; filas: FilaCatalogo[] }[] =
   [
     { key: "particula-base", titulo: "Partícula Base", filas: PARTICULAS_BASE },
@@ -360,6 +236,157 @@ function TodosLosOrisView({
 }
 
 /**
+ * Vista de todos los Conceptos en la columna derecha, agrupados por
+ * bloque. Mismo patrón que TodasLasBasesView / TodosLosOrisView: cada
+ * bloque es una sección con título y separador horizontal, apilados uno
+ * arriba del otro; los conceptos dentro de cada bloque van en columna
+ * única (una lista vertical), ya que cada uno lleva su editor de texto
+ * enriquecido y necesita ancho completo.
+ */
+function TodosLosConceptosView({
+  bloques,
+  onBack,
+  onActualizarConcepto,
+  onEliminarConcepto,
+  onAgregarConcepto,
+  agregandoConceptoDe,
+  mostrarInputSeccion,
+  nuevaSeccionNombre,
+  onCambiarNuevaSeccionNombre,
+  onConfirmarNuevaSeccion,
+  onCancelarNuevaSeccion,
+  onAbrirNuevaSeccion,
+  creandoSeccion,
+}: {
+  bloques: { bloque: string; items: FisicaConcepto[] }[];
+  onBack: () => void;
+  onActualizarConcepto: (id: string, cambios: Partial<FisicaConcepto>) => void;
+  onEliminarConcepto?: (id: string) => void;
+  onAgregarConcepto?: (bloque: string) => void;
+  agregandoConceptoDe?: string | null;
+  mostrarInputSeccion: boolean;
+  nuevaSeccionNombre: string;
+  onCambiarNuevaSeccionNombre: (v: string) => void;
+  onConfirmarNuevaSeccion: () => void;
+  onCancelarNuevaSeccion: () => void;
+  onAbrirNuevaSeccion: () => void;
+  creandoSeccion?: boolean;
+}) {
+  const total = bloques.reduce((acc, b) => acc + b.items.length, 0);
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div
+        style={{ background: "var(--bg-main)" }}
+        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <ChevronLeft size={12} />
+        </button>
+        <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary">
+          Conceptos · {total}
+        </p>
+
+        {mostrarInputSeccion ? (
+          <div className="flex items-center gap-1 min-w-0">
+            <input
+              autoFocus
+              value={nuevaSeccionNombre}
+              onChange={(e) => onCambiarNuevaSeccionNombre(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onConfirmarNuevaSeccion();
+                if (e.key === "Escape") onCancelarNuevaSeccion();
+              }}
+              placeholder="Nombre de la sección…"
+              className="w-40 min-w-0 bg-primary/5 rounded px-1.5 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
+            />
+            <button
+              type="button"
+              disabled={creandoSeccion || !nuevaSeccionNombre.trim()}
+              onClick={onConfirmarNuevaSeccion}
+              className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {creandoSeccion ? <Loader2 className="animate-spin" size={10} /> : "✓"}
+            </button>
+            <button
+              type="button"
+              onClick={onCancelarNuevaSeccion}
+              className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/30 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onAbrirNuevaSeccion}
+            title="Añadir nueva sección de conceptos"
+            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+          >
+            <Plus size={11} />
+            Sección
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
+        {bloques.length === 0 ? (
+          <div className="py-8 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
+            Sin conceptos todavía
+          </div>
+        ) : (
+          bloques.map(({ bloque, items }, idx) => (
+            <div key={bloque} className="flex flex-col gap-2">
+              <div
+                className={`flex items-center justify-between gap-1.5 text-primary/50 pb-1.5 ${
+                  idx > 0 ? "pt-2 border-t border-primary/10" : ""
+                }`}
+              >
+                <p className="text-micro font-black uppercase tracking-[0.2em]">
+                  {bloque} · {items.length}
+                </p>
+                {onAgregarConcepto && (
+                  <button
+                    type="button"
+                    disabled={agregandoConceptoDe === bloque}
+                    onClick={() => onAgregarConcepto(bloque)}
+                    title={`Añadir concepto en "${bloque}"`}
+                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {agregandoConceptoDe === bloque ? (
+                      <Loader2 className="animate-spin" size={10} />
+                    ) : (
+                      <Plus size={11} />
+                    )}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {items.map((c) => (
+                  <div key={c.id} className="rounded-lg border border-primary/10 overflow-hidden">
+                    <ConceptoEditor
+                      concepto={c}
+                      onBack={onBack}
+                      onActualizar={onActualizarConcepto}
+                      onEliminar={onEliminarConcepto}
+                      embedded
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Detalle editable de un concepto, para la columna derecha. Mismo patrón
  * de header que OrisEditor (volver + guardado al perder foco / on change),
  * pero sin fila de metadatos — un concepto es solo título + contenido.
@@ -369,11 +396,16 @@ function ConceptoEditor({
   onBack,
   onActualizar,
   onEliminar,
+  embedded,
 }: {
   concepto: FisicaConcepto;
   onBack: () => void;
   onActualizar: (id: string, cambios: Partial<FisicaConcepto>) => void;
   onEliminar?: (id: string) => void;
+  /** Cuando se renderiza dentro de la vista de todos los conceptos (varios
+   *  apilados): oculta el botón "volver" individual y usa un editor más
+   *  bajo, ya que ahí se vuelve una sola vez desde el header general. */
+  embedded?: boolean;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [local, setLocal] = useState(concepto);
@@ -389,19 +421,21 @@ function ConceptoEditor({
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div className={embedded ? "flex flex-col overflow-hidden" : "flex-1 flex flex-col min-h-0 overflow-hidden"}>
       <ConfirmModal />
       <div
         style={{ background: "var(--bg-main)" }}
         className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
       >
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <ChevronLeft size={12} />
-        </button>
+        {!embedded && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+          >
+            <ChevronLeft size={12} />
+          </button>
+        )}
 
         <span className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/30 px-1.5 py-0.5 rounded border border-primary/15">
           {concepto.bloque}
@@ -433,10 +467,10 @@ function ConceptoEditor({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 p-2.5 overflow-y-auto">
+      <div className={embedded ? "p-2.5" : "flex-1 min-h-0 p-2.5 overflow-y-auto"}>
         <div className="text-sm">
           <RichEditor
-            minHeight="16rem"
+            minHeight={embedded ? "8rem" : "16rem"}
             placeholder="Contenido del concepto…"
             value={local.contenido}
             onChange={(v) => {
@@ -645,73 +679,20 @@ export function FisicaPage({
             )}
           </button>
 
-          {/* Conceptos por bloque */}
-          <GrupoColapsable
-            titulo={`Conceptos · ${conceptosLocal.length}`}
-            accion={
-              mostrarInputSeccion ? (
-                <div className="flex items-center gap-1 min-w-0">
-                  <input
-                    autoFocus
-                    value={nuevaSeccionNombre}
-                    onChange={(e) => setNuevaSeccionNombre(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCrearSeccion();
-                      if (e.key === "Escape") {
-                        setMostrarInputSeccion(false);
-                        setNuevaSeccionNombre("");
-                      }
-                    }}
-                    placeholder="Nombre…"
-                    className="w-full min-w-0 bg-primary/5 rounded px-1.5 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
-                  />
-                  <button
-                    type="button"
-                    disabled={creandoSeccion || !nuevaSeccionNombre.trim()}
-                    onClick={handleCrearSeccion}
-                    className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {creandoSeccion ? <Loader2 className="animate-spin" size={9} /> : "✓"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMostrarInputSeccion(false);
-                      setNuevaSeccionNombre("");
-                    }}
-                    className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setMostrarInputSeccion(true)}
-                  title="Añadir nueva sección de conceptos"
-                  className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer"
-                >
-                  <Plus size={10} />
-                </button>
-              )
-            }
+          {/* Conceptos — botón único, abre los bloques en la columna derecha */}
+          <button
+            type="button"
+            onClick={() => setSeleccion({ tipo: "todos-conceptos" })}
+            className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
+              seleccion?.tipo === "todos-conceptos"
+                ? "border-primary/50 bg-primary/10 text-primary"
+                : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
+            }`}
           >
-            {loadingConceptos && conceptosLocal.length === 0 ? (
-              <div className="py-4 text-micro text-primary/30 text-center">Cargando…</div>
-            ) : (
-              bloquesConceptos.map(({ bloque, items }) => (
-                <BloqueConceptos
-                  key={bloque}
-                  bloque={bloque}
-                  items={items}
-                  activoId={conceptoActivo?.id ?? null}
-                  onSeleccionar={(id) => setSeleccion({ tipo: "concepto", id })}
-                  onAgregarConcepto={handleAgregarConcepto}
-                  agregandoConcepto={agregandoConceptoDe === bloque}
-                />
-              ))
-            )}
-          </GrupoColapsable>
+            <span className="text-micro font-black uppercase tracking-[0.2em]">
+              Conceptos · {conceptosLocal.length}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -743,6 +724,30 @@ export function FisicaPage({
           />
         ) : seleccion?.tipo === "todas-bases" ? (
           <TodasLasBasesView onBack={() => setSeleccion(null)} />
+        ) : seleccion?.tipo === "todos-conceptos" ? (
+          <TodosLosConceptosView
+            bloques={bloquesConceptos}
+            onBack={() => setSeleccion(null)}
+            onActualizarConcepto={(id, cambios) => {
+              setConceptosLocal((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+              );
+              onActualizarConcepto(id, cambios);
+            }}
+            onEliminarConcepto={handleEliminarConcepto}
+            onAgregarConcepto={handleAgregarConcepto}
+            agregandoConceptoDe={agregandoConceptoDe}
+            mostrarInputSeccion={mostrarInputSeccion}
+            nuevaSeccionNombre={nuevaSeccionNombre}
+            onCambiarNuevaSeccionNombre={setNuevaSeccionNombre}
+            onConfirmarNuevaSeccion={handleCrearSeccion}
+            onCancelarNuevaSeccion={() => {
+              setMostrarInputSeccion(false);
+              setNuevaSeccionNombre("");
+            }}
+            onAbrirNuevaSeccion={() => setMostrarInputSeccion(true)}
+            creandoSeccion={creandoSeccion}
+          />
         ) : conceptoActivo ? (
           <ConceptoEditor
             concepto={conceptoActivo}
