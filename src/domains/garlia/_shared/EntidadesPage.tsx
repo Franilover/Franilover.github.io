@@ -100,13 +100,13 @@ interface Props {
 
 export function EntidadesPage({ section, selectedId }: Props) {
   // ── Entidades ──────────────────────────────────────────────────────────
-  const { data: personajes, loading: loadingP, addRow: addPersonaje } =
+  const { data: personajes, loading: loadingP, addRow: addPersonaje, updateRow: updatePersonaje } =
     useSupabaseData<Personaje>("personajes");
   const { data: criaturas, loading: loadingC, addRow: addCriatura } =
     useSupabaseData<Criatura>("criaturas");
   const { data: items, loading: loadingI, addRow: addItem } =
     useSupabaseData<Item>("items");
-  const { ecosistemas, loading: loadingEco, creating: creatingEco, crear: crearEcosistema } = useEcosistemas();
+  const { ecosistemas, loading: loadingEco, creating: creatingEco, crear: crearEcosistema, actualizar: actualizarEcosistema } = useEcosistemas();
   const { biomas, loading: loadingBiomas, creating: creatingBiomas, crear: crearBioma, actualizar: actualizarBioma } = useBiomas();
   const { flora, loading: loadingFlora, creating: creatingFlora, crear: crearFlora } = useFlora();
   const { minerales, loading: loadingMinerales, creating: creatingMinerales, crear: crearMineral } = useMinerales();
@@ -992,6 +992,16 @@ export function EntidadesPage({ section, selectedId }: Props) {
             });
             if (data?.id) openEntity("personajes", data.id);
           }}
+          onAsignarCriaturaAEcosistema={async (criaturaId, ecosistemaId) => {
+            const eco = ecosistemas.find((e) => e.id === ecosistemaId);
+            if (!eco || eco.criatura_ids.includes(criaturaId)) return;
+            await actualizarEcosistema(eco.id, {
+              criatura_ids: [...eco.criatura_ids, criaturaId],
+            });
+          }}
+          onMoverPersonaje={async (personajeId, criaturaNombre) => {
+            await updatePersonaje(personajeId, { especie: criaturaNombre ?? undefined });
+          }}
           onOpen={(section, id) => openEntity(section, id)}
         />
       ) : (
@@ -1035,6 +1045,12 @@ export function EntidadesPage({ section, selectedId }: Props) {
             const bioma = biomas.find((b) => b.id === eco.bioma_id);
             if (!bioma || bioma.reino_ids.includes(reinoId)) return;
             await actualizarBioma(bioma.id, { reino_ids: [...bioma.reino_ids, reinoId] });
+          }}
+          onMoverPersonaje={async (personajeId, ciudadId, reinoNombre) => {
+            await updatePersonaje(personajeId, {
+              ciudad_id: ciudadId,
+              ...(ciudadId === null ? { reino: reinoNombre ?? undefined } : {}),
+            });
           }}
         />
       )}

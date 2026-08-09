@@ -36,6 +36,17 @@
  * Bioma.reino_ids (M:N) para resolver qué reinos tienen territorio en cada
  * bioma — no hay Ecosistema.reino_id directo, la relación pasa por el Bioma
  * contenedor. Un reino sin ningún bioma que lo liste cae en "Sin bioma".
+ *
+ * Arrastre (click izquierdo abre / click derecho arrastra): usa el hook
+ * compartido useRightClickDrag (DragDropReasignable.tsx). Hay dos arrastres
+ * independientes activos en esta vista:
+ *  - dragReino: chips de Reino → se pueden soltar sobre una card de
+ *    Ecosistema (modo ojo OFF) para asignar el reino a ese ecosistema
+ *    (onAsignarReinoAEcosistema).
+ *  - dragPersonaje: EntityCard de Personaje → se pueden soltar sobre una
+ *    columna de Ciudad o sobre la card de un Reino (modo ojo ON) para
+ *    reasignar Personaje.ciudad_id (y opcionalmente Personaje.reino) vía
+ *    onMoverPersonaje.
  */
 
 import { Compass, Plus, Users } from "lucide-react";
@@ -44,6 +55,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 import { EntityCard } from "./EntityCard";
 import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "./GrupoFiltroDropdown";
 import { BuscadorInline } from "./BuscadorInline";
+import { useRightClickDrag } from "./DragDropReasignable";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 export type GrupoPersonajeSubtipo = GrupoFiltroSubtipo;
@@ -104,6 +116,18 @@ interface Props {
    *  no hay FK directa Ecosistema→Reino. Solo aplica cuando el ecosistema
    *  tiene un bioma asignado; si no, el drop no hace nada. */
   onAsignarReinoAEcosistema?: (reinoId: string, ecosistemaId: string) => void;
+  /** Mueve un personaje a otra ciudad (arrastre por click derecho de una
+   *  EntityCard de personaje sobre una columna de ciudad, o sobre la card
+   *  de un reino para dejarlo en el slot "Sin Ciudad" de ese reino). Si
+   *  ciudadId es null, el personaje queda sin ciudad — reinoNombre indica
+   *  a qué reino asignarlo directamente (o null para el bloque "Sin
+   *  ciudad" global, sin reino). Si el elemento no acepta esta prop, los
+   *  personajes no son arrastrables. */
+  onMoverPersonaje?: (
+    personajeId: string,
+    ciudadId: string | null,
+    reinoNombre: string | null,
+  ) => void;
   creatingReino?: boolean;
   gruposPersonajesPorSubtipo?: GrupoPersonajeSubtipo[];
   grupoSeleccionadoId?: string | null;
@@ -134,7 +158,8 @@ function NodoTitulo({
   variant = "reino",
   maxWidthPx,
   fill,
-  draggableId,
+  dragProps,
+  dropActive,
 }: {
   label: string;
   onClick: () => void;
@@ -144,10 +169,12 @@ function NodoTitulo({
   maxWidthPx?: number;
   /** Si es true, el chip ocupa el 100% del ancho de su contenedor (uso en grid dinámico) */
   fill?: boolean;
-  /** Si se provee, el chip se vuelve arrastrable (drag & drop nativo) y
-   *  transporta este id como payload — usado por los chips de "reino" en
-   *  modo "ojo apagado" para poder soltarlos sobre una card de ecosistema. */
-  draggableId?: string;
+  /** Props de arrastre (click derecho) generadas por dragHandlers() del hook
+   *  useRightClickDrag — si se pasa, el chip se vuelve arrastrable. */
+  dragProps?: React.HTMLAttributes<HTMLElement>;
+  /** true si actualmente hay un arrastre activo pasando sobre este chip
+   *  como zona de drop — solo feedback visual. */
+  dropActive?: boolean;
 }) {
   const chipStyles =
     variant === "reino"
@@ -159,20 +186,14 @@ function NodoTitulo({
       <button
         type="button"
         onClick={onClick}
-        title={label}
+        title={dragProps?.title ?? label}
         style={maxWidthPx ? { maxWidth: maxWidthPx } : undefined}
-        draggable={!!draggableId}
-        onDragStart={
-          draggableId
-            ? (e) => {
-                e.dataTransfer.setData("application/x-reino-id", draggableId);
-                e.dataTransfer.effectAllowed = "link";
-              }
-            : undefined
-        }
+        {...dragProps}
         className={`px-2.5 py-0.5 rounded-full text-micro font-bold tracking-wide transition-colors truncate ${chipStyles} ${
           fill ? "flex-1 min-w-0 text-center" : ""
-        } ${draggableId ? "cursor-grab active:cursor-grabbing" : ""}`}
+        } ${dragProps ? "cursor-grab active:cursor-grabbing" : ""} ${
+          dropActive ? "ring-2 ring-accent/60" : ""
+        }`}
       >
         {label}
       </button>
@@ -204,6 +225,7 @@ export function GeografiaJerarquica({
   onCreateCiudad,
   onCreatePersonaje,
   onAsignarReinoAEcosistema,
+  onMoverPersonaje,
   creatingReino,
   gruposPersonajesPorSubtipo,
   grupoSeleccionadoId,
@@ -218,9 +240,17 @@ export function GeografiaJerarquica({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  // Id del ecosistema sobre el que se está arrastrando un chip de reino —
-  // solo feedback visual (resalte del borde), no afecta datos hasta el drop.
-  const [dragOverEcoId, setDragOverEcoId] = useState<string | null>(null);
+
+  // Arrastre (click derecho) de chips de Reino → se sueltan sobre una card
+  // de Ecosistema en modo "ojo apagado".
+  const dragReino = useRightClickDrag<string>({
+    label: (id) => reinos.find((r) => r.id === id)?.nombre ?? "",
+  });
+  // Arrastre (click derecho) de EntityCard de Personaje → se sueltan sobre
+  // una columna de Ciudad o sobre la card de un Reino en modo "ojo ON".
+  const dragPersonaje = useRightClickDrag<string>({
+    label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
+  });
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -452,6 +482,8 @@ export function GeografiaJerarquica({
     onClick,
     onCreate,
     anchoMaxDisponible,
+    ciudadIdDestino,
+    reinoNombreDestino,
   }: {
     key: string;
     nombre: string;
@@ -461,8 +493,24 @@ export function GeografiaJerarquica({
     /** Ancho máximo disponible (px); limita cuántas columnas internas puede
      * tener el grid para no desbordar la card. */
     anchoMaxDisponible?: number;
+    /** Ciudad a la que se asigna un personaje soltado sobre esta columna
+     *  (null = sin ciudad). Si se omite junto con onMoverPersonaje, la
+     *  columna no es zona de drop. */
+    ciudadIdDestino?: string | null;
+    /** Reino al que pertenece esta columna — se usa junto a
+     *  ciudadIdDestino: null para el slot "Sin Ciudad" de un reino
+     *  específico (distinto del bloque "Sin ciudad" global). */
+    reinoNombreDestino?: string | null;
   }) => {
     const vacia = habitantes.length === 0;
+    const zoneId = `col:${key}`;
+    const esZonaDrop = onMoverPersonaje && ciudadIdDestino !== undefined;
+    const dropHandlers = esZonaDrop
+      ? dragPersonaje.dropHandlers(zoneId, (personajeId) =>
+          onMoverPersonaje!(personajeId, ciudadIdDestino ?? null, reinoNombreDestino ?? null),
+        )
+      : {};
+    const dropActive = esZonaDrop && dragPersonaje.esZonaActiva(zoneId);
 
     if (!mostrarPersonajes) {
       // Vista colapsada: solo el chip de la ciudad + contador, sin grilla
@@ -500,7 +548,10 @@ export function GeografiaJerarquica({
     return (
       <div
         key={key}
-        className={vacia ? "w-fit shrink-0" : "shrink-0"}
+        {...dropHandlers}
+        className={`${vacia ? "w-fit shrink-0" : "shrink-0"} rounded-lg transition-colors ${
+          dropActive ? "ring-2 ring-accent/60 bg-accent/5" : ""
+        }`}
         style={vacia ? undefined : { width: anchoPx }}
       >
         <NodoTitulo
@@ -512,7 +563,7 @@ export function GeografiaJerarquica({
         />
         {vacia ? (
           <div className="mt-1.5 text-micro text-primary/25">
-            Sin personajes
+            {esZonaDrop ? "Soltá un personaje acá" : "Sin personajes"}
           </div>
         ) : (
           <div
@@ -522,13 +573,17 @@ export function GeografiaJerarquica({
             }}
           >
             {habitantes.map((p) => (
-              <EntityCard
+              <div
                 key={p.id}
-                nombre={p.nombre}
-                imageUrl={p.img_url}
-                Icon={Users}
-                onClick={() => onOpen("personajes", p.id)}
-              />
+                {...(onMoverPersonaje ? dragPersonaje.dragHandlers(p.id) : {})}
+              >
+                <EntityCard
+                  nombre={p.nombre}
+                  imageUrl={p.img_url}
+                  Icon={Users}
+                  onClick={() => onOpen("personajes", p.id)}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -546,6 +601,7 @@ export function GeografiaJerarquica({
         ? () => onCreatePersonaje!(ciudad.id)
         : undefined,
       anchoMaxDisponible: disponibleColumna,
+      ciudadIdDestino: ciudad.id,
     });
 
   const renderSinCiudadDeReino = (reino: Reino) =>
@@ -558,6 +614,8 @@ export function GeografiaJerarquica({
         ? () => onCreatePersonaje!(null)
         : undefined,
       anchoMaxDisponible: disponibleColumna,
+      ciudadIdDestino: null,
+      reinoNombreDestino: reino.nombre,
     });
 
   // ── Modo "ojo apagado": Bioma → Ecosistema → Reinos ───────────────────────
@@ -606,69 +664,51 @@ export function GeografiaJerarquica({
   const columnasEcosistemasOjoOff = distribuirEnColumnasEco(ecosistemasOrdenadosOjoOff);
   const hayEcosistemasConReinos = ecosistemasOrdenadosOjoOff.length > 0;
 
-  const renderTarjetaEcosistemaOjoOff = (eco: Ecosistema) => (
-    <div
-      key={eco.id}
-      onDragOver={
-        onAsignarReinoAEcosistema
-          ? (e) => {
-              if (!e.dataTransfer.types.includes("application/x-reino-id")) return;
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "link";
-              if (dragOverEcoId !== eco.id) setDragOverEcoId(eco.id);
-            }
-          : undefined
-      }
-      onDragLeave={
-        onAsignarReinoAEcosistema
-          ? () => setDragOverEcoId((cur) => (cur === eco.id ? null : cur))
-          : undefined
-      }
-      onDrop={
-        onAsignarReinoAEcosistema
-          ? (e) => {
-              e.preventDefault();
-              setDragOverEcoId(null);
-              const reinoId = e.dataTransfer.getData("application/x-reino-id");
-              if (reinoId) onAsignarReinoAEcosistema(reinoId, eco.id);
-            }
-          : undefined
-      }
-      className={`w-full rounded-lg border overflow-hidden transition-colors ${
-        dragOverEcoId === eco.id
-          ? "border-accent/50 bg-accent/5"
-          : "border-primary/10"
-      }`}
-    >
-      <div className="px-3 py-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onOpen("ecosistemas", eco.id)}
-          title={eco.nombre}
-          className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
-        >
-          {eco.nombre}
-        </button>
+  const renderTarjetaEcosistemaOjoOff = (eco: Ecosistema) => {
+    const zoneId = `eco:${eco.id}`;
+    const dropActive = !!onAsignarReinoAEcosistema && dragReino.esZonaActiva(zoneId);
+    const dropHandlers = onAsignarReinoAEcosistema
+      ? dragReino.dropHandlers(zoneId, (reinoId) => onAsignarReinoAEcosistema(reinoId, eco.id))
+      : {};
+
+    return (
+      <div
+        key={eco.id}
+        {...dropHandlers}
+        className={`w-full rounded-lg border overflow-hidden transition-colors ${
+          dropActive ? "border-accent/50 bg-accent/5" : "border-primary/10"
+        }`}
+      >
+        <div className="px-3 py-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onOpen("ecosistemas", eco.id)}
+            title={eco.nombre}
+            className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
+          >
+            {eco.nombre}
+          </button>
+        </div>
+        <div className="px-3 pb-3 flex flex-wrap gap-2">
+          {reinosDeEcosistema(eco.id).length === 0 && (
+            <div className="text-micro text-primary/25">
+              {onAsignarReinoAEcosistema ? "Soltá un reino acá" : "Sin reinos"}
+            </div>
+          )}
+          {reinosDeEcosistema(eco.id).map((r) => (
+            <NodoTitulo
+              key={r.id}
+              label={r.nombre}
+              variant="reino"
+              maxWidthPx={160}
+              dragProps={dragReino.dragHandlers(r.id)}
+              onClick={() => onOpen("reinos", r.id)}
+            />
+          ))}
+        </div>
       </div>
-      <div className="px-3 pb-3 flex flex-wrap gap-2">
-        {reinosDeEcosistema(eco.id).length === 0 && (
-          <div className="text-micro text-primary/25">
-            {onAsignarReinoAEcosistema ? "Soltá un reino acá" : "Sin reinos"}
-          </div>
-        )}
-        {reinosDeEcosistema(eco.id).map((r) => (
-          <NodoTitulo
-            key={r.id}
-            label={r.nombre}
-            variant="reino"
-            maxWidthPx={160}
-            draggableId={r.id}
-            onClick={() => onOpen("reinos", r.id)}
-          />
-        ))}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="mb-8 last:mb-0">
@@ -720,10 +760,22 @@ export function GeografiaJerarquica({
                 className="flex flex-col gap-6 min-w-0"
                 style={{ width: anchoColumnaMasonry }}
               >
-                {columna.map((reino) => (
+                {columna.map((reino) => {
+                  const zoneIdReino = `reino:${reino.id}`;
+                  const dropActiveReino =
+                    !!onMoverPersonaje && dragPersonaje.esZonaActiva(zoneIdReino);
+                  const dropHandlersReino = onMoverPersonaje
+                    ? dragPersonaje.dropHandlers(zoneIdReino, (personajeId) =>
+                        onMoverPersonaje(personajeId, null, reino.nombre),
+                      )
+                    : {};
+                  return (
                   <div
                     key={reino.id}
-                    className="w-full rounded-lg border border-primary/10 overflow-hidden"
+                    {...dropHandlersReino}
+                    className={`w-full rounded-lg border overflow-hidden transition-colors ${
+                      dropActiveReino ? "border-accent/50 bg-accent/5" : "border-primary/10"
+                    }`}
                   >
                     <div className="px-3 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                       <span />
@@ -774,7 +826,8 @@ export function GeografiaJerarquica({
                         )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -785,7 +838,18 @@ export function GeografiaJerarquica({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                 {/* Columna izquierda: Personajes sin ciudad */}
                 {personajesSinCiudad.length > 0 ? (
-                  <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+                  <div
+                    {...(onMoverPersonaje
+                      ? dragPersonaje.dropHandlers("sin-ciudad-global", (personajeId) =>
+                          onMoverPersonaje(personajeId, null, null),
+                        )
+                      : {})}
+                    className={`w-full rounded-lg border overflow-hidden transition-colors ${
+                      onMoverPersonaje && dragPersonaje.esZonaActiva("sin-ciudad-global")
+                        ? "border-accent/50 bg-accent/5"
+                        : "border-primary/10"
+                    }`}
+                  >
                     <div className="px-3 py-3 flex items-center gap-2">
                       <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
                         Sin ciudad
@@ -808,13 +872,14 @@ export function GeografiaJerarquica({
                       }}
                     >
                       {personajesSinCiudad.map((p) => (
-                        <EntityCard
-                          key={p.id}
-                          nombre={p.nombre}
-                          imageUrl={p.img_url}
-                          Icon={Users}
-                          onClick={() => onOpen("personajes", p.id)}
-                        />
+                        <div key={p.id} {...(onMoverPersonaje ? dragPersonaje.dragHandlers(p.id) : {})}>
+                          <EntityCard
+                            nombre={p.nombre}
+                            imageUrl={p.img_url}
+                            Icon={Users}
+                            onClick={() => onOpen("personajes", p.id)}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -837,15 +902,26 @@ export function GeografiaJerarquica({
                       }}
                     >
                       {reinosVacios.map((reino) => (
-                        <NodoTitulo
+                        <div
                           key={reino.id}
-                          fill
-                          label={reino.nombre}
-                          onClick={() => onOpen("reinos", reino.id)}
-                          onCreate={
-                            onCreateCiudad ? () => onCreateCiudad(reino.id) : undefined
-                          }
-                        />
+                          {...(onMoverPersonaje
+                            ? dragPersonaje.dropHandlers(`reino:${reino.id}`, (personajeId) =>
+                                onMoverPersonaje(personajeId, null, reino.nombre),
+                              )
+                            : {})}
+                        >
+                          <NodoTitulo
+                            fill
+                            label={reino.nombre}
+                            onClick={() => onOpen("reinos", reino.id)}
+                            dropActive={
+                              !!onMoverPersonaje && dragPersonaje.esZonaActiva(`reino:${reino.id}`)
+                            }
+                            onCreate={
+                              onCreateCiudad ? () => onCreateCiudad(reino.id) : undefined
+                            }
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -996,7 +1072,7 @@ export function GeografiaJerarquica({
                     label={r.nombre}
                     variant="reino"
                     maxWidthPx={160}
-                    draggableId={r.id}
+                    dragProps={dragReino.dragHandlers(r.id)}
                     onClick={() => onOpen("reinos", r.id)}
                   />
                 ))}
@@ -1014,6 +1090,8 @@ export function GeografiaJerarquica({
             )}
         </div>
       )}
+      {dragReino.overlay}
+      {dragPersonaje.overlay}
     </div>
   );
 }

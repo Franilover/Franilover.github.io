@@ -29,6 +29,16 @@
  *  - Personaje.especie (nombre de la criatura, no FK) → agrupa personajes
  *    bajo la criatura cuyo nombre coincide con su especie.
  * Las entidades sin vínculo caen en el bloque final global "Sin criatura".
+ *
+ * Arrastre (click izquierdo abre / click derecho arrastra): usa el hook
+ * compartido useRightClickDrag (DragDropReasignable.tsx), mismo patrón que
+ * GeografiaJerarquica. Dos arrastres independientes:
+ *  - dragCriatura: chips de Criatura → se pueden soltar sobre una card de
+ *    Ecosistema (modo ojo OFF) para asignar la criatura a ese ecosistema
+ *    (onAsignarCriaturaAEcosistema).
+ *  - dragPersonaje: EntityCard de Personaje → se pueden soltar sobre una
+ *    card de Criatura (modo ojo ON) para reasignar Personaje.especie vía
+ *    onMoverPersonaje.
  */
 
 import { Bug, ChevronDown, Compass, Gem, Leaf, Plus, Users } from "lucide-react";
@@ -37,6 +47,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
+import { useRightClickDrag } from "@/domains/garlia/_shared/DragDropReasignable";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 interface Criatura {
@@ -99,6 +110,17 @@ interface Props {
   onCreateCriatura?: () => void;
   onCreatePersonaje?: (criatura: Criatura | null) => void;
   creatingCriatura?: boolean;
+  /** Asigna una criatura a un ecosistema (arrastre por click derecho de un
+   *  chip de criatura sobre una card de ecosistema, modo "ojo apagado") —
+   *  agrega el id de la criatura a Ecosistema.criatura_ids. Si el elemento
+   *  no acepta esta prop, los chips de criatura no son arrastrables. */
+  onAsignarCriaturaAEcosistema?: (criaturaId: string, ecosistemaId: string) => void;
+  /** Mueve un personaje a otra criatura (especie) — arrastre por click
+   *  derecho de una EntityCard de personaje sobre una card de criatura en
+   *  modo "ojo ON". `criaturaNombre` es null para dejarlo sin especie
+   *  (bloque "Sin criatura"). Si el elemento no acepta esta prop, los
+   *  personajes no son arrastrables. */
+  onMoverPersonaje?: (personajeId: string, criaturaNombre: string | null) => void;
   /** Crea un ecosistema nuevo — botón junto a "Añadir criatura", para
    *  manejar ecosistemas sin salir de esta vista (antes solo se podían
    *  crear desde Magia → Biología). */
@@ -140,6 +162,8 @@ function NodoTitulo({
   variant = "ecosistema",
   maxWidthPx,
   fill,
+  dragProps,
+  dropActive,
 }: {
   label: string;
   onClick: () => void;
@@ -147,6 +171,12 @@ function NodoTitulo({
   variant?: "ecosistema" | "criatura" | "flora" | "mineral";
   maxWidthPx?: number;
   fill?: boolean;
+  /** Props de arrastre (click derecho) generadas por dragHandlers() del hook
+   *  useRightClickDrag — si se pasa, el chip se vuelve arrastrable. */
+  dragProps?: React.HTMLAttributes<HTMLElement>;
+  /** true si actualmente hay un arrastre activo pasando sobre este chip
+   *  como zona de drop — solo feedback visual. */
+  dropActive?: boolean;
 }) {
   const chipStyles =
     variant === "criatura"
@@ -158,10 +188,13 @@ function NodoTitulo({
       <button
         type="button"
         onClick={onClick}
-        title={label}
+        title={dragProps?.title ?? label}
         style={maxWidthPx ? { maxWidth: maxWidthPx } : undefined}
+        {...dragProps}
         className={`px-2.5 py-0.5 rounded-full text-micro font-bold tracking-wide transition-colors truncate ${chipStyles} ${
           fill ? "flex-1 min-w-0 text-center" : ""
+        } ${dragProps ? "cursor-grab active:cursor-grabbing" : ""} ${
+          dropActive ? "ring-2 ring-accent/60" : ""
         }`}
       >
         {label}
@@ -386,6 +419,8 @@ export function CriaturasJerarquica({
   onCreateCriatura,
   onCreatePersonaje,
   creatingCriatura,
+  onAsignarCriaturaAEcosistema,
+  onMoverPersonaje,
   onCreateEcosistema,
   creatingEcosistema,
   onCreateBioma,
@@ -404,6 +439,17 @@ export function CriaturasJerarquica({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+
+  // Arrastre (click derecho) de chips de Criatura → se sueltan sobre una
+  // card de Ecosistema en modo "ojo apagado".
+  const dragCriatura = useRightClickDrag<string>({
+    label: (id) => criaturas.find((c) => c.id === id)?.nombre ?? "",
+  });
+  // Arrastre (click derecho) de EntityCard de Personaje → se sueltan sobre
+  // una card de Criatura en modo "ojo ON" (o "Sin criatura").
+  const dragPersonaje = useRightClickDrag<string>({
+    label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
+  });
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -601,6 +647,14 @@ export function CriaturasJerarquica({
   const renderCriaturaCard = (criatura: Criatura, anchoMaxDisponible?: number) => {
     const habitantes = personajesDe(criatura.nombre);
     const vacia = habitantes.length === 0;
+    const zoneId = `criatura:${criatura.id}`;
+    const esZonaDrop = !!onMoverPersonaje;
+    const dropHandlers = esZonaDrop
+      ? dragPersonaje.dropHandlers(zoneId, (personajeId) =>
+          onMoverPersonaje!(personajeId, criatura.nombre),
+        )
+      : {};
+    const dropActive = esZonaDrop && dragPersonaje.esZonaActiva(zoneId);
 
     if (!mostrarPersonajes) {
       // Vista colapsada: solo el chip de la criatura + contador, sin grilla
@@ -612,6 +666,9 @@ export function CriaturasJerarquica({
               label={criatura.nombre}
               variant="criatura"
               maxWidthPx={160}
+              dragProps={
+                onAsignarCriaturaAEcosistema ? dragCriatura.dragHandlers(criatura.id) : undefined
+              }
               onClick={() => onOpen("criaturas", criatura.id)}
               onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
             />
@@ -634,31 +691,40 @@ export function CriaturasJerarquica({
     return (
       <div
         key={criatura.id}
-        className={vacia ? "w-fit shrink-0" : "shrink-0"}
+        {...dropHandlers}
+        className={`${vacia ? "w-fit shrink-0" : "shrink-0"} rounded-lg transition-colors ${
+          dropActive ? "ring-2 ring-accent/60 bg-accent/5" : ""
+        }`}
         style={vacia ? undefined : { width: anchoPx }}
       >
         <NodoTitulo
           label={criatura.nombre}
           variant="criatura"
           maxWidthPx={vacia ? 140 : anchoPx}
+          dragProps={
+            onAsignarCriaturaAEcosistema ? dragCriatura.dragHandlers(criatura.id) : undefined
+          }
           onClick={() => onOpen("criaturas", criatura.id)}
           onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
         />
         {vacia ? (
-          <div className="mt-1.5 text-micro text-primary/25">Sin personajes</div>
+          <div className="mt-1.5 text-micro text-primary/25">
+            {esZonaDrop ? "Soltá un personaje acá" : "Sin personajes"}
+          </div>
         ) : (
           <div
             className="mt-2 grid gap-1"
             style={{ gridTemplateColumns: `repeat(${cols}, ${itemSize}px)` }}
           >
             {habitantes.map((p) => (
-              <EntityCard
-                key={p.id}
-                nombre={p.nombre}
-                imageUrl={p.img_url}
-                Icon={Users}
-                onClick={() => onOpen("personajes", p.id)}
-              />
+              <div key={p.id} {...(onMoverPersonaje ? dragPersonaje.dragHandlers(p.id) : {})}>
+                <EntityCard
+                  nombre={p.nombre}
+                  imageUrl={p.img_url}
+                  Icon={Users}
+                  onClick={() => onOpen("personajes", p.id)}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -668,35 +734,54 @@ export function CriaturasJerarquica({
 
   // ── Card de ecosistema individual (idéntica a la de antes, extraída para
   // poder repetirla dentro de cada bloque de bioma sin duplicar el JSX) ────
-  const renderTarjetaEcosistema = (eco: Ecosistema) => (
-    <div key={eco.id} className="w-full rounded-lg border border-primary/10 overflow-hidden">
-      <div className="px-3 py-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onOpen("ecosistemas", eco.id)}
-          title={eco.nombre}
-          className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
-        >
-          {eco.nombre}
-        </button>
-        <EcosistemaExtrasIcono
-          items={floraDe(eco.id)}
-          Icon={Leaf}
-          label="Flora"
-          onOpenItem={(id) => onOpen("flora", id)}
-        />
-        <EcosistemaExtrasIcono
-          items={mineralesDe(eco.id)}
-          Icon={Gem}
-          label="Minerales"
-          onOpenItem={(id) => onOpen("minerales", id)}
-        />
+  const renderTarjetaEcosistema = (eco: Ecosistema) => {
+    const zoneId = `eco:${eco.id}`;
+    const dropActive = !!onAsignarCriaturaAEcosistema && dragCriatura.esZonaActiva(zoneId);
+    const dropHandlers = onAsignarCriaturaAEcosistema
+      ? dragCriatura.dropHandlers(zoneId, (criaturaId) =>
+          onAsignarCriaturaAEcosistema(criaturaId, eco.id),
+        )
+      : {};
+
+    return (
+      <div
+        key={eco.id}
+        {...dropHandlers}
+        className={`w-full rounded-lg border overflow-hidden transition-colors ${
+          dropActive ? "border-accent/50 bg-accent/5" : "border-primary/10"
+        }`}
+      >
+        <div className="px-3 py-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onOpen("ecosistemas", eco.id)}
+            title={eco.nombre}
+            className="flex-1 min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors"
+          >
+            {eco.nombre}
+          </button>
+          <EcosistemaExtrasIcono
+            items={floraDe(eco.id)}
+            Icon={Leaf}
+            label="Flora"
+            onOpenItem={(id) => onOpen("flora", id)}
+          />
+          <EcosistemaExtrasIcono
+            items={mineralesDe(eco.id)}
+            Icon={Gem}
+            label="Minerales"
+            onOpenItem={(id) => onOpen("minerales", id)}
+          />
+        </div>
+        <div className="px-3 pb-3 flex flex-wrap gap-6">
+          {criaturasDe(eco.id).length === 0 && onAsignarCriaturaAEcosistema && (
+            <div className="text-micro text-primary/25">Soltá una criatura acá</div>
+          )}
+          {criaturasDe(eco.id).map((c) => renderCriaturaCard(c, disponibleColumna))}
+        </div>
       </div>
-      <div className="px-3 pb-3 flex flex-wrap gap-6">
-        {criaturasDe(eco.id).map((c) => renderCriaturaCard(c, disponibleColumna))}
-      </div>
-    </div>
-  );
+    );
+  };
 
   // ── Vista "por especie" (ojo ON): todas las criaturas con sus personajes,
   // sin agrupar por ecosistema. Se recorren todas las criaturas de la base
@@ -769,7 +854,18 @@ export function CriaturasJerarquica({
               <div className="h-px mb-3 bg-primary/10" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                 {totalSinCriatura > 0 ? (
-                  <div className="w-full rounded-lg border border-primary/10 overflow-hidden">
+                  <div
+                    {...(onMoverPersonaje
+                      ? dragPersonaje.dropHandlers("sin-criatura-global", (personajeId) =>
+                          onMoverPersonaje(personajeId, null),
+                        )
+                      : {})}
+                    className={`w-full rounded-lg border overflow-hidden transition-colors ${
+                      onMoverPersonaje && dragPersonaje.esZonaActiva("sin-criatura-global")
+                        ? "border-accent/50 bg-accent/5"
+                        : "border-primary/10"
+                    }`}
+                  >
                     <div className="px-3 py-3 flex items-center gap-2">
                       <span className="flex-1 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70">
                         Sin criatura
@@ -777,7 +873,9 @@ export function CriaturasJerarquica({
                     </div>
                     <div className="px-3 pb-3">
                       {personajesSinCriatura.length === 0 ? (
-                        <div className="text-micro text-primary/25">Sin personajes</div>
+                        <div className="text-micro text-primary/25">
+                          {onMoverPersonaje ? "Soltá un personaje acá" : "Sin personajes"}
+                        </div>
                       ) : (
                         <div
                           className="grid gap-1"
@@ -786,13 +884,14 @@ export function CriaturasJerarquica({
                           }}
                         >
                           {personajesSinCriatura.map((p) => (
-                            <EntityCard
-                              key={p.id}
-                              nombre={p.nombre}
-                              imageUrl={p.img_url}
-                              Icon={Users}
-                              onClick={() => onOpen("personajes", p.id)}
-                            />
+                            <div key={p.id} {...(onMoverPersonaje ? dragPersonaje.dragHandlers(p.id) : {})}>
+                              <EntityCard
+                                nombre={p.nombre}
+                                imageUrl={p.img_url}
+                                Icon={Users}
+                                onClick={() => onOpen("personajes", p.id)}
+                              />
+                            </div>
                           ))}
                         </div>
                       )}
@@ -827,13 +926,25 @@ export function CriaturasJerarquica({
                         }}
                       >
                         {criaturasPorEspecieVacias.map((criatura) => (
-                          <NodoTitulo
+                          <div
                             key={criatura.id}
-                            fill
-                            variant="criatura"
-                            label={criatura.nombre}
-                            onClick={() => onOpen("criaturas", criatura.id)}
-                          />
+                            {...(onMoverPersonaje
+                              ? dragPersonaje.dropHandlers(`criatura:${criatura.id}`, (personajeId) =>
+                                  onMoverPersonaje(personajeId, criatura.nombre),
+                                )
+                              : {})}
+                          >
+                            <NodoTitulo
+                              fill
+                              variant="criatura"
+                              label={criatura.nombre}
+                              dropActive={
+                                !!onMoverPersonaje &&
+                                dragPersonaje.esZonaActiva(`criatura:${criatura.id}`)
+                              }
+                              onClick={() => onOpen("criaturas", criatura.id)}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -1040,6 +1151,8 @@ export function CriaturasJerarquica({
             )}
         </div>
       )}
+      {dragCriatura.overlay}
+      {dragPersonaje.overlay}
     </div>
   );
 }
