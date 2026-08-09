@@ -83,8 +83,56 @@ export const SeccionEntidad = ({
   const [cursor, setCursor] = useState(-1);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // ── Posición del dropdown (portal anti-clip) ────────────────────────────────
+  // El combo vive dentro de barras laterales que a su vez viven dentro de
+  // popovers flotantes con overflow-hidden/scroll propio — position: absolute
+  // relativo al contenedor de la sección se cortaba contra esos bordes. Se
+  // porta a document.body con position: fixed, calculado desde el trigger,
+  // igual patrón anti-clip que PopoverFlotante.
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    openUp: boolean;
+    maxHeight: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) {
+      setDropdownPos(null);
+      return;
+    }
+    const MARGIN = 8;
+    const DROPDOWN_HEIGHT_ESTIMATE = 220; // buscador + lista (~max-h-36) + paddings
+    const update = () => {
+      const el = triggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const width = Math.max(180, Math.min(260, window.innerWidth - MARGIN * 2));
+      const left = Math.min(Math.max(r.right - width, MARGIN), window.innerWidth - width - MARGIN);
+
+      const espacioAbajo = window.innerHeight - r.bottom - MARGIN;
+      const espacioArriba = r.top - MARGIN;
+      const openUp =
+        espacioAbajo < Math.min(DROPDOWN_HEIGHT_ESTIMATE, 180) && espacioArriba > espacioAbajo;
+      const espacioDisponible = Math.max(120, openUp ? espacioArriba : espacioAbajo);
+      const maxHeight = Math.min(DROPDOWN_HEIGHT_ESTIMATE, espacioDisponible);
+      const top = openUp ? r.top - MARGIN : r.bottom + MARGIN;
+
+      setDropdownPos({ top, left, width, openUp, maxHeight });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open]);
 
   // ── Entidades ──────────────────────────────────────────────────────────────
   const selected = allEntities.filter((e) => selectedIds.includes(e.id));
@@ -118,17 +166,18 @@ export const SeccionEntidad = ({
   }, [allEntities, query]);
 
   // ── Cerrar al click fuera ──────────────────────────────────────────────────
+  // Contempla tanto el contenedor de la sección como el portal del dropdown
+  // (que ahora vive en document.body, fuera del árbol de containerRef).
+  const dropdownPortalRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-        setQuery("");
-        setCursor(-1);
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (dropdownPortalRef.current?.contains(target)) return;
+      setOpen(false);
+      setQuery("");
+      setCursor(-1);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -218,6 +267,7 @@ export const SeccionEntidad = ({
 
         {/* Trigger del mini-combo */}
         <button
+          ref={triggerRef}
           className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md transition-all"
           style={{
             border: open ? borderFocus : border,
@@ -247,24 +297,32 @@ export const SeccionEntidad = ({
       </div>
 
       {/* ── Dropdown mini-combo ──
-          Flota en position: absolute (no empuja el layout de las
-          secciones siguientes) y con z-index alto para quedar siempre
-          por encima de las cabeceras/contenido de otras secciones,
-          incluso cuando esta sección está más abajo en la barra lateral. */}
-      {open && (
-        <div
-          className="absolute left-2 right-2 top-full mt-0.5 rounded-lg overflow-hidden"
-          style={{
-            border: borderFocus,
-            background: "var(--bg-main)",
-            boxShadow:
-              "0 6px 20px color-mix(in srgb, var(--primary) 10%, transparent)",
-            zIndex: 45,
-          }}
-        >
+          Portal a document.body con position: fixed (mismo patrón anti-clip
+          que PopoverFlotante) — así no se corta contra el overflow-hidden o
+          el scroll interno del popover flotante que contiene esta barra
+          lateral, sin importar en qué sección de la lista esté. */}
+      {open &&
+        dropdownPos &&
+        createPortal(
+          <div
+            ref={dropdownPortalRef}
+            className="fixed rounded-lg overflow-hidden flex flex-col"
+            style={{
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: dropdownPos.width,
+              maxHeight: dropdownPos.maxHeight,
+              transform: dropdownPos.openUp ? "translateY(-100%)" : undefined,
+              border: borderFocus,
+              background: "var(--bg-main)",
+              boxShadow:
+                "0 6px 20px color-mix(in srgb, var(--primary) 10%, transparent)",
+              zIndex: 9999,
+            }}
+          >
           {/* Búsqueda */}
           <div
-            className="flex items-center gap-1.5 px-2 py-1.5"
+            className="flex items-center gap-1.5 px-2 py-1.5 shrink-0"
             style={{
               borderBottom:
                 "1px solid color-mix(in srgb, var(--primary) 7%, transparent)",
@@ -309,7 +367,7 @@ export const SeccionEntidad = ({
           </div>
 
           {/* Lista */}
-          <div ref={listRef} className="max-h-36 overflow-y-auto">
+          <div ref={listRef} className="overflow-y-auto flex-1 min-h-0">
             {loading ? (
               <div className="flex items-center justify-center py-3 text-primary/20">
                 <Loader2 className="animate-spin" size={11} />
@@ -544,8 +602,9 @@ export const SeccionEntidad = ({
               </span>
             ))}
           </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
 
       {/* ── Entidades seleccionadas ── */}
       <div className={fill ? "flex-1 min-h-0 overflow-y-auto flex flex-col" : ""}>
@@ -806,5 +865,6 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
 export default SeccionEntidad;
