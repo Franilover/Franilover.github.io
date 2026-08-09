@@ -12,7 +12,7 @@
  * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
  */
 
-import { Atom, Beaker, ChevronLeft, Download, GitCompare, Loader2, Pencil, Plus, Save, Scale, Trash2, Upload, X } from "lucide-react";
+import { Atom, Beaker, Download, GitCompare, Loader2, Plus, Scale, Trash2, Upload, X } from "lucide-react";
 import React, { useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
@@ -281,10 +281,10 @@ function ElementoCasilla({
 // resonancia con Iums ya se explican en la sección Física, no se repiten.
 //
 // El contenido (lista de secciones título+texto) ya no está hardcodeado:
-// vive en la tabla `config_info_tabla_quimica` (useInfoTablaQuimica) y es
-// editable inline. Layout de 2 columnas (lista de secciones a la izquierda,
-// contenido/edición a la derecha), mismo patrón que la barra lateral de
-// FisicaPage.
+// vive en la tabla `config_info_tabla_quimica` (useInfoTablaQuimica). Se
+// muestran todas las secciones de una, siempre editables inline (sin modo
+// lectura/edición ni barra lateral) — cada cambio se guarda automáticamente
+// al salir del campo (onBlur).
 function ReglasQuimica({
   info,
   loading,
@@ -294,41 +294,36 @@ function ReglasQuimica({
   loading: boolean;
   guardarSecciones: (secciones: SeccionInfoTablaQuimica[]) => Promise<void>;
 }) {
-  const [editando, setEditando] = useState(false);
+  const [borrador, setBorrador] = useState<SeccionInfoTablaQuimica[]>(info.secciones);
   const [saving, setSaving] = useState(false);
-  const [borrador, setBorrador] = useState<SeccionInfoTablaQuimica[]>([]);
-  const [seccionActivaId, setSeccionActivaId] = useState<string | null>(null);
 
-  function empezarEdicion() {
-    setBorrador(info.secciones.map((s) => ({ ...s })));
-    setEditando(true);
-  }
-
-  function cancelarEdicion() {
-    setEditando(false);
-    setBorrador([]);
-  }
-
-  async function guardar() {
-    setSaving(true);
-    try {
-      // Descarta secciones vacías (título y contenido en blanco) al guardar.
-      const limpio = borrador.filter(
-        (s) => s.titulo.trim() || s.contenido.trim(),
-      );
-      await guardarSecciones(limpio);
-      setEditando(false);
-    } finally {
-      setSaving(false);
-    }
+  // Sincroniza el borrador cuando cambian los datos remotos (primera carga,
+  // o si se recargan tras guardar).
+  const infoSeccionesRef = useRef(info.secciones);
+  if (infoSeccionesRef.current !== info.secciones) {
+    infoSeccionesRef.current = info.secciones;
+    if (borrador !== info.secciones) setBorrador(info.secciones);
   }
 
   function actualizarSeccion(id: string, cambios: Partial<SeccionInfoTablaQuimica>) {
     setBorrador((prev) => prev.map((s) => (s.id === id ? { ...s, ...cambios } : s)));
   }
 
+  async function persistir(secciones: SeccionInfoTablaQuimica[]) {
+    setSaving(true);
+    try {
+      // Descarta secciones vacías (título y contenido en blanco) al guardar.
+      const limpio = secciones.filter((s) => s.titulo.trim() || s.contenido.trim());
+      await guardarSecciones(limpio);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function eliminarSeccion(id: string) {
-    setBorrador((prev) => prev.filter((s) => s.id !== id));
+    const siguiente = borrador.filter((s) => s.id !== id);
+    setBorrador(siguiente);
+    void persistir(siguiente);
   }
 
   function agregarSeccion() {
@@ -338,190 +333,65 @@ function ReglasQuimica({
     ]);
   }
 
-  const seccionActiva = useMemo(
-    () => info.secciones.find((s) => s.id === seccionActivaId) ?? null,
-    [info.secciones, seccionActivaId],
-  );
-
   return (
-    <div className="flex-1 min-h-0 flex overflow-hidden">
-      {/* Columna izquierda: navegación — lista de secciones, mismo patrón
-          que la barra lateral de Física. En mobile se oculta si hay algo
-          seleccionado o se está editando. */}
-      <div
-        className={`w-full sm:w-56 md:w-60 shrink-0 sm:flex flex-col min-h-0 overflow-hidden border-r border-primary/10 ${
-          seccionActiva || editando ? "hidden" : "flex"
-        }`}
-      >
-        <div className="shrink-0 flex items-center justify-between px-2 py-1.5 border-b border-primary/10">
-          <div className="flex items-center gap-1 text-primary/40">
-            <Atom size={11} />
-            <p className="text-micro font-black uppercase tracking-widest">
-              Reglas · {info.secciones.length}
-            </p>
-          </div>
+    <div className="flex-1 min-h-0 overflow-y-auto p-3">
+      <div className="shrink-0 flex items-center justify-between pb-2">
+        <div className="flex items-center gap-1.5 text-primary/40">
+          <Atom size={12} />
+          <p className="text-micro font-black uppercase tracking-widest">
+            Reglas · {borrador.length}
+            {saving && <Loader2 className="inline-block animate-spin ml-1.5 align-[-2px]" size={10} />}
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="p-6 text-micro text-primary/30 text-center">Cargando…</div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {borrador.map((seccion) => (
+            <div
+              key={seccion.id}
+              className="flex flex-col gap-1.5 p-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
+            >
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={seccion.titulo}
+                  onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
+                  onBlur={() => persistir(borrador)}
+                  placeholder="Título de la sección"
+                  className="flex-1 min-w-0 bg-primary/5 rounded-md px-2 py-1 text-micro font-black uppercase tracking-wide text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
+                />
+                <button
+                  type="button"
+                  onClick={() => eliminarSeccion(seccion.id)}
+                  title="Eliminar sección"
+                  className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
+              <textarea
+                value={seccion.contenido}
+                onChange={(e) => actualizarSeccion(seccion.id, { contenido: e.target.value })}
+                onBlur={() => persistir(borrador)}
+                placeholder="Contenido…"
+                rows={4}
+                className="bg-primary/5 rounded-md px-2 py-1.5 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25 leading-relaxed"
+              />
+            </div>
+          ))}
+
           <button
             type="button"
-            onClick={empezarEdicion}
-            title="Editar reglas"
-            className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+            onClick={agregarSeccion}
+            className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
           >
-            <Pencil size={10} />
+            <Plus size={10} />
+            Agregar sección
           </button>
         </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto p-1.5 flex flex-col gap-1.5">
-          {loading ? (
-            <div className="p-3 text-micro text-primary/30 text-center">Cargando…</div>
-          ) : info.secciones.length === 0 ? (
-            <p className="p-3 text-micro text-primary/30 text-center">
-              Todavía no hay reglas cargadas. Tocá el lápiz para agregarlas.
-            </p>
-          ) : (
-            info.secciones.map((seccion) => (
-              <button
-                key={seccion.id}
-                type="button"
-                onClick={() => setSeccionActivaId(seccion.id)}
-                className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors text-left ${
-                  seccionActivaId === seccion.id
-                    ? "border-primary/50 bg-primary/10 text-primary"
-                    : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
-                }`}
-              >
-                <span className="text-micro font-black uppercase tracking-[0.2em]">
-                  {seccion.titulo || "Sin título"}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Columna derecha: contenido de la sección elegida, o el editor
-          completo de reglas. En mobile ocupa toda la pantalla cuando hay
-          algo seleccionado; en desktop siempre está visible. */}
-      <div
-        className={`flex-1 min-h-0 flex-col min-w-0 ${
-          seccionActiva || editando ? "flex" : "hidden sm:flex"
-        }`}
-      >
-        {editando ? (
-          <>
-            <div
-              style={{ background: "var(--bg-main)" }}
-              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
-            >
-              <button
-                type="button"
-                onClick={cancelarEdicion}
-                className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer sm:hidden"
-              >
-                <ChevronLeft size={12} />
-              </button>
-              <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary/70">
-                Editando reglas
-              </p>
-            </div>
-
-            <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto">
-              {borrador.map((seccion) => (
-                <div
-                  key={seccion.id}
-                  className="flex flex-col gap-1.5 p-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      value={seccion.titulo}
-                      onChange={(e) =>
-                        actualizarSeccion(seccion.id, { titulo: e.target.value })
-                      }
-                      placeholder="Título de la sección"
-                      className="flex-1 min-w-0 bg-primary/5 rounded-md px-2 py-1 text-micro font-black uppercase tracking-wide text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => eliminarSeccion(seccion.id)}
-                      title="Eliminar sección"
-                      className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                  <textarea
-                    value={seccion.contenido}
-                    onChange={(e) =>
-                      actualizarSeccion(seccion.id, { contenido: e.target.value })
-                    }
-                    placeholder="Contenido…"
-                    rows={4}
-                    className="bg-primary/5 rounded-md px-2 py-1.5 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25 leading-relaxed"
-                  />
-                </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={agregarSeccion}
-                className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
-              >
-                <Plus size={10} />
-                Agregar sección
-              </button>
-            </div>
-
-            <div
-              style={{ background: "var(--bg-main)" }}
-              className="shrink-0 flex items-center justify-end gap-1.5 px-2.5 py-1.5 border-t border-primary/10"
-            >
-              <button
-                type="button"
-                onClick={cancelarEdicion}
-                disabled={saving}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={guardar}
-                disabled={saving}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer"
-              >
-                {saving ? <Loader2 className="animate-spin" size={10} /> : <Save size={10} />}
-                {saving ? "…" : "Guardar"}
-              </button>
-            </div>
-          </>
-        ) : seccionActiva ? (
-          <>
-            <div
-              style={{ background: "var(--bg-main)" }}
-              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
-            >
-              <button
-                type="button"
-                onClick={() => setSeccionActivaId(null)}
-                className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer sm:hidden"
-              >
-                <ChevronLeft size={12} />
-              </button>
-              <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary">
-                {seccionActiva.titulo || "Sin título"}
-              </p>
-            </div>
-            <div className="flex-1 min-h-0 p-3 overflow-y-auto text-micro text-primary/70 leading-relaxed whitespace-pre-line">
-              {seccionActiva.contenido || (
-                <span className="text-primary/30">Sin contenido.</span>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 min-h-0 hidden sm:flex items-center justify-center text-micro text-primary/30 text-center px-6">
-            Elegí una regla de la lista para ver su contenido.
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
