@@ -116,7 +116,9 @@ export function PopoverFlotante({
         borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
       }}
     >
-      <div className="overflow-y-auto p-4">{children}</div>
+      <div className="overflow-y-auto flex-1 min-h-0">
+        <div className="p-4 h-full min-h-0 flex flex-col">{children}</div>
+      </div>
     </div>,
     document.body,
   );

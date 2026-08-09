@@ -12,13 +12,18 @@
  * este panel directamente.
  */
 
-import { ArrowLeft, Leaf, Plus, Salad, Trash2, X } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { ArrowLeft, Bug, Compass, Gem, Leaf, Plus, Salad, Trash2, X } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 
 import { SelectorFloraMulti } from "@/domains/garlia/flora/SelectorFloraMulti";
+import { useFloraCatalogoMin } from "@/domains/garlia/flora/useFloraCatalogoMin";
 import { SelectorMineralesMulti } from "@/domains/garlia/minerales/SelectorMineralesMulti";
+import { useMineralesCatalogoMin } from "@/domains/garlia/minerales/useMineralesCatalogoMin";
+import { useReinosMin } from "@/domains/garlia/reinos/useReinosMin";
+import { useCriaturasCatalogoMin } from "@/domains/garlia/runas/useCriaturasCatalogoMin";
 
 import { SelectorCriaturasMulti } from "./SelectorCriaturasMulti";
 import { useBiomas } from "./useBiologia";
@@ -249,8 +254,127 @@ export function PanelEcosistema({
     onSave({ nombre: nombre.trim() || ecosistema.nombre, clima, descripcion });
   };
 
+  // ── Barra lateral — Criaturas / Flora / Minerales / Reino, mismo patrón
+  // que Personajes/Criaturas/Ítems en LoreTab (reinos/EditorReino). El
+  // Reino no vive en el ecosistema directamente: se deriva del bioma_id
+  // (bioma.reino_ids), y esta sección solo lo muestra como referencia
+  // navegable — no es editable desde acá (se edita en el Bioma).
+  const criaturaIds = ecosistema.criatura_ids ?? [];
+  const floraIds = ecosistema.flora_ids ?? [];
+  const mineralIds = ecosistema.mineral_ids ?? [];
+
+  const { criaturas: catalogoCriaturas, loading: loadingCatalogoCriaturas } =
+    useCriaturasCatalogoMin();
+  const { flora: catalogoFlora, loading: loadingCatalogoFlora } = useFloraCatalogoMin();
+  const { minerales: catalogoMinerales, loading: loadingCatalogoMinerales } =
+    useMineralesCatalogoMin();
+  const catalogoReinos = useReinosMin();
+
+  const biomaActual = biomas.find((b) => b.id === ecosistema.bioma_id);
+  const reinoIdsDelBioma = biomaActual?.reino_ids ?? [];
+  const allReinosEntidad = useMemo(
+    () => catalogoReinos.map((r) => ({ id: r.id, nombre: r.nombre })),
+    [catalogoReinos],
+  );
+
+  const handleToggleCriatura = (id: string, add: boolean) =>
+    onSave({
+      criatura_ids: add
+        ? [...criaturaIds, id]
+        : criaturaIds.filter((x) => x !== id),
+    });
+  const handleToggleFlora = (id: string, add: boolean) =>
+    onSave({
+      flora_ids: add ? [...floraIds, id] : floraIds.filter((x) => x !== id),
+    });
+  const handleToggleMineral = (id: string, add: boolean) =>
+    onSave({
+      mineral_ids: add
+        ? [...mineralIds, id]
+        : mineralIds.filter((x) => x !== id),
+    });
+
+  const sectionDivider = (
+    <div
+      style={{
+        borderTop: "1px solid color-mix(in srgb, var(--primary) 7%, transparent)",
+      }}
+    />
+  );
+
+  const sidebar = (
+    <>
+      <SeccionEntidad
+        allEntities={catalogoCriaturas.map((c) => ({
+          id: c.id,
+          nombre: c.nombre,
+          imagen_url: c.imagen_url,
+        }))}
+        emptyLabel="Sin criaturas"
+        fallbackIcon={<Bug size={14} strokeWidth={1} />}
+        fill={false}
+        icon={<Bug size={9} />}
+        label="Criaturas"
+        loading={loadingCatalogoCriaturas}
+        saving={false}
+        selectedIds={criaturaIds}
+        onEntityClick={onSelectCriatura}
+        onToggle={handleToggleCriatura}
+      />
+      {sectionDivider}
+      <SeccionEntidad
+        allEntities={catalogoFlora.map((f) => ({
+          id: f.id,
+          nombre: f.nombre,
+          imagen_url: f.imagen_url,
+        }))}
+        emptyLabel="Sin flora"
+        fallbackIcon={<Leaf size={14} strokeWidth={1} />}
+        fill={false}
+        icon={<Leaf size={9} />}
+        label="Flora"
+        loading={loadingCatalogoFlora}
+        saving={false}
+        selectedIds={floraIds}
+        onToggle={handleToggleFlora}
+      />
+      {sectionDivider}
+      <SeccionEntidad
+        allEntities={catalogoMinerales.map((m) => ({
+          id: m.id,
+          nombre: m.nombre,
+          imagen_url: m.imagen_url,
+        }))}
+        emptyLabel="Sin minerales"
+        fallbackIcon={<Gem size={14} strokeWidth={1} />}
+        fill={false}
+        icon={<Gem size={9} />}
+        label="Minerales"
+        loading={loadingCatalogoMinerales}
+        saving={false}
+        selectedIds={mineralIds}
+        onToggle={handleToggleMineral}
+      />
+      {sectionDivider}
+      <SeccionEntidad
+        allEntities={allReinosEntidad}
+        emptyLabel="Sin reinos (vía bioma)"
+        fallbackIcon={<Compass size={14} strokeWidth={1} />}
+        fill={false}
+        icon={<Compass size={9} />}
+        label="Reinos"
+        loading={false}
+        saving={false}
+        selectedIds={reinoIdsDelBioma}
+        onEntityClick={onSelectBioma ? () => onSelectBioma(ecosistema.bioma_id!) : undefined}
+        onToggle={() => {}}
+      />
+    </>
+  );
+
   return (
-    <div>
+    <div className={modoPopover ? "flex h-full min-h-0" : undefined}>
+      <div className={modoPopover ? "flex-1 min-w-0 flex flex-col min-h-0" : undefined}>
       <div className="flex items-center justify-between gap-2 mb-4">
         <button
           type="button"
@@ -291,85 +415,60 @@ export function PanelEcosistema({
       </div>
 
       {modoPopover ? (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-                    Bioma
-                  </span>
-                  {ecosistema.bioma_id && onSelectBioma && (
-                    <button
-                      type="button"
-                      onClick={() => onSelectBioma(ecosistema.bioma_id!)}
-                      className="text-micro font-bold text-accent/60 hover:text-accent transition-colors"
-                    >
-                      Abrir
-                    </button>
-                  )}
-                </div>
-                <select
-                  className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
-                  value={ecosistema.bioma_id ?? ""}
-                  onChange={(e) => onSave({ bioma_id: e.target.value || null })}
-                >
-                  <option value="">Sin bioma</option>
-                  {biomas.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
-                  Clima
-                </span>
-                <input
-                  className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
-                  placeholder="Ej. húmedo templado…"
-                  value={clima}
-                  onChange={(e) => setClima(e.target.value)}
-                  onBlur={guardar}
-                />
-              </div>
-            </div>
-
+        <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
-                Descripción
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+                  Bioma
+                </span>
+                {ecosistema.bioma_id && onSelectBioma && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectBioma(ecosistema.bioma_id!)}
+                    className="text-micro font-bold text-accent/60 hover:text-accent transition-colors"
+                  >
+                    Abrir
+                  </button>
+                )}
+              </div>
+              <select
+                className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
+                value={ecosistema.bioma_id ?? ""}
+                onChange={(e) => onSave({ bioma_id: e.target.value || null })}
+              >
+                <option value="">Sin bioma</option>
+                {biomas.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+                Clima
               </span>
-              <RichEditor
-                minHeight="5rem"
-                placeholder="Cómo es el ecosistema, particularidades, peligros…"
-                value={descripcion}
-                onChange={setDescripcion}
+              <input
+                className="w-full bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs outline-none placeholder:text-primary/30"
+                placeholder="Ej. húmedo templado…"
+                value={clima}
+                onChange={(e) => setClima(e.target.value)}
+                onBlur={guardar}
               />
             </div>
+          </div>
 
-            <SelectorCriaturasMulti
-              ids={ecosistema.criatura_ids ?? []}
-              onChange={(ids) => onSave({ criatura_ids: ids })}
-              onSelectCriatura={onSelectCriatura}
-              label="Criaturas que lo habitan"
-              compacto
+          <div>
+            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+              Descripción
+            </span>
+            <RichEditor
+              minHeight="5rem"
+              placeholder="Cómo es el ecosistema, particularidades, peligros…"
+              value={descripcion}
+              onChange={setDescripcion}
             />
-
-            <div className="grid grid-cols-2 gap-3">
-              <SelectorFloraMulti
-                ids={ecosistema.flora_ids ?? []}
-                onChange={(ids) => onSave({ flora_ids: ids })}
-                label="Flora"
-                compacto
-              />
-              <SelectorMineralesMulti
-                ids={ecosistema.mineral_ids ?? []}
-                onChange={(ids) => onSave({ mineral_ids: ids })}
-                label="Minerales"
-                compacto
-              />
-            </div>
           </div>
 
           <div>
@@ -518,6 +617,23 @@ export function PanelEcosistema({
             )}
           </div>
         </>
+      )}
+      </div>
+
+      {/* ── Barra lateral — sección Entidad (Criaturas/Flora/Minerales/Reinos) ──
+          Solo en modo popover: la pantalla completa (EcosistemaEditor) mantiene
+          el layout original de una sola columna. */}
+      {modoPopover && (
+        <aside
+          className="shrink-0 w-44 flex flex-col border-l overflow-y-auto overflow-x-hidden -my-4 -mr-4 pl-0"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 7%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 1%, transparent)",
+            scrollbarWidth: "none",
+          }}
+        >
+          {sidebar}
+        </aside>
       )}
     </div>
   );

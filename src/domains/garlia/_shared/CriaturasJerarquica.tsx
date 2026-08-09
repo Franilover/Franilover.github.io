@@ -1233,7 +1233,12 @@ export function CriaturasJerarquica({
 
       {biomaAbierto &&
         biomas.some((b) => b.id === biomaAbierto.id) && (
-          <PopoverFlotante anchor={biomaAbierto.anchor} onClose={() => setBiomaAbierto(null)}>
+          <PopoverFlotante
+            anchor={biomaAbierto.anchor}
+            onClose={() => setBiomaAbierto(null)}
+            width={640}
+            maxHeight={480}
+          >
             <BiomaPopoverContent biomaId={biomaAbierto.id} onClose={() => setBiomaAbierto(null)} />
           </PopoverFlotante>
         )}
