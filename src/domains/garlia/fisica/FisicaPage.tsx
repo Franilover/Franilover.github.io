@@ -21,6 +21,7 @@
 import { Atom, ChevronLeft, Download, Loader2, Plus, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
+import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
@@ -198,10 +199,10 @@ function ConceptoCasilla({
           : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
       }`}
     >
-      <span className="text-micro font-black text-primary/80 truncate">
+      <span className="text-sm font-black text-primary/80 truncate">
         {concepto.titulo || "Sin título"}
       </span>
-      <span className="text-micro text-primary/45 leading-relaxed line-clamp-2">
+      <span className="text-sm text-primary/45 leading-relaxed line-clamp-2">
         {concepto.contenido || "Sin contenido…"}
       </span>
     </button>
@@ -317,7 +318,7 @@ function ConceptoEditor({
           onChange={(e) => setLocal((p) => ({ ...p, titulo: e.target.value }))}
           onBlur={() => persist({ titulo: local.titulo })}
           placeholder="Título del concepto"
-          className="flex-1 min-w-0 bg-transparent text-micro font-black text-primary outline-none placeholder:text-primary/25"
+          className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
         />
 
         {onEliminar && (
@@ -339,14 +340,17 @@ function ConceptoEditor({
       </div>
 
       <div className="flex-1 min-h-0 p-2.5 overflow-y-auto">
-        <textarea
-          value={local.contenido}
-          onChange={(e) => setLocal((p) => ({ ...p, contenido: e.target.value }))}
-          onBlur={() => persist({ contenido: local.contenido })}
-          rows={12}
-          placeholder="Contenido del concepto…"
-          className="w-full bg-primary/5 rounded-md px-2 py-1.5 text-micro text-primary leading-relaxed outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
-        />
+        <div className="text-sm">
+          <RichEditor
+            minHeight="16rem"
+            placeholder="Contenido del concepto…"
+            value={local.contenido}
+            onChange={(v) => {
+              setLocal((p) => ({ ...p, contenido: v }));
+              persist({ contenido: v });
+            }}
+          />
+        </div>
       </div>
     </div>
   );
