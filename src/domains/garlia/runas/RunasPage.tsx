@@ -30,6 +30,7 @@ import type { Elemento } from "@/domains/garlia/elementos/types";
 import { BiologiaPage } from "@/domains/garlia/biologia/BiologiaPage";
 import { FisicaPage } from "@/domains/garlia/fisica/FisicaPage";
 import { ORIS_CONFIG, type Oris } from "@/domains/garlia/fisica/types";
+import { FISICA_CONCEPTOS_CONFIG, type FisicaConcepto } from "@/domains/garlia/fisica/types";
 import { useFisicaConceptos, useOris } from "@/domains/garlia/fisica/useFisica";
 
 import {
@@ -397,6 +398,34 @@ function BloqueFisica({
     }
   }
 
+  // Inserta un lote de Oris y/o conceptos ya parseados/validados por
+  // FisicaPage (parsearArchivoFisicaJSON) — mismo insert que handleCreate
+  // pero con varias filas a la vez, para el botón "Subir JSON".
+  async function handleImportarFisica(
+    orisNuevos: Omit<Oris, "id">[],
+    conceptosNuevos: Omit<FisicaConcepto, "id">[],
+  ) {
+    let total = 0;
+    if (orisNuevos.length > 0) {
+      const { data, error } = await supabase.from(ORIS_CONFIG.tabla).insert(orisNuevos).select();
+      if (error) throw error;
+      const insertados = (data ?? []) as Oris[];
+      setOris((prev) => [...prev, ...insertados]);
+      total += insertados.length;
+    }
+    if (conceptosNuevos.length > 0) {
+      const { data, error } = await supabase
+        .from(FISICA_CONCEPTOS_CONFIG.tabla)
+        .insert(conceptosNuevos)
+        .select();
+      if (error) throw error;
+      const insertados = (data ?? []) as FisicaConcepto[];
+      setConceptos((prev) => [...prev, ...insertados]);
+      total += insertados.length;
+    }
+    return total;
+  }
+
   return (
     <div>
       <FisicaPage
@@ -414,6 +443,7 @@ function BloqueFisica({
         onActualizarConcepto={(id, cambios) =>
           setConceptos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
         }
+        onImportarFisica={handleImportarFisica}
       />
 
       {/* Subsistemas de Magia — al final de Física, abre en modal flotante */}

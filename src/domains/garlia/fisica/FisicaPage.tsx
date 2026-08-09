@@ -20,8 +20,8 @@
  * "oris" y "fisica_conceptos", separadas de "elementos".
  */
 
-import { Atom, ChevronLeft, Download, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import { Atom, ChevronLeft, Download, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
@@ -54,6 +54,17 @@ interface Props {
   conceptos: FisicaConcepto[];
   loadingConceptos?: boolean;
   onActualizarConcepto: (id: string, cambios: Partial<FisicaConcepto>) => void;
+
+  /**
+   * Inserta en Supabase un lote de Oris y/o conceptos nuevos (sin id) y
+   * devuelve cuántos quedaron guardados en total. El botón "Subir JSON"
+   * llama a esto tras parsear el archivo — mismo espíritu que
+   * onImportarElementos en elementos/ElementosPage.tsx.
+   */
+  onImportarFisica?: (
+    orisNuevos: Omit<Oris, "id">[],
+    conceptosNuevos: Omit<FisicaConcepto, "id">[],
+  ) => Promise<number>;
 }
 
 /** Qué está activo en el editor de la columna derecha. */
@@ -86,6 +97,69 @@ function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// ─── Subida: leer un JSON con el mismo formato exportado (oris + conceptos)
+// y devolver los registros nuevos listos para insertar. No toca Supabase
+// directamente — eso lo hace el caller (BloqueFisica en RunasPage), mismo
+// espíritu que parsearArchivoElementosJSON en elementos/ElementosPage.tsx.
+export interface ImportacionFisica {
+  orisNuevos: Omit<Oris, "id">[];
+  conceptosNuevos: Omit<FisicaConcepto, "id">[];
+  duplicadosOris: { nombre: string }[];
+}
+
+export function parsearArchivoFisicaJSON(
+  raw: string,
+  orisExistentes: Oris[],
+): ImportacionFisica {
+  const data = JSON.parse(raw);
+  const listaOris: unknown[] = Array.isArray(data?.oris) ? data.oris : [];
+  const listaConceptos: unknown[] = Array.isArray(data?.conceptos) ? data.conceptos : [];
+
+  if (listaOris.length === 0 && listaConceptos.length === 0) {
+    throw new Error('El JSON debe traer al menos una de las claves "oris" o "conceptos" con arreglos.');
+  }
+
+  const nombresExistentes = new Set(orisExistentes.map((o) => o.nombre));
+  const orisNuevos: Omit<Oris, "id">[] = [];
+  const duplicadosOris: { nombre: string }[] = [];
+
+  for (const item of listaOris) {
+    const o = item as Partial<Oris>;
+    if (!o.nombre || !o.familia) {
+      throw new Error(`Oris inválido (falta nombre o familia): ${JSON.stringify(o).slice(0, 120)}`);
+    }
+    if (nombresExistentes.has(o.nombre)) {
+      duplicadosOris.push({ nombre: o.nombre });
+      continue;
+    }
+    nombresExistentes.add(o.nombre);
+    orisNuevos.push({
+      orden: o.orden ?? 0,
+      nombre: o.nombre,
+      familia: o.familia,
+      formula: o.formula ?? "",
+      dominio: o.dominio ?? "",
+      descripcion: o.descripcion ?? null,
+    });
+  }
+
+  const conceptosNuevos: Omit<FisicaConcepto, "id">[] = [];
+  for (const item of listaConceptos) {
+    const c = item as Partial<FisicaConcepto>;
+    if (!c.titulo || !c.bloque) {
+      throw new Error(`Concepto inválido (falta titulo o bloque): ${JSON.stringify(c).slice(0, 120)}`);
+    }
+    conceptosNuevos.push({
+      orden: c.orden ?? 0,
+      bloque: c.bloque,
+      titulo: c.titulo,
+      contenido: c.contenido ?? "",
+    });
+  }
+
+  return { orisNuevos, conceptosNuevos, duplicadosOris };
 }
 
 // ─── Filas de navegación (columna izquierda) ───────────────────────────────
@@ -517,6 +591,7 @@ export function FisicaPage({
   conceptos,
   loadingConceptos,
   onActualizarConcepto,
+  onImportarFisica,
 }: Props) {
   const [seleccion, setSeleccion] = useState<Seleccion>(
     seleccionarOrisId ? { tipo: "oris", id: seleccionarOrisId } : null,
@@ -532,6 +607,35 @@ export function FisicaPage({
   const [creandoSeccion, setCreandoSeccion] = useState(false);
   const [nuevaSeccionNombre, setNuevaSeccionNombre] = useState("");
   const [mostrarInputSeccion, setMostrarInputSeccion] = useState(false);
+
+  // ── Subida de JSON (mismo patrón que "Subir JSON" en Elementos) ─────────
+  const inputArchivoRef = useRef<HTMLInputElement>(null);
+  const [importando, setImportando] = useState(false);
+  const [mensajeImportacion, setMensajeImportacion] = useState<string | null>(null);
+
+  async function handleArchivoSeleccionado(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo || !onImportarFisica) return;
+
+    setImportando(true);
+    setMensajeImportacion(null);
+    try {
+      const texto = await archivo.text();
+      const { orisNuevos, conceptosNuevos, duplicadosOris } = parsearArchivoFisicaJSON(texto, oris);
+      const insertados = await onImportarFisica(orisNuevos, conceptosNuevos);
+      const partes = [`${insertados} registro${insertados === 1 ? "" : "s"} importado${insertados === 1 ? "" : "s"}`];
+      if (duplicadosOris.length > 0) {
+        partes.push(`${duplicadosOris.length} Oris omitido${duplicadosOris.length === 1 ? "" : "s"} por nombre duplicado`);
+      }
+      setMensajeImportacion(partes.join(" · "));
+    } catch (err) {
+      console.error("[FisicaPage] error importando JSON:", err);
+      setMensajeImportacion(err instanceof Error ? `Error: ${err.message}` : "Error al leer el archivo.");
+    } finally {
+      setImportando(false);
+    }
+  }
 
   async function handleAgregarConcepto(bloque: string) {
     setAgregandoConceptoDe(bloque);
@@ -630,15 +734,51 @@ export function FisicaPage({
               Física · {oris.length}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => descargarDatosFisica(oris, conceptosLocal)}
-            title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
-            className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-          >
-            <Download size={10} />
-          </button>
+          <div className="flex items-center gap-0.5">
+            {onImportarFisica && (
+              <>
+                <input
+                  ref={inputArchivoRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={handleArchivoSeleccionado}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={importando}
+                  onClick={() => inputArchivoRef.current?.click()}
+                  title='Subir un JSON con Oris y/o conceptos nuevos (mismo formato que "Descargar datos")'
+                  className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => descargarDatosFisica(oris, conceptosLocal)}
+              title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
+              className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+            >
+              <Download size={10} />
+            </button>
+          </div>
         </div>
+
+        {mensajeImportacion && (
+          <div className="shrink-0 flex items-center justify-between gap-2 px-2 py-1.5 border-b border-primary/10 text-micro text-primary/60 bg-primary/[0.03]">
+            <span className="min-w-0">{mensajeImportacion}</span>
+            <button
+              type="button"
+              onClick={() => setMensajeImportacion(null)}
+              className="shrink-0 text-primary/30 hover:text-primary/60 cursor-pointer"
+              title="Cerrar"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 min-h-0 overflow-y-auto p-1.5 flex flex-col gap-1.5">
           {/* Bases — botón único, abre los 3 catálogos en la columna derecha */}

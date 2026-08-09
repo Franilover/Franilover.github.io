@@ -143,7 +143,7 @@ export function useClados() {
     await supabase.from("clados").delete().eq("id", id);
   }, []);
 
-  return { clados, loading, creating, crear, actualizar, eliminar };
+  return { clados, setClados, loading, creating, crear, actualizar, eliminar };
 }
 
 // ─── Ecosistemas ────────────────────────────────────────────────────────────
