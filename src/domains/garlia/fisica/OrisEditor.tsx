@@ -21,9 +21,13 @@ interface Props {
   onBack: () => void;
   onActualizar: (id: string, cambios: Partial<Oris>) => void;
   onEliminar?: (id: string) => void;
+  /** Cuando se renderiza dentro de la vista de familia (varios apilados):
+   *  oculta el botón "volver" individual, ya que ahí se vuelve una sola vez
+   *  desde el header de la familia. */
+  embedded?: boolean;
 }
 
-export function OrisEditor({ oris, onBack, onActualizar, onEliminar }: Props) {
+export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }: Props) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
   const [local, setLocal] = useState(oris);
@@ -53,13 +57,15 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar }: Props) {
         style={{ background: "var(--bg-main)" }}
         className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
       >
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <ChevronLeft size={12} />
-        </button>
+        {!embedded && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+          >
+            <ChevronLeft size={12} />
+          </button>
+        )}
 
         <span className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/30 px-1.5 py-0.5 rounded border border-primary/15">
           #{local.orden}
