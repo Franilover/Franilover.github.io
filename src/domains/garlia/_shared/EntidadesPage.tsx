@@ -219,6 +219,17 @@ export function EntidadesPage({ section, selectedId }: Props) {
     }
   }
 
+  // Inserta un lote de elementos ya parseados/validados por ElementosPage
+  // (parsearArchivoElementosJSON) — mismo insert que handleCreateElemento
+  // pero con varias filas a la vez, para el botón "Subir JSON".
+  async function handleImportarElementos(nuevos: Omit<Elemento, "id">[]) {
+    const { data, error } = await supabase.from("elementos").insert(nuevos).select();
+    if (error) throw error;
+    const insertados = (data ?? []) as Elemento[];
+    setElementos((prev) => [...prev, ...insertados]);
+    return insertados.length;
+  }
+
   // ── Organización (Grupos + Notas) ────────────────────────────────────────
   const { grupos, loaded: loadedGrupos, crearGrupo, actualizarGrupo, eliminarGrupo } = useGrupos();
   const { notas, loading: loadingNotas, crear: crearNota, actualizar: actualizarNota, eliminar: eliminarNota } =
@@ -719,6 +730,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           }
           onEliminarElemento={handleEliminarElemento}
           seleccionarElementoId={elementoRecienCreadoId}
+          onImportarElementos={handleImportarElementos}
         />
       </div>
     );
