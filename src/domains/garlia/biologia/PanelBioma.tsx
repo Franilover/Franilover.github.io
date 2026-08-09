@@ -8,7 +8,7 @@
  * (subzonas concretas dentro de este bioma).
  */
 
-import { ArrowLeft, Leaf, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Leaf, Plus, Trash2, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -26,6 +26,7 @@ export function PanelBioma({
   onSelectEcosistema,
   onCrearEcosistema,
   creandoEcosistema,
+  modoPopover = false,
 }: {
   bioma: Bioma;
   /** Ecosistemas cuyo bioma_id apunta a este bioma. */
@@ -37,6 +38,11 @@ export function PanelBioma({
   onSelectEcosistema?: (id: string) => void;
   onCrearEcosistema?: () => void;
   creandoEcosistema?: boolean;
+  /** true cuando se renderiza dentro de un popover flotante: el botón
+   *  izquierdo pasa de "volver" (flecha) a "cerrar" (X), ya que no hay
+   *  navegación de por medio — el popover se cierra con click afuera,
+   *  Escape, o este botón. */
+  modoPopover?: boolean;
 }) {
   const [nombre, setNombre] = useState(bioma.nombre);
   const [afinidad, setAfinidad] = useState(bioma.afinidad ?? "");
@@ -63,7 +69,7 @@ export function PanelBioma({
           }}
           className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
         >
-          <ArrowLeft size={14} />
+          {modoPopover ? <X size={14} /> : <ArrowLeft size={14} />}
         </button>
         <div className="flex-1 min-w-0 flex items-center gap-1.5">
           <BIOMA_ICON size={12} className="text-accent/60 shrink-0" />

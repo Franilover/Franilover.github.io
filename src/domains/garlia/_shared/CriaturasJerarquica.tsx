@@ -14,10 +14,12 @@
  *   [Ecosistema 2]
  *   ...
  *
- * El chip "Ecosistema" abre su editor completo (openEntity("ecosistemas",
- * id)); cada card de "Criatura" conserva su título-botón propio que abre
- * su editor completo (openEntity("criaturas", id)) y por dentro sigue
- * mostrando la grilla de personajes tal cual antes.
+ * El chip "Ecosistema" (y el título de su Bioma agrupador) abren un popover
+ * flotante local con su editor (ver PopoverFlotante + EcosistemaPopoverContent
+ * / BiomaPopoverContent más abajo), sin navegar fuera de esta vista. Cada
+ * card de "Criatura" conserva su título-botón propio que abre su editor
+ * completo (openEntity("criaturas", id)) y por dentro sigue mostrando la
+ * grilla de personajes tal cual antes.
  *
  * Relaciones usadas:
  *  - Ecosistema.criatura_ids → agrupa criaturas bajo cada ecosistema que
@@ -48,6 +50,9 @@ import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
 import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { useRightClickDrag } from "@/domains/garlia/_shared/DragDropReasignable";
+import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
+import { BiomaPopoverContent } from "@/domains/garlia/biologia/BiomaPopoverContent";
+import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 interface Criatura {
@@ -171,7 +176,7 @@ function NodoTitulo({
   dropActive,
 }: {
   label: string;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onCreate?: () => void;
   variant?: "ecosistema" | "criatura" | "flora" | "mineral";
   maxWidthPx?: number;
@@ -445,6 +450,17 @@ export function CriaturasJerarquica({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+
+  // Popovers flotantes de bioma/ecosistema (reemplazan la navegación a
+  // pantalla completa: click en un ecosistema o en el título de su bioma
+  // abre un panel anclado en vez de onOpen("ecosistemas"/"biomas", id)).
+  const [ecosistemaAbierto, setEcosistemaAbierto] = useState<{
+    id: string;
+    anchor: HTMLElement;
+  } | null>(null);
+  const [biomaAbierto, setBiomaAbierto] = useState<{ id: string; anchor: HTMLElement } | null>(
+    null,
+  );
 
   // Arrastre (click derecho) de chips de Criatura → se sueltan sobre una
   // card de Ecosistema en modo "ojo apagado".
@@ -765,7 +781,7 @@ export function CriaturasJerarquica({
         <div className="px-3 py-3 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onOpen("ecosistemas", eco.id)}
+            onClick={(e) => setEcosistemaAbierto({ id: eco.id, anchor: e.currentTarget })}
             {...(onAsignarEcosistemaABioma ? dragEcosistema.dragHandlers(eco.id) : {})}
             title={
               onAsignarEcosistemaABioma
@@ -1059,8 +1075,9 @@ export function CriaturasJerarquica({
                     >
                       <button
                         type="button"
-                        onClick={() =>
-                          grupo.key !== "__sin_bioma__" && onOpen("biomas", grupo.key)
+                        onClick={(e) =>
+                          grupo.key !== "__sin_bioma__" &&
+                          setBiomaAbierto({ id: grupo.key, anchor: e.currentTarget })
                         }
                         disabled={grupo.key === "__sin_bioma__"}
                         title={grupo.label}
@@ -1104,7 +1121,9 @@ export function CriaturasJerarquica({
                                     ? dragEcosistema.dragHandlers(eco.id)
                                     : undefined
                                 }
-                                onClick={() => onOpen("ecosistemas", eco.id)}
+                                onClick={(e) =>
+                                  setEcosistemaAbierto({ id: eco.id, anchor: e.currentTarget })
+                                }
                               />
                             ))}
                           </div>
@@ -1195,6 +1214,37 @@ export function CriaturasJerarquica({
       {dragCriatura.overlay}
       {dragPersonaje.overlay}
       {dragEcosistema.overlay}
+
+      {ecosistemaAbierto &&
+        (() => {
+          const eco = ecosistemas.find((e) => e.id === ecosistemaAbierto.id);
+          if (!eco) return null;
+          return (
+            <PopoverFlotante
+              anchor={ecosistemaAbierto.anchor}
+              onClose={() => setEcosistemaAbierto(null)}
+              width={420}
+              maxHeight={620}
+            >
+              <EcosistemaPopoverContent
+                ecosistema={eco}
+                onClose={() => setEcosistemaAbierto(null)}
+                onSelectCriatura={(id) => onOpen("criaturas", id)}
+              />
+            </PopoverFlotante>
+          );
+        })()}
+
+      {biomaAbierto &&
+        (() => {
+          const bioma = biomas.find((b) => b.id === biomaAbierto.id);
+          if (!bioma) return null;
+          return (
+            <PopoverFlotante anchor={biomaAbierto.anchor} onClose={() => setBiomaAbierto(null)}>
+              <BiomaPopoverContent bioma={bioma} onClose={() => setBiomaAbierto(null)} />
+            </PopoverFlotante>
+          );
+        })()}
     </div>
   );
 }

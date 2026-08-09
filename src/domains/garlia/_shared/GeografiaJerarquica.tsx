@@ -31,6 +31,9 @@
  *
  * Modo "ojo apagado" (mostrarPersonajes=false): en vez de Reino → Ciudad →
  * Personajes, se muestra Bioma → Reinos directo, usando Bioma.reino_ids
+ * (M:N). El título de cada Bioma abre un popover flotante local con su
+ * editor (ver PopoverFlotante + BiomaPopoverContent), sin navegar fuera de
+ * esta vista.
  * (M:N) — no pasa por Ecosistema (eso queda exclusivo de CriaturasJerarquica,
  * donde Ecosistema es el hábitat de Criatura). Un reino que ningún bioma
  * lista cae en "Sin bioma".
@@ -54,6 +57,8 @@ import { EntityCard } from "./EntityCard";
 import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "./GrupoFiltroDropdown";
 import { BuscadorInline } from "./BuscadorInline";
 import { useRightClickDrag } from "./DragDropReasignable";
+import { PopoverFlotante } from "./PopoverFlotante";
+import { BiomaPopoverContent } from "@/domains/garlia/biologia/BiomaPopoverContent";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 
 export type GrupoPersonajeSubtipo = GrupoFiltroSubtipo;
@@ -228,6 +233,13 @@ export function GeografiaJerarquica({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+
+  // Popover flotante del editor de bioma (reemplaza la navegación a
+  // pantalla completa: click en el título de un bioma abre este panel
+  // anclado en vez de onOpen("biomas", id)).
+  const [biomaAbierto, setBiomaAbierto] = useState<{ id: string; anchor: HTMLElement } | null>(
+    null,
+  );
 
   // Arrastre (click derecho) de chips de Reino → se sueltan sobre el título
   // de un Bioma en modo "ojo apagado".
@@ -865,7 +877,7 @@ export function GeografiaJerarquica({
                   >
                     <button
                       type="button"
-                      onClick={() => onOpen("biomas", bioma.id)}
+                      onClick={(e) => setBiomaAbierto({ id: bioma.id, anchor: e.currentTarget })}
                       title={bioma.nombre}
                       className="flex items-center gap-1.5 px-1 text-micro font-black uppercase tracking-[0.15em] text-primary/50 hover:text-accent transition-colors"
                     >
@@ -925,6 +937,17 @@ export function GeografiaJerarquica({
       )}
       {dragReino.overlay}
       {dragPersonaje.overlay}
+
+      {biomaAbierto &&
+        (() => {
+          const bioma = biomas.find((b) => b.id === biomaAbierto.id);
+          if (!bioma) return null;
+          return (
+            <PopoverFlotante anchor={biomaAbierto.anchor} onClose={() => setBiomaAbierto(null)}>
+              <BiomaPopoverContent bioma={bioma} onClose={() => setBiomaAbierto(null)} />
+            </PopoverFlotante>
+          );
+        })()}
     </div>
   );
 }

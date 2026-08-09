@@ -216,6 +216,7 @@ export function PanelEcosistema({
   onEliminarCadena,
   onSelectCriatura,
   onSelectBioma,
+  modoPopover = false,
 }: {
   ecosistema: Ecosistema;
   cadenas: CadenaAlimenticia[];
@@ -229,6 +230,9 @@ export function PanelEcosistema({
   onSelectCriatura?: (id: string) => void;
   /** Abre el editor completo del bioma actualmente seleccionado. */
   onSelectBioma?: (id: string) => void;
+  /** true cuando se renderiza dentro de un popover flotante: el botón
+   *  izquierdo pasa de "volver" (flecha) a "cerrar" (X). */
+  modoPopover?: boolean;
 }) {
   const { biomas } = useBiomas();
   const [nombre, setNombre] = useState(ecosistema.nombre);
@@ -256,7 +260,7 @@ export function PanelEcosistema({
           }}
           className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
         >
-          <ArrowLeft size={14} />
+          {modoPopover ? <X size={14} /> : <ArrowLeft size={14} />}
         </button>
         <div className="flex-1 min-w-0 flex items-center gap-1.5">
           <Leaf size={12} className="text-accent/60 shrink-0" />
