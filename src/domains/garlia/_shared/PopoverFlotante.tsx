@@ -35,26 +35,42 @@ export function PopoverFlotante({
   maxHeight?: number;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number; openUp: boolean } | null>(
-    null,
-  );
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    availHeight: number;
+    openUp: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (!anchor) {
       setPos(null);
       return;
     }
+    const MARGIN = 8;
     const update = () => {
       const r = anchor.getBoundingClientRect();
       // Ancho efectivo: el pedido, acotado al viewport (con margen), para que
       // el layout horizontal no se corte en pantallas angostas.
-      const effectiveWidth = Math.min(width, window.innerWidth - 16);
-      const espacioAbajo = window.innerHeight - r.bottom;
-      const espacioArriba = r.top;
+      const effectiveWidth = Math.min(width, window.innerWidth - MARGIN * 2);
+
+      const espacioAbajo = window.innerHeight - r.bottom - MARGIN;
+      const espacioArriba = r.top - MARGIN;
+      // Abre hacia arriba solo si abajo no entra Y arriba hay más lugar que
+      // abajo — y en ese caso la altura disponible real es espacioArriba,
+      // no un valor fijo: así nunca se corta contra el borde superior.
       const openUp = espacioAbajo < Math.min(maxHeight, 280) && espacioArriba > espacioAbajo;
-      const left = Math.min(Math.max(r.left, 8), window.innerWidth - effectiveWidth - 8);
-      const top = openUp ? r.top - 8 : r.bottom + 8;
-      setPos({ top, left, width: effectiveWidth, openUp });
+      // Techo duro: nunca superamos el espacio real disponible en la
+      // dirección elegida (evita cortes contra cualquier borde), aunque
+      // sea menor a maxHeight — el panel se acota y su scroll interno
+      // absorbe el resto.
+      const espacioDisponible = Math.max(120, openUp ? espacioArriba : espacioAbajo);
+      const availHeight = Math.min(maxHeight, espacioDisponible);
+
+      const left = Math.min(Math.max(r.left, MARGIN), window.innerWidth - effectiveWidth - MARGIN);
+      const top = openUp ? r.top - MARGIN : r.bottom + MARGIN;
+      setPos({ top, left, width: effectiveWidth, availHeight, openUp });
     };
     update();
     window.addEventListener("resize", update);
@@ -94,7 +110,7 @@ export function PopoverFlotante({
         top: pos.top,
         left: pos.left,
         width: pos.width,
-        maxHeight: `min(${maxHeight}px, calc(100vh - 16px))`,
+        maxHeight: pos.availHeight,
         transform: pos.openUp ? "translateY(-100%)" : undefined,
         background: "var(--bg-main)",
         borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
