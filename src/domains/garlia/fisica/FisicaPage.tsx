@@ -60,7 +60,7 @@ interface Props {
 type Seleccion =
   | { tipo: "oris"; id: string }
   | { tipo: "concepto"; id: string }
-  | { tipo: "familia"; familia: OrisFamilia }
+  | { tipo: "todos-oris" }
   | null;
 
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
@@ -154,83 +154,6 @@ function GrupoColapsable({
 
 // ─── Filas de navegación (columna izquierda) ───────────────────────────────
 
-function OrisFila({
-  oris,
-  seleccionado,
-  onClick,
-}: {
-  oris: Oris;
-  seleccionado?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-col items-stretch gap-0 px-1.5 py-1 rounded-md border text-left transition-colors ${
-        seleccionado
-          ? "border-primary/50 bg-primary/10"
-          : "border-transparent hover:bg-primary/5 hover:border-primary/15"
-      }`}
-    >
-      <span className="text-micro font-black text-primary truncate">{oris.nombre}</span>
-      <span className="text-micro text-primary/40 truncate">
-        {oris.formula} · {oris.dominio}
-      </span>
-    </button>
-  );
-}
-
-function GrupoOrisPorFamilia({
-  familia,
-  items,
-  activoId,
-  familiaActiva,
-  onSeleccionar,
-  onSeleccionarFamilia,
-}: {
-  familia: OrisFamilia;
-  items: Oris[];
-  activoId?: string | null;
-  familiaActiva?: boolean;
-  onSeleccionar: (id: string) => void;
-  onSeleccionarFamilia: (familia: OrisFamilia) => void;
-}) {
-  const Icon = ORIS_FAMILIA_ICON[familia];
-  return (
-    <div className="flex flex-col gap-0.5 min-w-0">
-      <button
-        type="button"
-        onClick={() => onSeleccionarFamilia(familia)}
-        className={`flex items-center gap-1.5 px-1.5 py-1 mt-0.5 rounded-md transition-colors ${
-          familiaActiva
-            ? "bg-primary/10 text-primary"
-            : "text-primary/40 hover:bg-primary/5 hover:text-primary/60"
-        }`}
-        title={`Ver todos los Oris de ${familia}`}
-      >
-        <Icon size={11} />
-        <p className="text-micro font-black uppercase tracking-widest">{familia}</p>
-      </button>
-      <div className="flex flex-col gap-0.5">
-        {items.length === 0 ? (
-          <div className="mx-2 py-2 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
-            Sin Oris
-          </div>
-        ) : (
-          items.map((o) => (
-            <OrisFila
-              key={o.id}
-              oris={o}
-              seleccionado={o.id === activoId}
-              onClick={() => onSeleccionar(o.id)}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
 
 function ConceptoFila({
   concepto,
@@ -313,25 +236,23 @@ function BloqueConceptos({
 }
 
 /**
- * Vista de familia: todos los Oris de una familia (Mecánica / Energética /
- * Biológica), apilados verticalmente en la columna derecha, cada uno con
- * su propio OrisEditor completo — aprovecha el espacio sin tener que abrir
- * los Oris de a uno.
+ * Vista de todos los Oris agrupados por familia (Mecánica / Energética /
+ * Biológica), en la columna derecha. Cada familia es un bloque con título
+ * y separador; dentro, sus Oris se acomodan en 3 columnas para aprovechar
+ * el espacio horizontal.
  */
-function FamiliaOrisView({
-  familia,
-  items,
+function TodosLosOrisView({
+  orisPorFamilia,
   onBack,
   onActualizarOris,
   onEliminarOris,
 }: {
-  familia: OrisFamilia;
-  items: Oris[];
+  orisPorFamilia: Map<OrisFamilia, Oris[]>;
   onBack: () => void;
   onActualizarOris: (id: string, cambios: Partial<Oris>) => void;
   onEliminarOris?: (id: string) => void;
 }) {
-  const Icon = ORIS_FAMILIA_ICON[familia];
+  const totalOris = ORIS_FAMILIAS.reduce((acc, f) => acc + (orisPorFamilia.get(f)?.length ?? 0), 0);
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div
@@ -345,30 +266,51 @@ function FamiliaOrisView({
         >
           <ChevronLeft size={12} />
         </button>
-        <Icon size={12} className="shrink-0 text-primary/40" />
+        <Atom size={12} className="shrink-0 text-primary/40" />
         <p className="text-micro font-black uppercase tracking-widest text-primary">
-          {familia} · {items.length} Oris
+          Oris · {totalOris}
         </p>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 grid grid-cols-1 lg:grid-cols-3 gap-2.5 items-start">
-        {items.length === 0 ? (
-          <div className="col-span-full py-8 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
-            Sin Oris en esta familia
-          </div>
-        ) : (
-          items.map((o) => (
-            <div key={o.id} className="rounded-lg border border-primary/10 overflow-hidden">
-              <OrisEditor
-                oris={o}
-                onBack={onBack}
-                onActualizar={onActualizarOris}
-                onEliminar={onEliminarOris}
-                embedded
-              />
+      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
+        {ORIS_FAMILIAS.map((familia, idx) => {
+          const items = orisPorFamilia.get(familia) ?? [];
+          const Icon = ORIS_FAMILIA_ICON[familia];
+          return (
+            <div key={familia} className="flex flex-col gap-2">
+              <div
+                className={`flex items-center gap-1.5 text-primary/50 pb-1.5 ${
+                  idx > 0 ? "pt-2 border-t border-primary/10" : ""
+                }`}
+              >
+                <Icon size={13} />
+                <p className="text-micro font-black uppercase tracking-[0.2em]">
+                  {familia} · {items.length}
+                </p>
+              </div>
+
+              {items.length === 0 ? (
+                <div className="py-6 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
+                  Sin Oris en esta familia
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 items-start">
+                  {items.map((o) => (
+                    <div key={o.id} className="rounded-lg border border-primary/10 overflow-hidden">
+                      <OrisEditor
+                        oris={o}
+                        onBack={onBack}
+                        onActualizar={onActualizarOris}
+                        onEliminar={onEliminarOris}
+                        embedded
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))
-        )}
+          );
+        })}
       </div>
     </div>
   );
@@ -576,11 +518,6 @@ export function FisicaPage({
     [conceptosLocal, seleccion],
   );
 
-  const orisDeFamiliaActiva = useMemo(
-    () => (seleccion?.tipo === "familia" ? oris.filter((o) => o.familia === seleccion.familia) : []),
-    [oris, seleccion],
-  );
-
   const orisPorFamilia = useMemo(() => {
     const map = new Map<OrisFamilia, Oris[]>();
     for (const familia of ORIS_FAMILIAS) map.set(familia, []);
@@ -628,39 +565,36 @@ export function FisicaPage({
             </div>
           </GrupoColapsable>
 
-          {/* Oris por familia */}
-          <GrupoColapsable
-            titulo={`Oris · ${oris.length}`}
-            accion={
-              onCreateOris && (
-                <button
-                  type="button"
-                  disabled={creatingOris}
-                  onClick={onCreateOris}
-                  title="Nuevo Oris"
-                  className="flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {creatingOris ? <Loader2 className="animate-spin" size={9} /> : <Plus size={10} />}
-                </button>
-              )
-            }
+          {/* Oris — botón único, abre las 3 familias en la columna derecha */}
+          <button
+            type="button"
+            onClick={() => setSeleccion({ tipo: "todos-oris" })}
+            className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
+              seleccion?.tipo === "todos-oris"
+                ? "border-primary/50 bg-primary/10 text-primary"
+                : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
+            }`}
           >
-            {loadingOris && oris.length === 0 ? (
-              <div className="py-4 text-micro text-primary/30 text-center">Cargando…</div>
-            ) : (
-              ORIS_FAMILIAS.map((familia) => (
-                <GrupoOrisPorFamilia
-                  key={familia}
-                  familia={familia}
-                  items={orisPorFamilia.get(familia) ?? []}
-                  activoId={orisActivo?.id ?? null}
-                  familiaActiva={seleccion?.tipo === "familia" && seleccion.familia === familia}
-                  onSeleccionar={(id) => setSeleccion({ tipo: "oris", id })}
-                  onSeleccionarFamilia={(familia) => setSeleccion({ tipo: "familia", familia })}
-                />
-              ))
+            <div className="flex items-center gap-1.5">
+              <Atom size={11} />
+              <span className="text-micro font-black uppercase tracking-[0.2em]">
+                Oris · {oris.length}
+              </span>
+            </div>
+            {onCreateOris && (
+              <span
+                role="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateOris();
+                }}
+                title="Nuevo Oris"
+                className="flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {creatingOris ? <Loader2 className="animate-spin" size={9} /> : <Plus size={10} />}
+              </span>
             )}
-          </GrupoColapsable>
+          </button>
 
           {/* Conceptos por bloque */}
           <GrupoColapsable
@@ -751,10 +685,9 @@ export function FisicaPage({
                 : undefined
             }
           />
-        ) : seleccion?.tipo === "familia" ? (
-          <FamiliaOrisView
-            familia={seleccion.familia}
-            items={orisDeFamiliaActiva}
+        ) : seleccion?.tipo === "todos-oris" ? (
+          <TodosLosOrisView
+            orisPorFamilia={orisPorFamilia}
             onBack={() => setSeleccion(null)}
             onActualizarOris={onActualizarOris}
             onEliminarOris={onEliminarOris}
