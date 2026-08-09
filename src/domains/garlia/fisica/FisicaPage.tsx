@@ -108,6 +108,46 @@ function CatalogoCardMini({ titulo, filas }: { titulo: string; filas: FilaCatalo
   );
 }
 
+// ─── Grupo colapsable de nivel superior (Bases / Oris / Conceptos) ────────
+// Mismo lenguaje visual que CatalogoCardMini (borde + summary + chevron),
+// para que se note claramente dónde termina un grupo y empieza el otro.
+
+function GrupoColapsable({
+  titulo,
+  accion,
+  children,
+  defaultOpen = true,
+}: {
+  titulo: string;
+  accion?: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="rounded-lg border border-primary/10 overflow-hidden group/grupo"
+    >
+      <summary className="px-2 py-1.5 bg-primary/[0.04] cursor-pointer select-none flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-micro text-primary/30 group-open/grupo:rotate-90 transition-transform shrink-0">
+            ›
+          </span>
+          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/50 truncate">
+            {titulo}
+          </span>
+        </div>
+        {accion && (
+          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+            {accion}
+          </div>
+        )}
+      </summary>
+      <div className="p-1.5 flex flex-col gap-1.5 border-t border-primary/10">{children}</div>
+    </details>
+  );
+}
+
 // ─── Filas de navegación (columna izquierda) ───────────────────────────────
 
 function OrisFila({
@@ -494,21 +534,21 @@ export function FisicaPage({
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-3">
-          {/* Catálogos fijos — compactos, colapsables */}
-          <div className="flex flex-col gap-1">
-            <CatalogoCardMini titulo="Partícula Base" filas={PARTICULAS_BASE} />
-            <CatalogoCardMini titulo="Partículas" filas={PARTICULAS} />
-            <CatalogoCardMini titulo="Iums" filas={IUMS} />
-          </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
+          {/* Bases — catálogos fijos (Partícula Base, Partículas, Iums) */}
+          <GrupoColapsable titulo="Bases">
+            <div className="flex flex-col gap-1">
+              <CatalogoCardMini titulo="Partícula Base" filas={PARTICULAS_BASE} />
+              <CatalogoCardMini titulo="Partículas" filas={PARTICULAS} />
+              <CatalogoCardMini titulo="Iums" filas={IUMS} />
+            </div>
+          </GrupoColapsable>
 
           {/* Oris por familia */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between px-1">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Oris
-              </p>
-              {onCreateOris && (
+          <GrupoColapsable
+            titulo={`Oris · ${oris.length}`}
+            accion={
+              onCreateOris && (
                 <button
                   type="button"
                   disabled={creatingOris}
@@ -518,8 +558,9 @@ export function FisicaPage({
                 >
                   {creatingOris ? <Loader2 className="animate-spin" size={9} /> : <Plus size={10} />}
                 </button>
-              )}
-            </div>
+              )
+            }
+          >
             {loadingOris && oris.length === 0 ? (
               <div className="py-4 text-micro text-primary/30 text-center">Cargando…</div>
             ) : (
@@ -533,15 +574,13 @@ export function FisicaPage({
                 />
               ))
             )}
-          </div>
+          </GrupoColapsable>
 
           {/* Conceptos por bloque */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between px-1 gap-2">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Conceptos
-              </p>
-              {mostrarInputSeccion ? (
+          <GrupoColapsable
+            titulo={`Conceptos · ${conceptosLocal.length}`}
+            accion={
+              mostrarInputSeccion ? (
                 <div className="flex items-center gap-1 min-w-0">
                   <input
                     autoFocus
@@ -585,8 +624,9 @@ export function FisicaPage({
                 >
                   <Plus size={10} />
                 </button>
-              )}
-            </div>
+              )
+            }
+          >
             {loadingConceptos && conceptosLocal.length === 0 ? (
               <div className="py-4 text-micro text-primary/30 text-center">Cargando…</div>
             ) : (
@@ -602,7 +642,7 @@ export function FisicaPage({
                 />
               ))
             )}
-          </div>
+          </GrupoColapsable>
         </div>
       </div>
 
