@@ -340,6 +340,7 @@ function TodosLosConceptosView({
         ) : (
           bloques.map(({ bloque, items }, idx) => {
             const columnasTres = /manifestaciones|base/i.test(bloque);
+            const columnasCuatro = /cadena m[aá]gica/i.test(bloque);
             return (
             <div key={bloque} className="flex flex-col gap-2">
               <div
@@ -369,7 +370,7 @@ function TodosLosConceptosView({
 
               <div
                 className={`grid grid-cols-1 gap-2 items-start ${
-                  columnasTres ? "lg:grid-cols-3" : "lg:grid-cols-2"
+                  columnasCuatro ? "lg:grid-cols-4" : columnasTres ? "lg:grid-cols-3" : "lg:grid-cols-2"
                 }`}
               >
                 {items.map((c) => (
