@@ -18,13 +18,15 @@
  * "oris" y "fisica_conceptos", separadas de "elementos".
  */
 
-import { Atom, ChevronLeft, Download, Loader2, Plus } from "lucide-react";
+import { Atom, ChevronLeft, Download, Loader2, Plus, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
+import { useConfirm } from "@/ui/ConfirmModal";
 
 import { OrisEditor } from "./OrisEditor";
 import {
+  FISICA_CONCEPTOS_CONFIG,
   IUMS,
   ORIS_FAMILIAS,
   ORIS_FAMILIA_ICON,
@@ -211,15 +213,39 @@ function BloqueConceptos({
   items,
   activoId,
   onSeleccionar,
+  onAgregarConcepto,
+  agregandoConcepto,
 }: {
   bloque: string;
   items: FisicaConcepto[];
   activoId?: string | null;
   onSeleccionar: (id: string) => void;
+  onAgregarConcepto?: (bloque: string) => void;
+  agregandoConcepto?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <p className="text-micro font-black uppercase tracking-widest text-primary/40">{bloque}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-micro font-black uppercase tracking-widest text-primary/40">
+          {bloque}
+        </p>
+        {onAgregarConcepto && (
+          <button
+            type="button"
+            disabled={agregandoConcepto}
+            onClick={() => onAgregarConcepto(bloque)}
+            title={`Añadir concepto en "${bloque}"`}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {agregandoConcepto ? (
+              <Loader2 className="animate-spin" size={9} />
+            ) : (
+              <Plus size={9} />
+            )}
+            <span className="hidden sm:inline">Concepto</span>
+          </button>
+        )}
+      </div>
       <div
         className="grid gap-2"
         style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
@@ -247,11 +273,14 @@ function ConceptoEditor({
   concepto,
   onBack,
   onActualizar,
+  onEliminar,
 }: {
   concepto: FisicaConcepto;
   onBack: () => void;
   onActualizar: (id: string, cambios: Partial<FisicaConcepto>) => void;
+  onEliminar?: (id: string) => void;
 }) {
+  const { confirm, ConfirmModal } = useConfirm();
   const [local, setLocal] = useState(concepto);
 
   useEffect(() => setLocal(concepto), [concepto]);
@@ -266,6 +295,7 @@ function ConceptoEditor({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <ConfirmModal />
       <div
         style={{ background: "var(--bg-main)" }}
         className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
@@ -289,6 +319,23 @@ function ConceptoEditor({
           placeholder="Título del concepto"
           className="flex-1 min-w-0 bg-transparent text-micro font-black text-primary outline-none placeholder:text-primary/25"
         />
+
+        {onEliminar && (
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await confirm({
+                title: "Eliminar concepto",
+                message: `¿Eliminar "${local.titulo || "Sin título"}"? Esta acción no se puede deshacer.`,
+              });
+              if (ok) onEliminar(concepto.id);
+            }}
+            className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+            title="Eliminar concepto"
+          >
+            <Trash2 size={11} />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 p-2.5 overflow-y-auto">
@@ -321,13 +368,77 @@ export function FisicaPage({
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [conceptoSeleccionadoId, setConceptoSeleccionadoId] = useState<string | null>(null);
+  const [conceptosLocal, setConceptosLocal] = useState<FisicaConcepto[]>(conceptos);
+  useEffect(() => setConceptosLocal(conceptos), [conceptos]);
+
+  const [agregandoConceptoDe, setAgregandoConceptoDe] = useState<string | null>(null);
+  const [creandoSeccion, setCreandoSeccion] = useState(false);
+  const [nuevaSeccionNombre, setNuevaSeccionNombre] = useState("");
+  const [mostrarInputSeccion, setMostrarInputSeccion] = useState(false);
+
+  async function handleAgregarConcepto(bloque: string) {
+    setAgregandoConceptoDe(bloque);
+    try {
+      const orden =
+        Math.max(0, ...conceptosLocal.filter((c) => c.bloque === bloque).map((c) => c.orden)) + 1;
+      const { data, error } = await supabase
+        .from(FISICA_CONCEPTOS_CONFIG.tabla)
+        .insert([{ bloque, titulo: "Nuevo concepto", contenido: "", orden }])
+        .select()
+        .single();
+      if (error) throw error;
+      const nuevo = data as FisicaConcepto;
+      setConceptosLocal((prev) => [...prev, nuevo]);
+      setConceptoSeleccionadoId(nuevo.id);
+    } catch (e) {
+      console.error("[FisicaPage] error creando concepto:", e);
+    } finally {
+      setAgregandoConceptoDe(null);
+    }
+  }
+
+  async function handleCrearSeccion() {
+    const nombre = nuevaSeccionNombre.trim();
+    if (!nombre) return;
+    setCreandoSeccion(true);
+    try {
+      const { data, error } = await supabase
+        .from(FISICA_CONCEPTOS_CONFIG.tabla)
+        .insert([{ bloque: nombre, titulo: "Nuevo concepto", contenido: "", orden: 1 }])
+        .select()
+        .single();
+      if (error) throw error;
+      const nuevo = data as FisicaConcepto;
+      setConceptosLocal((prev) => [...prev, nuevo]);
+      setConceptoSeleccionadoId(nuevo.id);
+      setNuevaSeccionNombre("");
+      setMostrarInputSeccion(false);
+    } catch (e) {
+      console.error("[FisicaPage] error creando sección:", e);
+    } finally {
+      setCreandoSeccion(false);
+    }
+  }
+
+  async function handleEliminarConcepto(id: string) {
+    try {
+      const { error } = await supabase
+        .from(FISICA_CONCEPTOS_CONFIG.tabla)
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      setConceptosLocal((prev) => prev.filter((c) => c.id !== id));
+    } catch (e) {
+      console.error("[FisicaPage] error eliminando concepto:", e);
+    }
+  }
 
   const activoId = seleccionadoId ?? seleccionarOrisId ?? null;
   const activo = useMemo(() => oris.find((o) => o.id === activoId) ?? null, [oris, activoId]);
 
   const conceptoActivo = useMemo(
-    () => conceptos.find((c) => c.id === conceptoSeleccionadoId) ?? null,
-    [conceptos, conceptoSeleccionadoId],
+    () => conceptosLocal.find((c) => c.id === conceptoSeleccionadoId) ?? null,
+    [conceptosLocal, conceptoSeleccionadoId],
   );
 
   const orisPorFamilia = useMemo(() => {
@@ -337,7 +448,7 @@ export function FisicaPage({
     return map;
   }, [oris]);
 
-  const bloquesConceptos = useMemo(() => agruparPorBloque(conceptos), [conceptos]);
+  const bloquesConceptos = useMemo(() => agruparPorBloque(conceptosLocal), [conceptosLocal]);
 
   return (
     <div className="flex-1 min-h-0 flex overflow-hidden relative">
@@ -352,7 +463,7 @@ export function FisicaPage({
           <div className="shrink-0 flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => descargarDatosFisica(oris, conceptos)}
+              onClick={() => descargarDatosFisica(oris, conceptosLocal)}
               title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
               className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
             >
@@ -411,10 +522,58 @@ export function FisicaPage({
 
         {/* Bloque 3: conceptos */}
         <div className="flex flex-col gap-3">
-          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-            Conceptos
-          </p>
-          {loadingConceptos && conceptos.length === 0 ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+              Conceptos
+            </p>
+            {mostrarInputSeccion ? (
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={nuevaSeccionNombre}
+                  onChange={(e) => setNuevaSeccionNombre(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCrearSeccion();
+                    if (e.key === "Escape") {
+                      setMostrarInputSeccion(false);
+                      setNuevaSeccionNombre("");
+                    }
+                  }}
+                  placeholder="Nombre de la sección…"
+                  className="bg-primary/5 rounded-md px-2 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
+                />
+                <button
+                  type="button"
+                  disabled={creandoSeccion || !nuevaSeccionNombre.trim()}
+                  onClick={handleCrearSeccion}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {creandoSeccion ? <Loader2 className="animate-spin" size={9} /> : "Crear"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarInputSeccion(false);
+                    setNuevaSeccionNombre("");
+                  }}
+                  className="px-1.5 py-0.5 rounded-md text-micro font-bold text-primary/40 hover:text-primary/70 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMostrarInputSeccion(true)}
+                title="Añadir nueva sección de conceptos"
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+              >
+                <Plus size={10} />
+                <span className="hidden sm:inline">Nueva sección</span>
+              </button>
+            )}
+          </div>
+          {loadingConceptos && conceptosLocal.length === 0 ? (
             <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
           ) : (
             bloquesConceptos.map(({ bloque, items }) => (
@@ -426,6 +585,8 @@ export function FisicaPage({
                 onSeleccionar={(id) =>
                   setConceptoSeleccionadoId((actual) => (actual === id ? null : id))
                 }
+                onAgregarConcepto={handleAgregarConcepto}
+                agregandoConcepto={agregandoConceptoDe === bloque}
               />
             ))
           )}
@@ -484,7 +645,16 @@ export function FisicaPage({
             <ConceptoEditor
               concepto={conceptoActivo}
               onBack={() => setConceptoSeleccionadoId(null)}
-              onActualizar={onActualizarConcepto}
+              onActualizar={(id, cambios) => {
+                setConceptosLocal((prev) =>
+                  prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+                );
+                onActualizarConcepto(id, cambios);
+              }}
+              onEliminar={(id) => {
+                handleEliminarConcepto(id);
+                setConceptoSeleccionadoId(null);
+              }}
             />
           </div>
         </div>
