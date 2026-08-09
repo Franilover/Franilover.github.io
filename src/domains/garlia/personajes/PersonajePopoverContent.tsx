@@ -22,6 +22,7 @@ import React from "react";
 
 import { ComboSelector } from "@/ui/ComboSelector";
 import { useNombresDeTabla } from "@/domains/garlia/_shared/useNombresDeTabla";
+import { useCiudades } from "@garlia/ciudades";
 import { useReinosMin } from "@garlia/reinos";
 
 import { SidebarContenido } from "./PersonajeSidebarPanel";
@@ -32,6 +33,7 @@ interface PersonajeMin {
   img_url?: string | null;
   especie?: string | null;
   reino?: string | null;
+  ciudad_id?: string | null;
 }
 
 export function PersonajePopoverContent({
@@ -45,8 +47,8 @@ export function PersonajePopoverContent({
   onNavigateCapitulo,
 }: {
   personaje: PersonajeMin;
-  /** Guarda un patch parcial (especie/reino) — el resto de campos se editan
-   *  solo en el editor completo. */
+  /** Guarda un patch parcial (especie/reino/ciudad_id) — el resto de campos
+   *  se editan solo en el editor completo. */
   onSave: (patch: Partial<PersonajeMin>) => void;
   onClose: () => void;
   /** Abre el EditorPersonaje a pantalla completa para este personaje. */
@@ -58,6 +60,16 @@ export function PersonajePopoverContent({
 }) {
   const especies = useNombresDeTabla("criaturas");
   const reinosMin = useReinosMin();
+  const ciudades = useCiudades();
+
+  // Mismo criterio que FormularioPersonaje (EditorPersonaje.tsx): ciudades
+  // filtradas por el reino actual del personaje (o sin reino_id si no tiene
+  // reino asignado).
+  const reinoSeleccionadoId =
+    reinosMin.find((r) => r.nombre === personaje.reino)?.id ?? null;
+  const ciudadesFiltradas = ciudades.filter((l) =>
+    reinoSeleccionadoId ? l.reino_id === reinoSeleccionadoId : !l.reino_id,
+  );
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -87,8 +99,8 @@ export function PersonajePopoverContent({
         </button>
       </div>
 
-      {/* Selectores rápidos: Especie, Reino */}
-      <div className="shrink-0 grid grid-cols-2 gap-2 mb-3">
+      {/* Selectores rápidos: Especie, Reino, Ubicación */}
+      <div className="shrink-0 grid grid-cols-3 gap-2 mb-3">
         <ComboSelector
           allowNone
           items={especies.map((e) => ({ id: e, label: e }))}
@@ -108,7 +120,18 @@ export function PersonajePopoverContent({
           noneLabel="Sin reino"
           placeholder="Territorio…"
           value={personaje.reino ?? null}
-          onChange={(v) => onSave({ reino: v ?? "" })}
+          onChange={(v) => onSave({ reino: v ?? "", ciudad_id: null })}
+        />
+        <ComboSelector
+          allowNone
+          groups={[]}
+          items={ciudadesFiltradas.map((l) => ({ id: l.id, label: l.nombre }))}
+          label="Ubicación"
+          mode="single"
+          noneLabel="Sin ubicación"
+          placeholder="Ciudad…"
+          value={personaje.ciudad_id ?? null}
+          onChange={(v) => onSave({ ciudad_id: v ?? null })}
         />
       </div>
 

@@ -1070,7 +1070,7 @@ export function GeografiaJerarquica({
             <PopoverFlotante
               anchor={personajeAbierto.anchor}
               onClose={() => setPersonajeAbierto(null)}
-              width={360}
+              width={420}
               maxHeight={520}
               centerVertically
               centerHorizontally
