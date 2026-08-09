@@ -365,7 +365,7 @@ function TodosLosConceptosView({
                 )}
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 items-start">
                 {items.map((c) => (
                   <div key={c.id} className="rounded-lg border border-primary/10 overflow-hidden">
                     <ConceptoEditor
