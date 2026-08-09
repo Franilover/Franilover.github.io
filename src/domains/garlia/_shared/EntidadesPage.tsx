@@ -219,6 +219,15 @@ export function EntidadesPage({ section, selectedId }: Props) {
     }
   }
 
+  // Borra varios elementos de una sola vez — usada por la selección
+  // múltiple (Shift+Click) en ElementosPage, en vez de N deletes sueltos.
+  async function handleEliminarVariosElementos(ids: string[]) {
+    const { error } = await supabase.from("elementos").delete().in("id", ids);
+    if (error) throw error;
+    const idsSet = new Set(ids);
+    setElementos((prev) => prev.filter((e) => !idsSet.has(e.id)));
+  }
+
   // Inserta un lote de elementos ya parseados/validados por ElementosPage
   // (parsearArchivoElementosJSON) — mismo insert que handleCreateElemento
   // pero con varias filas a la vez, para el botón "Subir JSON".
@@ -731,6 +740,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           onEliminarElemento={handleEliminarElemento}
           seleccionarElementoId={elementoRecienCreadoId}
           onImportarElementos={handleImportarElementos}
+          onEliminarVariosElementos={handleEliminarVariosElementos}
         />
       </div>
     );

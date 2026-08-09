@@ -91,6 +91,7 @@ interface Props {
   onEliminarElemento?: (id: string) => void;
   seleccionarElementoId?: string | null;
   onImportarElementos?: (elementos: Omit<Elemento, "id">[]) => Promise<number>;
+  onEliminarVariosElementos?: (ids: string[]) => Promise<void>;
 }
 
 /**
@@ -649,6 +650,7 @@ export function RunasPage({
   onEliminarElemento,
   seleccionarElementoId,
   onImportarElementos,
+  onEliminarVariosElementos,
 }: Props) {
   const { config: configRunas, actualizar: actualizarConfigRunas } = useConfigRunas();
   const abrirPanel = usePanelFlotante((s) => s.abrir);
@@ -824,6 +826,7 @@ export function RunasPage({
             onEliminar={onEliminarElemento}
             seleccionarId={seleccionarElementoId}
             onImportarElementos={onImportarElementos}
+            onEliminarVarios={onEliminarVariosElementos}
           />
         </div>
       ) : seccionMagia === "fisica" ? (

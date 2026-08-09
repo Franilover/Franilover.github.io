@@ -139,6 +139,12 @@ interface Props {
   onCreate?: () => void;
   onActualizar: (id: string, cambios: Partial<Elemento>) => void;
   onEliminar?: (id: string) => void;
+  /**
+   * Borra varios elementos de una: usada por la selección múltiple
+   * (Shift+Click en el grid). Si no se pasa, se cae a llamar onEliminar
+   * uno por uno.
+   */
+  onEliminarVarios?: (ids: string[]) => Promise<void>;
   /** Id a dejar seleccionado tras crear (mismo patrón que runaRecienCreadaId). */
   seleccionarId?: string | null;
   /**
@@ -195,11 +201,14 @@ function agruparComoTablaPeriodica(elementos: Elemento[]): { grupo: number; elem
 function ElementoCasilla({
   elemento,
   seleccionado,
+  enSeleccionMultiple,
   onClick,
 }: {
   elemento: Elemento;
   seleccionado?: boolean;
-  onClick: () => void;
+  /** true si esta casilla está marcada dentro de una selección múltiple (Shift+Click). */
+  enSeleccionMultiple?: boolean;
+  onClick: (e: React.MouseEvent) => void;
 }) {
   const dominantes = useMemo(() => calcularParticulaDominante(elemento), [elemento]);
   const nombreDominante =
@@ -213,10 +222,13 @@ function ElementoCasilla({
     <button
       type="button"
       onClick={onClick}
+      title="Click: ver detalle · Shift+Click: agregar/quitar de la selección múltiple"
       className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
-        seleccionado
-          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
-          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+        enSeleccionMultiple
+          ? "border-accent/60 bg-accent/10 ring-2 ring-accent/40"
+          : seleccionado
+            ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
+            : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
       }`}
     >
       <div className="flex items-start justify-between">
@@ -487,10 +499,61 @@ export function ElementosPage({
   onCreate,
   onActualizar,
   onEliminar,
+  onEliminarVarios,
   seleccionarId,
   onImportarElementos,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [seleccionMultiple, setSeleccionMultiple] = useState<Set<string>>(new Set());
+  const [eliminandoVarios, setEliminandoVarios] = useState(false);
+
+  function toggleSeleccionMultiple(id: string) {
+    setSeleccionMultiple((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleClickCasilla(id: string, e: React.MouseEvent) {
+    if (e.shiftKey) {
+      // Shift+Click: no abre el panel de detalle, solo marca/desmarca
+      // para el borrado en lote.
+      toggleSeleccionMultiple(id);
+      return;
+    }
+    // Click normal: comportamiento de siempre (abrir/cerrar detalle),
+    // y limpia cualquier selección múltiple activa para no mezclar modos.
+    setSeleccionMultiple(new Set());
+    setSeleccionadoId((actual) => (actual === id ? null : id));
+  }
+
+  async function handleEliminarSeleccionMultiple() {
+    const ids = Array.from(seleccionMultiple);
+    if (ids.length === 0) return;
+    const confirmado = window.confirm(
+      `¿Eliminar ${ids.length} elemento${ids.length === 1 ? "" : "s"}? Esta acción no se puede deshacer.`,
+    );
+    if (!confirmado) return;
+
+    setEliminandoVarios(true);
+    try {
+      if (onEliminarVarios) {
+        await onEliminarVarios(ids);
+      } else if (onEliminar) {
+        // Fallback: sin batch delete disponible, se borra uno por uno.
+        for (const id of ids) {
+          await onEliminar(id);
+        }
+      }
+      setSeleccionMultiple(new Set());
+    } catch (e) {
+      console.error("[ElementosPage] error eliminando selección múltiple:", e);
+    } finally {
+      setEliminandoVarios(false);
+    }
+  }
   const [comparadorAbierto, setComparadorAbierto] = useState(false);
   const inputArchivoRef = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
@@ -747,6 +810,37 @@ export function ElementosPage({
           </div>
         </div>
 
+        {seleccionMultiple.size > 0 && (
+          <div className="text-micro font-black uppercase tracking-wide bg-accent/10 border border-accent/30 rounded-md px-2 py-1.5 flex items-center justify-between gap-2">
+            <span className="text-primary/70">
+              {seleccionMultiple.size} elemento{seleccionMultiple.size === 1 ? "" : "s"} seleccionado
+              {seleccionMultiple.size === 1 ? "" : "s"}
+              <span className="font-normal normal-case tracking-normal text-primary/40">
+                {" "}
+                — Shift+Click para agregar o quitar más
+              </span>
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSeleccionMultiple(new Set())}
+                className="text-primary/40 hover:text-primary/70 cursor-pointer px-1.5 py-0.5"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={eliminandoVarios || (!onEliminarVarios && !onEliminar)}
+                onClick={handleEliminarSeleccionMultiple}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-btn-text bg-red-500 hover:bg-red-600 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {eliminandoVarios ? <Loader2 className="animate-spin" size={10} /> : <Trash2 size={10} />}
+                Eliminar seleccionados
+              </button>
+            </div>
+          </div>
+        )}
+
         {mensajeImportacion && (
           <div className="text-micro text-primary/60 bg-primary/5 border border-primary/15 rounded-md px-2 py-1.5 flex items-center justify-between gap-2">
             <span>{mensajeImportacion}</span>
@@ -791,9 +885,8 @@ export function ElementosPage({
                       key={el.id}
                       elemento={el}
                       seleccionado={el.id === activoId}
-                      onClick={() =>
-                        setSeleccionadoId((actual) => (actual === el.id ? null : el.id))
-                      }
+                      enSeleccionMultiple={seleccionMultiple.has(el.id)}
+                      onClick={(e) => handleClickCasilla(el.id, e)}
                     />
                   ))}
                 </div>
@@ -810,9 +903,8 @@ export function ElementosPage({
                 key={el.id}
                 elemento={el}
                 seleccionado={el.id === activoId}
-                onClick={() =>
-                  setSeleccionadoId((actual) => (actual === el.id ? null : el.id))
-                }
+                enSeleccionMultiple={seleccionMultiple.has(el.id)}
+                onClick={(e) => handleClickCasilla(el.id, e)}
               />
             ))}
           </div>
