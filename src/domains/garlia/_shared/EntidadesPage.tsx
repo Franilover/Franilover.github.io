@@ -18,7 +18,7 @@
  * muestra sin lógica extra acá.
  */
 
-import { Eye, EyeOff, Gem, Leaf, Music, Plus, StickyNote } from "lucide-react";
+import { Download, Eye, EyeOff, Gem, Leaf, Music, Plus, StickyNote } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
@@ -96,6 +96,43 @@ interface Ciudad {
 interface Props {
   section: SectionKey;
   selectedId: string | null;
+}
+
+// ─── Descarga: dataset de Criaturas (agrupación por ecosistema) ───────────
+// Mismo patrón que descargarDatosElementos/descargarDatosFisica/
+// descargarDatosBiologia — un solo archivo JSON autocontenido.
+function descargarUtil(nombreBase: string, payload: Record<string, unknown>) {
+  const blob = new Blob(
+    [JSON.stringify({ exportado_en: new Date().toISOString(), ...payload }, null, 2)],
+    { type: "application/json" },
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${nombreBase}-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function descargarDatosCriaturas(datos: {
+  criaturas: Criatura[];
+  personajes: Personaje[];
+  ecosistemas: unknown[];
+  biomas: unknown[];
+  flora: unknown[];
+  minerales: unknown[];
+}) {
+  descargarUtil("criaturas", datos);
+}
+
+function descargarDatosReinos(datos: {
+  reinos: Reino[];
+  ciudades: Ciudad[];
+  personajes: Personaje[];
+}) {
+  descargarUtil("reinos", datos);
 }
 
 export function EntidadesPage({ section, selectedId }: Props) {
@@ -944,6 +981,25 @@ export function EntidadesPage({ section, selectedId }: Props) {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div className="flex items-center justify-end mb-1">
+        <button
+          type="button"
+          onClick={() =>
+            agrupacionPersonajes === "criatura"
+              ? descargarDatosCriaturas({ criaturas, personajes, ecosistemas, biomas, flora, minerales })
+              : descargarDatosReinos({ reinos, ciudades, personajes })
+          }
+          title={
+            agrupacionPersonajes === "criatura"
+              ? "Descargar todos los datos de Criaturas (criaturas, personajes, ecosistemas, biomas, flora, minerales) como JSON"
+              : "Descargar todos los datos de Reinos (reinos, ciudades, personajes) como JSON"
+          }
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <Download size={10} />
+          <span className="hidden sm:inline">Descargar datos</span>
+        </button>
+      </div>
       {agrupacionPersonajes === "criatura" ? (
         <CriaturasJerarquica
           criaturas={criaturas}
