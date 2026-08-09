@@ -132,7 +132,7 @@ function GrupoColapsable({
       open={defaultOpen}
       className="rounded-lg border border-primary/10 overflow-hidden group/grupo"
     >
-      <summary className="px-2 py-1.5 bg-primary/[0.04] cursor-pointer select-none flex items-center justify-between gap-2">
+      <summary className="px-1.5 py-1 bg-primary/[0.04] cursor-pointer select-none flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-micro text-primary/30 group-open/grupo:rotate-90 transition-transform shrink-0">
             ›
@@ -147,7 +147,7 @@ function GrupoColapsable({
           </div>
         )}
       </summary>
-      <div className="p-1.5 flex flex-col gap-1.5 border-t border-primary/10">{children}</div>
+      <div className="p-1 flex flex-col gap-1 border-t border-primary/10">{children}</div>
     </details>
   );
 }
@@ -167,7 +167,7 @@ function OrisFila({
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-stretch gap-0 px-2 py-1.5 rounded-md border text-left transition-colors ${
+      className={`flex flex-col items-stretch gap-0 px-1.5 py-1 rounded-md border text-left transition-colors ${
         seleccionado
           ? "border-primary/50 bg-primary/10"
           : "border-transparent hover:bg-primary/5 hover:border-primary/15"
@@ -202,7 +202,7 @@ function GrupoOrisPorFamilia({
       <button
         type="button"
         onClick={() => onSeleccionarFamilia(familia)}
-        className={`flex items-center gap-1.5 px-2 py-1 mt-0.5 rounded-md transition-colors ${
+        className={`flex items-center gap-1.5 px-1.5 py-1 mt-0.5 rounded-md transition-colors ${
           familiaActiva
             ? "bg-primary/10 text-primary"
             : "text-primary/40 hover:bg-primary/5 hover:text-primary/60"
@@ -245,7 +245,7 @@ function ConceptoFila({
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-stretch gap-0 px-2 py-1.5 rounded-md border text-left transition-colors ${
+      className={`flex flex-col items-stretch gap-0 px-1.5 py-1 rounded-md border text-left transition-colors ${
         seleccionado
           ? "border-primary/50 bg-primary/10"
           : "border-transparent hover:bg-primary/5 hover:border-primary/15"
@@ -351,9 +351,9 @@ function FamiliaOrisView({
         </p>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-2.5">
+      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 grid grid-cols-1 lg:grid-cols-3 gap-2.5 items-start">
         {items.length === 0 ? (
-          <div className="py-8 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
+          <div className="col-span-full py-8 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
             Sin Oris en esta familia
           </div>
         ) : (
@@ -597,28 +597,28 @@ export function FisicaPage({
       {/* Columna izquierda: navegación. En mobile se oculta si hay algo
           seleccionado, para dejarle todo el espacio al editor. */}
       <div
-        className={`w-full sm:w-72 md:w-80 shrink-0 sm:flex flex-col min-h-0 overflow-hidden border-r border-primary/10 ${
+        className={`w-full sm:w-56 md:w-60 shrink-0 sm:flex flex-col min-h-0 overflow-hidden border-r border-primary/10 ${
           hayAlgoSeleccionado ? "hidden" : "flex"
         }`}
       >
-        <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-primary/10">
-          <div className="flex items-center gap-1.5 text-primary/40">
-            <Atom size={12} />
+        <div className="shrink-0 flex items-center justify-between px-2 py-1.5 border-b border-primary/10">
+          <div className="flex items-center gap-1 text-primary/40">
+            <Atom size={11} />
             <p className="text-micro font-black uppercase tracking-widest">
-              Física · {oris.length} Oris
+              Física · {oris.length}
             </p>
           </div>
           <button
             type="button"
             onClick={() => descargarDatosFisica(oris, conceptosLocal)}
             title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
-            className="flex items-center justify-center w-6 h-6 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+            className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
           >
-            <Download size={11} />
+            <Download size={10} />
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
+        <div className="flex-1 min-h-0 overflow-y-auto p-1.5 flex flex-col gap-1.5">
           {/* Bases — catálogos fijos (Partícula Base, Partículas, Iums) */}
           <GrupoColapsable titulo="Bases">
             <div className="flex flex-col gap-1">

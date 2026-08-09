@@ -116,8 +116,8 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className={`flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto ${embedded ? "p-2" : "p-2.5"}`}>
+        <div className={`grid grid-cols-1 gap-2 ${embedded ? "" : "sm:grid-cols-3"}`}>
           <div className="flex flex-col gap-0.5">
             <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
               Familia
