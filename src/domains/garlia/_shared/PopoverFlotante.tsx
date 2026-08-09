@@ -26,6 +26,7 @@ export function PopoverFlotante({
   children,
   width = 560,
   maxHeight = 460,
+  centerVertically = false,
 }: {
   /** Elemento al que se ancla el popover. Si es null, no se renderiza nada. */
   anchor: HTMLElement | null;
@@ -33,6 +34,15 @@ export function PopoverFlotante({
   children: React.ReactNode;
   width?: number;
   maxHeight?: number;
+  /**
+   * Si true, el panel ignora el anclaje vertical arriba/abajo del trigger
+   * y en cambio se centra verticalmente en el viewport — útil para
+   * editores con muchas secciones (ej. Ecosistema) que se cortaban contra
+   * el borde superior o inferior de la pantalla al abrir cerca de los
+   * extremos. El anclaje horizontal (columna cerca del trigger) se
+   * mantiene igual.
+   */
+  centerVertically?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{
@@ -54,6 +64,18 @@ export function PopoverFlotante({
       // Ancho efectivo: el pedido, acotado al viewport (con margen), para que
       // el layout horizontal no se corte en pantallas angostas.
       const effectiveWidth = Math.min(width, window.innerWidth - MARGIN * 2);
+      const left = Math.min(Math.max(r.left, MARGIN), window.innerWidth - effectiveWidth - MARGIN);
+
+      if (centerVertically) {
+        // Centrado vertical en el viewport: la altura disponible es el
+        // alto de pantalla completo (con márgenes), y el panel se centra
+        // dentro de ese espacio en vez de anclarse arriba/abajo del trigger.
+        const espacioVertical = window.innerHeight - MARGIN * 2;
+        const availHeight = Math.min(maxHeight, espacioVertical);
+        const top = Math.max(MARGIN, (window.innerHeight - availHeight) / 2);
+        setPos({ top, left, width: effectiveWidth, availHeight, openUp: false });
+        return;
+      }
 
       const espacioAbajo = window.innerHeight - r.bottom - MARGIN;
       const espacioArriba = r.top - MARGIN;
@@ -68,7 +90,6 @@ export function PopoverFlotante({
       const espacioDisponible = Math.max(120, openUp ? espacioArriba : espacioAbajo);
       const availHeight = Math.min(maxHeight, espacioDisponible);
 
-      const left = Math.min(Math.max(r.left, MARGIN), window.innerWidth - effectiveWidth - MARGIN);
       const top = openUp ? r.top - MARGIN : r.bottom + MARGIN;
       setPos({ top, left, width: effectiveWidth, availHeight, openUp });
     };
@@ -79,7 +100,7 @@ export function PopoverFlotante({
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [anchor, width, maxHeight]);
+  }, [anchor, width, maxHeight, centerVertically]);
 
   useEffect(() => {
     if (!anchor) return;

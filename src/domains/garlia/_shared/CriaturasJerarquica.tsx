@@ -1221,7 +1221,8 @@ export function CriaturasJerarquica({
             anchor={ecosistemaAbierto.anchor}
             onClose={() => setEcosistemaAbierto(null)}
             width={640}
-            maxHeight={480}
+            maxHeight={560}
+            centerVertically
           >
             <EcosistemaPopoverContent
               ecosistemaId={ecosistemaAbierto.id}
