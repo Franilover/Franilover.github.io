@@ -20,6 +20,14 @@ interface Props {
   imageUrl?: string | null;
   Icon: React.ElementType;
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  /**
+   * Click con el botón del medio del mouse (rueda) sobre la miniatura.
+   * Opcional — si no se pasa, la card ignora el click del medio y el
+   * navegador hace su comportamiento default (auto-scroll). Se usa para
+   * abrir el panel flotante en pantalla completa (ver FullscreenEntityPanel)
+   * sin perder el lugar actual, a diferencia del click normal.
+   */
+  onMiddleClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   subtitle?: string | null;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
@@ -33,6 +41,7 @@ export function EntityCard({
   imageUrl,
   Icon,
   onClick,
+  onMiddleClick,
   subtitle,
   isFavorite,
   onToggleFavorite,
@@ -60,7 +69,27 @@ export function EntityCard({
           />
         </button>
       )}
-      <button type="button" onClick={onClick} className="flex flex-col items-center gap-1 w-full">
+      <button
+        type="button"
+        onClick={onClick}
+        onMouseDown={(e) => {
+          // Click del medio (rueda, button === 1): evita el auto-scroll
+          // default del navegador y abre el panel flotante en pantalla
+          // completa en vez del comportamiento de click normal.
+          if (e.button === 1 && onMiddleClick) {
+            e.preventDefault();
+            onMiddleClick(e);
+          }
+        }}
+        onAuxClick={(e) => {
+          // Algunos navegadores disparan auxclick (no mousedown) para el
+          // botón del medio — prevenimos el default acá también.
+          if (e.button === 1 && onMiddleClick) {
+            e.preventDefault();
+          }
+        }}
+        className="flex flex-col items-center gap-1 w-full"
+      >
         <div className="w-full aspect-square rounded-xl overflow-hidden bg-primary/5 border border-primary/10 flex items-center justify-center group-hover/card:border-primary/25 transition-colors">
           {visual ? (
             visual

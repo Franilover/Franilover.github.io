@@ -41,6 +41,7 @@ import { MundoHomeContent } from "@/domains/garlia/_shared/MundoHomeContent";
 import { useCreateEntity } from "@/domains/garlia/_shared/useCreateEntity";
 import { useWikilinkNavigate } from "@/domains/garlia/_shared/useWikilinkNavigate";
 import { EntityTabBar } from "@/domains/garlia/_shared/EntityTabBar";
+import { FullscreenEntityPanel } from "@/domains/garlia/_shared/FullscreenEntityPanel";
 import { EnsayoGosScreen } from "@/domains/plataforma/puentes/EnsayoGosScreen";
 
 // ─── Code-splitting por página combinada ──────────────────────────────────
@@ -186,6 +187,7 @@ function EditorMundoInner() {
           </Suspense>
         </WikilinkProvider>
       </div>
+      <FullscreenEntityPanel />
     </div>
   );
 }

@@ -51,6 +51,7 @@ import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_sha
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { useRightClickDrag } from "@/domains/garlia/_shared/DragDropReasignable";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
+import { useFullscreenEntityPanel } from "@/domains/garlia/_shared/useFullscreenEntityPanelStore";
 import { BiomaPopoverContent } from "@/domains/garlia/biologia/BiomaPopoverContent";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PersonajePopoverContent } from "@/domains/garlia/personajes/PersonajePopoverContent";
@@ -196,6 +197,7 @@ interface Props {
 function NodoTitulo({
   label,
   onClick,
+  onMiddleClick,
   onCreate,
   variant = "ecosistema",
   maxWidthPx,
@@ -205,6 +207,9 @@ function NodoTitulo({
 }: {
   label: string;
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  /** Click con el botón del medio del mouse — abre el panel flotante en
+   *  pantalla completa (solo usado en chips de Criatura). Opcional. */
+  onMiddleClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onCreate?: () => void;
   variant?: "ecosistema" | "criatura" | "flora" | "mineral";
   maxWidthPx?: number;
@@ -226,6 +231,17 @@ function NodoTitulo({
       <button
         type="button"
         onClick={onClick}
+        onMouseDown={(e) => {
+          if (e.button === 1 && onMiddleClick) {
+            e.preventDefault();
+            onMiddleClick(e);
+          }
+        }}
+        onAuxClick={(e) => {
+          if (e.button === 1 && onMiddleClick) {
+            e.preventDefault();
+          }
+        }}
         title={dragProps?.title ?? label}
         style={maxWidthPx ? { maxWidth: maxWidthPx } : undefined}
         {...dragProps}
@@ -539,6 +555,12 @@ export function CriaturasJerarquica({
   const dragPersonaje = useRightClickDrag<string>({
     label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
   });
+  // Click del medio en una EntityCard de Personaje → abre el editor
+  // completo en un panel flotante a pantalla completa (por encima de esta
+  // vista, sin navegar fuera) en vez del popover minimalista del click
+  // normal — ver FullscreenEntityPanel, montado una sola vez en
+  // EditorMundoRoot.
+  const openFullscreen = useFullscreenEntityPanel((s) => s.open);
   // Arrastre (click derecho) de chips/cards de Ecosistema → se sueltan
   // sobre el título de un Bioma.
   const dragEcosistema = useRightClickDrag<string>({
@@ -764,6 +786,7 @@ export function CriaturasJerarquica({
                 onAsignarCriaturaAEcosistema ? dragCriatura.dragHandlers(criatura.id) : undefined
               }
               onClick={(e) => setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })}
+              onMiddleClick={() => openFullscreen("criatura", criatura)}
               onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
             />
             {!vacia && (
@@ -799,6 +822,7 @@ export function CriaturasJerarquica({
             onAsignarCriaturaAEcosistema ? dragCriatura.dragHandlers(criatura.id) : undefined
           }
           onClick={(e) => setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })}
+          onMiddleClick={() => openFullscreen("criatura", criatura)}
           onCreate={onCreatePersonaje ? () => onCreatePersonaje(criatura) : undefined}
         />
         {vacia ? (
@@ -819,6 +843,7 @@ export function CriaturasJerarquica({
                   onClick={(e) =>
                     setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
                   }
+                  onMiddleClick={() => openFullscreen("personaje", p)}
                 />
               </div>
             ))}
@@ -995,6 +1020,7 @@ export function CriaturasJerarquica({
                                 onClick={(e) =>
                                   setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
                                 }
+                                onMiddleClick={() => openFullscreen("personaje", p)}
                               />
                             </div>
                           ))}
@@ -1050,6 +1076,7 @@ export function CriaturasJerarquica({
                               onClick={(e) =>
                                 setCriaturaAbierta({ id: criatura.id, anchor: e.currentTarget })
                               }
+                              onMiddleClick={() => openFullscreen("criatura", criatura)}
                             />
                           </div>
                         ))}

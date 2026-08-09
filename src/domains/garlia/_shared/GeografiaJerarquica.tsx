@@ -58,6 +58,7 @@ import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "./GrupoFiltroDropdown
 import { BuscadorInline } from "./BuscadorInline";
 import { useRightClickDrag } from "./DragDropReasignable";
 import { PopoverFlotante } from "./PopoverFlotante";
+import { useFullscreenEntityPanel } from "./useFullscreenEntityPanelStore";
 import { BiomaPopoverContent } from "@/domains/garlia/biologia/BiomaPopoverContent";
 import { PersonajePopoverContent } from "@/domains/garlia/personajes/PersonajePopoverContent";
 import type { SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
@@ -362,6 +363,13 @@ export function GeografiaJerarquica({
     label: (id) => personajes.find((p) => p.id === id)?.nombre ?? "",
   });
 
+  // Click del medio en una EntityCard de Personaje → abre el editor
+  // completo en un panel flotante a pantalla completa (por encima de esta
+  // vista, sin navegar fuera) en vez del popover minimalista del click
+  // normal — ver FullscreenEntityPanel, montado una sola vez en
+  // EditorMundoRoot.
+  const openFullscreen = useFullscreenEntityPanel((s) => s.open);
+
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -662,6 +670,7 @@ export function GeografiaJerarquica({
                   onClick={(e) =>
                     setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
                   }
+                  onMiddleClick={() => openFullscreen("personaje", p)}
                 />
               </div>
             ))}
@@ -895,6 +904,7 @@ export function GeografiaJerarquica({
                             onClick={(e) =>
                               setPersonajeAbierto({ id: p.id, anchor: e.currentTarget })
                             }
+                            onMiddleClick={() => openFullscreen("personaje", p)}
                           />
                         </div>
                       ))}
