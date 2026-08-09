@@ -13,7 +13,7 @@
  */
 
 import { Atom, Beaker, Download, GitCompare, Loader2, Plus, Scale, Trash2, Upload, X } from "lucide-react";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
@@ -50,13 +50,36 @@ export function descargarDatosElementos(
     info_tabla_quimica: infoTabla,
     compuestos,
   };
+  descargarJSON(payload, "tabla-elementos");
+}
+
+// ─── Descarga: solo Elementos + Compuestos (sin las reglas) ───────────────
+function descargarElementosYCompuestos(elementos: Elemento[], compuestos: Compuesto[]) {
+  const payload = {
+    exportado_en: new Date().toISOString(),
+    elementos,
+    compuestos,
+  };
+  descargarJSON(payload, "elementos-compuestos");
+}
+
+// ─── Descarga: solo las reglas de la Química ───────────────────────────────
+function descargarReglas(infoTabla: SeccionInfoTablaQuimica[]) {
+  const payload = {
+    exportado_en: new Date().toISOString(),
+    info_tabla_quimica: infoTabla,
+  };
+  descargarJSON(payload, "reglas-quimica");
+}
+
+function descargarJSON(payload: unknown, nombreBase: string) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `tabla-elementos-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `${nombreBase}-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -405,6 +428,63 @@ function ReglasQuimica({
   );
 }
 
+// ─── Dropdown genérico para el botón "Descargar" ───────────────────────────
+// Botón icon-only que al hacer click despliega un menú con las opciones de
+// descarga. Se cierra al elegir una opción o al hacer click afuera.
+function DropdownDescargar({
+  opciones,
+}: {
+  opciones: { key: string; label: string; onClick: () => void }[];
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    function handleClickFuera(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setAbierto(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickFuera);
+    return () => document.removeEventListener("mousedown", handleClickFuera);
+  }, [abierto]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        title="Descargar datos"
+        className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+      >
+        <Download size={14} />
+      </button>
+
+      {abierto && (
+        <div
+          style={{ background: "var(--white-custom, var(--bg-main))" }}
+          className="absolute right-0 top-full mt-1 z-20 min-w-[10rem] rounded-md border border-primary/15 shadow-lg overflow-hidden"
+        >
+          {opciones.map((op) => (
+            <button
+              key={op.key}
+              type="button"
+              onClick={() => {
+                op.onClick();
+                setAbierto(false);
+              }}
+              className="w-full text-left px-2.5 py-1.5 text-micro font-black uppercase tracking-wide text-primary/60 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+            >
+              {op.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ElementosPage({
   elementos,
   loading,
@@ -687,14 +767,25 @@ export function ElementosPage({
             >
               <GitCompare size={14} />
             </button>
-            <button
-              type="button"
-              onClick={() => descargarDatosElementos(elementos, infoTabla.secciones, compuestos)}
-              title="Descargar todos los datos de la Tabla Química como JSON"
-              className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-            >
-              <Download size={14} />
-            </button>
+            <DropdownDescargar
+              opciones={[
+                {
+                  key: "todo",
+                  label: "Descargar todo",
+                  onClick: () => descargarDatosElementos(elementos, infoTabla.secciones, compuestos),
+                },
+                {
+                  key: "elementos-compuestos",
+                  label: "Elementos y Compuestos",
+                  onClick: () => descargarElementosYCompuestos(elementos, compuestos),
+                },
+                {
+                  key: "reglas",
+                  label: "Reglas",
+                  onClick: () => descargarReglas(infoTabla.secciones),
+                },
+              ]}
+            />
             {onImportarElementos && (
               <>
                 <input
