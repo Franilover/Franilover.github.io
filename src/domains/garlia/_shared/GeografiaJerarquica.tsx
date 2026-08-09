@@ -50,7 +50,7 @@
  *    onMoverPersonaje.
  */
 
-import { Compass, Plus, Users } from "lucide-react";
+import { ChevronDown, Compass, Plus, Users } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
 import { EntityCard } from "./EntityCard";
@@ -201,6 +201,93 @@ function NodoTitulo({
         >
           <Plus size={9} className="text-primary/60" />
         </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * AñadirDropdown
+ * ───────────────────────────────────────────────────────────────────────────
+ * Mismo patrón que el "+" de CriaturasJerarquica: un solo botón compacto
+ * ("+" con chevron) que despliega las opciones de creación de este nivel
+ * (Reino / Personaje sin reino) en un menú, en vez del botón largo con
+ * texto "Añadir reino" que había antes.
+ */
+function AñadirDropdown({
+  onCreateReino,
+  creatingReino,
+  onCreatePersonaje,
+}: {
+  onCreateReino?: () => void;
+  creatingReino?: boolean;
+  onCreatePersonaje?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  const opciones: {
+    key: string;
+    label: string;
+    Icon: React.ElementType;
+    onClick?: () => void;
+    creating?: boolean;
+  }[] = [
+    {
+      key: "reino",
+      label: "Añadir reino",
+      Icon: Compass,
+      onClick: onCreateReino,
+      creating: creatingReino,
+    },
+    {
+      key: "personaje",
+      label: "Añadir personaje",
+      Icon: Users,
+      onClick: onCreatePersonaje,
+    },
+  ].filter((o) => o.onClick);
+
+  if (opciones.length === 0) return null;
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="Añadir…"
+        className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-primary/70"
+      >
+        <Plus size={13} />
+        <ChevronDown size={10} className="shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-20 top-full right-0 mt-1 min-w-[180px] rounded-lg border border-primary/10 bg-[var(--card,_#1a1a1a)] shadow-lg overflow-hidden py-1">
+          {opciones.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              disabled={o.creating}
+              onClick={() => {
+                o.onClick?.();
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-1.5 text-left px-3 py-1.5 text-micro font-bold uppercase tracking-wide truncate transition-colors text-primary/70 hover:bg-primary/5 disabled:opacity-50"
+            >
+              <o.Icon size={11} className="shrink-0" />
+              {o.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -645,16 +732,12 @@ export function GeografiaJerarquica({
             onOpenGrupo={onOpenGrupo}
           />
         </div>
-        {onCreateReino && (
-          <button
-            type="button"
-            onClick={onCreateReino}
-            disabled={creatingReino}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-micro font-bold uppercase tracking-wide text-primary disabled:opacity-50"
-          >
-            <Plus size={11} />
-            Añadir reino
-          </button>
+        {(onCreateReino || onCreatePersonaje) && (
+          <AñadirDropdown
+            onCreateReino={onCreateReino}
+            creatingReino={creatingReino}
+            onCreatePersonaje={onCreatePersonaje ? () => onCreatePersonaje(null) : undefined}
+          />
         )}
       </div>
 
