@@ -3,22 +3,24 @@
 /**
  * FisicaPage.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Vista de la tab "Física" (Energías Universales), pensada para aprovechar
- * el espacio en bloques en vez de texto corrido de ensayo:
+ * Vista de la tab "Física" (Energías Universales).
  *
- *   1. Catálogos fijos (Partícula Base / Partículas / Iums) — constantes,
- *      referencia rápida, sin CRUD.
- *   2. Grid de Oris agrupado por familia (Mecánica/Energética/Biológica) —
- *      editable, con detalle inline al seleccionar uno (mismo patrón que
- *      ElementosPage/RunasPage).
- *   3. Conceptos (Vacío/Garin/Eterium, Manifestaciones, etc.) agrupados por
- *      bloque en tarjetas cortas — editable inline.
+ * Layout de 2 columnas fijas (reemplaza el panel modal flotante anterior):
+ *   - Columna izquierda: navegación — catálogos fijos (compactos), Oris
+ *     agrupados por familia y Conceptos agrupados por bloque, todo en una
+ *     lista scrolleable de filas clickeables.
+ *   - Columna derecha: editor de lo seleccionado (Oris o Concepto), fijo
+ *     y siempre visible junto a la lista — sin overlay ni modal, sin perder
+ *     contexto de qué más hay para editar.
+ *
+ * En mobile (breakpoint sm) colapsa a una sola columna: se ve la lista, y
+ * al seleccionar algo se reemplaza por el editor con un botón "volver".
  *
  * Todo el contenido variable (Oris, conceptos) vive en Supabase — tablas
  * "oris" y "fisica_conceptos", separadas de "elementos".
  */
 
-import { Atom, ChevronLeft, Download, Loader2, Plus, Trash2 } from "lucide-react";
+import { Atom, ChevronLeft, Download, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -54,10 +56,10 @@ interface Props {
   onActualizarConcepto: (id: string, cambios: Partial<FisicaConcepto>) => void;
 }
 
+/** Qué está activo en el editor de la columna derecha. */
+type Seleccion = { tipo: "oris"; id: string } | { tipo: "concepto"; id: string } | null;
+
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
-// Incluye los catálogos fijos (Partícula Base/Partículas/Iums, que no
-// tienen tabla propia) + los datos de Supabase (Oris, Conceptos), para
-// mandar el archivo completo y editar todo junto de una.
 function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
   const payload = {
     exportado_en: new Date().toISOString(),
@@ -80,35 +82,35 @@ function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
   URL.revokeObjectURL(url);
 }
 
-// ─── Bloque 1: catálogos fijos ─────────────────────────────────────────────
+// ─── Catálogos fijos, versión compacta para la columna angosta ────────────
 
-function CatalogoCard({ titulo, filas }: { titulo: string; filas: FilaCatalogo[] }) {
+function CatalogoCardMini({ titulo, filas }: { titulo: string; filas: FilaCatalogo[] }) {
   return (
-    <div className="rounded-lg border border-primary/10 overflow-hidden">
-      <div className="px-2 py-1 bg-primary/[0.04] border-b border-primary/10">
-        <p className="text-micro font-black uppercase tracking-widest text-primary/50">
+    <details className="rounded-lg border border-primary/10 overflow-hidden group">
+      <summary className="px-2 py-1.5 bg-primary/[0.04] cursor-pointer select-none flex items-center justify-between">
+        <span className="text-micro font-black uppercase tracking-widest text-primary/50">
           {titulo}
-        </p>
-      </div>
-      <div className="p-1.5 grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))" }}>
+        </span>
+        <span className="text-micro text-primary/30 group-open:rotate-90 transition-transform">
+          ›
+        </span>
+      </summary>
+      <div className="p-1.5 flex flex-col gap-1 border-t border-primary/10">
         {filas.map((f) => (
-          <div
-            key={f.nombre}
-            className="flex flex-col gap-0.5 px-1.5 py-1 rounded-md bg-primary/[0.02] border border-primary/5"
-          >
+          <div key={f.nombre} className="flex flex-col gap-0 px-1.5 py-1 rounded-md bg-primary/[0.02]">
             <span className="text-micro font-bold text-primary/80 truncate">{f.nombre}</span>
             <span className="text-micro text-primary/45 truncate">{f.detalle}</span>
             {f.extra && <span className="text-micro text-primary/35 truncate">{f.extra}</span>}
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }
 
-// ─── Bloque 2: grid de Oris ─────────────────────────────────────────────────
+// ─── Filas de navegación (columna izquierda) ───────────────────────────────
 
-function OrisCasilla({
+function OrisFila({
   oris,
   seleccionado,
   onClick,
@@ -121,15 +123,16 @@ function OrisCasilla({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
+      className={`flex flex-col items-stretch gap-0 px-2 py-1.5 rounded-md border text-left transition-colors ${
         seleccionado
-          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
-          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+          ? "border-primary/50 bg-primary/10"
+          : "border-transparent hover:bg-primary/5 hover:border-primary/15"
       }`}
     >
       <span className="text-micro font-black text-primary truncate">{oris.nombre}</span>
-      <span className="text-micro font-bold text-primary/45 truncate">{oris.formula}</span>
-      <span className="text-micro text-primary/35 truncate">{oris.dominio}</span>
+      <span className="text-micro text-primary/40 truncate">
+        {oris.formula} · {oris.dominio}
+      </span>
     </button>
   );
 }
@@ -147,19 +150,19 @@ function GrupoOrisPorFamilia({
 }) {
   const Icon = ORIS_FAMILIA_ICON[familia];
   return (
-    <div className="flex flex-col gap-1.5 min-w-0">
-      <div className="flex items-center gap-1.5 text-primary/40">
-        <Icon size={12} />
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <div className="flex items-center gap-1.5 text-primary/40 px-2 pt-1">
+        <Icon size={11} />
         <p className="text-micro font-black uppercase tracking-widest">{familia}</p>
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-0.5">
         {items.length === 0 ? (
-          <div className="py-3 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
+          <div className="mx-2 py-2 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
             Sin Oris
           </div>
         ) : (
           items.map((o) => (
-            <OrisCasilla
+            <OrisFila
               key={o.id}
               oris={o}
               seleccionado={o.id === activoId}
@@ -172,15 +175,7 @@ function GrupoOrisPorFamilia({
   );
 }
 
-// ─── Bloque 3: conceptos, agrupados por bloque; editables en modal ─────────
-
-/**
- * Casilla resumen: título + preview del contenido truncado. Ya no es
- * editable inline — al hacer click abre el detalle en el panel flotante
- * centrado (mismo patrón que Oris), para no perder el contexto de la
- * grilla al editar un texto largo.
- */
-function ConceptoCasilla({
+function ConceptoFila({
   concepto,
   seleccionado,
   onClick,
@@ -193,17 +188,17 @@ function ConceptoCasilla({
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-stretch gap-1 p-2 rounded-lg border text-left transition-colors ${
+      className={`flex flex-col items-stretch gap-0 px-2 py-1.5 rounded-md border text-left transition-colors ${
         seleccionado
-          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
-          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+          ? "border-primary/50 bg-primary/10"
+          : "border-transparent hover:bg-primary/5 hover:border-primary/15"
       }`}
     >
-      <span className="text-sm font-black text-primary/80 truncate">
+      <span className="text-micro font-black text-primary/80 truncate">
         {concepto.titulo || "Sin título"}
       </span>
-      <span className="text-sm text-primary/45 leading-relaxed line-clamp-2">
-        {concepto.contenido || "Sin contenido…"}
+      <span className="text-micro text-primary/40 truncate">
+        {concepto.contenido?.replace(/<[^>]+>/g, "").slice(0, 60) || "Sin contenido…"}
       </span>
     </button>
   );
@@ -225,9 +220,9 @@ function BloqueConceptos({
   agregandoConcepto?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-micro font-black uppercase tracking-widest text-primary/40">
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center justify-between gap-1 px-2 pt-1">
+        <p className="text-micro font-black uppercase tracking-widest text-primary/40 truncate">
           {bloque}
         </p>
         {onAgregarConcepto && (
@@ -236,23 +231,19 @@ function BloqueConceptos({
             disabled={agregandoConcepto}
             onClick={() => onAgregarConcepto(bloque)}
             title={`Añadir concepto en "${bloque}"`}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
           >
             {agregandoConcepto ? (
               <Loader2 className="animate-spin" size={9} />
             ) : (
-              <Plus size={9} />
+              <Plus size={10} />
             )}
-            <span className="hidden sm:inline">Concepto</span>
           </button>
         )}
       </div>
-      <div
-        className="grid gap-2"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
-      >
+      <div className="flex flex-col gap-0.5">
         {items.map((c) => (
-          <ConceptoCasilla
+          <ConceptoFila
             key={c.id}
             concepto={c}
             seleccionado={c.id === activoId}
@@ -265,10 +256,9 @@ function BloqueConceptos({
 }
 
 /**
- * Detalle editable de un concepto, para el panel flotante centrado.
- * Mismo patrón de header que OrisEditor/ElementoEditor (volver + guardado
- * al perder foco), pero sin fila de metadatos — un concepto es solo
- * título + contenido largo.
+ * Detalle editable de un concepto, para la columna derecha. Mismo patrón
+ * de header que OrisEditor (volver + guardado al perder foco / on change),
+ * pero sin fila de metadatos — un concepto es solo título + contenido.
  */
 function ConceptoEditor({
   concepto,
@@ -356,6 +346,18 @@ function ConceptoEditor({
   );
 }
 
+/** Estado vacío de la columna derecha cuando no hay nada seleccionado. */
+function EditorVacio() {
+  return (
+    <div className="flex-1 hidden sm:flex flex-col items-center justify-center gap-2 text-primary/25">
+      <Sparkles size={20} />
+      <p className="text-micro font-black uppercase tracking-widest">
+        Elegí un Oris o un Concepto para editar
+      </p>
+    </div>
+  );
+}
+
 // ─── Página principal ───────────────────────────────────────────────────────
 
 export function FisicaPage({
@@ -370,10 +372,15 @@ export function FisicaPage({
   loadingConceptos,
   onActualizarConcepto,
 }: Props) {
-  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
-  const [conceptoSeleccionadoId, setConceptoSeleccionadoId] = useState<string | null>(null);
+  const [seleccion, setSeleccion] = useState<Seleccion>(
+    seleccionarOrisId ? { tipo: "oris", id: seleccionarOrisId } : null,
+  );
   const [conceptosLocal, setConceptosLocal] = useState<FisicaConcepto[]>(conceptos);
   useEffect(() => setConceptosLocal(conceptos), [conceptos]);
+
+  useEffect(() => {
+    if (seleccionarOrisId) setSeleccion({ tipo: "oris", id: seleccionarOrisId });
+  }, [seleccionarOrisId]);
 
   const [agregandoConceptoDe, setAgregandoConceptoDe] = useState<string | null>(null);
   const [creandoSeccion, setCreandoSeccion] = useState(false);
@@ -393,7 +400,7 @@ export function FisicaPage({
       if (error) throw error;
       const nuevo = data as FisicaConcepto;
       setConceptosLocal((prev) => [...prev, nuevo]);
-      setConceptoSeleccionadoId(nuevo.id);
+      setSeleccion({ tipo: "concepto", id: nuevo.id });
     } catch (e) {
       console.error("[FisicaPage] error creando concepto:", e);
     } finally {
@@ -414,7 +421,7 @@ export function FisicaPage({
       if (error) throw error;
       const nuevo = data as FisicaConcepto;
       setConceptosLocal((prev) => [...prev, nuevo]);
-      setConceptoSeleccionadoId(nuevo.id);
+      setSeleccion({ tipo: "concepto", id: nuevo.id });
       setNuevaSeccionNombre("");
       setMostrarInputSeccion(false);
     } catch (e) {
@@ -437,12 +444,17 @@ export function FisicaPage({
     }
   }
 
-  const activoId = seleccionadoId ?? seleccionarOrisId ?? null;
-  const activo = useMemo(() => oris.find((o) => o.id === activoId) ?? null, [oris, activoId]);
+  const orisActivo = useMemo(
+    () => (seleccion?.tipo === "oris" ? oris.find((o) => o.id === seleccion.id) ?? null : null),
+    [oris, seleccion],
+  );
 
   const conceptoActivo = useMemo(
-    () => conceptosLocal.find((c) => c.id === conceptoSeleccionadoId) ?? null,
-    [conceptosLocal, conceptoSeleccionadoId],
+    () =>
+      seleccion?.tipo === "concepto"
+        ? conceptosLocal.find((c) => c.id === seleccion.id) ?? null
+        : null,
+    [conceptosLocal, seleccion],
   );
 
   const orisPorFamilia = useMemo(() => {
@@ -454,215 +466,184 @@ export function FisicaPage({
 
   const bloquesConceptos = useMemo(() => agruparPorBloque(conceptosLocal), [conceptosLocal]);
 
+  const hayAlgoSeleccionado = seleccion !== null;
+
   return (
-    <div className="flex-1 min-h-0 flex overflow-hidden relative">
-      <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+    <div className="flex-1 min-h-0 flex overflow-hidden">
+      {/* Columna izquierda: navegación. En mobile se oculta si hay algo
+          seleccionado, para dejarle todo el espacio al editor. */}
+      <div
+        className={`w-full sm:w-72 md:w-80 shrink-0 sm:flex flex-col min-h-0 border-r border-primary/10 ${
+          hayAlgoSeleccionado ? "hidden" : "flex"
+        }`}
+      >
+        <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-primary/10">
           <div className="flex items-center gap-1.5 text-primary/40">
             <Atom size={12} />
             <p className="text-micro font-black uppercase tracking-widest">
               Física · {oris.length} Oris
             </p>
           </div>
-          <div className="shrink-0 flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => descargarDatosFisica(oris, conceptosLocal)}
-              title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-            >
-              <Download size={10} />
-              <span className="hidden sm:inline">Descargar datos</span>
-            </button>
-            {onCreateOris && (
-              <button
-                type="button"
-                disabled={creatingOris}
-                onClick={onCreateOris}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {creatingOris ? <Loader2 className="animate-spin" size={10} /> : <Plus size={10} />}
-                Nuevo Oris
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => descargarDatosFisica(oris, conceptosLocal)}
+            title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
+            className="flex items-center justify-center w-6 h-6 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+          >
+            <Download size={11} />
+          </button>
         </div>
 
-        {/* Bloque 1: catálogos fijos */}
-        <div className="flex flex-col gap-2">
-          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-            Jerarquía · Partícula Base → Partículas → Ium → Oris
-          </p>
-          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
-            <CatalogoCard titulo="Partícula Base" filas={PARTICULAS_BASE} />
-            <CatalogoCard titulo="Partículas" filas={PARTICULAS} />
-            <CatalogoCard titulo="Iums" filas={IUMS} />
+        <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-3">
+          {/* Catálogos fijos — compactos, colapsables */}
+          <div className="flex flex-col gap-1">
+            <CatalogoCardMini titulo="Partícula Base" filas={PARTICULAS_BASE} />
+            <CatalogoCardMini titulo="Partículas" filas={PARTICULAS} />
+            <CatalogoCardMini titulo="Iums" filas={IUMS} />
           </div>
-        </div>
 
-        {/* Bloque 2: Oris por familia — 3 columnas lado a lado (Mecánica |
-            Energética | Biológica), cada una con sus Oris apilados
-            verticalmente adentro. En pantallas angostas colapsa a 1
-            columna para no aplastar el contenido. */}
-        <div className="flex flex-col gap-2">
-          {loadingOris && oris.length === 0 ? (
-            <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
-              {ORIS_FAMILIAS.map((familia) => (
+          {/* Oris por familia */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between px-1">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Oris
+              </p>
+              {onCreateOris && (
+                <button
+                  type="button"
+                  disabled={creatingOris}
+                  onClick={onCreateOris}
+                  title="Nuevo Oris"
+                  className="flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {creatingOris ? <Loader2 className="animate-spin" size={9} /> : <Plus size={10} />}
+                </button>
+              )}
+            </div>
+            {loadingOris && oris.length === 0 ? (
+              <div className="py-4 text-micro text-primary/30 text-center">Cargando…</div>
+            ) : (
+              ORIS_FAMILIAS.map((familia) => (
                 <GrupoOrisPorFamilia
                   key={familia}
                   familia={familia}
                   items={orisPorFamilia.get(familia) ?? []}
-                  activoId={activoId}
-                  onSeleccionar={(id) =>
-                    setSeleccionadoId((actual) => (actual === id ? null : id))
-                  }
+                  activoId={orisActivo?.id ?? null}
+                  onSeleccionar={(id) => setSeleccion({ tipo: "oris", id })}
                 />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Bloque 3: conceptos */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-              Conceptos
-            </p>
-            {mostrarInputSeccion ? (
-              <div className="flex items-center gap-1">
-                <input
-                  autoFocus
-                  value={nuevaSeccionNombre}
-                  onChange={(e) => setNuevaSeccionNombre(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleCrearSeccion();
-                    if (e.key === "Escape") {
-                      setMostrarInputSeccion(false);
-                      setNuevaSeccionNombre("");
-                    }
-                  }}
-                  placeholder="Nombre de la sección…"
-                  className="bg-primary/5 rounded-md px-2 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
-                />
-                <button
-                  type="button"
-                  disabled={creandoSeccion || !nuevaSeccionNombre.trim()}
-                  onClick={handleCrearSeccion}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {creandoSeccion ? <Loader2 className="animate-spin" size={9} /> : "Crear"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMostrarInputSeccion(false);
-                    setNuevaSeccionNombre("");
-                  }}
-                  className="px-1.5 py-0.5 rounded-md text-micro font-bold text-primary/40 hover:text-primary/70 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setMostrarInputSeccion(true)}
-                title="Añadir nueva sección de conceptos"
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-              >
-                <Plus size={10} />
-                <span className="hidden sm:inline">Nueva sección</span>
-              </button>
+              ))
             )}
           </div>
-          {loadingConceptos && conceptosLocal.length === 0 ? (
-            <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
-          ) : (
-            bloquesConceptos.map(({ bloque, items }) => (
-              <BloqueConceptos
-                key={bloque}
-                bloque={bloque}
-                items={items}
-                activoId={conceptoSeleccionadoId}
-                onSeleccionar={(id) =>
-                  setConceptoSeleccionadoId((actual) => (actual === id ? null : id))
-                }
-                onAgregarConcepto={handleAgregarConcepto}
-                agregandoConcepto={agregandoConceptoDe === bloque}
-              />
-            ))
-          )}
+
+          {/* Conceptos por bloque */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between px-1 gap-2">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Conceptos
+              </p>
+              {mostrarInputSeccion ? (
+                <div className="flex items-center gap-1 min-w-0">
+                  <input
+                    autoFocus
+                    value={nuevaSeccionNombre}
+                    onChange={(e) => setNuevaSeccionNombre(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCrearSeccion();
+                      if (e.key === "Escape") {
+                        setMostrarInputSeccion(false);
+                        setNuevaSeccionNombre("");
+                      }
+                    }}
+                    placeholder="Nombre…"
+                    className="w-full min-w-0 bg-primary/5 rounded px-1.5 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
+                  />
+                  <button
+                    type="button"
+                    disabled={creandoSeccion || !nuevaSeccionNombre.trim()}
+                    onClick={handleCrearSeccion}
+                    className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {creandoSeccion ? <Loader2 className="animate-spin" size={9} /> : "✓"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMostrarInputSeccion(false);
+                      setNuevaSeccionNombre("");
+                    }}
+                    className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMostrarInputSeccion(true)}
+                  title="Añadir nueva sección de conceptos"
+                  className="shrink-0 flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer"
+                >
+                  <Plus size={10} />
+                </button>
+              )}
+            </div>
+            {loadingConceptos && conceptosLocal.length === 0 ? (
+              <div className="py-4 text-micro text-primary/30 text-center">Cargando…</div>
+            ) : (
+              bloquesConceptos.map(({ bloque, items }) => (
+                <BloqueConceptos
+                  key={bloque}
+                  bloque={bloque}
+                  items={items}
+                  activoId={conceptoActivo?.id ?? null}
+                  onSeleccionar={(id) => setSeleccion({ tipo: "concepto", id })}
+                  onAgregarConcepto={handleAgregarConcepto}
+                  agregandoConcepto={agregandoConceptoDe === bloque}
+                />
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Panel flotante centrado: overlay clickeable + tarjeta con margen a
-          los lados (no ocupa toda la pantalla) para poder salir tocando
-          afuera sin sensación de estar atrapado. El grid queda debajo,
-          visible detrás del overlay. */}
-      {activo && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 md:p-12">
-          <div
-            className="absolute inset-0 bg-primary/10 backdrop-blur-sm"
-            onClick={() => setSeleccionadoId(null)}
+      {/* Columna derecha: editor fijo. En mobile ocupa toda la pantalla
+          cuando hay algo seleccionado; en desktop siempre está visible. */}
+      <div
+        className={`flex-1 min-h-0 flex-col min-w-0 ${hayAlgoSeleccionado ? "flex" : "hidden sm:flex"}`}
+      >
+        {orisActivo ? (
+          <OrisEditor
+            oris={orisActivo}
+            onBack={() => setSeleccion(null)}
+            onActualizar={onActualizarOris}
+            onEliminar={
+              onEliminarOris
+                ? (id) => {
+                    onEliminarOris(id);
+                    setSeleccion(null);
+                  }
+                : undefined
+            }
           />
-          <div
-            className="relative z-10 flex flex-col w-full max-w-xl max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] rounded-[var(--radius-card)] border shadow-2xl overflow-hidden"
-            style={{
-              background: "var(--white-custom, var(--bg-main))",
-              borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
+        ) : conceptoActivo ? (
+          <ConceptoEditor
+            concepto={conceptoActivo}
+            onBack={() => setSeleccion(null)}
+            onActualizar={(id, cambios) => {
+              setConceptosLocal((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+              );
+              onActualizarConcepto(id, cambios);
             }}
-          >
-            <OrisEditor
-              oris={activo}
-              onBack={() => setSeleccionadoId(null)}
-              onActualizar={onActualizarOris}
-              onEliminar={
-                onEliminarOris
-                  ? (id) => {
-                      onEliminarOris(id);
-                      setSeleccionadoId(null);
-                    }
-                  : undefined
-              }
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Panel flotante centrado del concepto — mismo patrón que el de
-          Oris arriba (overlay clickeable + tarjeta con margen). */}
-      {conceptoActivo && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 md:p-12">
-          <div
-            className="absolute inset-0 bg-primary/10 backdrop-blur-sm"
-            onClick={() => setConceptoSeleccionadoId(null)}
+            onEliminar={(id) => {
+              handleEliminarConcepto(id);
+              setSeleccion(null);
+            }}
           />
-          <div
-            className="relative z-10 flex flex-col w-full max-w-xl max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] rounded-[var(--radius-card)] border shadow-2xl overflow-hidden"
-            style={{
-              background: "var(--white-custom, var(--bg-main))",
-              borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
-            }}
-          >
-            <ConceptoEditor
-              concepto={conceptoActivo}
-              onBack={() => setConceptoSeleccionadoId(null)}
-              onActualizar={(id, cambios) => {
-                setConceptosLocal((prev) =>
-                  prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
-                );
-                onActualizarConcepto(id, cambios);
-              }}
-              onEliminar={(id) => {
-                handleEliminarConcepto(id);
-                setConceptoSeleccionadoId(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
+        ) : (
+          <EditorVacio />
+        )}
+      </div>
     </div>
   );
 }
