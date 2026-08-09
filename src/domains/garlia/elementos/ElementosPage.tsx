@@ -12,7 +12,7 @@
  * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
  */
 
-import { Atom, Beaker, Download, GitCompare, Info, Loader2, Pencil, Plus, Save, Trash2, Upload, X } from "lucide-react";
+import { Atom, Beaker, ChevronLeft, Download, GitCompare, Loader2, Pencil, Plus, Save, Scale, Trash2, Upload, X } from "lucide-react";
 import React, { useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
@@ -275,15 +275,17 @@ function ElementoCasilla({
   );
 }
 
-// ─── Info: reglas de la Tabla Química, editable desde Supabase ────────────
+// ─── Reglas: reglas de la Química, editable desde Supabase ────────────────
 // Solo lo propio de acá (estructura de capas, estabilidad/familias,
 // manifestaciones) — la jerarquía Partícula Base→Partículas→Iums y la
 // resonancia con Iums ya se explican en la sección Física, no se repiten.
 //
 // El contenido (lista de secciones título+texto) ya no está hardcodeado:
 // vive en la tabla `config_info_tabla_quimica` (useInfoTablaQuimica) y es
-// editable inline desde el propio modal con el botón de lápiz.
-function InfoTablaQuimica({
+// editable inline. Layout de 2 columnas (lista de secciones a la izquierda,
+// contenido/edición a la derecha), mismo patrón que la barra lateral de
+// FisicaPage.
+function ReglasQuimica({
   info,
   loading,
   guardarSecciones,
@@ -292,15 +294,10 @@ function InfoTablaQuimica({
   loading: boolean;
   guardarSecciones: (secciones: SeccionInfoTablaQuimica[]) => Promise<void>;
 }) {
-  const [abierto, setAbierto] = useState(false);
   const [editando, setEditando] = useState(false);
   const [saving, setSaving] = useState(false);
   const [borrador, setBorrador] = useState<SeccionInfoTablaQuimica[]>([]);
-
-  function abrir() {
-    setAbierto(true);
-    setEditando(false);
-  }
+  const [seccionActivaId, setSeccionActivaId] = useState<string | null>(null);
 
   function empezarEdicion() {
     setBorrador(info.secciones.map((s) => ({ ...s })));
@@ -341,154 +338,191 @@ function InfoTablaQuimica({
     ]);
   }
 
-  return (
-    <>
-      <button
-        type="button"
-        onClick={abrir}
-        title="Cómo funciona la Tabla Química"
-        className="shrink-0 flex items-center justify-center w-4 h-4 rounded-full border border-primary/25 text-primary/40 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer"
-      >
-        <Info size={10} />
-      </button>
+  const seccionActiva = useMemo(
+    () => info.secciones.find((s) => s.id === seccionActivaId) ?? null,
+    [info.secciones, seccionActivaId],
+  );
 
-      {abierto && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-8 md:p-12">
-          <div
-            className="absolute inset-0 bg-primary/10 backdrop-blur-sm"
-            onClick={() => setAbierto(false)}
-          />
-          <div
-            className="relative z-10 flex flex-col w-full max-w-lg max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] rounded-[var(--radius-card)] border shadow-2xl overflow-hidden"
-            style={{
-              background: "var(--white-custom, var(--bg-main))",
-              borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
-            }}
+  return (
+    <div className="flex-1 min-h-0 flex overflow-hidden">
+      {/* Columna izquierda: navegación — lista de secciones, mismo patrón
+          que la barra lateral de Física. En mobile se oculta si hay algo
+          seleccionado o se está editando. */}
+      <div
+        className={`w-full sm:w-56 md:w-60 shrink-0 sm:flex flex-col min-h-0 overflow-hidden border-r border-primary/10 ${
+          seccionActiva || editando ? "hidden" : "flex"
+        }`}
+      >
+        <div className="shrink-0 flex items-center justify-between px-2 py-1.5 border-b border-primary/10">
+          <div className="flex items-center gap-1 text-primary/40">
+            <Atom size={11} />
+            <p className="text-micro font-black uppercase tracking-widest">
+              Reglas · {info.secciones.length}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={empezarEdicion}
+            title="Editar reglas"
+            className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
           >
+            <Pencil size={10} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-1.5 flex flex-col gap-1.5">
+          {loading ? (
+            <div className="p-3 text-micro text-primary/30 text-center">Cargando…</div>
+          ) : info.secciones.length === 0 ? (
+            <p className="p-3 text-micro text-primary/30 text-center">
+              Todavía no hay reglas cargadas. Tocá el lápiz para agregarlas.
+            </p>
+          ) : (
+            info.secciones.map((seccion) => (
+              <button
+                key={seccion.id}
+                type="button"
+                onClick={() => setSeccionActivaId(seccion.id)}
+                className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors text-left ${
+                  seccionActivaId === seccion.id
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
+                }`}
+              >
+                <span className="text-micro font-black uppercase tracking-[0.2em]">
+                  {seccion.titulo || "Sin título"}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Columna derecha: contenido de la sección elegida, o el editor
+          completo de reglas. En mobile ocupa toda la pantalla cuando hay
+          algo seleccionado; en desktop siempre está visible. */}
+      <div
+        className={`flex-1 min-h-0 flex-col min-w-0 ${
+          seccionActiva || editando ? "flex" : "hidden sm:flex"
+        }`}
+      >
+        {editando ? (
+          <>
             <div
               style={{ background: "var(--bg-main)" }}
               className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
             >
-              <Info size={12} className="text-primary/40" />
+              <button
+                type="button"
+                onClick={cancelarEdicion}
+                className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer sm:hidden"
+              >
+                <ChevronLeft size={12} />
+              </button>
               <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary/70">
-                Cómo funciona la Tabla Química
+                Editando reglas
               </p>
+            </div>
 
-              {!editando && (
-                <button
-                  type="button"
-                  onClick={empezarEdicion}
-                  title="Editar contenido"
-                  className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+            <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto">
+              {borrador.map((seccion) => (
+                <div
+                  key={seccion.id}
+                  className="flex flex-col gap-1.5 p-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
                 >
-                  <Pencil size={11} />
-                </button>
-              )}
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      value={seccion.titulo}
+                      onChange={(e) =>
+                        actualizarSeccion(seccion.id, { titulo: e.target.value })
+                      }
+                      placeholder="Título de la sección"
+                      className="flex-1 min-w-0 bg-primary/5 rounded-md px-2 py-1 text-micro font-black uppercase tracking-wide text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => eliminarSeccion(seccion.id)}
+                      title="Eliminar sección"
+                      className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                  <textarea
+                    value={seccion.contenido}
+                    onChange={(e) =>
+                      actualizarSeccion(seccion.id, { contenido: e.target.value })
+                    }
+                    placeholder="Contenido…"
+                    rows={4}
+                    className="bg-primary/5 rounded-md px-2 py-1.5 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25 leading-relaxed"
+                  />
+                </div>
+              ))}
 
               <button
                 type="button"
-                onClick={() => setAbierto(false)}
-                className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+                onClick={agregarSeccion}
+                className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
               >
-                <X size={12} />
+                <Plus size={10} />
+                Agregar sección
               </button>
             </div>
 
-            {loading ? (
-              <div className="p-6 text-micro text-primary/30 text-center">Cargando…</div>
-            ) : editando ? (
-              <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto">
-                {borrador.map((seccion) => (
-                  <div
-                    key={seccion.id}
-                    className="flex flex-col gap-1.5 p-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        value={seccion.titulo}
-                        onChange={(e) =>
-                          actualizarSeccion(seccion.id, { titulo: e.target.value })
-                        }
-                        placeholder="Título de la sección"
-                        className="flex-1 min-w-0 bg-primary/5 rounded-md px-2 py-1 text-micro font-black uppercase tracking-wide text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => eliminarSeccion(seccion.id)}
-                        title="Eliminar sección"
-                        className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                    <textarea
-                      value={seccion.contenido}
-                      onChange={(e) =>
-                        actualizarSeccion(seccion.id, { contenido: e.target.value })
-                      }
-                      placeholder="Contenido…"
-                      rows={4}
-                      className="bg-primary/5 rounded-md px-2 py-1.5 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25 leading-relaxed"
-                    />
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={agregarSeccion}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/40 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
-                >
-                  <Plus size={10} />
-                  Agregar sección
-                </button>
-              </div>
-            ) : (
-              <div className="flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-y-auto text-micro text-primary/70 leading-relaxed">
-                {info.secciones.length === 0 ? (
-                  <p className="text-primary/30 text-center py-4">
-                    Todavía no hay contenido cargado. Tocá el lápiz para agregarlo.
-                  </p>
-                ) : (
-                  info.secciones.map((seccion) => (
-                    <div key={seccion.id} className="flex flex-col gap-1">
-                      <p className="font-black uppercase tracking-[0.2em] text-primary/40">
-                        {seccion.titulo}
-                      </p>
-                      <p className="whitespace-pre-line">{seccion.contenido}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-
-            {editando && (
-              <div
-                style={{ background: "var(--bg-main)" }}
-                className="shrink-0 flex items-center justify-end gap-1.5 px-2.5 py-1.5 border-t border-primary/10"
+            <div
+              style={{ background: "var(--bg-main)" }}
+              className="shrink-0 flex items-center justify-end gap-1.5 px-2.5 py-1.5 border-t border-primary/10"
+            >
+              <button
+                type="button"
+                onClick={cancelarEdicion}
+                disabled={saving}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50"
               >
-                <button
-                  type="button"
-                  onClick={cancelarEdicion}
-                  disabled={saving}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={guardar}
-                  disabled={saving}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer"
-                >
-                  {saving ? <Loader2 className="animate-spin" size={10} /> : <Save size={10} />}
-                  {saving ? "…" : "Guardar"}
-                </button>
-              </div>
-            )}
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={guardar}
+                disabled={saving}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? <Loader2 className="animate-spin" size={10} /> : <Save size={10} />}
+                {saving ? "…" : "Guardar"}
+              </button>
+            </div>
+          </>
+        ) : seccionActiva ? (
+          <>
+            <div
+              style={{ background: "var(--bg-main)" }}
+              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+            >
+              <button
+                type="button"
+                onClick={() => setSeccionActivaId(null)}
+                className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer sm:hidden"
+              >
+                <ChevronLeft size={12} />
+              </button>
+              <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary">
+                {seccionActiva.titulo || "Sin título"}
+              </p>
+            </div>
+            <div className="flex-1 min-h-0 p-3 overflow-y-auto text-micro text-primary/70 leading-relaxed whitespace-pre-line">
+              {seccionActiva.contenido || (
+                <span className="text-primary/30">Sin contenido.</span>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 min-h-0 hidden sm:flex items-center justify-center text-micro text-primary/30 text-center px-6">
+            Elegí una regla de la lista para ver su contenido.
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -598,8 +632,9 @@ export function ElementosPage({
     guardarSecciones,
   } = useInfoTablaQuimica();
 
-  // ── Compuestos: sub-tab hermana de Elementos, mismo bloque "Tabla" ──────
-  const [subTab, setSubTab] = useState<"elementos" | "compuestos">("elementos");
+  // ── Compuestos / Reglas: sub-tabs hermanas de Elementos, mismo bloque
+  // "Química" ───────────────────────────────────────────────────────────
+  const [subTab, setSubTab] = useState<"elementos" | "compuestos" | "reglas">("elementos");
   const {
     items: compuestos,
     setItems: setCompuestos,
@@ -681,6 +716,19 @@ export function ElementosPage({
     [vista, elementosFiltrados],
   );
 
+  if (subTab === "reglas") {
+    return (
+      <div className="flex-1 min-h-0 flex flex-col">
+        <SubTabsElementos subTab={subTab} onCambiar={setSubTab} />
+        <ReglasQuimica
+          info={infoTabla}
+          loading={loadingInfoTabla}
+          guardarSecciones={guardarSecciones}
+        />
+      </div>
+    );
+  }
+
   if (subTab === "compuestos") {
     return (
       <div className="flex-1 min-h-0 flex flex-col">
@@ -710,11 +758,6 @@ export function ElementosPage({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-primary/40">
             <Atom size={12} />
-            <InfoTablaQuimica
-              info={infoTabla}
-              loading={loadingInfoTabla}
-              guardarSecciones={guardarSecciones}
-            />
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
             <div className="flex items-center rounded-md border border-primary/15 overflow-hidden">
@@ -954,16 +997,17 @@ export function ElementosPage({
   );
 }
 
-// ─── Sub-tabs "Elementos" / "Compuestos" ───────────────────────────────────
-// Mini toggle propio del bloque Tabla, independiente del toggle grande
-// Sistema/Runas/Tabla/Física de RunasPage. Compuestos combina elementos de
-// esta misma tabla, así que vive como pestaña hermana acá adentro.
+// ─── Sub-tabs "Elementos" / "Compuestos" / "Reglas" ────────────────────────
+// Mini toggle propio del bloque Química, independiente del toggle grande
+// Sistema/Runas/Química/Física de RunasPage. Compuestos combina elementos de
+// esta misma tabla, y Reglas explica cómo funciona todo — ambas viven como
+// pestañas hermanas acá adentro.
 function SubTabsElementos({
   subTab,
   onCambiar,
 }: {
-  subTab: "elementos" | "compuestos";
-  onCambiar: (tab: "elementos" | "compuestos") => void;
+  subTab: "elementos" | "compuestos" | "reglas";
+  onCambiar: (tab: "elementos" | "compuestos" | "reglas") => void;
 }) {
   return (
     <div className="shrink-0 flex items-center gap-1 px-3 pt-2">
@@ -971,6 +1015,7 @@ function SubTabsElementos({
         [
           { key: "elementos" as const, label: "Elementos", Icon: Atom },
           { key: "compuestos" as const, label: "Compuestos", Icon: Beaker },
+          { key: "reglas" as const, label: "Reglas", Icon: Scale },
         ]
       ).map(({ key, label, Icon }) => {
         const activo = subTab === key;
