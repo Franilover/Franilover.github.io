@@ -249,17 +249,23 @@ function CatalogoView({
         </p>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 grid grid-cols-1 lg:grid-cols-3 gap-2.5 items-start">
-        {filas.map((f) => (
-          <div
-            key={f.nombre}
-            className="flex flex-col gap-1 px-3 py-2.5 rounded-lg border border-primary/10 bg-primary/[0.02]"
-          >
-            <span className="text-sm font-black text-primary">{f.nombre}</span>
-            <span className="text-micro text-primary/60">{f.detalle}</span>
-            {f.extra && <span className="text-micro text-primary/40">{f.extra}</span>}
-          </div>
-        ))}
+      <div className="min-h-0 overflow-y-auto p-2.5">
+        <div
+          className={`grid grid-cols-1 sm:grid-cols-2 gap-2 content-start ${
+            catalogo === "particula-base" ? "lg:grid-cols-3" : "lg:grid-cols-4"
+          }`}
+        >
+          {filas.map((f) => (
+            <div
+              key={f.nombre}
+              className="flex flex-col gap-1 px-2.5 py-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
+            >
+              <span className="text-micro font-black text-primary">{f.nombre}</span>
+              <span className="text-xs text-primary/60 leading-snug">{f.detalle}</span>
+              {f.extra && <span className="text-xs text-primary/40 leading-snug">{f.extra}</span>}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
