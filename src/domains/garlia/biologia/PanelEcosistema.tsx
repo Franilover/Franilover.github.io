@@ -522,7 +522,3 @@ export function PanelEcosistema({
     </div>
   );
 }
-      </div>
-    </div>
-  );
-}
