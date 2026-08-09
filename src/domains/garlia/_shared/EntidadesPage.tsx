@@ -968,12 +968,12 @@ export function EntidadesPage({ section, selectedId }: Props) {
           creatingEcosistema={creatingEco}
           onCreateEcosistema={async () => {
             const nuevo = await crearEcosistema("Nuevo ecosistema");
-            if (nuevo?.id) openEntity("ecosistemas", nuevo.id);
+            return nuevo?.id ?? null;
           }}
           creatingBioma={creatingBiomas}
           onCreateBioma={async () => {
             const nuevo = await crearBioma("Nuevo bioma");
-            if (nuevo?.id) openEntity("biomas", nuevo.id);
+            return nuevo?.id ?? null;
           }}
           creatingFlora={creatingFlora}
           onCreateFlora={async () => {

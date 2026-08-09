@@ -133,12 +133,14 @@ interface Props {
   onMoverPersonaje?: (personajeId: string, criaturaNombre: string | null) => void;
   /** Crea un ecosistema nuevo — botón junto a "Añadir criatura", para
    *  manejar ecosistemas sin salir de esta vista (antes solo se podían
-   *  crear desde Magia → Biología). */
-  onCreateEcosistema?: () => void;
+   *  crear desde Magia → Biología). Devuelve el id creado (o null si
+   *  falló) para que este componente abra su popover de edición anclado
+   *  al botón que disparó la acción, en vez de navegar a pantalla completa. */
+  onCreateEcosistema?: () => Promise<string | null> | string | null | void;
   creatingEcosistema?: boolean;
   /** Crea un Bioma nuevo — botón junto a "Añadir ecosistema", mismo criterio
-   *  de atajo sin salir de esta vista. */
-  onCreateBioma?: () => void;
+   *  de atajo sin salir de esta vista. Mismo contrato que onCreateEcosistema. */
+  onCreateBioma?: () => Promise<string | null> | string | null | void;
   creatingBioma?: boolean;
   /** Crea una entidad de Flora nueva — botón junto a "Añadir ecosistema",
    *  misma lógica: no se agrupa jerárquicamente acá, solo un atajo para no
@@ -245,9 +247,9 @@ function AñadirDropdown({
 }: {
   onCreateCriatura?: () => void;
   creatingCriatura?: boolean;
-  onCreateBioma?: () => void;
+  onCreateBioma?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   creatingBioma?: boolean;
-  onCreateEcosistema?: () => void;
+  onCreateEcosistema?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   creatingEcosistema?: boolean;
   onCreateFlora?: () => void;
   creatingFlora?: boolean;
@@ -270,7 +272,7 @@ function AñadirDropdown({
     key: string;
     label: string;
     Icon: React.ElementType;
-    onClick?: () => void;
+    onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     creating?: boolean;
   }[] = [
     {
@@ -330,8 +332,8 @@ function AñadirDropdown({
               key={o.key}
               type="button"
               disabled={o.creating}
-              onClick={() => {
-                o.onClick?.();
+              onClick={(e) => {
+                o.onClick?.(e);
                 setOpen(false);
               }}
               className="w-full flex items-center gap-1.5 text-left px-3 py-1.5 text-micro font-bold uppercase tracking-wide truncate transition-colors text-primary/70 hover:bg-primary/5 disabled:opacity-50"
@@ -461,6 +463,21 @@ export function CriaturasJerarquica({
   const [biomaAbierto, setBiomaAbierto] = useState<{ id: string; anchor: HTMLElement } | null>(
     null,
   );
+
+  // Envuelven las props onCreateBioma/onCreateEcosistema (que crean la
+  // entidad y devuelven su id) para además abrir el popover de edición
+  // anclado al botón "Añadir…" que disparó la acción, en vez de navegar a
+  // pantalla completa.
+  const handleCreateBioma = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    const anchor = e.currentTarget;
+    const resultado = await onCreateBioma?.();
+    if (resultado) setBiomaAbierto({ id: resultado, anchor });
+  };
+  const handleCreateEcosistema = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    const anchor = e.currentTarget;
+    const resultado = await onCreateEcosistema?.();
+    if (resultado) setEcosistemaAbierto({ id: resultado, anchor });
+  };
 
   // Arrastre (click derecho) de chips de Criatura → se sueltan sobre una
   // card de Ecosistema en modo "ojo apagado".
@@ -863,9 +880,9 @@ export function CriaturasJerarquica({
         <AñadirDropdown
           onCreateCriatura={onCreateCriatura}
           creatingCriatura={creatingCriatura}
-          onCreateEcosistema={onCreateEcosistema}
+          onCreateEcosistema={handleCreateEcosistema}
           creatingEcosistema={creatingEcosistema}
-          onCreateBioma={onCreateBioma}
+          onCreateBioma={handleCreateBioma}
           creatingBioma={creatingBioma}
           onCreateFlora={onCreateFlora}
           creatingFlora={creatingFlora}
