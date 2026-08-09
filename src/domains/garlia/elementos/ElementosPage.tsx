@@ -12,8 +12,8 @@
  * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
  */
 
-import { Atom, Beaker, Download, GitCompare, Info, Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { Atom, Beaker, Download, GitCompare, Info, Loader2, Pencil, Plus, Save, Trash2, Upload, X } from "lucide-react";
+import React, { useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 
@@ -63,6 +63,75 @@ export function descargarDatosElementos(
   URL.revokeObjectURL(url);
 }
 
+// ─── Subida: leer un JSON con el mismo formato exportado y devolver los ───
+// elementos nuevos listos para insertar. No toca Supabase directamente —
+// eso lo hace el caller (ElementosSection), mismo espíritu que onCreate:
+// esta función solo parsea/valida el archivo del usuario.
+//
+// Reglas de importación:
+// - Solo se leen los campos válidos de Elemento (se ignora "id" si viene,
+//   porque Supabase genera uno nuevo — igual que handleCreate en
+//   ElementosSection, que tampoco manda id).
+// - "numero_atomico" es obligatorio y debe ser único frente a lo ya
+//   cargado en la tabla (evita pisar el elemento equivocado sin darse
+//   cuenta al importar un lote como el de este chat).
+// - Si el archivo trae "info_tabla_quimica" o "compuestos" se devuelven
+//   también, sueltos, para que el caller decida si los sube.
+export interface ImportacionElementos {
+  elementosNuevos: Omit<Elemento, "id">[];
+  duplicados: { numero_atomico: number; nombre: string }[];
+  infoTablaQuimica?: SeccionInfoTablaQuimica[];
+  compuestos?: Compuesto[];
+}
+
+export function parsearArchivoElementosJSON(
+  raw: string,
+  elementosExistentes: Elemento[],
+): ImportacionElementos {
+  const data = JSON.parse(raw);
+  const lista: unknown[] = Array.isArray(data) ? data : Array.isArray(data?.elementos) ? data.elementos : null;
+  if (!lista) {
+    throw new Error('El JSON debe ser un arreglo de elementos, o un objeto con la clave "elementos".');
+  }
+
+  const numerosExistentes = new Set(elementosExistentes.map((e) => e.numero_atomico));
+  const elementosNuevos: Omit<Elemento, "id">[] = [];
+  const duplicados: { numero_atomico: number; nombre: string }[] = [];
+
+  for (const raw of lista) {
+    const e = raw as Partial<Elemento>;
+    if (typeof e.numero_atomico !== "number" || !e.nombre || !e.simbolo || !e.familia) {
+      throw new Error(
+        `Elemento inválido (falta numero_atomico, nombre, simbolo o familia): ${JSON.stringify(e).slice(0, 120)}`,
+      );
+    }
+    if (numerosExistentes.has(e.numero_atomico)) {
+      duplicados.push({ numero_atomico: e.numero_atomico, nombre: e.nombre });
+      continue;
+    }
+    numerosExistentes.add(e.numero_atomico); // también evita duplicados dentro del propio archivo
+    elementosNuevos.push({
+      numero_atomico: e.numero_atomico,
+      nombre: e.nombre,
+      simbolo: e.simbolo,
+      familia: e.familia,
+      es_noble: e.es_noble ?? false,
+      notas: e.notas ?? null,
+      nucleo: e.nucleo ?? {},
+      media: e.media ?? {},
+      externa: e.externa ?? {},
+      es_catalizador: e.es_catalizador ?? false,
+    });
+  }
+
+  return {
+    elementosNuevos,
+    duplicados,
+    infoTablaQuimica: Array.isArray(data?.info_tabla_quimica) ? data.info_tabla_quimica : undefined,
+    compuestos: Array.isArray(data?.compuestos) ? data.compuestos : undefined,
+  };
+}
+
 interface Props {
   elementos: Elemento[];
   loading?: boolean;
@@ -72,6 +141,13 @@ interface Props {
   onEliminar?: (id: string) => void;
   /** Id a dejar seleccionado tras crear (mismo patrón que runaRecienCreadaId). */
   seleccionarId?: string | null;
+  /**
+   * Inserta en Supabase un lote de elementos nuevos (sin id) y devuelve
+   * cuántos quedaron guardados. El botón "Subir JSON" llama a esto tras
+   * parsear el archivo — mismo espíritu que onCreate pero para varios a
+   * la vez.
+   */
+  onImportarElementos?: (elementos: Omit<Elemento, "id">[]) => Promise<number>;
 }
 
 // ─── Grupo (columna) tipo tabla periódica real ─────────────────────────────
@@ -412,9 +488,47 @@ export function ElementosPage({
   onActualizar,
   onEliminar,
   seleccionarId,
+  onImportarElementos,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [comparadorAbierto, setComparadorAbierto] = useState(false);
+  const inputArchivoRef = useRef<HTMLInputElement>(null);
+  const [importando, setImportando] = useState(false);
+  const [mensajeImportacion, setMensajeImportacion] = useState<string | null>(null);
+
+  async function handleArchivoSeleccionado(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    e.target.value = ""; // permite volver a elegir el mismo archivo si se reintenta
+    if (!archivo || !onImportarElementos) return;
+
+    setImportando(true);
+    setMensajeImportacion(null);
+    try {
+      const texto = await archivo.text();
+      const { elementosNuevos, duplicados } = parsearArchivoElementosJSON(texto, elementos);
+
+      if (elementosNuevos.length === 0) {
+        setMensajeImportacion(
+          duplicados.length > 0
+            ? `Los ${duplicados.length} elementos del archivo ya existen (mismo número atómico) — no se subió nada.`
+            : "El archivo no traía elementos nuevos.",
+        );
+        return;
+      }
+
+      const insertados = await onImportarElementos(elementosNuevos);
+      const partes = [`${insertados} elemento${insertados === 1 ? "" : "s"} nuevo${insertados === 1 ? "" : "s"} subido${insertados === 1 ? "" : "s"}.`];
+      if (duplicados.length > 0) {
+        partes.push(`${duplicados.length} se saltaron por número atómico repetido.`);
+      }
+      setMensajeImportacion(partes.join(" "));
+    } catch (err) {
+      console.error("[ElementosPage] error importando JSON:", err);
+      setMensajeImportacion(err instanceof Error ? `Error: ${err.message}` : "Error al leer el archivo.");
+    } finally {
+      setImportando(false);
+    }
+  }
   const {
     info: infoTabla,
     loading: loadingInfoTabla,
@@ -598,6 +712,27 @@ export function ElementosPage({
               <Download size={10} />
               <span className="hidden sm:inline">Descargar datos</span>
             </button>
+            {onImportarElementos && (
+              <>
+                <input
+                  ref={inputArchivoRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={handleArchivoSeleccionado}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={importando}
+                  onClick={() => inputArchivoRef.current?.click()}
+                  title='Subir un JSON con elementos nuevos (mismo formato que "Descargar datos")'
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}
+                  <span className="hidden sm:inline">Subir JSON</span>
+                </button>
+              </>
+            )}
             {onCreate && (
               <button
                 type="button"
@@ -611,6 +746,20 @@ export function ElementosPage({
             )}
           </div>
         </div>
+
+        {mensajeImportacion && (
+          <div className="text-micro text-primary/60 bg-primary/5 border border-primary/15 rounded-md px-2 py-1.5 flex items-center justify-between gap-2">
+            <span>{mensajeImportacion}</span>
+            <button
+              type="button"
+              onClick={() => setMensajeImportacion(null)}
+              className="text-primary/30 hover:text-primary/60 cursor-pointer shrink-0"
+              title="Cerrar"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        )}
 
         {loading && elementos.length === 0 ? (
           <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>

@@ -69,6 +69,17 @@ export function ElementosSection({ selectedId }: { selectedId: string | null }) 
     }
   }
 
+  // Inserta un lote de elementos ya parseados/validados por ElementosPage
+  // (parsearArchivoElementosJSON) — mismo insert que handleCreate pero con
+  // varias filas a la vez, para el botón "Subir JSON".
+  async function handleImportarElementos(nuevos: Omit<Elemento, "id">[]) {
+    const { data, error } = await supabase.from("elementos").insert(nuevos).select();
+    if (error) throw error;
+    const insertados = (data ?? []) as Elemento[];
+    setElementos((prev) => [...prev, ...insertados]);
+    return insertados.length;
+  }
+
   return (
     <ElementosPage
       elementos={elementos}
@@ -80,6 +91,7 @@ export function ElementosSection({ selectedId }: { selectedId: string | null }) 
       }
       onEliminar={handleEliminar}
       seleccionarId={selectedId ?? recienCreadoId}
+      onImportarElementos={handleImportarElementos}
     />
   );
 }
