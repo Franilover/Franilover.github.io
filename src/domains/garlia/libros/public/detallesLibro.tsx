@@ -54,6 +54,7 @@ interface Libro {
   portada_url: string;
   categoria: string | null;
   trigger_warnings?: string[] | null;
+  [key: string]: unknown;
 }
 
 interface Personaje {
