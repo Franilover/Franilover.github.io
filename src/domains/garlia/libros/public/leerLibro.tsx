@@ -998,7 +998,23 @@ export default function Lector({
             .where("libro_id")
             .equals(libroId)
             .toArray()) as any[];
-          const capsCached = cached.filter((c) => !c.deleted);
+          // Mismo filtro de seguridad que aplicarCaps: la tabla Dexie
+          // `capitulos` es compartida con el editor, así que puede tener
+          // capítulos ocultos o programados-a-futuro cacheados localmente.
+          // Si no filtramos acá, se ven todos por un instante al recargar
+          // y luego "desaparecen" cuando llega el fetch fresco (paso 3).
+          const ahoraCache = new Date();
+          const capsCached = cached.filter((c) => {
+            if (c.deleted) return false;
+            const vis = c.visibilidad ?? "publico";
+            if (vis === "oculto") return false;
+            if (vis === "publico") return true;
+            if (vis === "programado") {
+              if (!c.fecha_publicacion) return false;
+              return new Date(c.fecha_publicacion) <= ahoraCache;
+            }
+            return false;
+          });
           if (capsCached.length > 0) {
             aplicarCaps(capsCached, libroId, esExtraLocal, actualSlug);
             const contenidoCacheado: Record<string, string> = {};
@@ -1028,6 +1044,7 @@ export default function Lector({
         titulo_capitulo: string;
         fecha_publicacion: string;
         dia_absoluto: number | null;
+        visibilidad: string;
         personajes_ids: string[];
         reinos_ids: string[] | null;
         ciudades_ids: string[] | null;
@@ -1065,6 +1082,7 @@ export default function Lector({
         // Sin `contenido` a propósito — ver comentario del select de arriba.
         fecha_publicacion: c.fecha_publicacion,
         dia_absoluto: c.dia_absoluto,
+        visibilidad: c.visibilidad,
         personajes_ids: c.personajes_ids,
         reinos_ids: c.reinos_ids ?? [],
         ciudades_ids: c.ciudades_ids ?? [],
