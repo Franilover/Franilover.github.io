@@ -235,7 +235,7 @@ function DiagramaCladograma({
               transform={`translate(${n.x}, ${n.y})`}
               onClick={() => onSelect(n.clado.id)}
               className={siendoArrastrado ? "cursor-grabbing" : "cursor-grab"}
-              draggable
+              {...{ draggable: true }}
               onDragStart={(e) => {
                 e.stopPropagation();
                 setArrastrandoId(n.clado.id);
