@@ -315,6 +315,26 @@ const PanelEditor = ({
   const lastSnapshotAtRef = useRef<number>(0);
   const SNAPSHOT_MIN_INTERVAL_MS = 5 * 60_000;
 
+  // ── Lock de guardado en curso + valor pendiente ─────────────────────────
+  // Bug que resuelve: "a veces guarda antes y borra lo último que escribí".
+  // Con un debounce ingenuo de tiempo fijo (clearTimeout + setTimeout), si
+  // doSave(valA) tarda en resolver (red lenta) y mientras tanto el usuario
+  // sigue tipeando, el siguiente debounce puede disparar doSave(valB) EN
+  // PARALELO. El orden en que esas dos promesas resuelven no está
+  // garantizado — si doSave(valA) resuelve DESPUÉS de doSave(valB), su
+  // setCap(...contenido: valA) pisa el contenido más nuevo (valB) con uno
+  // viejo, y el usuario ve desaparecer lo último que escribió.
+  //
+  // Solución: un lock (isSavingRef) que impide que dos doSave corran a la
+  // vez. Si llega contenido nuevo mientras hay un guardado en curso, se
+  // guarda solo en pendingValueRef (no dispara un doSave nuevo); al
+  // terminar el guardado en curso, si quedó un valor pendiente más nuevo
+  // que el que se acaba de guardar, se dispara automáticamente ese
+  // guardado — sin esperar otro debounce completo, así no se demora la
+  // persistencia real más de lo necesario.
+  const isSavingRef = useRef(false);
+  const pendingValueRef = useRef<string | null>(null);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -411,6 +431,17 @@ const PanelEditor = ({
         return;
       }
 
+      // GUARD 3 (lock): ya hay un guardado en curso — en vez de disparar
+      // un segundo doSave en paralelo (la causa real de la pérdida de
+      // texto: dos guardados corriendo a la vez cuyo orden de resolución
+      // no está garantizado), dejamos este valor como "pendiente" y
+      // salimos. El guardado en curso, al terminar, revisa
+      // pendingValueRef y se re-dispara solo si quedó algo más nuevo.
+      if (isSavingRef.current) {
+        pendingValueRef.current = val;
+        return;
+      }
+
       // GUARD 2: contenido vacío que reemplazaría contenido previo NO
       // vacío es la firma exacta del bug de carga-lenta-borra-todo. No lo
       // bloqueamos silenciosamente (el usuario puede legítimamente querer
@@ -431,6 +462,7 @@ const PanelEditor = ({
         return;
       }
 
+      isSavingRef.current = true;
       setSaveStatus("saving");
       draft.save(val);
 
@@ -462,22 +494,41 @@ const PanelEditor = ({
           void capGuardarVersion(capId, val).catch(() => {});
         }
         const stillOnline = await isReallyOnline();
-        setSaveStatus(stillOnline ? "saved" : "pending");
-        if (stillOnline)
-          setTimeout(() => {
-            if (isMountedRef.current) setSaveStatus("idle");
-          }, 2500);
+        // Si no quedó un guardado pendiente más nuevo (ver finally más
+        // abajo), recién ahí es seguro mostrar "saved" — si hay uno
+        // pendiente, ese va a re-disparar doSave y actualizar el status él
+        // mismo, así que mostrar "saved" acá sería un parpadeo falso.
+        if (!pendingValueRef.current) {
+          setSaveStatus(stillOnline ? "saved" : "pending");
+          if (stillOnline)
+            setTimeout(() => {
+              if (isMountedRef.current) setSaveStatus("idle");
+            }, 2500);
+        }
       } catch {
         if (!isMountedRef.current) return;
         // capUpdateContenido ya dejó el pending en Dexie + encolado para sync
-        setSaveStatus("pending");
-        setTimeout(() => {
-          if (isMountedRef.current)
-            setSaveStatus((s) => (s === "pending" ? "idle" : s));
-        }, 5000);
+        if (!pendingValueRef.current) {
+          setSaveStatus("pending");
+          setTimeout(() => {
+            if (isMountedRef.current)
+              setSaveStatus((s) => (s === "pending" ? "idle" : s));
+          }, 5000);
+        }
+      } finally {
+        isSavingRef.current = false;
+        // Si llegó contenido más nuevo mientras este guardado estaba en
+        // curso, lo re-disparamos ahora mismo (sin esperar otro debounce
+        // completo) — así el guardado siempre termina reflejando lo
+        // último que el usuario escribió, nunca un valor viejo.
+        const pending = pendingValueRef.current;
+        if (pending !== null && isMountedRef.current) {
+          pendingValueRef.current = null;
+          void doSave(pending);
+        }
       }
     },
-    [capId, setCap, draft, titulo],
+    [capId, setCap, draft],
   );
 
   const onChange = useCallback(
@@ -498,7 +549,15 @@ const PanelEditor = ({
       draft.save(val);
       setSaveStatus("saving");
       clearTimeout(timer.current);
-      timer.current = setTimeout(() => doSave(val), 2000);
+      // Si ya hay un guardado en curso, no programamos un setTimeout que
+      // podría disparar doSave EN PARALELO con el que está en vuelo (la
+      // causa raíz del bug) — dejamos el valor en pendingValueRef y
+      // doSave se reprograma solo al terminar (ver finally en doSave).
+      if (isSavingRef.current) {
+        pendingValueRef.current = val;
+      } else {
+        timer.current = setTimeout(() => doSave(val), 2000);
+      }
       const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
       if (!isTouchDevice) requestAnimationFrame(() => centerCursor());
     },
@@ -826,7 +885,15 @@ const PanelEditor = ({
       setContenido(version.contenido_delta);
       draft.save(version.contenido_delta);
       clearTimeout(timer.current);
+      // Si justo hay un guardado en curso, doSave solo deja este valor en
+      // pendingValueRef y retorna al toque (no lo persiste todavía) — acá
+      // sí queremos esperar a que se persista de verdad antes de cerrar el
+      // modal, así que reintentamos hasta que el lock se libere y este
+      // valor (u otro más nuevo que lo haya reemplazado) quede guardado.
       await doSave(version.contenido_delta);
+      while (isSavingRef.current || pendingValueRef.current !== null) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
       setHistorialOpen(false);
     } finally {
       setRestaurando(false);
