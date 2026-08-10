@@ -929,9 +929,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
   // que reemplazó a la sección propia "Items" que antes vivía en la navbar
   // (ver AgrupacionPersonajesDropdown): alterna entre agrupar por Reino
   // (GeografiaJerarquica), por Criatura (CriaturasJerarquica) o mostrar
-  // Items agrupados por categoría (ItemsJerarquia, sin relación a
-  // Personajes), y los dropdowns de filtro por grupo debajo cambian según
-  // cuál esté activa.
+  // Items en un grid plano (ItemsJerarquia, sin relación a Personajes ni
+  // agrupación alguna — junto con Flora y Minerales, también planos), y
+  // los dropdowns de filtro por grupo debajo cambian según cuál esté
+  // activa.
   const agrupacionSelector = (
     <div className="flex items-center gap-1.5">
       <AgrupacionPersonajesDropdown value={agrupacionPersonajes} onChange={setAgrupacionPersonajes} />
