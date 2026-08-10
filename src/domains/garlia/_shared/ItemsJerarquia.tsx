@@ -20,8 +20,12 @@
  *   ...
  *
  * Los items sin categoría (vacía/null) caen en un bloque final "Sin
- * categoría". Cada tarjeta abre el editor completo del item
- * (openEntity("items", id)), igual que el resto de las vistas jerárquicas.
+ * categoría". Debajo de las categorías de Items se muestran, aparte y sin
+ * agrupar (no tienen campo `categoria`), Flora y Minerales — mismo
+ * catálogo que ya aparece en la vista "por Criatura" (colgando de
+ * Ecosistema ahí), acá solo como bloques planos informativos. Cada
+ * tarjeta abre el editor completo de su entidad (openEntity(section, id)),
+ * igual que el resto de las vistas jerárquicas.
  */
 
 import { Package } from "lucide-react";
@@ -37,6 +41,11 @@ interface Item {
   imagen_url?: string | null;
   categoria?: string | null;
 }
+interface EntidadMin {
+  id: string;
+  nombre: string;
+  imagen_url?: string | null;
+}
 
 const SIN_CATEGORIA = "__sin_categoria__";
 
@@ -46,6 +55,16 @@ interface Props {
   onOpen: (id: string) => void;
   onCreate?: () => void;
   creating?: boolean;
+  /** Flora — se muestra como bloque aparte debajo de las categorías de
+   *  Items, sin agrupar (no tiene campo `categoria`). Puramente informativo:
+   *  reusa el mismo catálogo que ya se muestra en la vista "por Criatura". */
+  flora?: EntidadMin[];
+  loadingFlora?: boolean;
+  onOpenFlora?: (id: string) => void;
+  /** Minerales — mismo criterio que `flora`. */
+  minerales?: EntidadMin[];
+  loadingMinerales?: boolean;
+  onOpenMineral?: (id: string) => void;
   /** Grupos de tipo "items" agrupados por subtipo, para el dropdown de
    *  filtro por grupo de la barra superior — mismo patrón que las otras
    *  vistas jerárquicas. */
@@ -67,6 +86,12 @@ export function ItemsJerarquia({
   onOpen,
   onCreate,
   creating,
+  flora,
+  loadingFlora,
+  onOpenFlora,
+  minerales,
+  loadingMinerales,
+  onOpenMineral,
   gruposItemsPorSubtipo,
   grupoSeleccionadoId,
   onSeleccionarGrupo,
@@ -174,6 +199,39 @@ export function ItemsJerarquia({
             </div>
           );
         })
+      )}
+
+      {/* Flora y Minerales — bloques aparte, sin agrupar (no tienen
+          `categoria`), debajo de las categorías de Items. Mismo catálogo
+          que ya se ve en la vista "por Criatura", puramente informativo
+          acá: solo mostrarlos y poder abrir su editor. */}
+      {flora && flora.length > 0 && (
+        <EntityCardGrid
+          title="Flora"
+          variant="grid"
+          loading={loadingFlora}
+          items={flora.map((f) => ({
+            id: f.id,
+            nombre: f.nombre,
+            imageUrl: f.imagen_url || undefined,
+          }))}
+          onItemClick={(id) => onOpenFlora?.(id)}
+          section="flora"
+        />
+      )}
+      {minerales && minerales.length > 0 && (
+        <EntityCardGrid
+          title="Minerales"
+          variant="grid"
+          loading={loadingMinerales}
+          items={minerales.map((m) => ({
+            id: m.id,
+            nombre: m.nombre,
+            imageUrl: m.imagen_url || undefined,
+          }))}
+          onItemClick={(id) => onOpenMineral?.(id)}
+          section="minerales"
+        />
       )}
 
       {onCreate && (

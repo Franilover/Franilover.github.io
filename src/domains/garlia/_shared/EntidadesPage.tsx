@@ -993,6 +993,12 @@ export function EntidadesPage({ section, selectedId }: Props) {
             const { data } = await addItem({ nombre: "Nuevo objeto" });
             if (data?.id) openEntity("items", data.id);
           }}
+          flora={flora}
+          loadingFlora={loadingFlora}
+          onOpenFlora={(id) => openEntity("flora", id)}
+          minerales={minerales}
+          loadingMinerales={loadingMinerales}
+          onOpenMineral={(id) => openEntity("minerales", id)}
           gruposItemsPorSubtipo={gruposItemsPorSubtipo}
           grupoSeleccionadoId={grupoItemSeleccionadoId}
           onSeleccionarGrupo={setGrupoItemSeleccionadoId}
