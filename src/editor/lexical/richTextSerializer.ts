@@ -40,6 +40,7 @@ import type {
   LexicalNode} from "lexical";
 import {
   $createLineBreakNode,
+  $createParagraphNode,
   $createTextNode,
   $getRoot,
   $insertNodes,
@@ -239,6 +240,47 @@ export function rawTextToLexicalTree(raw: string): void {
 
   if (!raw.trim()) return; // documento vacío — Lexical deja su párrafo por defecto
 
+  // 0) Líneas vacías EXTRA como separador visual entre párrafos.
+  // $convertFromMarkdownString sigue la spec de Markdown al pie de la
+  // letra: CUALQUIER cantidad de líneas en blanco consecutivas (una,
+  // dos, tres...) se interpreta exactamente igual — "nuevo párrafo".
+  // No hay forma de que Markdown estándar distinga "1 línea vacía" de
+  // "3 líneas vacías", así que si el usuario dejaba más de una línea en
+  // blanco como espaciado visual entre escenas, esa cantidad se perdía
+  // en cada roundtrip guardar→recargar (se normalizaba a un solo "\n\n").
+  // Capturamos acá esos bloques de 3+ saltos de línea (= 2+ líneas
+  // vacías reales) y los reemplazamos por un token de "párrafos vacíos
+  // extra" que en el post-proceso (paso 6) se traduce de vuelta a la
+  // cantidad exacta de ParagraphNode vacíos. Debe ir ANTES que el paso
+  // de tablas/condicion/snippets porque esos también manipulan saltos
+  // de línea multilinea y podrían interferir con el conteo.
+  // No tocamos saltos de línea dentro de bloques ```code``` — ahí 3+
+  // saltos consecutivos pueden ser espaciado intencional del código
+  // fuente, no "líneas vacías entre párrafos", e insertar párrafos
+  // vacíos ahí rompería el bloque. Partimos el raw en tramos código /
+  // no-código y solo aplicamos el reemplazo a los tramos no-código.
+  const emptyParaRegistry = new Map<string, number>();
+  let emptyParaCounter = 0;
+  const nextEmptyParaToken = () => `xEmptyParaTokenxx${emptyParaCounter++}xx`;
+  const codeFenceSplitRe = /(```[\s\S]*?```)/g;
+  let working0 = raw
+    .split(codeFenceSplitRe)
+    .map((segment, i) => {
+      // Los índices impares del split son los propios bloques ``` — se
+      // devuelven intactos.
+      if (i % 2 === 1) return segment;
+      return segment.replace(/\n{3,}/g, (match) => {
+        // match tiene N "\n"; eso equivale a (N-1) líneas vacías reales.
+        // Una línea vacía "normal" (\n\n) ya la maneja Markdown estándar
+        // como separador de párrafo — solo tokenizamos el EXCEDENTE.
+        const extraBlankLines = match.length - 2; // líneas vacías por encima de la primera
+        const token = nextEmptyParaToken();
+        emptyParaRegistry.set(token, extraBlankLines);
+        return `\n\n${token}\n\n`;
+      });
+    })
+    .join("");
+
   // Extraemos TODO lo que no es markdown estándar (gates, snippets,
   // wikilinks, tablas) y lo reemplazamos por un placeholder de texto
   // plano de una sola palabra, ASCII, sin espacios ni símbolos markdown
@@ -269,7 +311,7 @@ export function rawTextToLexicalTree(raw: string): void {
 
   // 1) Tablas primero (son bloques multilinea, deben extraerse antes de
   // que cualquier otra cosa toque los saltos de línea internos).
-  let working = raw.replace(
+  let working = working0.replace(
     new RegExp(TABLE_BLOCK_RE.source, "gm"),
     (match) => {
       const token = nextToken();
@@ -354,7 +396,7 @@ export function rawTextToLexicalTree(raw: string): void {
   // Un TextNode puede contener el token pegado a texto real a los
   // lados (ej: "Miras al xSnippetTokenxx0xx." tras la conversión), así
   // que separamos manualmente el texto sobrante alrededor del token.
-  const tokenRe = /xSnippetTokenxx(\d+)xx|xSoftBreakTokenxx/;
+  const tokenRe = /xSnippetTokenxx(\d+)xx|xSoftBreakTokenxx|xEmptyParaTokenxx(\d+)xx/;
 
   function resolveTextNode(node: LexicalNode): void {
     if (node.getType() !== "text") return;
@@ -364,8 +406,9 @@ export function rawTextToLexicalTree(raw: string): void {
 
     const token = match[0];
     const isSoftBreak = token === linebreakToken;
-    const entry = isSoftBreak ? null : registry.get(token);
-    if (!isSoftBreak && !entry) return;
+    const isEmptyPara = emptyParaRegistry.has(token);
+    const entry = isSoftBreak || isEmptyPara ? null : registry.get(token);
+    if (!isSoftBreak && !isEmptyPara && !entry) return;
 
     const before = text.slice(0, match.index);
     const after = text.slice(match.index + token.length);
@@ -385,7 +428,25 @@ export function rawTextToLexicalTree(raw: string): void {
     if (!parent) return;
 
     if (before) (node as any).insertBefore($createTextNode(before));
-    if (replacement) (node as any).insertBefore(replacement);
+
+    if (isEmptyPara) {
+      // El token de párrafo(s) vacío(s) extra vive solo, dentro de su
+      // propio ParagraphNode (rodeado de "\n\n" a cada lado — ver paso
+      // 0). Insertamos N ParagraphNode vacíos como hermanos de ese
+      // párrafo contenedor, uno por cada línea en blanco excedente que
+      // había en el raw original.
+      const count = emptyParaRegistry.get(token) ?? 0;
+      const containerParagraph = parent;
+      for (let i = 0; i < count; i++) {
+        const emptyPara = $createParagraphNode();
+        if ((containerParagraph as any)?.insertBefore) {
+          (containerParagraph as any).insertBefore(emptyPara);
+        }
+      }
+    } else if (replacement) {
+      (node as any).insertBefore(replacement);
+    }
+
     if (after) {
       const afterNode = $createTextNode(after);
       (node as any).insertBefore(afterNode);
@@ -416,6 +477,12 @@ export function rawTextToLexicalTree(raw: string): void {
   // token vivía en un TextNode dentro de un párrafo), pero TableNode
   // debe ser hijo directo del root, no de un párrafo — lo sacamos.
   hoistTableNodes($getRoot());
+
+  // El párrafo que envolvía cada token de "párrafos vacíos extra" (paso
+  // 0) queda vacío tras remover el TextNode del token — lo eliminamos
+  // para no sumar un párrafo vacío de más además de los N que ya
+  // insertamos como hermanos.
+  removeEmptyPlaceholderParagraphs($getRoot());
 
   // El sufijo "{variante}" (ej: "{barra}") llega pegado como texto plano
   // al final del último TextNode de cada heading, porque HEADING_TRANSFORMER
@@ -489,6 +556,26 @@ function hoistTableNodes(root: LexicalNode): void {
     // Si el párrafo quedó vacío tras sacar la tabla, lo eliminamos; si
     // tenía texto antes/después de la tabla, esos quedan como párrafos
     // separados automáticamente por cómo insertBefore reordena.
+    if ((child as any).getChildrenSize?.() === 0) {
+      (child as any).remove();
+    }
+  }
+}
+
+// El token de "párrafos vacíos extra" vivía solo dentro de su propio
+// ParagraphNode contenedor (ver paso 0 de rawTextToLexicalTree). Tras
+// resolveTextNode() insertar los N ParagraphNode reales como hermanos y
+// remover el TextNode del token, ese párrafo contenedor queda con 0
+// hijos — lo eliminamos para no dejar un párrafo vacío de más además de
+// los que representan el espaciado real que tenía el usuario.
+// IMPORTANTE: solo se eliminan párrafos que quedaron vacíos como efecto
+// colateral de este mecanismo (top-level, sin hijos) — nunca se tocan
+// párrafos vacíos "reales" del usuario que no pasaron por acá, porque
+// esos nunca llegan a estar en esta lista intermedia.
+function removeEmptyPlaceholderParagraphs(root: LexicalNode): void {
+  const children: LexicalNode[] = (root as any).getChildren?.() ?? [];
+  for (const child of [...children]) {
+    if (child.getType() !== "paragraph") continue;
     if ((child as any).getChildrenSize?.() === 0) {
       (child as any).remove();
     }
