@@ -112,13 +112,19 @@ function descendientesDe(id: string, clados: Clado[]): Set<string> {
 function DiagramaCladograma({
   clados,
   seleccionadoId,
+  seleccionMultiple,
   onSelect,
+  onToggleMultiple,
   onMover,
+  onMoverGrupo,
 }: {
   clados: Clado[];
   seleccionadoId: string | null;
+  seleccionMultiple: Set<string>;
   onSelect: (id: string) => void;
+  onToggleMultiple: (id: string) => void;
   onMover: (cladoId: string, nuevoPadreId: string | null) => void;
+  onMoverGrupo: (cladoIds: string[], nuevoPadreId: string | null) => void;
 }) {
   const { nodos, alturaTotal } = useMemo(() => construirLayout(clados), [clados]);
   const ancho = useMemo(() => anchoMaximo(nodos), [nodos]);
@@ -127,13 +133,25 @@ function DiagramaCladograma({
 
   // Arrastre manual con mouse events (más confiable que drag&drop HTML5
   // dentro de SVG, que varios navegadores manejan mal sobre <g>).
-  const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
+  // arrastrandoIds: uno o varios clados (selección múltiple con Shift+click
+  // izquierdo, luego arrastrados juntos con click derecho).
+  const [arrastrandoIds, setArrastrandoIds] = useState<string[] | null>(null);
   const [huboMovimiento, setHuboMovimiento] = useState(false);
   const [posMouse, setPosMouse] = useState<{ x: number; y: number } | null>(null);
   const [hoverDestinoId, setHoverDestinoId] = useState<string | null>(null);
   const [hoverRaiz, setHoverRaiz] = useState(false);
 
-  const bloqueados = arrastrandoId ? descendientesDe(arrastrandoId, clados) : null;
+  // Unión de descendientes de TODOS los nodos que se están arrastrando —
+  // ninguno de ellos puede recibirse a sí mismo ni a un hermano de grupo
+  // como nuevo padre (evita ciclos).
+  const bloqueados = useMemo(() => {
+    if (!arrastrandoIds) return null;
+    const set = new Set<string>();
+    for (const id of arrastrandoIds) {
+      for (const d of descendientesDe(id, clados)) set.add(d);
+    }
+    return set;
+  }, [arrastrandoIds, clados]);
 
   if (clados.length === 0) return null;
 
@@ -147,25 +165,35 @@ function DiagramaCladograma({
   const nodoEnPunto = (x: number, y: number) =>
     nodos.find((n) => Math.hypot(n.x - x, n.y - y) < 16);
 
-  const confirmarMover = (cladoId: string, destinoId: string | null) => {
-    const origenActual = clados.find((c) => c.id === cladoId)?.padre_id ?? null;
-    const desc = descendientesDe(cladoId, clados);
-    const invalido = destinoId !== null && desc.has(destinoId);
-    if (origenActual === destinoId || invalido || cladoId === destinoId) return;
-    onMover(cladoId, destinoId);
+  const confirmarMoverGrupo = (cladoIds: string[], destinoId: string | null) => {
+    const desc = new Set<string>();
+    for (const id of cladoIds) for (const d of descendientesDe(id, clados)) desc.add(d);
+    if (destinoId !== null && desc.has(destinoId)) return; // ciclo
+    const idsAMover = cladoIds.filter((id) => {
+      const origenActual = clados.find((c) => c.id === id)?.padre_id ?? null;
+      return origenActual !== destinoId && id !== destinoId;
+    });
+    if (idsAMover.length === 0) return;
+    if (idsAMover.length === 1) onMover(idsAMover[0], destinoId);
+    else onMoverGrupo(idsAMover, destinoId);
   };
 
   const handleMouseDown = (e: React.MouseEvent, cladoId: string) => {
     if (e.button !== 2) return; // solo click derecho arranca el arrastre
     e.preventDefault();
     e.stopPropagation();
-    setArrastrandoId(cladoId);
+    // Si el nodo sobre el que se apretó click derecho ya forma parte de la
+    // selección múltiple, arrastramos todo el grupo; si no, solo ese nodo.
+    const grupo = seleccionMultiple.has(cladoId) && seleccionMultiple.size > 0
+      ? Array.from(seleccionMultiple)
+      : [cladoId];
+    setArrastrandoIds(grupo);
     setHuboMovimiento(false);
     setPosMouse(puntoSvg(e.clientX, e.clientY));
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!arrastrandoId) return;
+    if (!arrastrandoIds) return;
     setHuboMovimiento(true);
     const p = puntoSvg(e.clientX, e.clientY);
     setPosMouse(p);
@@ -176,24 +204,34 @@ function DiagramaCladograma({
   };
 
   const finalizarArrastre = () => {
-    if (arrastrandoId && huboMovimiento) {
-      if (hoverDestinoId) confirmarMover(arrastrandoId, hoverDestinoId);
-      else if (hoverRaiz) confirmarMover(arrastrandoId, null);
+    if (arrastrandoIds && huboMovimiento) {
+      if (hoverDestinoId) confirmarMoverGrupo(arrastrandoIds, hoverDestinoId);
+      else if (hoverRaiz) confirmarMoverGrupo(arrastrandoIds, null);
     }
-    setArrastrandoId(null);
+    setArrastrandoIds(null);
     setHuboMovimiento(false);
     setPosMouse(null);
     setHoverDestinoId(null);
     setHoverRaiz(false);
   };
 
-  const nodoArrastrado = arrastrandoId ? nodos.find((n) => n.clado.id === arrastrandoId) : null;
+  const nodosArrastrados = arrastrandoIds
+    ? nodos.filter((n) => arrastrandoIds.includes(n.clado.id))
+    : [];
 
   return (
     <div className="overflow-auto rounded-2xl border border-primary/10 bg-white-custom/60 p-3 relative">
-      {arrastrandoId && huboMovimiento && (
+      {arrastrandoIds && huboMovimiento && (
         <p className="text-micro font-black uppercase tracking-widest text-accent/70 mb-2 px-1">
-          Soltá el click derecho sobre otro clado para reasignarlo como su hijo — o a la izquierda para volverlo ancestro común
+          Soltá el click derecho sobre otro clado para reasignar
+          {arrastrandoIds.length > 1 ? ` los ${arrastrandoIds.length} seleccionados` : "lo"} como su hijo — o
+          a la izquierda para volverlo{arrastrandoIds.length > 1 ? "s" : ""} ancestro común
+        </p>
+      )}
+      {!arrastrandoIds && seleccionMultiple.size > 0 && (
+        <p className="text-micro font-black uppercase tracking-widest text-accent/60 mb-2 px-1">
+          {seleccionMultiple.size} clados seleccionados — Shift+click para sumar o quitar, click derecho y
+          arrastrá uno de ellos para moverlos juntos
         </p>
       )}
       <svg
@@ -201,7 +239,7 @@ function DiagramaCladograma({
         width={ancho}
         height={alturaTotal}
         className="block select-none"
-        style={{ minWidth: "100%", cursor: arrastrandoId ? "grabbing" : "default" }}
+        style={{ minWidth: "100%", cursor: arrastrandoIds ? "grabbing" : "default" }}
         onMouseMove={handleMouseMove}
         onMouseUp={finalizarArrastre}
         onMouseLeave={finalizarArrastre}
@@ -226,16 +264,17 @@ function DiagramaCladograma({
         })}
 
         {/* Franja de "soltar como raíz" a la izquierda, visible al arrastrar */}
-        {arrastrandoId && huboMovimiento && clados.find((c) => c.id === arrastrandoId)?.padre_id !== null && (
+        {arrastrandoIds && huboMovimiento && arrastrandoIds.some((id) => clados.find((c) => c.id === id)?.padre_id !== null) && (
           <rect x={0} y={0} width={PAD_X + 40} height={alturaTotal} className={hoverRaiz ? "fill-accent/15" : "fill-primary/5"} />
         )}
 
         {/* Nodos + etiquetas */}
         {nodos.map((n) => {
           const activo = n.clado.id === seleccionadoId;
+          const enSeleccionMultiple = seleccionMultiple.has(n.clado.id);
           const esHoja = n.hijos.length === 0;
-          const siendoArrastrado = n.clado.id === arrastrandoId;
-          const esDestinoInvalido = arrastrandoId !== null && bloqueados?.has(n.clado.id);
+          const siendoArrastrado = arrastrandoIds?.includes(n.clado.id) ?? false;
+          const esDestinoInvalido = arrastrandoIds !== null && bloqueados?.has(n.clado.id);
           const esHoverDestino = hoverDestinoId === n.clado.id && !esDestinoInvalido;
 
           return (
@@ -243,7 +282,10 @@ function DiagramaCladograma({
               key={n.clado.id}
               transform={`translate(${n.x}, ${n.y})`}
               onMouseDown={(e) => handleMouseDown(e, n.clado.id)}
-              onClick={() => onSelect(n.clado.id)}
+              onClick={(e) => {
+                if (e.shiftKey) onToggleMultiple(n.clado.id);
+                else onSelect(n.clado.id);
+              }}
               onContextMenu={(e) => {
                 // El menú nativo del navegador se previene siempre acá;
                 // el click derecho se usa para arrastrar (ver handleMouseDown),
@@ -255,12 +297,15 @@ function DiagramaCladograma({
               {esHoverDestino && (
                 <circle r={10} className="fill-none stroke-accent" strokeWidth={1.5} strokeDasharray="3 2" />
               )}
+              {enSeleccionMultiple && !siendoArrastrado && (
+                <circle r={9} className="fill-none stroke-accent/50" strokeWidth={1.5} strokeDasharray="2 2" />
+              )}
               <circle
                 r={esHoja ? 3.5 : 4.5}
                 className={
                   siendoArrastrado
                     ? "fill-accent/40"
-                    : activo
+                    : activo || enSeleccionMultiple
                       ? "fill-accent"
                       : esHoja
                         ? "fill-primary/40"
@@ -273,7 +318,7 @@ function DiagramaCladograma({
                 y={4}
                 opacity={siendoArrastrado ? 0.4 : esDestinoInvalido ? 0.3 : 1}
                 className={`text-[11px] font-bold select-none ${
-                  activo ? "fill-accent" : esHoverDestino ? "fill-accent" : "fill-primary/75"
+                  activo || enSeleccionMultiple ? "fill-accent" : esHoverDestino ? "fill-accent" : "fill-primary/75"
                 }`}
               >
                 {n.clado.nombre || "Sin nombre"}
@@ -291,12 +336,14 @@ function DiagramaCladograma({
           );
         })}
 
-        {/* "Fantasma" del nodo mientras se arrastra, siguiendo al mouse */}
-        {nodoArrastrado && huboMovimiento && posMouse && (
+        {/* "Fantasma" de los nodos mientras se arrastran, siguiendo al mouse */}
+        {nodosArrastrados.length > 0 && huboMovimiento && posMouse && (
           <g transform={`translate(${posMouse.x}, ${posMouse.y})`} className="pointer-events-none" opacity={0.85}>
             <circle r={5} className="fill-accent" />
             <text x={8} y={4} className="text-[11px] font-black fill-accent select-none">
-              {nodoArrastrado.clado.nombre || "Sin nombre"}
+              {nodosArrastrados.length === 1
+                ? nodosArrastrados[0].clado.nombre || "Sin nombre"
+                : `${nodosArrastrados.length} clados`}
             </text>
           </g>
         )}
@@ -424,6 +471,7 @@ function PanelClado({
 export function CladisticaPage({ onSelectCriatura }: Props) {
   const { clados, loading, creating, crear, actualizar, eliminar } = useClados();
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [seleccionMultiple, setSeleccionMultiple] = useState<Set<string>>(new Set());
 
   const seleccionado = clados.find((c) => c.id === seleccionadoId) ?? null;
 
@@ -437,6 +485,23 @@ export function CladisticaPage({ onSelectCriatura }: Props) {
     if (nuevo) setSeleccionadoId(nuevo.id);
   };
 
+  const toggleMultiple = (id: string) => {
+    setSeleccionMultiple((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    // Al armar/editar la selección múltiple, el panel lateral sigue el
+    // último nodo tocado con Shift — así se puede ver su detalle también.
+    setSeleccionadoId(id);
+  };
+
+  const moverGrupo = async (ids: string[], nuevoPadreId: string | null) => {
+    await Promise.all(ids.map((id) => actualizar(id, { padre_id: nuevoPadreId })));
+    setSeleccionMultiple(new Set());
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-4">
       <div className="flex-1 min-w-0">
@@ -444,14 +509,25 @@ export function CladisticaPage({ onSelectCriatura }: Props) {
           <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
             Cladograma
           </span>
-          <button
-            type="button"
-            disabled={creating}
-            onClick={() => void crearRaiz()}
-            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
-          >
-            <Plus size={10} /> Nuevo ancestro común
-          </button>
+          <div className="flex items-center gap-3">
+            {seleccionMultiple.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setSeleccionMultiple(new Set())}
+                className="text-micro font-black uppercase tracking-widest text-accent/60 hover:text-accent transition-colors"
+              >
+                Limpiar selección ({seleccionMultiple.size})
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={creating}
+              onClick={() => void crearRaiz()}
+              className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
+            >
+              <Plus size={10} /> Nuevo ancestro común
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -465,8 +541,14 @@ export function CladisticaPage({ onSelectCriatura }: Props) {
           <DiagramaCladograma
             clados={clados}
             seleccionadoId={seleccionadoId}
-            onSelect={setSeleccionadoId}
+            seleccionMultiple={seleccionMultiple}
+            onSelect={(id) => {
+              setSeleccionadoId(id);
+              setSeleccionMultiple(new Set());
+            }}
+            onToggleMultiple={toggleMultiple}
             onMover={(cladoId, nuevoPadreId) => void actualizar(cladoId, { padre_id: nuevoPadreId })}
+            onMoverGrupo={(ids, nuevoPadreId) => void moverGrupo(ids, nuevoPadreId)}
           />
         )}
       </div>
