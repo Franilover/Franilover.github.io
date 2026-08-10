@@ -90,7 +90,7 @@ export async function resolverLibroPorId<T extends LibroBase = LibroBase>(
   try {
     await db?.libros?.put(data as any);
   } catch {}
-  return data as T;
+  return data as unknown as T;
 }
 
 /** Determina si un libro es "extra" (poemario u otro grupo sin navegación
