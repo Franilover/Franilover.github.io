@@ -21,6 +21,7 @@ import { useEffect } from "react";
 
 import type { SectionKey } from "./useMundoNavigationStore";
 import { useMundoNavigation } from "./useMundoNavigationStore";
+import { usePanelFlotante, type PanelFlotanteKind } from "./usePanelFlotanteStore";
 
 type OpenEntityDetail = { tabla: string; id: string };
 type CreateEntityDetail = { tab: string };
@@ -58,13 +59,30 @@ export const TABLA_TO_SECTION: Record<string, SectionKey> = {
 
 const MAGIA_TABLAS = new Set(["runas"]);
 
+// Tablas cuya vista "rápida" en el resto de la app es el panel flotante
+// (usePanelFlotante), no una tab a pantalla completa — ver
+// GeografiaJerarquica/CriaturasJerarquica, que ya abren personajes y
+// criaturas así. Este puente de eventos globales (paleta de comandos,
+// wikilinks, sidebar de EditorCapitulos vía dispatchOpen) debe seguir el
+// mismo criterio en vez de mandar siempre a openEntity().
+const TABLA_TO_PANEL_KIND: Record<string, PanelFlotanteKind> = {
+  personajes: "personaje",
+  criaturas: "criatura",
+};
+
 export function useExternalCommandBridge(onCreateEntity: (tab: string) => void) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
   const selectSection = useMundoNavigation((s) => s.selectSection);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   useEffect(() => {
     const handleOpenEntity = (e: Event) => {
       const { tabla, id } = (e as CustomEvent<OpenEntityDetail>).detail;
+      const panelKind = TABLA_TO_PANEL_KIND[tabla];
+      if (panelKind) {
+        abrirPanel(panelKind, id);
+        return;
+      }
       const section = TABLA_TO_SECTION[tabla];
       if (!section) return;
       openEntity(section, id);
@@ -104,9 +122,14 @@ export function useExternalCommandBridge(onCreateEntity: (tab: string) => void) 
         const pending = JSON.parse(raw) as OpenEntityDetail & { ts: number };
         const isFresh = pending?.tabla && pending?.id && Date.now() - pending.ts < 15_000;
         if (isFresh) {
-          const section = TABLA_TO_SECTION[pending.tabla];
-          if (section) {
-            openEntity(section, pending.id);
+          const panelKind = TABLA_TO_PANEL_KIND[pending.tabla];
+          if (panelKind) {
+            abrirPanel(panelKind, pending.id);
+          } else {
+            const section = TABLA_TO_SECTION[pending.tabla];
+            if (section) {
+              openEntity(section, pending.id);
+            }
           }
         }
       }
@@ -123,5 +146,5 @@ export function useExternalCommandBridge(onCreateEntity: (tab: string) => void) 
       window.removeEventListener("garlia-add-magic", handleAddMagic);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openEntity, selectSection]);
+  }, [openEntity, selectSection, abrirPanel]);
 }

@@ -1060,7 +1060,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
               nombre: "Nuevo personaje",
               ...(criatura ? { especie: criatura.nombre } : {}),
             });
-            if (data?.id) openEntity("personajes", data.id);
+            if (data?.id) abrirPanel("personaje", data.id);
           }}
           onAsignarCriaturaAEcosistema={async (criaturaId, ecosistemaId) => {
             const eco = ecosistemas.find((e) => e.id === ecosistemaId);
@@ -1112,7 +1112,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
               nombre: "Nuevo personaje",
               ciudad_id: ciudadId,
             });
-            if (data?.id) openEntity("personajes", data.id);
+            if (data?.id) abrirPanel("personaje", data.id);
           }}
           onAsignarReinoABioma={async (reinoId, biomaId) => {
             const bioma = biomas.find((b) => b.id === biomaId);
