@@ -234,12 +234,17 @@ jobs:
         # https://github.com/tauri-apps/tauri/issues/14413) — a veces ni se
         # genera. Por eso: 1) lo buscamos en cualquier lado bajo gen/android,
         # 2) si no aparece, lo creamos nosotros mismos en la ruta esperada
-        # por Tauri (gen/android/tauri.properties) para el caso en que exista
-        # pero self-init no lo haya listado, y 3) además, como red de
-        # seguridad, seteamos versionCode/versionName directo en
-        # defaultConfig del build.gradle.kts del módulo app — eso es lo que
-        # Gradle usa en última instancia, sin depender de que Tauri lea bien
-        # tauri.properties.
+        # por Tauri: gen/android/app/tauri.properties (¡OJO! dentro de app/,
+        # no en la raíz de gen/android). El build.gradle.kts del módulo app
+        # carga tauriProperties con file("tauri.properties"), que es
+        # relativo a ese mismo build script — o sea a gen/android/app/. Si
+        # el archivo se crea un nivel arriba, Gradle nunca lo encuentra,
+        # propFile.exists() da false, tauriProperties queda vacío, y las
+        # líneas versionCode/versionName = tauriProperties.getProperty(...)
+        # caen siempre al fallback ("1" / "1.0") — pisando en silencio
+        # cualquier valor que hayamos puesto antes en el archivo. Y 3)
+        # además, como red de seguridad, seteamos versionCode/versionName
+        # directo en defaultConfig del build.gradle.kts del módulo app.
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
@@ -254,7 +259,7 @@ jobs:
 
           if [ -z "$PROPS" ]; then
             echo "tauri.properties no existe todavía — lo creamos en la ruta default."
-            PROPS="src-tauri/gen/android/tauri.properties"
+            PROPS="src-tauri/gen/android/app/tauri.properties"
           fi
 
           if grep -q "^tauri.android.versionCode=" "$PROPS" 2>/dev/null; then
