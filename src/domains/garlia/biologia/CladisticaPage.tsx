@@ -91,23 +91,88 @@ function anchoMaximo(nodos: NodoLayout[]): number {
 
 // ─── Diagrama SVG ────────────────────────────────────────────────────────────
 
+// Devuelve el set de ids descendientes (incluyendo el propio) de un clado,
+// para impedir soltar un nodo dentro de su propia rama (eso crearía un
+// ciclo padre_id → hijo → …→ el mismo padre).
+function descendientesDe(id: string, clados: Clado[]): Set<string> {
+  const set = new Set<string>([id]);
+  let cambiado = true;
+  while (cambiado) {
+    cambiado = false;
+    for (const c of clados) {
+      if (c.padre_id && set.has(c.padre_id) && !set.has(c.id)) {
+        set.add(c.id);
+        cambiado = true;
+      }
+    }
+  }
+  return set;
+}
+
 function DiagramaCladograma({
   clados,
   seleccionadoId,
   onSelect,
+  onMover,
 }: {
   clados: Clado[];
   seleccionadoId: string | null;
   onSelect: (id: string) => void;
+  onMover: (cladoId: string, nuevoPadreId: string | null) => void;
 }) {
-  const { nodos, alturaTotal } = useMemo(() => construirLayout(clados), [clados]);
+  const { nodos, raices, alturaTotal } = useMemo(() => construirLayout(clados), [clados]);
   const ancho = useMemo(() => anchoMaximo(nodos), [nodos]);
+
+  const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
+  const [hoverDestinoId, setHoverDestinoId] = useState<string | null>(null);
+  // "raiz-drop" es un destino especial: soltar en el fondo del lienzo para
+  // convertir el clado en un nuevo ancestro común (padre_id: null).
+  const [hoverRaiz, setHoverRaiz] = useState(false);
 
   if (clados.length === 0) return null;
 
+  const bloqueados = arrastrandoId ? descendientesDe(arrastrandoId, clados) : null;
+
+  const handleDrop = (destinoId: string | null) => {
+    if (!arrastrandoId) return;
+    const origenActual = clados.find((c) => c.id === arrastrandoId)?.padre_id ?? null;
+    const yaEsPadre = origenActual === destinoId;
+    const invalido = destinoId !== null && bloqueados?.has(destinoId);
+    if (!yaEsPadre && !invalido && arrastrandoId !== destinoId) {
+      onMover(arrastrandoId, destinoId);
+    }
+    setArrastrandoId(null);
+    setHoverDestinoId(null);
+    setHoverRaiz(false);
+  };
+
   return (
     <div className="overflow-auto rounded-2xl border border-primary/10 bg-white-custom/60 p-3">
-      <svg width={ancho} height={alturaTotal} className="block" style={{ minWidth: "100%" }}>
+      {arrastrandoId && (
+        <p className="text-micro font-black uppercase tracking-widest text-accent/70 mb-2 px-1 animate-pulse">
+          Soltá sobre otro clado para reasignarlo como su hijo — o en el fondo para volverlo ancestro común
+        </p>
+      )}
+      <svg
+        width={ancho}
+        height={alturaTotal}
+        className="block"
+        style={{ minWidth: "100%" }}
+        onDragOver={(e) => {
+          if (!arrastrandoId) return;
+          e.preventDefault();
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          // Drop en el fondo del SVG (no sobre un nodo puntual): raíz.
+          handleDrop(null);
+        }}
+        onDragEnd={() => {
+          setArrastrandoId(null);
+          setHoverDestinoId(null);
+          setHoverRaiz(false);
+        }}
+      >
         {/* Ramas: para cada nodo con hijos, un tronco horizontal hasta la
             columna del hijo + una barra vertical que conecta las Y de todos
             los hijos + un horizontal corto desde la barra hasta cada hijo. */}
@@ -160,22 +225,60 @@ function DiagramaCladograma({
         {nodos.map((n) => {
           const activo = n.clado.id === seleccionadoId;
           const esHoja = n.hijos.length === 0;
+          const siendoArrastrado = n.clado.id === arrastrandoId;
+          const esDestinoInvalido = arrastrandoId !== null && bloqueados?.has(n.clado.id);
+          const esHoverDestino = hoverDestinoId === n.clado.id && !esDestinoInvalido;
+
           return (
             <g
               key={n.clado.id}
               transform={`translate(${n.x}, ${n.y})`}
               onClick={() => onSelect(n.clado.id)}
-              className="cursor-pointer"
+              className={siendoArrastrado ? "cursor-grabbing" : "cursor-grab"}
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                setArrastrandoId(n.clado.id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                if (!arrastrandoId || esDestinoInvalido) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setHoverDestinoId(n.clado.id);
+              }}
+              onDragLeave={() => {
+                setHoverDestinoId((cur) => (cur === n.clado.id ? null : cur));
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDrop(n.clado.id);
+              }}
             >
+              {/* halo de destino válido al pasar por encima arrastrando */}
+              {esHoverDestino && (
+                <circle r={10} className="fill-none stroke-accent" strokeWidth={1.5} strokeDasharray="3 2" />
+              )}
               <circle
                 r={esHoja ? 3.5 : 4.5}
-                className={activo ? "fill-accent" : esHoja ? "fill-primary/40" : "fill-primary/60"}
+                className={
+                  siendoArrastrado
+                    ? "fill-accent/40"
+                    : activo
+                      ? "fill-accent"
+                      : esHoja
+                        ? "fill-primary/40"
+                        : "fill-primary/60"
+                }
+                opacity={esDestinoInvalido ? 0.25 : 1}
               />
               <text
                 x={8}
                 y={4}
+                opacity={siendoArrastrado ? 0.4 : esDestinoInvalido ? 0.3 : 1}
                 className={`text-[11px] font-bold select-none ${
-                  activo ? "fill-accent" : "fill-primary/75"
+                  activo ? "fill-accent" : esHoverDestino ? "fill-accent" : "fill-primary/75"
                 }`}
               >
                 {n.clado.nombre || "Sin nombre"}
@@ -192,6 +295,34 @@ function DiagramaCladograma({
             </g>
           );
         })}
+
+        {/* Zona de "soltar como nuevo ancestro común (raíz)" — franja vacía
+            a la izquierda de la primera columna, visible solo mientras se
+            arrastra un nodo que no es ya raíz. */}
+        {arrastrandoId &&
+          clados.find((c) => c.id === arrastrandoId)?.padre_id !== null && (
+            <g
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setHoverRaiz(true);
+              }}
+              onDragLeave={() => setHoverRaiz(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDrop(null);
+              }}
+            >
+              <rect
+                x={0}
+                y={0}
+                width={PAD_X - 4}
+                height={alturaTotal}
+                className={hoverRaiz ? "fill-accent/15" : "fill-primary/5"}
+              />
+            </g>
+          )}
       </svg>
     </div>
   );
@@ -358,6 +489,7 @@ export function CladisticaPage({ onSelectCriatura }: Props) {
             clados={clados}
             seleccionadoId={seleccionadoId}
             onSelect={setSeleccionadoId}
+            onMover={(cladoId, nuevoPadreId) => void actualizar(cladoId, { padre_id: nuevoPadreId })}
           />
         )}
       </div>
