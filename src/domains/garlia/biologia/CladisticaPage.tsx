@@ -120,62 +120,94 @@ function DiagramaCladograma({
   onSelect: (id: string) => void;
   onMover: (cladoId: string, nuevoPadreId: string | null) => void;
 }) {
-  const { nodos, raices, alturaTotal } = useMemo(() => construirLayout(clados), [clados]);
+  const { nodos, alturaTotal } = useMemo(() => construirLayout(clados), [clados]);
   const ancho = useMemo(() => anchoMaximo(nodos), [nodos]);
 
-  const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
-  const [hoverDestinoId, setHoverDestinoId] = useState<string | null>(null);
-  // "raiz-drop" es un destino especial: soltar en el fondo del lienzo para
-  // convertir el clado en un nuevo ancestro común (padre_id: null).
-  const [hoverRaiz, setHoverRaiz] = useState(false);
+  const svgRef = React.useRef<SVGSVGElement>(null);
 
-  if (clados.length === 0) return null;
+  // Arrastre manual con mouse events (más confiable que drag&drop HTML5
+  // dentro de SVG, que varios navegadores manejan mal sobre <g>).
+  const [arrastrandoId, setArrastrandoId] = useState<string | null>(null);
+  const [huboMovimiento, setHuboMovimiento] = useState(false);
+  const [posMouse, setPosMouse] = useState<{ x: number; y: number } | null>(null);
+  const [hoverDestinoId, setHoverDestinoId] = useState<string | null>(null);
+  const [hoverRaiz, setHoverRaiz] = useState(false);
 
   const bloqueados = arrastrandoId ? descendientesDe(arrastrandoId, clados) : null;
 
-  const handleDrop = (destinoId: string | null) => {
+  if (clados.length === 0) return null;
+
+  const puntoSvg = (clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const rect = svg.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const nodoEnPunto = (x: number, y: number) =>
+    nodos.find((n) => Math.hypot(n.x - x, n.y - y) < 16);
+
+  const confirmarMover = (cladoId: string, destinoId: string | null) => {
+    const origenActual = clados.find((c) => c.id === cladoId)?.padre_id ?? null;
+    const desc = descendientesDe(cladoId, clados);
+    const invalido = destinoId !== null && desc.has(destinoId);
+    if (origenActual === destinoId || invalido || cladoId === destinoId) return;
+    onMover(cladoId, destinoId);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent, cladoId: string) => {
+    if (e.button !== 2) return; // solo click derecho arranca el arrastre
+    e.preventDefault();
+    e.stopPropagation();
+    setArrastrandoId(cladoId);
+    setHuboMovimiento(false);
+    setPosMouse(puntoSvg(e.clientX, e.clientY));
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
     if (!arrastrandoId) return;
-    const origenActual = clados.find((c) => c.id === arrastrandoId)?.padre_id ?? null;
-    const yaEsPadre = origenActual === destinoId;
-    const invalido = destinoId !== null && bloqueados?.has(destinoId);
-    if (!yaEsPadre && !invalido && arrastrandoId !== destinoId) {
-      onMover(arrastrandoId, destinoId);
+    setHuboMovimiento(true);
+    const p = puntoSvg(e.clientX, e.clientY);
+    setPosMouse(p);
+    const destino = nodoEnPunto(p.x, p.y);
+    const esBloqueado = destino && bloqueados?.has(destino.clado.id);
+    setHoverDestinoId(destino && !esBloqueado ? destino.clado.id : null);
+    setHoverRaiz(!destino && p.x < PAD_X + 40);
+  };
+
+  const finalizarArrastre = () => {
+    if (arrastrandoId && huboMovimiento) {
+      if (hoverDestinoId) confirmarMover(arrastrandoId, hoverDestinoId);
+      else if (hoverRaiz) confirmarMover(arrastrandoId, null);
     }
     setArrastrandoId(null);
+    setHuboMovimiento(false);
+    setPosMouse(null);
     setHoverDestinoId(null);
     setHoverRaiz(false);
   };
 
+  const nodoArrastrado = arrastrandoId ? nodos.find((n) => n.clado.id === arrastrandoId) : null;
+
   return (
-    <div className="overflow-auto rounded-2xl border border-primary/10 bg-white-custom/60 p-3">
-      {arrastrandoId && (
-        <p className="text-micro font-black uppercase tracking-widest text-accent/70 mb-2 px-1 animate-pulse">
-          Soltá sobre otro clado para reasignarlo como su hijo — o en el fondo para volverlo ancestro común
+    <div className="overflow-auto rounded-2xl border border-primary/10 bg-white-custom/60 p-3 relative">
+      {arrastrandoId && huboMovimiento && (
+        <p className="text-micro font-black uppercase tracking-widest text-accent/70 mb-2 px-1">
+          Soltá el click derecho sobre otro clado para reasignarlo como su hijo — o a la izquierda para volverlo ancestro común
         </p>
       )}
       <svg
+        ref={svgRef}
         width={ancho}
         height={alturaTotal}
-        className="block"
-        style={{ minWidth: "100%" }}
-        onDragOver={(e) => {
-          if (!arrastrandoId) return;
-          e.preventDefault();
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          // Drop en el fondo del SVG (no sobre un nodo puntual): raíz.
-          handleDrop(null);
-        }}
-        onDragEnd={() => {
-          setArrastrandoId(null);
-          setHoverDestinoId(null);
-          setHoverRaiz(false);
-        }}
+        className="block select-none"
+        style={{ minWidth: "100%", cursor: arrastrandoId ? "grabbing" : "default" }}
+        onMouseMove={handleMouseMove}
+        onMouseUp={finalizarArrastre}
+        onMouseLeave={finalizarArrastre}
+        onContextMenu={(e) => e.preventDefault()}
       >
-        {/* Ramas: para cada nodo con hijos, un tronco horizontal hasta la
-            columna del hijo + una barra vertical que conecta las Y de todos
-            los hijos + un horizontal corto desde la barra hasta cada hijo. */}
+        {/* Ramas */}
         {nodos.map((n) => {
           if (n.hijos.length === 0) return null;
           const xHijos = n.x + COL_W;
@@ -184,42 +216,19 @@ function DiagramaCladograma({
           const yMax = Math.max(...ys);
           return (
             <g key={`ramas-${n.clado.id}`}>
-              {/* tronco desde el nodo hasta la columna de bifurcación */}
-              <line
-                x1={n.x}
-                y1={n.y}
-                x2={xHijos}
-                y2={n.y}
-                stroke="currentColor"
-                strokeWidth={1.5}
-                className="text-primary/25"
-              />
-              {/* barra vertical de bifurcación */}
-              <line
-                x1={xHijos}
-                y1={yMin}
-                x2={xHijos}
-                y2={yMax}
-                stroke="currentColor"
-                strokeWidth={1.5}
-                className="text-primary/25"
-              />
-              {/* horizontales cortas hacia cada hijo (si el hijo no está ya en xHijos) */}
+              <line x1={n.x} y1={n.y} x2={xHijos} y2={n.y} stroke="currentColor" strokeWidth={1.5} className="text-primary/25" />
+              <line x1={xHijos} y1={yMin} x2={xHijos} y2={yMax} stroke="currentColor" strokeWidth={1.5} className="text-primary/25" />
               {n.hijos.map((h) => (
-                <line
-                  key={`h-${h.clado.id}`}
-                  x1={xHijos}
-                  y1={h.y}
-                  x2={h.x}
-                  y2={h.y}
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                  className="text-primary/25"
-                />
+                <line key={`h-${h.clado.id}`} x1={xHijos} y1={h.y} x2={h.x} y2={h.y} stroke="currentColor" strokeWidth={1.5} className="text-primary/25" />
               ))}
             </g>
           );
         })}
+
+        {/* Franja de "soltar como raíz" a la izquierda, visible al arrastrar */}
+        {arrastrandoId && huboMovimiento && clados.find((c) => c.id === arrastrandoId)?.padre_id !== null && (
+          <rect x={0} y={0} width={PAD_X + 40} height={alturaTotal} className={hoverRaiz ? "fill-accent/15" : "fill-primary/5"} />
+        )}
 
         {/* Nodos + etiquetas */}
         {nodos.map((n) => {
@@ -233,30 +242,16 @@ function DiagramaCladograma({
             <g
               key={n.clado.id}
               transform={`translate(${n.x}, ${n.y})`}
+              onMouseDown={(e) => handleMouseDown(e, n.clado.id)}
               onClick={() => onSelect(n.clado.id)}
-              className={siendoArrastrado ? "cursor-grabbing" : "cursor-grab"}
-              {...{ draggable: true }}
-              onDragStart={(e) => {
-                e.stopPropagation();
-                setArrastrandoId(n.clado.id);
-                e.dataTransfer.effectAllowed = "move";
-              }}
-              onDragOver={(e) => {
-                if (!arrastrandoId || esDestinoInvalido) return;
+              onContextMenu={(e) => {
+                // El menú nativo del navegador se previene siempre acá;
+                // el click derecho se usa para arrastrar (ver handleMouseDown),
+                // no para abrir un menú.
                 e.preventDefault();
-                e.stopPropagation();
-                setHoverDestinoId(n.clado.id);
               }}
-              onDragLeave={() => {
-                setHoverDestinoId((cur) => (cur === n.clado.id ? null : cur));
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDrop(n.clado.id);
-              }}
+              className={siendoArrastrado ? "cursor-grabbing" : "cursor-pointer"}
             >
-              {/* halo de destino válido al pasar por encima arrastrando */}
               {esHoverDestino && (
                 <circle r={10} className="fill-none stroke-accent" strokeWidth={1.5} strokeDasharray="3 2" />
               )}
@@ -296,33 +291,15 @@ function DiagramaCladograma({
           );
         })}
 
-        {/* Zona de "soltar como nuevo ancestro común (raíz)" — franja vacía
-            a la izquierda de la primera columna, visible solo mientras se
-            arrastra un nodo que no es ya raíz. */}
-        {arrastrandoId &&
-          clados.find((c) => c.id === arrastrandoId)?.padre_id !== null && (
-            <g
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setHoverRaiz(true);
-              }}
-              onDragLeave={() => setHoverRaiz(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDrop(null);
-              }}
-            >
-              <rect
-                x={0}
-                y={0}
-                width={PAD_X - 4}
-                height={alturaTotal}
-                className={hoverRaiz ? "fill-accent/15" : "fill-primary/5"}
-              />
-            </g>
-          )}
+        {/* "Fantasma" del nodo mientras se arrastra, siguiendo al mouse */}
+        {nodoArrastrado && huboMovimiento && posMouse && (
+          <g transform={`translate(${posMouse.x}, ${posMouse.y})`} className="pointer-events-none" opacity={0.85}>
+            <circle r={5} className="fill-accent" />
+            <text x={8} y={4} className="text-[11px] font-black fill-accent select-none">
+              {nodoArrastrado.clado.nombre || "Sin nombre"}
+            </text>
+          </g>
+        )}
       </svg>
     </div>
   );
