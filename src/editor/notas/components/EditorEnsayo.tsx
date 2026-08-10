@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Save, BookOpen, X, PanelRight } from "lucide-react";
+import { Save, BookOpen, X, PanelRight, Globe, Lock } from "lucide-react";
 import React, {
   useRef,
   useState,
@@ -27,6 +27,56 @@ import type { SaveStatus } from "@/ui/saveStatus";
 import { CitePopup } from "./citePopup";
 import { LibroPanel } from "./LibroPanel";
 import { NotaPanel } from "./NotaPanel";
+
+// ── Publicar/Privado ──────────────────────────────────────────────────────────
+// Mismo patrón que el estado de lectura de libros (LibrosDashboard:
+// onToggleEstado agrega/quita "leyendo"/"leido"/"pendiente" del array
+// `tags`) — "publico" es un tag reservado más, sin columna nueva en
+// Supabase. La vista pública (/personal/ensayos) filtra por
+// tags.includes("publico").
+function PublicarToggle({
+  ensayo,
+  onUpdateField,
+}: {
+  ensayo: any;
+  onUpdateField: (id: string, field: string, value: any) => void;
+}) {
+  const tags: string[] = ensayo.tags ?? [];
+  const esPublico = tags.includes("publico");
+
+  const toggle = () => {
+    const next = esPublico
+      ? tags.filter((t) => t !== "publico")
+      : [...tags, "publico"];
+    onUpdateField(ensayo.id, "tags", next);
+  };
+
+  return (
+    <button
+      className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors"
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        color: esPublico
+          ? "var(--color-primary, #7c6af7)"
+          : "color-mix(in srgb, var(--foreground) 35%, transparent)",
+        background: esPublico
+          ? "color-mix(in srgb, var(--color-primary, #7c6af7) 12%, transparent)"
+          : "transparent",
+      }}
+      title={
+        esPublico
+          ? "Público — visible en /personal/ensayos. Click para volver a privado."
+          : "Privado — solo vos lo ves. Click para publicarlo."
+      }
+      type="button"
+      onClick={toggle}
+    >
+      {esPublico ? <Globe size={11} /> : <Lock size={11} />}
+      {esPublico ? "Público" : "Privado"}
+    </button>
+  );
+}
 
 // ── TOC extractor ─────────────────────────────────────────────────────────────
 function extractTOC(
@@ -462,6 +512,7 @@ export function Editor({
               ensayos={ensayos}
               onNavigateToPage={onNavigateToPage}
             />
+            <PublicarToggle ensayo={ensayo} onUpdateField={onUpdateField} />
           </>
         )}
       </div>

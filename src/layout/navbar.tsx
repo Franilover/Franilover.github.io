@@ -29,6 +29,7 @@ import {
   Shirt,
   Upload,
   Wand2,
+  NotebookPen,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -634,6 +635,13 @@ const Navbar = () => {
       active: currentPath?.startsWith("/personal/galeria") ?? false,
       fillActive: false,
     },
+    {
+      href: "/personal/ensayos",
+      label: "Ensayos",
+      icon: NotebookPen,
+      active: currentPath?.startsWith("/personal/ensayos") ?? false,
+      fillActive: false,
+    },
     ...(user
       ? [
           {
@@ -670,18 +678,6 @@ const Navbar = () => {
             icon: Compass,
             active: currentPath?.startsWith("/garlia/mapa") ?? false,
           },
-          {
-            href: "/garlia/aventura",
-            label: "Aventura",
-            icon: BookOpen,
-            active: isAventura,
-          },
-          {
-            href: "/garlia/runas",
-            label: "Runas",
-            icon: ScrollText,
-            active: isRunas,
-          },
         ]
       : []),
     {
@@ -692,9 +688,8 @@ const Navbar = () => {
     },
   ];
 
-  // Versión mobile: mismos links, pero Aventura y Runas se agrupan en un
-  // solo botón con subLinks (panel flotante), en vez de dos íconos sueltos
-  // en la barra inferior.
+  // Versión mobile: mismos links que garliaLinks (Aventura y Runas ocultos
+  // acá también — ver arriba).
   const mobileGarliaLinks: NavLinkDef[] = [
     {
       href: user ? "/garlia/personal" : "/auth/login",
@@ -710,12 +705,6 @@ const Navbar = () => {
             icon: Compass,
             active: currentPath?.startsWith("/garlia/mapa") ?? false,
           },
-          {
-            href: "/garlia/aventura",
-            label: "Aventura",
-            icon: BookOpen,
-            active: isAventura || isRunas,
-          },
         ]
       : []),
     {
@@ -726,6 +715,10 @@ const Navbar = () => {
     },
   ];
 
+  // aventuraSubLinks queda sin uso ahora que "Aventura" no aparece en
+  // garliaLinks/mobileGarliaLinks (ítem con subLinks solo se activaba
+  // para href === "/garlia/aventura") — se mantiene la definición por si
+  // se vuelve a mostrar más adelante, pero no se referencia en el render.
   const aventuraSubLinks: NavLinkDef[] = [
     {
       href: "/garlia/aventura",
