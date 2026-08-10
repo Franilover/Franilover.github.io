@@ -102,25 +102,22 @@ jobs:
 
           conf["version"] = version
 
-          partes = version.split(".")
-          major = int(partes[0]) if len(partes) > 0 and partes[0].isdigit() else 0
-          minor = int(partes[1]) if len(partes) > 1 and partes[1].isdigit() else 0
-          patch = int(partes[2]) if len(partes) > 2 and partes[2].isdigit() else 0
-          version_code = major * 1000000 + minor * 1000 + patch
-
-          conf.setdefault("bundle", {}).setdefault("android", {})
-          conf["bundle"]["android"]["versionCode"] = version_code
-          conf["bundle"]["android"]["versionName"] = version
+          # NOTA: bundle.android en el schema de Tauri 2 solo admite
+          # "minSdkVersion" — versionCode/versionName ahí adentro rompen la
+          # validación con "Additional properties are not allowed" y tiran
+          # abajo el build. El versionCode/versionName de Android se setean
+          # más adelante, después de "tauri android init", directamente en
+          # src-tauri/gen/android/tauri.properties (ver paso "Forzar
+          # versionCode/versionName de Android").
 
           with open(path, "w") as f:
               json.dump(conf, f, indent=2)
               f.write("\n")
 
-          print(f"bundle.android.versionCode = {version_code}")
-          print(f"bundle.android.versionName = {version}")
+          print(f"version = {version}")
           PYEOF
 
-          grep -n "\"version\"\|versionCode\|versionName" "$CONF"
+          grep -n "\"version\"" "$CONF"
 
       - name: Quitar rutas dinámicas web-only (no compatibles con output:export)
         # /garlia/libros/[slug] (y su subruta anidada [slug]/leer/[orden]) usan
@@ -213,6 +210,47 @@ jobs:
         run: |
           rm -rf src-tauri/gen/android
           npx tauri android init
+
+      - name: Forzar versionCode/versionName de Android
+        # Reemplaza al viejo enfoque de escribir bundle.android.versionCode/
+        # versionName en tauri.conf.json, que rompe el JSON schema de Tauri 2
+        # ("Additional properties are not allowed ('versionName' was
+        # unexpected)") porque bundle.android solo admite "minSdkVersion".
+        #
+        # El archivo correcto para esto es tauri.properties, que recién
+        # existe a partir de "tauri android init" (paso anterior) y es lo
+        # que Gradle lee de verdad para versionCode/versionName en Android.
+        # Sigue haciendo falta setearlo a mano por el bug conocido de Tauri
+        # donde este archivo no se regenera bien en CI:
+        # https://github.com/tauri-apps/tauri/issues/14413
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          PROPS="src-tauri/gen/android/tauri.properties"
+
+          if [ ! -f "$PROPS" ]; then
+            echo "::error::$PROPS no existe — este paso debe ir después de 'tauri android init'."
+            exit 1
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          MAJOR="${MAJOR:-0}"; MINOR="${MINOR:-0}"; PATCH="${PATCH:-0}"
+          VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
+
+          if grep -q "^tauri.android.versionCode=" "$PROPS"; then
+            sed -i "s/^tauri.android.versionCode=.*/tauri.android.versionCode=$VERSION_CODE/" "$PROPS"
+          else
+            echo "tauri.android.versionCode=$VERSION_CODE" >> "$PROPS"
+          fi
+
+          if grep -q "^tauri.android.versionName=" "$PROPS"; then
+            sed -i "s/^tauri.android.versionName=.*/tauri.android.versionName=$VERSION/" "$PROPS"
+          else
+            echo "tauri.android.versionName=$VERSION" >> "$PROPS"
+          fi
+
+          echo "Contenido final de $PROPS:"
+          cat "$PROPS"
 
       - name: Restaurar el keystore de firma
         env:
