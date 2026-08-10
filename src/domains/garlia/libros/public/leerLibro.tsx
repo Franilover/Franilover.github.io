@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 
 import { Btn } from "@/ui";
+import { FechaMundoBadge } from "@/domains/garlia/calendario/FechaMundoBadge";
 import type {
   CapituloLista,
   CapituloScrollItem,
@@ -540,6 +541,22 @@ function PanelLateral({
         </button>
       </div>
 
+      {/* Fecha del mundo — justo debajo de la imagen del narrador */}
+      {(capActual as any)?.dia_absoluto != null && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: "10px 16px 0",
+          }}
+        >
+          <FechaMundoBadge
+            diaAbsoluto={(capActual as any).dia_absoluto}
+            mostrarEraDot={false}
+          />
+        </div>
+      )}
+
       {/* ── Scroll único: metadata + separador + índice ── */}
       <div
         style={{
@@ -1010,6 +1027,7 @@ export default function Lector({
         orden: number;
         titulo_capitulo: string;
         fecha_publicacion: string;
+        dia_absoluto: number | null;
         personajes_ids: string[];
         reinos_ids: string[] | null;
         ciudades_ids: string[] | null;
@@ -1020,7 +1038,7 @@ export default function Lector({
       const { data: indice, error: capsError } = await supabase
         .from("capitulos")
         .select(
-          `id, orden, titulo_capitulo, fecha_publicacion, visibilidad, personajes_ids, reinos_ids, ciudades_ids, libros(titulo), narrador:personajes!narrador_id(id, nombre, img_url)`,
+          `id, orden, titulo_capitulo, fecha_publicacion, dia_absoluto, visibilidad, personajes_ids, reinos_ids, ciudades_ids, libros(titulo), narrador:personajes!narrador_id(id, nombre, img_url)`,
         )
         .eq("libro_id", libroId)
         .or(
@@ -1046,6 +1064,7 @@ export default function Lector({
         titulo_capitulo: c.titulo_capitulo,
         // Sin `contenido` a propósito — ver comentario del select de arriba.
         fecha_publicacion: c.fecha_publicacion,
+        dia_absoluto: c.dia_absoluto,
         personajes_ids: c.personajes_ids,
         reinos_ids: c.reinos_ids ?? [],
         ciudades_ids: c.ciudades_ids ?? [],

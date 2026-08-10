@@ -657,7 +657,7 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
           return (
             <button
               key={cap.id}
-              className={`w-full flex items-center justify-between p-4 transition-all text-left group rounded-btn shadow-card ${esRuta ? "bg-blue-50/60" : leido ? "bg-primary/[0.03]" : "bg-white-custom"}`}
+              className={`relative w-full flex items-center justify-between p-4 transition-all text-left group rounded-btn shadow-card ${esRuta ? "bg-blue-50/60" : leido ? "bg-primary/[0.03]" : "bg-white-custom"}`}
               style={{
                 border: `var(--border-width) solid ${esRuta ? "rgb(219 234 254)" : leido ? "color-mix(in srgb, var(--primary) 5%, transparent)" : "color-mix(in srgb, var(--primary) 8%, transparent)"}`,
                 boxShadow: leido ? "none" : undefined,
@@ -704,10 +704,12 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
                   </span>
                 )}
               </div>
-              <div className="flex-shrink-0 ml-4 flex flex-col items-end gap-2">
-                {cap.dia_absoluto != null && (
+              {cap.dia_absoluto != null && (
+                <div className="absolute top-2 right-3">
                   <FechaMundoBadge diaAbsoluto={cap.dia_absoluto} mostrarEraDot={false} />
-                )}
+                </div>
+              )}
+              <div className="flex-shrink-0 ml-4 flex flex-col items-end gap-2">
                 {leido ? (
                   <CheckCircle2 className="text-primary/25" size={14} />
                 ) : (

@@ -29,6 +29,7 @@ export interface CapituloScrollItem {
    */
   contenido?: string;
   fecha_publicacion: string;
+  dia_absoluto?: number | null;
   libros?: { titulo?: string };
   personajes_ids?: string[];
   reinos_ids?: string[];
