@@ -46,7 +46,7 @@ import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { useGlobalSearch } from "@/lib/api/queries/search";
 import { toSlug } from "@/lib/utils/slugify";
-import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/public/leerLibro";
+import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/utils/rutas";
 import { rutaCancion } from "@/domains/garlia/canciones/public/detallesCancion";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTheme } from "@/providers/ThemeProvider";

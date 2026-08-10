@@ -16,7 +16,11 @@ import React, { useEffect, useState, useRef } from "react";
 import { Loading, BackBtn } from "@/ui";
 import { SmartImage } from "@/ui/SmartImage";
 import { FechaMundoBadge } from "@/domains/garlia/calendario/FechaMundoBadge";
-import { db } from "@/infra/supabase/db";
+import {
+  resolverLibroPorId,
+  resolverLibroPorSlug,
+} from "@/domains/garlia/libros/utils/resolverLibro";
+import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/utils/rutas";
 import { supabase } from "@/infra/supabase/supabase";
 import {
   loadCapitulos,
@@ -27,7 +31,6 @@ import {
   collectIds,
 } from "@/infra/sync/syncEngine";
 import { toSlug, esUUID } from "@/lib/utils/slugify";
-import { IS_TAURI_BUILD } from "@/lib/config/buildTarget";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -87,38 +90,6 @@ function marcarLibroTWAceptado(libroId: string) {
       localStorage.setItem(TW_STORAGE_KEY, JSON.stringify(set));
     }
   } catch {}
-}
-
-// ─── Resolver slug → libro (Dexie first) ─────────────────────────────────────
-async function resolverLibroPorSlug(slugParam: string): Promise<Libro | null> {
-  try {
-    if (db?.libros) {
-      const todos = (await db.libros.toArray()) as any[];
-      if (todos.length > 0) {
-        const encontrado = todos.find(
-          (l: any) =>
-            toSlug(l.titulo ?? "") === slugParam &&
-            (l.visibilidad === "publico" || l.visibilidad === "programado"),
-        );
-        // Solo usar caché si ya tiene trigger_warnings (campo nuevo)
-        if (encontrado && Array.isArray(encontrado.trigger_warnings)) {
-          return encontrado as Libro;
-        }
-      }
-    }
-  } catch {}
-
-  const { data } = await supabase
-    .from("libros")
-    .select("id, titulo, sinopsis, portada_url, categoria, trigger_warnings")
-    .in("visibilidad", ["publico", "programado"]);
-  if (!data) return null;
-
-  try {
-    await db?.libros?.bulkPut(data as any[]);
-  } catch {}
-  return (data.find((l: any) => toSlug(l.titulo ?? "") === slugParam) ??
-    null) as Libro | null;
 }
 
 // ─── Modal Trigger Warning ────────────────────────────────────────────────────
@@ -420,26 +391,10 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
       let libroData: Libro | null = null;
 
       // ── Resolver libro ──────────────────────────────────────────────────────
+      const COLUMNAS_LIBRO =
+        "id, titulo, sinopsis, portada_url, categoria, trigger_warnings";
       if (esUUID(slugParam)) {
-        try {
-          libroData = ((await db?.libros?.get(slugParam)) as any) ?? null;
-        } catch {}
-        if (!libroData) {
-          const { data } = await supabase
-            .from("libros")
-            .select(
-              "id, titulo, sinopsis, portada_url, categoria, trigger_warnings",
-            )
-            .eq("id", slugParam)
-            .in("visibilidad", ["publico", "programado"])
-            .single();
-          libroData = data as Libro | null;
-          if (libroData) {
-            try {
-              await db?.libros?.put(libroData as any);
-            } catch {}
-          }
-        }
+        libroData = await resolverLibroPorId<Libro>(slugParam, COLUMNAS_LIBRO);
         if (!libroData) {
           if (mounted) {
             setNotFound(true);
@@ -449,14 +404,12 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
           return;
         }
         const slug = toSlug(libroData.titulo);
-        if (slug) {
-          const destino = IS_TAURI_BUILD
-            ? `/garlia/libros/detalle?slug=${slug}`
-            : `/garlia/libros/${slug}`;
-          router.replace(destino);
-        }
+        if (slug) router.replace(rutaLibro(slug));
       } else {
-        libroData = await resolverLibroPorSlug(slugParam);
+        libroData = await resolverLibroPorSlug<Libro>(slugParam, {
+          columnas: COLUMNAS_LIBRO,
+          exigirColumnas: ["trigger_warnings"],
+        });
         if (!libroData) {
           if (mounted) {
             setNotFound(true);
@@ -572,9 +525,7 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
       capitulos.find((c) => c.id === targetId) ??
       capitulos.find((c) => c.id === primerCapId);
     const orden = cap?.orden ?? 1;
-    return IS_TAURI_BUILD
-      ? `/garlia/libros/leer?slug=${slugParam}&orden=${orden}`
-      : `/garlia/libros/${slugParam}/leer/${orden}`;
+    return rutaLeer(slugParam, orden);
   };
 
   // ── Narrador (imagen + nombre) ──────────────────────────────────────────────

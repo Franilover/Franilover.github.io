@@ -8,10 +8,10 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Loading } from "@/ui";
 import { MotionDiv } from "@/ui/Motion";
 import { SmartImage } from "@/ui/SmartImage";
+import { rutaLibro } from "@/domains/garlia/libros/utils/rutas";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import { toSlug } from "@/lib/utils/slugify";
-import { IS_TAURI_BUILD } from "@/lib/config/buildTarget";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface Libro {
@@ -295,9 +295,7 @@ function LibroCard({
 }) {
   const progreso = numCaps > 0 ? Math.round((leidosCount / numCaps) * 100) : 0;
   const slug = toSlug(libro.titulo);
-  const href = IS_TAURI_BUILD
-    ? `/garlia/libros/detalle?slug=${slug}`
-    : `/garlia/libros/${slug}`;
+  const href = rutaLibro(slug);
 
   return (
     <MotionDiv

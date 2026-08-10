@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 import { MotionDiv, MotionButton } from "@/ui/Motion";
-import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/public/leerLibro";
+import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/utils/rutas";
 import { ReinoTileCanvas } from "@garlia/reinos";
 import {
   UnifiedTileCanvas,

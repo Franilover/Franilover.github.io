@@ -2,12 +2,10 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, List, ChevronRight } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 
 import { Btn } from "@/ui";
-import { FechaMundoBadge } from "@/domains/garlia/calendario/FechaMundoBadge";
 import type {
   CapituloLista,
   CapituloScrollItem,
@@ -17,6 +15,8 @@ import {
   ToastPortal,
 } from "@/domains/garlia/libros/public/CapituloScrollBlock";
 import { Vignette, AjustesLectura } from "@/domains/garlia/libros/public/LectorUI";
+import { PanelLateral } from "@/domains/garlia/libros/public/PanelLateral";
+import { useCargadorContenido } from "@/domains/garlia/libros/public/useCargadorContenido";
 import { useLectorAjustes } from "@/domains/garlia/libros/public/useLectorAjustes";
 import {
   useLectorStore,
@@ -24,6 +24,9 @@ import {
   capVecino,
 } from "@/domains/garlia/libros/useLectorStore";
 import { useLectorEntidadesStore } from "@/domains/garlia/libros/useLectorEntidadesStore";
+import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/utils/rutas";
+import { filtrarCapitulosVisibles } from "@/domains/garlia/libros/utils/filtrarVisibilidad";
+import { esLibroExtra } from "@/domains/garlia/libros/utils/resolverLibro";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 // ⚠️ Ajustar esta ruta si syncEngine.ts vive en otra carpeta del proyecto.
@@ -34,661 +37,8 @@ import {
   loadReinosMap,
 } from "@/infra/sync/syncEngine";
 import { toSlug, esUUID } from "@/lib/utils/slugify";
-import { IS_TAURI_BUILD } from "@/lib/config/buildTarget";
 
-// Arma la URL al índice de capítulos de un libro, condicional según build.
-// Acepta tanto slug canónico como UUID legacy (leerLibro/detallesLibro
-// resuelven el UUID a slug real en un efecto posterior y canonicalizan la URL).
-export function rutaLibro(slug: string): string {
-  return IS_TAURI_BUILD
-    ? `/garlia/libros/detalle?slug=${slug}`
-    : `/garlia/libros/${slug}`;
-}
 
-// Arma la URL al lector de un capítulo puntual, condicional según build.
-// `orden` acepta tanto el número de orden canónico como un UUID de capítulo
-// legacy (el componente Lector resuelve ambos casos vía esUUID()).
-export function rutaLeer(slug: string, orden: number | string): string {
-  return IS_TAURI_BUILD
-    ? `/garlia/libros/leer?slug=${slug}&orden=${orden}`
-    : `/garlia/libros/${slug}/leer/${orden}`;
-}
-
-/* ─────────────────────────────────────────────
-   Tipos
-   ───────────────────────────────────────────── */
-interface NarradorInfo {
-  id: string;
-  nombre: string;
-  img_url?: string | null;
-}
-
-/* ─────────────────────────────────────────────
-   useContenidoCapitulo — fetch de contenido bajo demanda
-   ───────────────────────────────────────────────────────────────────────────
-   Reemplaza al viejo modelo de "traer el contenido de todos los capítulos
-   de una". Cada capítulo pide su `contenido` recién cuando:
-     a) el lector lo abre (capId activo sin entrada en contenidoPorCapId), o
-     b) se prefetchea en silencio apenas se resuelve `capSiguiente` (ver
-        efecto de prefetch en el componente Lector más abajo) — así
-        "Siguiente capítulo" se siente instantáneo.
-   En ambos casos: si ya está en el mapa (memoria) o `cargandoContenidoIds`
-   ya lo tiene en vuelo, no repite el fetch. Al resolver, persiste en Dexie
-   (cache por capítulo individual, no el libro entero).
-   ───────────────────────────────────────────── */
-function useCargadorContenido() {
-  const contenidoPorCapId = useLectorStore((s) => s.contenidoPorCapId);
-  const cargandoContenidoIds = useLectorStore((s) => s.cargandoContenidoIds);
-  const setContenidoCap = useLectorStore((s) => s.setContenidoCap);
-  const setCargandoContenido = useLectorStore((s) => s.setCargandoContenido);
-
-  const cargar = useCallback(
-    async (capId: string) => {
-      if (!capId) return;
-      const estado = useLectorStore.getState();
-      if (estado.contenidoPorCapId[capId] !== undefined) return; // ya en memoria
-      if (estado.cargandoContenidoIds[capId]) return; // ya en vuelo
-
-      setCargandoContenido(capId, true);
-      try {
-        // Dexie primero: si el capítulo ya se leyó antes, esto resuelve
-        // instantáneo sin tocar red.
-        try {
-          if (db && (db as any).capitulos) {
-            const local = await (db as any).capitulos.get(capId);
-            if (local?.contenido) {
-              setContenidoCap(capId, local.contenido);
-              return;
-            }
-          }
-        } catch {}
-
-        const { data, error } = await supabase
-          .from("capitulos")
-          .select("contenido")
-          .eq("id", capId)
-          .single();
-
-        if (error || !data) {
-          setCargandoContenido(capId, false);
-          return;
-        }
-
-        const contenido = (data as any).contenido ?? "";
-        setContenidoCap(capId, contenido);
-
-        // Cache individual en Dexie — solo este capítulo, no el libro entero.
-        try {
-          if (db && (db as any).capitulos) {
-            await (db as any).capitulos.update(capId, {
-              contenido,
-              status: "synced",
-            });
-          }
-        } catch {}
-      } catch {
-        setCargandoContenido(capId, false);
-      }
-    },
-    [setContenidoCap, setCargandoContenido],
-  );
-
-  return { contenidoPorCapId, cargandoContenidoIds, cargar };
-}
-
-/* ─────────────────────────────────────────────
-   Barra de progreso VERTICAL — rail sobre borde derecho
-   ───────────────────────────────────────────── */
-function BarraProgresoVertical({ capId }: { capId: string }) {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    if (!capId) return;
-    const container = document.getElementById("lector-scroll-container");
-    if (!container) return;
-
-    const calc = () => {
-      const el = document.getElementById(`cap-${capId}`);
-      if (!el) return;
-      const top = el.offsetTop;
-      const bottom = top + el.offsetHeight;
-      const total = bottom - top;
-      const scrolled = container.scrollTop + container.clientHeight - top;
-      setProgress(Math.min(100, Math.max(0, (scrolled / total) * 100)));
-    };
-    calc();
-    container.addEventListener("scroll", calc, { passive: true });
-    return () => container.removeEventListener("scroll", calc);
-  }, [capId]);
-
-  return (
-    <div style={{ position: "absolute", inset: 0 }}>
-      <motion.div
-        animate={{ height: `${progress}%` }}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          originY: 0,
-          background:
-            "linear-gradient(to bottom, var(--accent, var(--primary)), color-mix(in srgb, var(--primary) 60%, transparent))",
-          borderRadius: 99,
-        }}
-        transition={{ duration: 0.18, ease: "linear" }}
-      />
-      <motion.div
-        animate={{ top: `${progress}%` }}
-        style={{
-          position: "absolute",
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: "var(--primary)",
-          opacity: 0.6,
-          marginLeft: -1,
-        }}
-        transition={{ duration: 0.18, ease: "linear" }}
-      />
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   Personajes del capítulo activo
-   — Lookup puro sobre el mapa precargado para todo el libro
-   (ver cargarEntidades en el efecto principal). Sin fetch propio:
-   así cambiar de capítulo no dispara red/IO y no parpadea.
-   ───────────────────────────────────────────── */
-function PersonajesPanel({ ids, border }: { ids: string[]; border: string }) {
-  // Selector granular: este panel solo re-renderiza cuando cambia
-  // personajesMap, no cuando cambia capId, activeCapTitle, etc.
-  const personajesMap = useLectorEntidadesStore((s) => s.personajesMap);
-  const personajes = ids.map((id) => personajesMap[id]).filter(Boolean) as {
-    id: string;
-    nombre: string;
-    img_url?: string | null;
-  }[];
-
-  if (personajes.length === 0) return null;
-
-  return (
-    <div style={{ paddingTop: 14, borderTop: border }}>
-      <p
-        style={{
-          fontSize: 8,
-          fontFamily: "var(--font-mono)",
-          letterSpacing: "0.2em",
-          textTransform: "uppercase",
-          color: "var(--primary)",
-          opacity: 0.25,
-          marginBottom: 10,
-        }}
-      >
-        Personajes
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        {personajes.map((p) => (
-          <div
-            key={p.id}
-            style={{ display: "flex", alignItems: "center", gap: 9 }}
-          >
-            {p.img_url ? (
-              <Image
-                alt={p.nombre}
-                src={p.img_url}
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "var(--radius-btn, 4px)",
-                  objectFit: "cover",
-                  border,
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "var(--radius-btn, 4px)",
-                  border,
-                  flexShrink: 0,
-                  background:
-                    "color-mix(in srgb, var(--primary) 8%, transparent)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 9,
-                  fontWeight: 800,
-                  color: "var(--primary)",
-                  opacity: 0.4,
-                }}
-              >
-                {p.nombre.charAt(0)}
-              </div>
-            )}
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "var(--primary)",
-                opacity: 0.65,
-                lineHeight: 1.2,
-              }}
-            >
-              {p.nombre}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   Reinos y ciudades del capítulo activo
-   — Igual que PersonajesPanel: lookup puro sobre los mapas
-   precargados para todo el libro, sin fetch propio por capítulo.
-   ───────────────────────────────────────────── */
-function LugaresPanel({
-  reinosIds,
-  ciudadesIds,
-  border: _border,
-}: {
-  reinosIds: string[];
-  ciudadesIds: string[];
-  border: string;
-}) {
-  // Selectores granulares: no re-renderiza con cambios de capId ni de
-  // personajesMap — solo con reinosMap/ciudadesMap.
-  const reinosMap = useLectorEntidadesStore((s) => s.reinosMap);
-  const ciudadesMap = useLectorEntidadesStore((s) => s.ciudadesMap);
-  const reinos = reinosIds.map((id) => reinosMap[id]).filter(Boolean) as {
-    id: string;
-    nombre: string;
-  }[];
-  const ciudades = ciudadesIds.map((id) => ciudadesMap[id]).filter(Boolean) as {
-    id: string;
-    nombre: string;
-  }[];
-
-  if (reinos.length === 0 && ciudades.length === 0) return null;
-
-  return (
-    <div
-      style={{
-        padding: "14px 16px 0",
-        flexShrink: 0,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-      }}
-    >
-      {reinos.length > 0 && (
-        <div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {reinos.map((r) => (
-              <div
-                key={r.id}
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <span
-                  style={{
-                    fontSize: 14,
-                    color: "var(--primary)",
-                    opacity: 0.2,
-                    lineHeight: 1,
-                  }}
-                >
-                  ♛
-                </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    fontStyle: "italic",
-                    color: "var(--primary)",
-                    opacity: 0.55,
-                    letterSpacing: "-0.01em",
-                    textTransform: "uppercase",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {r.nombre}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {ciudades.length > 0 && (
-        <div>
-          <p
-            style={{
-              fontSize: 8,
-              fontFamily: "var(--font-mono)",
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: "var(--primary)",
-              opacity: 0.25,
-              marginBottom: 7,
-            }}
-          >
-            {ciudades.length === 1 ? "Ciudad" : "Ciudades"}
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {ciudades.map((c) => (
-              <div
-                key={c.id}
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <span
-                  style={{
-                    fontSize: 14,
-                    color: "var(--primary)",
-                    opacity: 0.2,
-                    lineHeight: 1,
-                  }}
-                >
-                  ♖
-                </span>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "var(--primary)",
-                    opacity: 0.45,
-                    textTransform: "uppercase",
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {c.nombre}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   Panel lateral izquierdo
-   ───────────────────────────────────────────── */
-function PanelLateral({
-  libroTitulo: _libroTitulo,
-  capActual,
-  esExtra,
-  onVolver,
-  onSelectCap,
-  isMobile,
-}: {
-  libroTitulo?: string;
-  capActual: CapituloScrollItem | null;
-  esExtra?: boolean;
-  onVolver: () => void;
-  onSelectCap?: (capId: string) => void;
-  isMobile?: boolean;
-}) {
-  // Selectores granulares: cambiar capId (navegar de capítulo) SÍ toca este
-  // panel (resalta el ítem activo), pero cambiar personajesMap/reinosMap NO
-  // dispara un re-render de la lista de índice — cada bloque hijo
-  // (PersonajesPanel/LugaresPanel) tiene su propio selector.
-  const capitulos = useLectorStore((s) => s.capitulos);
-  const loading = useLectorStore((s) => s.loading);
-  const capIdActual = useLectorStore((s) => s.capId);
-
-  const border =
-    "1px solid color-mix(in srgb, var(--primary) 10%, transparent)";
-  const narrador = (capActual as any)?._narrador as
-    | NarradorInfo
-    | null
-    | undefined;
-  const personajesIds = Array.from(new Set(capActual?.personajes_ids ?? []));
-
-  return (
-    <div
-      style={{
-        width: isMobile ? "100%" : "clamp(220px, 22vw, 300px)",
-        flexShrink: 0,
-        height: "100vh",
-        borderRight: border,
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        position: "relative",
-        background: "var(--bg-main)",
-      }}
-    >
-      {/* ── Hero: imagen del narrador con degradado ── */}
-      <div style={{ position: "relative", flexShrink: 0 }}>
-        {narrador?.img_url ? (
-          <img
-            alt={narrador.nombre}
-            src={narrador.img_url}
-            style={{ width: "100%", height: "auto", display: "block" }}
-          />
-        ) : (
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              background:
-                "color-mix(in srgb, var(--primary) 6%, var(--bg-main))",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {narrador?.nombre && (
-              <span
-                style={{
-                  fontSize: 56,
-                  fontWeight: 900,
-                  color: "var(--primary)",
-                  opacity: 0.06,
-                  fontStyle: "italic",
-                  textTransform: "uppercase",
-                }}
-              >
-                {narrador.nombre.charAt(0)}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Degradado sobre la imagen */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(to bottom, color-mix(in srgb, var(--bg-main) 0%, transparent) 0%, color-mix(in srgb, var(--bg-main) 55%, transparent) 55%, var(--bg-main) 100%)",
-          }}
-        />
-
-        {/* Botón volver — arriba izquierda */}
-        <button
-          style={{
-            position: "absolute",
-            top: 12,
-            left: 14,
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            border: "none",
-            background: "none",
-            cursor: "pointer",
-            color: "var(--primary)",
-            fontSize: 9,
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            opacity: 0.55,
-            transition: "opacity 0.15s",
-            textShadow: "0 1px 6px var(--bg-main)",
-          }}
-          onClick={onVolver}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.55")}
-        >
-          ← Volver
-        </button>
-      </div>
-
-      {/* Fecha del mundo — justo debajo de la imagen del narrador */}
-      {(capActual as any)?.dia_absoluto != null && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            padding: "10px 16px 0",
-          }}
-        >
-          <FechaMundoBadge
-            diaAbsoluto={(capActual as any).dia_absoluto}
-            mostrarEraDot={false}
-          />
-        </div>
-      )}
-
-      {/* ── Scroll único: metadata + separador + índice ── */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          overflowX: "hidden",
-        }}
-      >
-        {/* Metadata */}
-        {!loading && capActual && !esExtra && (
-          <LugaresPanel
-            border={border}
-            ciudadesIds={(capActual as any).ciudades_ids ?? []}
-            reinosIds={(capActual as any).reinos_ids ?? []}
-          />
-        )}
-        {!loading && !esExtra && personajesIds.length > 0 && (
-          <div style={{ padding: "10px 16px 0" }}>
-            <PersonajesPanel border={border} ids={personajesIds} />
-          </div>
-        )}
-
-        {/* Separador */}
-        <div
-          style={{
-            margin: "10px 16px 4px",
-            height: 1,
-            background: border.replace("1px solid ", ""),
-          }}
-        />
-
-        {/* Índice */}
-        <div style={{ padding: "0 8px 16px" }}>
-          {loading ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                padding: "8px",
-              }}
-            >
-              {[80, 60, 100, 50, 75].map((w, i) => (
-                <div
-                  key={i}
-                  style={{
-                    height: 9,
-                    width: `${w}%`,
-                    borderRadius: 4,
-                    background:
-                      "color-mix(in srgb, var(--primary) 7%, transparent)",
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {capitulos.map((cap) => {
-                const esActual = cap.id === capIdActual;
-                return (
-                  <button
-                    key={cap.id}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "6px 10px",
-                      borderRadius: 6,
-                      border: "none",
-                      background: esActual
-                        ? "color-mix(in srgb, var(--primary) 10%, transparent)"
-                        : "transparent",
-                      cursor: "pointer",
-                      transition: "background 0.12s",
-                      color: esActual
-                        ? "var(--primary)"
-                        : "color-mix(in srgb, var(--primary) 45%, transparent)",
-                      fontSize: 10,
-                      fontFamily: "var(--font-mono)",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      lineHeight: 1.4,
-                    }}
-                    onClick={() => onSelectCap?.(cap.id)}
-                    onMouseEnter={(e) => {
-                      if (!esActual)
-                        e.currentTarget.style.background =
-                          "color-mix(in srgb, var(--primary) 6%, transparent)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!esActual)
-                        e.currentTarget.style.background = "transparent";
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 8,
-                        opacity: 0.35,
-                        marginRight: 6,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {String(cap.orden).padStart(2, "0")}
-                    </span>
-                    {cap.titulo_capitulo}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Barra de progreso vertical */}
-      <div
-        style={{
-          position: "absolute",
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: 3,
-          background: "color-mix(in srgb, var(--primary) 6%, transparent)",
-          borderRadius: 99,
-        }}
-      >
-        <BarraProgresoVertical capId={capIdActual} />
-      </div>
-    </div>
-  );
-}
 /* ─────────────────────────────────────────────
    Componente principal del lector
    ───────────────────────────────────────────── */
@@ -849,20 +199,13 @@ export default function Lector({
       actualSlug: string,
     ) => {
       if (cancelled) return;
-      // ── Filtro de seguridad en cliente ────────────────────────────────────
-      // Descarta caps que no sean públicos o que tengan fecha futura,
-      // independientemente de la fuente (Supabase, Dexie, caché).
-      const ahora = new Date();
-      const caps = capsValidas.filter((c) => {
-        const vis = c.visibilidad ?? "publico"; // fallback para datos Dexie sin campo
-        if (vis === "oculto") return false;
-        if (vis === "publico") return true;
-        if (vis === "programado") {
-          if (!c.fecha_publicacion) return false;
-          return new Date(c.fecha_publicacion) <= ahora;
-        }
-        return false; // cualquier otro valor desconocido → ocultar
-      });
+      // Filtro de seguridad en cliente: descarta caps ocultos o con fecha
+      // futura, independientemente de la fuente (Supabase, Dexie, caché).
+      // Ver domains/garlia/libros/utils/filtrarVisibilidad.ts — mismo
+      // filtro usado también en el render instantáneo desde Dexie y en el
+      // fallback de error, para que las tres rutas de datos apliquen
+      // exactamente la misma regla.
+      const caps = filtrarCapitulosVisibles(capsValidas);
 
       const lista: CapituloLista[] = caps.map((c) => ({
         id: c.id,
@@ -902,20 +245,7 @@ export default function Lector({
         }
         libroId = data.id;
         actualSlug = toSlug(data.titulo); // <--- Obtenemos el slug real si vino un UUID
-        // Detectar tipo de grupo: poemario u otros sin navegación lineal
-        if (data.categoria && esUUID(data.categoria)) {
-          const { data: grupo } = await supabase
-            .from("grupos_mundo")
-            .select("nombre")
-            .eq("id", data.categoria)
-            .single();
-          if (
-            grupo?.nombre?.toLowerCase().includes("poemario") ||
-            grupo?.nombre?.toLowerCase().includes("extra")
-          ) {
-            esExtraLocal = true;
-          }
-        }
+        esExtraLocal = await esLibroExtra(data.categoria);
         // Canonicalizamos el slug del libro en la URL de inmediato (link
         // legacy con UUID), conservando el segmento de capítulo actual.
         if (!cancelled) {
@@ -932,7 +262,6 @@ export default function Lector({
         try {
           if (db?.libros) {
             const dexieLibros = (await db.libros.toArray()) as any[];
-            // Simplificamos la comparación manual usando la función toSlug importada arriba
             encontrado =
               dexieLibros.find(
                 (l: any) => toSlug(l.titulo ?? "") === slugParam,
@@ -959,20 +288,7 @@ export default function Lector({
         }
         libroId = encontrado.id;
         actualSlug = toSlug(encontrado.titulo); // <--- Nos aseguramos de tener el slug formateado correctamente
-        // Detectar tipo de grupo
-        if (encontrado.categoria && esUUID(encontrado.categoria)) {
-          const { data: grupo } = await supabase
-            .from("grupos_mundo")
-            .select("nombre")
-            .eq("id", encontrado.categoria)
-            .single();
-          if (
-            grupo?.nombre?.toLowerCase().includes("poemario") ||
-            grupo?.nombre?.toLowerCase().includes("extra")
-          ) {
-            esExtraLocal = true;
-          }
-        }
+        esExtraLocal = await esLibroExtra(encontrado.categoria);
         // El slug pudo venir con formato distinto al canónico (mayúsculas,
         // acentos, etc.) — lo normalizamos sin tocar el capítulo actual.
         if (actualSlug !== slugParam && !cancelled) {
@@ -998,23 +314,13 @@ export default function Lector({
             .where("libro_id")
             .equals(libroId)
             .toArray()) as any[];
-          // Mismo filtro de seguridad que aplicarCaps: la tabla Dexie
-          // `capitulos` es compartida con el editor, así que puede tener
-          // capítulos ocultos o programados-a-futuro cacheados localmente.
-          // Si no filtramos acá, se ven todos por un instante al recargar
-          // y luego "desaparecen" cuando llega el fetch fresco (paso 3).
-          const ahoraCache = new Date();
-          const capsCached = cached.filter((c) => {
-            if (c.deleted) return false;
-            const vis = c.visibilidad ?? "publico";
-            if (vis === "oculto") return false;
-            if (vis === "publico") return true;
-            if (vis === "programado") {
-              if (!c.fecha_publicacion) return false;
-              return new Date(c.fecha_publicacion) <= ahoraCache;
-            }
-            return false;
-          });
+          // Mismo filtro que aplicarCaps (ver filtrarVisibilidad.ts): la
+          // tabla Dexie `capitulos` es compartida con el editor, así que
+          // puede tener capítulos ocultos o programados-a-futuro cacheados
+          // localmente. Si no filtramos acá, se ven todos por un instante
+          // al recargar y luego "desaparecen" cuando llega el fetch fresco
+          // (paso 3).
+          const capsCached = filtrarCapitulosVisibles(cached);
           if (capsCached.length > 0) {
             aplicarCaps(capsCached, libroId, esExtraLocal, actualSlug);
             const contenidoCacheado: Record<string, string> = {};
@@ -1103,7 +409,7 @@ export default function Lector({
           if (table && resolvedLibroId) {
             const todos = (await table.toArray()) as any[];
             const cached = todos.filter(
-              (c) => !c.deleted && c.libro_id === resolvedLibroId,
+              (c) => c.libro_id === resolvedLibroId,
             );
             if (cached.length > 0) {
               const estadoActual = useLectorStore.getState();
