@@ -29,7 +29,6 @@ import {
   Shirt,
   Upload,
   Wand2,
-  Package,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -771,25 +770,25 @@ const Navbar = () => {
   // ── Submenú admin (desktop) ──────────────────────────────────────────────
   // Reemplaza a <MundoTabs /> (que vivía arriba del editor): toda la
   // navegación entre secciones de /myself/garlia pasa a vivir acá.
-  // "Items" salió de "Entidades" y tiene su propio estado activo, igual
-  // que ya pasaba con "letras" (Canciones) y "runas" (Magia).
   // "Criaturas" ya NO es una sección propia del submenú: la vista de
-  // Personajes ahora tiene un dropdown para agrupar por Reino o por
-  // Criatura (ver EntidadesPage/AgrupacionPersonajesDropdown), así que
-  // "criaturas" solo sigue existiendo como SectionKey transitoria cuando se
-  // abre el editor puntual de una criatura desde ese dropdown — por eso
-  // sigue contando como "Entidades" acá (no tiene entrada de menú propia).
+  // Personajes ahora tiene un dropdown para agrupar por Reino, por
+  // Criatura o por Items (ver EntidadesPage/AgrupacionPersonajesDropdown),
+  // así que "criaturas" solo sigue existiendo como SectionKey transitoria
+  // cuando se abre el editor puntual de una criatura desde ese dropdown —
+  // por eso sigue contando como "Entidades" acá (no tiene entrada de menú
+  // propia). "Items" tampoco tiene entrada propia por el mismo motivo:
+  // pasó a ser la 3ra opción de ese mismo dropdown en vez de una sección
+  // propia de la navbar.
   // "Organización" (Grupos/Notas) ya NO vive acá — se sacó del submenú y
   // ahora es un botón propio en el Home del editor de mundo (ver
   // MundoHomeContent), en vez de una sección más de navegación global.
   const ENTIDADES_SECTIONS = new Set<SectionKey>([
     "personajes",
     "criaturas",
+    "items",
     "reinos",
     "ciudades",
   ]);
-
-  const ITEMS_SECTIONS = new Set<SectionKey>(["items"]);
 
   // "Magia" agrupa Runas + Tabla (elementos) — antes vivía dentro de
   // "Entidades", pero al tener su propio editor (FormularioMagico) tiene
@@ -851,16 +850,6 @@ const Navbar = () => {
         mundoSection !== null &&
         MAGIA_SECTIONS.has(mundoSection),
       onSelect: () => mundoSelectSection("runas"),
-    },
-    {
-      key: "items",
-      label: "Items",
-      icon: Package,
-      active:
-        isGarliaeditor &&
-        mundoSection !== null &&
-        ITEMS_SECTIONS.has(mundoSection),
-      onSelect: () => mundoSelectSection("items"),
     },
     { key: "div-2", divider: true },
     {

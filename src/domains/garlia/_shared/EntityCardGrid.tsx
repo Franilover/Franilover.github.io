@@ -56,6 +56,10 @@ interface Props {
   variant?: "grid" | "chips";
   /** Ancho mínimo de cada tarjeta en px antes de que el grid agregue una columna más. Default: 76. */
   minCardWidth?: number;
+  /** Oculta el header propio (título + contador + Añadir) — para cuando el
+   *  llamador ya renderiza su propio header encima (ej. ItemsJerarquia, que
+   *  necesita que sea clickeable para colapsar la categoría). */
+  hideHeader?: boolean;
 }
 
 export function EntityCardGrid({
@@ -70,33 +74,36 @@ export function EntityCardGrid({
   variant = "grid",
   minCardWidth = 76,
   section,
+  hideHeader = false,
 }: Props) {
   const isFavorito = useFavoritos((s) => s.isFavorito);
   const toggleFavorito = useFavoritos((s) => s.toggleFavorito);
   return (
     <div className="mb-8 last:mb-0">
-      <div className="flex items-center gap-2 mb-3 px-1">
-        <h2 className="text-micro font-black uppercase tracking-[0.25em] text-primary/50">
-          {title}
-        </h2>
-        <span className="text-micro text-primary/25 tabular-nums">{items.length}</span>
-        <div className="flex-1" />
-        {onCreate && (
-          <button
-            type="button"
-            onClick={onCreate}
-            disabled={creating}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-micro font-bold uppercase tracking-wide text-primary disabled:opacity-50"
-          >
-            {creating ? (
-              <Loader2 size={11} className="animate-spin" />
-            ) : (
-              <Plus size={11} />
-            )}
-            Añadir
-          </button>
-        )}
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center gap-2 mb-3 px-1">
+          <h2 className="text-micro font-black uppercase tracking-[0.25em] text-primary/50">
+            {title}
+          </h2>
+          <span className="text-micro text-primary/25 tabular-nums">{items.length}</span>
+          <div className="flex-1" />
+          {onCreate && (
+            <button
+              type="button"
+              onClick={onCreate}
+              disabled={creating}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors text-micro font-bold uppercase tracking-wide text-primary disabled:opacity-50"
+            >
+              {creating ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Plus size={11} />
+              )}
+              Añadir
+            </button>
+          )}
+        </div>
+      )}
 
       {loading && items.length === 0 ? (
         <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>

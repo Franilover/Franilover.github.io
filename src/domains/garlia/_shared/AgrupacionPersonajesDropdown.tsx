@@ -5,20 +5,24 @@
  * ───────────────────────────────────────────────────────────────────────────
  * Ícono tipo dropdown que vive pegado a la izquierda del buscador de
  * "Personajes" y deja elegir cómo agrupar la vista: por Reino (jerarquía
- * Reino → Ciudad → Personaje) o por Criatura (Criatura → Personaje).
+ * Reino → Ciudad → Personaje), por Criatura (Criatura → Personaje) o por
+ * Items (Categoría → Item — ver ItemsJerarquia; sin relación a Personajes,
+ * es la 3ra pestaña de este mismo dropdown porque "Items" dejó de ser
+ * sección propia de la navbar y pasó a vivir acá adentro).
  * Al cambiar la agrupación, EntidadesPage swapea qué componente jerárquico
- * renderiza (GeografiaJerarquica / CriaturasJerarquica) y qué dropdowns de
- * filtro por grupo corresponden — ver EntidadesPage.
+ * renderiza (GeografiaJerarquica / CriaturasJerarquica / ItemsJerarquia) y
+ * qué dropdowns de filtro por grupo corresponden — ver EntidadesPage.
  */
 
-import { ChevronDown, Map, Bug } from "lucide-react";
+import { ChevronDown, Map, Bug, Package } from "lucide-react";
 import React, { useLayoutEffect, useRef, useState } from "react";
 
-export type AgrupacionPersonajes = "reino" | "criatura";
+export type AgrupacionPersonajes = "reino" | "criatura" | "items";
 
 const OPCIONES: { value: AgrupacionPersonajes; label: string; Icon: React.ElementType }[] = [
   { value: "reino", label: "Por Reino", Icon: Map },
   { value: "criatura", label: "Por Criatura", Icon: Bug },
+  { value: "items", label: "Items", Icon: Package },
 ];
 
 export function AgrupacionPersonajesDropdown({

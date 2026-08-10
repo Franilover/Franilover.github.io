@@ -52,6 +52,7 @@ import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GeografiaJerarquica, type GrupoPersonajeSubtipo } from "@/domains/garlia/_shared/GeografiaJerarquica";
 import { GrupoFiltroBarra, GrupoFiltroDropdown, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import { CriaturasJerarquica } from "@/domains/garlia/_shared/CriaturasJerarquica";
+import { ItemsJerarquia } from "@/domains/garlia/_shared/ItemsJerarquia";
 import {
   AgrupacionPersonajesDropdown,
   type AgrupacionPersonajes,
@@ -802,55 +803,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
     );
   }
 
-  // ── Items ────────────────────────────────────────────────────────
-  // Sección propia de la navbar (antes vivía adentro de Criaturas).
-  // Grid simple de items sin agrupación, con dropdowns de filtro por grupo.
-  if (section === "items") {
-    const grupoItemSeleccionado = grupoItemSeleccionadoId
-      ? gruposItemsPorSubtipo.flatMap((b) => b.grupos).find((g) => g.id === grupoItemSeleccionadoId)
-      : null;
-    const itemsDelGrupo = grupoItemSeleccionado
-      ? items.filter((i) => grupoItemSeleccionado.miembro_ids.includes(i.id))
-      : items;
-    const qItem = busquedaItem.trim().toLocaleLowerCase("es");
-    const itemsFiltrados = qItem
-      ? itemsDelGrupo.filter((i) => i.nombre?.toLocaleLowerCase("es").includes(qItem))
-      : itemsDelGrupo;
-
-    return (
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <div className="flex items-center gap-2 mb-3 px-1 flex-wrap">
-          <BuscadorInline
-            value={busquedaItem}
-            onChange={setBusquedaItem}
-            placeholder="Buscar item por nombre…"
-          />
-          <GrupoFiltroBarra
-            bloques={gruposItemsPorSubtipo}
-            grupoSeleccionadoId={grupoItemSeleccionadoId}
-            onSeleccionarGrupo={setGrupoItemSeleccionadoId}
-            onOpenGrupo={(id) => openEntity("grupos", id)}
-          />
-        </div>
-        <EntityCardGrid
-          title="Items"
-          variant="grid"
-          loading={loadingI}
-          items={itemsFiltrados.map((i) => ({
-            id: i.id,
-            nombre: i.nombre,
-            imageUrl: i.imagen_url || undefined,
-          }))}
-          onItemClick={(id) => openEntity("items", id)}
-          onCreate={async () => {
-            const { data } = await addItem({ nombre: "Nuevo objeto" });
-            if (data?.id) openEntity("items", data.id);
-          }}
-        />
-      </div>
-    );
-  }
-
   // ── Organización (Grupos + Notas) ────────────────────────────────────
   // Sección propia de la navbar (antes vivía adentro de Entidades → sub-tab
   // "Organización").
@@ -970,61 +922,86 @@ export function EntidadesPage({ section, selectedId }: Props) {
     );
   }
 
-  // ── Entidades (Personajes + Geografía/Criaturas) ─────────────────────
+  // ── Entidades (Personajes + Geografía/Criaturas + Items) ─────────────
   // Sin sub-tabs: Organización ahora es sección propia de la navbar.
-  // "Personajes" absorbe también la vista antes llamada "Criaturas": el
-  // dropdown de agrupación (junto al buscador) alterna entre agrupar por
-  // Reino (GeografiaJerarquica) o por Criatura (CriaturasJerarquica), y los
-  // dropdowns de filtro por grupo debajo cambian según cuál esté activa.
+  // "Personajes" absorbe también la vista antes llamada "Criaturas", y el
+  // dropdown de agrupación (junto al buscador) tiene una 3ra opción "Items"
+  // que reemplazó a la sección propia "Items" que antes vivía en la navbar
+  // (ver AgrupacionPersonajesDropdown): alterna entre agrupar por Reino
+  // (GeografiaJerarquica), por Criatura (CriaturasJerarquica) o mostrar
+  // Items agrupados por categoría (ItemsJerarquia, sin relación a
+  // Personajes), y los dropdowns de filtro por grupo debajo cambian según
+  // cuál esté activa.
   const agrupacionSelector = (
     <div className="flex items-center gap-1.5">
       <AgrupacionPersonajesDropdown value={agrupacionPersonajes} onChange={setAgrupacionPersonajes} />
-      <button
-        type="button"
-        onClick={() => setMostrarPersonajes((v) => !v)}
-        title={
-          agrupacionPersonajes === "criatura"
-            ? mostrarPersonajes
-              ? "Ver por ecosistema (criaturas, flora y minerales)"
-              : "Ver por especie (personajes agrupados por criatura)"
-            : mostrarPersonajes
-              ? "Ver por bioma y ecosistema (reinos)"
-              : "Ver por reino (ciudades y personajes)"
-        }
-        aria-pressed={mostrarPersonajes}
-        className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-colors ${
-          mostrarPersonajes
-            ? "bg-accent/10 border-accent/20 text-accent/80"
-            : "bg-primary/[0.04] border-primary/10 text-primary/40 hover:bg-primary/10"
-        }`}
-      >
-        {mostrarPersonajes ? <Eye size={12} /> : <EyeOff size={12} />}
-      </button>
+      {agrupacionPersonajes !== "items" && (
+        <button
+          type="button"
+          onClick={() => setMostrarPersonajes((v) => !v)}
+          title={
+            agrupacionPersonajes === "criatura"
+              ? mostrarPersonajes
+                ? "Ver por ecosistema (criaturas, flora y minerales)"
+                : "Ver por especie (personajes agrupados por criatura)"
+              : mostrarPersonajes
+                ? "Ver por bioma y ecosistema (reinos)"
+                : "Ver por reino (ciudades y personajes)"
+          }
+          aria-pressed={mostrarPersonajes}
+          className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-colors ${
+            mostrarPersonajes
+              ? "bg-accent/10 border-accent/20 text-accent/80"
+              : "bg-primary/[0.04] border-primary/10 text-primary/40 hover:bg-primary/10"
+          }`}
+        >
+          {mostrarPersonajes ? <Eye size={12} /> : <EyeOff size={12} />}
+        </button>
+      )}
     </div>
   );
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4">
-      <div className="flex items-center justify-end mb-1">
-        <button
-          type="button"
-          onClick={() =>
-            agrupacionPersonajes === "criatura"
-              ? descargarDatosCriaturas({ criaturas, personajes, ecosistemas, biomas, flora, minerales })
-              : descargarDatosReinos({ reinos, ciudades, personajes })
-          }
-          title={
-            agrupacionPersonajes === "criatura"
-              ? "Descargar todos los datos de Criaturas (criaturas, personajes, ecosistemas, biomas, flora, minerales) como JSON"
-              : "Descargar todos los datos de Reinos (reinos, ciudades, personajes) como JSON"
-          }
-          className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <Download size={10} />
-          <span className="hidden sm:inline">Descargar datos</span>
-        </button>
-      </div>
-      {agrupacionPersonajes === "criatura" ? (
+      {agrupacionPersonajes !== "items" && (
+        <div className="flex items-center justify-end mb-1">
+          <button
+            type="button"
+            onClick={() =>
+              agrupacionPersonajes === "criatura"
+                ? descargarDatosCriaturas({ criaturas, personajes, ecosistemas, biomas, flora, minerales })
+                : descargarDatosReinos({ reinos, ciudades, personajes })
+            }
+            title={
+              agrupacionPersonajes === "criatura"
+                ? "Descargar todos los datos de Criaturas (criaturas, personajes, ecosistemas, biomas, flora, minerales) como JSON"
+                : "Descargar todos los datos de Reinos (reinos, ciudades, personajes) como JSON"
+            }
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+          >
+            <Download size={10} />
+            <span className="hidden sm:inline">Descargar datos</span>
+          </button>
+        </div>
+      )}
+      {agrupacionPersonajes === "items" ? (
+        <ItemsJerarquia
+          items={items}
+          loading={loadingI}
+          onOpen={(id) => openEntity("items", id)}
+          onCreate={async () => {
+            const { data } = await addItem({ nombre: "Nuevo objeto" });
+            if (data?.id) openEntity("items", data.id);
+          }}
+          gruposItemsPorSubtipo={gruposItemsPorSubtipo}
+          grupoSeleccionadoId={grupoItemSeleccionadoId}
+          onSeleccionarGrupo={setGrupoItemSeleccionadoId}
+          onOpenGrupo={(id) => openEntity("grupos", id)}
+          busqueda={busquedaItem}
+          onBusquedaChange={setBusquedaItem}
+          agrupacionSelector={agrupacionSelector}
+        />
+      ) : agrupacionPersonajes === "criatura" ? (
         <CriaturasJerarquica
           criaturas={criaturas}
           personajes={personajes}
