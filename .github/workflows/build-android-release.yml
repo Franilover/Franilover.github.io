@@ -211,39 +211,59 @@ jobs:
           rm -rf src-tauri/gen/android
           npx tauri android init
 
+      - name: Debug — inventario de lo que generó tauri android init
+        # Paso de diagnóstico: la versión de Tauri CLI que estamos usando
+        # (2.8.0) no está dejando tauri.properties en la ruta esperada
+        # (src-tauri/gen/android/tauri.properties), así que antes de forzar
+        # nada, listamos qué archivos *.properties existen de verdad y dónde,
+        # para dejar de adivinar la ruta.
+        run: |
+          echo "Buscando cualquier .properties dentro de gen/android:"
+          find src-tauri/gen/android -iname "*.properties" 2>/dev/null || echo "(ninguno encontrado)"
+          echo ""
+          echo "Estructura de gen/android (2 niveles):"
+          find src-tauri/gen/android -maxdepth 2 2>/dev/null
+
       - name: Forzar versionCode/versionName de Android
         # Reemplaza al viejo enfoque de escribir bundle.android.versionCode/
         # versionName en tauri.conf.json, que rompe el JSON schema de Tauri 2
         # ("Additional properties are not allowed ('versionName' was
         # unexpected)") porque bundle.android solo admite "minSdkVersion".
         #
-        # El archivo correcto para esto es tauri.properties, que recién
-        # existe a partir de "tauri android init" (paso anterior) y es lo
-        # que Gradle lee de verdad para versionCode/versionName en Android.
-        # Sigue haciendo falta setearlo a mano por el bug conocido de Tauri
-        # donde este archivo no se regenera bien en CI:
-        # https://github.com/tauri-apps/tauri/issues/14413
+        # tauri.properties no siempre queda donde la doc vieja dice (bug
+        # https://github.com/tauri-apps/tauri/issues/14413) — a veces ni se
+        # genera. Por eso: 1) lo buscamos en cualquier lado bajo gen/android,
+        # 2) si no aparece, lo creamos nosotros mismos en la ruta esperada
+        # por Tauri (gen/android/tauri.properties) para el caso en que exista
+        # pero self-init no lo haya listado, y 3) además, como red de
+        # seguridad, seteamos versionCode/versionName directo en
+        # defaultConfig del build.gradle.kts del módulo app — eso es lo que
+        # Gradle usa en última instancia, sin depender de que Tauri lea bien
+        # tauri.properties.
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          PROPS="src-tauri/gen/android/tauri.properties"
-
-          if [ ! -f "$PROPS" ]; then
-            echo "::error::$PROPS no existe — este paso debe ir después de 'tauri android init'."
-            exit 1
-          fi
-
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
           MAJOR="${MAJOR:-0}"; MINOR="${MINOR:-0}"; PATCH="${PATCH:-0}"
           VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
 
-          if grep -q "^tauri.android.versionCode=" "$PROPS"; then
+          echo "VERSION=$VERSION  VERSION_CODE=$VERSION_CODE"
+
+          # 1) Si existe tauri.properties en cualquier lado bajo gen/android, actualizarlo.
+          PROPS=$(find src-tauri/gen/android -iname "tauri.properties" 2>/dev/null | head -n 1)
+
+          if [ -z "$PROPS" ]; then
+            echo "tauri.properties no existe todavía — lo creamos en la ruta default."
+            PROPS="src-tauri/gen/android/tauri.properties"
+          fi
+
+          if grep -q "^tauri.android.versionCode=" "$PROPS" 2>/dev/null; then
             sed -i "s/^tauri.android.versionCode=.*/tauri.android.versionCode=$VERSION_CODE/" "$PROPS"
           else
             echo "tauri.android.versionCode=$VERSION_CODE" >> "$PROPS"
           fi
 
-          if grep -q "^tauri.android.versionName=" "$PROPS"; then
+          if grep -q "^tauri.android.versionName=" "$PROPS" 2>/dev/null; then
             sed -i "s/^tauri.android.versionName=.*/tauri.android.versionName=$VERSION/" "$PROPS"
           else
             echo "tauri.android.versionName=$VERSION" >> "$PROPS"
@@ -251,6 +271,50 @@ jobs:
 
           echo "Contenido final de $PROPS:"
           cat "$PROPS"
+
+          # 2) Red de seguridad: forzar también en defaultConfig del build.gradle.kts
+          #    del módulo app, que es lo que Gradle usa en última instancia
+          #    independientemente de si tauri.properties se leyó bien o no.
+          APP_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
+          if [ -f "$APP_GRADLE" ]; then
+            python3 - "$APP_GRADLE" "$VERSION_CODE" "$VERSION" << 'PYEOF'
+          import re
+          import sys
+
+          path, version_code, version_name = sys.argv[1], sys.argv[2], sys.argv[3]
+          with open(path) as f:
+              contenido = f.read()
+
+          if re.search(r'versionCode\s*=\s*\d+', contenido):
+              contenido = re.sub(r'versionCode\s*=\s*\d+', f'versionCode = {version_code}', contenido)
+          else:
+              contenido = re.sub(
+                  r'(defaultConfig\s*\{\n)',
+                  rf'\1        versionCode = {version_code}\n',
+                  contenido,
+                  count=1,
+              )
+
+          if re.search(r'versionName\s*=\s*"[^"]*"', contenido):
+              contenido = re.sub(r'versionName\s*=\s*"[^"]*"', f'versionName = "{version_name}"', contenido)
+          else:
+              contenido = re.sub(
+                  r'(defaultConfig\s*\{\n)',
+                  rf'\1        versionName = "{version_name}"\n',
+                  contenido,
+                  count=1,
+              )
+
+          with open(path, "w") as f:
+              f.write(contenido)
+
+          print(f"build.gradle.kts: versionCode={version_code}, versionName={version_name}")
+          PYEOF
+            echo "Verificación en build.gradle.kts:"
+            grep -n "versionCode\|versionName" "$APP_GRADLE"
+          else
+            echo "::warning::$APP_GRADLE no existe todavía en este punto — la red de seguridad de defaultConfig no se pudo aplicar acá."
+          fi
 
       - name: Restaurar el keystore de firma
         env:
