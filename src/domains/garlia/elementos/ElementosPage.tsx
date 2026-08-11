@@ -508,29 +508,29 @@ function ReglasQuimica({
       </div>
 
       {loading ? (
-        <div className="p-6 text-micro text-primary/30 text-center">Cargando…</div>
+        <div className="p-6 text-sm text-primary/30 text-center">Cargando…</div>
       ) : (
-        <div className="columns-1 sm:columns-2 lg:columns-4 gap-4">
+        <div className="columns-1 lg:columns-2 gap-x-10">
           {borrador.map((seccion) => (
             <div
               key={seccion.id}
-              className="group break-inside-avoid mb-4 flex flex-col gap-1"
+              className="group break-inside-avoid mb-7 pb-6 border-b border-primary/10 last:border-b-0 flex flex-col gap-2"
             >
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <input
                   value={seccion.titulo}
                   onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
                   onBlur={() => persistir(borrador)}
                   placeholder="Título"
-                  className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-micro font-black uppercase tracking-[0.2em] text-primary/60 outline-none placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
+                  className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-sm font-black uppercase tracking-[0.15em] text-primary/70 outline-none placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
                 />
                 <button
                   type="button"
                   onClick={() => eliminarSeccion(seccion.id)}
                   title="Eliminar sección"
-                  className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/0 group-hover:text-primary/30 hover:!text-red-400 transition-all cursor-pointer"
+                  className="shrink-0 flex items-center justify-center w-6 h-6 rounded text-primary/0 group-hover:text-primary/30 hover:!text-red-400 transition-all cursor-pointer"
                 >
-                  <Trash2 size={10} />
+                  <Trash2 size={12} />
                 </button>
               </div>
               <textarea
@@ -538,8 +538,8 @@ function ReglasQuimica({
                 onChange={(e) => actualizarSeccion(seccion.id, { contenido: e.target.value })}
                 onBlur={() => persistir(borrador)}
                 placeholder="Contenido…"
-                rows={4}
-                className="bg-transparent px-0 py-0 text-micro text-primary/70 outline-none resize-none placeholder:text-primary/25 leading-relaxed"
+                rows={5}
+                className="bg-transparent px-0 py-0 text-sm text-primary/80 outline-none resize-none placeholder:text-primary/25 leading-relaxed"
               />
             </div>
           ))}
@@ -548,7 +548,7 @@ function ReglasQuimica({
             <button
               type="button"
               onClick={agregarSeccion}
-              className="text-micro text-primary/30 hover:text-primary/60 transition-all cursor-pointer"
+              className="text-sm text-primary/30 hover:text-primary/60 transition-all cursor-pointer"
             >
               + Agregar sección
             </button>
