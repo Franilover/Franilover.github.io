@@ -22,6 +22,7 @@
 
 import { Atom, ChevronLeft, Download, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
@@ -259,8 +260,10 @@ function TodasLasBasesView({ onBack }: { onBack: () => void }) {
 /**
  * Vista de todos los Oris agrupados por familia (Mecánica / Energética /
  * Biológica), en la columna derecha. Cada familia es un bloque con título
- * y separador; dentro, sus Oris se acomodan en 3 columnas para aprovechar
- * el espacio horizontal.
+ * y separador; dentro, sus Oris se muestran como tarjetas compactas con
+ * nombre + dominio — clickeables para abrir el editor completo en un
+ * panel flotante centrado (mismo patrón que Elementos/Biología), en vez
+ * de mostrar el editor entero embebido en la grilla.
  */
 function TodosLosOrisView({
   orisPorFamilia,
@@ -273,7 +276,18 @@ function TodosLosOrisView({
   onActualizarOris: (id: string, cambios: Partial<Oris>) => void;
   onEliminarOris?: (id: string) => void;
 }) {
+  const [orisAbiertoId, setOrisAbiertoId] = useState<string | null>(null);
   const totalOris = ORIS_FAMILIAS.reduce((acc, f) => acc + (orisPorFamilia.get(f)?.length ?? 0), 0);
+
+  const orisAbierto = useMemo(() => {
+    if (!orisAbiertoId) return null;
+    for (const familia of ORIS_FAMILIAS) {
+      const encontrado = orisPorFamilia.get(familia)?.find((o) => o.id === orisAbiertoId);
+      if (encontrado) return encontrado;
+    }
+    return null;
+  }, [orisAbiertoId, orisPorFamilia]);
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div
@@ -315,17 +329,17 @@ function TodosLosOrisView({
                   Sin Oris en esta familia
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 items-start">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 items-start">
                   {items.map((o) => (
-                    <div key={o.id} className="rounded-lg border border-primary/10 overflow-hidden">
-                      <OrisEditor
-                        oris={o}
-                        onBack={onBack}
-                        onActualizar={onActualizarOris}
-                        onEliminar={onEliminarOris}
-                        embedded
-                      />
-                    </div>
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setOrisAbiertoId(o.id)}
+                      className="flex flex-col gap-1 px-3 py-2.5 rounded-lg border border-primary/10 bg-primary/[0.02] text-left hover:border-primary/30 hover:bg-primary/5 transition-all cursor-pointer"
+                    >
+                      <span className="text-base font-black text-primary truncate">{o.nombre}</span>
+                      <span className="text-sm text-primary/50 truncate">{o.dominio || "Sin dominio"}</span>
+                    </button>
                   ))}
                 </div>
               )}
@@ -333,7 +347,116 @@ function TodosLosOrisView({
           );
         })}
       </div>
+
+      {orisAbierto && (
+        <OrisPanelFlotante
+          oris={orisAbierto}
+          onCerrar={() => setOrisAbiertoId(null)}
+          onActualizar={onActualizarOris}
+          onEliminar={
+            onEliminarOris
+              ? (id) => {
+                  onEliminarOris(id);
+                  setOrisAbiertoId(null);
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Panel flotante centrado para editar un Oris — mismo patrón visual que
+ * ElementoPanelFlotante (Química) y CladoPanelFlotante (Biología): modal
+ * grande con backdrop blur, Escape para cerrar, bloqueo de scroll del
+ * fondo. Envuelve el OrisEditor existente (embedded, sin su propio botón
+ * volver) dentro del modal.
+ */
+function OrisPanelFlotante({
+  oris,
+  onCerrar,
+  onActualizar,
+  onEliminar,
+}: {
+  oris: Oris;
+  onCerrar: () => void;
+  onActualizar: (id: string, cambios: Partial<Oris>) => void;
+  onEliminar?: (id: string) => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCerrar();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onCerrar]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6"
+      style={{
+        background: "color-mix(in srgb, var(--primary) 35%, transparent)",
+        backdropFilter: "blur(8px)",
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCerrar();
+      }}
+    >
+      <div
+        className="w-full h-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        style={{
+          background: "var(--bg-main)",
+          border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+          animation: "popIn 160ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
+      >
+        <div
+          className="shrink-0 flex items-center gap-3 px-4 py-3 border-b"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+          }}
+        >
+          <div
+            className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+              borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
+            }}
+          >
+            <Atom className="text-primary/50" size={12} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+              Oris · vista rápida
+            </p>
+            <p className="text-xs font-bold text-primary truncate">{oris.nombre}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onCerrar}
+            title="Cerrar (Esc)"
+            className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/8 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <OrisEditor oris={oris} onBack={onCerrar} onActualizar={onActualizar} onEliminar={onEliminar} embedded />
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

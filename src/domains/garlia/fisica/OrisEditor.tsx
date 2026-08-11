@@ -108,7 +108,7 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
                 descripcion: local.descripcion,
               })
             }
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             <Save size={10} />
             {saving ? "…" : "Guardar"}
