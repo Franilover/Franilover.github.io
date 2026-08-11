@@ -559,7 +559,7 @@ function TodosLosConceptosView({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-6 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-6 items-start">
                 {items.map((c) => (
                   <ConceptoEditor
                     key={c.id}
@@ -1004,167 +1004,115 @@ export function FisicaPage({
 
   const bloquesConceptos = useMemo(() => agruparPorBloque(conceptosLocal), [conceptosLocal]);
 
-  const hayAlgoSeleccionado = seleccion !== null;
-
   return (
-    <div className="flex-1 min-h-0 flex overflow-hidden">
-      {/* Columna izquierda: navegación. En mobile se oculta si hay algo
-          seleccionado, para dejarle todo el espacio al editor. */}
-      <div
-        className={`w-full sm:w-56 md:w-60 shrink-0 sm:flex flex-col min-h-0 overflow-hidden border-r border-primary/10 ${
-          hayAlgoSeleccionado ? "hidden" : "flex"
-        }`}
-      >
-        <div className="shrink-0 flex items-center justify-between px-2 py-1.5 border-b border-primary/10">
-          <div className="flex items-center gap-1 text-primary/40">
-            <Atom size={11} />
-            <p className="text-micro font-black uppercase tracking-widest">
-              Física · {oris.length}
-            </p>
-          </div>
-          <div className="flex items-center gap-0.5">
-            {onImportarFisica && (
-              <>
-                <input
-                  ref={inputArchivoRef}
-                  type="file"
-                  accept="application/json,.json"
-                  onChange={handleArchivoSeleccionado}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  disabled={importando}
-                  onClick={() => inputArchivoRef.current?.click()}
-                  title='Subir un JSON con Oris y/o conceptos: crea los nuevos y actualiza los existentes (mismo formato que "Descargar datos")'
-                  className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => descargarDatosFisica(oris, conceptosLocal)}
-              title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
-              className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-            >
-              <Download size={10} />
-            </button>
-          </div>
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* Barra superior de navegación (mismo patrón que SubTabsElementos en
+          Química): tabs para Bases / Oris / Conceptos / Subsistemas, en vez
+          de la columna lateral que había antes. */}
+      <div className="shrink-0 flex items-center justify-between gap-2 px-3 pt-2 pb-1.5 border-b border-primary/10">
+        <div className="flex items-center gap-1 flex-wrap">
+          {(
+            [
+              { tipo: "todas-bases" as const, label: `Bases · ${PARTICULAS_BASE.length + PARTICULAS.length + IUMS.length}`, Icon: null as typeof Atom | null, onAdd: undefined as (() => void) | undefined, addPending: undefined as boolean | undefined },
+              { tipo: "todos-oris" as const, label: `Oris · ${oris.length}`, Icon: Atom, onAdd: onCreateOris, addPending: creatingOris },
+              { tipo: "todos-conceptos" as const, label: `Conceptos · ${conceptosLocal.length}`, Icon: null, onAdd: undefined, addPending: undefined },
+              { tipo: "todos-subsistemas" as const, label: `Subsistemas de Magia · ${subsistemas.length}`, Icon: Sparkles, onAdd: undefined, addPending: undefined },
+            ]
+          ).map(({ tipo, label, Icon, onAdd, addPending }) => {
+            const activo =
+              seleccion?.tipo === tipo ||
+              (tipo === "todos-oris" && seleccion?.tipo === "oris") ||
+              (tipo === "todos-conceptos" && seleccion?.tipo === "concepto") ||
+              (tipo === "todos-subsistemas" && seleccion?.tipo === "subsistema");
+            return (
+              <button
+                key={tipo}
+                type="button"
+                onClick={() => setSeleccion({ tipo } as Seleccion)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
+                  activo
+                    ? "bg-primary/10 text-primary"
+                    : "text-primary/40 hover:text-primary/70 hover:bg-primary/5"
+                }`}
+              >
+                {Icon && <Icon size={11} />}
+                {label}
+                {onAdd && (
+                  <span
+                    role="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAdd();
+                    }}
+                    title="Nuevo Oris"
+                    className="flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {addPending ? <Loader2 className="animate-spin" size={9} /> : <Plus size={10} />}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {mensajeImportacion && (
-          <div className="shrink-0 flex items-center justify-between gap-2 px-2 py-1.5 border-b border-primary/10 text-micro text-primary/60 bg-primary/[0.03]">
-            <span className="min-w-0">{mensajeImportacion}</span>
-            <button
-              type="button"
-              onClick={() => setMensajeImportacion(null)}
-              className="shrink-0 text-primary/30 hover:text-primary/60 cursor-pointer"
-              title="Cerrar"
-            >
-              <X size={10} />
-            </button>
-          </div>
-        )}
-
-        <div className="flex-1 min-h-0 overflow-y-auto p-1.5 flex flex-col gap-1.5">
-          {/* Bases — botón único, abre los 3 catálogos en la columna derecha */}
-          <button
-            type="button"
-            onClick={() => setSeleccion({ tipo: "todas-bases" })}
-            className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
-              seleccion?.tipo === "todas-bases"
-                ? "border-primary/50 bg-primary/10 text-primary"
-                : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
-            }`}
-          >
-            <span className="text-micro font-black uppercase tracking-[0.2em]">
-              Bases · {PARTICULAS_BASE.length + PARTICULAS.length + IUMS.length}
-            </span>
-          </button>
-
-          {/* Oris — botón único, abre las 3 familias en la columna derecha */}
-          <button
-            type="button"
-            onClick={() => setSeleccion({ tipo: "todos-oris" })}
-            className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
-              seleccion?.tipo === "todos-oris"
-                ? "border-primary/50 bg-primary/10 text-primary"
-                : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <Atom size={11} />
-              <span className="text-micro font-black uppercase tracking-[0.2em]">
-                Oris · {oris.length}
-              </span>
-            </div>
-            {onCreateOris && (
-              <span
-                role="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCreateOris();
-                }}
-                title="Nuevo Oris"
-                className="flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
+        <div className="shrink-0 flex items-center gap-0.5">
+          {onImportarFisica && (
+            <>
+              <input
+                ref={inputArchivoRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={handleArchivoSeleccionado}
+                className="hidden"
+              />
+              <button
+                type="button"
+                disabled={importando}
+                onClick={() => inputArchivoRef.current?.click()}
+                title='Subir un JSON con Oris y/o conceptos: crea los nuevos y actualiza los existentes (mismo formato que "Descargar datos")'
+                className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
-                {creatingOris ? <Loader2 className="animate-spin" size={9} /> : <Plus size={10} />}
-              </span>
-            )}
-          </button>
-
-          {/* Conceptos — botón único, abre los bloques en la columna derecha */}
+                {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}
+              </button>
+            </>
+          )}
           <button
             type="button"
-            onClick={() => setSeleccion({ tipo: "todos-conceptos" })}
-            className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
-              seleccion?.tipo === "todos-conceptos"
-                ? "border-primary/50 bg-primary/10 text-primary"
-                : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
-            }`}
+            onClick={() => descargarDatosFisica(oris, conceptosLocal)}
+            title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
+            className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
           >
-            <span className="text-micro font-black uppercase tracking-[0.2em]">
-              Conceptos · {conceptosLocal.length}
-            </span>
-          </button>
-
-          {/* Subsistemas de Magia — botón único, abre la grilla de chips en la columna derecha */}
-          <button
-            type="button"
-            onClick={() => setSeleccion({ tipo: "todos-subsistemas" })}
-            className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
-              seleccion?.tipo === "todos-subsistemas"
-                ? "border-primary/50 bg-primary/10 text-primary"
-                : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <Sparkles size={11} />
-              <span className="text-micro font-black uppercase tracking-[0.2em]">
-                Subsistemas de Magia · {subsistemas.length}
-              </span>
-            </div>
+            <Download size={10} />
           </button>
         </div>
       </div>
 
-      {/* Columna derecha: editor fijo. En mobile ocupa toda la pantalla
-          cuando hay algo seleccionado; en desktop siempre está visible. */}
-      <div
-        className={`flex-1 min-h-0 flex-col min-w-0 ${hayAlgoSeleccionado ? "flex" : "hidden sm:flex"}`}
-      >
+      {mensajeImportacion && (
+        <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-1.5 border-b border-primary/10 text-micro text-primary/60 bg-primary/[0.03]">
+          <span className="min-w-0">{mensajeImportacion}</span>
+          <button
+            type="button"
+            onClick={() => setMensajeImportacion(null)}
+            className="shrink-0 text-primary/30 hover:text-primary/60 cursor-pointer"
+            title="Cerrar"
+          >
+            <X size={10} />
+          </button>
+        </div>
+      )}
+
+      {/* Contenido: ocupa todo el ancho ahora que no hay columna lateral. */}
+      <div className="flex-1 min-h-0 flex flex-col min-w-0">
         {orisActivo ? (
           <OrisEditor
             oris={orisActivo}
-            onBack={() => setSeleccion(null)}
+            onBack={() => setSeleccion({ tipo: "todos-oris" })}
             onActualizar={onActualizarOris}
             onEliminar={
               onEliminarOris
                 ? (id) => {
                     onEliminarOris(id);
-                    setSeleccion(null);
+                    setSeleccion({ tipo: "todos-oris" });
                   }
                 : undefined
             }
@@ -1205,7 +1153,7 @@ export function FisicaPage({
         ) : conceptoActivo ? (
           <ConceptoEditor
             concepto={conceptoActivo}
-            onBack={() => setSeleccion(null)}
+            onBack={() => setSeleccion({ tipo: "todos-conceptos" })}
             onActualizar={(id, cambios) => {
               setConceptosLocal((prev) =>
                 prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
@@ -1214,7 +1162,7 @@ export function FisicaPage({
             }}
             onEliminar={(id) => {
               handleEliminarConcepto(id);
-              setSeleccion(null);
+              setSeleccion({ tipo: "todos-conceptos" });
             }}
           />
         ) : seleccion?.tipo === "todos-subsistemas" ? (
