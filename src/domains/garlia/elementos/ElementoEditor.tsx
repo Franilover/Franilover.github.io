@@ -301,26 +301,26 @@ export function ElementoEditor({
                 )}
               </div>
             </div>
-            <div className="rounded-lg border border-primary/10 overflow-hidden">
+            <div className="grid grid-cols-3 rounded-lg border border-primary/10 overflow-hidden">
               {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
                 <div
                   key={layer}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 ${
-                    i > 0 ? "border-t border-primary/10" : ""
+                  className={`flex flex-col gap-2 p-2 ${
+                    i > 0 ? "border-l border-primary/10" : ""
                   } bg-primary/[0.02]`}
                 >
-                  <span className="shrink-0 w-6 text-micro font-black text-primary/35">
-                    {LAYER_LABEL[layer].slice(0, 1)}
+                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 text-center">
+                    {LAYER_LABEL[layer]}
                   </span>
-                  <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
+                  <div className="flex flex-col items-stretch gap-1.5">
                     {PARTICLE_TYPES.map((particle) => {
                       const value = local[layer]?.[particle] ?? 0;
                       return (
                         <div
                           key={particle}
-                          className="shrink-0 flex items-center gap-1 bg-primary/5 rounded-md pl-1.5 pr-0.5 py-0.5 border border-primary/10 focus-within:border-primary/30"
+                          className="flex items-center justify-between gap-1.5 bg-primary/5 rounded-lg pl-2.5 pr-1 py-1.5 border border-primary/10 focus-within:border-primary/30"
                         >
-                          <span className="text-micro font-bold text-primary/45 whitespace-nowrap">
+                          <span className="text-xs font-bold text-primary/60 truncate">
                             {particle}
                           </span>
                           <input
@@ -331,7 +331,7 @@ export function ElementoEditor({
                               setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
                             }
                             onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
-                            className="w-7 shrink-0 text-center bg-transparent text-micro font-bold text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            className="w-9 shrink-0 text-center bg-transparent text-sm font-black text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                         </div>
                       );
