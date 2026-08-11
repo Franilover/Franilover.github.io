@@ -12,7 +12,7 @@
  * a Supabase + propagación al estado del padre via onActualizar.
  */
 
-import { ChevronLeft, Save, Sparkles, Trash2 } from "lucide-react";
+import { ChevronLeft, Save, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -22,7 +22,6 @@ import { useConfirm } from "@/ui/ConfirmModal";
 import {
   calcularParticulaDominante,
   calcularReactividadElemento,
-  ordenarElementosPorAfinidad,
 } from "./afinidad";
 import {
   ELEMENT_FAMILIES,
@@ -84,22 +83,6 @@ export function ElementoEditor({
   // el elemento solo — mismo cálculo que para compuestos, aplicado a un
   // elemento suelto (ver calcularReactividadElemento en afinidad.ts).
   const reactividad = useMemo(() => calcularReactividadElemento(local), [local]);
-
-  // Afinidad con el resto de la tabla — misma lógica que compuestos, pero
-  // comparando elementos sueltos entre sí (sirve antes de armar un
-  // compuesto, para saber qué pareja tiene sentido combinar).
-  const afinidades = useMemo(
-    () =>
-      todosLosElementos ? ordenarElementosPorAfinidad(local, todosLosElementos) : [],
-    [local, todosLosElementos],
-  );
-
-  // Solo los que se complementan — compite/saturado/estable no se muestran
-  // en esta sección (ver AFINIDAD_LABEL en types.ts para el resto).
-  const afinidadesComplementarias = useMemo(
-    () => afinidades.filter(({ afinidad }) => afinidad.tipo === "complementa"),
-    [afinidades],
-  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -359,38 +342,6 @@ export function ElementoEditor({
             </div>
           </div>
         </div>
-
-        {/* Afinidad con el resto de la tabla — mismo cálculo que entre
-            compuestos, pero comparando elementos sueltos entre sí. Solo se
-            muestran los que se complementan (el resto de tipos de afinidad
-            no aportan acá): grid uno al lado del otro, sin repetir el label
-            "Se complementan" en cada casilla (ya lo dice el título de la
-            sección), y con color dinámico (--accent) en vez de un verde
-            hardcodeado. */}
-        {todosLosElementos && todosLosElementos.length > 1 && afinidadesComplementarias.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            <p className="flex items-center gap-1 text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-              <Sparkles size={10} />
-              Se complementan
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-              {afinidadesComplementarias.map(({ elemento: otro }) => (
-                <div
-                  key={otro.id}
-                  className="flex items-center justify-center px-2 py-1.5 rounded-md border text-micro font-black truncate"
-                  style={{
-                    color: "var(--accent)",
-                    background: "color-mix(in srgb, var(--accent) 10%, transparent)",
-                    borderColor: "color-mix(in srgb, var(--accent) 20%, transparent)",
-                  }}
-                  title={otro.nombre}
-                >
-                  {otro.simbolo || "??"} · {otro.nombre}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
