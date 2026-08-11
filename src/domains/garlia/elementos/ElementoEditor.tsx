@@ -184,8 +184,9 @@ export function ElementoEditor({
 
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
-        {/* Metadatos */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Metadatos: N° atómico, Familia, Noble y Catalizador en una sola
+            fila de 4 columnas. */}
+        <div className="grid grid-cols-4 gap-2">
           <div className="flex flex-col gap-0.5">
             <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
               N° atómico
@@ -268,41 +269,43 @@ export function ElementoEditor({
           </div>
         </div>
 
-        {/* Descripción auto-generada: se recalcula sola a partir de
-            familia + capas, sin campo manual que mantener. */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-              Rol
-            </p>
-            {dominantes.length > 0 && (
-              <span
-                title="Partícula(s) dominante(s)"
-                className="text-micro font-bold text-accent/70 bg-accent/10 rounded px-1.5 py-0.5"
-              >
-                {dominantes.map((d) => d.particula).join(" / ")}
-              </span>
-            )}
+        {/* Notas (izquierda) y Rol (derecha), lado a lado. */}
+        <div className="grid grid-cols-2 gap-2 items-start">
+          <div className="flex flex-col gap-0.5">
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Notas
+            </label>
+            <textarea
+              value={local.notas ?? ""}
+              onChange={(e) => setLocal((p) => ({ ...p, notas: e.target.value }))}
+              onBlur={() => persist({ notas: local.notas })}
+              rows={2}
+              placeholder="Descripción del elemento…"
+              className="bg-primary/5 rounded-md px-2 py-1 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
+            />
           </div>
-          <div className="rounded-lg border border-primary/10 bg-primary/[0.02] px-2 py-1.5 flex flex-col gap-1">
-            <p className="text-micro font-black text-primary/70">{descripcion.rol}</p>
-            <p className="text-micro text-primary/50 leading-relaxed">{descripcion.texto}</p>
-          </div>
-        </div>
 
-        {/* Notas */}
-        <div className="flex flex-col gap-0.5">
-          <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-            Notas
-          </label>
-          <textarea
-            value={local.notas ?? ""}
-            onChange={(e) => setLocal((p) => ({ ...p, notas: e.target.value }))}
-            onBlur={() => persist({ notas: local.notas })}
-            rows={2}
-            placeholder="Descripción del elemento…"
-            className="bg-primary/5 rounded-md px-2 py-1 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
-          />
+          {/* Descripción auto-generada: se recalcula sola a partir de
+              familia + capas, sin campo manual que mantener. */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Rol
+              </p>
+              {dominantes.length > 0 && (
+                <span
+                  title="Partícula(s) dominante(s)"
+                  className="text-micro font-bold text-accent/70 bg-accent/10 rounded px-1.5 py-0.5"
+                >
+                  {dominantes.map((d) => d.particula).join(" / ")}
+                </span>
+              )}
+            </div>
+            <div className="rounded-lg border border-primary/10 bg-primary/[0.02] px-2 py-1.5 flex flex-col gap-1">
+              <p className="text-micro font-black text-primary/70">{descripcion.rol}</p>
+              <p className="text-micro text-primary/50 leading-relaxed">{descripcion.texto}</p>
+            </div>
+          </div>
         </div>
 
         {/* Capas: filas apiladas en vez de 3 tarjetas con borde propio —
