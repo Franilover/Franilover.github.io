@@ -532,8 +532,6 @@ function TodosLosConceptosView({
           </div>
         ) : (
           bloques.map(({ bloque, items }, idx) => {
-            const columnasTres = /manifestaciones|base/i.test(bloque);
-            const columnasCuatro = /cadena m[aá]gica/i.test(bloque);
             return (
             <div key={bloque} className="flex flex-col gap-2">
               <div
@@ -561,21 +559,16 @@ function TodosLosConceptosView({
                 )}
               </div>
 
-              <div
-                className={`grid grid-cols-1 gap-2 items-start ${
-                  columnasCuatro ? "lg:grid-cols-4" : columnasTres ? "lg:grid-cols-3" : "lg:grid-cols-2"
-                }`}
-              >
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-6 items-start">
                 {items.map((c) => (
-                  <div key={c.id} className="rounded-lg border border-primary/10 overflow-hidden">
-                    <ConceptoEditor
-                      concepto={c}
-                      onBack={onBack}
-                      onActualizar={onActualizarConcepto}
-                      onEliminar={onEliminarConcepto}
-                      embedded
-                    />
-                  </div>
+                  <ConceptoEditor
+                    key={c.id}
+                    concepto={c}
+                    onBack={onBack}
+                    onActualizar={onActualizarConcepto}
+                    onEliminar={onEliminarConcepto}
+                    embedded
+                  />
                 ))}
               </div>
             </div>
@@ -622,11 +615,21 @@ function ConceptoEditor({
   }
 
   return (
-    <div className={embedded ? "flex flex-col overflow-hidden" : "flex-1 flex flex-col min-h-0 overflow-hidden"}>
+    <div
+      className={
+        embedded
+          ? "group flex flex-col gap-2 pb-6 border-b border-primary/10"
+          : "flex-1 flex flex-col min-h-0 overflow-hidden"
+      }
+    >
       <ConfirmModal />
       <div
-        style={{ background: "var(--bg-main)" }}
-        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+        className={
+          embedded
+            ? "shrink-0 flex items-center gap-1.5"
+            : "shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+        }
+        style={embedded ? undefined : { background: "var(--bg-main)" }}
       >
         {!embedded && (
           <button
@@ -638,16 +641,22 @@ function ConceptoEditor({
           </button>
         )}
 
-        <span className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/30 px-1.5 py-0.5 rounded border border-primary/15">
-          {concepto.bloque}
-        </span>
+        {!embedded && (
+          <span className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/30 px-1.5 py-0.5 rounded border border-primary/15">
+            {concepto.bloque}
+          </span>
+        )}
 
         <input
           value={local.titulo}
           onChange={(e) => setLocal((p) => ({ ...p, titulo: e.target.value }))}
           onBlur={() => persist({ titulo: local.titulo })}
           placeholder="Título del concepto"
-          className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
+          className={
+            embedded
+              ? "flex-1 min-w-0 bg-transparent text-sm font-black uppercase tracking-[0.1em] text-primary/70 outline-none placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
+              : "flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
+          }
         />
 
         {onEliminar && (
@@ -660,18 +669,22 @@ function ConceptoEditor({
               });
               if (ok) onEliminar(concepto.id);
             }}
-            className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+            className={
+              embedded
+                ? "shrink-0 flex items-center justify-center w-6 h-6 rounded text-primary/0 group-hover:text-primary/30 hover:!text-red-400 transition-all cursor-pointer"
+                : "shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
+            }
             title="Eliminar concepto"
           >
-            <Trash2 size={11} />
+            <Trash2 size={embedded ? 12 : 11} />
           </button>
         )}
       </div>
 
-      <div className={embedded ? "p-2.5" : "flex-1 min-h-0 p-2.5 overflow-y-auto"}>
+      <div className={embedded ? "" : "flex-1 min-h-0 p-2.5 overflow-y-auto"}>
         <div className="text-sm">
           <RichEditor
-            minHeight={embedded ? "8rem" : "16rem"}
+            minHeight={embedded ? "6rem" : "16rem"}
             placeholder="Contenido del concepto…"
             value={local.contenido}
             onChange={(v) => {
