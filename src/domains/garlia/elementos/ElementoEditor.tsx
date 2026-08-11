@@ -398,8 +398,8 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
   const cx = size / 2;
   const cy = size / 2;
   const radios = { media: 48, externa: 82 };
-  const particleRadius = { nucleo: 12, orbita: 11 };
-  const fontSize = { nucleo: 9, orbita: 8.5 };
+  const particleRadius = { nucleo: 10, orbita: 9 };
+  const fontSize = { nucleo: 7.5, orbita: 7 };
 
   function posicionEnOrbita(i: number, total: number, radio: number) {
     const angulo = (i / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
