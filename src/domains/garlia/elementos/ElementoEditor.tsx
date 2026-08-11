@@ -28,7 +28,6 @@ import {
   ELEMENT_FAMILIES,
   LAYER_LABEL,
   PARTICLE_TYPES,
-  REACTIVIDAD_LABEL,
   type Elemento,
   type ElementFamily,
   type LayerName,
@@ -308,80 +307,58 @@ export function ElementoEditor({
           </div>
         </div>
 
-        {/* Capas: filas apiladas en vez de 3 tarjetas con borde propio —
-            un solo contenedor con separadores finos entre filas, para
-            aprovechar mejor el ancho del panel lateral. Reactividad va al
-            costado: mismo cálculo de déficit que en compuestos, aplicado
-            acá al elemento solo. */}
-        <div className="grid grid-cols-[1fr_auto] gap-1.5 items-start">
-          <div className="flex flex-col gap-1.5 min-w-0">
+        {/* Capas: título con el ratio deficit/capacidad alineado a la
+            derecha (solo texto, sin columna ni tarjeta aparte). */}
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <div className="flex items-center justify-between">
             <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
               Capas atómicas
             </p>
-            <div className="rounded-lg border border-primary/10 overflow-hidden">
-              {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
-                <div
-                  key={layer}
-                  className={`flex items-center gap-1.5 px-2 py-1.5 ${
-                    i > 0 ? "border-t border-primary/10" : ""
-                  } bg-primary/[0.02]`}
-                >
-                  <span className="shrink-0 w-6 text-micro font-black text-primary/35">
-                    {LAYER_LABEL[layer].slice(0, 1)}
-                  </span>
-                  <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
-                    {PARTICLE_TYPES.map((particle) => {
-                      const value = local[layer]?.[particle] ?? 0;
-                      return (
-                        <div
-                          key={particle}
-                          className="shrink-0 flex items-center gap-1 bg-primary/5 rounded-md pl-1.5 pr-0.5 py-0.5 border border-primary/10 focus-within:border-primary/30"
-                        >
-                          <span className="text-micro font-bold text-primary/45 whitespace-nowrap">
-                            {particle}
-                          </span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={value}
-                            onChange={(e) =>
-                              setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
-                            }
-                            onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
-                            className="w-7 shrink-0 text-center bg-transparent text-micro font-bold text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5 w-28 shrink-0">
-            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-              Reactividad
-            </p>
-            <div
-              title="Cuánto déficit acumulado tiene el elemento sobre sus 3 capas — más déficit, menos energía hace falta para que reaccione."
-              className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2.5 text-center ${
-                reactividad.nivel === "inerte"
-                  ? "text-primary/40 bg-primary/5 border-primary/10"
-                  : reactividad.nivel === "moderado"
-                    ? "text-sky-500 bg-sky-500/10 border-sky-500/20"
-                    : reactividad.nivel === "inestable"
-                      ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
-                      : "text-red-500 bg-red-500/10 border-red-500/20"
-              }`}
+            <span
+              title="Déficit acumulado sobre la capacidad total de las 3 capas"
+              className="text-micro font-black tabular-nums text-primary/40"
             >
-              <span className="text-micro font-black uppercase tracking-wide leading-tight">
-                {REACTIVIDAD_LABEL[reactividad.nivel]}
-              </span>
-              <span className="text-micro opacity-70 tabular-nums">
-                {reactividad.deficitTotal}/{reactividad.capacidadTotal}
-              </span>
-            </div>
+              {reactividad.deficitTotal}/{reactividad.capacidadTotal}
+            </span>
+          </div>
+          <div className="rounded-lg border border-primary/10 overflow-hidden">
+            {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
+              <div
+                key={layer}
+                className={`flex items-center gap-1.5 px-2 py-1.5 ${
+                  i > 0 ? "border-t border-primary/10" : ""
+                } bg-primary/[0.02]`}
+              >
+                <span className="shrink-0 w-6 text-micro font-black text-primary/35">
+                  {LAYER_LABEL[layer].slice(0, 1)}
+                </span>
+                <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
+                  {PARTICLE_TYPES.map((particle) => {
+                    const value = local[layer]?.[particle] ?? 0;
+                    return (
+                      <div
+                        key={particle}
+                        className="shrink-0 flex items-center gap-1 bg-primary/5 rounded-md pl-1.5 pr-0.5 py-0.5 border border-primary/10 focus-within:border-primary/30"
+                      >
+                        <span className="text-micro font-bold text-primary/45 whitespace-nowrap">
+                          {particle}
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={value}
+                          onChange={(e) =>
+                            setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
+                          }
+                          onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
+                          className="w-7 shrink-0 text-center bg-transparent text-micro font-bold text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
