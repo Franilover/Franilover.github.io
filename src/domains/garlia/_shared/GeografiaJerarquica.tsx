@@ -13,10 +13,12 @@
  *   ...
  *
  * Cada nodo (reino / ciudad) se muestra como un botón tipo "chip" temático
- * (sin corchetes) y al hacer click abre su editor completo
- * (openEntity("reinos", id) / openEntity("ciudades", id)), que ya trae
- * adentro sus propias ciudades / personajes. Los personajes sí usan la
- * tarjeta normal (imagen + nombre) porque son la hoja del árbol.
+ * (sin corchetes). El reino abre su editor completo en el panel flotante
+ * (abrirPanel("reino", id) — mismo comportamiento que Personaje/Criatura,
+ * ver usePanelFlotanteStore); la ciudad sigue navegando a página completa
+ * (openEntity("ciudades", id)), que ya trae adentro sus propios personajes.
+ * Los personajes sí usan la tarjeta normal (imagen + nombre) porque son la
+ * hoja del árbol.
  *
  * Relaciones usadas:
  *  - Ciudad.reino_id   → agrupa ciudades bajo su reino (obligatorio: toda
@@ -790,7 +792,7 @@ export function GeografiaJerarquica({
                       <span />
                       <button
                         type="button"
-                        onClick={() => onOpen("reinos", reino.id)}
+                        onClick={() => abrirPanel("reino", reino.id)}
                         title={reino.nombre}
                         className="min-w-0 truncate text-micro font-bold uppercase tracking-[0.12em] text-primary/70 hover:text-accent transition-colors text-center justify-self-center max-w-full"
                       >
@@ -922,7 +924,7 @@ export function GeografiaJerarquica({
                           <NodoTitulo
                             fill
                             label={reino.nombre}
-                            onClick={() => onOpen("reinos", reino.id)}
+                            onClick={() => abrirPanel("reino", reino.id)}
                             dropActive={
                               !!onMoverPersonaje && dragPersonaje.esZonaActiva(`reino:${reino.id}`)
                             }
@@ -1000,7 +1002,7 @@ export function GeografiaJerarquica({
                           variant="reino"
                           maxWidthPx={160}
                           dragProps={dragReino.dragHandlers(r.id)}
-                          onClick={() => onOpen("reinos", r.id)}
+                          onClick={() => abrirPanel("reino", r.id)}
                         />
                       ))}
                     </div>
@@ -1023,7 +1025,7 @@ export function GeografiaJerarquica({
                     variant="reino"
                     maxWidthPx={160}
                     dragProps={dragReino.dragHandlers(r.id)}
-                    onClick={() => onOpen("reinos", r.id)}
+                    onClick={() => abrirPanel("reino", r.id)}
                   />
                 ))}
               </div>

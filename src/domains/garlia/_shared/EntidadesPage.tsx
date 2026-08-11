@@ -534,7 +534,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           onNavigateCiudad={(id) => openEntity("ciudades", id)}
           onNavigateGrupo={(id) => openEntity("grupos", id)}
           onNavigatePersonaje={(id) => abrirPanel("personaje", id)}
-          onNavigateReino={(id) => openEntity("reinos", id)}
+          onNavigateReino={(id) => abrirPanel("reino", id)}
         />
       </div>
     );
@@ -1026,7 +1026,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           onNavigateCapitulo={(id) => openEntity("capitulos", id)}
           onUpdatePersonaje={(id, patch) => void updatePersonaje(id, patch)}
           onSelectGrupo={(id) => openEntity("grupos", id)}
-          onNavigateReino={(id) => openEntity("reinos", id)}
+          onNavigateReino={(id) => abrirPanel("reino", id)}
           onUpdateCriatura={(id, patch) => void updateCriatura(id, patch)}
           busqueda={busquedaCriatura}
           onBusquedaChange={setBusquedaCriatura}
@@ -1101,7 +1101,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           agrupacionSelector={agrupacionSelector}
           onCreateReino={async () => {
             const { data } = await addReino({ nombre: "Nuevo reino" });
-            if (data?.id) openEntity("reinos", data.id);
+            if (data?.id) abrirPanel("reino", data.id);
           }}
           onCreateCiudad={async (reinoId) => {
             const { data } = await addCiudad({ nombre: "Nueva ciudad", reino_id: reinoId });
