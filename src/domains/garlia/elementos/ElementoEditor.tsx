@@ -15,13 +15,13 @@
 import { ChevronLeft, Save, Sparkles, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
+import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
 import {
   calcularParticulaDominante,
   calcularReactividadElemento,
-  generarDescripcionElemento,
   ordenarElementosPorAfinidad,
 } from "./afinidad";
 import {
@@ -74,10 +74,6 @@ export function ElementoEditor({
     else delete current[particle as keyof ParticleMap];
     setLocal((prev) => ({ ...prev, [layer]: current }));
   }
-
-  // Descripción auto-generada: se recalcula sola a partir de familia +
-  // capas + estado, no hay campo manual que mantener.
-  const descripcion = useMemo(() => generarDescripcionElemento(local), [local]);
 
   // Partícula(s) dominante(s): la(s) de mayor cantidad sumando las 3 capas.
   const dominantes = useMemo(() => calcularParticulaDominante(local), [local]);
@@ -268,29 +264,39 @@ export function ElementoEditor({
           </div>
         </div>
 
-        {/* Notas (izquierda) y Rol (derecha), lado a lado. */}
-        <div className="grid grid-cols-2 gap-2 items-start">
-          <div className="flex flex-col gap-0.5">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Notas
-            </label>
-            <textarea
-              value={local.notas ?? ""}
-              onChange={(e) => setLocal((p) => ({ ...p, notas: e.target.value }))}
-              onBlur={() => persist({ notas: local.notas })}
-              rows={2}
-              placeholder="Descripción del elemento…"
-              className="bg-primary/5 rounded-md px-2 py-1 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
-            />
-          </div>
+        {/* Notas: expandido a ancho completo, editor rich text (Lexical)
+            en vez de textarea plano — mismo componente que usa el resto
+            de la app para descripciones largas (ver MineralEditor). */}
+        <div className="flex flex-col gap-0.5">
+          <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            Notas
+          </label>
+          <RichEditor
+            minHeight="10rem"
+            placeholder="Descripción del elemento…"
+            value={local.notas ?? ""}
+            onChange={(v) => {
+              setLocal((p) => ({ ...p, notas: v }));
+              persist({ notas: v });
+            }}
+          />
+        </div>
 
-          {/* Descripción auto-generada: se recalcula sola a partir de
-              familia + capas, sin campo manual que mantener. */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Rol
-              </p>
+        {/* Capas: título con el ratio deficit/capacidad y, justo detrás,
+            las partículas dominantes (mismo chip que antes vivía en Rol,
+            ahora eliminado). */}
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <div className="flex items-center justify-between">
+            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+              Capas atómicas
+            </p>
+            <div className="flex items-center gap-1.5">
+              <span
+                title="Déficit acumulado sobre la capacidad total de las 3 capas"
+                className="text-micro font-black tabular-nums text-primary/40"
+              >
+                {reactividad.deficitTotal}/{reactividad.capacidadTotal}
+              </span>
               {dominantes.length > 0 && (
                 <span
                   title="Partícula(s) dominante(s)"
@@ -300,26 +306,6 @@ export function ElementoEditor({
                 </span>
               )}
             </div>
-            <div className="rounded-lg border border-primary/10 bg-primary/[0.02] px-2 py-1.5 flex flex-col gap-1">
-              <p className="text-micro font-black text-primary/70">{descripcion.rol}</p>
-              <p className="text-micro text-primary/50 leading-relaxed">{descripcion.texto}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Capas: título con el ratio deficit/capacidad alineado a la
-            derecha (solo texto, sin columna ni tarjeta aparte). */}
-        <div className="flex flex-col gap-1.5 min-w-0">
-          <div className="flex items-center justify-between">
-            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-              Capas atómicas
-            </p>
-            <span
-              title="Déficit acumulado sobre la capacidad total de las 3 capas"
-              className="text-micro font-black tabular-nums text-primary/40"
-            >
-              {reactividad.deficitTotal}/{reactividad.capacidadTotal}
-            </span>
           </div>
           <div className="rounded-lg border border-primary/10 overflow-hidden">
             {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
