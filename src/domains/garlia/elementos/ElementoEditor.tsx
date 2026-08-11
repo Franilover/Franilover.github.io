@@ -284,8 +284,10 @@ export function ElementoEditor({
           />
         </div>
 
-        {/* Átomo (izquierda) + Capas atómicas (derecha), lado a lado. */}
-        <div className="grid grid-cols-[auto_1fr] gap-3 items-start">
+        {/* Átomo (izquierda) + Capas atómicas (derecha), lado a lado.
+            items-stretch para que el átomo (cuadrado, aspect-square) crezca
+            hasta la misma altura que el bloque de capas de al lado. */}
+        <div className="grid grid-cols-[auto_1fr] gap-3 items-stretch">
           {/* Visualización tipo átomo real: núcleo + capas orbitales, pero
               con las partículas propias del mundo (Masa, Cinética,
               Voluntad…) en vez de protones/neutrones/electrones genéricos. */}
@@ -455,10 +457,10 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
 
   return (
     <div
-      className="shrink-0 w-fit rounded-lg border border-primary/10 bg-primary/[0.02] flex flex-col items-center gap-1.5 px-2 py-3"
+      className="shrink-0 aspect-square h-full rounded-lg border border-primary/10 bg-primary/[0.02] flex items-center justify-center p-2"
       title="Representación del átomo: núcleo + capas orbitales con las partículas propias del mundo"
     >
-      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="max-w-full">
+      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full max-w-full max-h-full">
         {/* Órbitas: solo el trazo, sin relleno */}
         {(["media", "externa"] as const).map((layer) => (
           <circle
@@ -485,22 +487,22 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
           ) : (
             nucleares.map((particula, i) => {
               const color = colorDeParticula(particula);
-              const jitter =
+              const pos =
                 nucleares.length === 1
-                  ? { x: 0, y: 0 }
+                  ? { x: cx, y: cy }
                   : posicionEnOrbita(i, nucleares.length, particleRadius.nucleo + 4);
               return (
                 <g key={`${particula}-${i}`}>
                   <circle
-                    cx={cx + jitter.x}
-                    cy={cy + jitter.y}
+                    cx={pos.x}
+                    cy={pos.y}
                     r={particleRadius.nucleo}
                     strokeWidth={1.5}
                     style={{ fill: color.bg, stroke: color.border }}
                   />
                   <text
-                    x={cx + jitter.x}
-                    y={cy + jitter.y}
+                    x={pos.x}
+                    y={pos.y}
                     textAnchor="middle"
                     dominantBaseline="central"
                     fontSize={fontSize.nucleo}
@@ -550,25 +552,6 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
           }),
         )}
       </svg>
-
-      {/* Leyenda: qué partículas aparecen y de qué tipo, una por línea
-          para que se lea bien en la columna angosta. */}
-      <div className="flex flex-col items-stretch gap-1 w-full">
-        {PARTICLE_TYPES.filter(
-          (p) => nucleares.includes(p) || capaMedia.includes(p) || capaExterna.includes(p),
-        ).map((p) => {
-          const color = colorDeParticula(p);
-          return (
-            <span
-              key={p}
-              className="text-micro font-bold rounded px-1.5 py-0.5 border text-center"
-              style={{ color: color.fg, background: color.bg, borderColor: color.border }}
-            >
-              {PARTICLE_INITIAL[p]} · {p}
-            </span>
-          );
-        })}
-      </div>
     </div>
   );
 }
