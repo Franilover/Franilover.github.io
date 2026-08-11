@@ -27,11 +27,13 @@ import {
 import {
   ELEMENT_FAMILIES,
   LAYER_LABEL,
+  PARTICLE_INITIAL,
   PARTICLE_TYPES,
   type Elemento,
   type ElementFamily,
   type LayerName,
   type ParticleMap,
+  type ParticleType,
 } from "./types";
 
 interface Props {
@@ -179,6 +181,11 @@ export function ElementoEditor({
 
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
+        {/* Visualización tipo átomo real: núcleo + capas orbitales, pero
+            con las partículas propias del mundo (Masa, Cinética, Voluntad…)
+            en vez de protones/neutrones/electrones genéricos. */}
+        <AtomoVisual elemento={local} />
+
         {/* Metadatos: N° atómico, Familia, Noble y Catalizador en una sola
             fila de 4 columnas. */}
         <div className="grid grid-cols-4 gap-2">
@@ -379,6 +386,176 @@ export function ElementoEditor({
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Visualización tipo átomo real ──────────────────────────────────────
+// Núcleo central con las partículas de la capa "nucleo" (equivalente a
+// protones/neutrones) y dos anillos orbitales para "media" y "externa"
+// (equivalente a las capas de electrones), cada uno con las partículas
+// propias del mundo (Masa, Cinética, Voluntad, etc.) girando alrededor en
+// vez de electrones genéricos. Cada tipo de partícula recibe un color
+// determinístico derivado de --primary/--accent (sin paleta hardcodeada),
+// así distintos tipos se distinguen entre sí de forma consistente.
+const PARTICLE_HUE_MIX = PARTICLE_TYPES.reduce<Record<string, number>>((acc, p, i) => {
+  acc[p] = Math.round((i / PARTICLE_TYPES.length) * 100);
+  return acc;
+}, {});
+
+function colorDeParticula(particula: ParticleType): { fg: string; bg: string; border: string } {
+  // Alterna entre --primary y --accent según la posición del tipo en
+  // PARTICLE_TYPES, variando el porcentaje de mezcla — 100% dinámico
+  // (deriva de las 2 variables de tema), nunca un hex fijo.
+  const base = PARTICLE_TYPES.indexOf(particula) % 2 === 0 ? "--primary" : "--accent";
+  const mix = 55 + (PARTICLE_HUE_MIX[particula] % 35);
+  return {
+    fg: `color-mix(in srgb, var(${base}) ${mix + 20}%, var(--bg-main))`,
+    bg: `color-mix(in srgb, var(${base}) ${mix}%, transparent)`,
+    border: `color-mix(in srgb, var(${base}) ${mix + 15}%, transparent)`,
+  };
+}
+
+/** Une todas las ocurrencias de una capa en una lista plana de partículas
+ * individuales (ej. {Masa: 2} → ["Masa", "Masa"]) para poder distribuirlas
+ * una por una alrededor de una órbita. */
+function particulasDeCapa(layer: ParticleMap | null | undefined): ParticleType[] {
+  if (!layer) return [];
+  const out: ParticleType[] = [];
+  for (const tipo of PARTICLE_TYPES) {
+    const n = layer[tipo] ?? 0;
+    for (let i = 0; i < n; i++) out.push(tipo);
+  }
+  return out;
+}
+
+function AtomoVisual({ elemento }: { elemento: Elemento }) {
+  const nucleares = useMemo(() => particulasDeCapa(elemento.nucleo), [elemento.nucleo]);
+  const capaMedia = useMemo(() => particulasDeCapa(elemento.media), [elemento.media]);
+  const capaExterna = useMemo(() => particulasDeCapa(elemento.externa), [elemento.externa]);
+
+  const size = 240;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radios = { media: 58, externa: 96 };
+
+  function posicionEnOrbita(i: number, total: number, radio: number) {
+    const angulo = (i / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
+    return { x: cx + Math.cos(angulo) * radio, y: cy + Math.sin(angulo) * radio };
+  }
+
+  return (
+    <div
+      className="rounded-lg border border-primary/10 bg-primary/[0.02] flex flex-col items-center gap-1.5 py-3"
+      title="Representación del átomo: núcleo + capas orbitales con las partículas propias del mundo"
+    >
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="max-w-full">
+        {/* Órbitas: solo el trazo, sin relleno */}
+        {(["media", "externa"] as const).map((layer) => (
+          <circle
+            key={layer}
+            cx={cx}
+            cy={cy}
+            r={radios[layer]}
+            fill="none"
+            style={{ stroke: "color-mix(in srgb, var(--primary) 12%, transparent)" }}
+            strokeDasharray="2 4"
+            strokeWidth={1}
+          />
+        ))}
+
+        {/* Núcleo: partículas de la capa "nucleo" apiladas al centro */}
+        <g>
+          {nucleares.length === 0 ? (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={10}
+              style={{ fill: "color-mix(in srgb, var(--primary) 15%, transparent)" }}
+            />
+          ) : (
+            nucleares.map((particula, i) => {
+              const color = colorDeParticula(particula);
+              const jitter = nucleares.length === 1 ? { x: 0, y: 0 } : posicionEnOrbita(i, nucleares.length, 9);
+              return (
+                <g key={`${particula}-${i}`}>
+                  <circle
+                    cx={cx + jitter.x}
+                    cy={cy + jitter.y}
+                    r={10}
+                    strokeWidth={1}
+                    style={{ fill: color.bg, stroke: color.border }}
+                  />
+                  <text
+                    x={cx + jitter.x}
+                    y={cy + jitter.y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={7}
+                    fontWeight={900}
+                    style={{ fill: color.fg }}
+                  >
+                    {PARTICLE_INITIAL[particula]}
+                  </text>
+                </g>
+              );
+            })
+          )}
+        </g>
+
+        {/* Capas orbitales: cada partícula distribuida a lo largo del anillo */}
+        {(
+          [
+            { layer: "media" as const, particulas: capaMedia, radio: radios.media },
+            { layer: "externa" as const, particulas: capaExterna, radio: radios.externa },
+          ]
+        ).map(({ layer, particulas, radio }) =>
+          particulas.map((particula, i) => {
+            const color = colorDeParticula(particula);
+            const pos = posicionEnOrbita(i, particulas.length, radio);
+            return (
+              <g key={`${layer}-${particula}-${i}`}>
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={8}
+                  strokeWidth={1}
+                  style={{ fill: color.bg, stroke: color.border }}
+                />
+                <text
+                  x={pos.x}
+                  y={pos.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={6.5}
+                  fontWeight={900}
+                  style={{ fill: color.fg }}
+                >
+                  {PARTICLE_INITIAL[particula]}
+                </text>
+              </g>
+            );
+          }),
+        )}
+      </svg>
+
+      {/* Leyenda: qué partículas aparecen y de qué tipo */}
+      <div className="flex flex-wrap items-center justify-center gap-1 px-2">
+        {PARTICLE_TYPES.filter(
+          (p) => nucleares.includes(p) || capaMedia.includes(p) || capaExterna.includes(p),
+        ).map((p) => {
+          const color = colorDeParticula(p);
+          return (
+            <span
+              key={p}
+              className="text-micro font-bold rounded px-1.5 py-0.5 border"
+              style={{ color: color.fg, background: color.bg, borderColor: color.border }}
+            >
+              {PARTICLE_INITIAL[p]} {p}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
