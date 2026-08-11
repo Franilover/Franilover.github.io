@@ -196,9 +196,16 @@ export function ActualizacionDisponible() {
       : localUri;
 
     setEstado("instalando");
+    // Limpiamos la key ANTES de invocar install_apk, no después. El Intent
+    // nativo de instalación se lleva puesta la Activity de Android; si el
+    // WebView se pausa o se mata en ese momento (algo común, porque Android
+    // abre esa pantalla como una Activity nueva encima), el `await` de acá
+    // puede no resolver nunca. Si dejábamos el guardarDescargaPendiente(null)
+    // después del invoke, la key quedaba viva para siempre y la app volvía
+    // a ofrecer instalar el mismo APK cada vez que se abría, en loop.
+    guardarDescargaPendiente(null);
     await invoke("plugin:android-installer|install_apk", { path });
 
-    guardarDescargaPendiente(null);
     setVisible(false);
     setEstado("idle");
   }
@@ -264,49 +271,78 @@ export function ActualizacionDisponible() {
     const pendiente = leerDescargaPendiente();
     if (!pendiente) return;
 
-    setPlataforma("android");
-    setEstado("descargando");
-    setProgreso(0);
-    setVisible(true);
-    setRemota((actual) =>
-      actual ?? {
-        version: pendiente.version,
-        notas: null,
-        url: "",
-        nombreArchivo: "",
-      }
-    );
+    let cancelado = false;
 
-    detenerPollingRef.current = pollearDescarga(
-      pendiente.downloadId,
-      setProgreso,
-      async (resultado) => {
-        if (resultado.status === "failed" || !resultado.localUri) {
+    (async () => {
+      // Red de seguridad clave: si la versión ya instalada coincide con (o
+      // superó a) la que quedó pendiente en localStorage, esa entrada es
+      // basura de una instalación anterior que no se limpió (por ejemplo
+      // porque el Intent de install_apk mató el WebView antes de que
+      // guardarDescargaPendiente(null) llegara a correr). No tiene sentido
+      // reofrecer instalar una versión que ya tenemos — la limpiamos y no
+      // mostramos nada. Sin este chequeo, el panel nativo de instalación
+      // vuelve a aparecer en cada apertura de la app, para siempre.
+      try {
+        const { getVersion } = await import("@tauri-apps/api/app");
+        const versionActual = await getVersion();
+        if (cancelado) return;
+
+        if (!esVersionMasNueva(versionActual, pendiente.version)) {
           guardarDescargaPendiente(null);
-          setEstado("error");
-          setError(
-            resultado.status === "failed"
-              ? `La descarga falló (código ${resultado.reason}).`
-              : "La descarga terminó pero no se encontró el archivo."
-          );
           return;
         }
-        try {
-          await finalizarInstalacion(resultado.localUri);
-        } catch (e) {
-          setEstado("error");
-          setError(
-            e instanceof Error ? e.message : "Error abriendo el instalador."
-          );
-        }
-      },
-      (mensaje) => {
-        setEstado("error");
-        setError(mensaje);
+      } catch {
+        // Si no pudimos leer la versión actual, seguimos con el flujo
+        // normal de retomar la descarga en vez de bloquear todo.
       }
-    );
+
+      if (cancelado) return;
+
+      setPlataforma("android");
+      setEstado("descargando");
+      setProgreso(0);
+      setVisible(true);
+      setRemota((actual) =>
+        actual ?? {
+          version: pendiente.version,
+          notas: null,
+          url: "",
+          nombreArchivo: "",
+        }
+      );
+
+      detenerPollingRef.current = pollearDescarga(
+        pendiente.downloadId,
+        setProgreso,
+        async (resultado) => {
+          if (resultado.status === "failed" || !resultado.localUri) {
+            guardarDescargaPendiente(null);
+            setEstado("error");
+            setError(
+              resultado.status === "failed"
+                ? `La descarga falló (código ${resultado.reason}).`
+                : "La descarga terminó pero no se encontró el archivo."
+            );
+            return;
+          }
+          try {
+            await finalizarInstalacion(resultado.localUri);
+          } catch (e) {
+            setEstado("error");
+            setError(
+              e instanceof Error ? e.message : "Error abriendo el instalador."
+            );
+          }
+        },
+        (mensaje) => {
+          setEstado("error");
+          setError(mensaje);
+        }
+      );
+    })();
 
     return () => {
+      cancelado = true;
       detenerPollingRef.current?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
