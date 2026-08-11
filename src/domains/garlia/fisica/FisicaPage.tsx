@@ -65,6 +65,16 @@ interface Props {
     orisNuevos: Omit<Oris, "id">[],
     conceptosNuevos: Omit<FisicaConcepto, "id">[],
   ) => Promise<number>;
+  /**
+   * Actualiza en Supabase un lote de Oris y/o conceptos ya existentes
+   * (coincidencia por nombre en Oris, por bloque+titulo en conceptos) —
+   * upsert en vez de saltarlos. Devuelve cuántos quedaron actualizados
+   * en total.
+   */
+  onActualizarVariosFisica?: (
+    orisActualizar: (Partial<Oris> & { id: string })[],
+    conceptosActualizar: (Partial<FisicaConcepto> & { id: string })[],
+  ) => Promise<number>;
 }
 
 /** Qué está activo en el editor de la columna derecha. */
@@ -105,13 +115,17 @@ function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
 // espíritu que parsearArchivoElementosJSON en elementos/ElementosPage.tsx.
 export interface ImportacionFisica {
   orisNuevos: Omit<Oris, "id">[];
+  /** Oris del archivo que coinciden por nombre con uno existente: se actualizan en vez de saltarse. */
+  orisActualizar: (Partial<Oris> & { id: string })[];
   conceptosNuevos: Omit<FisicaConcepto, "id">[];
-  duplicadosOris: { nombre: string }[];
+  /** Conceptos del archivo que coinciden por (bloque, titulo) con uno existente: se actualizan. */
+  conceptosActualizar: (Partial<FisicaConcepto> & { id: string })[];
 }
 
 export function parsearArchivoFisicaJSON(
   raw: string,
   orisExistentes: Oris[],
+  conceptosExistentes: FisicaConcepto[] = [],
 ): ImportacionFisica {
   const data = JSON.parse(raw);
   const listaOris: unknown[] = Array.isArray(data?.oris) ? data.oris : [];
@@ -121,45 +135,59 @@ export function parsearArchivoFisicaJSON(
     throw new Error('El JSON debe traer al menos una de las claves "oris" o "conceptos" con arreglos.');
   }
 
-  const nombresExistentes = new Set(orisExistentes.map((o) => o.nombre));
+  const orisPorNombre = new Map(orisExistentes.map((o) => [o.nombre, o]));
   const orisNuevos: Omit<Oris, "id">[] = [];
-  const duplicadosOris: { nombre: string }[] = [];
+  const orisActualizar: (Partial<Oris> & { id: string })[] = [];
 
   for (const item of listaOris) {
     const o = item as Partial<Oris>;
     if (!o.nombre || !o.familia) {
       throw new Error(`Oris inválido (falta nombre o familia): ${JSON.stringify(o).slice(0, 120)}`);
     }
-    if (nombresExistentes.has(o.nombre)) {
-      duplicadosOris.push({ nombre: o.nombre });
-      continue;
-    }
-    nombresExistentes.add(o.nombre);
-    orisNuevos.push({
+    const datos = {
       orden: o.orden ?? 0,
       nombre: o.nombre,
       familia: o.familia,
       formula: o.formula ?? "",
       dominio: o.dominio ?? "",
       descripcion: o.descripcion ?? null,
-    });
+    };
+    const existente = orisPorNombre.get(o.nombre);
+    if (existente) {
+      orisActualizar.push({ id: existente.id, ...datos });
+    } else {
+      orisNuevos.push(datos);
+    }
   }
 
+  // Los conceptos no tienen un campo único natural — se identifican por la
+  // combinación (bloque, titulo), igual que se agrupan visualmente.
+  const conceptosPorClave = new Map(
+    conceptosExistentes.map((c) => [`${c.bloque}\u0000${c.titulo}`, c]),
+  );
   const conceptosNuevos: Omit<FisicaConcepto, "id">[] = [];
+  const conceptosActualizar: (Partial<FisicaConcepto> & { id: string })[] = [];
+
   for (const item of listaConceptos) {
     const c = item as Partial<FisicaConcepto>;
     if (!c.titulo || !c.bloque) {
       throw new Error(`Concepto inválido (falta titulo o bloque): ${JSON.stringify(c).slice(0, 120)}`);
     }
-    conceptosNuevos.push({
+    const datos = {
       orden: c.orden ?? 0,
       bloque: c.bloque,
       titulo: c.titulo,
       contenido: c.contenido ?? "",
-    });
+    };
+    const existente = conceptosPorClave.get(`${c.bloque}\u0000${c.titulo}`);
+    if (existente) {
+      conceptosActualizar.push({ id: existente.id, ...datos });
+    } else {
+      conceptosNuevos.push(datos);
+    }
   }
 
-  return { orisNuevos, conceptosNuevos, duplicadosOris };
+  return { orisNuevos, orisActualizar, conceptosNuevos, conceptosActualizar };
 }
 
 // ─── Filas de navegación (columna izquierda) ───────────────────────────────
@@ -592,6 +620,7 @@ export function FisicaPage({
   loadingConceptos,
   onActualizarConcepto,
   onImportarFisica,
+  onActualizarVariosFisica,
 }: Props) {
   const [seleccion, setSeleccion] = useState<Seleccion>(
     seleccionarOrisId ? { tipo: "oris", id: seleccionarOrisId } : null,
@@ -622,12 +651,30 @@ export function FisicaPage({
     setMensajeImportacion(null);
     try {
       const texto = await archivo.text();
-      const { orisNuevos, conceptosNuevos, duplicadosOris } = parsearArchivoFisicaJSON(texto, oris);
-      const insertados = await onImportarFisica(orisNuevos, conceptosNuevos);
-      const partes = [`${insertados} registro${insertados === 1 ? "" : "s"} importado${insertados === 1 ? "" : "s"}`];
-      if (duplicadosOris.length > 0) {
-        partes.push(`${duplicadosOris.length} Oris omitido${duplicadosOris.length === 1 ? "" : "s"} por nombre duplicado`);
+      const { orisNuevos, orisActualizar, conceptosNuevos, conceptosActualizar } = parsearArchivoFisicaJSON(
+        texto,
+        oris,
+        conceptosLocal,
+      );
+
+      const partes: string[] = [];
+
+      if (orisNuevos.length > 0 || conceptosNuevos.length > 0) {
+        const insertados = await onImportarFisica(orisNuevos, conceptosNuevos);
+        partes.push(`${insertados} registro${insertados === 1 ? "" : "s"} nuevo${insertados === 1 ? "" : "s"} importado${insertados === 1 ? "" : "s"}`);
       }
+
+      if (orisActualizar.length > 0 || conceptosActualizar.length > 0) {
+        if (onActualizarVariosFisica) {
+          const actualizados = await onActualizarVariosFisica(orisActualizar, conceptosActualizar);
+          partes.push(`${actualizados} registro${actualizados === 1 ? "" : "s"} existente${actualizados === 1 ? "" : "s"} actualizado${actualizados === 1 ? "" : "s"}`);
+        } else {
+          const total = orisActualizar.length + conceptosActualizar.length;
+          partes.push(`${total} ya exist${total === 1 ? "e" : "en"} y no se actualiz${total === 1 ? "ó" : "aron"} (falta onActualizarVariosFisica)`);
+        }
+      }
+
+      if (partes.length === 0) partes.push("El archivo no traía registros.");
       setMensajeImportacion(partes.join(" · "));
     } catch (err) {
       console.error("[FisicaPage] error importando JSON:", err);
@@ -748,7 +795,7 @@ export function FisicaPage({
                   type="button"
                   disabled={importando}
                   onClick={() => inputArchivoRef.current?.click()}
-                  title='Subir un JSON con Oris y/o conceptos nuevos (mismo formato que "Descargar datos")'
+                  title='Subir un JSON con Oris y/o conceptos: crea los nuevos y actualiza los existentes (mismo formato que "Descargar datos")'
                   className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}

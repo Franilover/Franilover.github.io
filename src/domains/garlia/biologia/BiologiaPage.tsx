@@ -62,7 +62,8 @@ function descargarDatosBiologia(datos: {
 // colgantes — mismo criterio conservador que usa eliminar() en useBiologia.
 interface ImportacionBiologia {
   cladosNuevos: Omit<Clado, "id" | "created_at" | "updated_at">[];
-  duplicados: { nombre: string }[];
+  /** Clados del archivo que coinciden por nombre con uno existente: se actualizan en vez de saltarse. */
+  cladosActualizar: (Partial<Clado> & { id: string })[];
   padresOmitidos: { nombre: string }[];
 }
 
@@ -74,9 +75,9 @@ function parsearArchivoBiologiaJSON(raw: string, cladosExistentes: Clado[]): Imp
   }
 
   const idsExistentes = new Set(cladosExistentes.map((c) => c.id));
-  const nombresExistentes = new Set(cladosExistentes.map((c) => c.nombre));
+  const porNombre = new Map(cladosExistentes.map((c) => [c.nombre, c]));
   const cladosNuevos: Omit<Clado, "id" | "created_at" | "updated_at">[] = [];
-  const duplicados: { nombre: string }[] = [];
+  const cladosActualizar: (Partial<Clado> & { id: string })[] = [];
   const padresOmitidos: { nombre: string }[] = [];
 
   for (const item of lista) {
@@ -84,29 +85,35 @@ function parsearArchivoBiologiaJSON(raw: string, cladosExistentes: Clado[]): Imp
     if (!c.nombre) {
       throw new Error(`Clado inválido (falta nombre): ${JSON.stringify(c).slice(0, 120)}`);
     }
-    if (nombresExistentes.has(c.nombre)) {
-      duplicados.push({ nombre: c.nombre });
-      continue;
-    }
-    nombresExistentes.add(c.nombre);
 
+    const existente = porNombre.get(c.nombre);
+
+    // padre_id: solo se acepta si apunta a un clado que ya existe en la
+    // base (los ids del propio archivo, si trae, no sirven porque los
+    // clados nuevos todavía no tienen id asignado por Supabase).
     let padreId = c.padre_id ?? null;
     if (padreId && !idsExistentes.has(padreId)) {
       padresOmitidos.push({ nombre: c.nombre });
       padreId = null;
     }
 
-    cladosNuevos.push({
+    const datos = {
       nombre: c.nombre,
       sinapomorfia: c.sinapomorfia ?? "",
       padre_id: padreId,
       descripcion: c.descripcion ?? "",
       criatura_ids: c.criatura_ids ?? [],
       orden: c.orden ?? 0,
-    });
+    };
+
+    if (existente) {
+      cladosActualizar.push({ id: existente.id, ...datos });
+    } else {
+      cladosNuevos.push(datos);
+    }
   }
 
-  return { cladosNuevos, duplicados, padresOmitidos };
+  return { cladosNuevos, cladosActualizar, padresOmitidos };
 }
 
 export function BiologiaPage({ onSelectCriatura }: Props) {
@@ -128,20 +135,41 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
     setMensajeImportacion(null);
     try {
       const texto = await archivo.text();
-      const { cladosNuevos, duplicados, padresOmitidos } = parsearArchivoBiologiaJSON(texto, clados);
-      if (cladosNuevos.length === 0) {
-        setMensajeImportacion("Nada nuevo para importar.");
+      const { cladosNuevos, cladosActualizar, padresOmitidos } = parsearArchivoBiologiaJSON(texto, clados);
+      if (cladosNuevos.length === 0 && cladosActualizar.length === 0) {
+        setMensajeImportacion("Nada para importar.");
         return;
       }
-      const { data, error } = await supabase.from("clados").insert(cladosNuevos).select();
-      if (error) throw error;
-      const insertados = (data ?? []) as Clado[];
-      setClados((prev) => [...prev, ...insertados]);
 
-      const partes = [`${insertados.length} clado${insertados.length === 1 ? "" : "s"} importado${insertados.length === 1 ? "" : "s"}`];
-      if (duplicados.length > 0) {
-        partes.push(`${duplicados.length} omitido${duplicados.length === 1 ? "" : "s"} por nombre duplicado`);
+      const partes: string[] = [];
+
+      if (cladosNuevos.length > 0) {
+        const { data, error } = await supabase.from("clados").insert(cladosNuevos).select();
+        if (error) throw error;
+        const insertados = (data ?? []) as Clado[];
+        setClados((prev) => [...prev, ...insertados]);
+        partes.push(`${insertados.length} clado${insertados.length === 1 ? "" : "s"} nuevo${insertados.length === 1 ? "" : "s"} importado${insertados.length === 1 ? "" : "s"}`);
       }
+
+      if (cladosActualizar.length > 0) {
+        let actualizados = 0;
+        for (const { id, ...datos } of cladosActualizar) {
+          const { error } = await supabase.from("clados").update(datos).eq("id", id);
+          if (error) {
+            console.error("[BiologiaPage] error actualizando clado", id, error);
+            continue;
+          }
+          actualizados++;
+        }
+        setClados((prev) =>
+          prev.map((c) => {
+            const cambio = cladosActualizar.find((x) => x.id === c.id);
+            return cambio ? { ...c, ...cambio } : c;
+          }),
+        );
+        partes.push(`${actualizados} clado${actualizados === 1 ? "" : "s"} existente${actualizados === 1 ? "" : "s"} actualizado${actualizados === 1 ? "" : "s"}`);
+      }
+
       if (padresOmitidos.length > 0) {
         partes.push(`${padresOmitidos.length} sin padre_id válido (quedaron como raíz)`);
       }
@@ -168,7 +196,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
           type="button"
           disabled={importando}
           onClick={() => inputArchivoRef.current?.click()}
-          title='Subir un JSON con clados nuevos (mismo formato que "Descargar datos")'
+          title='Subir un JSON con clados: crea los nuevos y actualiza los existentes (mismo nombre), mismo formato que "Descargar datos"'
           className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
         >
           {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}

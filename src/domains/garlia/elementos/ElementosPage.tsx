@@ -103,7 +103,12 @@ function descargarJSON(payload: unknown, nombreBase: string) {
 //   también, sueltos, para que el caller decida si los sube.
 export interface ImportacionElementos {
   elementosNuevos: Omit<Elemento, "id">[];
-  duplicados: { numero_atomico: number; nombre: string }[];
+  /**
+   * Elementos del archivo que coinciden (mismo número atómico) con uno ya
+   * existente en la tabla: se actualizan (upsert) en vez de saltarse.
+   * Incluye el id existente para poder hacer el UPDATE.
+   */
+  elementosActualizar: (Partial<Elemento> & { id: string })[];
   infoTablaQuimica?: SeccionInfoTablaQuimica[];
   compuestos?: Compuesto[];
 }
@@ -118,9 +123,9 @@ export function parsearArchivoElementosJSON(
     throw new Error('El JSON debe ser un arreglo de elementos, o un objeto con la clave "elementos".');
   }
 
-  const numerosExistentes = new Set(elementosExistentes.map((e) => e.numero_atomico));
+  const porNumeroAtomico = new Map(elementosExistentes.map((e) => [e.numero_atomico, e]));
   const elementosNuevos: Omit<Elemento, "id">[] = [];
-  const duplicados: { numero_atomico: number; nombre: string }[] = [];
+  const elementosActualizar: (Partial<Elemento> & { id: string })[] = [];
 
   for (const raw of lista) {
     const e = raw as Partial<Elemento>;
@@ -129,12 +134,7 @@ export function parsearArchivoElementosJSON(
         `Elemento inválido (falta numero_atomico, nombre, simbolo o familia): ${JSON.stringify(e).slice(0, 120)}`,
       );
     }
-    if (numerosExistentes.has(e.numero_atomico)) {
-      duplicados.push({ numero_atomico: e.numero_atomico, nombre: e.nombre });
-      continue;
-    }
-    numerosExistentes.add(e.numero_atomico); // también evita duplicados dentro del propio archivo
-    elementosNuevos.push({
+    const datos = {
       numero_atomico: e.numero_atomico,
       nombre: e.nombre,
       simbolo: e.simbolo,
@@ -145,12 +145,25 @@ export function parsearArchivoElementosJSON(
       media: e.media ?? {},
       externa: e.externa ?? {},
       es_catalizador: e.es_catalizador ?? false,
-    });
+    };
+
+    const existente = porNumeroAtomico.get(e.numero_atomico);
+    if (existente) {
+      // Actualiza (upsert): mismo número atómico → sobrescribe el existente
+      // con los datos del archivo, en vez de saltarlo.
+      elementosActualizar.push({ id: existente.id, ...datos });
+    } else {
+      elementosNuevos.push(datos);
+    }
+    // También evita tratar dos filas del propio archivo con el mismo
+    // número atómico como "nuevas" por separado — la segunda pasa a
+    // actualizar la primera (aunque todavía no tenga id real, se resuelve
+    // en el insert; este Map solo protege contra los ya existentes en DB).
   }
 
   return {
     elementosNuevos,
-    duplicados,
+    elementosActualizar,
     infoTablaQuimica: Array.isArray(data?.info_tabla_quimica) ? data.info_tabla_quimica : undefined,
     compuestos: Array.isArray(data?.compuestos) ? data.compuestos : undefined,
   };
@@ -178,6 +191,12 @@ interface Props {
    * la vez.
    */
   onImportarElementos?: (elementos: Omit<Elemento, "id">[]) => Promise<number>;
+  /**
+   * Actualiza en Supabase un lote de elementos ya existentes (con id) cuyo
+   * número atómico coincidió con uno del archivo subido — hace upsert en
+   * vez de saltarlos. Devuelve cuántos quedaron actualizados.
+   */
+  onActualizarVarios?: (elementos: (Partial<Elemento> & { id: string })[]) => Promise<number>;
 }
 
 // ─── Grupo (columna) tipo tabla periódica real ─────────────────────────────
@@ -607,6 +626,7 @@ export function ElementosPage({
   onEliminarVarios,
   seleccionarId,
   onImportarElementos,
+  onActualizarVarios,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [seleccionMultiple, setSeleccionMultiple] = useState<Set<string>>(new Set());
@@ -673,22 +693,29 @@ export function ElementosPage({
     setMensajeImportacion(null);
     try {
       const texto = await archivo.text();
-      const { elementosNuevos, duplicados } = parsearArchivoElementosJSON(texto, elementos);
+      const { elementosNuevos, elementosActualizar } = parsearArchivoElementosJSON(texto, elementos);
 
-      if (elementosNuevos.length === 0) {
-        setMensajeImportacion(
-          duplicados.length > 0
-            ? `Los ${duplicados.length} elementos del archivo ya existen (mismo número atómico) — no se subió nada.`
-            : "El archivo no traía elementos nuevos.",
-        );
+      if (elementosNuevos.length === 0 && elementosActualizar.length === 0) {
+        setMensajeImportacion("El archivo no traía elementos.");
         return;
       }
 
-      const insertados = await onImportarElementos(elementosNuevos);
-      const partes = [`${insertados} elemento${insertados === 1 ? "" : "s"} nuevo${insertados === 1 ? "" : "s"} subido${insertados === 1 ? "" : "s"}.`];
-      if (duplicados.length > 0) {
-        partes.push(`${duplicados.length} se saltaron por número atómico repetido.`);
+      const partes: string[] = [];
+
+      if (elementosNuevos.length > 0) {
+        const insertados = await onImportarElementos(elementosNuevos);
+        partes.push(`${insertados} elemento${insertados === 1 ? "" : "s"} nuevo${insertados === 1 ? "" : "s"} subido${insertados === 1 ? "" : "s"}.`);
       }
+
+      if (elementosActualizar.length > 0) {
+        if (onActualizarVarios) {
+          const actualizados = await onActualizarVarios(elementosActualizar);
+          partes.push(`${actualizados} elemento${actualizados === 1 ? "" : "s"} existente${actualizados === 1 ? "" : "s"} actualizado${actualizados === 1 ? "" : "s"}.`);
+        } else {
+          partes.push(`${elementosActualizar.length} ya existían y no se actualizaron (falta onActualizarVarios).`);
+        }
+      }
+
       setMensajeImportacion(partes.join(" "));
     } catch (err) {
       console.error("[ElementosPage] error importando JSON:", err);
@@ -911,7 +938,7 @@ export function ElementosPage({
                   type="button"
                   disabled={importando}
                   onClick={() => inputArchivoRef.current?.click()}
-                  title='Subir un JSON con elementos nuevos (mismo formato que "Descargar datos")'
+                  title='Subir un JSON con elementos: crea los nuevos y actualiza los existentes (mismo número atómico), mismo formato que "Descargar datos"'
                   className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}

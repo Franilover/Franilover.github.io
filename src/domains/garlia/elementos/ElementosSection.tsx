@@ -80,6 +80,30 @@ export function ElementosSection({ selectedId }: { selectedId: string | null }) 
     return insertados.length;
   }
 
+  // Actualiza (upsert) un lote de elementos ya existentes cuyo número
+  // atómico coincidió con uno del JSON subido — mismo patrón que
+  // handleImportarElementos pero con UPDATE en vez de INSERT, uno por
+  // fila (Supabase no soporta upsert de varias filas con distinto id vía
+  // update() en una sola llamada).
+  async function handleActualizarVarios(cambios: (Partial<Elemento> & { id: string })[]) {
+    let actualizados = 0;
+    for (const { id, ...datos } of cambios) {
+      const { error } = await supabase.from("elementos").update(datos).eq("id", id);
+      if (error) {
+        console.error("[ElementosSection] error actualizando elemento", id, error);
+        continue;
+      }
+      actualizados++;
+    }
+    setElementos((prev) =>
+      prev.map((e) => {
+        const cambio = cambios.find((c) => c.id === e.id);
+        return cambio ? { ...e, ...cambio } : e;
+      }),
+    );
+    return actualizados;
+  }
+
   return (
     <ElementosPage
       elementos={elementos}
@@ -92,6 +116,7 @@ export function ElementosSection({ selectedId }: { selectedId: string | null }) 
       onEliminar={handleEliminar}
       seleccionarId={selectedId ?? recienCreadoId}
       onImportarElementos={handleImportarElementos}
+      onActualizarVarios={handleActualizarVarios}
     />
   );
 }

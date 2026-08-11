@@ -426,6 +426,53 @@ function BloqueFisica({
     return total;
   }
 
+  // Actualiza (upsert) un lote de Oris y/o conceptos ya existentes cuyo
+  // nombre (Oris) o bloque+titulo (conceptos) coincidió con uno del JSON
+  // subido — mismo patrón que handleImportarFisica pero con UPDATE en vez
+  // de INSERT, uno por fila.
+  async function handleActualizarVariosFisica(
+    orisActualizar: (Partial<Oris> & { id: string })[],
+    conceptosActualizar: (Partial<FisicaConcepto> & { id: string })[],
+  ) {
+    let actualizados = 0;
+
+    for (const { id, ...datos } of orisActualizar) {
+      const { error } = await supabase.from(ORIS_CONFIG.tabla).update(datos).eq("id", id);
+      if (error) {
+        console.error("[BloqueFisica] error actualizando Oris", id, error);
+        continue;
+      }
+      actualizados++;
+    }
+    if (orisActualizar.length > 0) {
+      setOris((prev) =>
+        prev.map((o) => {
+          const cambio = orisActualizar.find((c) => c.id === o.id);
+          return cambio ? { ...o, ...cambio } : o;
+        }),
+      );
+    }
+
+    for (const { id, ...datos } of conceptosActualizar) {
+      const { error } = await supabase.from(FISICA_CONCEPTOS_CONFIG.tabla).update(datos).eq("id", id);
+      if (error) {
+        console.error("[BloqueFisica] error actualizando concepto", id, error);
+        continue;
+      }
+      actualizados++;
+    }
+    if (conceptosActualizar.length > 0) {
+      setConceptos((prev) =>
+        prev.map((c) => {
+          const cambio = conceptosActualizar.find((x) => x.id === c.id);
+          return cambio ? { ...c, ...cambio } : c;
+        }),
+      );
+    }
+
+    return actualizados;
+  }
+
   return (
     <div>
       <FisicaPage
@@ -444,6 +491,7 @@ function BloqueFisica({
           setConceptos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
         }
         onImportarFisica={handleImportarFisica}
+        onActualizarVariosFisica={handleActualizarVariosFisica}
       />
 
       {/* Subsistemas de Magia — al final de Física, abre en modal flotante */}
