@@ -14,13 +14,14 @@
  * nodo interno, hojas alineadas a la derecha), no una lista anidada tipo
  * carpeta. Layout calculado en SVG a partir del árbol.
  *
- * Panel de detalle del clado seleccionado como sidebar angosta a la
- * derecha (patrón "lienzo central + barra lateral compacta" — el
- * cladograma es el protagonista, la edición queda secundaria y a mano).
+ * Panel de detalle del clado seleccionado como panel flotante centrado
+ * (mismo patrón que Elementos/Personajes/Criaturas — modal grande con
+ * backdrop blur), no una barra lateral fija.
  */
 
-import { Dna, Plus, Trash2 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { Dna, Plus, Trash2, X } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { RichEditor } from "@/editor/lexical";
 
@@ -466,6 +467,107 @@ function PanelClado({
   );
 }
 
+// ─── Panel flotante centrado (mismo patrón que ElementoPanelFlotante en
+// Química y los paneles de Personaje/Criatura) ─────────────────────────────
+// Reemplaza el sidebar fijo: al clickear un clado se abre un modal grande
+// centrado con backdrop blur, en vez de una barra lateral angosta.
+function CladoPanelFlotante({
+  clado,
+  onCerrar,
+  onSave,
+  onDelete,
+  onCrearHijo,
+  onSelectCriatura,
+}: {
+  clado: Clado;
+  onCerrar: () => void;
+  onSave: (updates: Partial<Clado>) => void;
+  onDelete: () => void;
+  onCrearHijo: () => void;
+  onSelectCriatura?: (id: string) => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCerrar();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onCerrar]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6"
+      style={{
+        background: "color-mix(in srgb, var(--primary) 35%, transparent)",
+        backdropFilter: "blur(8px)",
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCerrar();
+      }}
+    >
+      <div
+        className="w-full h-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        style={{
+          background: "var(--bg-main)",
+          border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+          animation: "popIn 160ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
+      >
+        <div
+          className="shrink-0 flex items-center gap-3 px-4 py-3 border-b"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+          }}
+        >
+          <div
+            className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+              borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
+            }}
+          >
+            <Dna className="text-primary/50" size={12} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+              Clado · vista rápida
+            </p>
+            <p className="text-xs font-bold text-primary truncate">{clado.nombre}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onCerrar}
+            title="Cerrar (Esc)"
+            className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/8 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-3.5">
+          <PanelClado
+            key={clado.id}
+            clado={clado}
+            onSave={onSave}
+            onDelete={onDelete}
+            onCrearHijo={onCrearHijo}
+            onSelectCriatura={onSelectCriatura}
+          />
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ─── Página principal ────────────────────────────────────────────────────────
 
 export function CladisticaPage({ onSelectCriatura }: Props) {
@@ -503,79 +605,70 @@ export function CladisticaPage({ onSelectCriatura }: Props) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-            Cladograma
-          </span>
-          <div className="flex items-center gap-3">
-            {seleccionMultiple.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setSeleccionMultiple(new Set())}
-                className="text-micro font-black uppercase tracking-widest text-accent/60 hover:text-accent transition-colors"
-              >
-                Limpiar selección ({seleccionMultiple.size})
-              </button>
-            )}
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+          Cladograma
+        </span>
+        <div className="flex items-center gap-3">
+          {seleccionMultiple.size > 0 && (
             <button
               type="button"
-              disabled={creating}
-              onClick={() => void crearRaiz()}
-              className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
+              onClick={() => setSeleccionMultiple(new Set())}
+              className="text-micro font-black uppercase tracking-widest text-accent/60 hover:text-accent transition-colors"
             >
-              <Plus size={10} /> Nuevo ancestro común
+              Limpiar selección ({seleccionMultiple.size})
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            disabled={creating}
+            onClick={() => void crearRaiz()}
+            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40"
+          >
+            <Plus size={10} /> Nuevo ancestro común
+          </button>
         </div>
-
-        {loading ? (
-          <div className="w-full py-6 text-xs text-primary/30 text-center">Cargando…</div>
-        ) : clados.length === 0 ? (
-          <p className="text-xs text-primary/25 italic py-4 text-center">
-            Sin clados todavía — creá el primer nodo (el ancestro común más
-            lejano que quieras registrar).
-          </p>
-        ) : (
-          <DiagramaCladograma
-            clados={clados}
-            seleccionadoId={seleccionadoId}
-            seleccionMultiple={seleccionMultiple}
-            onSelect={(id) => {
-              setSeleccionadoId(id);
-              setSeleccionMultiple(new Set());
-            }}
-            onToggleMultiple={toggleMultiple}
-            onMover={(cladoId, nuevoPadreId) => void actualizar(cladoId, { padre_id: nuevoPadreId })}
-            onMoverGrupo={(ids, nuevoPadreId) => void moverGrupo(ids, nuevoPadreId)}
-          />
-        )}
       </div>
 
-      <div className="w-full lg:w-[300px] xl:w-[330px] shrink-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto rounded-2xl border border-primary/10 bg-white-custom/40 p-3.5">
-        {seleccionado ? (
-          <PanelClado
-            key={seleccionado.id}
-            clado={seleccionado}
-            onSave={(updates) => void actualizar(seleccionado.id, updates)}
-            onDelete={() => {
-              void eliminar(seleccionado.id);
-              setSeleccionadoId(null);
-            }}
-            onCrearHijo={() => void crearHijo(seleccionado.id)}
-            onSelectCriatura={onSelectCriatura}
-          />
-        ) : (
-          <div className="py-8 text-center">
-            <Dna size={16} className="mx-auto mb-2 text-primary/15" />
-            <p className="text-micro text-primary/30 leading-snug px-2">
-              Seleccioná un clado del cladograma para ver o editar su
-              detalle.
-            </p>
-          </div>
-        )}
-      </div>
+      {loading ? (
+        <div className="w-full py-6 text-xs text-primary/30 text-center">Cargando…</div>
+      ) : clados.length === 0 ? (
+        <p className="text-xs text-primary/25 italic py-4 text-center">
+          Sin clados todavía — creá el primer nodo (el ancestro común más
+          lejano que quieras registrar).
+        </p>
+      ) : (
+        <DiagramaCladograma
+          clados={clados}
+          seleccionadoId={seleccionadoId}
+          seleccionMultiple={seleccionMultiple}
+          onSelect={(id) => {
+            setSeleccionadoId(id);
+            setSeleccionMultiple(new Set());
+          }}
+          onToggleMultiple={toggleMultiple}
+          onMover={(cladoId, nuevoPadreId) => void actualizar(cladoId, { padre_id: nuevoPadreId })}
+          onMoverGrupo={(ids, nuevoPadreId) => void moverGrupo(ids, nuevoPadreId)}
+        />
+      )}
+
+      {/* Panel flotante centrado: mismo patrón que Elementos/Personajes/
+          Criaturas — modal grande centrado con backdrop blur, en vez de
+          sidebar fijo. Se cierra con click en el backdrop, Escape, o X. */}
+      {seleccionado && (
+        <CladoPanelFlotante
+          clado={seleccionado}
+          onCerrar={() => setSeleccionadoId(null)}
+          onSave={(updates) => void actualizar(seleccionado.id, updates)}
+          onDelete={() => {
+            void eliminar(seleccionado.id);
+            setSeleccionadoId(null);
+          }}
+          onCrearHijo={() => void crearHijo(seleccionado.id)}
+          onSelectCriatura={onSelectCriatura}
+        />
+      )}
     </div>
   );
 }
