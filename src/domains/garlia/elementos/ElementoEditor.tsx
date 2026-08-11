@@ -181,11 +181,6 @@ export function ElementoEditor({
 
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
-        {/* Visualización tipo átomo real: núcleo + capas orbitales, pero
-            con las partículas propias del mundo (Masa, Cinética, Voluntad…)
-            en vez de protones/neutrones/electrones genéricos. */}
-        <AtomoVisual elemento={local} />
-
         {/* Metadatos: N° atómico, Familia, Noble y Catalizador en una sola
             fila de 4 columnas. */}
         <div className="grid grid-cols-4 gap-2">
@@ -289,69 +284,77 @@ export function ElementoEditor({
           />
         </div>
 
-        {/* Capas: título con el ratio deficit/capacidad y, justo detrás,
-            las partículas dominantes (mismo chip que antes vivía en Rol,
-            ahora eliminado). */}
-        <div className="flex flex-col gap-1.5 min-w-0">
-          <div className="flex items-center justify-between">
-            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-              Capas atómicas
-            </p>
-            <div className="flex items-center gap-1.5">
-              <span
-                title="Déficit acumulado sobre la capacidad total de las 3 capas"
-                className="text-micro font-black tabular-nums text-primary/40"
-              >
-                {reactividad.deficitTotal}/{reactividad.capacidadTotal}
-              </span>
-              {dominantes.length > 0 && (
+        {/* Átomo (izquierda) + Capas atómicas (derecha), lado a lado. */}
+        <div className="grid grid-cols-[auto_1fr] gap-3 items-start">
+          {/* Visualización tipo átomo real: núcleo + capas orbitales, pero
+              con las partículas propias del mundo (Masa, Cinética,
+              Voluntad…) en vez de protones/neutrones/electrones genéricos. */}
+          <AtomoVisual elemento={local} />
+
+          {/* Capas: título con el ratio deficit/capacidad y, justo detrás,
+              las partículas dominantes (mismo chip que antes vivía en Rol,
+              ahora eliminado). */}
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <div className="flex items-center justify-between">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Capas atómicas
+              </p>
+              <div className="flex items-center gap-1.5">
                 <span
-                  title="Partícula(s) dominante(s)"
-                  className="text-micro font-bold text-accent/70 bg-accent/10 rounded px-1.5 py-0.5"
+                  title="Déficit acumulado sobre la capacidad total de las 3 capas"
+                  className="text-micro font-black tabular-nums text-primary/40"
                 >
-                  {dominantes.map((d) => d.particula).join(" / ")}
+                  {reactividad.deficitTotal}/{reactividad.capacidadTotal}
                 </span>
-              )}
-            </div>
-          </div>
-          <div className="rounded-lg border border-primary/10 overflow-hidden">
-            {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
-              <div
-                key={layer}
-                className={`flex items-center gap-1.5 px-2 py-1.5 ${
-                  i > 0 ? "border-t border-primary/10" : ""
-                } bg-primary/[0.02]`}
-              >
-                <span className="shrink-0 w-6 text-micro font-black text-primary/35">
-                  {LAYER_LABEL[layer].slice(0, 1)}
-                </span>
-                <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
-                  {PARTICLE_TYPES.map((particle) => {
-                    const value = local[layer]?.[particle] ?? 0;
-                    return (
-                      <div
-                        key={particle}
-                        className="shrink-0 flex items-center gap-1 bg-primary/5 rounded-md pl-1.5 pr-0.5 py-0.5 border border-primary/10 focus-within:border-primary/30"
-                      >
-                        <span className="text-micro font-bold text-primary/45 whitespace-nowrap">
-                          {particle}
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={value}
-                          onChange={(e) =>
-                            setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
-                          }
-                          onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
-                          className="w-7 shrink-0 text-center bg-transparent text-micro font-bold text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+                {dominantes.length > 0 && (
+                  <span
+                    title="Partícula(s) dominante(s)"
+                    className="text-micro font-bold text-accent/70 bg-accent/10 rounded px-1.5 py-0.5"
+                  >
+                    {dominantes.map((d) => d.particula).join(" / ")}
+                  </span>
+                )}
               </div>
-            ))}
+            </div>
+            <div className="rounded-lg border border-primary/10 overflow-hidden">
+              {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
+                <div
+                  key={layer}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 ${
+                    i > 0 ? "border-t border-primary/10" : ""
+                  } bg-primary/[0.02]`}
+                >
+                  <span className="shrink-0 w-6 text-micro font-black text-primary/35">
+                    {LAYER_LABEL[layer].slice(0, 1)}
+                  </span>
+                  <div className="flex-1 min-w-0 flex flex-wrap items-center gap-1">
+                    {PARTICLE_TYPES.map((particle) => {
+                      const value = local[layer]?.[particle] ?? 0;
+                      return (
+                        <div
+                          key={particle}
+                          className="shrink-0 flex items-center gap-1 bg-primary/5 rounded-md pl-1.5 pr-0.5 py-0.5 border border-primary/10 focus-within:border-primary/30"
+                        >
+                          <span className="text-micro font-bold text-primary/45 whitespace-nowrap">
+                            {particle}
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={value}
+                            onChange={(e) =>
+                              setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
+                            }
+                            onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
+                            className="w-7 shrink-0 text-center bg-transparent text-micro font-bold text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -407,13 +410,16 @@ const PARTICLE_HUE_MIX = PARTICLE_TYPES.reduce<Record<string, number>>((acc, p, 
 function colorDeParticula(particula: ParticleType): { fg: string; bg: string; border: string } {
   // Alterna entre --primary y --accent según la posición del tipo en
   // PARTICLE_TYPES, variando el porcentaje de mezcla — 100% dinámico
-  // (deriva de las 2 variables de tema), nunca un hex fijo.
+  // (deriva de las variables de tema, nunca un hex fijo). Fondo sólido y
+  // fuerte (no transparente) + texto con --btn-text (misma variable que ya
+  // usa el resto de la app para texto de alto contraste sobre bg-primary
+  // sólido), así las letras siempre se leen sin importar el tema activo.
   const base = PARTICLE_TYPES.indexOf(particula) % 2 === 0 ? "--primary" : "--accent";
-  const mix = 55 + (PARTICLE_HUE_MIX[particula] % 35);
+  const mix = 60 + (PARTICLE_HUE_MIX[particula] % 30);
   return {
-    fg: `color-mix(in srgb, var(${base}) ${mix + 20}%, var(--bg-main))`,
-    bg: `color-mix(in srgb, var(${base}) ${mix}%, transparent)`,
-    border: `color-mix(in srgb, var(${base}) ${mix + 15}%, transparent)`,
+    fg: "var(--btn-text)",
+    bg: `color-mix(in srgb, var(${base}) ${mix}%, var(--bg-main))`,
+    border: `color-mix(in srgb, var(${base}) 90%, black)`,
   };
 }
 
@@ -435,10 +441,12 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
   const capaMedia = useMemo(() => particulasDeCapa(elemento.media), [elemento.media]);
   const capaExterna = useMemo(() => particulasDeCapa(elemento.externa), [elemento.externa]);
 
-  const size = 240;
+  const size = 200;
   const cx = size / 2;
   const cy = size / 2;
-  const radios = { media: 58, externa: 96 };
+  const radios = { media: 48, externa: 82 };
+  const particleRadius = { nucleo: 12, orbita: 11 };
+  const fontSize = { nucleo: 9, orbita: 8.5 };
 
   function posicionEnOrbita(i: number, total: number, radio: number) {
     const angulo = (i / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
@@ -447,7 +455,7 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
 
   return (
     <div
-      className="rounded-lg border border-primary/10 bg-primary/[0.02] flex flex-col items-center gap-1.5 py-3"
+      className="shrink-0 w-fit rounded-lg border border-primary/10 bg-primary/[0.02] flex flex-col items-center gap-1.5 px-2 py-3"
       title="Representación del átomo: núcleo + capas orbitales con las partículas propias del mundo"
     >
       <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="max-w-full">
@@ -471,20 +479,23 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
             <circle
               cx={cx}
               cy={cy}
-              r={10}
+              r={particleRadius.nucleo}
               style={{ fill: "color-mix(in srgb, var(--primary) 15%, transparent)" }}
             />
           ) : (
             nucleares.map((particula, i) => {
               const color = colorDeParticula(particula);
-              const jitter = nucleares.length === 1 ? { x: 0, y: 0 } : posicionEnOrbita(i, nucleares.length, 9);
+              const jitter =
+                nucleares.length === 1
+                  ? { x: 0, y: 0 }
+                  : posicionEnOrbita(i, nucleares.length, particleRadius.nucleo + 4);
               return (
                 <g key={`${particula}-${i}`}>
                   <circle
                     cx={cx + jitter.x}
                     cy={cy + jitter.y}
-                    r={10}
-                    strokeWidth={1}
+                    r={particleRadius.nucleo}
+                    strokeWidth={1.5}
                     style={{ fill: color.bg, stroke: color.border }}
                   />
                   <text
@@ -492,7 +503,7 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
                     y={cy + jitter.y}
                     textAnchor="middle"
                     dominantBaseline="central"
-                    fontSize={7}
+                    fontSize={fontSize.nucleo}
                     fontWeight={900}
                     style={{ fill: color.fg }}
                   >
@@ -519,8 +530,8 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r={8}
-                  strokeWidth={1}
+                  r={particleRadius.orbita}
+                  strokeWidth={1.5}
                   style={{ fill: color.bg, stroke: color.border }}
                 />
                 <text
@@ -528,7 +539,7 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
                   y={pos.y}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fontSize={6.5}
+                  fontSize={fontSize.orbita}
                   fontWeight={900}
                   style={{ fill: color.fg }}
                 >
@@ -540,8 +551,9 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
         )}
       </svg>
 
-      {/* Leyenda: qué partículas aparecen y de qué tipo */}
-      <div className="flex flex-wrap items-center justify-center gap-1 px-2">
+      {/* Leyenda: qué partículas aparecen y de qué tipo, una por línea
+          para que se lea bien en la columna angosta. */}
+      <div className="flex flex-col items-stretch gap-1 w-full">
         {PARTICLE_TYPES.filter(
           (p) => nucleares.includes(p) || capaMedia.includes(p) || capaExterna.includes(p),
         ).map((p) => {
@@ -549,10 +561,10 @@ function AtomoVisual({ elemento }: { elemento: Elemento }) {
           return (
             <span
               key={p}
-              className="text-micro font-bold rounded px-1.5 py-0.5 border"
+              className="text-micro font-bold rounded px-1.5 py-0.5 border text-center"
               style={{ color: color.fg, background: color.bg, borderColor: color.border }}
             >
-              {PARTICLE_INITIAL[p]} {p}
+              {PARTICLE_INITIAL[p]} · {p}
             </span>
           );
         })}
