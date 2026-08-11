@@ -202,25 +202,8 @@ const CATALOGOS_BASES: { key: "particula-base" | "particulas" | "iums"; titulo: 
   ];
 
 function TodasLasBasesView({ onBack }: { onBack: () => void }) {
-  const total = CATALOGOS_BASES.reduce((acc, c) => acc + c.filas.length, 0);
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div
-        style={{ background: "var(--bg-main)" }}
-        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
-      >
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <ChevronLeft size={12} />
-        </button>
-        <p className="text-micro font-black uppercase tracking-widest text-primary">
-          Bases · {total}
-        </p>
-      </div>
-
       <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
         {CATALOGOS_BASES.map(({ key, titulo, filas }, idx) => (
           <div key={key} className="flex flex-col gap-2">
@@ -290,23 +273,6 @@ function TodosLosOrisView({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div
-        style={{ background: "var(--bg-main)" }}
-        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
-      >
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <ChevronLeft size={12} />
-        </button>
-        <Atom size={12} className="shrink-0 text-primary/40" />
-        <p className="text-micro font-black uppercase tracking-widest text-primary">
-          Oris · {totalOris}
-        </p>
-      </div>
-
       <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
         {ORIS_FAMILIAS.map((familia, idx) => {
           const items = orisPorFamilia.get(familia) ?? [];
@@ -497,24 +463,12 @@ function TodosLosConceptosView({
   onAbrirNuevaSeccion: () => void;
   creandoSeccion?: boolean;
 }) {
-  const total = bloques.reduce((acc, b) => acc + b.items.length, 0);
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div
         style={{ background: "var(--bg-main)" }}
-        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+        className="shrink-0 flex items-center justify-end gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
       >
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <ChevronLeft size={12} />
-        </button>
-        <p className="flex-1 min-w-0 text-micro font-black uppercase tracking-widest text-primary">
-          Conceptos · {total}
-        </p>
-
         {mostrarInputSeccion ? (
           <div className="flex items-center gap-1 min-w-0">
             <input
