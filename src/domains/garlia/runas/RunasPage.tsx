@@ -38,7 +38,6 @@ import {
   SelectorProbadorConfig,
   type SeccionProbadorConfig,
 } from "./BloqueProbadorYCombinaciones";
-import { BloqueSubsistemasMagia, ModalEditorSubsistema } from "./BloqueSubsistemasMagia";
 import type { Punto } from "./dollarOneRecognizer";
 import { PanelConfigRunas, type PreviewCombinacion } from "./PanelConfigRunas";
 import { PanelDetectorUnificado } from "./PanelDetectorUnificado";
@@ -366,9 +365,6 @@ function BloqueFisica({
     actualizar: actualizarSubsistema,
     eliminar: eliminarSubsistema,
   } = useSubsistemasMagia();
-  const [subsistemaSeleccionadoId, setSubsistemaSeleccionadoId] = useState<string | null>(null);
-  const subsistemaSeleccionado =
-    subsistemas.find((s) => s.id === subsistemaSeleccionadoId) ?? null;
 
   async function handleCreate() {
     setCreating(true);
@@ -492,36 +488,14 @@ function BloqueFisica({
         }
         onImportarFisica={handleImportarFisica}
         onActualizarVariosFisica={handleActualizarVariosFisica}
+        subsistemas={subsistemas}
+        loadingSubsistemas={loadingSubsistemas}
+        creandoSubsistema={creandoSubsistema}
+        onCrearSubsistema={crearSubsistema}
+        onActualizarSubsistema={(id, updates) => void actualizarSubsistema(id, updates)}
+        onEliminarSubsistema={(id) => void eliminarSubsistema(id)}
+        onSelectCriatura={onSelectCriatura}
       />
-
-      {/* Subsistemas de Magia — al final de Física, abre en modal flotante */}
-      <div className="mt-8 pt-6 border-t border-primary/10">
-        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-2">
-          Subsistemas de Magia
-        </span>
-        <BloqueSubsistemasMagia
-          subsistemas={subsistemas}
-          loading={loadingSubsistemas}
-          creating={creandoSubsistema}
-          crear={crearSubsistema}
-          subsistemaSeleccionadoId={subsistemaSeleccionadoId}
-          onSelect={setSubsistemaSeleccionadoId}
-        />
-      </div>
-
-      {subsistemaSeleccionado && (
-        <ModalEditorSubsistema
-          key={subsistemaSeleccionado.id}
-          subsistema={subsistemaSeleccionado}
-          onClose={() => setSubsistemaSeleccionadoId(null)}
-          onSave={(updates) => void actualizarSubsistema(subsistemaSeleccionado.id, updates)}
-          onDelete={() => {
-            void eliminarSubsistema(subsistemaSeleccionado.id);
-            setSubsistemaSeleccionadoId(null);
-          }}
-          onSelectCriatura={onSelectCriatura}
-        />
-      )}
     </div>
   );
 }

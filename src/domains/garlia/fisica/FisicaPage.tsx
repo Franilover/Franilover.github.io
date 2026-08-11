@@ -42,6 +42,8 @@ import {
   type Oris,
   type OrisFamilia,
 } from "./types";
+import { PanelEditorSubsistema } from "@/domains/garlia/runas/BloqueSubsistemasMagia";
+import type { SubsistemaMagia } from "@/domains/garlia/runas/useSubsistemasMagia";
 
 interface Props {
   oris: Oris[];
@@ -76,15 +78,27 @@ interface Props {
     orisActualizar: (Partial<Oris> & { id: string })[],
     conceptosActualizar: (Partial<FisicaConcepto> & { id: string })[],
   ) => Promise<number>;
+
+  /** Subsistemas de Magia — cuarto ítem de la barra lateral de Física. */
+  subsistemas: SubsistemaMagia[];
+  loadingSubsistemas?: boolean;
+  creandoSubsistema?: boolean;
+  onCrearSubsistema: (nombre: string) => Promise<SubsistemaMagia | null>;
+  onActualizarSubsistema: (id: string, updates: Partial<SubsistemaMagia>) => void;
+  onEliminarSubsistema: (id: string) => void;
+  /** Se dispara al clickear una criatura dentro del editor de subsistema. */
+  onSelectCriatura?: (id: string) => void;
 }
 
 /** Qué está activo en el editor de la columna derecha. */
 type Seleccion =
   | { tipo: "oris"; id: string }
   | { tipo: "concepto"; id: string }
+  | { tipo: "subsistema"; id: string }
   | { tipo: "todos-oris" }
   | { tipo: "todas-bases" }
   | { tipo: "todos-conceptos" }
+  | { tipo: "todos-subsistemas" }
   | null;
 
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
@@ -671,6 +685,128 @@ function ConceptoEditor({
   );
 }
 
+/** Vista de grid de chips de Subsistemas de Magia (columna derecha). */
+function TodosLosSubsistemasView({
+  subsistemas,
+  loading,
+  creating,
+  onBack,
+  onCrear,
+  onSelect,
+}: {
+  subsistemas: SubsistemaMagia[];
+  loading?: boolean;
+  creating?: boolean;
+  onBack: () => void;
+  onCrear: (nombre: string) => Promise<SubsistemaMagia | null>;
+  onSelect: (id: string) => void;
+}) {
+  const [nombreNuevo, setNombreNuevo] = useState("");
+  const [creandoAbierto, setCreandoAbierto] = useState(false);
+
+  const handleCrear = async () => {
+    const nombre = nombreNuevo.trim();
+    if (!nombre) return;
+    const nuevo = await onCrear(nombre);
+    setNombreNuevo("");
+    setCreandoAbierto(false);
+    if (nuevo) onSelect(nuevo.id);
+  };
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div
+        style={{ background: "var(--bg-main)" }}
+        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <ChevronLeft size={12} />
+        </button>
+        <span className="flex-1 min-w-0 text-sm font-black text-primary flex items-center gap-1.5">
+          <Sparkles size={13} className="text-accent/60" />
+          Subsistemas de Magia
+        </span>
+        <button
+          type="button"
+          onClick={() => setCreandoAbierto((o) => !o)}
+          title="Añadir subsistema"
+          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <Plus size={12} />
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
+        {creandoAbierto && (
+          <div className="flex items-center gap-1.5 mb-3">
+            <input
+              autoFocus
+              className="flex-1 min-w-0 bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/80 outline-none placeholder:text-primary/30 focus:border-primary/25"
+              placeholder="Nombre del subsistema (ej. Luminia)…"
+              value={nombreNuevo}
+              onChange={(e) => setNombreNuevo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCrear();
+                if (e.key === "Escape") setCreandoAbierto(false);
+              }}
+            />
+            <button
+              type="button"
+              disabled={!nombreNuevo.trim() || creating}
+              onClick={() => void handleCrear()}
+              className="shrink-0 text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              Crear
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="w-full py-6 text-xs text-primary/30 text-center">Cargando…</div>
+        ) : subsistemas.length === 0 ? (
+          <p className="text-xs text-primary/25 italic py-2">Sin subsistemas todavía</p>
+        ) : (
+          <div className="flex flex-wrap items-start gap-2">
+            {subsistemas.map((s) => {
+              const totalFilas =
+                (s.canales?.length ?? 0) + (s.filtros?.length ?? 0) + (s.complementos?.length ?? 0);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onSelect(s.id)}
+                  className="flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl border border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25 transition-colors text-left min-w-[140px] max-w-[220px]"
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-primary/80 truncate w-full">
+                    <Sparkles size={11} className="text-accent/60 shrink-0" />
+                    {s.nombre || "Sin nombre"}
+                  </span>
+                  {s.descripcion ? (
+                    <span className="text-micro text-primary/40 line-clamp-2 leading-snug">
+                      {s.descripcion}
+                    </span>
+                  ) : (
+                    <span className="text-micro text-primary/25 italic">Sin descripción</span>
+                  )}
+                  {totalFilas > 0 && (
+                    <span className="text-micro font-bold text-primary/30 uppercase tracking-wide">
+                      {totalFilas} {totalFilas === 1 ? "fila" : "filas"}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Estado vacío de la columna derecha cuando no hay nada seleccionado. */
 function EditorVacio() {
   return (
@@ -698,6 +834,13 @@ export function FisicaPage({
   onActualizarConcepto,
   onImportarFisica,
   onActualizarVariosFisica,
+  subsistemas,
+  loadingSubsistemas,
+  creandoSubsistema,
+  onCrearSubsistema,
+  onActualizarSubsistema,
+  onEliminarSubsistema,
+  onSelectCriatura,
 }: Props) {
   const [seleccion, setSeleccion] = useState<Seleccion>(
     seleccionarOrisId ? { tipo: "oris", id: seleccionarOrisId } : null,
@@ -829,6 +972,14 @@ export function FisicaPage({
         ? conceptosLocal.find((c) => c.id === seleccion.id) ?? null
         : null,
     [conceptosLocal, seleccion],
+  );
+
+  const subsistemaActivo = useMemo(
+    () =>
+      seleccion?.tipo === "subsistema"
+        ? subsistemas.find((s) => s.id === seleccion.id) ?? null
+        : null,
+    [subsistemas, seleccion],
   );
 
   const orisPorFamilia = useMemo(() => {
@@ -965,6 +1116,24 @@ export function FisicaPage({
               Conceptos · {conceptosLocal.length}
             </span>
           </button>
+
+          {/* Subsistemas de Magia — botón único, abre la grilla de chips en la columna derecha */}
+          <button
+            type="button"
+            onClick={() => setSeleccion({ tipo: "todos-subsistemas" })}
+            className={`flex items-center justify-between px-1.5 py-1.5 rounded-lg border transition-colors ${
+              seleccion?.tipo === "todos-subsistemas"
+                ? "border-primary/50 bg-primary/10 text-primary"
+                : "border-primary/10 bg-primary/[0.04] text-primary/50 hover:bg-primary/[0.07]"
+            }`}
+          >
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={11} />
+              <span className="text-micro font-black uppercase tracking-[0.2em]">
+                Subsistemas de Magia · {subsistemas.length}
+              </span>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -1035,6 +1204,28 @@ export function FisicaPage({
               setSeleccion(null);
             }}
           />
+        ) : seleccion?.tipo === "todos-subsistemas" ? (
+          <TodosLosSubsistemasView
+            subsistemas={subsistemas}
+            loading={loadingSubsistemas}
+            creating={creandoSubsistema}
+            onBack={() => setSeleccion(null)}
+            onCrear={onCrearSubsistema}
+            onSelect={(id) => setSeleccion({ tipo: "subsistema", id })}
+          />
+        ) : subsistemaActivo ? (
+          <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
+            <PanelEditorSubsistema
+              subsistema={subsistemaActivo}
+              onVolver={() => setSeleccion({ tipo: "todos-subsistemas" })}
+              onSave={(updates) => onActualizarSubsistema(subsistemaActivo.id, updates)}
+              onDelete={() => {
+                onEliminarSubsistema(subsistemaActivo.id);
+                setSeleccion({ tipo: "todos-subsistemas" });
+              }}
+              onSelectCriatura={onSelectCriatura}
+            />
+          </div>
         ) : (
           <EditorVacio />
         )}
