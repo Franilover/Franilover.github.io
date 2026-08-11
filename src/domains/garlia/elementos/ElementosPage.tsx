@@ -16,6 +16,7 @@ import { Atom, Beaker, Download, GitCompare, Loader2, Plus, Scale, Trash2, Uploa
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { calcularParticulaDominante } from "./afinidad";
@@ -533,13 +534,17 @@ function ReglasQuimica({
                   <Trash2 size={12} />
                 </button>
               </div>
-              <textarea
-                value={seccion.contenido}
-                onChange={(e) => actualizarSeccion(seccion.id, { contenido: e.target.value })}
-                onBlur={() => persistir(borrador)}
+              <RichEditor
+                minHeight="6rem"
                 placeholder="Contenido…"
-                rows={5}
-                className="bg-transparent px-0 py-0 text-sm text-primary/80 outline-none resize-none placeholder:text-primary/25 leading-relaxed"
+                value={seccion.contenido}
+                onChange={(v) => {
+                  const siguiente = borrador.map((s) =>
+                    s.id === seccion.id ? { ...s, contenido: v } : s
+                  );
+                  setBorrador(siguiente);
+                  void persistir(siguiente);
+                }}
               />
             </div>
           ))}
