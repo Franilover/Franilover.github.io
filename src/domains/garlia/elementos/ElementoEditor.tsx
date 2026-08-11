@@ -25,7 +25,6 @@ import {
   ordenarElementosPorAfinidad,
 } from "./afinidad";
 import {
-  AFINIDAD_LABEL,
   ELEMENT_FAMILIES,
   LAYER_LABEL,
   PARTICLE_TYPES,
@@ -34,7 +33,6 @@ import {
   type ElementFamily,
   type LayerName,
   type ParticleMap,
-  type TipoAfinidad,
 } from "./types";
 
 interface Props {
@@ -44,13 +42,6 @@ interface Props {
   onActualizar: (id: string, cambios: Partial<Elemento>) => void;
   onEliminar?: (id: string) => void;
 }
-
-const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
-  complementa: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-  compite: "text-amber-500 bg-amber-500/10 border-amber-500/20",
-  saturado: "text-primary/40 bg-primary/5 border-primary/10",
-  estable: "text-primary/30 bg-primary/[0.02] border-primary/10",
-};
 
 export function ElementoEditor({
   elemento,
@@ -104,6 +95,13 @@ export function ElementoEditor({
     () =>
       todosLosElementos ? ordenarElementosPorAfinidad(local, todosLosElementos) : [],
     [local, todosLosElementos],
+  );
+
+  // Solo los que se complementan — compite/saturado/estable no se muestran
+  // en esta sección (ver AFINIDAD_LABEL en types.ts para el resto).
+  const afinidadesComplementarias = useMemo(
+    () => afinidades.filter(({ afinidad }) => afinidad.tipo === "complementa"),
+    [afinidades],
   );
 
   return (
@@ -385,27 +383,31 @@ export function ElementoEditor({
         </div>
 
         {/* Afinidad con el resto de la tabla — mismo cálculo que entre
-            compuestos, pero comparando elementos sueltos entre sí. */}
-        {todosLosElementos && todosLosElementos.length > 1 && (
+            compuestos, pero comparando elementos sueltos entre sí. Solo se
+            muestran los que se complementan (el resto de tipos de afinidad
+            no aportan acá): grid uno al lado del otro, sin repetir el label
+            "Se complementan" en cada casilla (ya lo dice el título de la
+            sección), y con color dinámico (--accent) en vez de un verde
+            hardcodeado. */}
+        {todosLosElementos && todosLosElementos.length > 1 && afinidadesComplementarias.length > 0 && (
           <div className="flex flex-col gap-1.5">
             <p className="flex items-center gap-1 text-micro font-black uppercase tracking-[0.2em] text-primary/25">
               <Sparkles size={10} />
-              Afinidad con otros elementos
+              Se complementan
             </p>
-            <div className="flex flex-col gap-1">
-              {afinidades.map(({ elemento: otro, afinidad }) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+              {afinidadesComplementarias.map(({ elemento: otro }) => (
                 <div
                   key={otro.id}
-                  className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${AFINIDAD_COLOR[afinidad.tipo]}`}
+                  className="flex items-center justify-center px-2 py-1.5 rounded-md border text-micro font-black truncate"
+                  style={{
+                    color: "var(--accent)",
+                    background: "color-mix(in srgb, var(--accent) 10%, transparent)",
+                    borderColor: "color-mix(in srgb, var(--accent) 20%, transparent)",
+                  }}
+                  title={otro.nombre}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-micro font-black truncate">
-                      {otro.simbolo || "??"} · {otro.nombre}
-                    </span>
-                    <span className="shrink-0 text-micro font-black uppercase tracking-wide">
-                      {AFINIDAD_LABEL[afinidad.tipo]}
-                    </span>
-                  </div>
+                  {otro.simbolo || "??"} · {otro.nombre}
                 </div>
               ))}
             </div>
