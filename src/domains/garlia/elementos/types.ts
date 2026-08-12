@@ -12,7 +12,7 @@
  * patrón que patron_trazos (jsonb) en runas/types.ts.
  */
 
-import { Atom, Beaker, Gem, Layers, Sparkle } from "lucide-react";
+import { Atom, Flame, Gem, Layers, Mountain, Sparkle, Wind } from "lucide-react";
 
 export type ParticleType =
   | "Masa"
@@ -68,25 +68,31 @@ export type ParticleMap = Partial<Record<ParticleType, number>>;
 
 export type ElementFamily =
   | "Sensibles"
-  | "Reactivos"
   | "Nobles"
   | "Base Terrosa"
-  | "Puente";
+  | "Metal"
+  | "Mineral"
+  | "Gas/Fluido"
+  | "Energético";
 
 export const ELEMENT_FAMILIES: ElementFamily[] = [
   "Sensibles",
-  "Reactivos",
   "Nobles",
   "Base Terrosa",
-  "Puente",
+  "Metal",
+  "Mineral",
+  "Gas/Fluido",
+  "Energético",
 ];
 
 export const FAMILY_ICON: Record<ElementFamily, React.ElementType> = {
   Sensibles: Sparkle,
-  Reactivos: Beaker,
   Nobles: Gem,
   "Base Terrosa": Layers,
-  Puente: Atom,
+  Metal: Atom,
+  Mineral: Mountain,
+  "Gas/Fluido": Wind,
+  Energético: Flame,
 };
 
 /** Fila cruda tal cual vive en Supabase (tabla "elementos"). */
@@ -160,10 +166,20 @@ export function layerTotal(layer: ParticleMap | null | undefined): number {
 
 // ─── Afinidad entre compuestos ─────────────────────────────────────────────
 // Basada en estructura atómica real, no en reglas arbitrarias tipo "agua
-// apaga fuego": cada capa (núcleo/media/externa) tiene una capacidad fija
-// (2/4/6, ver CAPACIDAD_CAPA) — igual que la valencia química real, donde
-// el carbono "necesita" 4 electrones más para completar su capa externa y
-// por eso se enlaza con otros átomos que se los aportan.
+// apaga fuego": Núcleo (2) y Media (4) tienen capacidad fija — igual que la
+// valencia química real, donde el carbono "necesita" 4 electrones más para
+// completar su capa externa y por eso se enlaza con otros átomos que se
+// los aportan.
+//
+// La capa Externa NO tiene capacidad fija: crece por "armónicos" según la
+// Ley de Expansión por Cierre de Noble (ver reglas-sistema-actualizado.md).
+// Cada vez que un átomo alcanza el techo de su armónico se vuelve Noble
+// (capa saturada, inerte); para ir más allá el núcleo "abre" +2 espacios
+// nuevos cada bloque de 6 elementos:
+//   Z 1–12  → techo 6   (armónico base, 2×3)
+//   Z 13–18 → techo 8   (armónico secundario, ej. Solthenar #18)
+//   Z 19–24 → techo 10  (armónico terciario, ej. Solkarath #24)
+//   ... y así +2 cada bloque de 6 elementos nuevos.
 //
 // Acá: sumamos las partículas de todos los elementos de un compuesto, capa
 // por capa. Si una capa queda por debajo de su capacidad, el compuesto
@@ -172,11 +188,42 @@ export function layerTotal(layer: ParticleMap | null | undefined): number {
 // déficit de uno se resuelve con el superávit (sobrante) del otro: se
 // "atraen" porque uno completa lo que al otro le falta, igual que dos
 // elementos que se enlazan para completar su capa de valencia.
-export const CAPACIDAD_CAPA: Record<LayerName, number> = {
+export const CAPACIDAD_CAPA_FIJA: Record<"nucleo" | "media", number> = {
   nucleo: 2,
   media: 4,
-  externa: 6,
 };
+
+/** Tamaño de cada bloque armónico (elementos nuevos por bloque, tras el base). */
+const TAMANO_BLOQUE_ARMONICO = 6;
+/** Techo de la Capa Externa en el armónico base (Z 1–12). */
+const TECHO_EXTERNA_BASE = 6;
+/** Techo del primer armónico expandido (Z 13–18). */
+const TECHO_EXTERNA_ARMONICO_1 = 8;
+/** Cuánto se expande la Externa por cada bloque armónico nuevo tras el base. */
+const EXPANSION_POR_BLOQUE = 2;
+/** Último Z cubierto por el armónico base, antes de empezar a expandir. */
+const Z_FIN_ARMONICO_BASE = 12;
+
+/**
+ * Techo de la Capa Externa para un elemento, según su número atómico —
+ * Ley de Expansión por Cierre de Noble. No es una capacidad fija: crece
+ * +2 cada bloque de 6 elementos después del armónico base (Z 1–12 → 6).
+ */
+export function capacidadExterna(numero_atomico: number): number {
+  if (numero_atomico <= Z_FIN_ARMONICO_BASE) return TECHO_EXTERNA_BASE;
+  const bloque = Math.floor((numero_atomico - (Z_FIN_ARMONICO_BASE + 1)) / TAMANO_BLOQUE_ARMONICO);
+  return TECHO_EXTERNA_ARMONICO_1 + bloque * EXPANSION_POR_BLOQUE;
+}
+
+/**
+ * Capacidad de una capa para un elemento puntual. Núcleo/Media son fijos;
+ * Externa depende del armónico (ver capacidadExterna). Se usa para mostrar
+ * ocupación individual de UN elemento (ej. en ElementoEditor).
+ */
+export function capacidadCapaElemento(layer: LayerName, numero_atomico: number): number {
+  if (layer === "externa") return capacidadExterna(numero_atomico);
+  return CAPACIDAD_CAPA_FIJA[layer];
+}
 
 export type TipoAfinidad = "complementa" | "compite" | "saturado" | "estable";
 

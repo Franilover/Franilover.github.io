@@ -8,11 +8,17 @@
  * "necesita" 4 más para completar su capa externa (regla del octeto) — por
  * eso se enlaza con elementos que se los aportan (ej. 4× hidrógeno → CH4).
  *
- * Acá el mismo principio, aplicado a las 3 capas del sistema (núcleo 2 /
- * media 4 / externa 6, ver CAPACIDAD_CAPA):
+ * Acá el mismo principio, aplicado a las 3 capas del sistema. Núcleo (2) y
+ * Media (4) tienen capacidad fija (CAPACIDAD_CAPA_FIJA). La Externa NO:
+ * su techo depende del armónico de cada elemento según su número atómico
+ * (Ley de Expansión por Cierre de Noble, ver capacidadExterna en types.ts) —
+ * por eso la "capacidad" de externa de un compuesto es la SUMA de los
+ * techos individuales de sus elementos componentes, igual que se suman
+ * sus partículas:
  *
  *   1. Sumamos las partículas de TODOS los elementos de un compuesto,
- *      capa por capa y tipo por tipo (calcularPerfilAtomico).
+ *      capa por capa y tipo por tipo (calcularPerfilAtomico) — y también
+ *      sumamos el techo de externa de cada elemento (capacidadExternaTotal).
  *   2. Por cada capa, comparamos el total contra su capacidad:
  *        - si suma < capacidad → DÉFICIT (le faltan partículas ahí)
  *        - si suma > capacidad → SUPERÁVIT (tiene de sobra, "sueltas")
@@ -25,7 +31,8 @@
  */
 
 import {
-  CAPACIDAD_CAPA,
+  CAPACIDAD_CAPA_FIJA,
+  capacidadExterna,
   type ComponenteCompuesto,
   type Compuesto,
   type Elemento,
@@ -55,19 +62,22 @@ function sumarParticleMap(a: ParticleMap, b: ParticleMap | undefined): ParticleM
 /**
  * Perfil atómico de un compuesto: suma de las partículas de todos sus
  * elementos componentes (multiplicadas por su cantidad en la mezcla),
- * capa por capa.
+ * capa por capa. Incluye además capacidadExternaTotal: la suma de los
+ * techos individuales de Externa de cada elemento (ya que ese techo
+ * depende del armónico/Z de cada uno, no es un valor fijo por compuesto).
  */
 export interface PerfilAtomico {
   nucleo: ParticleMap;
   media: ParticleMap;
   externa: ParticleMap;
+  capacidadExternaTotal: number;
 }
 
 export function calcularPerfilAtomico(
   compuesto: Compuesto,
   elementos: Elemento[],
 ): PerfilAtomico {
-  const perfil: PerfilAtomico = { nucleo: {}, media: {}, externa: {} };
+  const perfil: PerfilAtomico = { nucleo: {}, media: {}, externa: {}, capacidadExternaTotal: 0 };
 
   for (const componente of compuesto.componentes ?? []) {
     const elemento = elementos.find((e) => e.id === componente.elemento_id);
@@ -81,12 +91,14 @@ export function calcularPerfilAtomico(
       }
       perfil[layer] = sumarParticleMap(perfil[layer], capaMultiplicada);
     }
+
+    perfil.capacidadExternaTotal += capacidadExterna(elemento.numero_atomico) * veces;
   }
 
   return perfil;
 }
 
-/** Déficit (falta) o superávit (sobra) de una capa contra su capacidad fija. */
+/** Déficit (falta) o superávit (sobra) de una capa contra su capacidad. */
 export interface BalanceCapa {
   layer: LayerName;
   total: number;
@@ -98,7 +110,9 @@ export interface BalanceCapa {
 export function calcularBalancePorCapa(perfil: PerfilAtomico): BalanceCapa[] {
   return LAYERS.map((layer) => {
     const total = Object.values(perfil[layer]).reduce((a, b) => a + (b ?? 0), 0);
-    const capacidad = CAPACIDAD_CAPA[layer];
+    // Núcleo/Media: capacidad fija. Externa: suma de techos por elemento
+    // (armónico según Z), ya calculada en calcularPerfilAtomico.
+    const capacidad = layer === "externa" ? perfil.capacidadExternaTotal : CAPACIDAD_CAPA_FIJA[layer];
     return { layer, total, capacidad, balance: total - capacidad };
   });
 }
@@ -386,10 +400,12 @@ export function generarDescripcionElemento(elemento: Elemento): DescripcionEleme
   const completo = balanceExterna.balance === 0;
   const rolFamilia: Record<ElementFamily, string> = {
     Sensibles: "sensible a estímulos externos",
-    Reactivos: "propenso a combinarse con otros",
     Nobles: "estable e inerte",
     "Base Terrosa": "base estructural, poco reactiva",
-    Puente: "conecta y equilibra otras familias",
+    Metal: "conductor y estructural, se alea con facilidad",
+    Mineral: "denso y resistente, base de estructuras rígidas",
+    "Gas/Fluido": "liviano y disperso, reactivo ante impulsos",
+    Energético: "acumula o propaga energía activamente",
   };
   const rol = elemento.es_noble
     ? "Noble — inerte y estable"
@@ -538,7 +554,17 @@ export function calcularReactividad(
   compuesto: Compuesto,
   elementos: Elemento[],
 ): ResultadoReactividad {
-  const capacidadTotal = Object.values(CAPACIDAD_CAPA).reduce((a, b) => a + b, 0);
+  // Capacidad total real del compuesto: nucleo+media fijos por elemento
+  // presente, más la suma de techos de externa (armónico según Z) — no es
+  // una constante global porque externa varía según qué elementos entran.
+  const perfil = calcularPerfilAtomico(compuesto, elementos);
+  const numElementos = (compuesto.componentes ?? []).reduce(
+    (acc, c) => acc + Math.max(1, c.cantidad ?? 1),
+    0,
+  );
+  const capacidadTotal =
+    numElementos * (CAPACIDAD_CAPA_FIJA.nucleo + CAPACIDAD_CAPA_FIJA.media) +
+    perfil.capacidadExternaTotal;
   const { deficitFinal } = calcularDeficitConCatalizadores(compuesto, elementos);
 
   const proporcion = capacidadTotal > 0 ? deficitFinal / capacidadTotal : 0;

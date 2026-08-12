@@ -31,7 +31,7 @@ import {
 import {
   formatLayer,
   ELEMENT_FAMILIES,
-  CAPACIDAD_CAPA,
+  capacidadExterna,
   type Compuesto,
   type Elemento,
   type ElementFamily,
@@ -212,7 +212,9 @@ function grupoDeElemento(elemento: Elemento): number {
     0,
   );
   // balance: negativo = falta, positivo = sobra, 0 = completa (Noble).
-  return totalExterna - CAPACIDAD_CAPA.externa;
+  // El techo depende del armónico del elemento (Ley de Expansión por
+  // Cierre de Noble), no es un valor fijo — ver capacidadExterna.
+  return totalExterna - capacidadExterna(elemento.numero_atomico);
 }
 
 /** Agrupa y ordena elementos por su "grupo" (déficit/superávit de capa externa),
