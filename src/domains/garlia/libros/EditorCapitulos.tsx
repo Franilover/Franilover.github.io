@@ -302,6 +302,14 @@ const PanelEditor = ({
   // NO estaba vacío, lo tratamos como sospechoso (ver doSave) en vez de
   // guardarlo ciegamente.
   const lastNonEmptyContentRef = useRef<string>("");
+  // Último valor que ESTE editor le pidió guardar a doSave (seteado en
+  // doSave justo antes de confirmar, ver más abajo). Se usa en el
+  // useEffect de refresh para distinguir un refresh real (Supabase trajo
+  // datos de otra fuente: otra pestaña, otro dispositivo, un restore de
+  // versión) del eco del propio doSave: el setCap(...status:"synced") que
+  // doSave dispara al confirmar cambia la identidad de `cap` igual que un
+  // refresh externo, así que sin esto no hay forma de diferenciarlos.
+  const lastSavedContentRef = useRef<string | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
   const { versiones, loading: loadingVersiones, reload: reloadVersiones } =
     useCapituloVersiones(capId);
@@ -370,7 +378,14 @@ const PanelEditor = ({
     // por el guard en onChange, así que no hay nada que "recuperar" acá.
     lastLoadedCapIdRef.current = cap.id;
     if (cap.contenido) lastNonEmptyContentRef.current = cap.contenido;
+    // Nuevo capítulo → el eco del guardado anterior ya no aplica. Sin este
+    // reset, si el capítulo nuevo llegara a tener por casualidad el mismo
+    // contenido textual que el último guardado del capítulo anterior, el
+    // useEffect de refresh lo confundiría con su propio eco y se saltaría
+    // un refresh legítimo.
+    lastSavedContentRef.current = null;
   }
+
 
   // Cuando el hook refresca cap con datos remotos (mismo id, Supabase llega
   // después de Dexie), actualizar contenido solo si no hay un pending local.
@@ -379,6 +394,20 @@ const PanelEditor = ({
   useEffect(() => {
     if (!cap || cap.id !== initializedCapId) return;
     if ((cap as any).status === "pending") return; // no pisar borrador local
+
+    // Eco del propio doSave: cap.contenido es exactamente lo último que
+    // este editor guardó (ver lastSavedContentRef, seteado en doSave justo
+    // antes de confirmar). Si el usuario ya siguió escribiendo mientras el
+    // guardado estaba en vuelo, `contenido` en React es más nuevo que este
+    // eco — pisarlo acá sería retroceder el texto y saltar el cursor justo
+    // mientras el usuario tipea. No hay nada que refrescar: ya lo tenemos.
+    if (
+      lastSavedContentRef.current !== null &&
+      cap.contenido === lastSavedContentRef.current
+    ) {
+      return;
+    }
+
     setContenido(cap.contenido || "");
     setTitulo(cap.titulo_capitulo || "");
     setCapVisibilidad(cap.visibilidad ?? "oculto");
@@ -479,6 +508,12 @@ const PanelEditor = ({
         //   - marcar "synced" si el servidor confirma
         await capUpdateContenido(capId, val);
         if (!isMountedRef.current) return;
+        // Marcar ANTES del setCap de abajo: ese setCap cambia la identidad
+        // de `cap` con status "synced", lo que dispara el useEffect de
+        // refresh — necesitamos que lastSavedContentRef ya tenga este
+        // valor para que ese useEffect lo reconozca como su propio eco y
+        // no lo confunda con un refresh externo real.
+        lastSavedContentRef.current = val;
         setCap((prev) =>
           prev ? { ...prev, contenido: val, status: "synced" } : prev,
         );
