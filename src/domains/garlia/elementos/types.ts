@@ -64,6 +64,21 @@ export const LAYER_LABEL: Record<LayerName, string> = {
   externa: "Externa",
 };
 
+/**
+ * Qué tipos de partícula pertenecen a cada capa — según la Ley de las 3
+ * capas (ver reglas-sistema-actualizado.md):
+ *   Núcleo (Ancla Estructural): Masa, Cinética, Equilibrio.
+ *   Media (Motor Energético): Potencial, Información, Ciclo, Entropía.
+ *   Externa (Nube de Reactividad): Voluntad, Percepción, Transición, Catálisis.
+ * Se usa para que el editor/creador de elementos solo ofrezca, en cada
+ * capa, las partículas que realmente le corresponden — no las 11 sueltas.
+ */
+export const LAYER_PARTICLES: Record<LayerName, ParticleType[]> = {
+  nucleo: ["Masa", "Cinética", "Equilibrio"],
+  media: ["Potencial", "Información", "Ciclo", "Entropía"],
+  externa: ["Voluntad", "Percepción", "Transición", "Catálisis"],
+};
+
 export type ParticleMap = Partial<Record<ParticleType, number>>;
 
 export type ElementFamily =

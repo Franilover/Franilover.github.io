@@ -26,6 +26,7 @@ import {
 import {
   ELEMENT_FAMILIES,
   LAYER_LABEL,
+  LAYER_PARTICLES,
   PARTICLE_INITIAL,
   PARTICLE_TYPES,
   type Elemento,
@@ -313,7 +314,7 @@ export function ElementoEditor({
                     {LAYER_LABEL[layer]}
                   </span>
                   <div className="flex flex-col items-stretch gap-1.5">
-                    {PARTICLE_TYPES.map((particle) => {
+                    {LAYER_PARTICLES[layer].map((particle) => {
                       const value = local[layer]?.[particle] ?? 0;
                       return (
                         <div
