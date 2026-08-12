@@ -68,12 +68,28 @@ import { useEffect } from "react";
 import { RICH_TRANSFORMERS, VariantHeadingNode } from "../nodes/VariantHeadingNode";
 import { $createMathNode, MATH_BLOCK_RE, MathNode } from "../nodes/MathNode";
 import { TABLE_NODES } from "./TablePlugin";
+import { HorizontalRuleNode } from "@lexical/react/LexicalHorizontalRuleNode";
 
 // Nodos mínimos necesarios para que $convertFromMarkdownString reconozca
-// heading, cita, lista, código, link, tabla y fórmulas — el subconjunto
-// de RICH_EDITOR_NODES relevante a markdown estándar. No incluye los
-// nodos custom del proyecto (DropNode, ChoiceNode, etc.) porque texto
-// pegado desde afuera nunca va a producir esa sintaxis propia.
+// heading, cita, lista, código, link, tabla, regla horizontal y fórmulas —
+// el subconjunto de RICH_EDITOR_NODES relevante a markdown estándar. No
+// incluye los nodos custom del proyecto (DropNode, ChoiceNode, etc.)
+// porque texto pegado desde afuera nunca va a producir esa sintaxis propia.
+//
+// CRÍTICO: este set tiene que ser un superconjunto de TODO tipo de nodo
+// que RICH_TRANSFORMERS pueda intentar crear, no solo "lo que se ve
+// obviamente relacionado a markdown". HorizontalRuleNode es la prueba: es
+// markdown estándar ("---"), el propio RICH_TRANSFORMERS lo cubre (hereda
+// el transformer HR de @lexical/markdown vía TRANSFORMERS), pero al faltar
+// acá, $convertFromMarkdownString lanzaba una excepción DENTRO del
+// scratchEditor.update() en cuanto encontraba un "---" en el texto pegado
+// — y como esa llamada construye el árbol línea por línea dentro de un
+// único update(), una excepción a mitad de camino dejaba el árbol
+// parcialmente construido / en un estado inválido, lo que corrompía
+// silenciosamente TODOS los bloques ya procesados (headings incluidos),
+// no solo el "---" que la disparó. Sin este nodo, cualquier documento con
+// una sola línea "---" en cualquier parte perdía el texto de sus headings
+// aunque el heading en sí no tuviera nada que ver con la regla horizontal.
 const SCRATCH_EDITOR_NODES = [
   VariantHeadingNode,
   QuoteNode,
@@ -82,6 +98,7 @@ const SCRATCH_EDITOR_NODES = [
   CodeNode,
   LinkNode,
   MathNode,
+  HorizontalRuleNode,
   ...TABLE_NODES,
 ];
 
@@ -311,47 +328,70 @@ export function MarkdownPastePlugin() {
         const scratchEditor = createEditor({ nodes: SCRATCH_EDITOR_NODES });
         let serializedNodes: Array<Record<string, unknown>> = [];
 
-        scratchEditor.update(
-          () => {
-            $convertFromMarkdownString(textWithMathTokens, RICH_TRANSFORMERS);
+        // try/catch alrededor del update: si $convertFromMarkdownString
+        // encuentra una construcción que necesita un tipo de nodo no
+        // registrado en SCRATCH_EDITOR_NODES (ver el comentario largo
+        // junto a esa constante — HorizontalRuleNode fue un caso real de
+        // esto), Lexical lanza una excepción A MITAD del procesamiento
+        // línea por línea. Sin este try/catch, esa excepción se propagaba
+        // hacia afuera del PASTE_COMMAND, pero el efecto visible más
+        // dañino era que el árbol del scratchEditor quedaba en un estado
+        // parcial/inconsistente — bloques procesados ANTES del punto de
+        // falla podían perder su contenido de texto al leerse después.
+        // Con el catch: si algo sale mal acá, tratamos la conversión como
+        // fallida por completo (serializedNodes se queda vacío) y el
+        // bloque de abajo hace fallback a pegar el texto plano tal cual
+        // — degrada a un paste normal en vez de arriesgar corromper
+        // silenciosamente bloques que sí se habían procesado bien.
+        try {
+          scratchEditor.update(
+            () => {
+              $convertFromMarkdownString(textWithMathTokens, RICH_TRANSFORMERS);
 
-            // Reemplazamos cada token de bloque math por su MathNode
-            // real, recorriendo los TextNode resultantes (mismo patrón
-            // que resolveTextNode en richTextSerializer.ts).
-            const tokenRe = /xMathBlockTokenxx(\d+)xx/;
-            const walk = (node: any): void => {
-              if (node.getType?.() === "text") {
-                const content: string = node.getTextContent();
-                const match = tokenRe.exec(content);
-                if (!match) return;
-                const formula = mathBlocks[Number(match[1])];
-                if (formula === undefined) return;
-                const before = content.slice(0, match.index);
-                const after = content.slice(match.index + match[0].length);
-                const mathNode = $createMathNode({ formula, inline: false });
-                if (before) node.insertBefore($createTextNode(before));
-                node.insertBefore(mathNode);
-                if (after) node.insertBefore($createTextNode(after));
-                node.remove();
-                return;
+              // Reemplazamos cada token de bloque math por su MathNode
+              // real, recorriendo los TextNode resultantes (mismo patrón
+              // que resolveTextNode en richTextSerializer.ts).
+              const tokenRe = /xMathBlockTokenxx(\d+)xx/;
+              const walk = (node: any): void => {
+                if (node.getType?.() === "text") {
+                  const content: string = node.getTextContent();
+                  const match = tokenRe.exec(content);
+                  if (!match) return;
+                  const formula = mathBlocks[Number(match[1])];
+                  if (formula === undefined) return;
+                  const before = content.slice(0, match.index);
+                  const after = content.slice(match.index + match[0].length);
+                  const mathNode = $createMathNode({ formula, inline: false });
+                  if (before) node.insertBefore($createTextNode(before));
+                  node.insertBefore(mathNode);
+                  if (after) node.insertBefore($createTextNode(after));
+                  node.remove();
+                  return;
+                }
+                const children = node.getChildren?.() ?? [];
+                for (const child of [...children]) walk(child);
+              };
+              walk($getRoot());
+
+              // Ver hasRealTextContent arriba: si tras convertir no quedó
+              // ningún texto real, dejamos serializedNodes vacío a propósito
+              // — el bloque de abajo hace fallback a texto plano en vez de
+              // insertar bloques vacíos.
+              if (hasRealTextContent($getRoot())) {
+                serializedNodes = $getRoot()
+                  .getChildren()
+                  .map((n) => n.exportJSON());
               }
-              const children = node.getChildren?.() ?? [];
-              for (const child of [...children]) walk(child);
-            };
-            walk($getRoot());
-
-            // Ver hasRealTextContent arriba: si tras convertir no quedó
-            // ningún texto real, dejamos serializedNodes vacío a propósito
-            // — el bloque de abajo hace fallback a texto plano en vez de
-            // insertar bloques vacíos.
-            if (hasRealTextContent($getRoot())) {
-              serializedNodes = $getRoot()
-                .getChildren()
-                .map((n) => n.exportJSON());
-            }
-          },
-          { discrete: true },
-        );
+            },
+            { discrete: true },
+          );
+        } catch (err) {
+          console.warn(
+            "[MarkdownPastePlugin] Conversión de markdown falló, fallback a texto plano:",
+            err,
+          );
+          serializedNodes = [];
+        }
 
         if (serializedNodes.length === 0) {
           // No había texto real que convertir (ver hasRealTextContent) o
