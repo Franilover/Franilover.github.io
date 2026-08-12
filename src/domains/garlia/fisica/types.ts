@@ -92,11 +92,14 @@ export const PARTICULAS_BASE: FilaCatalogo[] = [
 
 // ─── Partículas (capa intermedia Base → Partículas → Ium) ─────────────────
 // A diferencia de Base/Ium, esta capa SÍ vive en Supabase (tabla
-// "particulas"): son las 11 combinaciones originales de Tesis/Antítesis/
-// Síntesis más las 16 combinaciones restantes del espacio 3³=27 (marcadas
-// con es_teorica=true — inestables/no manifestadas en el mundo tras la
-// ruptura del Garin), para poder nombrarlas, editarlas y ampliarlas sin
-// tocar código.
+// "particulas"): son las 11 combinaciones de Tesis/Antítesis/Síntesis que
+// representan clases distintas dentro del espacio 3³=27. Las 16 combinaciones
+// restantes se exploraron como partículas candidatas y luego se eliminaron
+// (12/08/2026, ver "Partículas teóricas descartadas" en fisica_conceptos) al
+// confirmar que son rotaciones de estas 11 — mismo grado de libertad visto en
+// otra fase del ciclo A→T→S, no partículas nuevas ("Ley de Equivalencia
+// Rotacional"). El campo es_teorica queda en el schema por compatibilidad,
+// pero ya no debería haber filas con es_teorica=true.
 
 /** Fila cruda tal cual vive en Supabase (tabla "particulas"). */
 export interface Particula {

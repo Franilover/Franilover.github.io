@@ -20,13 +20,14 @@
  * "oris" y "fisica_conceptos", separadas de "elementos".
  */
 
-import { Atom, ChevronLeft, Download, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Atom, ChevronLeft, Download, Info, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
+import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
 import { OrisEditor } from "./OrisEditor";
 import {
@@ -226,6 +227,63 @@ function catalogosBases(
   ];
 }
 
+/** Texto de la Ley de Equivalencia Rotacional, mostrado en el popover junto
+ *  a "Partículas · N" — mismo contenido que el registro en fisica_conceptos
+ *  ("Partículas teóricas descartadas"), resumido para lectura rápida. */
+const LEY_EQUIVALENCIA_ROTACIONAL = {
+  titulo: "Ley de Equivalencia Rotacional",
+  contenido:
+    "Del espacio completo de 27 combinaciones de Tesis/Antítesis/Síntesis (3³), solo 11 son partículas distintas. " +
+    "Las 16 restantes son rotaciones de esas 11 — la misma partícula vista desde otro punto de inicio de su ciclo " +
+    "A→T→S (ej. ATA y TAT son rotaciones de TAA/ATT), igual que un espín ↑/↓ no son dos partículas sino dos estados " +
+    "del mismo grado de libertad. Se exploraron como candidatas independientes y se descartaron el 12/08/2026 tras " +
+    "confirmar que ningún elemento del mundo las usaba: las 11 originales ya cubren el espacio completo de clases " +
+    "de equivalencia rotacional del sistema.",
+};
+
+function BasesRowTitle({
+  titulo,
+  cantidad,
+  mostrarInfo,
+}: {
+  titulo: string;
+  cantidad: number;
+  /** Si true, muestra el ícono de info con el popover de la Ley de
+   *  Equivalencia Rotacional — solo aplica al bloque "Partículas". */
+  mostrarInfo?: boolean;
+}) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  return (
+    <div className="flex items-center gap-1">
+      <p className="text-micro font-black uppercase tracking-[0.2em]">
+        {titulo} · {cantidad}
+      </p>
+      {mostrarInfo && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
+            title="Por qué son solo 11 partículas"
+            className="flex items-center justify-center w-4 h-4 rounded-full text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer"
+          >
+            <Info size={11} />
+          </button>
+          <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={340} maxHeight={280}>
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-black uppercase tracking-wide text-primary">
+                {LEY_EQUIVALENCIA_ROTACIONAL.titulo}
+              </p>
+              <p className="text-xs text-primary/70 leading-relaxed">
+                {LEY_EQUIVALENCIA_ROTACIONAL.contenido}
+              </p>
+            </div>
+          </PopoverFlotante>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TodasLasBasesView({
   particulas,
   onBack,
@@ -244,9 +302,7 @@ function TodasLasBasesView({
                 idx > 0 ? "pt-2 border-t border-primary/10" : ""
               }`}
             >
-              <p className="text-micro font-black uppercase tracking-[0.2em]">
-                {titulo} · {filas.length}
-              </p>
+              <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
             </div>
 
             <div
