@@ -211,6 +211,47 @@ function hasRealTextContent(root: any): boolean {
   return found;
 }
 
+// ── Heurística: ¿el HTML pegado es sospechoso de perder texto? ─────────
+// Algunos orígenes (visores de markdown, sitios de documentación, algunas
+// interfaces de chat) renderizan cada heading con un ícono de anchor-link
+// junto al título — típicamente un "#" o "§" clickeable insertado antes o
+// después del texto real, ej. <h1><a class="anchor">#</a>Número Atómico</h1>
+// o variantes con el ícono en un <span>/<svg> adyacente. El importDOM
+// estándar de HeadingNode (@lexical/rich-text, heredado sin cambios por
+// VariantHeadingNode) extrae TODO el texto de los nodos hijos del heading.
+// Si por la estructura específica del HTML de origen (ej. el título real
+// vive en un nodo que Lexical no reconoce como parte del contenido, o hay
+// whitespace/anidamiento que rompe la extracción) el resultado termina
+// siendo solo el ícono, el heading se pega con "#" y nada más — visualmente
+// indistinguible de "no se pegó texto".
+//
+// En vez de intentar enumerar y filtrar cada patrón de anchor-icon posible
+// (frágil: cambia por sitio), comparamos el volumen de texto que el HTML
+// produciría contra el texto plano equivalente disponible en el mismo
+// portapapeles. Si el HTML da mucho menos texto que el plano para el mismo
+// contenido, es señal de pérdida — mejor usar el camino markdown (texto
+// plano → $convertFromMarkdownString) que ya sabemos que preserva el
+// contenido real, en vez de confiar en el importDOM del HTML.
+function htmlLooksLossy(html: string, plainText: string): boolean {
+  const plainLen = plainText.replace(/\s+/g, "").length;
+  if (plainLen < 20) return false; // texto muy corto: no vale la pena arriesgar falsos positivos
+  // Extracción de texto grosera pero suficiente para la comparación: junta
+  // el contenido de nodos de bloque típicos, ignora tags y colapsa espacios.
+  const approxHtmlText = html
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, "")
+    .length;
+  // Si el HTML "aparente" tiene menos de la mitad del texto que el plano
+  // equivalente, algo se está perdiendo en el camino HTML — no es un
+  // umbral exacto, es deliberadamente generoso para no interceptar HTML
+  // legítimo que simplemente formatea distinto (listas, tablas cuentan
+  // caracteres distinto entre plano y HTML).
+  return approxHtmlText < plainLen * 0.5;
+}
+
 export function MarkdownPastePlugin() {
   const [editor] = useLexicalComposerContext();
 
@@ -221,13 +262,26 @@ export function MarkdownPastePlugin() {
         const clipboardData = event.clipboardData;
         if (!clipboardData) return false;
 
-        // Si el origen ya provee HTML enriquecido, dejamos que el
-        // handler default de RichTextPlugin lo procese (ya sabe pegar
-        // HTML preservando formato) — este plugin es específicamente
-        // para cuando lo que llega es TEXTO PLANO con sintaxis markdown.
-        if (clipboardData.types.includes("text/html")) return false;
-
         const text = clipboardData.getData("text/plain");
+
+        // Si el origen provee HTML enriquecido, por defecto dejamos que el
+        // handler default de RichTextPlugin lo procese (ya sabe pegar HTML
+        // preservando formato). EXCEPCIÓN: si ese HTML se ve "lossy" frente
+        // al texto plano del mismo portapapeles (ver htmlLooksLossy arriba)
+        // Y el texto plano sí parece markdown convertible, preferimos nuestro
+        // propio camino — más lento pero confiable — en vez de arriesgarnos
+        // a que el importDOM de Lexical descarte el contenido real y deje
+        // solo un ícono de anchor-link u otro resto no textual.
+        if (clipboardData.types.includes("text/html")) {
+          const html = clipboardData.getData("text/html");
+          const shouldPreferMarkdownPath =
+            html &&
+            text &&
+            htmlLooksLossy(html, text) &&
+            looksLikeMarkdown(text);
+          if (!shouldPreferMarkdownPath) return false;
+        }
+
         if (!text || !looksLikeMarkdown(text)) return false;
 
         event.preventDefault();
