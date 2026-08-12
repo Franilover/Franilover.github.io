@@ -278,6 +278,20 @@ export function useSupabaseData<T = any>(
     optionsRef.current = opciones;
   });
   const fetchGenRef = useRef(0);
+  // Eco del propio updateRow: guarda, por id, el timestamp del último
+  // updateRow() disparado desde ESTE hook. Un refetch (manual o gatillado
+  // por el canal realtime, que se activa con CUALQUIER escritura — incluida
+  // la nuestra) que llega dentro de este umbral para un id que acabamos de
+  // escribir se considera nuestro propio eco: se preserva el snapshot local
+  // (que ya tiene los cambios) en vez de reemplazarlo por lo que devolvió
+  // el servidor. Sin esto, tablas con autoguardado en cada tecla (ej.
+  // RichEditor + persist en fisica_conceptos) entran en un ciclo escribir→
+  // UPDATE→evento realtime→fetchData→setData con datos potencialmente algo
+  // más viejos que lo que el usuario ya tecleó→React resetea el estado
+  // controlado del editor→el cursor salta al inicio, y se repite en cada
+  // letra porque cada letra dispara un nuevo UPDATE.
+  const recentLocalWritesRef = useRef<Map<string, number>>(new Map());
+  const RECENT_WRITE_ECHO_MS = 4_000;
 
   // ─── fetchData ──────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -391,8 +405,37 @@ export function useSupabaseData<T = any>(
       const freshLocal = await readFromDexie<T>(tabla);
       if (isStale()) return;
 
-      const merged = mergeWithPending<T>(finalData, freshLocal);
-      setData(merged);
+      let merged = mergeWithPending<T>(finalData, freshLocal);
+
+      // Preservar filas que escribimos nosotros mismos hace muy poco (ver
+      // recentLocalWritesRef arriba): si el server todavía no propagó ese
+      // cambio exacto (o lo hizo pero el usuario ya siguió escribiendo
+      // después), no queremos pisar el estado local con una versión
+      // potencialmente más vieja solo porque el canal realtime nos avisó
+      // de "algún" cambio en la tabla.
+      const recentWrites = recentLocalWritesRef.current;
+      if (recentWrites.size > 0) {
+        const now = Date.now();
+        setData((prevData) => {
+          const prevById = new Map(
+            (prevData as any[]).map((r) => [String(r.id), r]),
+          );
+          merged = merged.map((row: any) => {
+            const writtenAt = recentWrites.get(String(row.id));
+            if (
+              writtenAt !== undefined &&
+              now - writtenAt < RECENT_WRITE_ECHO_MS &&
+              prevById.has(String(row.id))
+            ) {
+              return prevById.get(String(row.id));
+            }
+            return row;
+          });
+          return merged;
+        });
+      } else {
+        setData(merged);
+      }
       updateCache(tabla, merged);
       retryCount.current = 0;
       lastFetchRef.current = Date.now();
@@ -476,6 +519,19 @@ export function useSupabaseData<T = any>(
 
   const updateRow = useCallback(
     async (id: string | number, updates: any) => {
+      // Marcar ANTES del await: un evento realtime disparado por esta
+      // misma escritura puede llegar (y resolver su fetchData) antes de
+      // que updateRow() termine — el guard tiene que estar activo desde
+      // el momento en que decidimos escribir, no desde que confirmamos.
+      recentLocalWritesRef.current.set(String(id), Date.now());
+      // Poda oportunista de entradas vencidas para no acumular memoria en
+      // sesiones largas con muchas ediciones.
+      for (const [key, ts] of recentLocalWritesRef.current) {
+        if (Date.now() - ts > RECENT_WRITE_ECHO_MS) {
+          recentLocalWritesRef.current.delete(key);
+        }
+      }
+
       const online = await isReallyOnline();
       if (!online && OFFLINE_WRITABLE.has(tabla)) {
         const existing = await getDexieRow(tabla, id);
