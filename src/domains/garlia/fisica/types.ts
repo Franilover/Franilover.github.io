@@ -70,7 +70,7 @@ export function agruparPorBloque(
   return grupos;
 }
 
-// ─── Catálogos fijos: jerarquía Partícula Base → Partículas → Ium ─────────
+// ─── Catálogos fijos: Partícula Base e Iums ────────────────────────────────
 // No tienen CRUD ni tabla propia — son constantes del sistema, igual que
 // PARTICLE_TYPES en elementos/types.ts. Se muestran como referencia fija
 // arriba de los Oris en la tab Física.
@@ -90,19 +90,41 @@ export const PARTICULAS_BASE: FilaCatalogo[] = [
   },
 ];
 
-export const PARTICULAS: FilaCatalogo[] = [
-  { nombre: "Masa", detalle: "AAA", extra: "Fuerza en tensión" },
-  { nombre: "Cinética", detalle: "TTT", extra: "Fuerza en tensión" },
-  { nombre: "Potencial", detalle: "TAA", extra: "Fuerza en tensión" },
-  { nombre: "Información", detalle: "ATT", extra: "Fuerza en tensión" },
-  { nombre: "Voluntad", detalle: "TTA", extra: "Fuerza en tensión" },
-  { nombre: "Percepción", detalle: "AAT", extra: "Fuerza en tensión" },
-  { nombre: "Transición", detalle: "ASA", extra: "Resolución (cambio de estado)" },
-  { nombre: "Ciclo", detalle: "TST", extra: "Resolución (repetición)" },
-  { nombre: "Entropía", detalle: "SAT", extra: "Resolución (desorden)" },
-  { nombre: "Catálisis", detalle: "ATS", extra: "Resolución (activación)" },
-  { nombre: "Equilibrio", detalle: "SSS", extra: "Resolución (estabilidad pura)" },
-];
+// ─── Partículas (capa intermedia Base → Partículas → Ium) ─────────────────
+// A diferencia de Base/Ium, esta capa SÍ vive en Supabase (tabla
+// "particulas"): son las 11 combinaciones originales de Tesis/Antítesis/
+// Síntesis más las 16 combinaciones restantes del espacio 3³=27 (marcadas
+// con es_teorica=true — inestables/no manifestadas en el mundo tras la
+// ruptura del Garin), para poder nombrarlas, editarlas y ampliarlas sin
+// tocar código.
+
+/** Fila cruda tal cual vive en Supabase (tabla "particulas"). */
+export interface Particula {
+  id: string;
+  orden: number;
+  nombre: string;
+  /** Combinación de 3 letras A/T/S, ej. "AAA", "SAT". */
+  formula: string;
+  extra?: string | null;
+  /** Suma de A=+1/T=-1/S=0 sobre la fórmula — polaridad neta. */
+  vector_neto?: number | null;
+  /** Cantidad de "S" en la fórmula (0 a 3). */
+  s_count?: number | null;
+  /** true = parte de las 16 combinaciones no manifestadas originalmente,
+   *  añadidas para completar el espacio de 27; false = las 11 originales. */
+  es_teorica: boolean;
+}
+
+export const PARTICULAS_CONFIG = {
+  tabla: "particulas",
+  select: "id, orden, nombre, formula, extra, vector_neto, s_count, es_teorica",
+};
+
+/** Adapta una Particula (Supabase) al shape FilaCatalogo usado por las
+ *  vistas de catálogo compartidas con Base/Ium. */
+export function particulaAFilaCatalogo(p: Particula): FilaCatalogo {
+  return { nombre: p.nombre, detalle: p.formula, extra: p.extra ?? undefined };
+}
 
 export const IUMS: FilaCatalogo[] = [
   { nombre: "Pondus", detalle: "3 Masa", extra: "Peso puro, lo que ancla" },

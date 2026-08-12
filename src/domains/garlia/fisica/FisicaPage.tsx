@@ -34,18 +34,22 @@ import {
   IUMS,
   ORIS_FAMILIAS,
   ORIS_FAMILIA_ICON,
-  PARTICULAS,
   PARTICULAS_BASE,
   agruparPorBloque,
+  particulaAFilaCatalogo,
   type FilaCatalogo,
   type FisicaConcepto,
   type Oris,
   type OrisFamilia,
+  type Particula,
 } from "./types";
 import { PanelEditorSubsistema } from "@/domains/garlia/runas/BloqueSubsistemasMagia";
 import type { SubsistemaMagia } from "@/domains/garlia/runas/useSubsistemasMagia";
 
 interface Props {
+  particulas: Particula[];
+  loadingParticulas?: boolean;
+
   oris: Oris[];
   loadingOris?: boolean;
   creatingOris?: boolean;
@@ -102,11 +106,11 @@ type Seleccion =
   | null;
 
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
-function descargarDatosFisica(oris: Oris[], conceptos: FisicaConcepto[]) {
+function descargarDatosFisica(particulas: Particula[], oris: Oris[], conceptos: FisicaConcepto[]) {
   const payload = {
     exportado_en: new Date().toISOString(),
     particula_base: PARTICULAS_BASE,
-    particulas: PARTICULAS,
+    particulas,
     iums: IUMS,
     oris,
     conceptos,
@@ -208,18 +212,32 @@ export function parsearArchivoFisicaJSON(
 // ─── Filas de navegación (columna izquierda) ───────────────────────────────
 
 
-const CATALOGOS_BASES: { key: "particula-base" | "particulas" | "iums"; titulo: string; filas: FilaCatalogo[] }[] =
-  [
+function catalogosBases(
+  particulas: Particula[],
+): { key: "particula-base" | "particulas" | "iums"; titulo: string; filas: FilaCatalogo[] }[] {
+  return [
     { key: "particula-base", titulo: "Partícula Base", filas: PARTICULAS_BASE },
-    { key: "particulas", titulo: "Partículas", filas: PARTICULAS },
+    {
+      key: "particulas",
+      titulo: "Partículas",
+      filas: particulas.map(particulaAFilaCatalogo),
+    },
     { key: "iums", titulo: "Iums", filas: IUMS },
   ];
+}
 
-function TodasLasBasesView({ onBack }: { onBack: () => void }) {
+function TodasLasBasesView({
+  particulas,
+  onBack,
+}: {
+  particulas: Particula[];
+  onBack: () => void;
+}) {
+  const catalogos = catalogosBases(particulas);
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
-        {CATALOGOS_BASES.map(({ key, titulo, filas }, idx) => (
+        {catalogos.map(({ key, titulo, filas }, idx) => (
           <div key={key} className="flex flex-col gap-2">
             <div
               className={`flex items-center gap-1.5 text-primary/50 pb-1.5 ${
@@ -896,6 +914,8 @@ function EditorVacio() {
 // ─── Página principal ───────────────────────────────────────────────────────
 
 export function FisicaPage({
+  particulas,
+  loadingParticulas,
   oris,
   loadingOris,
   creatingOris,
@@ -1074,7 +1094,7 @@ export function FisicaPage({
         <div className="flex items-center gap-1 flex-wrap">
           {(
             [
-              { tipo: "todas-bases" as const, label: `Bases · ${PARTICULAS_BASE.length + PARTICULAS.length + IUMS.length}`, Icon: null as typeof Atom | null, onAdd: undefined as (() => void) | undefined, addPending: undefined as boolean | undefined },
+              { tipo: "todas-bases" as const, label: `Bases · ${PARTICULAS_BASE.length + particulas.length + IUMS.length}`, Icon: null as typeof Atom | null, onAdd: undefined as (() => void) | undefined, addPending: undefined as boolean | undefined },
               { tipo: "todos-oris" as const, label: `Oris · ${oris.length}`, Icon: Atom, onAdd: onCreateOris, addPending: creatingOris },
               { tipo: "todos-conceptos" as const, label: `Conceptos · ${conceptosLocal.length}`, Icon: null, onAdd: undefined, addPending: undefined },
               { tipo: "todos-subsistemas" as const, label: `Subsistemas de Magia · ${subsistemas.length}`, Icon: Sparkles, onAdd: undefined, addPending: undefined },
@@ -1139,7 +1159,7 @@ export function FisicaPage({
           )}
           <button
             type="button"
-            onClick={() => descargarDatosFisica(oris, conceptosLocal)}
+            onClick={() => descargarDatosFisica(particulas, oris, conceptosLocal)}
             title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
             className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
           >
@@ -1186,7 +1206,7 @@ export function FisicaPage({
             onEliminarOris={onEliminarOris}
           />
         ) : seleccion?.tipo === "todas-bases" ? (
-          <TodasLasBasesView onBack={() => setSeleccion(null)} />
+          <TodasLasBasesView particulas={particulas} onBack={() => setSeleccion(null)} />
         ) : seleccion?.tipo === "todos-conceptos" ? (
           <TodosLosConceptosView
             bloques={bloquesConceptos}

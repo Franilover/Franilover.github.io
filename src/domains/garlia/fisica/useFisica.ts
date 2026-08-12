@@ -16,9 +16,22 @@ import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import {
   FISICA_CONCEPTOS_CONFIG,
   ORIS_CONFIG,
+  PARTICULAS_CONFIG,
   type FisicaConcepto,
   type Oris,
+  type Particula,
 } from "./types";
+
+export function useParticulas() {
+  const { data, setData, loading } = useSupabaseData<Particula>(PARTICULAS_CONFIG.tabla, {
+    select: PARTICULAS_CONFIG.select,
+    order: { campo: "orden" },
+  });
+
+  const items = useMemo(() => data, [data]);
+
+  return { items, setItems: setData, loading };
+}
 
 export function useOris() {
   const { data, setData, loading } = useSupabaseData<Oris>(ORIS_CONFIG.tabla, {

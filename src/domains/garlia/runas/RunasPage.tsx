@@ -31,7 +31,7 @@ import { BiologiaPage } from "@/domains/garlia/biologia/BiologiaPage";
 import { FisicaPage } from "@/domains/garlia/fisica/FisicaPage";
 import { ORIS_CONFIG, type Oris } from "@/domains/garlia/fisica/types";
 import { FISICA_CONCEPTOS_CONFIG, type FisicaConcepto } from "@/domains/garlia/fisica/types";
-import { useFisicaConceptos, useOris } from "@/domains/garlia/fisica/useFisica";
+import { useFisicaConceptos, useOris, useParticulas } from "@/domains/garlia/fisica/useFisica";
 
 import {
   PanelCombinacionesRunas,
@@ -349,6 +349,7 @@ function BloqueFisica({
   seleccionarOrisId?: string | null;
   onSelectCriatura?: (id: string) => void;
 }) {
+  const { items: particulas, loading: loadingParticulas } = useParticulas();
   const { items: oris, setItems: setOris, loading: loadingOris } = useOris();
   const { items: conceptos, setItems: setConceptos, loading: loadingConceptos } =
     useFisicaConceptos();
@@ -472,6 +473,8 @@ function BloqueFisica({
   return (
     <div>
       <FisicaPage
+        particulas={particulas}
+        loadingParticulas={loadingParticulas}
         oris={oris}
         loadingOris={loadingOris}
         creatingOris={creating}
