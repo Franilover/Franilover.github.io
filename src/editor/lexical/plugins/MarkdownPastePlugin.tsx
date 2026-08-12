@@ -92,7 +92,19 @@ const SCRATCH_EDITOR_NODES = [
 // o bien una marca de bloque al inicio de línea (heading/lista/cita/
 // código/tabla), o bien un patrón inline claro y repetido (negrita,
 // cursiva, link) — una sola ocurrencia aislada de "*" o "_" no cuenta.
-const BLOCK_MARK_RE = /^(#{1,6}\s+\S|>\s?\S|```|[-*+]\s+\S|\d+\.\s+\S|\|.+\|\s*$)/m;
+// [^\S\n] en vez de \s en el heading/lista/numerada: excluye \n explícitamente
+// del "espacio" que separa la marca del contenido. Con \s (que incluye \n),
+// "#{1,6}\s+\S" podía cruzar el salto de línea y matchear contra el primer
+// carácter no-espacio de la LÍNEA SIGUIENTE — por ejemplo "# \n#" (dos
+// headings vacíos seguidos, cada uno "#" + un espacio y nada más) matcheaba
+// como si fuera un heading válido con contenido, aunque ninguna línea
+// individual lo era. Eso activaba looksLikeMarkdown y $convertFromMarkdownString
+// terminaba creando HeadingNodes reales pero completamente vacíos — el
+// síntoma exacto de "se pega markdown y no aparece ninguna letra": no había
+// letras que pegar, pero tampoco debía haberse interceptado el paste para
+// empezar (un "# " suelto, con espacio y nada más, es contenido plano, no
+// un heading real).
+const BLOCK_MARK_RE = /^(#{1,6}[^\S\n]+\S|>[^\S\n]?\S|```|[-*+][^\S\n]+\S|\d+\.[^\S\n]+\S|\|.+\|\s*$)/m;
 const TABLE_SEP_RE = /^\|?[\s:-]+\|[\s:|-]+$/m;
 const BOLD_RE = /\*\*[^*\n]+\*\*|__[^_\n]+__/;
 const LINK_RE = /\[[^\]\n]+\]\([^)\n]+\)/;
@@ -173,6 +185,32 @@ function normalizeLooseLineBreaks(text: string): string {
   return out.join("\n");
 }
 
+// ── Red de seguridad: ¿el árbol convertido tiene texto real? ───────────
+// Puede pasar que looksLikeMarkdown() de un falso positivo razonable (el
+// texto "parece" markdown por su forma) pero que, tras la conversión, el
+// resultado no tenga ningún contenido textual — por ejemplo, un heading
+// "# " sin texto real después del "#". En ese caso preferimos NO haber
+// interceptado el paste: mejor pegar el texto plano tal cual (fallback
+// más abajo) que insertar nodos de bloque vacíos silenciosamente, que es
+// indistinguible de "no pasó nada" para quien está mirando la pantalla.
+function hasRealTextContent(root: any): boolean {
+  let found = false;
+  const walk = (node: any): void => {
+    if (found) return;
+    if (node.getType?.() === "text") {
+      if (node.getTextContent().trim() !== "") found = true;
+      return;
+    }
+    const children = node.getChildren?.() ?? [];
+    for (const child of children) {
+      walk(child);
+      if (found) return;
+    }
+  };
+  walk(root);
+  return found;
+}
+
 export function MarkdownPastePlugin() {
   const [editor] = useLexicalComposerContext();
 
@@ -248,14 +286,35 @@ export function MarkdownPastePlugin() {
             };
             walk($getRoot());
 
-            serializedNodes = $getRoot()
-              .getChildren()
-              .map((n) => n.exportJSON());
+            // Ver hasRealTextContent arriba: si tras convertir no quedó
+            // ningún texto real, dejamos serializedNodes vacío a propósito
+            // — el bloque de abajo hace fallback a texto plano en vez de
+            // insertar bloques vacíos.
+            if (hasRealTextContent($getRoot())) {
+              serializedNodes = $getRoot()
+                .getChildren()
+                .map((n) => n.exportJSON());
+            }
           },
           { discrete: true },
         );
 
-        if (serializedNodes.length === 0) return true; // nada que insertar, pero ya hicimos preventDefault
+        if (serializedNodes.length === 0) {
+          // No había texto real que convertir (ver hasRealTextContent) o
+          // la conversión no produjo nodos: en vez de dejar el paste en
+          // silencio (preventDefault ya se llamó), insertamos el texto
+          // plano original tal cual, que es el comportamiento que el
+          // usuario esperaría de un paste normal.
+          if (text.trim() !== "") {
+            editor.update(() => {
+              const selection = $getSelection();
+              if ($isRangeSelection(selection)) {
+                selection.insertText(text);
+              }
+            });
+          }
+          return true;
+        }
 
         // 2) De vuelta en el editor real: reconstruimos cada nodo desde
         // su JSON y lo insertamos en el punto del cursor. Reconstruir
