@@ -34,7 +34,10 @@ import {
   autocompletarHastaEstable,
   calcularAfinidad,
   calcularBalancePorCapa,
+  calcularCancelacionCarga,
   calcularDeficitConCatalizadores,
+  calcularElectromagnetismo,
+  calcularEnlaceResultante,
   calcularEstequiometriaExacta,
   calcularPerfilAtomico,
   calcularPeso,
@@ -47,6 +50,7 @@ import {
 } from "./afinidad";
 import {
   AFINIDAD_LABEL,
+  ENLACE_LABEL,
   LAYER_LABEL,
   REACTIVIDAD_LABEL,
   type ComponenteCompuesto,
@@ -54,6 +58,7 @@ import {
   type Elemento,
   type LayerName,
   type TipoAfinidad,
+  type TipoEnlace,
 } from "./types";
 
 // ─── Descarga: todos los compuestos en un solo JSON ────────────────────────
@@ -485,6 +490,12 @@ const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
   estable: "text-primary/30 bg-primary/[0.02] border-primary/10",
 };
 
+const ENLACE_COLOR: Record<TipoEnlace, string> = {
+  fuerte: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+  debil: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+  neutro: "text-primary/30 bg-primary/[0.02] border-primary/10",
+};
+
 /**
  * Lista de afinidad del compuesto activo contra todos los demás del
  * catálogo, ordenada por complementariedad — los que mejor "encajan"
@@ -788,6 +799,29 @@ function LaboratorioModal({
     [compA, compB, mismosElegidos, elementos],
   );
 
+  // Ley de Cancelación de Carga: ¿la Voluntad libre de uno cancela los
+  // huecos de Percepción del otro? Es el criterio de compatibilidad real
+  // según reglas-sistema-actualizado.md — independiente del balance de
+  // capas que ya usa `afinidad` arriba.
+  const cancelacionCarga = useMemo(
+    () => (compA && compB && !mismosElegidos ? calcularCancelacionCarga(compA, compB, elementos) : null),
+    [compA, compB, mismosElegidos, elementos],
+  );
+
+  // Enlace Resultante: proporción Transición/Catálisis combinada — define
+  // si el compuesto resultante sería fuerte/permanente o débil/metaestable.
+  const enlace = useMemo(
+    () => (compA && compB && !mismosElegidos ? calcularEnlaceResultante(compA, compB, elementos) : null),
+    [compA, compB, mismosElegidos, elementos],
+  );
+
+  // Electromagnetismo Derivado: corriente (flujo de Voluntad por huecos de
+  // Percepción) y si esa corriente + la Cinética del núcleo inducen campo.
+  const electromagnetismo = useMemo(
+    () => (compA && compB && !mismosElegidos ? calcularElectromagnetismo(compA, compB, elementos) : null),
+    [compA, compB, mismosElegidos, elementos],
+  );
+
   const componentesCombinados = useMemo(
     () => (compA && compB && !mismosElegidos ? combinarComponentes(compA, compB) : []),
     [compA, compB, mismosElegidos],
@@ -913,6 +947,65 @@ function LaboratorioModal({
                     </span>
                   </div>
                 )
+              )}
+
+              {!mismosElegidos && cancelacionCarga && enlace && electromagnetismo && compA && compB && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                    Química real · Voluntad ↔ Percepción
+                  </label>
+
+                  <div
+                    className={`flex flex-col gap-1 px-2 py-1.5 rounded-md border ${
+                      cancelacionCarga.compatible
+                        ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+                        : "text-primary/30 bg-primary/[0.02] border-primary/10"
+                    }`}
+                  >
+                    <span className="text-micro font-black uppercase tracking-wide">
+                      {cancelacionCarga.compatible
+                        ? "Cancelación de carga compatible"
+                        : "Sin cancelación de carga"}
+                    </span>
+                    <span className="text-micro font-normal opacity-80">
+                      {compA.simbolo || compA.nombre} → {compB.simbolo || compB.nombre}:{" "}
+                      {cancelacionCarga.voluntadAaPercepcionB} · {compB.simbolo || compB.nombre} →{" "}
+                      {compA.simbolo || compA.nombre}: {cancelacionCarga.voluntadBaPercepcionA}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${ENLACE_COLOR[enlace.tipo]}`}
+                  >
+                    <span className="text-micro font-black uppercase tracking-wide">
+                      {ENLACE_LABEL[enlace.tipo]}
+                    </span>
+                    <span className="text-micro font-normal opacity-80">
+                      Transición {enlace.totalTransicion} · Catálisis {enlace.totalCatalisis}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${
+                      electromagnetismo.generaCampoMagnetico
+                        ? "text-sky-500 bg-sky-500/10 border-sky-500/20"
+                        : electromagnetismo.corriente > 0
+                          ? "text-primary/50 bg-primary/5 border-primary/10"
+                          : "text-primary/30 bg-primary/[0.02] border-primary/10"
+                    }`}
+                  >
+                    <span className="text-micro font-black uppercase tracking-wide">
+                      {electromagnetismo.generaCampoMagnetico
+                        ? "Genera campo magnético"
+                        : electromagnetismo.corriente > 0
+                          ? "Corriente sin campo (falta Cinética)"
+                          : "Sin corriente eléctrica"}
+                    </span>
+                    <span className="text-micro font-normal opacity-80">
+                      Corriente {electromagnetismo.corriente} · Cinética {electromagnetismo.cineticaTotal}
+                    </span>
+                  </div>
+                </div>
               )}
 
               {!mismosElegidos && componentesCombinados.length > 0 && (

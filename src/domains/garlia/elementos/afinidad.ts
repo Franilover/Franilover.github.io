@@ -42,9 +42,13 @@ import {
   type ParticleMap,
   type ParticleType,
   type ResultadoAfinidad,
+  type ResultadoCancelacionCarga,
+  type ResultadoElectromagnetismo,
+  type ResultadoEnlace,
   type ResultadoEstequiometria,
   type ResultadoPeso,
   type ResultadoReactividad,
+  type TipoEnlace,
 } from "./types";
 
 const LAYERS: LayerName[] = ["nucleo", "media", "externa"];
@@ -213,6 +217,108 @@ export function ordenarPorAfinidad(
     .filter((c) => c.id !== referencia.id)
     .map((c) => ({ compuesto: c, afinidad: calcularAfinidad(referencia, c, elementos) }))
     .sort((x, y) => orden[x.afinidad.tipo] - orden[y.afinidad.tipo]);
+}
+
+// ─── Ley de Cancelación de Carga (Voluntad ↔ Percepción) ───────────────────
+// Dos compuestos son compatibles si la Voluntad libre de uno cancela los
+// huecos de Percepción del otro, 1 a 1 (ver reglas-sistema-actualizado.md).
+// Se calcula en ambas direcciones porque no es simétrico: A puede tener
+// mucha Voluntad y poca Percepción, y B al revés.
+export function calcularCancelacionCarga(
+  a: Compuesto,
+  b: Compuesto,
+  elementos: Elemento[],
+): ResultadoCancelacionCarga {
+  const perfilA = calcularPerfilAtomico(a, elementos);
+  const perfilB = calcularPerfilAtomico(b, elementos);
+
+  const voluntadA = perfilA.externa.Voluntad ?? 0;
+  const percepcionA = perfilA.externa.Percepción ?? 0;
+  const voluntadB = perfilB.externa.Voluntad ?? 0;
+  const percepcionB = perfilB.externa.Percepción ?? 0;
+
+  const voluntadAaPercepcionB = Math.min(voluntadA, percepcionB);
+  const voluntadBaPercepcionA = Math.min(voluntadB, percepcionA);
+
+  return {
+    voluntadAaPercepcionB,
+    voluntadBaPercepcionA,
+    compatible: voluntadAaPercepcionB > 0 || voluntadBaPercepcionA > 0,
+  };
+}
+
+/** Misma cancelación de carga, pero para dos Elementos sueltos (sin armar Compuesto). */
+export function calcularCancelacionCargaElementos(
+  a: Elemento,
+  b: Elemento,
+): ResultadoCancelacionCarga {
+  const compuestoA: Compuesto = { id: a.id, nombre: a.nombre, componentes: [{ elemento_id: a.id, cantidad: 1 }] };
+  const compuestoB: Compuesto = { id: b.id, nombre: b.nombre, componentes: [{ elemento_id: b.id, cantidad: 1 }] };
+  return calcularCancelacionCarga(compuestoA, compuestoB, [a, b]);
+}
+
+// ─── Enlace Resultante (Transición vs Catálisis) ───────────────────────────
+// Igualadas las cargas, la proporción entre Transición y Catálisis de AMBOS
+// compuestos combinados determina si el enlace es fuerte/permanente
+// (predominio de Catálisis) o débil/metaestable (predominio de Transición).
+export function calcularEnlaceResultante(
+  a: Compuesto,
+  b: Compuesto,
+  elementos: Elemento[],
+): ResultadoEnlace {
+  const perfilA = calcularPerfilAtomico(a, elementos);
+  const perfilB = calcularPerfilAtomico(b, elementos);
+
+  const totalTransicion = (perfilA.externa.Transición ?? 0) + (perfilB.externa.Transición ?? 0);
+  const totalCatalisis = (perfilA.externa.Catálisis ?? 0) + (perfilB.externa.Catálisis ?? 0);
+
+  let tipo: TipoEnlace;
+  if (totalCatalisis > totalTransicion) tipo = "fuerte";
+  else if (totalTransicion > totalCatalisis) tipo = "debil";
+  else tipo = "neutro";
+
+  return { tipo, totalTransicion, totalCatalisis };
+}
+
+/** Misma clasificación de enlace, pero para dos Elementos sueltos. */
+export function calcularEnlaceResultanteElementos(a: Elemento, b: Elemento): ResultadoEnlace {
+  const compuestoA: Compuesto = { id: a.id, nombre: a.nombre, componentes: [{ elemento_id: a.id, cantidad: 1 }] };
+  const compuestoB: Compuesto = { id: b.id, nombre: b.nombre, componentes: [{ elemento_id: b.id, cantidad: 1 }] };
+  return calcularEnlaceResultante(compuestoA, compuestoB, [a, b]);
+}
+
+// ─── Electromagnetismo Derivado ────────────────────────────────────────────
+// Corriente Eléctrica: flujo de Voluntad a través de huecos de Percepción
+// compatibles — reusa la Cancelación de Carga como medida de ese flujo.
+// Campo Magnético: se induce cuando esa corriente se combina con la
+// Cinética del Núcleo (si no hay corriente o no hay Cinética, no hay campo).
+export function calcularElectromagnetismo(
+  a: Compuesto,
+  b: Compuesto,
+  elementos: Elemento[],
+): ResultadoElectromagnetismo {
+  const cancelacion = calcularCancelacionCarga(a, b, elementos);
+  const corriente = cancelacion.voluntadAaPercepcionB + cancelacion.voluntadBaPercepcionA;
+
+  const perfilA = calcularPerfilAtomico(a, elementos);
+  const perfilB = calcularPerfilAtomico(b, elementos);
+  const cineticaTotal = (perfilA.nucleo.Cinética ?? 0) + (perfilB.nucleo.Cinética ?? 0);
+
+  return {
+    corriente,
+    generaCampoMagnetico: corriente > 0 && cineticaTotal > 0,
+    cineticaTotal,
+  };
+}
+
+/** Mismo cálculo de electromagnetismo, pero para dos Elementos sueltos. */
+export function calcularElectromagnetismoElementos(
+  a: Elemento,
+  b: Elemento,
+): ResultadoElectromagnetismo {
+  const compuestoA: Compuesto = { id: a.id, nombre: a.nombre, componentes: [{ elemento_id: a.id, cantidad: 1 }] };
+  const compuestoB: Compuesto = { id: b.id, nombre: b.nombre, componentes: [{ elemento_id: b.id, cantidad: 1 }] };
+  return calcularElectromagnetismo(compuestoA, compuestoB, [a, b]);
 }
 
 // ─── Sugerencias en vivo: "qué elemento agregar para reducir el déficit" ───

@@ -287,6 +287,52 @@ export interface ResultadoPeso {
   categoria: "liviano" | "medio" | "pesado";
 }
 
+// ─── Ley de Cancelación de Carga (Voluntad ↔ Percepción) ───────────────────
+// Dos elementos/compuestos se combinan si la Voluntad LIBRE de uno cancela
+// exactamente los huecos de Percepción del otro (relación 1 a 1). "Libre"
+// acá significa: no toda la Voluntad de un lado sirve — solo hasta donde
+// hay Percepción disponible del otro lado para recibirla (y viceversa), de
+// ahí que el resultado sea asimétrico entre A→B y B→A.
+export interface ResultadoCancelacionCarga {
+  /** Voluntad de A que efectivamente cancela Percepción de B (1 a 1). */
+  voluntadAaPercepcionB: number;
+  /** Voluntad de B que efectivamente cancela Percepción de A (1 a 1). */
+  voluntadBaPercepcionA: number;
+  /** true si al menos una dirección cancela carga (hay compatibilidad real). */
+  compatible: boolean;
+}
+
+// ─── Enlace Resultante (Transición vs Catálisis) ───────────────────────────
+// Una vez igualadas las cargas, la proporción entre Transición y Catálisis
+// de ambos elementos/compuestos combinados determina qué tan estable es el
+// enlace resultante.
+export type TipoEnlace = "fuerte" | "debil" | "neutro";
+
+export const ENLACE_LABEL: Record<TipoEnlace, string> = {
+  fuerte: "Enlace fuerte (permanente, resistente al desgaste)",
+  debil: "Enlace débil (metaestable, sensible a estímulos térmicos/mágicos)",
+  neutro: "Sin predominio claro (Transición y Catálisis equilibrados)",
+};
+
+export interface ResultadoEnlace {
+  tipo: TipoEnlace;
+  totalTransicion: number;
+  totalCatalisis: number;
+}
+
+// ─── Electromagnetismo Derivado ────────────────────────────────────────────
+// Corriente: flujo de Voluntad a través de huecos de Percepción compatibles
+// (usa el mismo cálculo que la Cancelación de Carga). Campo magnético: se
+// induce cuando esa corriente se combina con la Cinética del Núcleo.
+export interface ResultadoElectromagnetismo {
+  /** Corriente total = Voluntad efectivamente cancelada en ambas direcciones. */
+  corriente: number;
+  /** true si hay corriente Y Cinética de núcleo disponible en la mezcla. */
+  generaCampoMagnetico: boolean;
+  /** Cinética total del núcleo combinado (insumo del campo magnético). */
+  cineticaTotal: number;
+}
+
 // ─── Estequiometría exacta ──────────────────────────────────────────────────
 // Múltiplo mínimo de cada elemento del compuesto que deja las 3 capas
 // exactamente en 0 (sin déficit ni sobrante) — el equivalente a balancear
