@@ -385,6 +385,7 @@ export function generarDescripcionElemento(elemento: Elemento): DescripcionEleme
     nucleo: elemento.nucleo ?? {},
     media: elemento.media ?? {},
     externa: elemento.externa ?? {},
+    capacidadExternaTotal: capacidadExterna(elemento.numero_atomico),
   };
   const balance = calcularBalancePorCapa(perfil);
   const balanceExterna = balance.find((b) => b.layer === "externa")!;
