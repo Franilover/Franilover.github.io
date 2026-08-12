@@ -603,16 +603,77 @@ function ConceptoEditor({
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [local, setLocal] = useState(concepto);
+  // Último `contenido` (y demás campos) que ESTE editor mandó a persist(),
+  // justo antes de confirmar. Mismo patrón que lastSavedContentRef en
+  // EditorCapitulos.tsx: sin esto, el useEffect de abajo no puede
+  // distinguir un refresh externo real (otra pestaña, otro dispositivo)
+  // del eco del propio persist() — que sube por onActualizar/
+  // setConceptosLocal y vuelve como una nueva identidad de `concepto`,
+  // pisando `local` con un valor potencialmente más viejo que lo que el
+  // usuario ya siguió escribiendo mientras el guardado estaba en vuelo.
+  // Esto es lo que causaba el salto de cursor al tipear.
+  const lastSavedRef = useRef<FisicaConcepto>(concepto);
 
-  useEffect(() => setLocal(concepto), [concepto]);
+  useEffect(() => {
+    if (
+      concepto.id === lastSavedRef.current.id &&
+      concepto.titulo === lastSavedRef.current.titulo &&
+      concepto.contenido === lastSavedRef.current.contenido
+    ) {
+      // Eco del propio guardado: ya lo tenemos reflejado en `local`
+      // (posiblemente con texto más nuevo que el usuario tipeó después de
+      // que este guardado arrancara) — no lo pisamos.
+      return;
+    }
+    setLocal(concepto);
+    lastSavedRef.current = concepto;
+  }, [concepto]);
 
   async function persist(cambios: Partial<FisicaConcepto>) {
     const { error } = await supabase
       .from("fisica_conceptos")
       .update(cambios)
       .eq("id", concepto.id);
-    if (!error) onActualizar(concepto.id, cambios);
+    if (!error) {
+      // Marcar ANTES de onActualizar: ese callback termina generando la
+      // nueva prop `concepto` que dispara el useEffect de arriba — hace
+      // falta que lastSavedRef ya refleje este guardado para que se
+      // reconozca como eco propio.
+      lastSavedRef.current = { ...lastSavedRef.current, ...cambios };
+      onActualizar(concepto.id, cambios);
+    }
   }
+
+  // Debounce del guardado de contenido: antes, persist({contenido: v}) se
+  // llamaba en CADA tecla (ver onChange de RichEditor más abajo), lo que
+  // disparaba un UPDATE a Supabase por letra tipeada. Además de ser
+  // innecesariamente costoso, con red variable el orden de resolución de
+  // esos UPDATEs en paralelo no está garantizado — el mismo problema que
+  // describe el comentario de doSave/isSavingRef en EditorCapitulos.tsx.
+  // Un guardado que resuelve tarde y pisa uno más nuevo es otra vía posible
+  // hacia el mismo síntoma (cursor saltando / texto retrocediendo).
+  const persistContenidoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const pendingContenidoRef = useRef<string | null>(null);
+  function persistContenidoDebounced(v: string) {
+    pendingContenidoRef.current = v;
+    if (persistContenidoTimerRef.current) {
+      clearTimeout(persistContenidoTimerRef.current);
+    }
+    persistContenidoTimerRef.current = setTimeout(() => {
+      const val = pendingContenidoRef.current;
+      pendingContenidoRef.current = null;
+      if (val !== null) void persist({ contenido: val });
+    }, 800);
+  }
+  useEffect(() => {
+    return () => {
+      if (persistContenidoTimerRef.current) {
+        clearTimeout(persistContenidoTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div
@@ -689,7 +750,7 @@ function ConceptoEditor({
             value={local.contenido}
             onChange={(v) => {
               setLocal((p) => ({ ...p, contenido: v }));
-              persist({ contenido: v });
+              persistContenidoDebounced(v);
             }}
           />
         </div>
