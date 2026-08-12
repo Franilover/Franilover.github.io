@@ -59,6 +59,7 @@ import {
   $getRoot,
   $getSelection,
   $isRangeSelection,
+  $parseSerializedNode,
   createEditor,
   COMMAND_PRIORITY_HIGH,
   PASTE_COMMAND,
@@ -257,23 +258,34 @@ export function MarkdownPastePlugin() {
         if (serializedNodes.length === 0) return true; // nada que insertar, pero ya hicimos preventDefault
 
         // 2) De vuelta en el editor real: reconstruimos cada nodo desde
-        // su JSON (LexicalNode.importJSON) y lo insertamos en el punto
-        // del cursor. Reconstruir desde JSON en vez de mover instancias
-        // directamente evita el problema de "un nodo no puede tener dos
-        // editores dueños" entre el editor headless y el real.
+        // su JSON y lo insertamos en el punto del cursor. Reconstruir
+        // desde JSON en vez de mover instancias directamente evita el
+        // problema de "un nodo no puede tener dos editores dueños" entre
+        // el editor headless y el real.
+        //
+        // IMPORTANTE: usamos $parseSerializedNode (no klass.importJSON
+        // llamado a mano) porque importJSON de un nodo es responsable
+        // ÚNICAMENTE de reconstruirse A SÍ MISMO (tag, formato, indent,
+        // etc.) — nunca de sus hijos. Para ElementNode (heading, párrafo,
+        // list item, quote...) eso significa que klass.importJSON(json)
+        // devuelve el bloque correcto pero VACÍO: el texto que vivía en
+        // json.children nunca se reconstruye. Ese era el bug: al pegar
+        // markdown se veían los saltos de línea/bloques (el contenedor sí
+        // se insertaba) pero el contenido de texto desaparecía. Lexical
+        // arma el árbol completo recursivamente vía $parseSerializedNode,
+        // que sí procesa children y es el punto de entrada documentado
+        // para esto (mismo mecanismo que usa editor.parseEditorState()).
         editor.update(() => {
           const selection = $getSelection();
           if (!$isRangeSelection(selection)) return;
 
-          const klassMap = new Map(
-            SCRATCH_EDITOR_NODES.map((klass) => [(klass as any).getType(), klass]),
-          );
-
           const rebuilt = serializedNodes
             .map((json) => {
-              const klass = klassMap.get(json.type) as any;
-              if (!klass || typeof klass.importJSON !== "function") return null;
-              return klass.importJSON(json);
+              try {
+                return $parseSerializedNode(json as any);
+              } catch {
+                return null;
+              }
             })
             .filter((n): n is NonNullable<typeof n> => n !== null);
 
