@@ -850,13 +850,13 @@ export function CriaturasJerarquica({
             items={floraDe(eco.id)}
             Icon={Leaf}
             label="Flora"
-            onOpenItem={(id) => onOpen("flora", id)}
+            onOpenItem={(id) => abrirPanel("flora", id)}
           />
           <EcosistemaExtrasIcono
             items={mineralesDe(eco.id)}
             Icon={Gem}
             label="Minerales"
-            onOpenItem={(id) => onOpen("minerales", id)}
+            onOpenItem={(id) => abrirPanel("mineral", id)}
           />
         </div>
         <div className="px-3 pb-3 flex flex-wrap gap-6">
@@ -1235,7 +1235,7 @@ export function CriaturasJerarquica({
                     label={f.nombre}
                     variant="flora"
                     maxWidthPx={160}
-                    onClick={() => onOpen("flora", f.id)}
+                    onClick={() => abrirPanel("flora", f.id)}
                   />
                 ))}
                 {mineralesSinEcosistema.map((m) => (
@@ -1244,7 +1244,7 @@ export function CriaturasJerarquica({
                     label={m.nombre}
                     variant="mineral"
                     maxWidthPx={160}
-                    onClick={() => onOpen("minerales", m.id)}
+                    onClick={() => abrirPanel("mineral", m.id)}
                   />
                 ))}
               </div>

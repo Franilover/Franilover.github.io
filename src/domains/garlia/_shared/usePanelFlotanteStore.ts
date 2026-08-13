@@ -26,7 +26,7 @@
 
 import { create } from "zustand";
 
-export type PanelFlotanteKind = "personaje" | "criatura" | "reino" | "item";
+export type PanelFlotanteKind = "personaje" | "criatura" | "reino" | "item" | "flora" | "mineral";
 
 interface PanelFlotanteState {
   entidad: { kind: PanelFlotanteKind; id: string } | null;

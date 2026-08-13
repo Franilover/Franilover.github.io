@@ -14,10 +14,9 @@
  * Debajo, en el mismo criterio, se muestran aparte Flora y Minerales
  * (tampoco agrupados) — mismo catálogo que ya aparece en la vista "por
  * Criatura" (colgando de Ecosistema ahí), acá solo como bloques planos
- * informativos. Un item abre el panel flotante (abrirPanel("item", id)),
- * igual que Personaje/Criatura/Reino en las otras vistas jerárquicas —
- * Flora y Minerales no tienen panel flotante propio, así que siguen
- * abriendo su editor a pantalla completa (onOpenFlora/onOpenMineral).
+ * informativos. Item, Flora y Mineral abren el panel flotante
+ * (abrirPanel(kind, id)), igual que Personaje/Criatura/Reino en las otras
+ * vistas jerárquicas.
  */
 
 import React from "react";
@@ -48,11 +47,9 @@ interface Props {
    *  el mismo catálogo que ya se muestra en la vista "por Criatura". */
   flora?: EntidadMin[];
   loadingFlora?: boolean;
-  onOpenFlora?: (id: string) => void;
   /** Minerales — mismo criterio que `flora`. */
   minerales?: EntidadMin[];
   loadingMinerales?: boolean;
-  onOpenMineral?: (id: string) => void;
   /** Grupos de tipo "items" agrupados por subtipo, para el dropdown de
    *  filtro por grupo de la barra superior — mismo patrón que las otras
    *  vistas jerárquicas. */
@@ -75,10 +72,8 @@ export function ItemsJerarquia({
   creating,
   flora,
   loadingFlora,
-  onOpenFlora,
   minerales,
   loadingMinerales,
-  onOpenMineral,
   gruposItemsPorSubtipo,
   grupoSeleccionadoId,
   onSeleccionarGrupo,
@@ -150,7 +145,7 @@ export function ItemsJerarquia({
             nombre: f.nombre,
             imageUrl: f.imagen_url || undefined,
           }))}
-          onItemClick={(id) => onOpenFlora?.(id)}
+          onItemClick={(id) => abrirPanel("flora", id)}
           section="flora"
         />
       )}
@@ -164,7 +159,7 @@ export function ItemsJerarquia({
             nombre: m.nombre,
             imageUrl: m.imagen_url || undefined,
           }))}
-          onItemClick={(id) => onOpenMineral?.(id)}
+          onItemClick={(id) => abrirPanel("mineral", id)}
           section="minerales"
         />
       )}

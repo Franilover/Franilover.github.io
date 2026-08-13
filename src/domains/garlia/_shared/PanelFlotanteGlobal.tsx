@@ -4,9 +4,9 @@
  * PanelFlotanteGlobal
  * ───────────────────────────────────────────────────────────────────────────
  * Único punto de renderizado para la "vista rápida" de Personaje/Criatura/
- * Reino/Item: el EDITOR COMPLETO (mismo PersonajeEditor/CriaturaEditor/
- * ReinoEditor/ItemEditor que se usa a pantalla completa en EntidadesPage), pero
- * flotando centrado en pantalla por encima de la vista actual — sin
+ * Reino/Item/Flora/Mineral: el EDITOR COMPLETO (mismo PersonajeEditor/
+ * CriaturaEditor/ReinoEditor/ItemEditor/FloraEditor/MineralEditor que se usa
+ * a pantalla completa en EntidadesPage), pero flotando centrado en pantalla por encima de la vista actual — sin
  * navegar, sin perder el lugar donde estabas. Es el mismo comportamiento
  * que antes daba el click del medio + FullscreenEntityPanel, solo que
  * ahora se dispara con click izquierdo normal desde cualquier parte de la
@@ -24,7 +24,7 @@
  * click en el backdrop.
  */
 
-import { Bug, Crown, Gem, Users, X } from "lucide-react";
+import { Bug, Crown, Diamond, Gem, Leaf, Users, X } from "lucide-react";
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 
@@ -33,6 +33,12 @@ import { PersonajeEditor } from "@/domains/garlia/personajes/PersonajeEditor";
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { ReinoEditor } from "@garlia/reinos";
 import { ItemEditor } from "@garlia/items";
+import { FloraEditor } from "@/domains/garlia/flora/FloraEditor";
+import { useFlora } from "@/domains/garlia/flora/useFlora";
+import { type Flora } from "@/domains/garlia/flora/types";
+import { MineralEditor } from "@/domains/garlia/minerales/MineralEditor";
+import { useMinerales } from "@/domains/garlia/minerales/useMinerales";
+import { type Mineral } from "@/domains/garlia/minerales/types";
 import type { Personaje } from "@garlia/personajes";
 import type { Criatura } from "@/domains/garlia/criaturas/types";
 import type { Reino } from "@garlia/reinos";
@@ -48,6 +54,8 @@ export function PanelFlotanteGlobal() {
   const { data: criaturas } = useSupabaseData<Criatura>("criaturas");
   const { data: reinos } = useSupabaseData<Reino>("reinos");
   const { data: items } = useSupabaseData<Item>("items");
+  const { flora } = useFlora();
+  const { minerales } = useMinerales();
 
   useEffect(() => {
     if (!entidad) return;
@@ -70,13 +78,27 @@ export function PanelFlotanteGlobal() {
   const criatura = entidad.kind === "criatura" ? criaturas.find((x) => x.id === entidad.id) : null;
   const reino = entidad.kind === "reino" ? reinos.find((x) => x.id === entidad.id) : null;
   const item = entidad.kind === "item" ? items.find((x) => x.id === entidad.id) : null;
+  const floraSel = entidad.kind === "flora" ? flora.find((x) => x.id === entidad.id) : null;
+  const mineralSel = entidad.kind === "mineral" ? minerales.find((x) => x.id === entidad.id) : null;
   if (entidad.kind === "personaje" && !personaje) return null;
   if (entidad.kind === "criatura" && !criatura) return null;
   if (entidad.kind === "reino" && !reino) return null;
   if (entidad.kind === "item" && !item) return null;
+  if (entidad.kind === "flora" && !floraSel) return null;
+  if (entidad.kind === "mineral" && !mineralSel) return null;
 
   const Icon =
-    entidad.kind === "personaje" ? Users : entidad.kind === "criatura" ? Bug : entidad.kind === "reino" ? Crown : Gem;
+    entidad.kind === "personaje"
+      ? Users
+      : entidad.kind === "criatura"
+        ? Bug
+        : entidad.kind === "reino"
+          ? Crown
+          : entidad.kind === "item"
+            ? Gem
+            : entidad.kind === "flora"
+              ? Leaf
+              : Diamond;
   const label =
     entidad.kind === "personaje"
       ? "Personaje"
@@ -84,7 +106,11 @@ export function PanelFlotanteGlobal() {
         ? "Criatura"
         : entidad.kind === "reino"
           ? "Reino"
-          : "Item";
+          : entidad.kind === "item"
+            ? "Item"
+            : entidad.kind === "flora"
+              ? "Flora"
+              : "Mineral";
   const nombre =
     entidad.kind === "personaje"
       ? personaje!.nombre
@@ -92,7 +118,11 @@ export function PanelFlotanteGlobal() {
         ? criatura!.nombre
         : entidad.kind === "reino"
           ? reino!.nombre
-          : item!.nombre;
+          : entidad.kind === "item"
+            ? item!.nombre
+            : entidad.kind === "flora"
+              ? floraSel!.nombre
+              : mineralSel!.nombre;
 
   return createPortal(
     <div
@@ -152,8 +182,12 @@ export function PanelFlotanteGlobal() {
             <CriaturaEditor key={criatura!.id} criatura={criatura!} />
           ) : entidad.kind === "reino" ? (
             <ReinoEditor key={reino!.id} reino={reino!} />
-          ) : (
+          ) : entidad.kind === "item" ? (
             <ItemEditor key={item!.id} item={item!} />
+          ) : entidad.kind === "flora" ? (
+            <FloraEditor key={floraSel!.id} flora={floraSel as Flora} onDeleted={() => cerrar()} />
+          ) : (
+            <MineralEditor key={mineralSel!.id} mineral={mineralSel as Mineral} onDeleted={() => cerrar()} />
           )}
         </div>
       </div>
