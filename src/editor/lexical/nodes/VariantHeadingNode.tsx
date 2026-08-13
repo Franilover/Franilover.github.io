@@ -29,7 +29,14 @@ import {
   type HeadingTagType,
 } from "@lexical/rich-text";
 import { TRANSFORMERS, type ElementTransformer, type TextMatchTransformer } from "@lexical/markdown";
-import { type EditorConfig, type LexicalNode, type NodeKey, type Spread } from "lexical";
+import {
+  $applyNodeReplacement,
+  $parseSerializedNode,
+  type EditorConfig,
+  type LexicalNode,
+  type NodeKey,
+  type Spread,
+} from "lexical";
 import { $createMathNode, $isMathNode, MathNode } from "./MathNode";
 
 export type HeadingVariant =
@@ -107,11 +114,29 @@ export class VariantHeadingNode extends HeadingNode {
   }
 
   static importJSON(serializedNode: SerializedVariantHeadingNode): VariantHeadingNode {
-    const node = new VariantHeadingNode(serializedNode.tag);
-    node.setVariant(serializedNode.variant ?? "none");
+    // OJO: HeadingNode/ElementNode.importJSON en Lexical NO reconstruye
+    // children por sí solo cuando se lo llama "a mano" (klass.importJSON) —
+    // eso es responsabilidad explícita de cada implementación. Antes esta
+    // función armaba el nodo y se quedaba ahí, sin tocar
+    // serializedNode.children en ningún momento: el heading se creaba
+    // vacío. $parseSerializedNode es recursivo a nivel de "qué nodos
+    // procesa", pero SOLO baja al children de un nodo si el importJSON de
+    // ESE nodo se lo pide — no lo hace automáticamente por vos.
+    // super.importJSON() (heredado de HeadingNode -> ElementNode) sí hace
+    // ese trabajo (recorre children, $parseSerializedNode de cada uno,
+    // append), así que lo usamos como base en vez de construir el nodo
+    // desde cero con "new VariantHeadingNode(...)".
+    const node = $applyNodeReplacement(new VariantHeadingNode(serializedNode.tag));
     node.setFormat(serializedNode.format);
     node.setIndent(serializedNode.indent);
     node.setDirection(serializedNode.direction);
+    node.setVariant(serializedNode.variant ?? "none");
+
+    for (const childJSON of serializedNode.children ?? []) {
+      const child = $parseSerializedNode(childJSON as any);
+      if (child) node.append(child);
+    }
+
     return node;
   }
 

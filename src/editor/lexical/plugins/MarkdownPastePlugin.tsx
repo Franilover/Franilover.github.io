@@ -309,11 +309,6 @@ export function MarkdownPastePlugin() {
 
         const text = clipboardData.getData("text/plain");
 
-        // eslint-disable-next-line no-console
-        console.log("[MDPasteDebug] types:", clipboardData.types);
-        // eslint-disable-next-line no-console
-        console.log("[MDPasteDebug] text/plain RAW:", JSON.stringify(text));
-
         // Si el origen provee HTML enriquecido, por defecto dejamos que el
         // handler default de RichTextPlugin lo procese (ya sabe pegar HTML
         // preservando formato). EXCEPCIÓN: si ese HTML se ve "lossy" frente
@@ -329,23 +324,10 @@ export function MarkdownPastePlugin() {
             text &&
             htmlLooksLossy(html, text) &&
             looksLikeMarkdown(text);
-          // eslint-disable-next-line no-console
-          console.log("[MDPasteDebug] html presente. shouldPreferMarkdownPath:", shouldPreferMarkdownPath, "htmlLossy:", html && text ? htmlLooksLossy(html, text) : null);
-          if (!shouldPreferMarkdownPath) {
-            // eslint-disable-next-line no-console
-            console.log("[MDPasteDebug] DEJANDO PASAR al importDOM nativo de HTML (return false)");
-            return false;
-          }
+          if (!shouldPreferMarkdownPath) return false;
         }
 
-        if (!text || !looksLikeMarkdown(text)) {
-          // eslint-disable-next-line no-console
-          console.log("[MDPasteDebug] no parece markdown o texto vacío, dejando pasar. looksLikeMarkdown:", text ? looksLikeMarkdown(text) : null);
-          return false;
-        }
-
-        // eslint-disable-next-line no-console
-        console.log("[MDPasteDebug] entrando al camino markdown propio");
+        if (!text || !looksLikeMarkdown(text)) return false;
 
         event.preventDefault();
 
@@ -355,8 +337,6 @@ export function MarkdownPastePlugin() {
         // solo "\n" en uno solo, o deja que una lista se coma texto
         // plano subsecuente — el bug de "pega pero no se ve nada".
         const normalizedText = normalizeLooseLineBreaks(text);
-        // eslint-disable-next-line no-console
-        console.log("[MDPasteDebug] normalizedText:", JSON.stringify(normalizedText));
 
         // 0) "$$formula$$" en bloque es multilinea (puede contener \n
         // propios del LaTeX, ej: \begin{aligned}...) — igual que las
@@ -420,16 +400,6 @@ export function MarkdownPastePlugin() {
                 for (const child of [...children]) walk(child);
               };
               walk($getRoot());
-
-              // eslint-disable-next-line no-console
-              console.log(
-                "[MDPasteDebug] scratchEditor tras convertir:",
-                $getRoot()
-                  .getChildren()
-                  .map((n) => ({ type: n.getType(), text: n.getTextContent() })),
-              );
-              // eslint-disable-next-line no-console
-              console.log("[MDPasteDebug] hasRealTextContent:", hasRealTextContent($getRoot()));
 
               // Ver hasRealTextContent arriba: si tras convertir no quedó
               // ningún texto real, dejamos serializedNodes vacío a propósito
