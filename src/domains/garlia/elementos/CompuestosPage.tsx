@@ -25,7 +25,8 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
@@ -774,6 +775,119 @@ function CompuestoEditor({
 }
 
 /**
+ * Panel flotante centrado del detalle de un Compuesto — mismo patrón visual
+ * que ElementoPanelFlotante en ElementosPage.tsx (modal grande centrado en
+ * pantalla con backdrop blur, animación popIn, Escape para cerrar y bloqueo
+ * de scroll del fondo), en vez del drawer lateral que usaba antes.
+ */
+function CompuestoPanelFlotante({
+  compuesto,
+  elementos,
+  todosLosCompuestos,
+  onCerrar,
+  onActualizar,
+  onEliminar,
+}: {
+  compuesto: Compuesto;
+  elementos: Elemento[];
+  todosLosCompuestos: Compuesto[];
+  onCerrar: () => void;
+  onActualizar: (id: string, cambios: Partial<Compuesto>) => void;
+  onEliminar?: (id: string) => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCerrar();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onCerrar]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6"
+      style={{
+        background: "color-mix(in srgb, var(--primary) 35%, transparent)",
+        backdropFilter: "blur(8px)",
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCerrar();
+      }}
+    >
+      <div
+        className="w-full h-full max-w-6xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        style={{
+          background: "var(--bg-main)",
+          border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+          animation: "popIn 160ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
+      >
+        <div
+          className="shrink-0 flex items-center gap-3 px-4 py-3 border-b"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+          }}
+        >
+          <div
+            className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+              borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
+            }}
+          >
+            <Beaker className="text-primary/50" size={12} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+              Compuesto · vista rápida
+            </p>
+            <p className="text-xs font-bold text-primary truncate">
+              {compuesto.simbolo ? `${compuesto.simbolo} · ` : ""}
+              {compuesto.nombre}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCerrar}
+            title="Cerrar (Esc)"
+            className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/8 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <CompuestoEditor
+            key={compuesto.id}
+            compuesto={compuesto}
+            elementos={elementos}
+            todosLosCompuestos={todosLosCompuestos}
+            onBack={onCerrar}
+            onActualizar={onActualizar}
+            onEliminar={
+              onEliminar
+                ? (id) => {
+                    onEliminar(id);
+                  }
+                : undefined
+            }
+          />
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
  * Laboratorio: combinar dos compuestos existentes en uno nuevo. Muestra la
  * afinidad entre los dos elegidos (misma lógica que PanelAfinidad) y, si el
  * usuario confirma, arma un compuesto nuevo con la unión de sus componentes
@@ -1214,37 +1328,26 @@ export function CompuestosPage({
         )}
       </div>
 
+      {/* Panel flotante centrado: mismo patrón que ElementoPanelFlotante en
+          ElementosPage.tsx — modal grande centrado en pantalla con backdrop
+          blur, en vez del drawer lateral que usaba antes. Se cierra con
+          click en el backdrop, Escape, o el botón X. */}
       {activo && (
-        <>
-          <div
-            className="absolute inset-0 z-30 md:hidden"
-            style={{ background: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
-            onClick={() => setSeleccionadoId(null)}
-          />
-          <div
-            className="absolute md:sticky md:top-0 inset-y-0 right-0 z-40 flex flex-col w-full sm:w-[380px] md:w-[420px] shrink-0 border-l shadow-2xl md:shadow-none md:h-full md:self-start"
-            style={{
-              background: "var(--white-custom, var(--bg-main))",
-              borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
-            }}
-          >
-            <CompuestoEditor
-              compuesto={activo}
-              elementos={elementos}
-              todosLosCompuestos={compuestos}
-              onBack={() => setSeleccionadoId(null)}
-              onActualizar={onActualizar}
-              onEliminar={
-                onEliminar
-                  ? (id) => {
-                      onEliminar(id);
-                      setSeleccionadoId(null);
-                    }
-                  : undefined
-              }
-            />
-          </div>
-        </>
+        <CompuestoPanelFlotante
+          compuesto={activo}
+          elementos={elementos}
+          todosLosCompuestos={compuestos}
+          onCerrar={() => setSeleccionadoId(null)}
+          onActualizar={onActualizar}
+          onEliminar={
+            onEliminar
+              ? (id) => {
+                  onEliminar(id);
+                  setSeleccionadoId(null);
+                }
+              : undefined
+          }
+        />
       )}
 
       {laboratorioAbierto && (
