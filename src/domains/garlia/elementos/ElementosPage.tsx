@@ -8,8 +8,8 @@
  * editables). Mismo patrón que RunasPage: sin navegar a otra ruta, toggle
  * de selección adentro de la misma página.
  *
- * Pensado para crecer con tabs hermanas (Iums, Simulador de reacciones) —
- * ver PanelSubTabsElementos más abajo, hoy con un solo tab activo.
+ * Elementos, Compuestos y Reglas se apilan verticalmente en una sola
+ * columna con scroll (en vez de tabs que muestran una sección a la vez).
  */
 
 import { Atom, Beaker, Download, GitCompare, Loader2, Plus, Scale, Trash2, Upload, X } from "lucide-react";
@@ -491,7 +491,7 @@ function ReglasQuimica({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto p-3">
+    <div className="p-3">
       <div className="shrink-0 flex items-center justify-between pb-3">
         <div className="flex items-center gap-1.5 text-primary/40">
           <Atom size={12} />
@@ -737,9 +737,8 @@ export function ElementosPage({
     guardarSecciones,
   } = useInfoTablaQuimica();
 
-  // ── Compuestos / Reglas: sub-tabs hermanas de Elementos, mismo bloque
-  // "Química" ───────────────────────────────────────────────────────────
-  const [subTab, setSubTab] = useState<"elementos" | "compuestos" | "reglas">("elementos");
+  // ── Compuestos / Reglas: ahora apiladas verticalmente debajo de
+  // Elementos en este mismo bloque "Química", sin selector de tabs ─────────
   const {
     items: compuestos,
     setItems: setCompuestos,
@@ -821,45 +820,16 @@ export function ElementosPage({
     [vista, elementosFiltrados],
   );
 
-  if (subTab === "reglas") {
-    return (
-      <div className="flex-1 min-h-0 flex flex-col">
-        <SubTabsElementos subTab={subTab} onCambiar={setSubTab} />
-        <ReglasQuimica
-          info={infoTabla}
-          loading={loadingInfoTabla}
-          guardarSecciones={guardarSecciones}
-        />
-      </div>
-    );
-  }
-
-  if (subTab === "compuestos") {
-    return (
-      <div className="flex-1 min-h-0 flex flex-col">
-        <SubTabsElementos subTab={subTab} onCambiar={setSubTab} />
-        <CompuestosPage
-          compuestos={compuestos}
-          elementos={elementos}
-          loading={loadingCompuestos}
-          creating={creatingCompuesto}
-          onCreate={handleCreateCompuesto}
-          onCrearConComponentes={handleCrearCompuestoConComponentes}
-          onActualizar={(id, cambios) =>
-            setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
-          }
-          onEliminar={handleEliminarCompuesto}
-          seleccionarId={compuestoRecienCreadoId}
-        />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <SubTabsElementos subTab={subTab} onCambiar={setSubTab} />
-      <div className="flex-1 min-h-0 flex overflow-hidden relative">
-      <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3">
+    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+      {/* Elementos */}
+      <div className="flex flex-col">
+        <div className="shrink-0 flex items-center gap-1.5 px-3 pt-3 text-primary/40">
+          <Atom size={12} />
+          <p className="text-micro font-black uppercase tracking-widest">Elementos</p>
+        </div>
+        <div className="flex relative">
+      <div className="flex-1 p-3 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-primary/40">
             <Atom size={12} />
@@ -1087,6 +1057,41 @@ export function ElementosPage({
           }
         />
       )}
+        </div>
+      </div>
+
+      {/* Compuestos */}
+      <div className="flex flex-col border-t border-primary/10">
+        <div className="shrink-0 flex items-center gap-1.5 px-3 pt-3 text-primary/40">
+          <Beaker size={12} />
+          <p className="text-micro font-black uppercase tracking-widest">Compuestos</p>
+        </div>
+        <CompuestosPage
+          compuestos={compuestos}
+          elementos={elementos}
+          loading={loadingCompuestos}
+          creating={creatingCompuesto}
+          onCreate={handleCreateCompuesto}
+          onCrearConComponentes={handleCrearCompuestoConComponentes}
+          onActualizar={(id, cambios) =>
+            setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
+          }
+          onEliminar={handleEliminarCompuesto}
+          seleccionarId={compuestoRecienCreadoId}
+        />
+      </div>
+
+      {/* Reglas */}
+      <div className="flex flex-col border-t border-primary/10">
+        <div className="shrink-0 flex items-center gap-1.5 px-3 pt-3 text-primary/40">
+          <Scale size={12} />
+          <p className="text-micro font-black uppercase tracking-widest">Reglas</p>
+        </div>
+        <ReglasQuimica
+          info={infoTabla}
+          loading={loadingInfoTabla}
+          guardarSecciones={guardarSecciones}
+        />
       </div>
 
       {comparadorAbierto && (
@@ -1095,48 +1100,6 @@ export function ElementosPage({
           onCerrar={() => setComparadorAbierto(false)}
         />
       )}
-    </div>
-  );
-}
-
-// ─── Sub-tabs "Elementos" / "Compuestos" / "Reglas" ────────────────────────
-// Mini toggle propio del bloque Química, independiente del toggle grande
-// Sistema/Runas/Química/Física de RunasPage. Compuestos combina elementos de
-// esta misma tabla, y Reglas explica cómo funciona todo — ambas viven como
-// pestañas hermanas acá adentro.
-function SubTabsElementos({
-  subTab,
-  onCambiar,
-}: {
-  subTab: "elementos" | "compuestos" | "reglas";
-  onCambiar: (tab: "elementos" | "compuestos" | "reglas") => void;
-}) {
-  return (
-    <div className="shrink-0 flex items-center gap-1 px-3 pt-2">
-      {(
-        [
-          { key: "elementos" as const, label: "Elementos", Icon: Atom },
-          { key: "compuestos" as const, label: "Compuestos", Icon: Beaker },
-          { key: "reglas" as const, label: "Reglas", Icon: Scale },
-        ]
-      ).map(({ key, label, Icon }) => {
-        const activo = subTab === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onCambiar(key)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
-              activo
-                ? "bg-primary/10 text-primary"
-                : "text-primary/40 hover:text-primary/70 hover:bg-primary/5"
-            }`}
-          >
-            <Icon size={11} />
-            {label}
-          </button>
-        );
-      })}
     </div>
   );
 }

@@ -1297,8 +1297,8 @@ export function CompuestosPage({
   );
 
   return (
-    <div className="flex-1 min-h-0 flex overflow-hidden relative">
-      <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3">
+    <div className="flex relative">
+      <div className="flex-1 p-3 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-primary/40">
             <Beaker size={12} />
