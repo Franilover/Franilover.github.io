@@ -373,15 +373,16 @@ function SelectorElementosCompuesto({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Elegidos, con stepper de cantidad */}
+      {/* Elegidos, con stepper de cantidad — en fila, con wrap a la
+          siguiente línea cuando no entran más. */}
       {componentes.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap gap-1">
           {componentes.map((c) => (
             <div
               key={c.elemento_id}
               className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2 pr-1 py-1 border border-primary/10"
             >
-              <span className="flex-1 min-w-0 truncate text-micro font-bold text-primary/80">
+              <span className="min-w-0 max-w-[140px] truncate text-micro font-bold text-primary/80">
                 {nombreElemento(elementos, c.elemento_id)}
               </span>
               <div className="shrink-0 flex items-center gap-1">
