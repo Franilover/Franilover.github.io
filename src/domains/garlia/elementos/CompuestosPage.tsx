@@ -161,7 +161,7 @@ function CompuestoCasilla({
           {estable && (
             <span
               title="Estructura atómica completa"
-              className="w-1.5 h-1.5 rounded-full bg-emerald-500/70 shrink-0 mt-0.5"
+              className="w-1.5 h-1.5 rounded-full bg-accent/70 shrink-0 mt-0.5"
             />
           )}
           <Beaker size={10} className="text-accent/60 shrink-0 mt-0.5" />
@@ -280,9 +280,9 @@ function BuscadorElementoCompuesto({
         typeof document !== "undefined" &&
         createPortal(
           <>
-            <div className="fixed inset-0 z-[70]" onClick={() => setAbierto(false)} />
+            <div className="fixed inset-0 z-[10000]" onClick={() => setAbierto(false)} />
             <div
-              className="fixed z-[71] max-h-56 overflow-y-auto rounded-xl border border-primary/10 bg-[var(--white-custom)] shadow-lg"
+              className="fixed z-[10001] max-h-56 overflow-y-auto rounded-xl border border-primary/10 bg-[var(--white-custom)] shadow-lg"
               style={{ top: posicion.top, left: posicion.left, width: posicion.width }}
             >
               {resultados.length === 0 ? (
@@ -306,7 +306,7 @@ function BuscadorElementoCompuesto({
                       title={sugerido ? `${el.nombre} — completa parte del déficit actual` : undefined}
                       className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-primary/5 transition-colors"
                     >
-                      {sugerido && <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />}
+                      {sugerido && <span className="w-1 h-1 rounded-full bg-accent shrink-0" />}
                       <span className="text-micro font-black text-primary/80">
                         {el.simbolo || "??"}
                       </span>
@@ -464,9 +464,7 @@ function BalanceAtomico({
             className={`shrink-0 text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded ${
               b.balance === 0
                 ? "text-primary/30"
-                : b.balance > 0
-                  ? "text-emerald-500 bg-emerald-500/10"
-                  : "text-amber-500 bg-amber-500/10"
+                : "text-accent bg-accent/10"
             }`}
           >
             {b.balance === 0 ? "Completa" : b.balance > 0 ? `+${b.balance} sobra` : `${b.balance} falta`}
@@ -504,10 +502,10 @@ function AnalisisReactivoPeso({
     reactividad.nivel === "inerte"
       ? "text-primary/40 bg-primary/5 border-primary/10"
       : reactividad.nivel === "moderado"
-        ? "text-sky-500 bg-sky-500/10 border-sky-500/20"
+        ? "text-accent/70 bg-accent/[0.06] border-accent/15"
         : reactividad.nivel === "inestable"
-          ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
-          : "text-red-500 bg-red-500/10 border-red-500/20";
+          ? "text-accent bg-accent/10 border-accent/25"
+          : "text-accent bg-accent/20 border-accent/40";
 
   return (
     <div className="grid grid-cols-2 gap-1.5">
@@ -566,7 +564,7 @@ function PanelEstequiometria({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/10 text-emerald-600">
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-accent/20 bg-accent/10 text-accent">
         <span className="text-micro font-bold leading-snug">
           {yaBalanceado
             ? "Esta mezcla ya está balanceada exacta (sin sobras)."
@@ -587,15 +585,15 @@ function PanelEstequiometria({
 }
 
 const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
-  complementa: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-  compite: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+  complementa: "text-accent bg-accent/10 border-accent/25",
+  compite: "text-accent/70 bg-accent/[0.06] border-accent/15",
   saturado: "text-primary/40 bg-primary/5 border-primary/10",
   estable: "text-primary/30 bg-primary/[0.02] border-primary/10",
 };
 
 const ENLACE_COLOR: Record<TipoEnlace, string> = {
-  fuerte: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-  debil: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+  fuerte: "text-accent bg-accent/10 border-accent/25",
+  debil: "text-accent/70 bg-accent/[0.06] border-accent/15",
   neutro: "text-primary/30 bg-primary/[0.02] border-primary/10",
 };
 
@@ -739,7 +737,7 @@ function CompuestoEditor({
 
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
         {duplicadoDe && (
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-amber-500/25 bg-amber-500/10 text-amber-600">
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-accent/25 bg-accent/10 text-accent">
             <span className="text-micro font-bold leading-snug">
               Misma combinación exacta que "{duplicadoDe.simbolo || "??"} · {duplicadoDe.nombre}" —
               ¿es a propósito?
@@ -1098,7 +1096,7 @@ function LaboratorioModal({
               </div>
 
               {mismosElegidos ? (
-                <p className="text-micro text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-md px-2 py-1.5">
+                <p className="text-micro text-accent bg-accent/10 border border-accent/20 rounded-md px-2 py-1.5">
                   Elegí dos compuestos distintos.
                 </p>
               ) : (
@@ -1120,7 +1118,7 @@ function LaboratorioModal({
                   </label>
 
                   {(compuestoEsInerte(compA, elementos) || compuestoEsInerte(compB, elementos)) && (
-                    <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border text-amber-500 bg-amber-500/10 border-amber-500/20">
+                    <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border text-accent bg-accent/10 border-accent/20">
                       <span className="text-micro font-black uppercase tracking-wide">
                         Estado Noble: bloquea el enlace
                       </span>
@@ -1135,7 +1133,7 @@ function LaboratorioModal({
                   <div
                     className={`flex flex-col gap-1 px-2 py-1.5 rounded-md border ${
                       cancelacionCarga.compatible
-                        ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+                        ? "text-accent bg-accent/10 border-accent/20"
                         : "text-primary/30 bg-primary/[0.02] border-primary/10"
                     }`}
                   >
@@ -1165,7 +1163,7 @@ function LaboratorioModal({
                   <div
                     className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${
                       electromagnetismo.generaCampoMagnetico
-                        ? "text-sky-500 bg-sky-500/10 border-sky-500/20"
+                        ? "text-accent bg-accent/10 border-accent/20"
                         : electromagnetismo.corriente > 0
                           ? "text-primary/50 bg-primary/5 border-primary/10"
                           : "text-primary/30 bg-primary/[0.02] border-primary/10"
@@ -1208,9 +1206,7 @@ function LaboratorioModal({
                           className={`shrink-0 text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded ${
                             b.balance === 0
                               ? "text-primary/30"
-                              : b.balance > 0
-                                ? "text-emerald-500 bg-emerald-500/10"
-                                : "text-amber-500 bg-amber-500/10"
+                              : "text-accent bg-accent/10"
                           }`}
                         >
                           {b.balance === 0 ? "Completa" : b.balance > 0 ? `+${b.balance} sobra` : `${b.balance} falta`}
