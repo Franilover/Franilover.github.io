@@ -50,12 +50,14 @@ export function useWikilinkNavigate() {
           items.find((i) => norm(i.nombre)?.startsWith(t)) ??
           items.find((i) => norm(i.nombre)?.includes(t));
         if (found) {
-          // Personaje/criatura SIEMPRE en panel flotante (reemplaza el
+          // Personaje/criatura/reino SIEMPRE en panel flotante (reemplaza el
           // contenido del panel actual, nunca abre una tab nueva). El resto
-          // de entidades (items, reinos, ciudades, runas, elementos) sigue
+          // de entidades (items, ciudades, runas, elementos) sigue
           // navegando a su tab vía openEntity.
-          if (section === "personajes" || section === "criaturas") {
-            abrirPanel(section === "personajes" ? "personaje" : "criatura", found.id);
+          if (section === "personajes" || section === "criaturas" || section === "reinos") {
+            const tipoPanel =
+              section === "personajes" ? "personaje" : section === "criaturas" ? "criatura" : "reino";
+            abrirPanel(tipoPanel, found.id);
           } else {
             openEntity(section, found.id);
           }
