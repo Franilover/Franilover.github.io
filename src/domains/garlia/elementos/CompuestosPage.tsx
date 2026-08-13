@@ -746,44 +746,44 @@ function CompuestoEditor({
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-              Elementos que lo componen
-            </p>
-            <button
-              type="button"
-              onClick={handleAutoCompletar}
-              disabled={(elementos.length ?? 0) === 0}
-              title="Agregar automáticamente los elementos que faltan para estabilizar las 3 capas"
-              className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <Wand2 size={10} />
-              Auto-completar
-            </button>
+        {/* Tres columnas: Elementos que lo componen (izquierda) · análisis
+            del compuesto — estequiometría, reactividad/peso, balance
+            (centro) · Notas con RichEditor (derecha). */}
+        <div className="grid grid-cols-3 gap-3 items-start">
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <div className="flex items-center justify-between">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Elementos que lo componen
+              </p>
+              <button
+                type="button"
+                onClick={handleAutoCompletar}
+                disabled={(elementos.length ?? 0) === 0}
+                title="Agregar automáticamente los elementos que faltan para estabilizar las 3 capas"
+                className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <Wand2 size={10} />
+                Auto-completar
+              </button>
+            </div>
+            <SelectorElementosCompuesto
+              elementos={elementos}
+              componentes={local.componentes ?? []}
+              onChange={(componentes) => {
+                setLocal((p) => ({ ...p, componentes }));
+                persist({ componentes });
+              }}
+            />
           </div>
-          <SelectorElementosCompuesto
-            elementos={elementos}
-            componentes={local.componentes ?? []}
-            onChange={(componentes) => {
-              setLocal((p) => ({ ...p, componentes }));
-              persist({ componentes });
-            }}
-          />
-        </div>
 
-        <div className="flex flex-col gap-1.5">
-          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-            Estequiometría exacta
-          </p>
-          <PanelEstequiometria compuesto={local} elementos={elementos} />
-        </div>
+          <div className="flex flex-col gap-3 min-w-0">
+            <div className="flex flex-col gap-1.5">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Estequiometría exacta
+              </p>
+              <PanelEstequiometria compuesto={local} elementos={elementos} />
+            </div>
 
-        {/* Reactividad/Peso/Balance (izquierda) + Notas (derecha), en una
-            sola fila — Notas ahora con RichEditor (Lexical) en vez de
-            textarea plano, mismo criterio que ElementoEditor. */}
-        <div className="grid grid-cols-2 gap-3 items-start">
-          <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
                 Reactividad y peso
