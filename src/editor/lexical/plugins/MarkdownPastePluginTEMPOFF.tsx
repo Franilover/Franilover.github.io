@@ -317,8 +317,6 @@ export function MarkdownPastePlugin() {
         // propio camino — más lento pero confiable — en vez de arriesgarnos
         // a que el importDOM de Lexical descarte el contenido real y deje
         // solo un ícono de anchor-link u otro resto no textual.
-        // eslint-disable-next-line no-console
-        console.log("[MDPasteDebug-HTML] types:", clipboardData.types);
         if (clipboardData.types.includes("text/html")) {
           const html = clipboardData.getData("text/html");
           const shouldPreferMarkdownPath =
@@ -326,22 +324,7 @@ export function MarkdownPastePlugin() {
             text &&
             htmlLooksLossy(html, text) &&
             looksLikeMarkdown(text);
-          // eslint-disable-next-line no-console
-          console.log(
-            "[MDPasteDebug-HTML] htmlLossy:",
-            html && text ? htmlLooksLossy(html, text) : null,
-            "looksLikeMarkdown(text):",
-            text ? looksLikeMarkdown(text) : null,
-            "shouldPreferMarkdownPath:",
-            shouldPreferMarkdownPath,
-          );
-          // eslint-disable-next-line no-console
-          console.log("[MDPasteDebug-HTML] html RAW:", JSON.stringify(html));
-          if (!shouldPreferMarkdownPath) {
-            // eslint-disable-next-line no-console
-            console.log("[MDPasteDebug-HTML] -> usando importDOM nativo de HTML, NO el camino markdown propio (por eso $$ queda literal)");
-            return false;
-          }
+          if (!shouldPreferMarkdownPath) return false;
         }
 
         if (!text || !looksLikeMarkdown(text)) return false;
