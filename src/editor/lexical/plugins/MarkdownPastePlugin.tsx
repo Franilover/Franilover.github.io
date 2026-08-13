@@ -173,8 +173,36 @@ export function looksLikeMarkdown(text: string): boolean {
 //   - si el texto YA usa líneas en blanco entre bloques (markdown más
 //     "formal", pegado desde otro editor markdown) esto es un no-op:
 //     nunca insertamos una segunda línea en blanco donde ya hay una.
+// Marca de heading ATX que aparece EN MEDIO de una línea (no al inicio):
+// "... texto ## Siguiente título ...". Esto pasa cuando el origen (Gemini,
+// ChatGPT, algunos visores) arma el text/plain del portapapeles colapsando
+// varios bloques en una sola línea física, sin ningún "\n" entre ellos —
+// típicamente porque en su DOM cada heading es un elemento de bloque
+// separado, pero la extracción a texto plano del navegador no inserta
+// salto de línea entre bloques adyacentes si el markup de origen no tiene
+// un nodo de bloque "real" entre medio (o usa <br> en vez de saltos).
+// Sin este paso, normalizeLooseLineBreaks no tiene nada que hacer (opera
+// línea por línea) porque a estos efectos TODO el texto pegado es una sola
+// "línea": el primer heading termina tragándose los "#"/"##"/"###"
+// siguientes como texto literal dentro de sí mismo (el regExp de
+// HEADING_TRANSFORMER solo dispara al INICIO de línea), y visualmente se
+// ve justo como "aparecen los #, ##, ### pero no hay texto" — el contenido
+// real existe, pero está todo concatenado dentro del primer heading, que
+// se corta/trunca visualmente por el estilo del heading (una sola línea
+// de alto, overflow, etc.).
+const MIDLINE_HEADING_RE = /[^\S\n](#{1,6})[^\S\n]+(?=\S)/g;
+function splitMidlineHeadings(text: string): string {
+  return text.replace(MIDLINE_HEADING_RE, (match, hashes: string, offset: number) => {
+    // No tocar si ya está al inicio de la línea (offset 0 o precedido de \n).
+    const before = text[offset - 1];
+    if (offset === 0 || before === "\n") return match;
+    return `\n\n${hashes} `;
+  });
+}
+
 function normalizeLooseLineBreaks(text: string): string {
-  const lines = text.split("\n");
+  const withSplitHeadings = splitMidlineHeadings(text);
+  const lines = withSplitHeadings.split("\n");
   const isListLine = (l: string) => /^\s*([-*+]|\d+\.)\s+\S/.test(l);
   const isTableLine = (l: string) => /^\s*\|.*\|\s*$/.test(l.trim()) || /^\s*\|?[\s:-]+\|[\s:|-]+$/.test(l);
   let inCodeFence = false;
@@ -269,55 +297,6 @@ function htmlLooksLossy(html: string, plainText: string): boolean {
   return approxHtmlText < plainLen * 0.5;
 }
 
-// ── Heurística inversa: ¿el texto PLANO ya nació con headings vacíos? ──
-// Caso distinto del de htmlLooksLossy: ahí el HTML era la fuente rota.
-// Acá el TEXTO PLANO es el que llega roto desde el origen — pasa cuando
-// el sitio de origen renderiza cada heading con un ícono de anchor-link
-// (ej. <h1><a class="anchor" aria-hidden>#</a> Número Atómico</h1>) y el
-// propio navegador arma el "text/plain" del portapapeles a partir de esa
-// estructura DOM, perdiendo el texto real y dejando solo el "#" del
-// ícono — el resultado es una línea "# " (marca + espacio, sin contenido)
-// aunque el heading SÍ tenía texto en el HTML original.
-// htmlLooksLossy no detecta esto: compara volumen total HTML vs. plano,
-// pero acá ambos "parecen" cortos de forma consistente entre sí (ninguno
-// es más chico que el otro en general — es sólo la línea del heading la
-// que perdió su contenido). Por eso esta heurística mira específicamente
-// las líneas de heading del texto plano: si una marca "#" no tiene texto
-// real después (o el "texto" que sigue es igual al de otra línea de
-// heading, señal de que todas capturaron el mismo ícono), y el HTML sí
-// trae contenido de heading no vacío en esa posición, preferimos el
-// camino HTML (dejar que el importDOM nativo procese el HTML, que si
-// tiene la estructura correcta de nodos hijos sí extrae el texto real).
-function plainTextHasEmptyHeadingMarks(text: string): boolean {
-  const lines = text.split("\n");
-  let emptyHeadingLines = 0;
-  let totalHeadingLines = 0;
-  for (const line of lines) {
-    const m = /^(#{1,6})[^\S\n]*(.*)$/.exec(line.trim());
-    if (!m) continue;
-    totalHeadingLines++;
-    if (m[2].trim() === "") emptyHeadingLines++;
-  }
-  return totalHeadingLines > 0 && emptyHeadingLines > 0;
-}
-
-// Extrae, de forma grosera, si el HTML tiene contenido de texto real
-// dentro de tags de heading (h1-h6) más allá de un ícono de 1-2 chars.
-function htmlHasNonEmptyHeadings(html: string): boolean {
-  const headingRe = /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = headingRe.exec(html)) !== null) {
-    const innerText = match[1]
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .trim();
-    // Descartamos "texto" de 1-2 caracteres (típico de íconos "#"/"§")
-    if (innerText.length > 2) return true;
-  }
-  return false;
-}
-
 export function MarkdownPastePlugin() {
   const [editor] = useLexicalComposerContext();
 
@@ -340,23 +319,6 @@ export function MarkdownPastePlugin() {
         // solo un ícono de anchor-link u otro resto no textual.
         if (clipboardData.types.includes("text/html")) {
           const html = clipboardData.getData("text/html");
-
-          // Caso inverso al de htmlLooksLossy: acá el TEXTO PLANO es el
-          // que nació roto (marcas "#" sin contenido — típico de anchor-
-          // links copiados desde documentación/visores markdown) mientras
-          // el HTML sí trae el texto real dentro de los <h1>-<h6>. En ese
-          // caso dejamos pasar el paste (return false) para que el
-          // importDOM nativo de RichTextPlugin procese el HTML, en vez de
-          // interceptar y convertir desde un texto plano ya corrupto.
-          if (
-            html &&
-            text &&
-            plainTextHasEmptyHeadingMarks(text) &&
-            htmlHasNonEmptyHeadings(html)
-          ) {
-            return false;
-          }
-
           const shouldPreferMarkdownPath =
             html &&
             text &&
