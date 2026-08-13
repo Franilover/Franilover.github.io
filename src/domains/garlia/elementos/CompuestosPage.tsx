@@ -234,20 +234,27 @@ function BuscadorElementoCompuesto({
     ];
   }, [elementos, query, idsSugeridos]);
 
+  const calcularPosicion = () => {
+    const rect = anclaRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPosicion({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  };
+
+  function abrir() {
+    calcularPosicion();
+    setAbierto(true);
+  }
+
   useLayoutEffect(() => {
     if (!abierto) return;
-    const calcular = () => {
-      const rect = anclaRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setPosicion({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-    };
-    calcular();
-    window.addEventListener("scroll", calcular, true);
-    window.addEventListener("resize", calcular);
+    calcularPosicion();
+    window.addEventListener("scroll", calcularPosicion, true);
+    window.addEventListener("resize", calcularPosicion);
     return () => {
-      window.removeEventListener("scroll", calcular, true);
-      window.removeEventListener("resize", calcular);
+      window.removeEventListener("scroll", calcularPosicion, true);
+      window.removeEventListener("resize", calcularPosicion);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto]);
 
   return (
@@ -257,10 +264,11 @@ function BuscadorElementoCompuesto({
         <input
           type="text"
           value={query}
-          onFocus={() => setAbierto(true)}
+          onFocus={abrir}
+          onClick={abrir}
           onChange={(e) => {
             setQuery(e.target.value);
-            setAbierto(true);
+            if (!abierto) abrir();
           }}
           placeholder="Buscar elemento para agregar…"
           className="flex-1 bg-transparent outline-none text-micro text-primary/80 placeholder:text-primary/30"
