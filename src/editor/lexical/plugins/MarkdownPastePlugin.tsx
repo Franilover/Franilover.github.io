@@ -403,6 +403,28 @@ export function MarkdownPastePlugin() {
               // Reemplazamos cada token de bloque math por su MathNode
               // real, recorriendo los TextNode resultantes (mismo patrón
               // que resolveTextNode en richTextSerializer.ts).
+              //
+              // OJO — MathNode con inline:false es un DecoratorNode de
+              // BLOQUE (isInline() === false, ver MathNode.tsx): Lexical
+              // no lo trata como contenido inline válido dentro de un
+              // ElementNode "de línea" como paragraph/heading/list-item.
+              // Insertarlo con node.insertBefore()/insertAfter() sobre el
+              // TextNode del token (como si fuera texto normal) lo deja
+              // "adentro" del paragraph sin quedar realmente adjunto como
+              // contenido — el paragraph sobrevive pero su
+              // getTextContent() queda vacío: exactamente el síntoma de
+              // "se pega, se ven los saltos de línea, pero no hay texto".
+              // El fix: si el token de math-bloque es TODO el contenido
+              // de su paragraph (antes/después vacíos, caso normal — el
+              // "$$...$$" ocupa su propia línea/bloque en el markdown
+              // original), sacamos el MathNode como HERMANO de ese
+              // paragraph (mismo nivel que heading/paragraph/list en
+              // root) y borramos el paragraph que quedó vacío. Si hubiera
+              // texto antes/después en la misma línea (caso atípico, ej.
+              // "texto $$formula$$ mas texto" todo pegado), preferimos no
+              // partir el bloque de forma quirúrgica — dejamos el texto
+              // plano de la fórmula tal cual en ese caso raro, en vez de
+              // arriesgar un árbol inválido.
               const tokenRe = /xMathBlockTokenxx(\d+)xx/;
               const walk = (node: any): void => {
                 if (node.getType?.() === "text") {
@@ -414,8 +436,32 @@ export function MarkdownPastePlugin() {
                   const before = content.slice(0, match.index);
                   const after = content.slice(match.index + match[0].length);
                   const mathNode = $createMathNode({ formula, inline: false });
+
+                  const parent = node.getParent?.();
+                  const isOnlyContentOfParagraph =
+                    !before &&
+                    !after &&
+                    parent?.getType?.() === "paragraph" &&
+                    parent.getChildren().length === 1;
+
+                  if (isOnlyContentOfParagraph) {
+                    // Caso normal: "$$...$$" solo en su línea → el
+                    // MathNode reemplaza al paragraph entero como nodo
+                    // de bloque hermano, no como hijo inline.
+                    parent.insertAfter(mathNode);
+                    parent.remove();
+                    return;
+                  }
+
+                  // Caso atípico: hay texto antes/después en la misma
+                  // línea que el token, o el padre no es un paragraph
+                  // simple. Insertar un nodo de bloque ahí adentro
+                  // rompería el invariante inline de Lexical (ver
+                  // comentario arriba), así que degradamos a texto
+                  // plano legible en vez de un MathNode mal ubicado.
+                  const rawFormula = `$$${formula}$$`;
                   if (before) node.insertBefore($createTextNode(before));
-                  node.insertBefore(mathNode);
+                  node.insertBefore($createTextNode(rawFormula));
                   if (after) node.insertBefore($createTextNode(after));
                   node.remove();
                   return;
