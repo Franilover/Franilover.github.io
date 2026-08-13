@@ -20,14 +20,15 @@ import {
   Loader2,
   Plus,
   Save,
-  Sparkles,
+  Search,
   Trash2,
   Wand2,
   X,
 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
@@ -47,7 +48,6 @@ import {
   compuestoEsInerte,
   encontrarCompuestoDuplicado,
   generarSimboloCompuesto,
-  ordenarPorAfinidad,
   sugerirElementosParaCompletar,
 } from "./afinidad";
 import {
@@ -197,11 +197,129 @@ function CompuestoCasilla({
 }
 
 /**
- * Selector de elementos a combinar: lista de chips clickeables (toggle) con
- * un stepper +/- de cantidad para los ya elegidos. Los elementos que más
+ * Buscador compacto para agregar un elemento al compuesto — mismo patrón
+ * que SelectorEntidad (fichaComponents.tsx): input con dropdown en portal
+ * en vez de listar todos los elementos disponibles de una. Los que más
  * ayudan a cerrar el déficit actual (sugerirElementosParaCompletar) se
- * destacan primero y con badge "sugerido" — guía la elección en vez de
- * dejarla a ciegas, sin ocultar el resto.
+ * destacan primero con un puntito, igual que antes.
+ */
+function BuscadorElementoCompuesto({
+  elementos,
+  idsSugeridos,
+  onSeleccionar,
+}: {
+  elementos: Elemento[];
+  idsSugeridos: Set<string>;
+  onSeleccionar: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const anclaRef = useRef<HTMLDivElement | null>(null);
+  const [posicion, setPosicion] = useState<{ top: number; left: number; width: number } | null>(
+    null,
+  );
+
+  const resultados = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const base = !q
+      ? elementos
+      : elementos.filter(
+          (el) =>
+            el.nombre.toLowerCase().includes(q) || (el.simbolo ?? "").toLowerCase().includes(q),
+        );
+    // Sugeridos primero, después el resto en su orden original.
+    return [
+      ...base.filter((el) => idsSugeridos.has(el.id)),
+      ...base.filter((el) => !idsSugeridos.has(el.id)),
+    ];
+  }, [elementos, query, idsSugeridos]);
+
+  useLayoutEffect(() => {
+    if (!abierto) return;
+    const calcular = () => {
+      const rect = anclaRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPosicion({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    };
+    calcular();
+    window.addEventListener("scroll", calcular, true);
+    window.addEventListener("resize", calcular);
+    return () => {
+      window.removeEventListener("scroll", calcular, true);
+      window.removeEventListener("resize", calcular);
+    };
+  }, [abierto]);
+
+  return (
+    <div ref={anclaRef} className="relative w-full min-w-0">
+      <div className="flex items-center gap-2 px-2.5 h-8 rounded-md border border-primary/10 bg-primary/[0.03] focus-within:border-primary/30 transition-colors">
+        <Search size={12} className="text-primary/35 shrink-0" />
+        <input
+          type="text"
+          value={query}
+          onFocus={() => setAbierto(true)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setAbierto(true);
+          }}
+          placeholder="Buscar elemento para agregar…"
+          className="flex-1 bg-transparent outline-none text-micro text-primary/80 placeholder:text-primary/30"
+        />
+      </div>
+
+      {abierto &&
+        posicion &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[70]" onClick={() => setAbierto(false)} />
+            <div
+              className="fixed z-[71] max-h-56 overflow-y-auto rounded-xl border border-primary/10 bg-[var(--white-custom)] shadow-lg"
+              style={{ top: posicion.top, left: posicion.left, width: posicion.width }}
+            >
+              {resultados.length === 0 ? (
+                <div className="px-3 py-3 text-micro text-primary/30 text-center">
+                  {elementos.length === 0
+                    ? "Todavía no hay elementos en la Tabla Química para combinar."
+                    : "Sin resultados."}
+                </div>
+              ) : (
+                resultados.map((el) => {
+                  const sugerido = idsSugeridos.has(el.id);
+                  return (
+                    <button
+                      key={el.id}
+                      type="button"
+                      onClick={() => {
+                        onSeleccionar(el.id);
+                        setAbierto(false);
+                        setQuery("");
+                      }}
+                      title={sugerido ? `${el.nombre} — completa parte del déficit actual` : undefined}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-primary/5 transition-colors"
+                    >
+                      {sugerido && <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />}
+                      <span className="text-micro font-black text-primary/80">
+                        {el.simbolo || "??"}
+                      </span>
+                      <span className="flex-1 text-micro text-primary/80 truncate">{el.nombre}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+/**
+ * Selector de elementos a combinar: los ya elegidos se muestran con un
+ * stepper +/- de cantidad; para agregar uno nuevo se usa un buscador
+ * compacto con dropdown (BuscadorElementoCompuesto) en vez de listar todos
+ * los elementos disponibles de una — mismo criterio que SelectorEntidad.
  */
 function SelectorElementosCompuesto({
   elementos,
@@ -223,12 +341,13 @@ function SelectorElementosCompuesto({
     [sugerencias],
   );
 
-  function toggleElemento(id: string) {
-    if (idsElegidos.has(id)) {
-      onChange(componentes.filter((c) => c.elemento_id !== id));
-    } else {
-      onChange([...componentes, { elemento_id: id, cantidad: 1 }]);
-    }
+  function agregarElemento(id: string) {
+    if (idsElegidos.has(id)) return;
+    onChange([...componentes, { elemento_id: id, cantidad: 1 }]);
+  }
+
+  function quitarElemento(id: string) {
+    onChange(componentes.filter((c) => c.elemento_id !== id));
   }
 
   function setCantidad(id: string, cantidad: number) {
@@ -240,11 +359,9 @@ function SelectorElementosCompuesto({
   }
 
   const disponibles = elementos.filter((el) => !idsElegidos.has(el.id));
-  // Sugeridos primero, después el resto en su orden original.
-  const disponiblesOrdenados = [
-    ...disponibles.filter((el) => idsSugeridos.has(el.id)),
-    ...disponibles.filter((el) => !idsSugeridos.has(el.id)),
-  ];
+  const idsSugeridosDisponibles = new Set(
+    [...idsSugeridos].filter((id) => !idsElegidos.has(id)),
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -279,7 +396,7 @@ function SelectorElementosCompuesto({
                 </button>
                 <button
                   type="button"
-                  onClick={() => toggleElemento(c.elemento_id)}
+                  onClick={() => quitarElemento(c.elemento_id)}
                   title="Quitar"
                   className="w-5 h-5 flex items-center justify-center rounded border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 transition-all cursor-pointer"
                 >
@@ -291,39 +408,12 @@ function SelectorElementosCompuesto({
         </div>
       )}
 
-      {/* Disponibles para agregar — los que más cierran el déficit actual
-          van primero, marcados con un puntito. */}
-      <div className="flex flex-wrap gap-1">
-        {disponiblesOrdenados.map((el) => {
-          const sugerido = idsSugeridos.has(el.id);
-          return (
-            <button
-              key={el.id}
-              type="button"
-              onClick={() => toggleElemento(el.id)}
-              title={
-                sugerido
-                  ? `${el.nombre} — completa parte del déficit actual`
-                  : `Agregar ${el.nombre}`
-              }
-              className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-bold border transition-all cursor-pointer ${
-                sugerido
-                  ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/15"
-                  : "border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
-              }`}
-            >
-              {sugerido && <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />}
-              <span className="font-black">{el.simbolo || "??"}</span>
-              <span className="truncate max-w-[80px]">{el.nombre}</span>
-            </button>
-          );
-        })}
-        {elementos.length === 0 && (
-          <p className="text-micro text-primary/25">
-            Todavía no hay elementos en la Tabla Química para combinar.
-          </p>
-        )}
-      </div>
+      {/* Buscador para agregar uno nuevo — no lista todos de una. */}
+      <BuscadorElementoCompuesto
+        elementos={disponibles}
+        idsSugeridos={idsSugeridosDisponibles}
+        onSeleccionar={agregarElemento}
+      />
     </div>
   );
 }
@@ -501,54 +591,6 @@ const ENLACE_COLOR: Record<TipoEnlace, string> = {
   neutro: "text-primary/30 bg-primary/[0.02] border-primary/10",
 };
 
-/**
- * Lista de afinidad del compuesto activo contra todos los demás del
- * catálogo, ordenada por complementariedad — los que mejor "encajan"
- * (cubren su déficit) primero.
- */
-function PanelAfinidad({
-  compuesto,
-  todosLosCompuestos,
-  elementos,
-}: {
-  compuesto: Compuesto;
-  todosLosCompuestos: Compuesto[];
-  elementos: Elemento[];
-}) {
-  const resultados = useMemo(
-    () => ordenarPorAfinidad(compuesto, todosLosCompuestos, elementos),
-    [compuesto, todosLosCompuestos, elementos],
-  );
-
-  if (todosLosCompuestos.length <= 1) {
-    return (
-      <p className="text-micro text-primary/25">
-        Creá otro compuesto para ver con cuáles tiene afinidad.
-      </p>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      {resultados.map(({ compuesto: otro, afinidad }) => (
-        <div
-          key={otro.id}
-          className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${AFINIDAD_COLOR[afinidad.tipo]}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-micro font-black truncate">
-              {otro.simbolo || "??"} · {otro.nombre}
-            </span>
-            <span className="shrink-0 text-micro font-black uppercase tracking-wide">
-              {AFINIDAD_LABEL[afinidad.tipo]}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /** Detalle editable de un compuesto — mismo criterio que ElementoEditor. */
 function CompuestoEditor({
   compuesto,
@@ -688,20 +730,6 @@ function CompuestoEditor({
       </div>
 
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
-        <div className="flex flex-col gap-0.5">
-          <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-            Notas
-          </label>
-          <textarea
-            value={local.notas ?? ""}
-            onChange={(e) => setLocal((p) => ({ ...p, notas: e.target.value }))}
-            onBlur={() => persist({ notas: local.notas })}
-            rows={2}
-            placeholder="Descripción del compuesto…"
-            className="bg-primary/5 rounded-md px-2 py-1 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
-          />
-        </div>
-
         {duplicadoDe && (
           <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-amber-500/25 bg-amber-500/10 text-amber-600">
             <span className="text-micro font-bold leading-snug">
@@ -739,35 +767,45 @@ function CompuestoEditor({
 
         <div className="flex flex-col gap-1.5">
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-            Balance atómico
-          </p>
-          <BalanceAtomico compuesto={local} elementos={elementos} />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-            Reactividad y peso
-          </p>
-          <AnalisisReactivoPeso compuesto={local} elementos={elementos} />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
             Estequiometría exacta
           </p>
           <PanelEstequiometria compuesto={local} elementos={elementos} />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <p className="flex items-center gap-1 text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-            <Sparkles size={10} />
-            Afinidad con otros compuestos
-          </p>
-          <PanelAfinidad
-            compuesto={local}
-            todosLosCompuestos={todosLosCompuestos}
-            elementos={elementos}
-          />
+        {/* Reactividad/Peso/Balance (izquierda) + Notas (derecha), en una
+            sola fila — Notas ahora con RichEditor (Lexical) en vez de
+            textarea plano, mismo criterio que ElementoEditor. */}
+        <div className="grid grid-cols-2 gap-3 items-start">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Reactividad y peso
+              </p>
+              <AnalisisReactivoPeso compuesto={local} elementos={elementos} />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Balance atómico
+              </p>
+              <BalanceAtomico compuesto={local} elementos={elementos} />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Notas
+            </label>
+            <RichEditor
+              minHeight="16rem"
+              placeholder="Descripción del compuesto…"
+              value={local.notas ?? ""}
+              onChange={(v) => {
+                setLocal((p) => ({ ...p, notas: v }));
+                persist({ notas: v });
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -889,7 +927,7 @@ function CompuestoPanelFlotante({
 
 /**
  * Laboratorio: combinar dos compuestos existentes en uno nuevo. Muestra la
- * afinidad entre los dos elegidos (misma lógica que PanelAfinidad) y, si el
+ * afinidad entre los dos elegidos y, si el
  * usuario confirma, arma un compuesto nuevo con la unión de sus componentes
  * (combinarComponentes) — punto de partida en vez de armar desde cero.
  */
