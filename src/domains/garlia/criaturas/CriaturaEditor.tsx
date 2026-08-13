@@ -20,7 +20,7 @@ export function CriaturaEditor({ criatura }: { criatura: Criatura }) {
       item={criatura as any}
       onSaved={() => {}}
       onDeleted={() => openEntity("criaturas", "")}
-      onSelectItem={(id) => openEntity("items", id)}
+      onSelectItem={(id) => abrirPanel("item", id)}
       onSelectPersonaje={(id) => abrirPanel("personaje", id)}
       onSelectGrupo={(id) => openEntity("grupos", id)}
       onSelectSubsistema={(id) => openEntity("runas", id)}

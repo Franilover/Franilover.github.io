@@ -4,8 +4,8 @@
  * PanelFlotanteGlobal
  * ───────────────────────────────────────────────────────────────────────────
  * Único punto de renderizado para la "vista rápida" de Personaje/Criatura/
- * Reino: el EDITOR COMPLETO (mismo PersonajeEditor/CriaturaEditor/
- * ReinoEditor que se usa a pantalla completa en EntidadesPage), pero
+ * Reino/Item: el EDITOR COMPLETO (mismo PersonajeEditor/CriaturaEditor/
+ * ReinoEditor/ItemEditor que se usa a pantalla completa en EntidadesPage), pero
  * flotando centrado en pantalla por encima de la vista actual — sin
  * navegar, sin perder el lugar donde estabas. Es el mismo comportamiento
  * que antes daba el click del medio + FullscreenEntityPanel, solo que
@@ -15,7 +15,7 @@
  *
  * Resuelve los datos por id vía useSupabaseData (mismo cache que ya usa
  * EntidadesPage — sin fetch nuevo). Reusa PersonajeEditor/CriaturaEditor/
- * ReinoEditor tal cual (mismos wrappers que ya resuelven toda su
+ * ReinoEditor/ItemEditor tal cual (mismos wrappers que ya resuelven toda su
  * navegación interna contra el store global, incluido abrirPanel() para
  * entidades relacionadas), así que una entidad relacionada abierta desde
  * acá reemplaza el contenido del mismo panel en vez de apilar otro.
@@ -24,7 +24,7 @@
  * click en el backdrop.
  */
 
-import { Bug, Crown, Users, X } from "lucide-react";
+import { Bug, Crown, Gem, Users, X } from "lucide-react";
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 
@@ -32,9 +32,11 @@ import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { PersonajeEditor } from "@/domains/garlia/personajes/PersonajeEditor";
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { ReinoEditor } from "@garlia/reinos";
+import { ItemEditor } from "@garlia/items";
 import type { Personaje } from "@garlia/personajes";
 import type { Criatura } from "@/domains/garlia/criaturas/types";
 import type { Reino } from "@garlia/reinos";
+import type { Item } from "@garlia/items";
 
 import { usePanelFlotante } from "./usePanelFlotanteStore";
 
@@ -45,6 +47,7 @@ export function PanelFlotanteGlobal() {
   const { data: personajes } = useSupabaseData<Personaje>("personajes");
   const { data: criaturas } = useSupabaseData<Criatura>("criaturas");
   const { data: reinos } = useSupabaseData<Reino>("reinos");
+  const { data: items } = useSupabaseData<Item>("items");
 
   useEffect(() => {
     if (!entidad) return;
@@ -66,14 +69,30 @@ export function PanelFlotanteGlobal() {
   const personaje = entidad.kind === "personaje" ? personajes.find((x) => x.id === entidad.id) : null;
   const criatura = entidad.kind === "criatura" ? criaturas.find((x) => x.id === entidad.id) : null;
   const reino = entidad.kind === "reino" ? reinos.find((x) => x.id === entidad.id) : null;
+  const item = entidad.kind === "item" ? items.find((x) => x.id === entidad.id) : null;
   if (entidad.kind === "personaje" && !personaje) return null;
   if (entidad.kind === "criatura" && !criatura) return null;
   if (entidad.kind === "reino" && !reino) return null;
+  if (entidad.kind === "item" && !item) return null;
 
-  const Icon = entidad.kind === "personaje" ? Users : entidad.kind === "criatura" ? Bug : Crown;
-  const label = entidad.kind === "personaje" ? "Personaje" : entidad.kind === "criatura" ? "Criatura" : "Reino";
+  const Icon =
+    entidad.kind === "personaje" ? Users : entidad.kind === "criatura" ? Bug : entidad.kind === "reino" ? Crown : Gem;
+  const label =
+    entidad.kind === "personaje"
+      ? "Personaje"
+      : entidad.kind === "criatura"
+        ? "Criatura"
+        : entidad.kind === "reino"
+          ? "Reino"
+          : "Item";
   const nombre =
-    entidad.kind === "personaje" ? personaje!.nombre : entidad.kind === "criatura" ? criatura!.nombre : reino!.nombre;
+    entidad.kind === "personaje"
+      ? personaje!.nombre
+      : entidad.kind === "criatura"
+        ? criatura!.nombre
+        : entidad.kind === "reino"
+          ? reino!.nombre
+          : item!.nombre;
 
   return createPortal(
     <div
@@ -131,8 +150,10 @@ export function PanelFlotanteGlobal() {
             <PersonajeEditor key={personaje!.id} personaje={personaje!} />
           ) : entidad.kind === "criatura" ? (
             <CriaturaEditor key={criatura!.id} criatura={criatura!} />
-          ) : (
+          ) : entidad.kind === "reino" ? (
             <ReinoEditor key={reino!.id} reino={reino!} />
+          ) : (
+            <ItemEditor key={item!.id} item={item!} />
           )}
         </div>
       </div>

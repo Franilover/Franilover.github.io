@@ -27,7 +27,7 @@ export function ReinoEditor({ reino }: { reino: Reino }) {
       onSelectPersonaje={(personaje) => abrirPanel("personaje", personaje.id)}
       onSelectCiudad={(id) => openEntity("ciudades", id)}
       onSelectCriatura={(id) => abrirPanel("criatura", id)}
-      onSelectItem={(id) => openEntity("items", id)}
+      onSelectItem={(id) => abrirPanel("item", id)}
     />
   );
 }
