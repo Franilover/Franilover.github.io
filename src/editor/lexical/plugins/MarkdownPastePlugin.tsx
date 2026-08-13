@@ -297,6 +297,30 @@ function htmlLooksLossy(html: string, plainText: string): boolean {
   return approxHtmlText < plainLen * 0.5;
 }
 
+// htmlLooksLossy mide FIDELIDAD DE TEXTO (¿el HTML conserva los mismos
+// caracteres que el texto plano?) — pero un HTML puede ser 100% fiel en
+// texto y aun así ser menos CAPAZ que nuestro camino markdown: el caso
+// real es "$$fórmula$$" en bloque. Cuando el origen (Gemini, ChatGPT,
+// cualquier <p> que renderiza markdown a HTML) serializa una fórmula
+// bloque, el <p> resultante contiene el texto "$$...$$" completo y sin
+// pérdida de caracteres — por eso htmlLooksLossy da false, correctamente
+// según lo que mide. El problema es que el importDOM nativo de Lexical
+// no tiene ningún nodo/transformer que reconozca "$$...$$" dentro de un
+// <p> — lo deja tal cual, como texto plano literal. Nuestro camino
+// markdown SÍ lo convierte a MathNode real (ver MATH_BLOCK_RE más abajo).
+// Por eso, aunque el HTML no sea "lossy" en el sentido de htmlLooksLossy,
+// si el texto plano tiene un bloque de fórmula que el HTML no va a poder
+// renderizar como fórmula real, preferimos igual el camino markdown.
+function htmlMissesMathBlock(plainText: string): boolean {
+  // Reseteamos lastIndex por las dudas: MATH_BLOCK_RE es /g y se importa
+  // como módulo compartido: si en algún otro lado del código se usó con
+  // .test()/.exec() y no se consumió hasta el final, podría quedar con
+  // lastIndex != 0. .test() en un string nuevo con /g arrancaría desde
+  // ahí y daría falsos negativos intermitentes.
+  MATH_BLOCK_RE.lastIndex = 0;
+  return MATH_BLOCK_RE.test(plainText);
+}
+
 export function MarkdownPastePlugin() {
   const [editor] = useLexicalComposerContext();
 
@@ -317,31 +341,14 @@ export function MarkdownPastePlugin() {
         // propio camino — más lento pero confiable — en vez de arriesgarnos
         // a que el importDOM de Lexical descarte el contenido real y deje
         // solo un ícono de anchor-link u otro resto no textual.
-        // eslint-disable-next-line no-console
-        console.log("[MDPasteDebug-HTML] types:", clipboardData.types);
         if (clipboardData.types.includes("text/html")) {
           const html = clipboardData.getData("text/html");
           const shouldPreferMarkdownPath =
             html &&
             text &&
-            htmlLooksLossy(html, text) &&
+            (htmlLooksLossy(html, text) || htmlMissesMathBlock(text)) &&
             looksLikeMarkdown(text);
-          // eslint-disable-next-line no-console
-          console.log(
-            "[MDPasteDebug-HTML] htmlLossy:",
-            html && text ? htmlLooksLossy(html, text) : null,
-            "looksLikeMarkdown(text):",
-            text ? looksLikeMarkdown(text) : null,
-            "shouldPreferMarkdownPath:",
-            shouldPreferMarkdownPath,
-          );
-          // eslint-disable-next-line no-console
-          console.log("[MDPasteDebug-HTML] html RAW:", JSON.stringify(html));
-          if (!shouldPreferMarkdownPath) {
-            // eslint-disable-next-line no-console
-            console.log("[MDPasteDebug-HTML] -> usando importDOM nativo de HTML, NO el camino markdown propio (por eso $$ queda literal)");
-            return false;
-          }
+          if (!shouldPreferMarkdownPath) return false;
         }
 
         if (!text || !looksLikeMarkdown(text)) return false;
