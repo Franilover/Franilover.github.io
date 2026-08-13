@@ -14,8 +14,10 @@
  * Debajo, en el mismo criterio, se muestran aparte Flora y Minerales
  * (tampoco agrupados) — mismo catálogo que ya aparece en la vista "por
  * Criatura" (colgando de Ecosistema ahí), acá solo como bloques planos
- * informativos. Cada tarjeta abre el editor completo de su entidad
- * (openEntity(section, id)), igual que el resto de las vistas jerárquicas.
+ * informativos. Un item abre el panel flotante (abrirPanel("item", id)),
+ * igual que Personaje/Criatura/Reino en las otras vistas jerárquicas —
+ * Flora y Minerales no tienen panel flotante propio, así que siguen
+ * abriendo su editor a pantalla completa (onOpenFlora/onOpenMineral).
  */
 
 import React from "react";
@@ -23,6 +25,7 @@ import React from "react";
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { EntityCardGrid } from "@/domains/garlia/_shared/EntityCardGrid";
 import { GrupoFiltroBarra, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 
 interface Item {
   id: string;
@@ -38,7 +41,6 @@ interface EntidadMin {
 interface Props {
   items: Item[];
   loading?: boolean;
-  onOpen: (id: string) => void;
   onCreate?: () => void;
   creating?: boolean;
   /** Flora — se muestra como bloque aparte debajo del grid de Items, sin
@@ -69,7 +71,6 @@ interface Props {
 export function ItemsJerarquia({
   items,
   loading,
-  onOpen,
   onCreate,
   creating,
   flora,
@@ -86,6 +87,8 @@ export function ItemsJerarquia({
   onBusquedaChange,
   agrupacionSelector,
 }: Props) {
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
+
   const grupoSeleccionado = grupoSeleccionadoId
     ? gruposItemsPorSubtipo?.flatMap((b) => b.grupos).find((g) => g.id === grupoSeleccionadoId)
     : null;
@@ -127,7 +130,7 @@ export function ItemsJerarquia({
           nombre: i.nombre,
           imageUrl: i.imagen_url || undefined,
         }))}
-        onItemClick={onOpen}
+        onItemClick={(id) => abrirPanel("item", id)}
         onCreate={onCreate}
         creating={creating}
         section="items"

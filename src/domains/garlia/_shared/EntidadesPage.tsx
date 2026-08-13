@@ -989,7 +989,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
         <ItemsJerarquia
           items={items}
           loading={loadingI}
-          onOpen={(id) => openEntity("items", id)}
           onCreate={async () => {
             const { data } = await addItem({ nombre: "Nuevo objeto" });
             if (data?.id) openEntity("items", data.id);
