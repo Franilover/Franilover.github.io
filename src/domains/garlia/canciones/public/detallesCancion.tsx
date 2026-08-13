@@ -247,9 +247,16 @@ export default function CancionDetallesPage({ slug }: { slug?: string } = {}) {
   const [slugParam, setSlugParam] = useState<string>("");
   useEffect(() => {
     const segmentos = window.location.pathname.split("/").filter(Boolean);
-    // .../garlia/canciones/:slug
+    // .../garlia/canciones/:slug  (esquema web)
+    // .../garlia/canciones/detalle?slug=...  (esquema Tauri/APK)
+    //
+    // Mismo bug que en detallesLibro.tsx/leerLibro.tsx: "detalle" puede ser
+    // el segmento literal del path en vez del slug real. Si el segmento
+    // siguiente a "canciones" es justo "detalle", no hay slug en el path —
+    // hay que leerlo del query string.
     const idx = segmentos.indexOf("canciones");
-    const slugDePath = idx >= 0 ? (segmentos[idx + 1] ?? "") : "";
+    const candidatoSlug = idx >= 0 ? (segmentos[idx + 1] ?? "") : "";
+    const slugDePath = candidatoSlug === "detalle" ? "" : candidatoSlug;
     const slugDeQuery = new URLSearchParams(window.location.search).get(
       "slug",
     );

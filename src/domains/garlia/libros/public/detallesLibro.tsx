@@ -287,9 +287,18 @@ export default function LibroDetalle({ slug }: { slug?: string } = {}) {
   const [slugParam, setSlugParam] = useState<string>("");
   useEffect(() => {
     const segmentos = window.location.pathname.split("/").filter(Boolean);
-    // .../garlia/libros/:slug
+    // .../garlia/libros/:slug  (esquema web)
+    // .../garlia/libros/detalle?slug=...  (esquema Tauri/APK)
+    //
+    // "detalle" puede aparecer como segmento literal del path (build Tauri)
+    // en vez de como marcador que precede al valor real. Si el segmento
+    // siguiente a "libros" es justo "detalle", no hay slug en el path —
+    // hay que leerlo del query string. Sin esta guarda, slugDePath daba
+    // "detalle" (truthy) y el `||` de abajo nunca llegaba a mirar el query
+    // param — mismo bug que en leerLibro.tsx con el segmento "leer".
     const idx = segmentos.indexOf("libros");
-    const slugDePath = idx >= 0 ? (segmentos[idx + 1] ?? "") : "";
+    const candidatoSlug = idx >= 0 ? (segmentos[idx + 1] ?? "") : "";
+    const slugDePath = candidatoSlug === "detalle" ? "" : candidatoSlug;
     const slugDeQuery = new URLSearchParams(window.location.search).get(
       "slug",
     );
