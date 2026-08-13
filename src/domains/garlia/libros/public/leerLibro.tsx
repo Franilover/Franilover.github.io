@@ -68,10 +68,18 @@ export default function Lector({
   const [ordenParam, setOrdenParam] = useState<string>("");
   useEffect(() => {
     const segmentos = window.location.pathname.split("/").filter(Boolean);
-    // .../garlia/libros/:slug/leer/:orden
+    // .../garlia/libros/:slug/leer/:orden  (esquema web)
+    // .../garlia/libros/leer?slug=...&orden=...  (esquema Tauri/APK)
+    //
+    // "leer" puede aparecer como segmento literal del path (build Tauri) en
+    // vez de como marcador que precede al valor real. Si el segmento
+    // siguiente a "libros" es justo "leer", no hay slug en el path — hay
+    // que leerlo del query string. Sin esta guarda, slugDePath daba "leer"
+    // (truthy) y el `||` de abajo nunca llegaba a mirar el query param.
     const idxLibros = segmentos.indexOf("libros");
-    const slugDePath =
+    const candidatoSlug =
       idxLibros >= 0 ? (segmentos[idxLibros + 1] ?? "") : "";
+    const slugDePath = candidatoSlug === "leer" ? "" : candidatoSlug;
     const idxLeer = segmentos.indexOf("leer");
     const ordenDePath = idxLeer >= 0 ? (segmentos[idxLeer + 1] ?? "") : "";
     const query = new URLSearchParams(window.location.search);
