@@ -31,7 +31,6 @@ import {
 import { TRANSFORMERS, type ElementTransformer, type TextMatchTransformer } from "@lexical/markdown";
 import {
   $applyNodeReplacement,
-  $parseSerializedNode,
   type EditorConfig,
   type LexicalNode,
   type NodeKey,
@@ -114,29 +113,29 @@ export class VariantHeadingNode extends HeadingNode {
   }
 
   static importJSON(serializedNode: SerializedVariantHeadingNode): VariantHeadingNode {
-    // OJO: HeadingNode/ElementNode.importJSON en Lexical NO reconstruye
-    // children por sí solo cuando se lo llama "a mano" (klass.importJSON) —
-    // eso es responsabilidad explícita de cada implementación. Antes esta
-    // función armaba el nodo y se quedaba ahí, sin tocar
-    // serializedNode.children en ningún momento: el heading se creaba
-    // vacío. $parseSerializedNode es recursivo a nivel de "qué nodos
-    // procesa", pero SOLO baja al children de un nodo si el importJSON de
-    // ESE nodo se lo pide — no lo hace automáticamente por vos.
-    // super.importJSON() (heredado de HeadingNode -> ElementNode) sí hace
-    // ese trabajo (recorre children, $parseSerializedNode de cada uno,
-    // append), así que lo usamos como base en vez de construir el nodo
-    // desde cero con "new VariantHeadingNode(...)".
+    // CORRECCIÓN (ver historial de debug): en un momento pensamos que
+    // hacía falta reconstruir "children" acá a mano, llamando
+    // $parseSerializedNode(childJSON) + node.append() por cada hijo.
+    // Estaba mal — verificado contra el código fuente real de Lexical
+    // instalado (node_modules/lexical, $parseSerializedNodeImpl):
+    //
+    //   const node = nodeClass.importJSON(serializedNode);  // esto
+    //   if ($isElementNode(node) && Array.isArray(children)) {
+    //     for (...) node.append($parseSerializedNodeImpl(child, ...));
+    //   }
+    //
+    // O sea: $parseSerializedNode YA reconstruye children automáticamente
+    // DESPUÉS de llamar a este importJSON, recorriendo
+    // serializedNode.children del propio nodo. Si este método también
+    // los agrega acá adentro, terminan agregados DOS VECES (bug real que
+    // reprodujimos: "Titulo con formulaTitulo con formula"). Este método
+    // es responsable ÚNICAMENTE de reconstruirse a sí mismo (tag, format,
+    // indent, direction, variant) — nunca debe tocar children.
     const node = $applyNodeReplacement(new VariantHeadingNode(serializedNode.tag));
     node.setFormat(serializedNode.format);
     node.setIndent(serializedNode.indent);
     node.setDirection(serializedNode.direction);
     node.setVariant(serializedNode.variant ?? "none");
-
-    for (const childJSON of serializedNode.children ?? []) {
-      const child = $parseSerializedNode(childJSON as any);
-      if (child) node.append(child);
-    }
-
     return node;
   }
 

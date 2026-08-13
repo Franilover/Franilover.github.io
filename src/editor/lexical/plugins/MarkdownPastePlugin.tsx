@@ -256,6 +256,33 @@ function hasRealTextContent(root: any): boolean {
   return found;
 }
 
+// ── exportJSON() de un nodo suelto NO incluye children ──────────────────
+// Descubierto al debuggear "los headings/párrafos se pierden al pegar":
+// ElementNode.exportJSON() en el CORE de Lexical (no algo nuestro, ni
+// algo de VariantHeadingNode) devuelve "children: []" hardcodeado por
+// diseño — la recursión hacia los hijos es responsabilidad de quien
+// arma la serialización completa (normalmente editorState.toJSON(),
+// que sí la hace desde afuera, recorriendo el árbol). Llamar
+// node.exportJSON() "a mano" sobre un nodo suelto, como hacíamos acá
+// (serializedNodes = root.getChildren().map(n => n.exportJSON())),
+// SIEMPRE devuelve children vacío sin importar si el nodo es HeadingNode
+// base, VariantHeadingNode, ParagraphNode, etc. — confirmado contra
+// HeadingNode nativo de @lexical/rich-text sin ningún código propio de
+// por medio. Por eso el bug reaparecía incluso después de arreglar
+// VariantHeadingNode.importJSON (ese fix sigue siendo necesario para
+// cuando llega un JSON con children ya completo desde otra fuente, pero
+// acá nunca llegaba completo desde el origen: el propio exportJSON()
+// nunca lo puso).
+// Fix: función recursiva propia que arma children explícitamente
+// bajando por getChildren() y llamando exportNodeJSONDeep en cada hijo.
+function exportNodeJSONDeep(node: any): Record<string, unknown> {
+  const json = node.exportJSON();
+  if (typeof node.getChildren === "function") {
+    json.children = node.getChildren().map((child: any) => exportNodeJSONDeep(child));
+  }
+  return json;
+}
+
 // ── Heurística: ¿el HTML pegado es sospechoso de perder texto? ─────────
 // Algunos orígenes (visores de markdown, sitios de documentación, algunas
 // interfaces de chat) renderizan cada heading con un ícono de anchor-link
@@ -478,7 +505,7 @@ export function MarkdownPastePlugin() {
               if (hasRealTextContent($getRoot())) {
                 serializedNodes = $getRoot()
                   .getChildren()
-                  .map((n) => n.exportJSON());
+                  .map((n) => exportNodeJSONDeep(n));
               }
             },
             { discrete: true },
