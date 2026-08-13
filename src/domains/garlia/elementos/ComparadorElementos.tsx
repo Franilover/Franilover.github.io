@@ -218,6 +218,9 @@ export function ComparadorElementosModal({
                           {AFINIDAD_LABEL[afinidad.tipo]}
                         </span>
                       </div>
+                      {(a.es_noble || b.es_noble) && (
+                        <span className="text-micro opacity-70">{afinidad.motivo}</span>
+                      )}
                     </div>
                   ))}
                 </div>

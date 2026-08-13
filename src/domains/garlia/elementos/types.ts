@@ -280,10 +280,23 @@ export interface ResultadoReactividad {
   nivel: NivelReactividad;
 }
 
-// ─── Peso molecular ─────────────────────────────────────────────────────────
+// ─── Peso Atómico (Propiedad Derivada) ─────────────────────────────────────
+// Peso Atómico = (partículas Núcleo × 3) + (partículas Media × 2) +
+// (partículas Externa × 1) — ver reglas-sistema-actualizado.md, sección 1.5.
+// Pondera más las capas internas (más "profundas") que la externa. NO debe
+// confundirse con el Número Atómico (Z), que es solo la posición en la
+// tabla. Dos elementos con Z consecutivos pueden tener pesos muy distintos.
+export const PESO_POR_CAPA: Record<LayerName, number> = {
+  nucleo: 3,
+  media: 2,
+  externa: 1,
+};
+
 export interface ResultadoPeso {
-  /** Suma de todas las partículas de todos los componentes (masa total). */
+  /** Peso Atómico ponderado: nucleo×3 + media×2 + externa×1 (sección 1.5). */
   pesoTotal: number;
+  /** Desglose del aporte de cada capa al peso total (ya ponderado). */
+  porCapa: Record<LayerName, number>;
   categoria: "liviano" | "medio" | "pesado";
 }
 

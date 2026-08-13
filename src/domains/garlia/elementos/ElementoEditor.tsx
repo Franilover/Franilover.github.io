@@ -29,6 +29,8 @@ import {
   LAYER_PARTICLES,
   PARTICLE_INITIAL,
   PARTICLE_TYPES,
+  capacidadExterna,
+  layerTotal,
   type Elemento,
   type ElementFamily,
   type LayerName,
@@ -56,6 +58,14 @@ export function ElementoEditor({
   const [local, setLocal] = useState(elemento);
 
   useEffect(() => setLocal(elemento), [elemento]);
+
+  // Estado Noble (sección 3.2): la capa externa debe estar 100% saturada
+  // para que "es_noble" sea coherente con la regla de bloqueo de enlaces.
+  const totalExterna = useMemo(() => layerTotal(local.externa), [local.externa]);
+  const capacidadTotalExterna = useMemo(
+    () => capacidadExterna(local.numero_atomico),
+    [local.numero_atomico],
+  );
 
   async function persist(cambios: Partial<Elemento>) {
     setSaving(true);
@@ -169,7 +179,10 @@ export function ElementoEditor({
             fila de 4 columnas. */}
         <div className="grid grid-cols-4 gap-2">
           <div className="flex flex-col gap-0.5">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            <label
+              className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
+              title="El Número Atómico es solo la posición de orden en la Tabla Periódica (1 a 62) — no es la suma de partículas del elemento."
+            >
               N° atómico
             </label>
             <input
@@ -205,11 +218,19 @@ export function ElementoEditor({
           </div>
 
           <div className="flex flex-col gap-0.5">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            <label
+              className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
+              title="Estado Noble (sección 3.2): capa externa 100% saturada. No puede iniciar ni aceptar enlaces nuevos, sin importar el balance de Voluntad/Percepción."
+            >
               Noble
             </label>
             <button
               type="button"
+              title={
+                capacidadTotalExterna > 0 && totalExterna !== capacidadTotalExterna
+                  ? `Capa externa ${totalExterna}/${capacidadTotalExterna} — no está saturada al 100%, marcar Noble aquí no coincidiría con la regla de cierre de capa.`
+                  : "Marca el elemento como Noble: bloquea enlaces nuevos en toda la app."
+              }
               onClick={() => {
                 const es_noble = !local.es_noble;
                 setLocal((p) => ({ ...p, es_noble }));
@@ -223,6 +244,11 @@ export function ElementoEditor({
             >
               {local.es_noble ? "Sí" : "No"}
             </button>
+            {local.es_noble && capacidadTotalExterna > 0 && totalExterna !== capacidadTotalExterna && (
+              <span className="text-micro text-amber-500 leading-tight">
+                ⚠ Externa {totalExterna}/{capacidadTotalExterna}, no saturada
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col gap-0.5">

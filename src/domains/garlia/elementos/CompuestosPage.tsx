@@ -43,6 +43,7 @@ import {
   calcularPeso,
   calcularReactividad,
   combinarComponentes,
+  compuestoEsInerte,
   encontrarCompuestoDuplicado,
   generarSimboloCompuesto,
   ordenarPorAfinidad,
@@ -426,7 +427,10 @@ function AnalisisReactivoPeso({
         <span className="text-micro font-black uppercase tracking-wide text-primary/60">
           {peso.pesoTotal} · peso {peso.categoria}
         </span>
-        <span className="text-micro text-primary/40">Suma total de partículas</span>
+        <span className="text-micro text-primary/40">
+          Núcleo×3 {peso.porCapa.nucleo} · Media×2 {peso.porCapa.media} · Externa×1{" "}
+          {peso.porCapa.externa}
+        </span>
       </div>
     </div>
   );
@@ -954,6 +958,19 @@ function LaboratorioModal({
                   <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
                     Química real · Voluntad ↔ Percepción
                   </label>
+
+                  {(compuestoEsInerte(compA, elementos) || compuestoEsInerte(compB, elementos)) && (
+                    <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border text-amber-500 bg-amber-500/10 border-amber-500/20">
+                      <span className="text-micro font-black uppercase tracking-wide">
+                        Estado Noble: bloquea el enlace
+                      </span>
+                      <span className="text-micro font-normal opacity-80">
+                        {compuestoEsInerte(compA, elementos) ? compA.nombre : compB.nombre} tiene su
+                        Capa Externa 100% saturada — no puede iniciar ni aceptar enlaces nuevos,
+                        sin importar el balance de cargas.
+                      </span>
+                    </div>
+                  )}
 
                   <div
                     className={`flex flex-col gap-1 px-2 py-1.5 rounded-md border ${

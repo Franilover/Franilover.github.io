@@ -1,12 +1,31 @@
 /**
  * afinidad.ts
  * ───────────────────────────────────────────────────────────────────────────
- * Calcula la afinidad entre dos Compuestos a partir de su estructura
- * atómica real — no de reglas arbitrarias tipo "agua apaga fuego".
+ * Dos sistemas de análisis distintos conviven en este archivo — no confundir:
  *
- * Analogía con química real: el carbono tiene 4 electrones de valencia y
- * "necesita" 4 más para completar su capa externa (regla del octeto) — por
- * eso se enlaza con elementos que se los aportan (ej. 4× hidrógeno → CH4).
+ * A) LEY DE CANCELACIÓN DE CARGA (documento oficial, sección 4.1-4.3): la
+ *    regla real que decide si dos elementos/compuestos FORMAN un enlace.
+ *    Voluntad(+) libre de uno cancela Percepción(-) libre del otro, 1 a 1.
+ *    De ahí salen: calcularCancelacionCarga, calcularEnlaceResultante,
+ *    calcularElectromagnetismo. Esto es lo que gobierna reacciones reales.
+ *
+ * B) "AFINIDAD" (calcularAfinidad y todo lo que sigue esta sección) — una
+ *    heurística de DISEÑO/SUGERENCIA propia de esta herramienta, no del
+ *    documento de reglas. Compara déficit/superávit de capacidad de capa
+ *    (análoga a la regla del octeto química) para sugerir qué elementos
+ *    "pegan bien" al armar un compuesto nuevo. Es útil para el editor, pero
+ *    NO es la Ley de Cancelación de Carga y no debe leerse como el criterio
+ *    oficial de si un compuesto es válido — eso lo decide (A).
+ *
+ * Ambos sistemas respetan el Estado Noble (sección 3.2 del documento): un
+ * elemento Noble tiene su Capa Externa 100% saturada, así que no puede
+ * iniciar ni aceptar enlaces nuevos. esNobleEnCompuesto() centraliza ese
+ * chequeo y se usa en (A) y (B) por igual.
+ *
+ * Analogía con química real para (B): el carbono tiene 4 electrones de
+ * valencia y "necesita" 4 más para completar su capa externa (regla del
+ * octeto) — por eso se enlaza con elementos que se los aportan (ej. 4×
+ * hidrógeno → CH4).
  *
  * Acá el mismo principio, aplicado a las 3 capas del sistema. Núcleo (2) y
  * Media (4) tienen capacidad fija (CAPACIDAD_CAPA_FIJA). La Externa NO:
@@ -41,6 +60,7 @@ import {
   type NivelReactividad,
   type ParticleMap,
   type ParticleType,
+  PESO_POR_CAPA,
   type ResultadoAfinidad,
   type ResultadoCancelacionCarga,
   type ResultadoElectromagnetismo,
@@ -52,6 +72,32 @@ import {
 } from "./types";
 
 const LAYERS: LayerName[] = ["nucleo", "media", "externa"];
+
+// ─── Estado Noble: bloqueo de enlaces (sección 3.2) ────────────────────────
+// "Al estar la Capa Externa 100% saturada, no queda espacio disponible ni
+// para donar Voluntad adicional ni para recibir Percepción adicional. El
+// átomo no puede iniciar ni aceptar enlaces nuevos, independientemente del
+// balance interno entre ambas cargas." — se aplica por igual a un Elemento
+// suelto marcado es_noble y a cualquier Compuesto que solo contenga
+// elementos Nobles entre sus componentes (no catalizadores: un catalizador
+// no "participa" del enlace en el mismo sentido).
+export function elementoBloqueaEnlace(elemento: Elemento): boolean {
+  return !!elemento.es_noble;
+}
+
+/** true si TODOS los componentes no-catalizadores del compuesto son Nobles
+ *  (compuesto íntegramente inerte) — o si no tiene componentes válidos. */
+export function compuestoEsInerte(compuesto: Compuesto, elementos: Elemento[]): boolean {
+  const componentesReactivos = (compuesto.componentes ?? []).filter((c) => {
+    const el = elementos.find((e) => e.id === c.elemento_id);
+    return !!el && !el.es_catalizador;
+  });
+  if (componentesReactivos.length === 0) return false;
+  return componentesReactivos.every((c) => {
+    const el = elementos.find((e) => e.id === c.elemento_id);
+    return !!el && elementoBloqueaEnlace(el);
+  });
+}
 
 /** Suma dos ParticleMap, entrada por entrada. */
 function sumarParticleMap(a: ParticleMap, b: ParticleMap | undefined): ParticleMap {
@@ -131,6 +177,14 @@ export function calcularAfinidad(
   b: Compuesto,
   elementos: Elemento[],
 ): ResultadoAfinidad {
+  if (compuestoEsInerte(a, elementos) || compuestoEsInerte(b, elementos)) {
+    return {
+      tipo: "saturado",
+      motivo: `Al menos uno de los dos es un elemento Noble con su Capa Externa 100% saturada: no puede iniciar ni aceptar enlaces nuevos, sin importar el balance interno.`,
+      aportes: [],
+    };
+  }
+
   const perfilA = calcularPerfilAtomico(a, elementos);
   const perfilB = calcularPerfilAtomico(b, elementos);
   const balanceA = calcularBalancePorCapa(perfilA);
@@ -223,12 +277,18 @@ export function ordenarPorAfinidad(
 // Dos compuestos son compatibles si la Voluntad libre de uno cancela los
 // huecos de Percepción del otro, 1 a 1 (ver reglas-sistema-actualizado.md).
 // Se calcula en ambas direcciones porque no es simétrico: A puede tener
-// mucha Voluntad y poca Percepción, y B al revés.
+// mucha Voluntad y poca Percepción, y B al revés. Si alguno de los dos es
+// enteramente Noble (Estado Noble, sección 3.2), no puede iniciar ni
+// aceptar enlaces nuevos: la cancelación es 0 sin importar las cargas.
 export function calcularCancelacionCarga(
   a: Compuesto,
   b: Compuesto,
   elementos: Elemento[],
 ): ResultadoCancelacionCarga {
+  if (compuestoEsInerte(a, elementos) || compuestoEsInerte(b, elementos)) {
+    return { voluntadAaPercepcionB: 0, voluntadBaPercepcionA: 0, compatible: false };
+  }
+
   const perfilA = calcularPerfilAtomico(a, elementos);
   const perfilB = calcularPerfilAtomico(b, elementos);
 
@@ -261,11 +321,16 @@ export function calcularCancelacionCargaElementos(
 // Igualadas las cargas, la proporción entre Transición y Catálisis de AMBOS
 // compuestos combinados determina si el enlace es fuerte/permanente
 // (predominio de Catálisis) o débil/metaestable (predominio de Transición).
+// Si alguno de los dos es Noble/inerte, no hay enlace que clasificar.
 export function calcularEnlaceResultante(
   a: Compuesto,
   b: Compuesto,
   elementos: Elemento[],
 ): ResultadoEnlace {
+  if (compuestoEsInerte(a, elementos) || compuestoEsInerte(b, elementos)) {
+    return { tipo: "neutro", totalTransicion: 0, totalCatalisis: 0 };
+  }
+
   const perfilA = calcularPerfilAtomico(a, elementos);
   const perfilB = calcularPerfilAtomico(b, elementos);
 
@@ -326,6 +391,8 @@ export function calcularElectromagnetismoElementos(
 // cuánto de su aporte por capa efectivamente se "usaría" (no cuenta lo que
 // se pasa de la capacidad, evita sugerir elementos que sobrecargan). El
 // mejor candidato es el que cubre más déficit total con menos desperdicio.
+// Los elementos Nobles nunca se sugieren: su Capa Externa saturada no
+// puede aceptar un enlace nuevo (Estado Noble, sección 3.2).
 export interface SugerenciaElemento {
   elemento: Elemento;
   /** Cuánto déficit total cubriría si se agrega una unidad de este elemento. */
@@ -351,6 +418,7 @@ export function sugerirElementosParaCompletar(
 
   for (const elemento of elementos) {
     if (idsElegidos.has(elemento.id)) continue; // ya está en la mezcla
+    if (elementoBloqueaEnlace(elemento)) continue; // Noble: no acepta enlaces nuevos (sección 3.2)
 
     let cubre = 0;
     let desperdicia = 0;
@@ -674,6 +742,12 @@ export function calcularReactividad(
     perfil.capacidadExternaTotal;
   const { deficitFinal } = calcularDeficitConCatalizadores(compuesto, elementos);
 
+  // Estado Noble (sección 3.2): capa externa saturada = inerte por
+  // definición, independientemente de si el déficit calculado da 0.
+  if (compuestoEsInerte(compuesto, elementos)) {
+    return { deficitTotal: 0, capacidadTotal, nivel: "inerte" };
+  }
+
   const proporcion = capacidadTotal > 0 ? deficitFinal / capacidadTotal : 0;
   let nivel: NivelReactividad;
   if (deficitFinal === 0) nivel = "inerte";
@@ -694,30 +768,33 @@ export function calcularReactividadElemento(elemento: Elemento): ResultadoReacti
   return calcularReactividad(compuestoTemporal, [elemento]);
 }
 
-// ─── Peso molecular ─────────────────────────────────────────────────────────
-// Proxy simple: suma de TODAS las partículas de todos los componentes
-// (multiplicadas por su cantidad), sin importar de qué capa vienen. Los
-// catalizadores no suman peso: no forman parte de la estructura resultante.
+// ─── Peso Atómico ────────────────────────────────────────────────────────
+// Peso Atómico = (Núcleo × 3) + (Media × 2) + (Externa × 1) — sección 1.5
+// del documento de reglas. Ponderado, NO una simple suma de partículas: las
+// capas más profundas (Núcleo) pesan más que la Externa. Los catalizadores
+// no suman peso: no forman parte de la estructura resultante del compuesto.
 export function calcularPeso(
   compuesto: Compuesto,
   elementos: Elemento[],
 ): ResultadoPeso {
-  let pesoTotal = 0;
+  const porCapa: Record<LayerName, number> = { nucleo: 0, media: 0, externa: 0 };
+
   for (const componente of compuesto.componentes ?? []) {
     const elemento = elementos.find((e) => e.id === componente.elemento_id);
     if (!elemento || elemento.es_catalizador) continue;
     const veces = Math.max(1, componente.cantidad ?? 1);
-    const totalElemento =
-      Object.values(elemento.nucleo ?? {}).reduce((a, b) => a + (b ?? 0), 0) +
-      Object.values(elemento.media ?? {}).reduce((a, b) => a + (b ?? 0), 0) +
-      Object.values(elemento.externa ?? {}).reduce((a, b) => a + (b ?? 0), 0);
-    pesoTotal += totalElemento * veces;
+
+    for (const layer of LAYERS) {
+      const totalCapa = Object.values(elemento[layer] ?? {}).reduce((a, b) => a + (b ?? 0), 0);
+      porCapa[layer] += totalCapa * veces * PESO_POR_CAPA[layer];
+    }
   }
 
+  const pesoTotal = porCapa.nucleo + porCapa.media + porCapa.externa;
   const categoria: ResultadoPeso["categoria"] =
-    pesoTotal <= 6 ? "liviano" : pesoTotal <= 14 ? "medio" : "pesado";
+    pesoTotal <= 12 ? "liviano" : pesoTotal <= 28 ? "medio" : "pesado";
 
-  return { pesoTotal, categoria };
+  return { pesoTotal, porCapa, categoria };
 }
 
 // ─── Estequiometría exacta ──────────────────────────────────────────────────
