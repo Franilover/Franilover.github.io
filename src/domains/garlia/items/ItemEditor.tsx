@@ -3,6 +3,7 @@
 import { EditorItem } from "@/domains/garlia/items/EditorItem";
 
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 
 interface Item {
   id: string;
@@ -12,6 +13,7 @@ interface Item {
 
 export function ItemEditor({ item }: { item: Item }) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   return (
     <EditorItem
@@ -19,7 +21,7 @@ export function ItemEditor({ item }: { item: Item }) {
       onSaved={() => {}}
       onDeleted={() => openEntity("items", "")}
       onNavigateCiudad={(id) => openEntity("ciudades", id)}
-      onNavigateReino={(id) => openEntity("reinos", id)}
+      onNavigateReino={(id) => abrirPanel("reino", id)}
       onSelectGrupo={(id) => openEntity("grupos", id)}
     />
   );

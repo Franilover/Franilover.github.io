@@ -5,10 +5,12 @@ import { useBiomas, useEcosistemas } from "@/domains/garlia/biologia/useBiologia
 import type { Bioma } from "@/domains/garlia/biologia/types";
 
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 
 export function BiomaEditor({ bioma }: { bioma: Bioma }) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
   const clearSelection = useMundoNavigation((s) => s.clearSelection);
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
 
   const { actualizar, eliminar } = useBiomas();
   const { ecosistemas, creating: creandoEcosistema, crear: crearEcosistema, actualizar: actualizarEcosistema } =
@@ -27,7 +29,7 @@ export function BiomaEditor({ bioma }: { bioma: Bioma }) {
           clearSelection();
         }}
         onVolver={clearSelection}
-        onSelectReino={(id) => openEntity("reinos", id)}
+        onSelectReino={(id) => abrirPanel("reino", id)}
         onSelectEcosistema={(id) => openEntity("ecosistemas", id)}
         creandoEcosistema={creandoEcosistema}
         onCrearEcosistema={async () => {

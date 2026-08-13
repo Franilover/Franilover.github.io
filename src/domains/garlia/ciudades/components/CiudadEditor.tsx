@@ -27,7 +27,7 @@ export function CiudadEditor({ ciudad }: { ciudad: Ciudad }) {
       onSelectPersonaje={(id) => abrirPanel("personaje", id)}
       onSelectCriatura={(id) => abrirPanel("criatura", id)}
       onSelectItem={(id) => openEntity("items", id)}
-      onNavigateReino={(id) => openEntity("reinos", id)}
+      onNavigateReino={(id) => abrirPanel("reino", id)}
     />
   );
 }
