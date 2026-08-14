@@ -501,7 +501,7 @@ function BasesItemCard({
         <span className="text-micro font-black text-primary truncate">{fila.nombre}</span>
       </button>
       {esOris ? (
-        <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={480} maxHeight={640}>
+        <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={560} maxHeight={520}>
           <OrisEditor
             oris={original!}
             embedded
@@ -531,12 +531,17 @@ function BasesItemCard({
           />
         </PopoverFlotante>
       ) : (
-        <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={280} maxHeight={340}>
-          <div className="flex flex-col gap-2">
-            {conVisual && (
-              <div className="flex justify-center py-1">
+        <PopoverFlotante
+          anchor={anchor}
+          onClose={() => setAnchor(null)}
+          width={conVisual ? 420 : 280}
+          maxHeight={340}
+        >
+          {conVisual ? (
+            <div className="flex flex-row gap-3">
+              <div className="shrink-0 flex items-center justify-center w-[140px]">
                 {bloque === "iums" ? (
-                  <IumVisual particulas={particulasDeIum(fila as FilaIum)} size={180} />
+                  <IumVisual particulas={particulasDeIum(fila as FilaIum)} size={140} />
                 ) : bloque === "particula-base" ? (
                   <ParticulaVisual formula={(fila as FilaParticulaBase).letra} size={88} />
                 ) : (
@@ -544,11 +549,19 @@ function BasesItemCard({
                   <ParticulaVisual formula={fila.detalle} size={88} />
                 )}
               </div>
-            )}
-            <p className="text-xs font-black uppercase tracking-wide text-primary">{fila.nombre}</p>
-            <p className="text-xs text-primary/70 leading-relaxed">{fila.detalle}</p>
-            {fila.extra && <p className="text-xs text-primary/40 leading-relaxed">{fila.extra}</p>}
-          </div>
+              <div className="flex-1 min-w-0 flex flex-col gap-2">
+                <p className="text-xs font-black uppercase tracking-wide text-primary">{fila.nombre}</p>
+                <p className="text-xs text-primary/70 leading-relaxed">{fila.detalle}</p>
+                {fila.extra && <p className="text-xs text-primary/40 leading-relaxed">{fila.extra}</p>}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-black uppercase tracking-wide text-primary">{fila.nombre}</p>
+              <p className="text-xs text-primary/70 leading-relaxed">{fila.detalle}</p>
+              {fila.extra && <p className="text-xs text-primary/40 leading-relaxed">{fila.extra}</p>}
+            </div>
+          )}
         </PopoverFlotante>
       )}
     </>
@@ -1053,8 +1066,8 @@ export function FisicaPage({
         <PopoverFlotante
           anchor={anchorFantasma}
           onClose={() => setSeleccion({ tipo: "todas-bases" })}
-          width={480}
-          maxHeight={640}
+          width={560}
+          maxHeight={520}
           centerVertically
           centerHorizontally
           backdrop

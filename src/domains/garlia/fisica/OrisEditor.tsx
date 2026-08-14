@@ -129,12 +129,13 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
         </div>
       </div>
 
-      <div className={`flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto ${embedded ? "p-2" : "p-2.5"}`}>
-        <div className="flex flex-col items-center gap-3 p-3 rounded-lg border border-primary/10 bg-primary/[0.02]">
-          <IumVisual particulas={particulasOris} size={240} />
+      <div className={`flex-1 min-h-0 flex flex-row gap-3 overflow-y-auto ${embedded ? "p-2" : "p-2.5"}`}>
+        {/* Columna izquierda: gráfico + composición de Iums */}
+        <div className="shrink-0 w-[200px] flex flex-col items-center gap-3 p-3 rounded-lg border border-primary/10 bg-primary/[0.02]">
+          <IumVisual particulas={particulasOris} size={160} />
 
           {iumsPresentes.length === 0 ? (
-            <span className="text-micro text-primary/30">Sin Iums en la composición</span>
+            <span className="text-micro text-primary/30 text-center">Sin Iums en la composición</span>
           ) : (
             <div className="flex flex-wrap justify-center gap-1.5">
               {iumsPresentes.map(({ ium, cantidad }) => (
@@ -153,7 +154,8 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
           </span>
         </div>
 
-        <div className={`grid grid-cols-1 gap-2 ${embedded ? "" : "sm:grid-cols-2"}`}>
+        {/* Columna derecha: título/selectores + descripción */}
+        <div className="flex-1 min-w-0 flex flex-col gap-2">
           <div className="flex flex-col gap-0.5">
             <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
               Familia
@@ -187,20 +189,20 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
               className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
             />
           </div>
-        </div>
 
-        <div className="flex flex-col gap-0.5">
-          <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-            Descripción
-          </label>
-          <textarea
-            value={local.descripcion ?? ""}
-            onChange={(e) => setLocal((p) => ({ ...p, descripcion: e.target.value }))}
-            onBlur={() => persist({ descripcion: local.descripcion })}
-            rows={4}
-            placeholder="Notas adicionales sobre este Oris…"
-            className="bg-primary/5 rounded-md px-2 py-1 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
-          />
+          <div className="flex-1 min-h-0 flex flex-col gap-0.5">
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Descripción
+            </label>
+            <textarea
+              value={local.descripcion ?? ""}
+              onChange={(e) => setLocal((p) => ({ ...p, descripcion: e.target.value }))}
+              onBlur={() => persist({ descripcion: local.descripcion })}
+              rows={6}
+              placeholder="Notas adicionales sobre este Oris…"
+              className="flex-1 min-h-0 bg-primary/5 rounded-md px-2 py-1 text-micro text-primary outline-none border border-primary/10 focus:border-primary/30 resize-none placeholder:text-primary/25"
+            />
+          </div>
         </div>
       </div>
     </div>
