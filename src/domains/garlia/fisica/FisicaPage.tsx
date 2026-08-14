@@ -550,7 +550,7 @@ function BasesItemCard({
             {fila.extra && <p className="text-xs text-primary/40 leading-relaxed">{fila.extra}</p>}
           </div>
         </PopoverFlotante>
-      ) : null}
+      )}
     </>
   );
 }
