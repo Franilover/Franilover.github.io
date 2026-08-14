@@ -8,14 +8,14 @@
  * perder foco / al cambiar selects, update directo a Supabase).
  */
 
-import { ChevronLeft, Minus, Plus, Save, Trash2 } from "lucide-react";
+import { ChevronLeft, Save, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
 import { IumVisual } from "./ParticulaVisual";
-import { IUMS, ORIS_CONFIG, ORIS_FAMILIAS, particulasDeOris, type Oris, type OrisFamilia } from "./types";
+import { IUM_POR_ID, ORIS_CONFIG, ORIS_FAMILIAS, particulasDeOris, type Oris, type OrisFamilia } from "./types";
 
 interface Props {
   oris: Oris;
@@ -37,19 +37,19 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
 
   const iumsComposicion = local.iums_composicion ?? {};
   const particulasOris = useMemo(() => particulasDeOris(iumsComposicion), [iumsComposicion]);
-
-  function cambiarCantidadIum(iumId: string, delta: number) {
-    const actual = iumsComposicion[iumId] ?? 0;
-    const siguiente = Math.max(0, actual + delta);
-    const nuevaComposicion = { ...iumsComposicion };
-    if (siguiente === 0) {
-      delete nuevaComposicion[iumId];
-    } else {
-      nuevaComposicion[iumId] = siguiente;
-    }
-    setLocal((p) => ({ ...p, iums_composicion: nuevaComposicion }));
-    void persist({ iums_composicion: nuevaComposicion });
-  }
+  // Lista de solo-lectura de los Iums presentes en la composición (con su
+  // cantidad) — ya no hay selectores +/- para editarla a mano: la fuente
+  // de verdad es la Fórmula de texto, iums_composicion se sincroniza desde
+  // ahí (ver migración de Oris). Ordenados por cantidad desc, luego nombre.
+  const iumsPresentes = useMemo(
+    () =>
+      Object.entries(iumsComposicion)
+        .filter(([, cantidad]) => cantidad > 0)
+        .map(([iumId, cantidad]) => ({ ium: IUM_POR_ID[iumId], cantidad }))
+        .filter((x) => x.ium)
+        .sort((a, b) => b.cantidad - a.cantidad || a.ium.nombre.localeCompare(b.ium.nombre)),
+    [iumsComposicion],
+  );
 
   async function persist(cambios: Partial<Oris>) {
     setSaving(true);
@@ -134,65 +134,27 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
       </div>
 
       <div className={`flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto ${embedded ? "p-2" : "p-2.5"}`}>
-        <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-start p-2.5 rounded-lg border border-primary/10 bg-primary/[0.02]">
-          <div className="shrink-0 flex flex-col items-center gap-1">
-            <IumVisual particulas={particulasOris} size={140} />
-            <span className="text-micro text-primary/30">
-              {particulasOris.length === 0
-                ? "Sin Iums"
-                : Object.entries(
-                    particulasOris.reduce<Record<string, number>>((acc, p) => {
-                      acc[p.nombre] = (acc[p.nombre] || 0) + 1;
-                      return acc;
-                    }, {}),
-                  )
-                    .map(([nombre, n]) => `${n}${nombre[0]}`)
-                    .join(" · ")}
-            </span>
-          </div>
+        <div className="flex flex-col items-center gap-3 p-3 rounded-lg border border-primary/10 bg-primary/[0.02]">
+          <IumVisual particulas={particulasOris} size={240} />
 
-          <div className="flex-1 min-w-0 flex flex-col gap-1.5 w-full">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Composición (Iums)
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-              {IUMS.map((ium) => {
-                const cantidad = iumsComposicion[ium.id] ?? 0;
-                return (
-                  <div
-                    key={ium.id}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-left transition-all ${
-                      cantidad > 0
-                        ? "border-primary/25 bg-primary/5"
-                        : "border-primary/10 bg-transparent"
-                    }`}
-                  >
-                    <span className="flex-1 min-w-0 text-micro font-bold text-primary truncate">
-                      {ium.nombre}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => cambiarCantidadIum(ium.id, -1)}
-                      disabled={cantidad === 0}
-                      className="flex items-center justify-center w-4 h-4 rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
-                    >
-                      <Minus size={9} />
-                    </button>
-                    <span className="w-3 text-center text-micro font-black text-primary tabular-nums">
-                      {cantidad}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => cambiarCantidadIum(ium.id, 1)}
-                      className="flex items-center justify-center w-4 h-4 rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer"
-                    >
-                      <Plus size={9} />
-                    </button>
-                  </div>
-                );
-              })}
+          {iumsPresentes.length === 0 ? (
+            <span className="text-micro text-primary/30">Sin Iums en la composición</span>
+          ) : (
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {iumsPresentes.map(({ ium, cantidad }) => (
+                <span
+                  key={ium.id}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md border border-primary/15 bg-primary/5 text-micro font-bold text-primary"
+                >
+                  {cantidad > 1 && <span className="text-primary/40">{cantidad}×</span>}
+                  {ium.nombre}
+                </span>
+              ))}
             </div>
-          </div>
+          )}
+          <span className="text-micro text-primary/25 text-center">
+            Composición sincronizada desde la Fórmula (texto libre) de abajo.
+          </span>
         </div>
 
         <div className={`grid grid-cols-1 gap-2 ${embedded ? "" : "sm:grid-cols-3"}`}>
@@ -225,7 +187,7 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
               value={local.formula ?? ""}
               onChange={(e) => setLocal((p) => ({ ...p, formula: e.target.value }))}
               onBlur={() => persist({ formula: local.formula })}
-              placeholder="ej. 2 Pondus + 1 Tensia (solo lore, no afecta el gráfico)"
+              placeholder="ej. 2 Pondus + 1 Tensia"
               className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
             />
           </div>

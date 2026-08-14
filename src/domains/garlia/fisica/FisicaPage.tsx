@@ -501,7 +501,7 @@ function BasesItemCard({
         <span className="text-micro font-black text-primary truncate">{fila.nombre}</span>
       </button>
       {esOris ? (
-        <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={420} maxHeight={560}>
+        <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={480} maxHeight={640}>
           <OrisEditor
             oris={original!}
             embedded
@@ -1053,8 +1053,8 @@ export function FisicaPage({
         <PopoverFlotante
           anchor={anchorFantasma}
           onClose={() => setSeleccion({ tipo: "todas-bases" })}
-          width={420}
-          maxHeight={560}
+          width={480}
+          maxHeight={640}
           centerVertically
           centerHorizontally
           backdrop
