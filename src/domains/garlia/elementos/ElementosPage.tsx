@@ -1127,6 +1127,10 @@ export function ElementosPage({
           }
           onEliminar={handleEliminarCompuesto}
           seleccionarId={compuestoAAbrir ?? compuestoRecienCreadoId}
+          onSeleccionarIdConsumido={() => {
+            setCompuestoAAbrir(null);
+            setCompuestoRecienCreadoId(null);
+          }}
         />
       </div>
 

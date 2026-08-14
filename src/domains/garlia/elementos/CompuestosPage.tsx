@@ -127,6 +127,11 @@ interface Props {
   onActualizar: (id: string, cambios: Partial<Compuesto>) => void;
   onEliminar?: (id: string) => void;
   seleccionarId?: string | null;
+  /** Se llama una vez que seleccionarId fue aplicado (el panel ya se abrió
+   *  con ese id) — el caller debe limpiar su estado acá, si no, al cerrar
+   *  el panel este vuelve a reabrirse solo porque seleccionarId sigue
+   *  teniendo el mismo valor. */
+  onSeleccionarIdConsumido?: () => void;
 }
 
 function nombreElemento(elementos: Elemento[], id: string): string {
@@ -1335,19 +1340,24 @@ export function CompuestosPage({
   onActualizar,
   onEliminar,
   seleccionarId,
+  onSeleccionarIdConsumido,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [laboratorioAbierto, setLaboratorioAbierto] = useState(false);
 
   // Permite que el caller fuerce la apertura de un compuesto específico
   // desde afuera (ej. al navegar desde "Usado en compuestos" en el editor
-  // de un Elemento) cada vez que seleccionarId cambia, no solo como valor
-  // inicial.
+  // de un Elemento). seleccionadoId pasa a ser la única fuente de verdad
+  // tras aplicarlo — así "cerrar" realmente cierra, en vez de reabrirse
+  // porque seleccionarId sigue teniendo el mismo id.
   useEffect(() => {
-    if (seleccionarId) setSeleccionadoId(seleccionarId);
+    if (seleccionarId) {
+      setSeleccionadoId(seleccionarId);
+      onSeleccionarIdConsumido?.();
+    }
   }, [seleccionarId]);
 
-  const activoId = seleccionadoId ?? seleccionarId ?? null;
+  const activoId = seleccionadoId;
   const activo = useMemo(
     () => compuestos.find((c) => c.id === activoId) ?? null,
     [compuestos, activoId],
