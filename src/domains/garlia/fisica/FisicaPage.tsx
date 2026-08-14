@@ -451,7 +451,7 @@ function BasesItemCard({
             {conVisual && (
               <div className="flex justify-center py-1">
                 {bloque === "iums" ? (
-                  <IumVisual particulas={particulasDeIum(fila as FilaIum)} size={120} />
+                  <IumVisual particulas={particulasDeIum(fila as FilaIum)} size={180} />
                 ) : bloque === "particula-base" ? (
                   <ParticulaVisual formula={(fila as FilaParticulaBase).letra} size={88} />
                 ) : (
