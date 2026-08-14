@@ -44,6 +44,12 @@ export const ORIS_CONFIG = {
   select: "id, orden, nombre, familia, formula, dominio, descripcion, iums_composicion",
 };
 
+/** Adapta un Oris (Supabase) al shape FilaCatalogo usado por las vistas de
+ *  catálogo compartidas con Base/Ium/Partículas. */
+export function orisAFilaCatalogo(o: Oris): FilaCatalogo {
+  return { nombre: o.nombre, detalle: o.dominio || o.formula, extra: o.familia };
+}
+
 /** Fila cruda tal cual vive en Supabase (tabla "fisica_conceptos"). */
 export interface FisicaConcepto {
   id: string;
@@ -144,7 +150,7 @@ export function particulaAFilaCatalogo(p: Particula): FilaCatalogo {
 /** Fila de Ium: además de nombre/detalle/extra, trae un id estable (slug)
  *  y su composición como lista de {particula de Química, cantidad} — usada
  *  para calcular el gráfico A/T/S (ver PARTICULA_QUIMICA_FORMULA +
- *  composicionIum en ParticulaVisual/este archivo). */
+ *  contarLetrasDeIum en este archivo). */
 export interface FilaIum extends FilaCatalogo {
   id: string;
   composicion: { particula: string; cantidad: number }[];
