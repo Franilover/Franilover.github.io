@@ -284,6 +284,23 @@ export const PARTICULA_QUIMICA_FORMULA: Record<string, string> = {
   Equilibrio: "SSS",
 };
 
+/** Inicial corta de cada Partícula de Química — para el modo "iniciales"
+ *  de IumVisual (mismo criterio que PARTICLE_INITIAL en elementos/types.ts):
+ *  cada círculo muestra la letra de su Partícula en vez de sus 3 tercios A/T/S. */
+export const PARTICULA_INITIAL: Record<string, string> = {
+  Masa: "M",
+  Cinética: "C",
+  Potencial: "P",
+  Información: "I",
+  Voluntad: "V",
+  Percepción: "Pc",
+  Transición: "T",
+  Ciclo: "Cl",
+  Entropía: "E",
+  Catálisis: "Ct",
+  Equilibrio: "Eq",
+};
+
 /** Conteo de letras A/T/S de una lista de {particula de Química, cantidad}
  *  — usado tanto para el Ium (composicion fija) como para el Oris
  *  (iums_composicion → cada Ium aporta su propio conteo × cantidad). */

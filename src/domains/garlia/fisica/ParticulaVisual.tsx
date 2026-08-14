@@ -20,7 +20,8 @@
  * los lea como la misma familia visual.
  */
 
-import React from "react";
+import React, { useState } from "react";
+import { PARTICULA_INITIAL } from "./types";
 
 export type LetraATS = "A" | "T" | "S";
 
@@ -253,9 +254,15 @@ export function sumarConteos(...conteos: Record<LetraATS, number>[]): Record<Let
  * Elementos: un centro y sus Partículas componentes distribuidas en un
  * anillo alrededor, una por una (no agregadas como arcos ni agrupadas por
  * cantidad) — cada Partícula repetida se dibuja como su propio círculo
- * individual de 3 tercios A/T/S en miniatura, sin badge de cantidad.
- * Reemplaza a LetrasVisual para este caso: acá se ven siempre las
- * Partículas reales que componen el Ium, no un conteo agregado.
+ * individual, sin badge de cantidad. Reemplaza a LetrasVisual para este
+ * caso: acá se ven siempre las Partículas reales que componen el Ium, no
+ * un conteo agregado.
+ *
+ * Tiene un botón flotante en la esquina (mismo patrón que un toggle de
+ * capa) para alternar cada círculo entre dos modos:
+ *   - "ats" (default): 3 tercios A/T/S en miniatura, igual que ParticulaVisual.
+ *   - "inicial": círculo sólido con la inicial de la Partícula (ej. "C" de
+ *     Cinética) — mismo criterio que PARTICLE_INITIAL en Elementos.
  */
 export function IumVisual({
   particulas,
@@ -268,96 +275,152 @@ export function IumVisual({
   size?: number;
   className?: string;
 }) {
+  const [modo, setModo] = useState<"ats" | "inicial">("ats");
   const cx = size / 2;
   const cy = size / 2;
   const orbitR = size * 0.34;
   const particleR = size * 0.155;
 
-  if (particulas.length === 0) {
-    return (
-      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className={className} role="img" aria-label="Sin composición">
-        <circle
-          cx={cx}
-          cy={cy}
-          r={orbitR}
-          strokeDasharray="3 4"
-          strokeWidth={1.5}
-          style={{ fill: "none", stroke: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
-        />
-      </svg>
-    );
-  }
-
   return (
-    <svg
-      viewBox={`0 0 ${size} ${size}`}
-      width={size}
-      height={size}
-      className={className}
-      role="img"
-      aria-label="Composición del Ium"
-    >
-      {/* Anillo orbital: solo el trazo, igual que las capas de AtomoVisual. */}
-      <circle
-        cx={cx}
-        cy={cy}
-        r={orbitR}
-        fill="none"
-        strokeDasharray="2 4"
-        strokeWidth={1}
-        style={{ stroke: "color-mix(in srgb, var(--primary) 12%, transparent)" }}
-      />
+    <div className={`relative inline-block ${className ?? ""}`} style={{ width: size, height: size }}>
+      {particulas.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setModo((m) => (m === "ats" ? "inicial" : "ats"))}
+          title={modo === "ats" ? "Mostrar iniciales de las Partículas" : "Mostrar letras A/T/S"}
+          className="absolute bottom-0.5 right-0.5 z-10 flex items-center justify-center rounded-full border shadow-sm cursor-pointer transition-transform hover:scale-110"
+          style={{
+            width: Math.max(20, size * 0.15),
+            height: Math.max(20, size * 0.15),
+            fontSize: Math.max(9, size * 0.075),
+            fontWeight: 900,
+            background: "var(--primary)",
+            color: "var(--btn-text)",
+            borderColor: "color-mix(in srgb, var(--primary) 90%, black)",
+          }}
+        >
+          {modo === "ats" ? "Aa" : "∆"}
+        </button>
+      )}
 
-      {particulas.map((p, i) => {
-        const angulo = (i / particulas.length) * Math.PI * 2 - Math.PI / 2;
-        const px = cx + Math.cos(angulo) * orbitR;
-        const py = cy + Math.sin(angulo) * orbitR;
-        const letras = p.formula
-          .toUpperCase()
-          .split("")
-          .filter(esLetraATS) as LetraATS[];
-        // 3 tercios en miniatura, mismo criterio que ParticulaVisual: cada
-        // letra de la fórmula ocupa su propio sector de 120°, con su
-        // letra sola (no las 3 juntas) para que quepa en el círculo chico.
-        const anguloTercio = (Math.PI * 2) / 3;
-        const miniFont = particleR * 0.62;
-        return (
-          <g key={`${p.nombre}-${i}`}>
-            <title>{`${p.nombre} (${p.formula})`}</title>
-            {letras.map((letra, j) => {
-              const aIni = -Math.PI / 2 + j * anguloTercio;
-              const aFin = aIni + anguloTercio;
-              const aMedio = (aIni + aFin) / 2;
-              const color = LETRA_COLOR[letra];
-              const labelR = particleR * 0.55;
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        width={size}
+        height={size}
+        role="img"
+        aria-label={modo === "ats" ? "Composición A/T/S del Ium" : "Iniciales de Partículas del Ium"}
+      >
+        {particulas.length === 0 ? (
+          <circle
+            cx={cx}
+            cy={cy}
+            r={orbitR}
+            strokeDasharray="3 4"
+            strokeWidth={1.5}
+            style={{ fill: "none", stroke: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
+          />
+        ) : (
+          <>
+            {/* Anillo orbital: solo el trazo, igual que las capas de AtomoVisual. */}
+            <circle
+              cx={cx}
+              cy={cy}
+              r={orbitR}
+              fill="none"
+              strokeDasharray="2 4"
+              strokeWidth={1}
+              style={{ stroke: "color-mix(in srgb, var(--primary) 12%, transparent)" }}
+            />
+
+            {particulas.map((p, i) => {
+              const angulo = (i / particulas.length) * Math.PI * 2 - Math.PI / 2;
+              const px = cx + Math.cos(angulo) * orbitR;
+              const py = cy + Math.sin(angulo) * orbitR;
+
+              if (modo === "inicial") {
+                // Modo iniciales: círculo sólido de un color por Partícula
+                // (derivado de --primary/--accent) con su letra corta.
+                const idx = Object.keys(PARTICULA_INITIAL).indexOf(p.nombre);
+                const base = idx % 2 === 0 ? "--primary" : "--accent";
+                const mix = 55 + ((idx * 11) % 30);
+                const initFont = particleR * 0.85;
+                return (
+                  <g key={`${p.nombre}-${i}`}>
+                    <title>{p.nombre}</title>
+                    <circle
+                      cx={px}
+                      cy={py}
+                      r={particleR}
+                      strokeWidth={1.5}
+                      style={{
+                        fill: `color-mix(in srgb, var(${base}) ${mix}%, var(--bg-main))`,
+                        stroke: `color-mix(in srgb, var(${base}) 90%, black)`,
+                      }}
+                    />
+                    <text
+                      x={px}
+                      y={py}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={initFont}
+                      fontWeight={900}
+                      style={{ fill: "var(--btn-text)" }}
+                    >
+                      {PARTICULA_INITIAL[p.nombre] ?? p.nombre[0]}
+                    </text>
+                  </g>
+                );
+              }
+
+              const letras = p.formula
+                .toUpperCase()
+                .split("")
+                .filter(esLetraATS) as LetraATS[];
+              // 3 tercios en miniatura, mismo criterio que ParticulaVisual: cada
+              // letra de la fórmula ocupa su propio sector de 120°, con su
+              // letra sola (no las 3 juntas) para que quepa en el círculo chico.
+              const anguloTercio = (Math.PI * 2) / 3;
+              const miniFont = particleR * 0.62;
               return (
-                <g key={j}>
-                  <path
-                    d={sectorPath(px, py, particleR, aIni, aFin)}
-                    strokeWidth={1}
-                    style={{ fill: color.bg, stroke: color.border }}
-                  />
-                  <text
-                    x={px + labelR * Math.cos(aMedio)}
-                    y={py + labelR * Math.sin(aMedio)}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={miniFont}
-                    fontWeight={900}
-                    style={{ fill: color.fg }}
-                  >
-                    {letra}
-                  </text>
+                <g key={`${p.nombre}-${i}`}>
+                  <title>{`${p.nombre} (${p.formula})`}</title>
+                  {letras.map((letra, j) => {
+                    const aIni = -Math.PI / 2 + j * anguloTercio;
+                    const aFin = aIni + anguloTercio;
+                    const aMedio = (aIni + aFin) / 2;
+                    const color = LETRA_COLOR[letra];
+                    const labelR = particleR * 0.55;
+                    return (
+                      <g key={j}>
+                        <path
+                          d={sectorPath(px, py, particleR, aIni, aFin)}
+                          strokeWidth={1}
+                          style={{ fill: color.bg, stroke: color.border }}
+                        />
+                        <text
+                          x={px + labelR * Math.cos(aMedio)}
+                          y={py + labelR * Math.sin(aMedio)}
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fontSize={miniFont}
+                          fontWeight={900}
+                          style={{ fill: color.fg }}
+                        >
+                          {letra}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  <circle cx={px} cy={py} r={particleR} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} />
                 </g>
               );
             })}
-            <circle cx={px} cy={py} r={particleR} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} />
-          </g>
-        );
-      })}
 
-      {/* Centro: punto de anclaje visual, igual que el núcleo de AtomoVisual. */}
-      <circle cx={cx} cy={cy} r={size * 0.05} style={{ fill: "color-mix(in srgb, var(--primary) 25%, transparent)" }} />
-    </svg>
+            {/* Centro: punto de anclaje visual, igual que el núcleo de AtomoVisual. */}
+            <circle cx={cx} cy={cy} r={size * 0.05} style={{ fill: "color-mix(in srgb, var(--primary) 25%, transparent)" }} />
+          </>
+        )}
+      </svg>
+    </div>
   );
 }
