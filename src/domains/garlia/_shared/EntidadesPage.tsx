@@ -143,7 +143,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
     useSupabaseData<Personaje>("personajes");
   const { data: criaturas, loading: loadingC, addRow: addCriatura, updateRow: updateCriatura } =
     useSupabaseData<Criatura>("criaturas");
-  const { data: items, loading: loadingI, addRow: addItem } =
+  const { data: items, loading: loadingI, addRow: addItem, updateRow: updateItem } =
     useSupabaseData<Item>("items");
   const { ecosistemas, loading: loadingEco, creating: creatingEco, crear: crearEcosistema, actualizar: actualizarEcosistema } = useEcosistemas();
   const { biomas, loading: loadingBiomas, creating: creatingBiomas, crear: crearBioma, actualizar: actualizarBioma } = useBiomas();
@@ -993,6 +993,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
             const { data } = await addItem({ nombre: "Nuevo objeto" });
             if (data?.id) openEntity("items", data.id);
           }}
+          onMoverItem={(itemId, categoria) => void updateItem(itemId, { categoria: categoria ?? undefined })}
           flora={flora}
           loadingFlora={loadingFlora}
           minerales={minerales}
