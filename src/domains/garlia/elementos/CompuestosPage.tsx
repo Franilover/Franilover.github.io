@@ -591,6 +591,7 @@ function CompuestoEditor({
   onEliminar,
   onHeaderControlsChange,
   onActualizarElemento,
+  onNavigateCompuesto,
 }: {
   compuesto: Compuesto;
   elementos: Elemento[];
