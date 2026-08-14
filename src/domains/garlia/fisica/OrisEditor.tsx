@@ -3,9 +3,10 @@
 /**
  * OrisEditor.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Detalle editable de un Oris: nombre, familia, fórmula, dominio y
- * descripción. Mismo patrón de guardado que ElementoEditor (debounce al
- * perder foco / al cambiar selects, update directo a Supabase).
+ * Detalle editable de un Oris: nombre, familia, dominio y descripción,
+ * más la composición de Iums (solo lectura, se edita a mano en la base de
+ * datos). Mismo patrón de guardado que ElementoEditor (debounce al perder
+ * foco / al cambiar selects, update directo a Supabase).
  */
 
 import { ChevronLeft, Save, Trash2 } from "lucide-react";
@@ -120,7 +121,6 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
               persist({
                 nombre: local.nombre,
                 familia: local.familia,
-                formula: local.formula,
                 dominio: local.dominio,
                 descripcion: local.descripcion,
               })
@@ -153,11 +153,11 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
             </div>
           )}
           <span className="text-micro text-primary/25 text-center">
-            Composición sincronizada desde la Fórmula (texto libre) de abajo.
+            Composición fija — se editó a mano en la base de datos.
           </span>
         </div>
 
-        <div className={`grid grid-cols-1 gap-2 ${embedded ? "" : "sm:grid-cols-3"}`}>
+        <div className={`grid grid-cols-1 gap-2 ${embedded ? "" : "sm:grid-cols-2"}`}>
           <div className="flex flex-col gap-0.5">
             <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
               Familia
@@ -177,19 +177,6 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="flex flex-col gap-0.5">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Fórmula (texto libre)
-            </label>
-            <input
-              value={local.formula ?? ""}
-              onChange={(e) => setLocal((p) => ({ ...p, formula: e.target.value }))}
-              onBlur={() => persist({ formula: local.formula })}
-              placeholder="ej. 2 Pondus + 1 Tensia"
-              className="bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
-            />
           </div>
 
           <div className="flex flex-col gap-0.5">
