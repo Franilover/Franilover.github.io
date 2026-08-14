@@ -27,7 +27,7 @@
 
 import { Bug, Dices, Package, X } from "lucide-react";
 import Image from "next/image";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
@@ -43,6 +43,24 @@ import { useItemCatalogosUbicacion } from "@/domains/garlia/_shared/useItemCatal
 import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 
+import {
+  calcularBalancePorCapa,
+  calcularPerfilAtomico,
+  calcularPeso,
+  calcularReactividad,
+} from "@/domains/garlia/elementos/afinidad";
+import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
+import {
+  LAYER_LABEL,
+  REACTIVIDAD_LABEL,
+  formatLayer,
+  type Compuesto,
+  type LayerName,
+} from "@/domains/garlia/elementos/types";
+import { SelectorCompuesto } from "@/domains/garlia/_shared/SelectorCompuesto";
+
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import {
@@ -52,6 +70,47 @@ import {
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { type Item } from "@garlia/items";
 import { type SaveStatus } from "@/ui/saveStatus";
+
+const LAYERS: LayerName[] = ["nucleo", "media", "externa"];
+
+// ─── Barra de balance de una capa (misma pieza que en Flora/Mineral) ──────
+function BarraCapa({
+  layer,
+  perfil,
+  total,
+  capacidad,
+}: {
+  layer: LayerName;
+  perfil: Record<string, number | undefined>;
+  total: number;
+  capacidad: number;
+}) {
+  const balance = total - capacidad;
+  const pct = capacidad > 0 ? Math.min(100, (total / capacidad) * 100) : 0;
+
+  return (
+    <div className="mb-2.5 last:mb-0">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-micro font-black uppercase tracking-wide text-primary/50">
+          {LAYER_LABEL[layer]}
+        </span>
+        <span className="text-micro font-bold text-primary/40">
+          {total}/{capacidad}{" "}
+          {balance === 0 ? "(saturada)" : balance > 0 ? `(+${balance})` : `(${balance})`}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-primary/8 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${
+            balance < 0 ? "bg-amber-400/60" : balance > 0 ? "bg-accent/60" : "bg-emerald-400/60"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-micro text-primary/35 mt-0.5 block">{formatLayer(perfil)}</span>
+    </div>
+  );
+}
 
 export function EditorItem({
   item,
@@ -84,6 +143,7 @@ export function EditorItem({
   const [form, setForm] = useState<Item>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [showModalDnd, setShowModalDnd] = useState(false);
+  const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
   const { onWikilink } = useWikilink();
 
@@ -96,11 +156,39 @@ export function EditorItem({
   const { allReinos, allCiudades, loadingReinos } = useItemCatalogosUbicacion();
   // Catálogo de criaturas para el selector "Criatura" (origen del ítem)
   const { criaturas: allCriaturas, loading: loadingCriaturas } = useCriaturasCatalogo();
+  // Catálogo de elementos/compuestos — mismo patrón que Flora/Mineral
+  const { items: elementos } = useElementos();
+  const { items: compuestos, setItems: setCompuestos, loading: loadingCompuestos } = useCompuestos();
 
   useEffect(() => {
     setForm(item);
     setStatus("idle");
   }, [item.id]);
+
+  const compuestoElegido = useMemo(
+    () => compuestos.find((c) => c.id === form.compuesto_id) ?? null,
+    [compuestos, form.compuesto_id],
+  );
+  const perfilAtomico = useMemo(
+    () => (compuestoElegido ? calcularPerfilAtomico(compuestoElegido, elementos) : null),
+    [compuestoElegido, elementos],
+  );
+  const balance = useMemo(
+    () => (perfilAtomico ? calcularBalancePorCapa(perfilAtomico) : null),
+    [perfilAtomico],
+  );
+  const reactividad = useMemo(
+    () => (compuestoElegido ? calcularReactividad(compuestoElegido, elementos) : null),
+    [compuestoElegido, elementos],
+  );
+  const peso = useMemo(
+    () => (compuestoElegido ? calcularPeso(compuestoElegido, elementos) : null),
+    [compuestoElegido, elementos],
+  );
+
+  function onCompuestoCreado(nuevo: Compuesto) {
+    setCompuestos((prev) => [...prev, nuevo]);
+  }
 
   const field =
     (k: keyof Item) =>
@@ -117,6 +205,7 @@ export function EditorItem({
         categoria: form.categoria,
         reino_ids: form.reino_ids ?? [],
         criatura_id: form.criatura_id ?? null,
+        compuesto_id: form.compuesto_id ?? null,
         es_arma: form.es_arma ?? false,
         dado_dano: form.dado_dano || null,
         sutileza: form.sutileza ?? false,
@@ -326,6 +415,64 @@ export function EditorItem({
                 </div>
               </div>
 
+              {/* Composición material — mismo patrón que Flora/Mineral: se
+                  elige/crea un Compuesto del catálogo en vez de armar
+                  elementos sueltos uno a uno */}
+              <div className="pt-2 border-t border-primary/10">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+                    Composición (Compuesto)
+                  </span>
+                </div>
+                <p className="text-micro text-primary/30 mb-1.5 -mt-1">
+                  Compuesto de la Tabla Química que forma este ítem.
+                </p>
+
+                <SelectorCompuesto
+                  compuestos={compuestos}
+                  loadingCompuestos={loadingCompuestos}
+                  compuestoId={form.compuesto_id ?? null}
+                  onChange={(compuestoId) =>
+                    setForm((f: Item) => ({ ...f, compuesto_id: compuestoId }))
+                  }
+                  onCompuestoCreado={onCompuestoCreado}
+                  onEditarCompuesto={setEditandoCompuestoId}
+                />
+              </div>
+
+              {/* Balance por capa del compuesto elegido */}
+              {compuestoElegido && balance && perfilAtomico && (
+                <div className="p-3 rounded-xl border border-primary/10 bg-primary/[0.02]">
+                  {LAYERS.map((layer) => {
+                    const b = balance.find((x) => x.layer === layer)!;
+                    return (
+                      <BarraCapa
+                        key={layer}
+                        layer={layer}
+                        perfil={perfilAtomico[layer]}
+                        total={b.total}
+                        capacidad={b.capacidad}
+                      />
+                    );
+                  })}
+
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary/10">
+                    <span className="text-micro font-bold text-primary/50">
+                      Reactividad:{" "}
+                      <span className="text-primary/80">
+                        {reactividad ? REACTIVIDAD_LABEL[reactividad.nivel] : "—"}
+                      </span>
+                    </span>
+                    <span className="text-micro font-bold text-primary/50">
+                      Peso:{" "}
+                      <span className="text-primary/80">
+                        {peso ? `${peso.pesoTotal} (${peso.categoria})` : "—"}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
                   Descripción
@@ -352,6 +499,18 @@ export function EditorItem({
           nombre={form.nombre}
           onChange={(cambios) => setForm((f: Item) => ({ ...f, ...cambios }))}
           onClose={() => setShowModalDnd(false)}
+        />
+      )}
+
+      {editandoCompuestoId && (
+        <CompuestoPanelFlotante
+          compuesto={compuestos.find((c) => c.id === editandoCompuestoId)!}
+          elementos={elementos}
+          todosLosCompuestos={compuestos}
+          onCerrar={() => setEditandoCompuestoId(null)}
+          onActualizar={(id, cambios) =>
+            setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
+          }
         />
       )}
     </div>

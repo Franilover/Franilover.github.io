@@ -13,6 +13,9 @@ export type Item = {
   reino_ids?: string[];
   criatura_id?: string | null;
   criatura?: { id: string; nombre: string; imagen_url?: string } | null;
+  /** Compuesto de la Tabla Química que compone este ítem (mismo patrón que
+   *  Flora/Mineral: se elige/crea vía SelectorCompuesto). */
+  compuesto_id?: string | null;
   // ── Reglas D&D 2024 (fichas_dnd las lee al equipar/atacar) ────────────
   /** Si el ítem es un arma: habilita dado_dano/sutileza/distancia y el
    *  selector de Maestría de Arma al equiparlo en una ficha. */
