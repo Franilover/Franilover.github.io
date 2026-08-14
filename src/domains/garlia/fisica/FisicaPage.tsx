@@ -193,6 +193,7 @@ export function parsearArchivoFisicaJSON(
       formula: o.formula ?? "",
       dominio: o.dominio ?? "",
       descripcion: o.descripcion ?? null,
+      iums_composicion: o.iums_composicion ?? {},
     };
     const existente = orisPorNombre.get(o.nombre);
     if (existente) {
