@@ -25,7 +25,7 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { RichEditor } from "@/editor/lexical";
@@ -197,137 +197,15 @@ function CompuestoCasilla({
 }
 
 /**
- * Buscador compacto para agregar un elemento al compuesto — mismo patrón
- * que SelectorEntidad (fichaComponents.tsx): input con dropdown en portal
- * en vez de listar todos los elementos disponibles de una. Los que más
- * ayudan a cerrar el déficit actual (sugerirElementosParaCompletar) se
- * destacan primero con un puntito, igual que antes.
- */
-function BuscadorElementoCompuesto({
-  elementos,
-  idsSugeridos,
-  onSeleccionar,
-}: {
-  elementos: Elemento[];
-  idsSugeridos: Set<string>;
-  onSeleccionar: (id: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [abierto, setAbierto] = useState(false);
-  const anclaRef = useRef<HTMLDivElement | null>(null);
-  const [posicion, setPosicion] = useState<{ top: number; left: number; width: number } | null>(
-    null,
-  );
-
-  const resultados = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = !q
-      ? elementos
-      : elementos.filter(
-          (el) =>
-            el.nombre.toLowerCase().includes(q) || (el.simbolo ?? "").toLowerCase().includes(q),
-        );
-    // Sugeridos primero, después el resto en su orden original.
-    return [
-      ...base.filter((el) => idsSugeridos.has(el.id)),
-      ...base.filter((el) => !idsSugeridos.has(el.id)),
-    ];
-  }, [elementos, query, idsSugeridos]);
-
-  const calcularPosicion = () => {
-    const rect = anclaRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setPosicion({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-  };
-
-  function abrir() {
-    calcularPosicion();
-    setAbierto(true);
-  }
-
-  useLayoutEffect(() => {
-    if (!abierto) return;
-    calcularPosicion();
-    window.addEventListener("scroll", calcularPosicion, true);
-    window.addEventListener("resize", calcularPosicion);
-    return () => {
-      window.removeEventListener("scroll", calcularPosicion, true);
-      window.removeEventListener("resize", calcularPosicion);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [abierto]);
-
-  return (
-    <div ref={anclaRef} className="relative w-full min-w-0">
-      <div className="flex items-center gap-2 px-2.5 h-8 rounded-md border border-primary/10 bg-primary/[0.03] focus-within:border-primary/30 transition-colors">
-        <Search size={12} className="text-primary/35 shrink-0" />
-        <input
-          type="text"
-          value={query}
-          onFocus={abrir}
-          onClick={abrir}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            if (!abierto) abrir();
-          }}
-          placeholder="Buscar elemento para agregar…"
-          className="flex-1 bg-transparent outline-none text-micro text-primary/80 placeholder:text-primary/30"
-        />
-      </div>
-
-      {abierto &&
-        posicion &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <>
-            <div className="fixed inset-0 z-[10000]" onClick={() => setAbierto(false)} />
-            <div
-              className="fixed z-[10001] max-h-56 overflow-y-auto rounded-xl border border-primary/10 bg-[var(--white-custom)] shadow-lg"
-              style={{ top: posicion.top, left: posicion.left, width: posicion.width }}
-            >
-              {resultados.length === 0 ? (
-                <div className="px-3 py-3 text-micro text-primary/30 text-center">
-                  {elementos.length === 0
-                    ? "Todavía no hay elementos en la Tabla Química para combinar."
-                    : "Sin resultados."}
-                </div>
-              ) : (
-                resultados.map((el) => {
-                  const sugerido = idsSugeridos.has(el.id);
-                  return (
-                    <button
-                      key={el.id}
-                      type="button"
-                      onClick={() => {
-                        onSeleccionar(el.id);
-                        setAbierto(false);
-                        setQuery("");
-                      }}
-                      title={sugerido ? `${el.nombre} — completa parte del déficit actual` : undefined}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-primary/5 transition-colors"
-                    >
-                      {sugerido && <span className="w-1 h-1 rounded-full bg-accent shrink-0" />}
-                      <span className="text-micro font-black text-primary/80">
-                        {el.simbolo || "??"}
-                      </span>
-                      <span className="flex-1 text-micro text-primary/80 truncate">{el.nombre}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </>,
-          document.body,
-        )}
-    </div>
-  );
-}
-
-/**
- * Selector de elementos a combinar: los ya elegidos se muestran con un
- * stepper +/- de cantidad; para agregar uno nuevo se usa un buscador
- * compacto con dropdown (BuscadorElementoCompuesto) en vez de listar todos
- * los elementos disponibles de una — mismo criterio que SelectorEntidad.
+ * Selector de elementos a combinar — mismo espíritu que SelectorEntidad
+ * (fichaComponents.tsx): barra de búsqueda arriba, siempre visible, con la
+ * lista de resultados en vertical justo debajo (sin dropdown ni portal,
+ * pensado para vivir fijo en una columna angosta). Cada fila trae su
+ * propio botón sumar/quitar para elegir muy rápido sin reabrir nada; los
+ * elementos ya elegidos muestran además el stepper +/- de cantidad y
+ * quedan arriba de la lista, con separador. Los que más ayudan a cerrar
+ * el déficit actual (sugerirElementosParaCompletar) se destacan con un
+ * puntito, igual que antes.
  */
 function SelectorElementosCompuesto({
   elementos,
@@ -338,6 +216,7 @@ function SelectorElementosCompuesto({
   componentes: ComponenteCompuesto[];
   onChange: (componentes: ComponenteCompuesto[]) => void;
 }) {
+  const [query, setQuery] = useState("");
   const idsElegidos = new Set(componentes.map((c) => c.elemento_id));
 
   const sugerencias = useMemo(
@@ -366,23 +245,57 @@ function SelectorElementosCompuesto({
     );
   }
 
-  const disponibles = elementos.filter((el) => !idsElegidos.has(el.id));
-  const idsSugeridosDisponibles = new Set(
-    [...idsSugeridos].filter((id) => !idsElegidos.has(id)),
-  );
+  const disponibles = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const base = elementos.filter((el) => !idsElegidos.has(el.id));
+    const filtrados = !q
+      ? base
+      : base.filter(
+          (el) =>
+            el.nombre.toLowerCase().includes(q) || (el.simbolo ?? "").toLowerCase().includes(q),
+        );
+    // Sugeridos primero, después el resto en su orden original.
+    return [
+      ...filtrados.filter((el) => idsSugeridos.has(el.id)),
+      ...filtrados.filter((el) => !idsSugeridos.has(el.id)),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elementos, query, idsElegidos, idsSugeridos]);
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Elegidos, con stepper de cantidad — en fila, con wrap a la
-          siguiente línea cuando no entran más. */}
+    <div className="flex flex-col gap-1.5">
+      {/* Barra de búsqueda, siempre visible */}
+      <div className="shrink-0 flex items-center gap-2 px-2.5 h-8 rounded-md border border-primary/10 bg-primary/[0.03] focus-within:border-primary/30 transition-colors">
+        <Search size={12} className="text-primary/35 shrink-0" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar elemento…"
+          className="flex-1 bg-transparent outline-none text-micro text-primary/80 placeholder:text-primary/30"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="shrink-0 text-primary/30 hover:text-primary/60 transition-colors cursor-pointer"
+            title="Limpiar búsqueda"
+          >
+            <X size={11} />
+          </button>
+        )}
+      </div>
+
+      {/* Elegidos, con stepper de cantidad — siempre arriba de la lista de
+          disponibles, con separador. */}
       {componentes.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="shrink-0 flex flex-col gap-0.5 pb-1 mb-0.5 border-b border-primary/10">
           {componentes.map((c) => (
             <div
               key={c.elemento_id}
-              className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2 pr-1 py-1 border border-primary/10"
+              className="flex items-center gap-1.5 bg-accent/[0.06] rounded-md pl-2 pr-1 py-1 border border-accent/15"
             >
-              <span className="min-w-0 max-w-[140px] truncate text-micro font-bold text-primary/80">
+              <span className="flex-1 min-w-0 truncate text-micro font-bold text-primary/80">
                 {nombreElemento(elementos, c.elemento_id)}
               </span>
               <div className="shrink-0 flex items-center gap-1">
@@ -417,12 +330,47 @@ function SelectorElementosCompuesto({
         </div>
       )}
 
-      {/* Buscador para agregar uno nuevo — no lista todos de una. */}
-      <BuscadorElementoCompuesto
-        elementos={disponibles}
-        idsSugeridos={idsSugeridosDisponibles}
-        onSeleccionar={agregarElemento}
-      />
+      {/* Disponibles: lista vertical siempre abierta, un botón + por fila
+          para agregar rápido sin reabrir ningún dropdown. Altura fija con
+          scroll propio — la columna vive en un grid items-start, así que
+          sin este límite crecería sin techo. */}
+      <div className="max-h-[22rem] overflow-y-auto flex flex-col gap-0.5 rounded-md border border-primary/10 bg-primary/[0.02] p-1">
+        {disponibles.length === 0 ? (
+          <p className="text-micro text-primary/25 text-center py-3">
+            {elementos.length === 0
+              ? "Todavía no hay elementos en la Tabla Química para combinar."
+              : query
+                ? "Sin resultados."
+                : "Ya agregaste todos los elementos disponibles."}
+          </p>
+        ) : (
+          disponibles.map((el) => {
+            const sugerido = idsSugeridos.has(el.id);
+            return (
+              <button
+                key={el.id}
+                type="button"
+                onClick={() => agregarElemento(el.id)}
+                title={sugerido ? `${el.nombre} — completa parte del déficit actual` : undefined}
+                className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors cursor-pointer ${
+                  sugerido ? "bg-accent/[0.06] hover:bg-accent/10" : "hover:bg-primary/5"
+                }`}
+              >
+                {sugerido && <span className="w-1 h-1 rounded-full bg-accent shrink-0" />}
+                <span className="shrink-0 text-micro font-black text-primary/70 w-8">
+                  {el.simbolo || "??"}
+                </span>
+                <span className="flex-1 min-w-0 text-micro text-primary/80 truncate">
+                  {el.nombre}
+                </span>
+                <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 group-hover:text-primary">
+                  <Plus size={10} />
+                </span>
+              </button>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
