@@ -12,18 +12,22 @@
  * columna con scroll (en vez de tabs que muestran una sección a la vez).
  */
 
-import { Atom, Beaker, Download, GitCompare, Loader2, Plus, Scale, Trash2, Upload, X } from "lucide-react";
+import { Atom, Beaker, Download, GitCompare, Loader2, Plus, Save, Scale, Trash2, Upload, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
+import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 
 import { calcularParticulaDominante } from "./afinidad";
 import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
 import { ElementoEditor } from "./ElementoEditor";
 import { useCompuestos } from "./useCompuestos";
+import {
+  type EditorHeaderControls,
+} from "../_shared/useEditorHeaderControls";
 import {
   useInfoTablaQuimica,
   type SeccionInfoTablaQuimica,
@@ -342,6 +346,8 @@ function ElementoPanelFlotante({
   onActualizar: (id: string, cambios: Partial<Elemento>) => void;
   onEliminar?: (id: string) => void;
 }) {
+  const [headerControls, setHeaderControls] = useState<EditorHeaderControls | null>(null);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCerrar();
@@ -377,29 +383,53 @@ function ElementoPanelFlotante({
         }}
       >
         <div
-          className="shrink-0 flex items-center gap-3 px-4 py-3 border-b"
+          className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-b"
           style={{
             borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
             background: "color-mix(in srgb, var(--primary) 3%, transparent)",
           }}
         >
-          <div
-            className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
-            style={{
-              background: "color-mix(in srgb, var(--primary) 8%, transparent)",
-              borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
-            }}
-          >
-            <Atom className="text-primary/50" size={12} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-              Elemento · vista rápida
-            </p>
-            <p className="text-xs font-bold text-primary truncate">
-              #{elemento.numero_atomico} · {elemento.nombre}
-            </p>
-          </div>
+          {headerControls ? (
+            <>
+              {headerControls.prefix}
+              <input
+                className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
+                placeholder={headerControls.placeholderNombre}
+                value={headerControls.nombre ?? ""}
+                onChange={(e) => headerControls.onChangeNombre(e.target.value)}
+                onBlur={headerControls.onBlurNombre}
+              />
+              {headerControls.extra}
+              <div className="shrink-0 flex items-center gap-1.5">
+                <SaveIndicator status={headerControls.status} />
+                <button
+                  type="button"
+                  onClick={headerControls.onEliminar}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
+                >
+                  <Trash2 size={10} />
+                </button>
+                <button
+                  type="button"
+                  disabled={headerControls.status === "saving"}
+                  onClick={headerControls.onGuardar}
+                  className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
+                >
+                  <Save size={10} /> Guardar
+                </button>
+              </div>
+            </>
+          ) : (
+            <div
+              className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+                borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
+              }}
+            >
+              <Atom className="text-primary/50" size={12} />
+            </div>
+          )}
           <button
             type="button"
             onClick={onCerrar}
@@ -424,6 +454,7 @@ function ElementoPanelFlotante({
                   }
                 : undefined
             }
+            onHeaderControlsChange={setHeaderControls}
           />
         </div>
       </div>

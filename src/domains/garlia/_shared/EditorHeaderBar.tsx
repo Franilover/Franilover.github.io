@@ -27,6 +27,7 @@ export function EditorHeaderBar({ controls }: { controls: EditorHeaderControls }
   const {
     imagenUrl,
     IconoFallback,
+    prefix,
     nombre,
     placeholderNombre,
     onChangeNombre,
@@ -45,14 +46,18 @@ export function EditorHeaderBar({ controls }: { controls: EditorHeaderControls }
         background: "color-mix(in srgb, var(--primary) 3%, transparent)",
       }}
     >
-      <div className="shrink-0 w-8 h-8 rounded-lg overflow-hidden border border-primary/15 bg-primary/5 flex items-center justify-center">
-        {imagenUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img alt={nombre} className="w-full h-full object-cover" src={imagenUrl} />
-        ) : IconoFallback ? (
-          <IconoFallback className="text-primary/25" size={16} />
-        ) : null}
-      </div>
+      {prefix}
+
+      {(imagenUrl || IconoFallback) && (
+        <div className="shrink-0 w-8 h-8 rounded-lg overflow-hidden border border-primary/15 bg-primary/5 flex items-center justify-center">
+          {imagenUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img alt={nombre} className="w-full h-full object-cover" src={imagenUrl} />
+          ) : IconoFallback ? (
+            <IconoFallback className="text-primary/25" size={16} />
+          ) : null}
+        </div>
+      )}
 
       <input
         className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"

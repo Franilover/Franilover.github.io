@@ -12,12 +12,16 @@
  * a Supabase + propagación al estado del padre via onActualizar.
  */
 
-import { ChevronLeft, Save, Trash2 } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
+
+import { EditorHeaderBar } from "../_shared/EditorHeaderBar";
+import { usePublishHeaderControls, type OnHeaderControlsChange } from "../_shared/useEditorHeaderControls";
+import { type SaveStatus } from "@/ui/saveStatus";
 
 import {
   calcularParticulaDominante,
@@ -44,6 +48,11 @@ interface Props {
   onBack: () => void;
   onActualizar: (id: string, cambios: Partial<Elemento>) => void;
   onEliminar?: (id: string) => void;
+  /** Publica los controles de header (nombre, símbolo, guardar, eliminar)
+   *  hacia el contenedor (ElementoPanelFlotante), que los renderiza en su
+   *  propia barra para evitar la barra duplicada. Si no se pasa, este
+   *  editor sigue mostrando su propia barra (uso standalone). */
+  onHeaderControlsChange?: OnHeaderControlsChange;
 }
 
 export function ElementoEditor({
@@ -52,6 +61,7 @@ export function ElementoEditor({
   onBack,
   onActualizar,
   onEliminar,
+  onHeaderControlsChange,
 }: Props) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
@@ -95,14 +105,34 @@ export function ElementoEditor({
   // elemento suelto (ver calcularReactividadElemento en afinidad.ts).
   const reactividad = useMemo(() => calcularReactividadElemento(local), [local]);
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <ConfirmModal />
-      {/* Header */}
-      <div
-        style={{ background: "var(--bg-main)" }}
-        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
-      >
+  async function handleEliminar() {
+    if (!onEliminar) return;
+    const ok = await confirm({
+      title: "Eliminar elemento",
+      message: `¿Eliminar "${local.nombre}" de la tabla? Esta acción no se puede deshacer.`,
+    });
+    if (ok) onEliminar(elemento.id);
+  }
+
+  function handleGuardar() {
+    persist({
+      nombre: local.nombre,
+      simbolo: local.simbolo,
+      familia: local.familia,
+      es_noble: local.es_noble,
+      es_catalizador: local.es_catalizador,
+      notas: local.notas,
+      nucleo: local.nucleo,
+      media: local.media,
+      externa: local.externa,
+    });
+  }
+
+  const status: SaveStatus = saving ? "saving" : "idle";
+
+  const headerControls = {
+    prefix: (
+      <>
         <button
           type="button"
           onClick={onBack}
@@ -110,68 +140,36 @@ export function ElementoEditor({
         >
           <ChevronLeft size={12} />
         </button>
-
         <span className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/30 px-1.5 py-0.5 rounded border border-primary/15">
           #{local.numero_atomico}
         </span>
+      </>
+    ),
+    nombre: local.nombre ?? "",
+    placeholderNombre: "Nombre del elemento",
+    onChangeNombre: (nombre: string) => setLocal((p) => ({ ...p, nombre })),
+    onBlurNombre: () => persist({ nombre: local.nombre }),
+    status,
+    onGuardar: handleGuardar,
+    onEliminar: handleEliminar,
+    extra: (
+      <input
+        value={local.simbolo ?? ""}
+        onChange={(e) => setLocal((p) => ({ ...p, simbolo: e.target.value }))}
+        onBlur={() => persist({ simbolo: local.simbolo })}
+        placeholder="Sm"
+        maxLength={3}
+        className="shrink-0 w-10 text-center bg-primary/5 rounded-md px-1 py-0.5 text-micro font-black text-primary outline-none placeholder:text-primary/25 border border-primary/10"
+      />
+    ),
+  };
 
-        <input
-          value={local.nombre ?? ""}
-          onChange={(e) => setLocal((p) => ({ ...p, nombre: e.target.value }))}
-          onBlur={() => persist({ nombre: local.nombre })}
-          placeholder="Nombre del elemento"
-          className="flex-1 min-w-0 bg-transparent text-micro font-black text-primary outline-none placeholder:text-primary/25"
-        />
+  usePublishHeaderControls(headerControls, onHeaderControlsChange);
 
-        <input
-          value={local.simbolo ?? ""}
-          onChange={(e) => setLocal((p) => ({ ...p, simbolo: e.target.value }))}
-          onBlur={() => persist({ simbolo: local.simbolo })}
-          placeholder="Sm"
-          maxLength={3}
-          className="shrink-0 w-10 text-center bg-primary/5 rounded-md px-1 py-0.5 text-micro font-black text-primary outline-none placeholder:text-primary/25 border border-primary/10"
-        />
-
-        <div className="shrink-0 flex items-center gap-1">
-          {onEliminar && (
-            <button
-              type="button"
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Eliminar elemento",
-                  message: `¿Eliminar "${local.nombre}" de la tabla? Esta acción no se puede deshacer.`,
-                });
-                if (ok) onEliminar(elemento.id);
-              }}
-              className="flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
-              title="Eliminar"
-            >
-              <Trash2 size={11} />
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() =>
-              persist({
-                nombre: local.nombre,
-                simbolo: local.simbolo,
-                familia: local.familia,
-                es_noble: local.es_noble,
-                es_catalizador: local.es_catalizador,
-                notas: local.notas,
-                nucleo: local.nucleo,
-                media: local.media,
-                externa: local.externa,
-              })
-            }
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            <Save size={10} />
-            {saving ? "…" : "Guardar"}
-          </button>
-        </div>
-      </div>
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <ConfirmModal />
+      {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">

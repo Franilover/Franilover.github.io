@@ -26,10 +26,17 @@ import { type ReactNode } from "react";
 import { type SaveStatus } from "@/ui/saveStatus";
 
 export interface EditorHeaderControls {
-  /** Ícono o thumbnail (imagen circular/rounded) mostrado a la izquierda. */
+  /** Ícono o thumbnail (imagen circular/rounded) mostrado a la izquierda.
+   *  Si no hay imagenUrl ni IconoFallback, no se renderiza el cuadro
+   *  (editores como Elemento/Compuesto no usan thumbnail de imagen). */
   imagenUrl?: string | null;
   /** Ícono de fallback cuando no hay imagenUrl (lucide component). */
   IconoFallback?: React.ComponentType<{ className?: string; size?: number }>;
+  /** Contenido libre renderizado ANTES del input de nombre — p. ej. el
+   *  botón de volver (ChevronLeft) y el badge "#numero_atomico" de
+   *  Elemento, que no encajan como thumbnail ni como "extra" (que va
+   *  después del nombre). */
+  prefix?: ReactNode;
   nombre: string;
   placeholderNombre: string;
   onChangeNombre: (nombre: string) => void;
@@ -66,6 +73,7 @@ export function usePublishHeaderControls(
   }, [
     onHeaderControlsChange,
     controls.imagenUrl,
+    controls.prefix,
     controls.nombre,
     controls.status,
     controls.extra,

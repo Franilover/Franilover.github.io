@@ -31,6 +31,15 @@ import { createPortal } from "react-dom";
 import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
+import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
+import { type SaveStatus } from "@/ui/saveStatus";
+
+import { EditorHeaderBar } from "../_shared/EditorHeaderBar";
+import {
+  usePublishHeaderControls,
+  type EditorHeaderControls,
+  type OnHeaderControlsChange,
+} from "../_shared/useEditorHeaderControls";
 
 import {
   autocompletarHastaEstable,
@@ -554,6 +563,7 @@ function CompuestoEditor({
   onBack,
   onActualizar,
   onEliminar,
+  onHeaderControlsChange,
 }: {
   compuesto: Compuesto;
   elementos: Elemento[];
@@ -561,6 +571,10 @@ function CompuestoEditor({
   onBack: () => void;
   onActualizar: (id: string, cambios: Partial<Compuesto>) => void;
   onEliminar?: (id: string) => void;
+  /** Publica los controles de header hacia CompuestoPanelFlotante, que los
+   *  renderiza en su propia barra para evitar la barra duplicada. Si no se
+   *  pasa, este editor sigue mostrando su propia barra (uso standalone). */
+  onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
@@ -606,29 +620,45 @@ function CompuestoEditor({
     [local.componentes, todosLosCompuestos, compuesto.id],
   );
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <ConfirmModal />
-      <div
-        style={{ background: "var(--bg-main)" }}
-        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
+  async function handleEliminar() {
+    if (!onEliminar) return;
+    const ok = await confirm({
+      title: "Eliminar compuesto",
+      message: `¿Eliminar "${local.nombre}"? Esta acción no se puede deshacer.`,
+    });
+    if (ok) onEliminar(compuesto.id);
+  }
+
+  function handleGuardar() {
+    persist({
+      nombre: local.nombre,
+      simbolo: local.simbolo,
+      notas: local.notas,
+      componentes: local.componentes,
+    });
+  }
+
+  const status: SaveStatus = saving ? "saving" : "idle";
+
+  const headerControls: EditorHeaderControls = {
+    prefix: (
+      <button
+        type="button"
+        onClick={onBack}
+        className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
       >
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <ChevronLeft size={12} />
-        </button>
-
-        <input
-          value={local.nombre ?? ""}
-          onChange={(e) => setLocal((p) => ({ ...p, nombre: e.target.value }))}
-          onBlur={() => persist({ nombre: local.nombre })}
-          placeholder="Nombre del compuesto"
-          className="flex-1 min-w-0 bg-transparent text-micro font-black text-primary outline-none placeholder:text-primary/25"
-        />
-
+        <ChevronLeft size={12} />
+      </button>
+    ),
+    nombre: local.nombre ?? "",
+    placeholderNombre: "Nombre del compuesto",
+    onChangeNombre: (nombre: string) => setLocal((p) => ({ ...p, nombre })),
+    onBlurNombre: () => persist({ nombre: local.nombre }),
+    status,
+    onGuardar: handleGuardar,
+    onEliminar: handleEliminar,
+    extra: (
+      <>
         <input
           value={local.simbolo ?? ""}
           onChange={(e) => setLocal((p) => ({ ...p, simbolo: e.target.value }))}
@@ -637,7 +667,6 @@ function CompuestoEditor({
           maxLength={6}
           className="shrink-0 w-14 text-center bg-primary/5 rounded-md px-1 py-0.5 text-micro font-black text-primary outline-none placeholder:text-primary/25 border border-primary/10"
         />
-
         <button
           type="button"
           onClick={handleAutoGenerarSimbolo}
@@ -647,42 +676,16 @@ function CompuestoEditor({
         >
           <Wand2 size={11} />
         </button>
+      </>
+    ),
+  };
 
-        <div className="shrink-0 flex items-center gap-1">
-          {onEliminar && (
-            <button
-              type="button"
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Eliminar compuesto",
-                  message: `¿Eliminar "${local.nombre}"? Esta acción no se puede deshacer.`,
-                });
-                if (ok) onEliminar(compuesto.id);
-              }}
-              className="flex items-center justify-center w-6 h-6 rounded-md border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
-              title="Eliminar"
-            >
-              <Trash2 size={11} />
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() =>
-              persist({
-                nombre: local.nombre,
-                simbolo: local.simbolo,
-                notas: local.notas,
-                componentes: local.componentes,
-              })
-            }
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            <Save size={10} />
-            {saving ? "…" : "Guardar"}
-          </button>
-        </div>
-      </div>
+  usePublishHeaderControls(headerControls, onHeaderControlsChange);
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <ConfirmModal />
+      {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
         {duplicadoDe && (
@@ -788,6 +791,8 @@ function CompuestoPanelFlotante({
   onActualizar: (id: string, cambios: Partial<Compuesto>) => void;
   onEliminar?: (id: string) => void;
 }) {
+  const [headerControls, setHeaderControls] = useState<EditorHeaderControls | null>(null);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCerrar();
@@ -823,30 +828,53 @@ function CompuestoPanelFlotante({
         }}
       >
         <div
-          className="shrink-0 flex items-center gap-3 px-4 py-3 border-b"
+          className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-b"
           style={{
             borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
             background: "color-mix(in srgb, var(--primary) 3%, transparent)",
           }}
         >
-          <div
-            className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
-            style={{
-              background: "color-mix(in srgb, var(--primary) 8%, transparent)",
-              borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
-            }}
-          >
-            <Beaker className="text-primary/50" size={12} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-              Compuesto · vista rápida
-            </p>
-            <p className="text-xs font-bold text-primary truncate">
-              {compuesto.simbolo ? `${compuesto.simbolo} · ` : ""}
-              {compuesto.nombre}
-            </p>
-          </div>
+          {headerControls ? (
+            <>
+              {headerControls.prefix}
+              <input
+                className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
+                placeholder={headerControls.placeholderNombre}
+                value={headerControls.nombre ?? ""}
+                onChange={(e) => headerControls.onChangeNombre(e.target.value)}
+                onBlur={headerControls.onBlurNombre}
+              />
+              {headerControls.extra}
+              <div className="shrink-0 flex items-center gap-1.5">
+                <SaveIndicator status={headerControls.status} />
+                <button
+                  type="button"
+                  onClick={headerControls.onEliminar}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
+                >
+                  <Trash2 size={10} />
+                </button>
+                <button
+                  type="button"
+                  disabled={headerControls.status === "saving"}
+                  onClick={headerControls.onGuardar}
+                  className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
+                >
+                  <Save size={10} /> Guardar
+                </button>
+              </div>
+            </>
+          ) : (
+            <div
+              className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+                borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
+              }}
+            >
+              <Beaker className="text-primary/50" size={12} />
+            </div>
+          )}
           <button
             type="button"
             onClick={onCerrar}
@@ -872,6 +900,7 @@ function CompuestoPanelFlotante({
                   }
                 : undefined
             }
+            onHeaderControlsChange={setHeaderControls}
           />
         </div>
       </div>
