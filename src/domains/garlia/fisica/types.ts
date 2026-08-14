@@ -33,18 +33,16 @@ export interface Oris {
   formula: string;
   dominio: string;
   descripcion?: string | null;
+  /** Mezcla de Iums que compone este Oris: { [iumId]: cantidad }. Se usa
+   *  para calcular su gráfico A/T/S (ver contarLetrasDeOris) — igual que
+   *  un Compuesto es mezcla de Elementos en la Tabla Química. */
+  iums_composicion: Record<string, number>;
 }
 
 export const ORIS_CONFIG = {
   tabla: "oris",
-  select: "id, orden, nombre, familia, formula, dominio, descripcion",
+  select: "id, orden, nombre, familia, formula, dominio, descripcion, iums_composicion",
 };
-
-/** Adapta un Oris (Supabase) al shape FilaCatalogo usado por las vistas de
- *  catálogo compartidas con Base/Ium/Partículas. */
-export function orisAFilaCatalogo(o: Oris): FilaCatalogo {
-  return { nombre: o.nombre, detalle: o.dominio || o.formula, extra: o.familia };
-}
 
 /** Fila cruda tal cual vive en Supabase (tabla "fisica_conceptos"). */
 export interface FisicaConcepto {
@@ -87,12 +85,20 @@ export interface FilaCatalogo {
   extra?: string;
 }
 
-export const PARTICULAS_BASE: FilaCatalogo[] = [
-  { nombre: "Tesis (A)", detalle: "Impulso, voluntad, lo que empuja." },
-  { nombre: "Antítesis (T)", detalle: "Inercia, resistencia, lo que limita." },
+/** Fila de Partícula Base: además de nombre/detalle, trae su letra A/T/S
+ *  suelta (no una fórmula de 3) para poder dibujar su círculo de un solo
+ *  color con ParticulaVisual. */
+export interface FilaParticulaBase extends FilaCatalogo {
+  letra: "A" | "T" | "S";
+}
+
+export const PARTICULAS_BASE: FilaParticulaBase[] = [
+  { nombre: "Tesis (A)", detalle: "Impulso, voluntad, lo que empuja.", letra: "A" },
+  { nombre: "Antítesis (T)", detalle: "Inercia, resistencia, lo que limita.", letra: "T" },
   {
     nombre: "Síntesis (S)",
     detalle: "Transformación, equilibrio, lo que surge del choque entre A y T.",
+    letra: "S",
   },
 ];
 
@@ -135,40 +141,180 @@ export function particulaAFilaCatalogo(p: Particula): FilaCatalogo {
   return { nombre: p.nombre, detalle: p.formula, extra: p.extra ?? undefined };
 }
 
-export const IUMS: FilaCatalogo[] = [
-  { nombre: "Pondus", detalle: "3 Masa", extra: "Peso puro, lo que ancla" },
-  { nombre: "Velox", detalle: "3 Cinética", extra: "Movimiento puro" },
-  { nombre: "Fluxor", detalle: "2 Cinética + 1 Masa", extra: "Flujo que arrastra" },
+/** Fila de Ium: además de nombre/detalle/extra, trae un id estable (slug)
+ *  y su composición como lista de {particula de Química, cantidad} — usada
+ *  para calcular el gráfico A/T/S (ver PARTICULA_QUIMICA_FORMULA +
+ *  composicionIum en ParticulaVisual/este archivo). */
+export interface FilaIum extends FilaCatalogo {
+  id: string;
+  composicion: { particula: string; cantidad: number }[];
+}
+
+export const IUMS: FilaIum[] = [
   {
+    id: "pondus",
+    nombre: "Pondus",
+    detalle: "3 Masa",
+    extra: "Peso puro, lo que ancla",
+    composicion: [{ particula: "Masa", cantidad: 3 }],
+  },
+  {
+    id: "velox",
+    nombre: "Velox",
+    detalle: "3 Cinética",
+    extra: "Movimiento puro",
+    composicion: [{ particula: "Cinética", cantidad: 3 }],
+  },
+  {
+    id: "fluxor",
+    nombre: "Fluxor",
+    detalle: "2 Cinética + 1 Masa",
+    extra: "Flujo que arrastra",
+    composicion: [
+      { particula: "Cinética", cantidad: 2 },
+      { particula: "Masa", cantidad: 1 },
+    ],
+  },
+  {
+    id: "fulgor",
     nombre: "Fulgor",
     detalle: "2 Potencial + 1 Cinética",
     extra: "Carga que estalla en movimiento",
+    composicion: [
+      { particula: "Potencial", cantidad: 2 },
+      { particula: "Cinética", cantidad: 1 },
+    ],
   },
   {
+    id: "patrix",
     nombre: "Patrix",
     detalle: "2 Información + 1 Potencial",
     extra: "Patrón que espera activarse",
+    composicion: [
+      { particula: "Información", cantidad: 2 },
+      { particula: "Potencial", cantidad: 1 },
+    ],
   },
-  { nombre: "Tensia", detalle: "3 Potencial", extra: "Tensión latente sin liberar" },
-  { nombre: "Formix", detalle: "2 Masa + 1 Información", extra: "Estructura que se repite" },
   {
+    id: "tensia",
+    nombre: "Tensia",
+    detalle: "3 Potencial",
+    extra: "Tensión latente sin liberar",
+    composicion: [{ particula: "Potencial", cantidad: 3 }],
+  },
+  {
+    id: "formix",
+    nombre: "Formix",
+    detalle: "2 Masa + 1 Información",
+    extra: "Estructura que se repite",
+    composicion: [
+      { particula: "Masa", cantidad: 2 },
+      { particula: "Información", cantidad: 1 },
+    ],
+  },
+  {
+    id: "voluntas",
     nombre: "Voluntas",
     detalle: "2 Voluntad + 1 Percepción",
     extra: "Impulso con conciencia de objetivo",
+    composicion: [
+      { particula: "Voluntad", cantidad: 2 },
+      { particula: "Percepción", cantidad: 1 },
+    ],
   },
   {
+    id: "sensia",
     nombre: "Sensia",
     detalle: "2 Percepción + 1 Voluntad",
     extra: "Conciencia que absorbe antes de actuar",
+    composicion: [
+      { particula: "Percepción", cantidad: 2 },
+      { particula: "Voluntad", cantidad: 1 },
+    ],
   },
   {
+    id: "metus",
     nombre: "Metus",
     detalle: "2 Transición + 1 Catálisis",
     extra: "Cambio de estado que se dispara y se sostiene",
+    composicion: [
+      { particula: "Transición", cantidad: 2 },
+      { particula: "Catálisis", cantidad: 1 },
+    ],
   },
   {
+    id: "ruina",
     nombre: "Ruina",
     detalle: "2 Entropía + 1 Ciclo",
     extra: "Desorden que se repite, desgaste constante",
+    composicion: [
+      { particula: "Entropía", cantidad: 2 },
+      { particula: "Ciclo", cantidad: 1 },
+    ],
   },
 ];
+
+export const IUM_POR_ID: Record<string, FilaIum> = Object.fromEntries(IUMS.map((i) => [i.id, i]));
+
+/**
+ * Fórmula A/T/S (3 letras) de cada una de las 11 Partículas de Química —
+ * mismo nombre que ParticleType en elementos/types.ts, pero acá es el
+ * mapeo hacia el sistema de Física (tabla "particulas" en Supabase).
+ * Duplicado como constante fija en vez de fetch porque no cambia (mismo
+ * criterio que PARTICULAS_BASE/IUMS) y evita acoplar este archivo al
+ * fetch de useParticulas() solo para dibujar íconos.
+ */
+export const PARTICULA_QUIMICA_FORMULA: Record<string, string> = {
+  Masa: "AAA",
+  Cinética: "TTT",
+  Potencial: "TAA",
+  Información: "ATT",
+  Voluntad: "TTA",
+  Percepción: "AAT",
+  Transición: "ASA",
+  Ciclo: "TST",
+  Entropía: "SAT",
+  Catálisis: "ATS",
+  Equilibrio: "SSS",
+};
+
+/** Conteo de letras A/T/S de una lista de {particula de Química, cantidad}
+ *  — usado tanto para el Ium (composicion fija) como para el Oris
+ *  (iums_composicion → cada Ium aporta su propio conteo × cantidad). */
+export function contarLetrasDeComposicion(
+  composicion: { particula: string; cantidad: number }[],
+): { A: number; T: number; S: number } {
+  const out = { A: 0, T: 0, S: 0 };
+  for (const { particula, cantidad } of composicion) {
+    const formula = PARTICULA_QUIMICA_FORMULA[particula];
+    if (!formula) continue;
+    for (const c of formula) {
+      if (c === "A" || c === "T" || c === "S") out[c] += cantidad;
+    }
+  }
+  return out;
+}
+
+/** Conteo de letras A/T/S de un Ium por su composición fija. */
+export function contarLetrasDeIum(ium: FilaIum): { A: number; T: number; S: number } {
+  return contarLetrasDeComposicion(ium.composicion);
+}
+
+/** Conteo de letras A/T/S de un Oris a partir de iums_composicion
+ *  ({ [iumId]: cantidad }): cada Ium aporta su propio conteo × cantidad. */
+export function contarLetrasDeOris(iumsComposicion: Record<string, number>): {
+  A: number;
+  T: number;
+  S: number;
+} {
+  const out = { A: 0, T: 0, S: 0 };
+  for (const [iumId, cantidad] of Object.entries(iumsComposicion)) {
+    const ium = IUM_POR_ID[iumId];
+    if (!ium || !cantidad) continue;
+    const letras = contarLetrasDeIum(ium);
+    out.A += letras.A * cantidad;
+    out.T += letras.T * cantidad;
+    out.S += letras.S * cantidad;
+  }
+  return out;
+}
