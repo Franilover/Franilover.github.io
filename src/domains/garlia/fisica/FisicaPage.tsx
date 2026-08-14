@@ -306,7 +306,9 @@ function TodasLasBasesView({
   subsistemas,
   onActualizarOris,
   onEliminarOris,
-  onSelectSubsistema,
+  onActualizarSubsistema,
+  onEliminarSubsistema,
+  onSelectCriatura,
   onCrearSubsistema,
   creandoSubsistema,
 }: {
@@ -315,13 +317,20 @@ function TodasLasBasesView({
   subsistemas: SubsistemaMagia[];
   onActualizarOris: (id: string, cambios: Partial<Oris>) => void;
   onEliminarOris?: (id: string) => void;
-  onSelectSubsistema: (id: string) => void;
+  onActualizarSubsistema: (id: string, updates: Partial<SubsistemaMagia>) => void;
+  onEliminarSubsistema: (id: string) => void;
+  onSelectCriatura?: (id: string) => void;
   onCrearSubsistema: (nombre: string) => Promise<SubsistemaMagia | null>;
   creandoSubsistema?: boolean;
 }) {
   const catalogos = catalogosBases(particulas, oris, subsistemas);
   const [nombreNuevoSubsistema, setNombreNuevoSubsistema] = useState("");
   const [creandoAbierto, setCreandoAbierto] = useState(false);
+  // Cuando se crea un subsistema nuevo, abrimos su popover automáticamente
+  // anclado a la fila donde estaba el input de creación (no hay tarjeta
+  // propia todavía en ese frame) — se guarda el id para que BasesItemCard
+  // lo detecte y se auto-abra apenas aparece en la lista.
+  const [autoAbrirSubsistemaId, setAutoAbrirSubsistemaId] = useState<string | null>(null);
 
   const handleCrearSubsistema = async () => {
     const nombre = nombreNuevoSubsistema.trim();
@@ -329,7 +338,7 @@ function TodasLasBasesView({
     const nuevo = await onCrearSubsistema(nombre);
     setNombreNuevoSubsistema("");
     setCreandoAbierto(false);
-    if (nuevo) onSelectSubsistema(nuevo.id);
+    if (nuevo) setAutoAbrirSubsistemaId(nuevo.id);
   };
 
   return (
@@ -393,13 +402,18 @@ function TodasLasBasesView({
                       fila={f}
                       bloque={key}
                       original={key === "oris" ? (original as Oris) : undefined}
+                      originalSubsistema={key === "subsistemas" ? (original as SubsistemaMagia) : undefined}
                       onActualizarOris={onActualizarOris}
                       onEliminarOris={onEliminarOris}
-                      onClick={
+                      onActualizarSubsistema={onActualizarSubsistema}
+                      onEliminarSubsistema={onEliminarSubsistema}
+                      onSelectCriatura={onSelectCriatura}
+                      autoAbrir={
                         key === "subsistemas" && original
-                          ? () => onSelectSubsistema((original as SubsistemaMagia).id)
-                          : undefined
+                          ? (original as SubsistemaMagia).id === autoAbrirSubsistemaId
+                          : false
                       }
+                      onAutoAbierto={() => setAutoAbrirSubsistemaId(null)}
                     />
                   );
                 })}
@@ -428,9 +442,14 @@ function BasesItemCard({
   fila,
   bloque,
   original,
+  originalSubsistema,
   onActualizarOris,
   onEliminarOris,
-  onClick,
+  onActualizarSubsistema,
+  onEliminarSubsistema,
+  onSelectCriatura,
+  autoAbrir,
+  onAutoAbierto,
 }: {
   fila: FilaCatalogo;
   bloque: ClaveCatalogo;
@@ -438,21 +457,41 @@ function BasesItemCard({
    *  el objeto completo (no el FilaCatalogo resumido) para abrir OrisEditor
    *  dentro del popover flotante. */
   original?: Oris;
+  /** Ídem para "subsistemas": objeto completo para abrir PanelEditorSubsistema
+   *  dentro de su propio popover flotante. */
+  originalSubsistema?: SubsistemaMagia;
   onActualizarOris?: (id: string, cambios: Partial<Oris>) => void;
   onEliminarOris?: (id: string) => void;
-  /** Usado por Subsistemas: reemplaza el popover por defecto y navega al
-   *  editor completo en la columna derecha. Oris ya no lo usa — abre su
-   *  propio popover con OrisEditor adentro (ver esOris más abajo). */
-  onClick?: () => void;
+  onActualizarSubsistema?: (id: string, updates: Partial<SubsistemaMagia>) => void;
+  onEliminarSubsistema?: (id: string) => void;
+  onSelectCriatura?: (id: string) => void;
+  /** true en el primer render de la tarjeta de un subsistema recién creado
+   *  desde el buscador de "Añadir subsistema" — no hay click del usuario
+   *  todavía, así que la tarjeta se auto-abre usando su propio botón como
+   *  ancla apenas se monta. */
+  autoAbrir?: boolean;
+  onAutoAbierto?: () => void;
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const botonRef = useRef<HTMLButtonElement>(null);
   const conVisual = bloque === "particula-base" || bloque === "particulas" || bloque === "iums";
   const esOris = bloque === "oris" && !!original;
+  const esSubsistema = bloque === "subsistemas" && !!originalSubsistema;
+
+  useEffect(() => {
+    if (autoAbrir && botonRef.current) {
+      setAnchor(botonRef.current);
+      onAutoAbierto?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAbrir]);
+
   return (
     <>
       <button
+        ref={botonRef}
         type="button"
-        onClick={onClick ? onClick : (e) => setAnchor(anchor ? null : e.currentTarget)}
+        onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
         className={`w-full flex items-center px-2.5 py-2 rounded-lg border text-left transition-all cursor-pointer ${
           anchor
             ? "border-primary/30 bg-primary/5"
@@ -478,7 +517,20 @@ function BasesItemCard({
             }
           />
         </PopoverFlotante>
-      ) : !onClick ? (
+      ) : esSubsistema ? (
+        <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={420} maxHeight={560}>
+          <PanelEditorSubsistema
+            subsistema={originalSubsistema!}
+            onVolver={() => setAnchor(null)}
+            onSave={(updates) => onActualizarSubsistema?.(originalSubsistema!.id, updates)}
+            onDelete={() => {
+              onEliminarSubsistema?.(originalSubsistema!.id);
+              setAnchor(null);
+            }}
+            onSelectCriatura={onSelectCriatura}
+          />
+        </PopoverFlotante>
+      ) : (
         <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={280} maxHeight={340}>
           <div className="flex flex-col gap-2">
             {conVisual && (
@@ -988,14 +1040,6 @@ export function FisicaPage({
     [conceptosLocal, seleccion],
   );
 
-  const subsistemaActivo = useMemo(
-    () =>
-      seleccion?.tipo === "subsistema"
-        ? subsistemas.find((s) => s.id === seleccion.id) ?? null
-        : null,
-    [subsistemas, seleccion],
-  );
-
   const bloquesConceptos = useMemo(() => agruparPorBloque(conceptosLocal), [conceptosLocal]);
 
   return (
@@ -1101,19 +1145,6 @@ export function FisicaPage({
               setSeleccion({ tipo: "todas-bases" });
             }}
           />
-        ) : subsistemaActivo ? (
-          <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
-            <PanelEditorSubsistema
-              subsistema={subsistemaActivo}
-              onVolver={() => setSeleccion({ tipo: "todas-bases" })}
-              onSave={(updates) => onActualizarSubsistema(subsistemaActivo.id, updates)}
-              onDelete={() => {
-                onEliminarSubsistema(subsistemaActivo.id);
-                setSeleccion({ tipo: "todas-bases" });
-              }}
-              onSelectCriatura={onSelectCriatura}
-            />
-          </div>
         ) : (
           <div className="flex-1 min-h-0 flex flex-row">
             <div className="w-1/2 min-w-0 min-h-0 overflow-y-auto border-r border-primary/10">
@@ -1123,7 +1154,9 @@ export function FisicaPage({
                 subsistemas={subsistemas}
                 onActualizarOris={onActualizarOris}
                 onEliminarOris={onEliminarOris}
-                onSelectSubsistema={(id) => setSeleccion({ tipo: "subsistema", id })}
+                onActualizarSubsistema={onActualizarSubsistema}
+                onEliminarSubsistema={onEliminarSubsistema}
+                onSelectCriatura={onSelectCriatura}
                 onCrearSubsistema={onCrearSubsistema}
                 creandoSubsistema={creandoSubsistema}
               />
