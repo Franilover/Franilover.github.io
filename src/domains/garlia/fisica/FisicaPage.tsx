@@ -304,7 +304,8 @@ function TodasLasBasesView({
   particulas,
   oris,
   subsistemas,
-  onSelectOris,
+  onActualizarOris,
+  onEliminarOris,
   onSelectSubsistema,
   onCrearSubsistema,
   creandoSubsistema,
@@ -312,7 +313,8 @@ function TodasLasBasesView({
   particulas: Particula[];
   oris: Oris[];
   subsistemas: SubsistemaMagia[];
-  onSelectOris: (id: string) => void;
+  onActualizarOris: (id: string, cambios: Partial<Oris>) => void;
+  onEliminarOris?: (id: string) => void;
   onSelectSubsistema: (id: string) => void;
   onCrearSubsistema: (nombre: string) => Promise<SubsistemaMagia | null>;
   creandoSubsistema?: boolean;
@@ -390,12 +392,13 @@ function TodasLasBasesView({
                       key={f.nombre + i}
                       fila={f}
                       bloque={key}
+                      original={key === "oris" ? (original as Oris) : undefined}
+                      onActualizarOris={onActualizarOris}
+                      onEliminarOris={onEliminarOris}
                       onClick={
-                        key === "oris" && original
-                          ? () => onSelectOris((original as Oris).id)
-                          : key === "subsistemas" && original
-                            ? () => onSelectSubsistema((original as SubsistemaMagia).id)
-                            : undefined
+                        key === "subsistemas" && original
+                          ? () => onSelectSubsistema((original as SubsistemaMagia).id)
+                          : undefined
                       }
                     />
                   );
@@ -424,14 +427,27 @@ function TodasLasBasesView({
 function BasesItemCard({
   fila,
   bloque,
+  original,
+  onActualizarOris,
+  onEliminarOris,
   onClick,
 }: {
   fila: FilaCatalogo;
   bloque: ClaveCatalogo;
+  /** Fila cruda de Supabase — solo presente para "oris", donde hace falta
+   *  el objeto completo (no el FilaCatalogo resumido) para abrir OrisEditor
+   *  dentro del popover flotante. */
+  original?: Oris;
+  onActualizarOris?: (id: string, cambios: Partial<Oris>) => void;
+  onEliminarOris?: (id: string) => void;
+  /** Usado por Subsistemas: reemplaza el popover por defecto y navega al
+   *  editor completo en la columna derecha. Oris ya no lo usa — abre su
+   *  propio popover con OrisEditor adentro (ver esOris más abajo). */
   onClick?: () => void;
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const conVisual = bloque === "particula-base" || bloque === "particulas" || bloque === "iums";
+  const esOris = bloque === "oris" && !!original;
   return (
     <>
       <button
@@ -445,7 +461,24 @@ function BasesItemCard({
       >
         <span className="text-micro font-black text-primary truncate">{fila.nombre}</span>
       </button>
-      {!onClick && (
+      {esOris ? (
+        <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={420} maxHeight={560}>
+          <OrisEditor
+            oris={original!}
+            embedded
+            onBack={() => setAnchor(null)}
+            onActualizar={onActualizarOris ?? (() => {})}
+            onEliminar={
+              onEliminarOris
+                ? (id) => {
+                    onEliminarOris(id);
+                    setAnchor(null);
+                  }
+                : undefined
+            }
+          />
+        </PopoverFlotante>
+      ) : !onClick ? (
         <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={280} maxHeight={340}>
           <div className="flex flex-col gap-2">
             {conVisual && (
@@ -465,7 +498,7 @@ function BasesItemCard({
             {fila.extra && <p className="text-xs text-primary/40 leading-relaxed">{fila.extra}</p>}
           </div>
         </PopoverFlotante>
-      )}
+      ) : null}
     </>
   );
 }
@@ -938,6 +971,15 @@ export function FisicaPage({
     [oris, seleccion],
   );
 
+  // Ancla "fantasma" para el popover de Oris cuando se abre por deep-link
+  // (seleccionarOrisId) en vez de por click en una tarjeta: no hay un
+  // elemento real que originó la apertura, así que se usa un div oculto
+  // fijo en el centro de la pantalla + modo backdrop (fondo oscurecido)
+  // para que igual se vea como panel flotante y cierre al clickear afuera.
+  // Se guarda en estado (no solo ref) para que el primer render, donde el
+  // ref todavía es null, se corrija apenas el div fantasma se monta.
+  const [anchorFantasma, setAnchorFantasma] = useState<HTMLDivElement | null>(null);
+
   const conceptoActivo = useMemo(
     () =>
       seleccion?.tipo === "concepto"
@@ -958,6 +1000,38 @@ export function FisicaPage({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* Ancla fantasma + popover flotante de Oris cuando se abre por
+          deep-link (seleccionarOrisId), fuera del flujo de columnas —
+          las tarjetas de la lista abren su propio popover anclado a sí
+          mismas (ver BasesItemCard), este es solo el caso sin tarjeta. */}
+      <div ref={setAnchorFantasma} className="fixed top-1/2 left-1/2 w-px h-px pointer-events-none" />
+      {orisActivo && (
+        <PopoverFlotante
+          anchor={anchorFantasma}
+          onClose={() => setSeleccion({ tipo: "todas-bases" })}
+          width={420}
+          maxHeight={560}
+          centerVertically
+          centerHorizontally
+          backdrop
+        >
+          <OrisEditor
+            oris={orisActivo}
+            embedded
+            onBack={() => setSeleccion({ tipo: "todas-bases" })}
+            onActualizar={onActualizarOris}
+            onEliminar={
+              onEliminarOris
+                ? (id) => {
+                    onEliminarOris(id);
+                    setSeleccion({ tipo: "todas-bases" });
+                  }
+                : undefined
+            }
+          />
+        </PopoverFlotante>
+      )}
+
       {/* Barra superior: solo acciones de import/export — sin tabs ni
           grupos, todo vive en una única vista de 2 columnas. */}
       <div className="shrink-0 flex flex-col gap-1 px-3 pt-2 pb-1.5 border-b border-primary/10">
@@ -1012,21 +1086,7 @@ export function FisicaPage({
 
       {/* Contenido: ocupa todo el ancho ahora que no hay columna lateral. */}
       <div className="flex-1 min-h-0 flex flex-col min-w-0">
-        {orisActivo ? (
-          <OrisEditor
-            oris={orisActivo}
-            onBack={() => setSeleccion({ tipo: "todas-bases" })}
-            onActualizar={onActualizarOris}
-            onEliminar={
-              onEliminarOris
-                ? (id) => {
-                    onEliminarOris(id);
-                    setSeleccion({ tipo: "todas-bases" });
-                  }
-                : undefined
-            }
-          />
-        ) : conceptoActivo ? (
+        {conceptoActivo ? (
           <ConceptoEditor
             concepto={conceptoActivo}
             onBack={() => setSeleccion({ tipo: "todas-bases" })}
@@ -1061,7 +1121,8 @@ export function FisicaPage({
                 particulas={particulas}
                 oris={oris}
                 subsistemas={subsistemas}
-                onSelectOris={(id) => setSeleccion({ tipo: "oris", id })}
+                onActualizarOris={onActualizarOris}
+                onEliminarOris={onEliminarOris}
                 onSelectSubsistema={(id) => setSeleccion({ tipo: "subsistema", id })}
                 onCrearSubsistema={onCrearSubsistema}
                 creandoSubsistema={creandoSubsistema}
