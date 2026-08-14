@@ -339,12 +339,19 @@ export function ElementoPanelFlotante({
   onCerrar,
   onActualizar,
   onEliminar,
+  compuestos,
+  onNavigateCompuesto,
 }: {
   elemento: Elemento;
   todosLosElementos: Elemento[];
   onCerrar: () => void;
   onActualizar: (id: string, cambios: Partial<Elemento>) => void;
   onEliminar?: (id: string) => void;
+  /** Catálogo de compuestos, para mostrar en qué compuestos se usa este
+   *  elemento (columna junto a Notas dentro de ElementoEditor). */
+  compuestos?: Compuesto[];
+  /** Navega al panel flotante de un Compuesto donde se usa este elemento. */
+  onNavigateCompuesto?: (compuestoId: string) => void;
 }) {
   const [headerControls, setHeaderControls] = useState<EditorHeaderControls | null>(null);
 
@@ -455,6 +462,8 @@ export function ElementoPanelFlotante({
                 : undefined
             }
             onHeaderControlsChange={setHeaderControls}
+            compuestos={compuestos}
+            onNavigateCompuesto={onNavigateCompuesto}
           />
         </div>
       </div>
@@ -667,6 +676,10 @@ export function ElementosPage({
   onActualizarVarios,
 }: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  // Al clickear un compuesto en "Usado en compuestos" desde el editor de un
+  // Elemento: cierra el panel de Elemento y fuerza la apertura de este
+  // compuesto en CompuestosPage (más abajo en la misma página).
+  const [compuestoAAbrir, setCompuestoAAbrir] = useState<string | null>(null);
   const [seleccionMultiple, setSeleccionMultiple] = useState<Set<string>>(new Set());
   const [eliminandoVarios, setEliminandoVarios] = useState(false);
 
@@ -1086,6 +1099,11 @@ export function ElementosPage({
                 }
               : undefined
           }
+          compuestos={compuestos}
+          onNavigateCompuesto={(compuestoId) => {
+            setSeleccionadoId(null);
+            setCompuestoAAbrir(compuestoId);
+          }}
         />
       )}
         </div>
@@ -1108,7 +1126,7 @@ export function ElementosPage({
             setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
           }
           onEliminar={handleEliminarCompuesto}
-          seleccionarId={compuestoRecienCreadoId}
+          seleccionarId={compuestoAAbrir ?? compuestoRecienCreadoId}
         />
       </div>
 

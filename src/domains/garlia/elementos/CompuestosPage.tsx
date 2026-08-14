@@ -606,6 +606,10 @@ function CompuestoEditor({
    *  caller, para que el panel flotante del elemento muestre datos frescos
    *  (mismo patrón que onActualizar de Compuesto). */
   onActualizarElemento?: (id: string, cambios: Partial<Elemento>) => void;
+  /** Navega a otro Compuesto donde se usa el elemento que se está viendo
+   *  (clic en "Usado en compuestos" dentro del panel de Elemento embebido).
+   *  Opcional: si no se pasa, esa lista queda como referencia sin navegar. */
+  onNavigateCompuesto?: (compuestoId: string) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
@@ -816,6 +820,15 @@ function CompuestoEditor({
           todosLosElementos={elementos}
           onCerrar={() => setEditandoElementoId(null)}
           onActualizar={persistElemento}
+          compuestos={todosLosCompuestos}
+          onNavigateCompuesto={
+            onNavigateCompuesto
+              ? (compuestoId) => {
+                  setEditandoElementoId(null);
+                  onNavigateCompuesto(compuestoId);
+                }
+              : undefined
+          }
         />
       )}
     </div>
@@ -835,6 +848,7 @@ export function CompuestoPanelFlotante({
   onCerrar,
   onActualizar,
   onEliminar,
+  onNavigateCompuesto,
 }: {
   compuesto: Compuesto;
   elementos: Elemento[];
@@ -842,6 +856,10 @@ export function CompuestoPanelFlotante({
   onCerrar: () => void;
   onActualizar: (id: string, cambios: Partial<Compuesto>) => void;
   onEliminar?: (id: string) => void;
+  /** Navega a otro Compuesto donde se usa un elemento visto desde acá
+   *  (clic en "Usado en compuestos" dentro del panel de Elemento anidado).
+   *  Opcional: si no se pasa, esa lista no navega. */
+  onNavigateCompuesto?: (compuestoId: string) => void;
 }) {
   const [headerControls, setHeaderControls] = useState<EditorHeaderControls | null>(null);
 
@@ -953,6 +971,7 @@ export function CompuestoPanelFlotante({
                 : undefined
             }
             onHeaderControlsChange={setHeaderControls}
+            onNavigateCompuesto={onNavigateCompuesto}
           />
         </div>
       </div>
@@ -1319,6 +1338,14 @@ export function CompuestosPage({
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [laboratorioAbierto, setLaboratorioAbierto] = useState(false);
 
+  // Permite que el caller fuerce la apertura de un compuesto específico
+  // desde afuera (ej. al navegar desde "Usado en compuestos" en el editor
+  // de un Elemento) cada vez que seleccionarId cambia, no solo como valor
+  // inicial.
+  useEffect(() => {
+    if (seleccionarId) setSeleccionadoId(seleccionarId);
+  }, [seleccionarId]);
+
   const activoId = seleccionadoId ?? seleccionarId ?? null;
   const activo = useMemo(
     () => compuestos.find((c) => c.id === activoId) ?? null,
@@ -1419,6 +1446,7 @@ export function CompuestosPage({
                 }
               : undefined
           }
+          onNavigateCompuesto={setSeleccionadoId}
         />
       )}
 
