@@ -106,6 +106,24 @@ type Seleccion =
   | { tipo: "todos-subsistemas" }
   | null;
 
+/** Grupo activo en la barra superior: "Bases" (con Conceptos anidado) u
+ *  "Oris" (con Subsistemas anidado) — reemplaza las 4 pestañas planas por
+ *  2 grupos con sub-tabs. */
+type GrupoNav = "bases" | "oris";
+
+function grupoDeSeleccion(seleccion: Seleccion): GrupoNav {
+  if (!seleccion) return "bases";
+  switch (seleccion.tipo) {
+    case "oris":
+    case "todos-oris":
+    case "subsistema":
+    case "todos-subsistemas":
+      return "oris";
+    default:
+      return "bases";
+  }
+}
+
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
 function descargarDatosFisica(particulas: Particula[], oris: Oris[], conceptos: FisicaConcepto[]) {
   const payload = {
@@ -1141,87 +1159,151 @@ export function FisicaPage({
 
   const bloquesConceptos = useMemo(() => agruparPorBloque(conceptosLocal), [conceptosLocal]);
 
+  const grupoActivo = grupoDeSeleccion(seleccion);
+
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      {/* Barra superior de navegación (mismo patrón que SubTabsElementos en
-          Química): tabs para Bases / Oris / Conceptos / Subsistemas, en vez
-          de la columna lateral que había antes. */}
-      <div className="shrink-0 flex items-center justify-between gap-2 px-3 pt-2 pb-1.5 border-b border-primary/10">
+      {/* Barra superior de navegación: 2 grupos — "Bases" (con Conceptos
+          anidado debajo) y "Oris" (con Subsistemas anidado debajo) — cada
+          uno con sub-tabs propias en una segunda fila. */}
+      <div className="shrink-0 flex flex-col gap-1 px-3 pt-2 pb-1.5 border-b border-primary/10">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 flex-wrap">
+            {(
+              [
+                {
+                  grupo: "bases" as const,
+                  destino: "todas-bases" as const,
+                  label: `Bases · ${PARTICULAS_BASE.length + particulas.length + IUMS.length}`,
+                  Icon: null as typeof Atom | null,
+                },
+                {
+                  grupo: "oris" as const,
+                  destino: "todos-oris" as const,
+                  label: `Oris · ${oris.length}`,
+                  Icon: Atom,
+                },
+              ]
+            ).map(({ grupo, destino, label, Icon }) => {
+              const activo = grupoActivo === grupo;
+              return (
+                <button
+                  key={grupo}
+                  type="button"
+                  onClick={() => setSeleccion({ tipo: destino } as Seleccion)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
+                    activo
+                      ? "bg-primary/10 text-primary"
+                      : "text-primary/40 hover:text-primary/70 hover:bg-primary/5"
+                  }`}
+                >
+                  {Icon && <Icon size={11} />}
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="shrink-0 flex items-center gap-0.5">
+            {onImportarFisica && (
+              <>
+                <input
+                  ref={inputArchivoRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={handleArchivoSeleccionado}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={importando}
+                  onClick={() => inputArchivoRef.current?.click()}
+                  title='Subir un JSON con Oris y/o conceptos: crea los nuevos y actualiza los existentes (mismo formato que "Descargar datos")'
+                  className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => descargarDatosFisica(particulas, oris, conceptosLocal)}
+              title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
+              className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+            >
+              <Download size={10} />
+            </button>
+          </div>
+        </div>
+
+        {/* Sub-tabs del grupo activo. */}
         <div className="flex items-center gap-1 flex-wrap">
-          {(
-            [
-              { tipo: "todas-bases" as const, label: `Bases · ${PARTICULAS_BASE.length + particulas.length + IUMS.length}`, Icon: null as typeof Atom | null, onAdd: undefined as (() => void) | undefined, addPending: undefined as boolean | undefined },
-              { tipo: "todos-oris" as const, label: `Oris · ${oris.length}`, Icon: Atom, onAdd: onCreateOris, addPending: creatingOris },
-              { tipo: "todos-conceptos" as const, label: `Conceptos · ${conceptosLocal.length}`, Icon: null, onAdd: undefined, addPending: undefined },
-              { tipo: "todos-subsistemas" as const, label: `Subsistemas de Magia · ${subsistemas.length}`, Icon: Sparkles, onAdd: undefined, addPending: undefined },
-            ]
-          ).map(({ tipo, label, Icon, onAdd, addPending }) => {
-            const activo =
-              seleccion?.tipo === tipo ||
-              (tipo === "todos-oris" && seleccion?.tipo === "oris") ||
-              (tipo === "todos-conceptos" && seleccion?.tipo === "concepto") ||
-              (tipo === "todos-subsistemas" && seleccion?.tipo === "subsistema");
-            return (
+          {grupoActivo === "bases" ? (
+            <>
               <button
-                key={tipo}
                 type="button"
-                onClick={() => setSeleccion({ tipo } as Seleccion)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
-                  activo
-                    ? "bg-primary/10 text-primary"
-                    : "text-primary/40 hover:text-primary/70 hover:bg-primary/5"
+                onClick={() => setSeleccion({ tipo: "todas-bases" })}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide transition-all cursor-pointer ${
+                  seleccion?.tipo === "todas-bases"
+                    ? "text-primary bg-primary/5"
+                    : "text-primary/35 hover:text-primary/60"
                 }`}
               >
-                {Icon && <Icon size={11} />}
-                {label}
-                {onAdd && (
+                Bases
+              </button>
+              <button
+                type="button"
+                onClick={() => setSeleccion({ tipo: "todos-conceptos" })}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide transition-all cursor-pointer ${
+                  seleccion?.tipo === "todos-conceptos" || seleccion?.tipo === "concepto"
+                    ? "text-primary bg-primary/5"
+                    : "text-primary/35 hover:text-primary/60"
+                }`}
+              >
+                Conceptos · {conceptosLocal.length}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setSeleccion({ tipo: "todos-oris" })}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide transition-all cursor-pointer ${
+                  seleccion?.tipo === "todos-oris" || seleccion?.tipo === "oris"
+                    ? "text-primary bg-primary/5"
+                    : "text-primary/35 hover:text-primary/60"
+                }`}
+              >
+                Oris
+                {onCreateOris && (
                   <span
                     role="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onAdd();
+                      onCreateOris();
                     }}
                     title="Nuevo Oris"
-                    className="flex items-center justify-center w-4 h-4 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-center w-3.5 h-3.5 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
                   >
-                    {addPending ? <Loader2 className="animate-spin" size={9} /> : <Plus size={10} />}
+                    {creatingOris ? <Loader2 className="animate-spin" size={9} /> : <Plus size={9} />}
                   </span>
                 )}
               </button>
-            );
-          })}
-        </div>
-
-        <div className="shrink-0 flex items-center gap-0.5">
-          {onImportarFisica && (
-            <>
-              <input
-                ref={inputArchivoRef}
-                type="file"
-                accept="application/json,.json"
-                onChange={handleArchivoSeleccionado}
-                className="hidden"
-              />
               <button
                 type="button"
-                disabled={importando}
-                onClick={() => inputArchivoRef.current?.click()}
-                title='Subir un JSON con Oris y/o conceptos: crea los nuevos y actualiza los existentes (mismo formato que "Descargar datos")'
-                className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                onClick={() => setSeleccion({ tipo: "todos-subsistemas" })}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide transition-all cursor-pointer ${
+                  seleccion?.tipo === "todos-subsistemas" || seleccion?.tipo === "subsistema"
+                    ? "text-primary bg-primary/5"
+                    : "text-primary/35 hover:text-primary/60"
+                }`}
               >
-                {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}
+                Subsistemas · {subsistemas.length}
               </button>
             </>
           )}
-          <button
-            type="button"
-            onClick={() => descargarDatosFisica(particulas, oris, conceptosLocal)}
-            title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
-            className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-          >
-            <Download size={10} />
-          </button>
         </div>
+
       </div>
 
       {mensajeImportacion && (
