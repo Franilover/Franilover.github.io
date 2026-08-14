@@ -90,7 +90,7 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
           onChange={(e) => setLocal((p) => ({ ...p, nombre: e.target.value }))}
           onBlur={() => persist({ nombre: local.nombre })}
           placeholder="Nombre del Oris"
-          className="flex-1 min-w-0 bg-transparent text-micro font-black text-primary outline-none placeholder:text-primary/25"
+          className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
         />
 
         <div className="shrink-0 flex items-center gap-1">
@@ -131,7 +131,7 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
 
       <div className={`flex-1 min-h-0 flex flex-row gap-3 overflow-y-auto ${embedded ? "p-2" : "p-2.5"}`}>
         {/* Columna izquierda: gráfico + composición de Iums */}
-        <div className="shrink-0 w-[200px] flex flex-col items-center gap-3 p-3 rounded-lg border border-primary/10 bg-primary/[0.02]">
+        <div className="shrink-0 w-[200px] flex flex-col items-center gap-3 p-3">
           <IumVisual particulas={particulasOris} size={160} />
 
           {iumsPresentes.length === 0 ? (
@@ -149,9 +149,6 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
               ))}
             </div>
           )}
-          <span className="text-micro text-primary/25 text-center">
-            Composición fija — se editó a mano en la base de datos.
-          </span>
         </div>
 
         {/* Columna derecha: título/selectores + descripción */}

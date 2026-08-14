@@ -185,7 +185,6 @@ export function LetrasVisual({
           cx={cx}
           cy={cy}
           r={r}
-          strokeDasharray="3 4"
           strokeWidth={1.5}
           style={{ fill: "color-mix(in srgb, var(--primary) 4%, transparent)", stroke: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
         />
@@ -315,7 +314,6 @@ export function IumVisual({
             cx={cx}
             cy={cy}
             r={orbitR}
-            strokeDasharray="3 4"
             strokeWidth={1.5}
             style={{ fill: "none", stroke: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
           />
@@ -327,7 +325,6 @@ export function IumVisual({
               cy={cy}
               r={orbitR}
               fill="none"
-              strokeDasharray="2 4"
               strokeWidth={1}
               style={{ stroke: "color-mix(in srgb, var(--primary) 12%, transparent)" }}
             />
