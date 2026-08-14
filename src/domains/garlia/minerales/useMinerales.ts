@@ -38,7 +38,7 @@ export function useMinerales() {
     setCreating(true);
     const { data, error } = await supabase
       .from("minerales")
-      .insert([{ nombre, imagen_url: null, descripcion: "", componentes: [], notas: "" }])
+      .insert([{ nombre, imagen_url: null, descripcion: "", compuesto_id: null, notas: "" }])
       .select()
       .single();
     setCreating(false);

@@ -2,18 +2,17 @@
  * types.ts (Minerales)
  * ───────────────────────────────────────────────────────────────────────────
  * Entidad plana (mismo molde que Flora/Item/Ecosistema): nombre, imagen,
- * descripción, notas y una composición de Elementos (componentes jsonb)
- * vía el mismo motor de afinidad.ts.
+ * descripción, notas y una referencia a un Compuesto del catálogo de
+ * Elementos (compuesto_id) — mismo cambio que Flora: ya no arma su propia
+ * lista de elementos sueltos, elige/crea un Compuesto existente.
  */
-
-import type { ComponenteCompuesto } from "@/domains/garlia/elementos/types";
 
 export interface Mineral {
   id: string;
   nombre: string;
   imagen_url: string | null;
   descripcion: string;
-  componentes: ComponenteCompuesto[];
+  compuesto_id: string | null;
   notas: string;
   orden: number;
   created_at: string;
@@ -21,5 +20,5 @@ export interface Mineral {
 }
 
 export type MineralInput = Partial<
-  Pick<Mineral, "nombre" | "imagen_url" | "descripcion" | "componentes" | "notas" | "orden">
+  Pick<Mineral, "nombre" | "imagen_url" | "descripcion" | "compuesto_id" | "notas" | "orden">
 >;

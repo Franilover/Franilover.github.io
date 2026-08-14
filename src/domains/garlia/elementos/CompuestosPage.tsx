@@ -776,7 +776,7 @@ function CompuestoEditor({
  * pantalla con backdrop blur, animación popIn, Escape para cerrar y bloqueo
  * de scroll del fondo), en vez del drawer lateral que usaba antes.
  */
-function CompuestoPanelFlotante({
+export function CompuestoPanelFlotante({
   compuesto,
   elementos,
   todosLosCompuestos,

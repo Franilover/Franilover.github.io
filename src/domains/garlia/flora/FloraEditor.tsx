@@ -4,15 +4,16 @@
  * FloraEditor.tsx
  * ───────────────────────────────────────────────────────────────────────────
  * Editor liviano y self-contained de una entidad Flora: nombre, imagen,
- * descripción rica, composición de Elementos (mismo motor de afinidad.ts
- * que Criaturas, vía SelectorComposicionElementos compartido) con balance
- * por capa / reactividad / peso, y notas.
+ * descripción rica, composición material referenciando un Compuesto del
+ * catálogo de Elementos (compuesto_id — elegido/creado vía SelectorCompuesto,
+ * en vez de armar elementos sueltos uno a uno) con balance por capa /
+ * reactividad / peso, y notas.
  *
  * Molde: liviano como ItemEditor/EcosistemaEditor, no tan pesado como
  * EditorCriatura.tsx (sin personajes/reinos/ítems/grupos/D&D).
  */
 
-import { Leaf, Wand2 } from "lucide-react";
+import { Leaf } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -20,24 +21,24 @@ import { useConfirm } from "@/ui/ConfirmModal";
 import { type SaveStatus } from "@/ui/saveStatus";
 
 import {
-  autocompletarHastaEstable,
   calcularBalancePorCapa,
   calcularPerfilAtomico,
   calcularPeso,
   calcularReactividad,
 } from "@/domains/garlia/elementos/afinidad";
-import { SelectorComposicionElementos } from "@/domains/garlia/elementos/SelectorComposicionElementos";
+import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import {
   LAYER_LABEL,
   REACTIVIDAD_LABEL,
   formatLayer,
-  type ComponenteCompuesto,
   type Compuesto,
   type LayerName,
 } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
+import { SelectorCompuesto } from "@/domains/garlia/_shared/SelectorCompuesto";
 import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
@@ -97,34 +98,40 @@ export function FloraEditor({
   onDeleted?: (id: string) => void;
   onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
-  const { items: elementos, loading: loadingElementos } = useElementos();
+  const { items: elementos } = useElementos();
+  const { items: compuestos, setItems: setCompuestos, loading: loadingCompuestos } = useCompuestos();
   const { actualizar, eliminar } = useFlora();
   const { confirm, ConfirmModal } = useConfirm();
 
   const [form, setForm] = useState<Flora>(floraProp);
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
 
   useEffect(() => {
     setForm(floraProp);
     setStatus("idle");
   }, [floraProp.id]);
 
-  const componentes = form.componentes ?? [];
-
-  const compuestoTemporal: Compuesto = useMemo(
-    () => ({ id: form.id, nombre: form.nombre, componentes }),
-    [form.id, form.nombre, componentes],
+  const compuestoElegido = useMemo(
+    () => compuestos.find((c) => c.id === form.compuesto_id) ?? null,
+    [compuestos, form.compuesto_id],
   );
   const perfilAtomico = useMemo(
-    () => calcularPerfilAtomico(compuestoTemporal, elementos),
-    [compuestoTemporal, elementos],
+    () => (compuestoElegido ? calcularPerfilAtomico(compuestoElegido, elementos) : null),
+    [compuestoElegido, elementos],
   );
-  const balance = useMemo(() => calcularBalancePorCapa(perfilAtomico), [perfilAtomico]);
+  const balance = useMemo(
+    () => (perfilAtomico ? calcularBalancePorCapa(perfilAtomico) : null),
+    [perfilAtomico],
+  );
   const reactividad = useMemo(
-    () => calcularReactividad(compuestoTemporal, elementos),
-    [compuestoTemporal, elementos],
+    () => (compuestoElegido ? calcularReactividad(compuestoElegido, elementos) : null),
+    [compuestoElegido, elementos],
   );
-  const peso = useMemo(() => calcularPeso(compuestoTemporal, elementos), [compuestoTemporal, elementos]);
+  const peso = useMemo(
+    () => (compuestoElegido ? calcularPeso(compuestoElegido, elementos) : null),
+    [compuestoElegido, elementos],
+  );
 
   async function guardar(updates: Partial<Flora>) {
     setStatus("saving");
@@ -137,14 +144,13 @@ export function FloraEditor({
     }
   }
 
-  function cambiarComponentes(nuevos: ComponenteCompuesto[]) {
-    setForm((f) => ({ ...f, componentes: nuevos }));
-    void guardar({ componentes: nuevos });
+  function cambiarCompuesto(compuestoId: string | null) {
+    setForm((f) => ({ ...f, compuesto_id: compuestoId }));
+    void guardar({ compuesto_id: compuestoId });
   }
 
-  function autocompletar() {
-    const nuevos = autocompletarHastaEstable(componentes, elementos);
-    cambiarComponentes(nuevos);
+  function onCompuestoCreado(nuevo: Compuesto) {
+    setCompuestos((prev) => [...prev, nuevo]);
   }
 
   async function eliminarFlora() {
@@ -209,40 +215,30 @@ export function FloraEditor({
                 />
               </div>
 
-              {/* Composición material — reusa el motor de afinidad.ts de Elementos */}
+              {/* Composición material — ahora se elige/crea un Compuesto del
+                  catálogo en vez de armar elementos sueltos uno a uno */}
               <div className="pt-2 border-t border-primary/10">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-                    Composición (Elementos)
+                    Composición (Compuesto)
                   </span>
-                  {componentes.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={autocompletar}
-                      title="Agregar elementos hasta cerrar el déficit de las 3 capas"
-                      className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-                    >
-                      <Wand2 size={10} /> Autocompletar
-                    </button>
-                  )}
                 </div>
                 <p className="text-micro text-primary/30 mb-1.5 -mt-1">
-                  Elementos de la Tabla Química que componen esta planta.
+                  Compuesto de la Tabla Química que forma esta planta.
                 </p>
 
-                {loadingElementos ? (
-                  <div className="py-3 text-xs text-primary/30 text-center">Cargando elementos…</div>
-                ) : (
-                  <SelectorComposicionElementos
-                    componentes={componentes}
-                    elementos={elementos}
-                    onChange={cambiarComponentes}
-                  />
-                )}
+                <SelectorCompuesto
+                  compuestos={compuestos}
+                  loadingCompuestos={loadingCompuestos}
+                  compuestoId={form.compuesto_id}
+                  onChange={cambiarCompuesto}
+                  onCompuestoCreado={onCompuestoCreado}
+                  onEditarCompuesto={setEditandoCompuestoId}
+                />
               </div>
 
-              {/* Balance por capa */}
-              {componentes.length > 0 && (
+              {/* Balance por capa del compuesto elegido */}
+              {compuestoElegido && balance && perfilAtomico && (
                 <div className="p-3 rounded-xl border border-primary/10 bg-primary/[0.02]">
                   {LAYERS.map((layer) => {
                     const b = balance.find((x) => x.layer === layer)!;
@@ -259,10 +255,16 @@ export function FloraEditor({
 
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary/10">
                     <span className="text-micro font-bold text-primary/50">
-                      Reactividad: <span className="text-primary/80">{REACTIVIDAD_LABEL[reactividad.nivel]}</span>
+                      Reactividad:{" "}
+                      <span className="text-primary/80">
+                        {reactividad ? REACTIVIDAD_LABEL[reactividad.nivel] : "—"}
+                      </span>
                     </span>
                     <span className="text-micro font-bold text-primary/50">
-                      Peso: <span className="text-primary/80">{peso.pesoTotal} ({peso.categoria})</span>
+                      Peso:{" "}
+                      <span className="text-primary/80">
+                        {peso ? `${peso.pesoTotal} (${peso.categoria})` : "—"}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -295,6 +297,18 @@ export function FloraEditor({
           </div>
         </div>
       </div>
+
+      {editandoCompuestoId && (
+        <CompuestoPanelFlotante
+          compuesto={compuestos.find((c) => c.id === editandoCompuestoId)!}
+          elementos={elementos}
+          todosLosCompuestos={compuestos}
+          onCerrar={() => setEditandoCompuestoId(null)}
+          onActualizar={(id, cambios) =>
+            setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
+          }
+        />
+      )}
     </div>
   );
 }
