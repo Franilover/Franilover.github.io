@@ -41,6 +41,7 @@ import {
   type OnHeaderControlsChange,
 } from "../_shared/useEditorHeaderControls";
 import { ElementoPanelFlotante } from "./ElementosPage";
+import { AtomoVisual } from "./ElementoEditor";
 
 import {
   autocompletarHastaEstable,
@@ -465,6 +466,35 @@ function BalanceAtomico({
 }
 
 /**
+ * Representación tipo átomo del compuesto: mismo dibujo (núcleo + capas
+ * orbitales con las partículas del mundo) que usa ElementoEditor, pero
+ * alimentado con el perfil atómico combinado — la suma de partículas de
+ * todos los elementos que lo componen, ya multiplicada por sus cantidades.
+ * Como calcularPerfilAtomico devuelve {nucleo, media, externa} con la
+ * misma forma (ParticleMap) que un Elemento, no hace falta ningún dibujo
+ * nuevo: se reutiliza AtomoVisual pasándole el perfil como si fuera un
+ * elemento con esas 3 capas ya combinadas ("molécula" en vez de átomo).
+ */
+function AtomoVisualCompuesto({
+  compuesto,
+  elementos,
+}: {
+  compuesto: Compuesto;
+  elementos: Elemento[];
+}) {
+  const perfil = useMemo(
+    () => calcularPerfilAtomico(compuesto, elementos),
+    [compuesto, elementos],
+  );
+
+  return (
+    <div className="h-40">
+      <AtomoVisual elemento={perfil} />
+    </div>
+  );
+}
+
+/**
  * Reactividad ("energía de activación") + peso molecular de un compuesto —
  * derivados directos del perfil atómico, sin datos nuevos que cargar. Los
  * catalizadores presentes en la mezcla ya están descontados del déficit
@@ -800,6 +830,13 @@ function CompuestoEditor({
                 Balance atómico
               </p>
               <BalanceAtomico compuesto={local} elementos={elementos} />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
+                Molécula
+              </p>
+              <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
             </div>
           </div>
 

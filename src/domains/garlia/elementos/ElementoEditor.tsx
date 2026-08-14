@@ -482,7 +482,19 @@ function particulasDeCapa(layer: ParticleMap | null | undefined): ParticleType[]
   return out;
 }
 
-function AtomoVisual({ elemento }: { elemento: Elemento }) {
+/**
+ * Perfil mínimo que necesita AtomoVisual: las 3 capas como ParticleMap.
+ * Tanto Elemento como el PerfilAtomico calculado de un Compuesto (suma de
+ * partículas de todos sus elementos componentes) cumplen esta forma, por
+ * eso el mismo dibujo sirve para ambos sin duplicar el SVG.
+ */
+export interface PerfilConCapas {
+  nucleo?: ParticleMap | null;
+  media?: ParticleMap | null;
+  externa?: ParticleMap | null;
+}
+
+export function AtomoVisual({ elemento }: { elemento: PerfilConCapas }) {
   const nucleares = useMemo(() => particulasDeCapa(elemento.nucleo), [elemento.nucleo]);
   const capaMedia = useMemo(() => particulasDeCapa(elemento.media), [elemento.media]);
   const capaExterna = useMemo(() => particulasDeCapa(elemento.externa), [elemento.externa]);
