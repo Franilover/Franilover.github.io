@@ -311,8 +311,8 @@ function TodasLasBasesView({
 }) {
   const catalogos = catalogosBases(particulas);
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
+    <div className="shrink-0 flex flex-col">
+      <div className="p-2.5 flex flex-col gap-4">
         {catalogos.map(({ key, titulo, filas }, idx) => (
           <div key={key} className="flex flex-col gap-2">
             <div
@@ -378,8 +378,8 @@ function TodosLosOrisView({
   }, [orisAbiertoId, orisPorFamilia]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
+    <div className="shrink-0 flex flex-col">
+      <div className="p-2.5 flex flex-col gap-4">
         {ORIS_FAMILIAS.map((familia, idx) => {
           const items = orisPorFamilia.get(familia) ?? [];
           const Icon = ORIS_FAMILIA_ICON[familia];
@@ -570,7 +570,7 @@ function TodosLosConceptosView({
   creandoSeccion?: boolean;
 }) {
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div className="shrink-0 flex flex-col">
       <div
         style={{ background: "var(--bg-main)" }}
         className="shrink-0 flex items-center justify-end gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
@@ -617,7 +617,7 @@ function TodosLosConceptosView({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-2.5 flex flex-col gap-4">
+      <div className="p-2.5 flex flex-col gap-4">
         {bloques.length === 0 ? (
           <div className="py-8 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
             Sin conceptos todavía
@@ -880,18 +880,11 @@ function TodosLosSubsistemasView({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div className="shrink-0 flex flex-col">
       <div
         style={{ background: "var(--bg-main)" }}
         className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
       >
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <ChevronLeft size={12} />
-        </button>
         <span className="flex-1 min-w-0 text-sm font-black text-primary flex items-center gap-1.5">
           <Sparkles size={13} className="text-accent/60" />
           Subsistemas de Magia
@@ -906,7 +899,7 @@ function TodosLosSubsistemasView({
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
+      <div className="p-2.5">
         {creandoAbierto && (
           <div className="flex items-center gap-1.5 mb-3">
             <input
@@ -1236,74 +1229,6 @@ export function FisicaPage({
           </div>
         </div>
 
-        {/* Sub-tabs del grupo activo. */}
-        <div className="flex items-center gap-1 flex-wrap">
-          {grupoActivo === "bases" ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setSeleccion({ tipo: "todas-bases" })}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide transition-all cursor-pointer ${
-                  seleccion?.tipo === "todas-bases"
-                    ? "text-primary bg-primary/5"
-                    : "text-primary/35 hover:text-primary/60"
-                }`}
-              >
-                Bases
-              </button>
-              <button
-                type="button"
-                onClick={() => setSeleccion({ tipo: "todos-conceptos" })}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide transition-all cursor-pointer ${
-                  seleccion?.tipo === "todos-conceptos" || seleccion?.tipo === "concepto"
-                    ? "text-primary bg-primary/5"
-                    : "text-primary/35 hover:text-primary/60"
-                }`}
-              >
-                Conceptos · {conceptosLocal.length}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setSeleccion({ tipo: "todos-oris" })}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide transition-all cursor-pointer ${
-                  seleccion?.tipo === "todos-oris" || seleccion?.tipo === "oris"
-                    ? "text-primary bg-primary/5"
-                    : "text-primary/35 hover:text-primary/60"
-                }`}
-              >
-                Oris
-                {onCreateOris && (
-                  <span
-                    role="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCreateOris();
-                    }}
-                    title="Nuevo Oris"
-                    className="flex items-center justify-center w-3.5 h-3.5 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {creatingOris ? <Loader2 className="animate-spin" size={9} /> : <Plus size={9} />}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSeleccion({ tipo: "todos-subsistemas" })}
-                className={`flex items-center gap-1 px-2 py-0.5 rounded text-micro font-bold uppercase tracking-wide transition-all cursor-pointer ${
-                  seleccion?.tipo === "todos-subsistemas" || seleccion?.tipo === "subsistema"
-                    ? "text-primary bg-primary/5"
-                    : "text-primary/35 hover:text-primary/60"
-                }`}
-              >
-                Subsistemas · {subsistemas.length}
-              </button>
-            </>
-          )}
-        </div>
-
       </div>
 
       {mensajeImportacion && (
@@ -1336,43 +1261,10 @@ export function FisicaPage({
                 : undefined
             }
           />
-        ) : seleccion?.tipo === "todos-oris" ? (
-          <TodosLosOrisView
-            orisPorFamilia={orisPorFamilia}
-            onBack={() => setSeleccion(null)}
-            onActualizarOris={onActualizarOris}
-            onEliminarOris={onEliminarOris}
-          />
-        ) : seleccion?.tipo === "todas-bases" ? (
-          <TodasLasBasesView particulas={particulas} onBack={() => setSeleccion(null)} />
-        ) : seleccion?.tipo === "todos-conceptos" ? (
-          <TodosLosConceptosView
-            bloques={bloquesConceptos}
-            onBack={() => setSeleccion(null)}
-            onActualizarConcepto={(id, cambios) => {
-              setConceptosLocal((prev) =>
-                prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
-              );
-              onActualizarConcepto(id, cambios);
-            }}
-            onEliminarConcepto={handleEliminarConcepto}
-            onAgregarConcepto={handleAgregarConcepto}
-            agregandoConceptoDe={agregandoConceptoDe}
-            mostrarInputSeccion={mostrarInputSeccion}
-            nuevaSeccionNombre={nuevaSeccionNombre}
-            onCambiarNuevaSeccionNombre={setNuevaSeccionNombre}
-            onConfirmarNuevaSeccion={handleCrearSeccion}
-            onCancelarNuevaSeccion={() => {
-              setMostrarInputSeccion(false);
-              setNuevaSeccionNombre("");
-            }}
-            onAbrirNuevaSeccion={() => setMostrarInputSeccion(true)}
-            creandoSeccion={creandoSeccion}
-          />
         ) : conceptoActivo ? (
           <ConceptoEditor
             concepto={conceptoActivo}
-            onBack={() => setSeleccion({ tipo: "todos-conceptos" })}
+            onBack={() => setSeleccion({ tipo: "todas-bases" })}
             onActualizar={(id, cambios) => {
               setConceptosLocal((prev) =>
                 prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
@@ -1381,30 +1273,69 @@ export function FisicaPage({
             }}
             onEliminar={(id) => {
               handleEliminarConcepto(id);
-              setSeleccion({ tipo: "todos-conceptos" });
+              setSeleccion({ tipo: "todas-bases" });
             }}
-          />
-        ) : seleccion?.tipo === "todos-subsistemas" ? (
-          <TodosLosSubsistemasView
-            subsistemas={subsistemas}
-            loading={loadingSubsistemas}
-            creating={creandoSubsistema}
-            onBack={() => setSeleccion(null)}
-            onCrear={onCrearSubsistema}
-            onSelect={(id) => setSeleccion({ tipo: "subsistema", id })}
           />
         ) : subsistemaActivo ? (
           <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
             <PanelEditorSubsistema
               subsistema={subsistemaActivo}
-              onVolver={() => setSeleccion({ tipo: "todos-subsistemas" })}
+              onVolver={() => setSeleccion({ tipo: "todos-oris" })}
               onSave={(updates) => onActualizarSubsistema(subsistemaActivo.id, updates)}
               onDelete={() => {
                 onEliminarSubsistema(subsistemaActivo.id);
-                setSeleccion({ tipo: "todos-subsistemas" });
+                setSeleccion({ tipo: "todos-oris" });
               }}
               onSelectCriatura={onSelectCriatura}
             />
+          </div>
+        ) : seleccion?.tipo === "todos-oris" ? (
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+            <TodosLosOrisView
+              orisPorFamilia={orisPorFamilia}
+              onBack={() => setSeleccion(null)}
+              onActualizarOris={onActualizarOris}
+              onEliminarOris={onEliminarOris}
+            />
+            <div className="border-t border-primary/10">
+              <TodosLosSubsistemasView
+                subsistemas={subsistemas}
+                loading={loadingSubsistemas}
+                creating={creandoSubsistema}
+                onBack={() => setSeleccion(null)}
+                onCrear={onCrearSubsistema}
+                onSelect={(id) => setSeleccion({ tipo: "subsistema", id })}
+              />
+            </div>
+          </div>
+        ) : seleccion?.tipo === "todas-bases" ? (
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+            <TodasLasBasesView particulas={particulas} onBack={() => setSeleccion(null)} />
+            <div className="border-t border-primary/10">
+              <TodosLosConceptosView
+                bloques={bloquesConceptos}
+                onBack={() => setSeleccion(null)}
+                onActualizarConcepto={(id, cambios) => {
+                  setConceptosLocal((prev) =>
+                    prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+                  );
+                  onActualizarConcepto(id, cambios);
+                }}
+                onEliminarConcepto={handleEliminarConcepto}
+                onAgregarConcepto={handleAgregarConcepto}
+                agregandoConceptoDe={agregandoConceptoDe}
+                mostrarInputSeccion={mostrarInputSeccion}
+                nuevaSeccionNombre={nuevaSeccionNombre}
+                onCambiarNuevaSeccionNombre={setNuevaSeccionNombre}
+                onConfirmarNuevaSeccion={handleCrearSeccion}
+                onCancelarNuevaSeccion={() => {
+                  setMostrarInputSeccion(false);
+                  setNuevaSeccionNombre("");
+                }}
+                onAbrirNuevaSeccion={() => setMostrarInputSeccion(true)}
+                creandoSeccion={creandoSeccion}
+              />
+            </div>
           </div>
         ) : (
           <EditorVacio />
