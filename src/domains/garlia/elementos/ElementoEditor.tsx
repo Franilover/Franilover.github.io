@@ -515,8 +515,18 @@ export function AtomoVisual({
   const cx = size / 2;
   const cy = size / 2;
   const radios = { media: 48, externa: 82 };
-  const particleRadius = { nucleo: 10, orbita: 9 };
-  const fontSize = { nucleo: 7.5, orbita: 7 };
+
+  // El núcleo no tiene radio de órbita fijo: a más partículas apiñadas,
+  // más chicas y más separadas del centro necesitan estar para no
+  // solaparse. Escala en base a la cantidad, con piso y techo para que
+  // ni quede gigante con 1 partícula ni ilegible con muchas.
+  const nucleoCount = Math.max(nucleares.length, 1);
+  const nucleoParticleRadius = Math.max(4, Math.min(10, 15 - nucleoCount * 0.7));
+  const nucleoOrbitRadius = nucleoCount === 1 ? 0 : Math.max(12, Math.min(26, 10 + nucleoCount * 1.6));
+  const nucleoFontSize = Math.max(3.5, nucleoParticleRadius * 0.75);
+
+  const particleRadius = { nucleo: nucleoParticleRadius, orbita: 9 };
+  const fontSize = { nucleo: nucleoFontSize, orbita: 7 };
 
   function posicionEnOrbita(i: number, total: number, radio: number) {
     const angulo = (i / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
@@ -560,7 +570,7 @@ export function AtomoVisual({
               const pos =
                 nucleares.length === 1
                   ? { x: cx, y: cy }
-                  : posicionEnOrbita(i, nucleares.length, particleRadius.nucleo + 4);
+                  : posicionEnOrbita(i, nucleares.length, nucleoOrbitRadius);
               return (
                 <g key={`${particula}-${i}`}>
                   <circle
