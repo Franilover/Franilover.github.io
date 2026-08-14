@@ -9,14 +9,16 @@
  * sección propia de la navbar y pasó a vivir acá adentro.
  *
  * A diferencia de sus pares, esta vista NO tiene relación con Personajes:
- * muestra Items en un único grid plano (sin agrupar por categoría ni
- * ninguna otra jerarquía) — no hay drag & drop ni popovers anidados.
- * Debajo, en el mismo criterio, se muestran aparte Flora y Minerales
- * (tampoco agrupados) — mismo catálogo que ya aparece en la vista "por
- * Criatura" (colgando de Ecosistema ahí), acá solo como bloques planos
- * informativos. Item, Flora y Mineral abren el panel flotante
- * (abrirPanel(kind, id)), igual que Personaje/Criatura/Reino en las otras
- * vistas jerárquicas.
+ * muestra Items agrupados por su campo `categoria` (ej. "Arma", "Poción")
+ * en bloques separados con encabezado — sin drag & drop ni popovers
+ * anidados, cada categoría es simplemente otro EntityCardGrid más, en
+ * orden alfabético. Los items sin categoría van al final en su propio
+ * bloque "Sin categoría". Debajo, en el mismo criterio, se muestran aparte
+ * Flora y Minerales (tampoco agrupados) — mismo catálogo que ya aparece en
+ * la vista "por Criatura" (colgando de Ecosistema ahí), acá solo como
+ * bloques planos informativos. Item, Flora y Mineral abren el panel
+ * flotante (abrirPanel(kind, id)), igual que Personaje/Criatura/Reino en
+ * las otras vistas jerárquicas.
  */
 
 import React from "react";
@@ -30,6 +32,7 @@ interface Item {
   id: string;
   nombre: string;
   imagen_url?: string | null;
+  categoria?: string;
 }
 interface EntidadMin {
   id: string;
@@ -97,6 +100,27 @@ export function ItemsJerarquia({
     ? itemsDelGrupo.filter((i) => i.nombre?.toLocaleLowerCase("es").includes(q))
     : itemsDelGrupo;
 
+  // Agrupa por categoria (campo simple de texto del item, ej. "Arma",
+  // "Poción", "Herramienta"…) — mismo criterio visual que las otras vistas
+  // jerárquicas (bloques con encabezado), pero sin drag & drop ni popovers
+  // anidados: cada categoría es solo un EntityCardGrid más, en orden
+  // alfabético, con los sin-categoría al final.
+  const categorias = React.useMemo(() => {
+    const mapa = new Map<string, Item[]>();
+    for (const item of itemsFiltrados) {
+      const clave = item.categoria?.trim() || "";
+      if (!mapa.has(clave)) mapa.set(clave, []);
+      mapa.get(clave)!.push(item);
+    }
+    const conCategoria = [...mapa.entries()]
+      .filter(([clave]) => clave !== "")
+      .sort(([a], [b]) => a.localeCompare(b, "es"));
+    const sinCategoria = mapa.get("") ?? [];
+    return { conCategoria, sinCategoria };
+  }, [itemsFiltrados]);
+
+  const hayCategorias = categorias.conCategoria.length > 0;
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-3 px-1 flex-wrap">
@@ -116,20 +140,56 @@ export function ItemsJerarquia({
         )}
       </div>
 
-      <EntityCardGrid
-        title="Items"
-        variant="grid"
-        loading={loading}
-        items={itemsFiltrados.map((i) => ({
-          id: i.id,
-          nombre: i.nombre,
-          imageUrl: i.imagen_url || undefined,
-        }))}
-        onItemClick={(id) => abrirPanel("item", id)}
-        onCreate={onCreate}
-        creating={creating}
-        section="items"
-      />
+      {hayCategorias ? (
+        <>
+          {categorias.conCategoria.map(([categoria, itemsCategoria]) => (
+            <EntityCardGrid
+              key={categoria}
+              title={categoria}
+              variant="grid"
+              loading={loading}
+              items={itemsCategoria.map((i) => ({
+                id: i.id,
+                nombre: i.nombre,
+                imageUrl: i.imagen_url || undefined,
+              }))}
+              onItemClick={(id) => abrirPanel("item", id)}
+              section="items"
+            />
+          ))}
+          {categorias.sinCategoria.length > 0 && (
+            <EntityCardGrid
+              title="Sin categoría"
+              variant="grid"
+              loading={loading}
+              items={categorias.sinCategoria.map((i) => ({
+                id: i.id,
+                nombre: i.nombre,
+                imageUrl: i.imagen_url || undefined,
+              }))}
+              onItemClick={(id) => abrirPanel("item", id)}
+              onCreate={onCreate}
+              creating={creating}
+              section="items"
+            />
+          )}
+        </>
+      ) : (
+        <EntityCardGrid
+          title="Items"
+          variant="grid"
+          loading={loading}
+          items={itemsFiltrados.map((i) => ({
+            id: i.id,
+            nombre: i.nombre,
+            imageUrl: i.imagen_url || undefined,
+          }))}
+          onItemClick={(id) => abrirPanel("item", id)}
+          onCreate={onCreate}
+          creating={creating}
+          section="items"
+        />
+      )}
 
       {/* Flora y Minerales — bloques aparte, sin agrupar (no tienen
           `categoria`), debajo del grid de Items. Mismo catálogo que ya se

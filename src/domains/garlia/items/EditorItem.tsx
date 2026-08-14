@@ -486,8 +486,6 @@ export function EditorItem({
                   onWikilinkNavigate={onWikilink}
                 />
               </div>
-
-              <PanelReglasDnd form={form} onChange={(cambios) => setForm((f: Item) => ({ ...f, ...cambios }))} />
             </div>
           </div>
         </div>
