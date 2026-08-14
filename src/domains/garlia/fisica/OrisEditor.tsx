@@ -14,8 +14,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
-import { LetrasVisual } from "./ParticulaVisual";
-import { IUMS, ORIS_CONFIG, ORIS_FAMILIAS, contarLetrasDeOris, type Oris, type OrisFamilia } from "./types";
+import { IumVisual } from "./ParticulaVisual";
+import { IUMS, ORIS_CONFIG, ORIS_FAMILIAS, particulasDeOris, type Oris, type OrisFamilia } from "./types";
 
 interface Props {
   oris: Oris;
@@ -36,7 +36,7 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
   useEffect(() => setLocal(oris), [oris]);
 
   const iumsComposicion = local.iums_composicion ?? {};
-  const conteoLetras = useMemo(() => contarLetrasDeOris(iumsComposicion), [iumsComposicion]);
+  const particulasOris = useMemo(() => particulasDeOris(iumsComposicion), [iumsComposicion]);
 
   function cambiarCantidadIum(iumId: string, delta: number) {
     const actual = iumsComposicion[iumId] ?? 0;
@@ -136,11 +136,11 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
       <div className={`flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto ${embedded ? "p-2" : "p-2.5"}`}>
         <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-start p-2.5 rounded-lg border border-primary/10 bg-primary/[0.02]">
           <div className="shrink-0 flex flex-col items-center gap-1">
-            <LetrasVisual conteo={conteoLetras} size={110} />
+            <IumVisual particulas={particulasOris} size={140} />
             <span className="text-micro text-primary/30">
-              {conteoLetras.A + conteoLetras.T + conteoLetras.S === 0
+              {particulasOris.length === 0
                 ? "Sin Iums"
-                : `${conteoLetras.A}A · ${conteoLetras.T}T · ${conteoLetras.S}S`}
+                : particulasOris.map((p) => `${p.cantidad}${p.nombre[0]}`).join(" · ")}
             </span>
           </div>
 

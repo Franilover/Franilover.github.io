@@ -306,6 +306,41 @@ export function contarLetrasDeIum(ium: FilaIum): { A: number; T: number; S: numb
   return contarLetrasDeComposicion(ium.composicion);
 }
 
+/** Lista de partículas componentes de un Ium con su fórmula A/T/S real —
+ *  para dibujar cada una como círculo propio orbitando (ver IumVisual en
+ *  ParticulaVisual.tsx), en vez de agregar todo en un solo conteo. */
+export function particulasDeIum(
+  ium: FilaIum,
+): { nombre: string; formula: string; cantidad: number }[] {
+  return ium.composicion
+    .filter((c) => PARTICULA_QUIMICA_FORMULA[c.particula])
+    .map((c) => ({ nombre: c.particula, formula: PARTICULA_QUIMICA_FORMULA[c.particula], cantidad: c.cantidad }));
+}
+
+/** Lista de partículas componentes de un Oris a partir de iums_composicion:
+ *  cada Ium aporta sus propias Partículas, con la cantidad multiplicada
+ *  por cuántas veces aparece ese Ium en el Oris. Partículas repetidas
+ *  entre distintos Iums se combinan en una sola entrada. */
+export function particulasDeOris(
+  iumsComposicion: Record<string, number>,
+): { nombre: string; formula: string; cantidad: number }[] {
+  const acumulado = new Map<string, { nombre: string; formula: string; cantidad: number }>();
+  for (const [iumId, cantidadIum] of Object.entries(iumsComposicion)) {
+    const ium = IUM_POR_ID[iumId];
+    if (!ium || !cantidadIum) continue;
+    for (const p of particulasDeIum(ium)) {
+      const previo = acumulado.get(p.nombre);
+      const cantidad = p.cantidad * cantidadIum;
+      if (previo) {
+        previo.cantidad += cantidad;
+      } else {
+        acumulado.set(p.nombre, { ...p, cantidad });
+      }
+    }
+  }
+  return Array.from(acumulado.values());
+}
+
 /** Conteo de letras A/T/S de un Oris a partir de iums_composicion
  *  ({ [iumId]: cantidad }): cada Ium aporta su propio conteo × cantidad. */
 export function contarLetrasDeOris(iumsComposicion: Record<string, number>): {

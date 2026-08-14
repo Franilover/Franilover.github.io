@@ -29,15 +29,15 @@ import { useConfirm } from "@/ui/ConfirmModal";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
 import { OrisEditor } from "./OrisEditor";
-import { LetrasVisual, ParticulaVisual } from "./ParticulaVisual";
+import { IumVisual, ParticulaVisual } from "./ParticulaVisual";
 import {
   FISICA_CONCEPTOS_CONFIG,
   IUMS,
   PARTICULAS_BASE,
   agruparPorBloque,
-  contarLetrasDeIum,
   orisAFilaCatalogo,
   particulaAFilaCatalogo,
+  particulasDeIum,
   type FilaCatalogo,
   type FilaIum,
   type FilaParticulaBase,
@@ -414,8 +414,9 @@ function TodasLasBasesView({
  * Subsistema, etc.): muestra solo el nombre. Por defecto, al hacer click
  * abre un popover flotante anclado a la tarjeta con el detalle completo —
  * y, para Partícula Base/Partículas/Iums, su gráfico A/T/S arriba del
- * detalle (círculo de 3 tercios para Base/Partículas vía ParticulaVisual,
- * círculo de arcos proporcionales para Iums vía LetrasVisual). Si se pasa
+ * detalle (círculo de 3 tercios para Base/Partículas vía ParticulaVisual;
+ * para Iums, sus Partículas componentes orbitando un centro vía
+ * IumVisual — mismo patrón que AtomoVisual en Elementos). Si se pasa
  * `onClick`, ese comportamiento se reemplaza y el click abre el editor
  * completo en la columna derecha (usado por Oris y Subsistemas, cuyo
  * gráfico —si aplica— vive dentro de ese editor, no acá).
@@ -450,7 +451,7 @@ function BasesItemCard({
             {conVisual && (
               <div className="flex justify-center py-1">
                 {bloque === "iums" ? (
-                  <LetrasVisual conteo={contarLetrasDeIum(fila as FilaIum)} size={96} />
+                  <IumVisual particulas={particulasDeIum(fila as FilaIum)} size={120} />
                 ) : bloque === "particula-base" ? (
                   <ParticulaVisual formula={(fila as FilaParticulaBase).letra} size={88} />
                 ) : (
