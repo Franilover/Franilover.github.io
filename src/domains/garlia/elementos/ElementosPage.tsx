@@ -12,7 +12,7 @@
  * columna con scroll (en vez de tabs que muestran una sección a la vez).
  */
 
-import { Atom, Beaker, Download, GitCompare, Loader2, Plus, Save, Scale, Trash2, Upload, X } from "lucide-react";
+import { Atom, Download, GitCompare, Loader2, Plus, Save, Scale, Trash2, Upload, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -533,10 +533,9 @@ function ReglasQuimica({
   return (
     <div className="p-3">
       <div className="shrink-0 flex items-center justify-between pb-3">
-        <div className="flex items-center gap-1.5 text-primary/40">
-          <Atom size={12} />
+        <div className="text-primary/40">
           <p className="text-micro font-black uppercase tracking-widest">
-            Reglas · {borrador.length}
+            Reglas
             {saving && <Loader2 className="inline-block animate-spin ml-1.5 align-[-2px]" size={10} />}
           </p>
         </div>
@@ -868,16 +867,13 @@ export function ElementosPage({
     <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
       {/* Elementos */}
       <div className="flex flex-col">
-        <div className="shrink-0 flex items-center gap-1.5 px-3 pt-3 text-primary/40">
-          <Atom size={12} />
+        <div className="shrink-0 px-3 pt-3 text-primary/40">
           <p className="text-micro font-black uppercase tracking-widest">Elementos</p>
         </div>
         <div className="flex relative">
       <div className="flex-1 p-3 flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-primary/40">
-            <Atom size={12} />
-          </div>
+          <div />
           <div className="shrink-0 flex items-center gap-1.5">
             <div className="flex items-center rounded-md border border-primary/15 overflow-hidden">
               {(
@@ -1111,8 +1107,7 @@ export function ElementosPage({
 
       {/* Compuestos */}
       <div className="flex flex-col border-t border-primary/10">
-        <div className="shrink-0 flex items-center gap-1.5 px-3 pt-3 text-primary/40">
-          <Beaker size={12} />
+        <div className="shrink-0 px-3 pt-3 text-primary/40">
           <p className="text-micro font-black uppercase tracking-widest">Compuestos</p>
         </div>
         <CompuestosPage

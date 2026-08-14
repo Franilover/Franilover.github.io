@@ -1404,10 +1404,9 @@ export function CompuestosPage({
     <div className="flex relative">
       <div className="flex-1 p-3 flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-primary/40">
-            <Beaker size={12} />
+          <div className="text-primary/40">
             <p className="text-micro font-black uppercase tracking-widest">
-              Compuestos · {compuestos.length}
+              Compuestos
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-1.5">
