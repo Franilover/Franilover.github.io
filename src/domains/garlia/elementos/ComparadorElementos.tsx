@@ -189,7 +189,7 @@ export function ComparadorElementosModal({
                   return (
                     <span
                       key={el.id}
-                      className="text-micro font-bold text-accent/70 bg-accent/10 rounded px-1.5 py-0.5 truncate text-center"
+                      className="text-micro font-bold text-primary/60 bg-primary/5 rounded px-1.5 py-0.5 truncate text-center"
                     >
                       {dominantes.length > 0
                         ? dominantes.map((d) => d.particula).join(" / ")

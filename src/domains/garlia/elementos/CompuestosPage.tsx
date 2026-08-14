@@ -312,7 +312,7 @@ function SelectorElementosCompuesto({
           {componentes.map((c) => (
             <div
               key={c.elemento_id}
-              className="flex items-center gap-1.5 bg-accent/[0.06] rounded-md pl-2 pr-1 py-1 border border-accent/15"
+              className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2 pr-1 py-1 border border-primary/10"
             >
               <span
                 className={`flex-1 min-w-0 truncate text-micro font-bold text-primary/80 ${
@@ -375,10 +375,10 @@ function SelectorElementosCompuesto({
               <div
                 key={el.id}
                 className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
-                  sugerido ? "bg-accent/[0.06] hover:bg-accent/10" : "hover:bg-primary/5"
+                  sugerido ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-primary/5"
                 }`}
               >
-                {sugerido && <span className="w-1 h-1 rounded-full bg-accent shrink-0" />}
+                {sugerido && <span className="w-1 h-1 rounded-full bg-primary/40 shrink-0" />}
                 <button
                   type="button"
                   onClick={() => (onAbrirElemento ? onAbrirElemento(el.id) : agregarElemento(el.id))}
@@ -453,7 +453,7 @@ function BalanceAtomico({
             className={`shrink-0 text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded ${
               b.balance === 0
                 ? "text-primary/30"
-                : "text-accent bg-accent/10"
+                : "text-primary/70 bg-primary/10"
             }`}
           >
             {b.balance === 0 ? "Completa" : b.balance > 0 ? `+${b.balance} sobra` : `${b.balance} falta`}
@@ -491,10 +491,10 @@ function AnalisisReactivoPeso({
     reactividad.nivel === "inerte"
       ? "text-primary/40 bg-primary/5 border-primary/10"
       : reactividad.nivel === "moderado"
-        ? "text-accent/70 bg-accent/[0.06] border-accent/15"
+        ? "text-primary/60 bg-primary/5 border-primary/10"
         : reactividad.nivel === "inestable"
-          ? "text-accent bg-accent/10 border-accent/25"
-          : "text-accent bg-accent/20 border-accent/40";
+          ? "text-primary/80 bg-primary/10 border-primary/15"
+          : "text-primary bg-primary/10 border-primary/20";
 
   return (
     <div className="grid grid-cols-2 gap-1.5">
@@ -553,7 +553,7 @@ function PanelEstequiometria({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-accent/20 bg-accent/10 text-accent">
+      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/5 text-primary/80">
         <span className="text-micro font-bold leading-snug">
           {yaBalanceado
             ? "Esta mezcla ya está balanceada exacta (sin sobras)."
@@ -574,15 +574,15 @@ function PanelEstequiometria({
 }
 
 const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
-  complementa: "text-accent bg-accent/10 border-accent/25",
-  compite: "text-accent/70 bg-accent/[0.06] border-accent/15",
+  complementa: "text-primary bg-primary/10 border-primary/20",
+  compite: "text-primary/70 bg-primary/5 border-primary/10",
   saturado: "text-primary/40 bg-primary/5 border-primary/10",
   estable: "text-primary/30 bg-primary/[0.02] border-primary/10",
 };
 
 const ENLACE_COLOR: Record<TipoEnlace, string> = {
-  fuerte: "text-accent bg-accent/10 border-accent/25",
-  debil: "text-accent/70 bg-accent/[0.06] border-accent/15",
+  fuerte: "text-primary bg-primary/10 border-primary/20",
+  debil: "text-primary/70 bg-primary/5 border-primary/10",
   neutro: "text-primary/30 bg-primary/[0.02] border-primary/10",
 };
 
@@ -741,7 +741,7 @@ function CompuestoEditor({
 
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
         {duplicadoDe && (
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-accent/25 bg-accent/10 text-accent">
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-primary/15 bg-primary/5 text-primary/80">
             <span className="text-micro font-bold leading-snug">
               Misma combinación exacta que "{duplicadoDe.simbolo || "??"} · {duplicadoDe.nombre}" —
               ¿es a propósito?
@@ -1151,7 +1151,7 @@ function LaboratorioModal({
               </div>
 
               {mismosElegidos ? (
-                <p className="text-micro text-accent bg-accent/10 border border-accent/20 rounded-md px-2 py-1.5">
+                <p className="text-micro text-primary/80 bg-primary/5 border border-primary/10 rounded-md px-2 py-1.5">
                   Elegí dos compuestos distintos.
                 </p>
               ) : (
@@ -1173,7 +1173,7 @@ function LaboratorioModal({
                   </label>
 
                   {(compuestoEsInerte(compA, elementos) || compuestoEsInerte(compB, elementos)) && (
-                    <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border text-accent bg-accent/10 border-accent/20">
+                    <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border text-primary/80 bg-primary/5 border-primary/10">
                       <span className="text-micro font-black uppercase tracking-wide">
                         Estado Noble: bloquea el enlace
                       </span>
@@ -1188,7 +1188,7 @@ function LaboratorioModal({
                   <div
                     className={`flex flex-col gap-1 px-2 py-1.5 rounded-md border ${
                       cancelacionCarga.compatible
-                        ? "text-accent bg-accent/10 border-accent/20"
+                        ? "text-primary/80 bg-primary/5 border-primary/10"
                         : "text-primary/30 bg-primary/[0.02] border-primary/10"
                     }`}
                   >
@@ -1218,7 +1218,7 @@ function LaboratorioModal({
                   <div
                     className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${
                       electromagnetismo.generaCampoMagnetico
-                        ? "text-accent bg-accent/10 border-accent/20"
+                        ? "text-primary/80 bg-primary/5 border-primary/10"
                         : electromagnetismo.corriente > 0
                           ? "text-primary/50 bg-primary/5 border-primary/10"
                           : "text-primary/30 bg-primary/[0.02] border-primary/10"
@@ -1261,7 +1261,7 @@ function LaboratorioModal({
                           className={`shrink-0 text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded ${
                             b.balance === 0
                               ? "text-primary/30"
-                              : "text-accent bg-accent/10"
+                              : "text-primary/70 bg-primary/10"
                           }`}
                         >
                           {b.balance === 0 ? "Completa" : b.balance > 0 ? `+${b.balance} sobra` : `${b.balance} falta`}

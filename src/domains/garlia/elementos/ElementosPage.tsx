@@ -275,7 +275,7 @@ function ElementoCasilla({
       title="Click: ver detalle · Shift+Click: agregar/quitar de la selección múltiple"
       className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
         enSeleccionMultiple
-          ? "border-accent/60 bg-accent/10 ring-2 ring-accent/40"
+          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
           : seleccionado
             ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
             : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
@@ -316,7 +316,7 @@ function ElementoCasilla({
       {nombreDominante && (
         <span
           title="Partícula dominante"
-          className="mt-0.5 self-center text-micro font-bold uppercase tracking-wide text-accent/70 bg-accent/10 rounded px-1 truncate max-w-full leading-tight"
+          className="mt-0.5 self-center text-micro font-bold uppercase tracking-wide text-primary/60 bg-primary/5 rounded px-1 truncate max-w-full leading-tight"
         >
           {nombreDominante}
         </span>
@@ -981,7 +981,7 @@ export function ElementosPage({
         </div>
 
         {seleccionMultiple.size > 0 && (
-          <div className="text-micro font-black uppercase tracking-wide bg-accent/10 border border-accent/30 rounded-md px-2 py-1.5 flex items-center justify-between gap-2">
+          <div className="text-micro font-black uppercase tracking-wide bg-primary/10 border border-primary/20 rounded-md px-2 py-1.5 flex items-center justify-between gap-2">
             <span className="text-primary/70">
               {seleccionMultiple.size} elemento{seleccionMultiple.size === 1 ? "" : "s"} seleccionado
               {seleccionMultiple.size === 1 ? "" : "s"}

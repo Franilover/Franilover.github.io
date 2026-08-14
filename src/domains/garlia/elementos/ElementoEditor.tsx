@@ -387,7 +387,7 @@ export function ElementoEditor({
                 {dominantes.length > 0 && (
                   <span
                     title="Partícula(s) dominante(s)"
-                    className="text-micro font-bold text-accent/70 bg-accent/10 rounded px-1.5 py-0.5"
+                    className="text-micro font-bold text-primary/60 bg-primary/5 rounded px-1.5 py-0.5"
                   >
                     {dominantes.map((d) => d.particula).join(" / ")}
                   </span>
