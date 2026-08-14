@@ -325,20 +325,45 @@ function TodasLasBasesView({
 
             <div className="grid grid-cols-3 gap-2 items-start">
               {filas.map((f) => (
-                <div
-                  key={f.nombre}
-                  className="flex flex-col gap-1 px-2.5 py-2 rounded-lg border border-primary/10 bg-primary/[0.02]"
-                >
-                  <span className="text-micro font-black text-primary">{f.nombre}</span>
-                  <span className="text-xs text-primary/60 leading-snug">{f.detalle}</span>
-                  {f.extra && <span className="text-xs text-primary/40 leading-snug">{f.extra}</span>}
-                </div>
+                <BasesItemCard key={f.nombre} fila={f} />
               ))}
             </div>
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * Tarjeta compacta de una fila de catálogo base (partícula, IUM, etc.):
+ * muestra solo el nombre; al hacer click abre un popover flotante anclado
+ * a la tarjeta con el detalle completo (mismo patrón que el "Info" de
+ * BasesRowTitle, vía PopoverFlotante).
+ */
+function BasesItemCard({ fila }: { fila: FilaCatalogo }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
+        className={`w-full flex items-center px-2.5 py-2 rounded-lg border text-left transition-all cursor-pointer ${
+          anchor
+            ? "border-primary/30 bg-primary/5"
+            : "border-primary/10 bg-primary/[0.02] hover:border-primary/25 hover:bg-primary/5"
+        }`}
+      >
+        <span className="text-micro font-black text-primary truncate">{fila.nombre}</span>
+      </button>
+      <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={280} maxHeight={280}>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-black uppercase tracking-wide text-primary">{fila.nombre}</p>
+          <p className="text-xs text-primary/70 leading-relaxed">{fila.detalle}</p>
+          {fila.extra && <p className="text-xs text-primary/40 leading-relaxed">{fila.extra}</p>}
+        </div>
+      </PopoverFlotante>
+    </>
   );
 }
 
