@@ -21,6 +21,7 @@
  */
 
 import { Atom, ChevronLeft, Download, Info, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { ChevronLeft, Download, Info, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -30,7 +31,6 @@ import { useConfirm } from "@/ui/ConfirmModal";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
 import { OrisEditor } from "./OrisEditor";
-import { LetrasVisual, ParticulaVisual } from "./ParticulaVisual";
 import {
   FISICA_CONCEPTOS_CONFIG,
   IUMS,
@@ -38,11 +38,9 @@ import {
   ORIS_FAMILIA_ICON,
   PARTICULAS_BASE,
   agruparPorBloque,
-  contarLetrasDeIum,
+  orisAFilaCatalogo,
   particulaAFilaCatalogo,
   type FilaCatalogo,
-  type FilaIum,
-  type FilaParticulaBase,
   type FisicaConcepto,
   type Oris,
   type OrisFamilia,
@@ -50,6 +48,12 @@ import {
 } from "./types";
 import { PanelEditorSubsistema } from "@/domains/garlia/runas/BloqueSubsistemasMagia";
 import type { SubsistemaMagia } from "@/domains/garlia/runas/useSubsistemasMagia";
+
+/** Adapta un SubsistemaMagia al shape FilaCatalogo — vive acá (no en
+ *  types.ts de física) para no acoplar ese módulo al dominio "runas". */
+function subsistemaAFilaCatalogo(s: SubsistemaMagia): FilaCatalogo {
+  return { nombre: s.nombre || "Sin nombre", detalle: s.descripcion || "Sin descripción" };
+}
 
 interface Props {
   particulas: Particula[];
@@ -100,6 +104,12 @@ interface Props {
 }
 
 /** Qué está activo en el editor de la columna derecha. */
+/**
+ * Qué está activo en el editor de la columna derecha. "todas-bases" es la
+ * pantalla por defecto: columna izquierda con los catálogos (Partícula
+ * Base, Partículas, Iums, Oris, Subsistemas) y columna derecha con
+ * Conceptos — sin sistema de grupos/tabs, todo vive en una sola vista.
+ */
 type Seleccion =
   | { tipo: "oris"; id: string }
   | { tipo: "concepto"; id: string }
@@ -193,7 +203,6 @@ export function parsearArchivoFisicaJSON(
       formula: o.formula ?? "",
       dominio: o.dominio ?? "",
       descripcion: o.descripcion ?? null,
-      iums_composicion: o.iums_composicion ?? {},
     };
     const existente = orisPorNombre.get(o.nombre);
     if (existente) {
@@ -236,20 +245,24 @@ export function parsearArchivoFisicaJSON(
 // ─── Filas de navegación (columna izquierda) ───────────────────────────────
 
 
+type ClaveCatalogo = "particula-base" | "particulas" | "iums" | "oris" | "subsistemas";
+
 function catalogosBases(
   particulas: Particula[],
 ): { key: "particula-base" | "particulas" | "iums"; titulo: string; filas: FilaCatalogo[] }[] {
+  oris: Oris[],
+  subsistemas: SubsistemaMagia[],
+): { key: ClaveCatalogo; titulo: string; filas: FilaCatalogo[] }[] {
   return [
     { key: "particula-base", titulo: "Partícula Base", filas: PARTICULAS_BASE },
     {
       key: "particulas",
       titulo: "Partículas",
-      // formula (ej. "SAT") queda en fila.detalle vía particulaAFilaCatalogo,
-      // que es justo lo que necesita ParticulaVisual para el círculo de 3
-      // tercios — mismo dato, sin duplicar.
       filas: particulas.map(particulaAFilaCatalogo),
     },
     { key: "iums", titulo: "Iums", filas: IUMS },
+    { key: "oris", titulo: "Oris", filas: oris.map(orisAFilaCatalogo) },
+    { key: "subsistemas", titulo: "Subsistemas", filas: subsistemas.map(subsistemaAFilaCatalogo) },
   ];
 }
 
@@ -313,11 +326,36 @@ function BasesRowTitle({
 function TodasLasBasesView({
   particulas,
   onBack,
+  oris,
+  subsistemas,
+  onSelectOris,
+  onSelectSubsistema,
+  onCrearSubsistema,
+  creandoSubsistema,
 }: {
   particulas: Particula[];
   onBack: () => void;
+  oris: Oris[];
+  subsistemas: SubsistemaMagia[];
+  onSelectOris: (id: string) => void;
+  onSelectSubsistema: (id: string) => void;
+  onCrearSubsistema: (nombre: string) => Promise<SubsistemaMagia | null>;
+  creandoSubsistema?: boolean;
 }) {
   const catalogos = catalogosBases(particulas);
+  const catalogos = catalogosBases(particulas, oris, subsistemas);
+  const [nombreNuevoSubsistema, setNombreNuevoSubsistema] = useState("");
+  const [creandoAbierto, setCreandoAbierto] = useState(false);
+
+  const handleCrearSubsistema = async () => {
+    const nombre = nombreNuevoSubsistema.trim();
+    if (!nombre) return;
+    const nuevo = await onCrearSubsistema(nombre);
+    setNombreNuevoSubsistema("");
+    setCreandoAbierto(false);
+    if (nuevo) onSelectSubsistema(nuevo.id);
+  };
+
   return (
     <div className="shrink-0 flex flex-col">
       <div className="p-2.5 flex flex-col gap-4">
@@ -325,17 +363,76 @@ function TodasLasBasesView({
           <div key={key} className="flex flex-col gap-2">
             <div
               className={`flex items-center gap-1.5 text-primary/50 pb-1.5 ${
+              className={`flex items-center justify-between gap-1.5 text-primary/50 pb-1.5 ${
                 idx > 0 ? "pt-2 border-t border-primary/10" : ""
               }`}
             >
               <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
+              {key === "subsistemas" && (
+                <button
+                  type="button"
+                  onClick={() => setCreandoAbierto((o) => !o)}
+                  title="Añadir subsistema"
+                  className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+                >
+                  <Plus size={11} />
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-2 items-start">
               {filas.map((f) => (
-                <BasesItemCard key={f.nombre} fila={f} bloque={key} />
+                <BasesItemCard key={f.nombre} fila={f} />
               ))}
             </div>
+            {key === "subsistemas" && creandoAbierto && (
+              <div className="flex items-center gap-1.5 -mt-1 mb-1">
+                <input
+                  autoFocus
+                  className="flex-1 min-w-0 bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/80 outline-none placeholder:text-primary/30 focus:border-primary/25"
+                  placeholder="Nombre del subsistema (ej. Luminia)…"
+                  value={nombreNuevoSubsistema}
+                  onChange={(e) => setNombreNuevoSubsistema(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void handleCrearSubsistema();
+                    if (e.key === "Escape") setCreandoAbierto(false);
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!nombreNuevoSubsistema.trim() || creandoSubsistema}
+                  onClick={() => void handleCrearSubsistema()}
+                  className="shrink-0 text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity disabled:opacity-40"
+                >
+                  Crear
+                </button>
+              </div>
+            )}
+
+            {filas.length === 0 ? (
+              <div className="py-4 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
+                Sin {titulo.toLowerCase()} todavía
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 items-start">
+                {filas.map((f, i) => {
+                  const original = key === "oris" ? oris[i] : key === "subsistemas" ? subsistemas[i] : null;
+                  return (
+                    <BasesItemCard
+                      key={f.nombre + i}
+                      fila={f}
+                      onClick={
+                        key === "oris" && original
+                          ? () => onSelectOris((original as Oris).id)
+                          : key === "subsistemas" && original
+                            ? () => onSelectSubsistema((original as SubsistemaMagia).id)
+                            : undefined
+                      }
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -344,26 +441,26 @@ function TodasLasBasesView({
 }
 
 /**
- * Tarjeta de una fila de catálogo (Partícula Base, Partícula o Ium): al
- * hacer click abre un popover con su gráfico A/T/S arriba del detalle —
- * círculo de 3 tercios para Base/Partículas (ParticulaVisual, usa la
- * fórmula tal cual), círculo de arcos proporcionales para Iums
- * (LetrasVisual, suma las letras de sus partículas componentes).
+ * Tarjeta compacta de una fila de catálogo base (partícula, IUM, etc.):
+ * muestra solo el nombre; al hacer click abre un popover flotante anclado
+ * a la tarjeta con el detalle completo (mismo patrón que el "Info" de
+ * BasesRowTitle, vía PopoverFlotante).
+ * Tarjeta compacta de una fila de catálogo base (partícula, IUM, Oris,
+ * Subsistema, etc.): muestra solo el nombre. Por defecto, al hacer click
+ * abre un popover flotante anclado a la tarjeta con el detalle completo
+ * (mismo patrón que el "Info" de BasesRowTitle, vía PopoverFlotante). Si
+ * se pasa `onClick`, ese comportamiento se reemplaza y el click abre el
+ * editor completo en la columna derecha (usado por Oris y Subsistemas).
  */
-function BasesItemCard({
-  fila,
-  bloque,
-}: {
-  fila: FilaCatalogo;
-  bloque: "particula-base" | "particulas" | "iums";
-}) {
+function BasesItemCard({ fila }: { fila: FilaCatalogo }) {
+function BasesItemCard({ fila, onClick }: { fila: FilaCatalogo; onClick?: () => void }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-
   return (
     <>
       <button
         type="button"
         onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
+        onClick={onClick ? onClick : (e) => setAnchor(anchor ? null : e.currentTarget)}
         className={`w-full flex items-center px-2.5 py-2 rounded-lg border text-left transition-all cursor-pointer ${
           anchor
             ? "border-primary/30 bg-primary/5"
@@ -372,18 +469,8 @@ function BasesItemCard({
       >
         <span className="text-micro font-black text-primary truncate">{fila.nombre}</span>
       </button>
-      <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={280} maxHeight={340}>
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-center py-1">
-            {bloque === "iums" ? (
-              <LetrasVisual conteo={contarLetrasDeIum(fila as FilaIum)} size={96} />
-            ) : bloque === "particula-base" ? (
-              <ParticulaVisual formula={(fila as FilaParticulaBase).letra} size={88} />
-            ) : (
-              // "particulas": particulaAFilaCatalogo pone la fórmula (ej. "SAT") en detalle.
-              <ParticulaVisual formula={fila.detalle} size={88} />
-            )}
-          </div>
+      <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={280} maxHeight={280}>
+        <div className="flex flex-col gap-1.5">
           <p className="text-xs font-black uppercase tracking-wide text-primary">{fila.nombre}</p>
           <p className="text-xs text-primary/70 leading-relaxed">{fila.detalle}</p>
           {fila.extra && <p className="text-xs text-primary/40 leading-relaxed">{fila.extra}</p>}
@@ -559,6 +646,12 @@ function OrisPanelFlotante({
               Oris · vista rápida
             </p>
             <p className="text-xs font-bold text-primary truncate">{oris.nombre}</p>
+      {!onClick && (
+        <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={280} maxHeight={280}>
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-black uppercase tracking-wide text-primary">{fila.nombre}</p>
+            <p className="text-xs text-primary/70 leading-relaxed">{fila.detalle}</p>
+            {fila.extra && <p className="text-xs text-primary/40 leading-relaxed">{fila.extra}</p>}
           </div>
           <button
             type="button"
@@ -576,12 +669,16 @@ function OrisPanelFlotante({
       </div>
     </div>,
     document.body,
+        </PopoverFlotante>
+      )}
+    </>
   );
 }
 
 /**
  * Vista de todos los Conceptos en la columna derecha, agrupados por
  * bloque. Mismo patrón que TodasLasBasesView / TodosLosOrisView: cada
+ * bloque. Mismo patrón que TodasLasBasesView: cada
  * bloque es una sección con título y separador horizontal, apilados uno
  * arriba del otro; los conceptos dentro de cada bloque van en columna
  * única (una lista vertical), ya que cada uno lleva su editor de texto
@@ -1206,6 +1303,8 @@ export function FisicaPage({
       {/* Barra superior de navegación: 2 grupos — "Bases" (con Conceptos
           anidado debajo) y "Oris" (con Subsistemas anidado debajo) — cada
           uno con sub-tabs propias en una segunda fila. */}
+      {/* Barra superior: solo acciones de import/export — sin tabs ni
+          grupos, todo vive en una única vista de 2 columnas. */}
       <div className="shrink-0 flex flex-col gap-1 px-3 pt-2 pb-1.5 border-b border-primary/10">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1 flex-wrap">
@@ -1244,6 +1343,7 @@ export function FisicaPage({
             })}
           </div>
 
+        <div className="flex items-center justify-end gap-2">
           <div className="shrink-0 flex items-center gap-0.5">
             {onImportarFisica && (
               <>
@@ -1298,12 +1398,14 @@ export function FisicaPage({
           <OrisEditor
             oris={orisActivo}
             onBack={() => setSeleccion({ tipo: "todos-oris" })}
+            onBack={() => setSeleccion({ tipo: "todas-bases" })}
             onActualizar={onActualizarOris}
             onEliminar={
               onEliminarOris
                 ? (id) => {
                     onEliminarOris(id);
                     setSeleccion({ tipo: "todos-oris" });
+                    setSeleccion({ tipo: "todas-bases" });
                   }
                 : undefined
             }
@@ -1328,10 +1430,12 @@ export function FisicaPage({
             <PanelEditorSubsistema
               subsistema={subsistemaActivo}
               onVolver={() => setSeleccion({ tipo: "todos-oris" })}
+              onVolver={() => setSeleccion({ tipo: "todas-bases" })}
               onSave={(updates) => onActualizarSubsistema(subsistemaActivo.id, updates)}
               onDelete={() => {
                 onEliminarSubsistema(subsistemaActivo.id);
                 setSeleccion({ tipo: "todos-oris" });
+                setSeleccion({ tipo: "todas-bases" });
               }}
               onSelectCriatura={onSelectCriatura}
             />
@@ -1356,9 +1460,19 @@ export function FisicaPage({
             </div>
           </div>
         ) : seleccion?.tipo === "todas-bases" ? (
+        ) : (
           <div className="flex-1 min-h-0 flex flex-row">
             <div className="w-1/2 min-w-0 min-h-0 overflow-y-auto border-r border-primary/10">
               <TodasLasBasesView particulas={particulas} onBack={() => setSeleccion(null)} />
+              <TodasLasBasesView
+                particulas={particulas}
+                oris={oris}
+                subsistemas={subsistemas}
+                onSelectOris={(id) => setSeleccion({ tipo: "oris", id })}
+                onSelectSubsistema={(id) => setSeleccion({ tipo: "subsistema", id })}
+                onCrearSubsistema={onCrearSubsistema}
+                creandoSubsistema={creandoSubsistema}
+              />
             </div>
             <div className="w-1/2 min-w-0 min-h-0 overflow-y-auto">
               <TodosLosConceptosView
