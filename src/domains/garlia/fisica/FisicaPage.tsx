@@ -323,11 +323,7 @@ function TodasLasBasesView({
               <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
             </div>
 
-            <div
-              className={`grid grid-cols-1 sm:grid-cols-2 gap-2 items-start ${
-                key === "particula-base" ? "lg:grid-cols-3" : "lg:grid-cols-4"
-              }`}
-            >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-start">
               {filas.map((f) => (
                 <div
                   key={f.nombre}
@@ -651,7 +647,7 @@ function TodosLosConceptosView({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-6 items-start">
+              <div className="grid grid-cols-1 gap-y-6 items-start">
                 {items.map((c) => (
                   <ConceptoEditor
                     key={c.id}
@@ -1309,9 +1305,11 @@ export function FisicaPage({
             </div>
           </div>
         ) : seleccion?.tipo === "todas-bases" ? (
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-            <TodasLasBasesView particulas={particulas} onBack={() => setSeleccion(null)} />
-            <div className="border-t border-primary/10">
+          <div className="flex-1 min-h-0 flex flex-row">
+            <div className="w-1/2 min-w-0 min-h-0 overflow-y-auto border-r border-primary/10">
+              <TodasLasBasesView particulas={particulas} onBack={() => setSeleccion(null)} />
+            </div>
+            <div className="w-1/2 min-w-0 min-h-0 overflow-y-auto">
               <TodosLosConceptosView
                 bloques={bloquesConceptos}
                 onBack={() => setSeleccion(null)}
