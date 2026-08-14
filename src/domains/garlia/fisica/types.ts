@@ -306,39 +306,42 @@ export function contarLetrasDeIum(ium: FilaIum): { A: number; T: number; S: numb
   return contarLetrasDeComposicion(ium.composicion);
 }
 
-/** Lista de partículas componentes de un Ium con su fórmula A/T/S real —
- *  para dibujar cada una como círculo propio orbitando (ver IumVisual en
- *  ParticulaVisual.tsx), en vez de agregar todo en un solo conteo. */
+/** Lista de partículas componentes de un Ium con su fórmula A/T/S real,
+ *  expandida en entradas individuales (una por cada unidad, sin agrupar
+ *  por cantidad) — para dibujar cada una como círculo propio orbitando
+ *  (ver IumVisual en ParticulaVisual.tsx). Ej. Fluxor (2×Cinética + 1×Masa)
+ *  → [Cinética, Cinética, Masa], 3 entradas individuales. */
 export function particulasDeIum(
   ium: FilaIum,
-): { nombre: string; formula: string; cantidad: number }[] {
-  return ium.composicion
-    .filter((c) => PARTICULA_QUIMICA_FORMULA[c.particula])
-    .map((c) => ({ nombre: c.particula, formula: PARTICULA_QUIMICA_FORMULA[c.particula], cantidad: c.cantidad }));
+): { nombre: string; formula: string }[] {
+  const out: { nombre: string; formula: string }[] = [];
+  for (const c of ium.composicion) {
+    const formula = PARTICULA_QUIMICA_FORMULA[c.particula];
+    if (!formula) continue;
+    for (let i = 0; i < c.cantidad; i++) {
+      out.push({ nombre: c.particula, formula });
+    }
+  }
+  return out;
 }
 
-/** Lista de partículas componentes de un Oris a partir de iums_composicion:
- *  cada Ium aporta sus propias Partículas, con la cantidad multiplicada
- *  por cuántas veces aparece ese Ium en el Oris. Partículas repetidas
- *  entre distintos Iums se combinan en una sola entrada. */
+/** Lista de partículas componentes de un Oris a partir de iums_composicion,
+ *  expandida en entradas individuales: cada Ium aporta sus propias
+ *  Partículas (ya expandidas), repetidas tantas veces como el Ium aparezca
+ *  en el Oris. Sin agrupar — se muestran siempre las partículas reales. */
 export function particulasDeOris(
   iumsComposicion: Record<string, number>,
-): { nombre: string; formula: string; cantidad: number }[] {
-  const acumulado = new Map<string, { nombre: string; formula: string; cantidad: number }>();
+): { nombre: string; formula: string }[] {
+  const out: { nombre: string; formula: string }[] = [];
   for (const [iumId, cantidadIum] of Object.entries(iumsComposicion)) {
     const ium = IUM_POR_ID[iumId];
     if (!ium || !cantidadIum) continue;
-    for (const p of particulasDeIum(ium)) {
-      const previo = acumulado.get(p.nombre);
-      const cantidad = p.cantidad * cantidadIum;
-      if (previo) {
-        previo.cantidad += cantidad;
-      } else {
-        acumulado.set(p.nombre, { ...p, cantidad });
-      }
+    const particulas = particulasDeIum(ium);
+    for (let i = 0; i < cantidadIum; i++) {
+      out.push(...particulas);
     }
   }
-  return Array.from(acumulado.values());
+  return out;
 }
 
 /** Conteo de letras A/T/S de un Oris a partir de iums_composicion

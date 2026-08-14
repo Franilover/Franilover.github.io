@@ -251,20 +251,20 @@ export function sumarConteos(...conteos: Record<LetraATS, number>[]): Record<Let
 /**
  * Círculo de un Ium (o de un Oris), en el mismo estilo que AtomoVisual de
  * Elementos: un centro y sus Partículas componentes distribuidas en un
- * anillo alrededor, una por una (no agregadas como arcos) — cada Partícula
- * es su propio círculo de 3 tercios A/T/S en miniatura, con la cantidad
- * como badge si se repite. Reemplaza a LetrasVisual para este caso: acá
- * se ven las Partículas reales que componen el Ium, no solo el conteo
- * agregado de letras sueltas.
+ * anillo alrededor, una por una (no agregadas como arcos ni agrupadas por
+ * cantidad) — cada Partícula repetida se dibuja como su propio círculo
+ * individual de 3 tercios A/T/S en miniatura, sin badge de cantidad.
+ * Reemplaza a LetrasVisual para este caso: acá se ven siempre las
+ * Partículas reales que componen el Ium, no un conteo agregado.
  */
 export function IumVisual({
   particulas,
   size = 160,
   className,
 }: {
-  /** Partículas componentes con su fórmula A/T/S y cuántas veces aparece,
-   *  ej. Fluxor → [{ nombre: "Cinética", formula: "TTT", cantidad: 2 }, { nombre: "Masa", formula: "AAA", cantidad: 1 }]. */
-  particulas: { nombre: string; formula: string; cantidad: number }[];
+  /** Partículas componentes ya expandidas (una entrada por unidad), con su
+   *  fórmula A/T/S, ej. Fluxor → [{ nombre: "Cinética", formula: "TTT" }, { nombre: "Cinética", formula: "TTT" }, { nombre: "Masa", formula: "AAA" }]. */
+  particulas: { nombre: string; formula: string }[];
   size?: number;
   className?: string;
 }) {
@@ -323,7 +323,7 @@ export function IumVisual({
         const miniFont = particleR * 0.62;
         return (
           <g key={`${p.nombre}-${i}`}>
-            <title>{`${p.nombre} (${p.formula})${p.cantidad > 1 ? ` ×${p.cantidad}` : ""}`}</title>
+            <title>{`${p.nombre} (${p.formula})`}</title>
             {letras.map((letra, j) => {
               const aIni = -Math.PI / 2 + j * anguloTercio;
               const aFin = aIni + anguloTercio;
@@ -352,27 +352,6 @@ export function IumVisual({
               );
             })}
             <circle cx={px} cy={py} r={particleR} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} />
-            {p.cantidad > 1 && (
-              <g>
-                <circle
-                  cx={px + particleR * 0.78}
-                  cy={py - particleR * 0.78}
-                  r={particleR * 0.42}
-                  style={{ fill: "var(--primary)" }}
-                />
-                <text
-                  x={px + particleR * 0.78}
-                  y={py - particleR * 0.78}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={particleR * 0.5}
-                  fontWeight={900}
-                  style={{ fill: "var(--btn-text)" }}
-                >
-                  {p.cantidad}
-                </text>
-              </g>
-            )}
           </g>
         );
       })}

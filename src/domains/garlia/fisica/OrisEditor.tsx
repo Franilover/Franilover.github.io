@@ -140,7 +140,14 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
             <span className="text-micro text-primary/30">
               {particulasOris.length === 0
                 ? "Sin Iums"
-                : particulasOris.map((p) => `${p.cantidad}${p.nombre[0]}`).join(" · ")}
+                : Object.entries(
+                    particulasOris.reduce<Record<string, number>>((acc, p) => {
+                      acc[p.nombre] = (acc[p.nombre] || 0) + 1;
+                      return acc;
+                    }, {}),
+                  )
+                    .map(([nombre, n]) => `${n}${nombre[0]}`)
+                    .join(" · ")}
             </span>
           </div>
 
