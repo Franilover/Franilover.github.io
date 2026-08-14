@@ -488,8 +488,8 @@ function AtomoVisualCompuesto({
   );
 
   return (
-    <div className="h-40">
-      <AtomoVisual elemento={perfil} />
+    <div className="w-full">
+      <AtomoVisual elemento={perfil} className="w-full aspect-square h-auto" />
     </div>
   );
 }

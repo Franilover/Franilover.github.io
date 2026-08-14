@@ -494,7 +494,19 @@ export interface PerfilConCapas {
   externa?: ParticleMap | null;
 }
 
-export function AtomoVisual({ elemento }: { elemento: PerfilConCapas }) {
+export function AtomoVisual({
+  elemento,
+  className,
+}: {
+  elemento: PerfilConCapas;
+  /** Clases del contenedor (tamaño/forma). Por defecto se comporta como
+   *  siempre — cuadrado atado a la altura del padre (h-full) — para no
+   *  romper el uso existente en ElementoEditor. Pasar algo como
+   *  "w-full aspect-square h-auto" cuando el padre es una columna angosta
+   *  y se quiere que la molécula use todo el ancho disponible en vez de
+   *  quedar chica por depender de una altura fija. */
+  className?: string;
+}) {
   const nucleares = useMemo(() => particulasDeCapa(elemento.nucleo), [elemento.nucleo]);
   const capaMedia = useMemo(() => particulasDeCapa(elemento.media), [elemento.media]);
   const capaExterna = useMemo(() => particulasDeCapa(elemento.externa), [elemento.externa]);
@@ -513,7 +525,9 @@ export function AtomoVisual({ elemento }: { elemento: PerfilConCapas }) {
 
   return (
     <div
-      className="shrink-0 aspect-square h-full rounded-lg border border-primary/10 bg-primary/[0.02] flex items-center justify-center p-2"
+      className={`rounded-lg border border-primary/10 bg-primary/[0.02] flex items-center justify-center p-2 ${
+        className ?? "shrink-0 aspect-square h-full"
+      }`}
       title="Representación del átomo: núcleo + capas orbitales con las partículas propias del mundo"
     >
       <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full max-w-full max-h-full">
