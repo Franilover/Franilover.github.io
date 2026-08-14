@@ -10,12 +10,14 @@
  *
  * A diferencia de sus pares, esta vista NO tiene relación con Personajes:
  * muestra Items agrupados por su campo `categoria` (ej. "Arma", "Poción")
- * en bloques separados con encabezado — sin drag & drop ni popovers
- * anidados, cada categoría es simplemente otro EntityCardGrid más, en
- * orden alfabético. Los items sin categoría van al final en su propio
- * bloque "Sin categoría". Debajo, en el mismo criterio, se muestran aparte
- * Flora y Minerales (tampoco agrupados) — mismo catálogo que ya aparece en
- * la vista "por Criatura" (colgando de Ecosistema ahí), acá solo como
+ * en bloques con encabezado, acomodados en un layout tipo masonry (columnas
+ * CSS, sin medir el DOM) — igual criterio visual que las columnas de
+ * ecosistemas/reinos en CriaturasJerarquica/GeografiaJerarquica, pero sin
+ * drag & drop ni popovers anidados: cada categoría es solo un
+ * EntityCardGrid más, ordenadas alfabéticamente y con los sin-categoría al
+ * final. Debajo, en el mismo criterio, se muestran aparte Flora y
+ * Minerales (tampoco agrupados) — mismo catálogo que ya aparece en la
+ * vista "por Criatura" (colgando de Ecosistema ahí), acá solo como
  * bloques planos informativos. Item, Flora y Mineral abren el panel
  * flotante (abrirPanel(kind, id)), igual que Personaje/Criatura/Reino en
  * las otras vistas jerárquicas.
@@ -141,39 +143,45 @@ export function ItemsJerarquia({
       </div>
 
       {hayCategorias ? (
-        <>
+        <div
+          className="[column-fill:_balance]"
+          style={{ columnWidth: 300, columnGap: 24 }}
+        >
           {categorias.conCategoria.map(([categoria, itemsCategoria]) => (
-            <EntityCardGrid
-              key={categoria}
-              title={categoria}
-              variant="grid"
-              loading={loading}
-              items={itemsCategoria.map((i) => ({
-                id: i.id,
-                nombre: i.nombre,
-                imageUrl: i.imagen_url || undefined,
-              }))}
-              onItemClick={(id) => abrirPanel("item", id)}
-              section="items"
-            />
+            <div key={categoria} className="break-inside-avoid mb-6">
+              <EntityCardGrid
+                title={categoria}
+                variant="grid"
+                loading={loading}
+                items={itemsCategoria.map((i) => ({
+                  id: i.id,
+                  nombre: i.nombre,
+                  imageUrl: i.imagen_url || undefined,
+                }))}
+                onItemClick={(id) => abrirPanel("item", id)}
+                section="items"
+              />
+            </div>
           ))}
           {categorias.sinCategoria.length > 0 && (
-            <EntityCardGrid
-              title="Sin categoría"
-              variant="grid"
-              loading={loading}
-              items={categorias.sinCategoria.map((i) => ({
-                id: i.id,
-                nombre: i.nombre,
-                imageUrl: i.imagen_url || undefined,
-              }))}
-              onItemClick={(id) => abrirPanel("item", id)}
-              onCreate={onCreate}
-              creating={creating}
-              section="items"
-            />
+            <div className="break-inside-avoid mb-6">
+              <EntityCardGrid
+                title="Sin categoría"
+                variant="grid"
+                loading={loading}
+                items={categorias.sinCategoria.map((i) => ({
+                  id: i.id,
+                  nombre: i.nombre,
+                  imageUrl: i.imagen_url || undefined,
+                }))}
+                onItemClick={(id) => abrirPanel("item", id)}
+                onCreate={onCreate}
+                creating={creating}
+                section="items"
+              />
+            </div>
           )}
-        </>
+        </div>
       ) : (
         <EntityCardGrid
           title="Items"
