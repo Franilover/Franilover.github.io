@@ -25,7 +25,7 @@
  */
 
 
-import { Bug, Dices, Package, Save, Trash2, X } from "lucide-react";
+import { Bug, Dices, Package, X } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
@@ -43,7 +43,12 @@ import { useItemCatalogosUbicacion } from "@/domains/garlia/_shared/useItemCatal
 import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 
-import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
+import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
+import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
+import {
+  usePublishHeaderControls,
+  type OnHeaderControlsChange,
+} from "@/domains/garlia/_shared/useEditorHeaderControls";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { type Item } from "@garlia/items";
 import { type SaveStatus } from "@/ui/saveStatus";
@@ -58,6 +63,7 @@ export function EditorItem({
   onNavigateReino,
   onSelectGrupo,
   onNavigateCriatura,
+  onHeaderControlsChange,
 }: {
   item: Item;
   tabla?: string;
@@ -68,6 +74,12 @@ export function EditorItem({
   onNavigateReino?: (id: string) => void;
   onSelectGrupo?: (grupoId: string) => void;
   onNavigateCriatura?: (id: string) => void;
+  /** Publica los controles de la barra superior (nombre, guardar, eliminar,
+   *  dado D&D) hacia el contenedor — normalmente PanelFlotanteGlobal, que
+   *  los renderiza en su propia barra en vez de que este editor dibuje la
+   *  suya (evita la barra duplicada en la vista rápida). Si no se pasa,
+   *  este editor dibuja su propia barra igual que antes (uso standalone). */
+  onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const [form, setForm] = useState<Item>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -140,63 +152,41 @@ export function EditorItem({
     onDeleted(form.id);
   };
 
+  // Botón de dado D&D — es específico de Item/Criatura, así que viaja como
+  // "extra" dentro de los controles de header en vez de ser un campo fijo.
+  const dadoDndBtn = (
+    <button
+      className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
+      title="Reglas D&D 2024"
+      type="button"
+      onClick={() => setShowModalDnd(true)}
+    >
+      <Dices size={13} />
+    </button>
+  );
+
+  const headerControls = {
+    imagenUrl: form.imagen_url,
+    IconoFallback: Package,
+    nombre: form.nombre ?? "",
+    placeholderNombre: "Nombre del objeto",
+    onChangeNombre: (nombre: string) => setForm((f: Item) => ({ ...f, nombre })),
+    status,
+    onGuardar: save,
+    onEliminar: del,
+    extra: dadoDndBtn,
+  };
+  usePublishHeaderControls(headerControls, onHeaderControlsChange);
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <ConfirmModal />
 
-      {/* ── Fixed header ────────────────────────────────────────────────────── */}
-      <div
-        className="shrink-0 flex items-center gap-2 px-3 py-2 border-b"
-        style={{
-          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
-          background: "color-mix(in srgb, var(--primary) 3%, transparent)",
-        }}
-      >
-        <div className="shrink-0 w-8 h-8 rounded-lg overflow-hidden border border-primary/15 bg-primary/5 flex items-center justify-center">
-          {form.imagen_url ? (
-            <Image
-              alt={form.nombre}
-              className="w-full h-full object-cover"
-              src={form.imagen_url}
-            />
-          ) : (
-            <Package className="text-primary/25" size={16} />
-          )}
-        </div>
-
-        <input
-          className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
-          placeholder="Nombre del objeto"
-          value={form.nombre ?? ""}
-          onChange={field("nombre")}
-        />
-
-        <button
-          className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
-          title="Reglas D&D 2024"
-          type="button"
-          onClick={() => setShowModalDnd(true)}
-        >
-          <Dices size={13} />
-        </button>
-
-        <div className="shrink-0 flex items-center gap-1.5">
-          <SaveIndicator status={status} />
-          <button
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
-            onClick={del}
-          >
-            <Trash2 size={10} />
-          </button>
-          <button
-            className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
-            disabled={status === "saving"}
-            onClick={save}
-          >
-            <Save size={10} /> Guardar
-          </button>
-        </div>
-      </div>
+      {/* Barra superior: si hay un contenedor escuchando (panel flotante),
+          los controles ya se publicaron arriba y este editor no dibuja su
+          propia barra — evita la duplicación. Si se usa standalone, se
+          sigue mostrando igual que siempre. */}
+      {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0">

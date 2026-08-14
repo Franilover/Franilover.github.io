@@ -6,13 +6,10 @@
 // criaturas/items.
 import {
   Map,
-  Trash2,
-  Save,
   Loader2,
   Image as ImageIcon,
   X,
 } from "lucide-react";
-import Image from "next/image";
 import React, { useState, useEffect } from "react";
 
 import {
@@ -22,7 +19,6 @@ import {
 
 import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { useConfirm } from "@/ui/ConfirmModal";
-import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";
 import { type Ciudad } from "@/domains/garlia/ciudades";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
@@ -30,6 +26,12 @@ import { usePersonajesDelReino } from "@garlia/personajes";
 import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 import { loadCiudadesPorReino } from "@/infra/sync/syncEngine";
+
+import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
+import {
+  usePublishHeaderControls,
+  type OnHeaderControlsChange,
+} from "@/domains/garlia/_shared/useEditorHeaderControls";
 
 import { type Reino } from "../types";
 import { reinosQueries } from "../queries";
@@ -113,6 +115,7 @@ export function EditorReino({
   onSelectCiudad,
   onSelectCriatura,
   onSelectItem,
+  onHeaderControlsChange,
 }: {
   item: Reino;
   onSaved: (r: Reino) => void;
@@ -122,6 +125,7 @@ export function EditorReino({
   onSelectCiudad?: (id: string) => void;
   onSelectCriatura?: (id: string) => void;
   onSelectItem?: (id: string) => void;
+  onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const [form, setForm] = useState<Reino>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -184,71 +188,24 @@ export function EditorReino({
     );
   };
 
+  const headerControls = {
+    imagenUrl: form.mapa_url,
+    IconoFallback: Map,
+    nombre: form.nombre ?? "",
+    placeholderNombre: "Nombre del reino",
+    onChangeNombre: (nombre: string) => setForm((f) => ({ ...f, nombre })),
+    status,
+    onGuardar: save,
+    onEliminar: del,
+  };
+  usePublishHeaderControls(headerControls, onHeaderControlsChange);
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
       <ConfirmModal />
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Header */}
-        <div
-          className="shrink-0 border-b"
-          style={{
-            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
-            background: "color-mix(in srgb, var(--primary) 2%, transparent)",
-          }}
-        >
-          <div className="flex items-center gap-2.5 px-3 pt-2.5 pb-1.5 sm:px-4 sm:py-2.5">
-            {/* Thumbnail */}
-            <div
-              className="shrink-0 w-8 h-8 rounded-lg overflow-hidden border flex items-center justify-center"
-              style={{
-                borderColor:
-                  "color-mix(in srgb, var(--primary) 15%, transparent)",
-                background:
-                  "color-mix(in srgb, var(--primary) 6%, transparent)",
-              }}
-            >
-              {form.mapa_url ? (
-                <Image
-                  alt={form.nombre}
-                  className="w-full h-full object-cover"
-                  src={form.mapa_url}
-                />
-              ) : (
-                <Map className="text-primary/25" size={14} />
-              )}
-            </div>
-
-            {/* Nombre */}
-            <input
-              className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
-              placeholder="Nombre del reino"
-              value={form.nombre ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, nombre: e.target.value }))
-              }
-            />
-
-            <SaveIndicator status={status} />
-
-            <button
-              className="flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
-              onClick={del}
-            >
-              <Trash2 size={10} />
-              <span className="hidden sm:inline">Eliminar</span>
-            </button>
-
-            <button
-              className="flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
-              disabled={status === "saving"}
-              onClick={save}
-            >
-              <Save size={10} />
-              <span className="hidden sm:inline">Guardar</span>
-            </button>
-          </div>
-        </div>
+        {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
         {/* LoreTab — ocupa todo el espacio restante */}
         <div className="flex-1 min-h-0 overflow-hidden">

@@ -4,6 +4,7 @@ import { EditorCriatura } from "@/domains/garlia/criaturas/EditorCriatura";
 
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
+import { type OnHeaderControlsChange } from "@/domains/garlia/_shared/useEditorHeaderControls";
 
 interface Criatura {
   id: string;
@@ -11,7 +12,13 @@ interface Criatura {
   [key: string]: any;
 }
 
-export function CriaturaEditor({ criatura }: { criatura: Criatura }) {
+export function CriaturaEditor({
+  criatura,
+  onHeaderControlsChange,
+}: {
+  criatura: Criatura;
+  onHeaderControlsChange?: OnHeaderControlsChange;
+}) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
   const abrirPanel = usePanelFlotante((s) => s.abrir);
 
@@ -26,6 +33,7 @@ export function CriaturaEditor({ criatura }: { criatura: Criatura }) {
       onSelectSubsistema={(id) => openEntity("runas", id)}
       onNavigateCiudad={(id) => openEntity("ciudades", id)}
       onNavigateReino={(id) => abrirPanel("reino", id)}
+      onHeaderControlsChange={onHeaderControlsChange}
     />
   );
 }

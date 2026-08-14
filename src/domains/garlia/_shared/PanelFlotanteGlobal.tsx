@@ -24,9 +24,13 @@
  * click en el backdrop.
  */
 
-import { Bug, Crown, Diamond, Gem, Leaf, Users, X } from "lucide-react";
-import React, { useEffect } from "react";
+import { Bug, Crown, Diamond, Gem, Leaf, Save, Trash2, Users, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+
+import { SaveIndicator as SaveIndicatorInline } from "@/domains/garlia/_shared/UIComponents";
+
+import { type EditorHeaderControls } from "./useEditorHeaderControls";
 
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { PersonajeEditor } from "@/domains/garlia/personajes/PersonajeEditor";
@@ -49,6 +53,19 @@ import { usePanelFlotante } from "./usePanelFlotanteStore";
 export function PanelFlotanteGlobal() {
   const entidad = usePanelFlotante((s) => s.entidad);
   const cerrar = usePanelFlotante((s) => s.cerrar);
+
+  // Controles publicados por el editor activo (nombre editable, guardar,
+  // eliminar, extras específicos) — reemplazan la barra propia que cada
+  // editor solía renderizar, así solo hay UNA barra superior en la vista
+  // rápida en vez de dos casi idénticas apiladas.
+  const [headerControls, setHeaderControls] = useState<EditorHeaderControls | null>(null);
+
+  // Al cambiar de entidad (o cerrar), se limpia lo publicado por la
+  // anterior para no arrastrar controles obsoletos mientras el nuevo
+  // editor todavía no publica los suyos.
+  useEffect(() => {
+    setHeaderControls(null);
+  }, [entidad?.kind, entidad?.id]);
 
   const { data: personajes } = useSupabaseData<Personaje>("personajes");
   const { data: criaturas } = useSupabaseData<Criatura>("criaturas");
@@ -159,12 +176,48 @@ export function PanelFlotanteGlobal() {
           >
             <Icon className="text-primary/50" size={12} />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-              {label} · vista rápida
-            </p>
-            <p className="text-xs font-bold text-primary truncate">{nombre}</p>
-          </div>
+          <p className="shrink-0 text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+            {label}
+          </p>
+
+          {/* Nombre editable + acciones del editor activo (guardar,
+              eliminar, extras) — publicados por el editor vía
+              onHeaderControlsChange. Mientras no haya llegado la primera
+              publicación (frame inicial), se muestra el nombre de solo
+              lectura como fallback para no parpadear a vacío. */}
+          {headerControls ? (
+            <>
+              <input
+                className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
+                placeholder={headerControls.placeholderNombre}
+                value={headerControls.nombre ?? ""}
+                onChange={(e) => headerControls.onChangeNombre(e.target.value)}
+                onBlur={headerControls.onBlurNombre}
+              />
+              {headerControls.extra}
+              <div className="shrink-0 flex items-center gap-1.5">
+                <SaveIndicatorInline status={headerControls.status} />
+                <button
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
+                  type="button"
+                  onClick={headerControls.onEliminar}
+                >
+                  <Trash2 size={10} />
+                </button>
+                <button
+                  className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
+                  disabled={headerControls.status === "saving"}
+                  type="button"
+                  onClick={headerControls.onGuardar}
+                >
+                  <Save size={10} /> Guardar
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="flex-1 min-w-0 text-xs font-bold text-primary truncate">{nombre}</p>
+          )}
+
           <button
             type="button"
             onClick={cerrar}
@@ -177,17 +230,43 @@ export function PanelFlotanteGlobal() {
 
         <div className="flex-1 min-h-0 overflow-y-auto">
           {entidad.kind === "personaje" ? (
-            <PersonajeEditor key={personaje!.id} personaje={personaje!} />
+            <PersonajeEditor
+              key={personaje!.id}
+              personaje={personaje!}
+              onHeaderControlsChange={setHeaderControls}
+            />
           ) : entidad.kind === "criatura" ? (
-            <CriaturaEditor key={criatura!.id} criatura={criatura!} />
+            <CriaturaEditor
+              key={criatura!.id}
+              criatura={criatura!}
+              onHeaderControlsChange={setHeaderControls}
+            />
           ) : entidad.kind === "reino" ? (
-            <ReinoEditor key={reino!.id} reino={reino!} />
+            <ReinoEditor
+              key={reino!.id}
+              reino={reino!}
+              onHeaderControlsChange={setHeaderControls}
+            />
           ) : entidad.kind === "item" ? (
-            <ItemEditor key={item!.id} item={item!} />
+            <ItemEditor
+              key={item!.id}
+              item={item!}
+              onHeaderControlsChange={setHeaderControls}
+            />
           ) : entidad.kind === "flora" ? (
-            <FloraEditor key={floraSel!.id} flora={floraSel as Flora} onDeleted={() => cerrar()} />
+            <FloraEditor
+              key={floraSel!.id}
+              flora={floraSel as Flora}
+              onDeleted={() => cerrar()}
+              onHeaderControlsChange={setHeaderControls}
+            />
           ) : (
-            <MineralEditor key={mineralSel!.id} mineral={mineralSel as Mineral} onDeleted={() => cerrar()} />
+            <MineralEditor
+              key={mineralSel!.id}
+              mineral={mineralSel as Mineral}
+              onDeleted={() => cerrar()}
+              onHeaderControlsChange={setHeaderControls}
+            />
           )}
         </div>
       </div>

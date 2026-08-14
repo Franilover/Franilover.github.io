@@ -27,13 +27,11 @@ import {
   Image as ImageIcon,
   MapPin,
   Package,
-  Save,
   Shield,
   SlidersHorizontal,
   Sparkles,
   Star,
   Tags,
-  Trash2,
   UserCircle2,
   Users,
   Wand2,
@@ -66,8 +64,12 @@ import { CriaturaStatsDndEditor } from "@/domains/garlia/criaturas/CriaturaStats
 import { PickerImagenCriaturaBtn } from "@/domains/garlia/criaturas/PickerImagenCriaturaBtn";
 import {
   SelectorImagen,
-  SaveIndicator,
 } from "@/domains/garlia/_shared/UIComponents";
+import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
+import {
+  usePublishHeaderControls,
+  type OnHeaderControlsChange,
+} from "@/domains/garlia/_shared/useEditorHeaderControls";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { useCriaturaAsideCatalogs } from "@/domains/garlia/criaturas/useCriaturaAsideCatalogs";
 import { useMembresiaSubsistemaCriatura } from "@/domains/garlia/criaturas/useMembresiaSubsistemaCriatura";
@@ -95,6 +97,7 @@ export function EditorCriatura({
   onSelectSubsistema,
   onNavigateCiudad,
   onNavigateReino,
+  onHeaderControlsChange,
 }: {
   item: Criatura;
   onSaved: (c: Criatura) => void;
@@ -106,6 +109,7 @@ export function EditorCriatura({
   onSelectSubsistema?: (subsistemaId: string) => void;
   onNavigateCiudad?: (id: string) => void;
   onNavigateReino?: (id: string) => void;
+  onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const [form, setForm] = useState<Criatura>(item);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -284,119 +288,90 @@ export function EditorCriatura({
     setSavingCrafted(false);
   };
 
+  // Los tres toggles de panel (Clasificación/Ilustraciones/Perfil atómico)
+  // + el dado D&D son específicos de Criatura, así que viajan juntos como
+  // "extra" dentro de los controles de header.
+  const extraBotonesHeader = (
+    <>
+      <button
+        className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
+          panelActivo === "clasificacion"
+            ? "border-primary/40 text-primary bg-primary/8"
+            : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+        }`}
+        title="Clasificación"
+        type="button"
+        onClick={() =>
+          setPanelActivo((p) => (p === "clasificacion" ? null : "clasificacion"))
+        }
+      >
+        <Tags size={11} />
+        <span className="hidden md:inline">Clasificación</span>
+      </button>
+
+      <button
+        className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
+          panelActivo === "ilustraciones"
+            ? "border-primary/40 text-primary bg-primary/8"
+            : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+        }`}
+        title="Ilustraciones"
+        type="button"
+        onClick={() =>
+          setPanelActivo((p) => (p === "ilustraciones" ? null : "ilustraciones"))
+        }
+      >
+        <ImageIcon size={11} />
+        <span className="hidden md:inline">Ilustraciones</span>
+      </button>
+
+      <button
+        className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
+          panelActivo === "perfilAtomico"
+            ? "border-primary/40 text-primary bg-primary/8"
+            : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+        }`}
+        title="Perfil atómico"
+        type="button"
+        onClick={() =>
+          setPanelActivo((p) => (p === "perfilAtomico" ? null : "perfilAtomico"))
+        }
+      >
+        <Atom size={11} />
+        <span className="hidden md:inline">Perfil atómico</span>
+      </button>
+
+      <button
+        className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
+        title="Reglas D&D 2024"
+        type="button"
+        onClick={() => setShowModalDnd(true)}
+      >
+        <Dices size={13} />
+      </button>
+    </>
+  );
+
+  const headerControls = {
+    imagenUrl: form.imagen_url,
+    IconoFallback: Bug,
+    nombre: form.nombre ?? "",
+    placeholderNombre: "Nombre de la criatura",
+    onChangeNombre: (nombre: string) => setForm((f) => ({ ...f, nombre })),
+    status,
+    onGuardar: save,
+    onEliminar: del,
+    extra: extraBotonesHeader,
+  };
+  usePublishHeaderControls(headerControls, onHeaderControlsChange);
+
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden relative">
       <ConfirmModal />
 
       {/* ── CONTENIDO PRINCIPAL ──────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* ── Header compacto ──────────────────────────────────────────────── */}
-        <div
-          className="shrink-0 flex items-center gap-2 px-3 py-2 border-b"
-          style={{
-            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
-            background: "color-mix(in srgb, var(--primary) 2%, transparent)",
-          }}
-        >
-          <div className="shrink-0 w-7 h-7 rounded-lg overflow-hidden border border-primary/15 bg-primary/5 flex items-center justify-center">
-            {form.imagen_url ? (
-              <Image
-                alt={form.nombre}
-                className="w-full h-full object-cover"
-                src={form.imagen_url}
-              />
-            ) : (
-              <Bug className="text-primary/25" size={13} />
-            )}
-          </div>
-
-          <input
-            className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
-            placeholder="Nombre de la criatura"
-            value={form.nombre ?? ""}
-            onChange={field("nombre")}
-          />
-
-          <button
-            className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
-              panelActivo === "clasificacion"
-                ? "border-primary/40 text-primary bg-primary/8"
-                : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
-            }`}
-            title="Clasificación"
-            type="button"
-            onClick={() =>
-              setPanelActivo((p) =>
-                p === "clasificacion" ? null : "clasificacion",
-              )
-            }
-          >
-            <Tags size={11} />
-            <span className="hidden md:inline">Clasificación</span>
-          </button>
-
-          <button
-            className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
-              panelActivo === "ilustraciones"
-                ? "border-primary/40 text-primary bg-primary/8"
-                : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
-            }`}
-            title="Ilustraciones"
-            type="button"
-            onClick={() =>
-              setPanelActivo((p) =>
-                p === "ilustraciones" ? null : "ilustraciones",
-              )
-            }
-          >
-            <ImageIcon size={11} />
-            <span className="hidden md:inline">Ilustraciones</span>
-          </button>
-
-          <button
-            className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
-              panelActivo === "perfilAtomico"
-                ? "border-primary/40 text-primary bg-primary/8"
-                : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
-            }`}
-            title="Perfil atómico"
-            type="button"
-            onClick={() =>
-              setPanelActivo((p) =>
-                p === "perfilAtomico" ? null : "perfilAtomico",
-              )
-            }
-          >
-            <Atom size={11} />
-            <span className="hidden md:inline">Perfil atómico</span>
-          </button>
-
-          <button
-            className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
-            title="Reglas D&D 2024"
-            type="button"
-            onClick={() => setShowModalDnd(true)}
-          >
-            <Dices size={13} />
-          </button>
-
-          <div className="shrink-0 flex items-center gap-1.5">
-            <SaveIndicator status={status} />
-            <button
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
-              onClick={del}
-            >
-              <Trash2 size={9} />
-            </button>
-            <button
-              className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-              disabled={status === "saving"}
-              onClick={save}
-            >
-              <Save size={10} /> Guardar
-            </button>
-          </div>
-        </div>
+        {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
         {/* ── Contenido superior ───────────────────────────────────────────── */}
         <div

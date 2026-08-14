@@ -16,6 +16,7 @@ import { EditorPersonaje } from "@/domains/garlia/personajes/EditorPersonaje";
 import { useMundoNavigation } from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 import { useWikilinkNavigate } from "@/domains/garlia/_shared/useWikilinkNavigate";
+import { type OnHeaderControlsChange } from "@/domains/garlia/_shared/useEditorHeaderControls";
 
 interface Personaje {
   id: string;
@@ -23,7 +24,13 @@ interface Personaje {
   [key: string]: any;
 }
 
-export function PersonajeEditor({ personaje }: { personaje: Personaje }) {
+export function PersonajeEditor({
+  personaje,
+  onHeaderControlsChange,
+}: {
+  personaje: Personaje;
+  onHeaderControlsChange?: OnHeaderControlsChange;
+}) {
   const openEntity = useMundoNavigation((s) => s.openEntity);
   const abrirPanel = usePanelFlotante((s) => s.abrir);
   // Resuelve nombre → id contra el cache de personajes/criaturas/items/
@@ -46,6 +53,7 @@ export function PersonajeEditor({ personaje }: { personaje: Personaje }) {
       onNavigateCiudad={(id) => openEntity("ciudades", id)}
       onNavigateCapitulo={(capituloId) => openEntity("capitulos", capituloId)}
       onSelectCancion={(id) => openEntity("letras", id)}
+      onHeaderControlsChange={onHeaderControlsChange}
     />
   );
 }

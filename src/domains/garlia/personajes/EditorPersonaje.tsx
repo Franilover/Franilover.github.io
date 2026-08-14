@@ -22,11 +22,9 @@
 
 import {
   Maximize2,
-  Save,
-  Trash2,
   UserCircle2,
 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import {
   useMobileAsidePanel,
@@ -47,7 +45,12 @@ import { type SaveStatus } from "@/ui/saveStatus";
 import { useCiudades } from "@garlia/ciudades";
 import { useReinosMin } from "@garlia/reinos";
 
-import { SelectorImagen, SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
+import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
+import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
+import {
+  usePublishHeaderControls,
+  type OnHeaderControlsChange,
+} from "@/domains/garlia/_shared/useEditorHeaderControls";
 import { useNombresDeTabla } from "@/domains/garlia/_shared/useNombresDeTabla";
 
 // ─── FormularioPersonaje ──────────────────────────────────────────────────────
@@ -67,6 +70,7 @@ export function FormularioPersonaje({
   onSelectCancion,
   onNavigateCapitulo,
   onFechaNacimientoChange,
+  onHeaderControlsChange,
 }: {
   form: Personaje;
   setForm: React.Dispatch<React.SetStateAction<Personaje>>;
@@ -82,6 +86,7 @@ export function FormularioPersonaje({
   onSelectCancion?: (id: string) => void;
   onNavigateCapitulo?: (capituloId: string) => void;
   onFechaNacimientoChange: (dia: number | null) => void;
+  onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const especies = useNombresDeTabla("criaturas");
   const reinosMin = useReinosMin();
@@ -188,47 +193,26 @@ export function FormularioPersonaje({
     onNavigateCapitulo,
   };
 
+  const headerControls = {
+    imagenUrl: form.img_url,
+    IconoFallback: UserCircle2,
+    nombre: form.nombre ?? "",
+    placeholderNombre: "Nombre del personaje",
+    onChangeNombre: (nombre: string) => setForm((f) => ({ ...f, nombre })),
+    status,
+    onGuardar: onSave,
+    // En modo "compacto" (embebido en otro panel) no se ofrece eliminar,
+    // igual que antes — se publica un no-op para no romper el contrato.
+    onEliminar: compacto ? () => {} : onDelete,
+  };
+  // Solo se publica hacia el contenedor cuando NO es compacto: el modo
+  // compacto es un uso embebido propio (p. ej. dentro de otro formulario)
+  // que no pasa por PanelFlotanteGlobal y siempre debe dibujar su header.
+  usePublishHeaderControls(headerControls, compacto ? undefined : onHeaderControlsChange);
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {/* Header */}
-      <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-primary/10 bg-primary/[0.03]">
-        <div className="shrink-0 w-8 h-8 rounded-lg overflow-hidden border border-primary/15 bg-primary/5 flex items-center justify-center">
-          {form.img_url ? (
-            <img
-              alt={form.nombre}
-              className="w-full h-full object-cover"
-              src={form.img_url}
-            />
-          ) : (
-            <UserCircle2 className="text-primary/25" size={16} />
-          )}
-        </div>
-        <input
-          className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
-          placeholder="Nombre del personaje"
-          style={{ letterSpacing: "0.02em" }}
-          value={form.nombre ?? ""}
-          onChange={field("nombre")}
-        />
-        <div className="shrink-0 flex items-center gap-1.5">
-          <SaveIndicator status={status} />
-          {!compacto && (
-            <button
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
-              onClick={onDelete}
-            >
-              <Trash2 size={10} />
-            </button>
-          )}
-          <button
-            className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
-            disabled={status === "saving"}
-            onClick={onSave}
-          >
-            <Save size={10} /> Guardar
-          </button>
-        </div>
-      </div>
+      {(compacto || !onHeaderControlsChange) && <EditorHeaderBar controls={headerControls} />}
 
       {/* Cuerpo: formulario + sidebar inline desktop */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -548,6 +532,7 @@ export function EditorPersonaje({
   onNavigateCiudad,
   onSelectCancion,
   onNavigateCapitulo,
+  onHeaderControlsChange,
 }: {
   item: Personaje;
   onSaved: (p: Personaje) => void;
@@ -559,6 +544,7 @@ export function EditorPersonaje({
   onNavigateCiudad?: (id: string) => void;
   onSelectCancion?: (id: string) => void;
   onNavigateCapitulo?: (capituloId: string) => void;
+  onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const { form, setForm, status, save, remove, onFechaNacimientoChange } =
     usePersonajeForm(item, onSaved, onDeleted);
@@ -583,6 +569,7 @@ export function EditorPersonaje({
         status={status}
         onDelete={del}
         onFechaNacimientoChange={onFechaNacimientoChange}
+        onHeaderControlsChange={onHeaderControlsChange}
         onNavigate={onNavigate}
         onNavigateCapitulo={onNavigateCapitulo}
         onNavigateCiudad={onNavigateCiudad}
