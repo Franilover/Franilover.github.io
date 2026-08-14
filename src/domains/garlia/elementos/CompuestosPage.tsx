@@ -40,6 +40,7 @@ import {
   type EditorHeaderControls,
   type OnHeaderControlsChange,
 } from "../_shared/useEditorHeaderControls";
+import { ElementoPanelFlotante } from "./ElementosPage";
 
 import {
   autocompletarHastaEstable,
@@ -220,10 +221,14 @@ function SelectorElementosCompuesto({
   elementos,
   componentes,
   onChange,
+  onAbrirElemento,
 }: {
   elementos: Elemento[];
   componentes: ComponenteCompuesto[];
   onChange: (componentes: ComponenteCompuesto[]) => void;
+  /** Abre el panel flotante del Elemento (mismo patrón que "Editar" en
+   *  SelectorCompuesto) al clickear su nombre, sin disparar sumar/quitar. */
+  onAbrirElemento?: (elementoId: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const idsElegidos = new Set(componentes.map((c) => c.elemento_id));
@@ -304,7 +309,13 @@ function SelectorElementosCompuesto({
               key={c.elemento_id}
               className="flex items-center gap-1.5 bg-accent/[0.06] rounded-md pl-2 pr-1 py-1 border border-accent/15"
             >
-              <span className="flex-1 min-w-0 truncate text-micro font-bold text-primary/80">
+              <span
+                className={`flex-1 min-w-0 truncate text-micro font-bold text-primary/80 ${
+                  onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
+                }`}
+                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                onClick={() => onAbrirElemento?.(c.elemento_id)}
+              >
                 {nombreElemento(elementos, c.elemento_id)}
               </span>
               <div className="shrink-0 flex items-center gap-1">
@@ -356,26 +367,41 @@ function SelectorElementosCompuesto({
           disponibles.map((el) => {
             const sugerido = idsSugeridos.has(el.id);
             return (
-              <button
+              <div
                 key={el.id}
-                type="button"
-                onClick={() => agregarElemento(el.id)}
-                title={sugerido ? `${el.nombre} — completa parte del déficit actual` : undefined}
-                className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors cursor-pointer ${
+                className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
                   sugerido ? "bg-accent/[0.06] hover:bg-accent/10" : "hover:bg-primary/5"
                 }`}
               >
                 {sugerido && <span className="w-1 h-1 rounded-full bg-accent shrink-0" />}
-                <span className="shrink-0 text-micro font-black text-primary/70 w-8">
-                  {el.simbolo || "??"}
-                </span>
-                <span className="flex-1 min-w-0 text-micro text-primary/80 truncate">
-                  {el.nombre}
-                </span>
-                <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 group-hover:text-primary">
+                <button
+                  type="button"
+                  onClick={() => (onAbrirElemento ? onAbrirElemento(el.id) : agregarElemento(el.id))}
+                  title={
+                    onAbrirElemento
+                      ? "Ver/editar este elemento"
+                      : sugerido
+                        ? `${el.nombre} — completa parte del déficit actual`
+                        : undefined
+                  }
+                  className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
+                >
+                  <span className="shrink-0 text-micro font-black text-primary/70 w-8">
+                    {el.simbolo || "??"}
+                  </span>
+                  <span className="flex-1 min-w-0 text-micro text-primary/80 truncate">
+                    {el.nombre}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => agregarElemento(el.id)}
+                  title="Agregar al compuesto"
+                  className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 group-hover:text-primary cursor-pointer"
+                >
                   <Plus size={10} />
-                </span>
-              </button>
+                </button>
+              </div>
             );
           })
         )}
@@ -564,6 +590,7 @@ function CompuestoEditor({
   onActualizar,
   onEliminar,
   onHeaderControlsChange,
+  onActualizarElemento,
 }: {
   compuesto: Compuesto;
   elementos: Elemento[];
@@ -575,10 +602,25 @@ function CompuestoEditor({
    *  renderiza en su propia barra para evitar la barra duplicada. Si no se
    *  pasa, este editor sigue mostrando su propia barra (uso standalone). */
   onHeaderControlsChange?: OnHeaderControlsChange;
+  /** Refleja los cambios de un Elemento en el catálogo en memoria del
+   *  caller, para que el panel flotante del elemento muestre datos frescos
+   *  (mismo patrón que onActualizar de Compuesto). */
+  onActualizarElemento?: (id: string, cambios: Partial<Elemento>) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
   const [local, setLocal] = useState(compuesto);
+  const [editandoElementoId, setEditandoElementoId] = useState<string | null>(null);
+
+  async function persistElemento(id: string, cambios: Partial<Elemento>) {
+    try {
+      const { error } = await supabase.from("elementos").update(cambios).eq("id", id);
+      if (error) throw error;
+      onActualizarElemento?.(id, cambios);
+    } catch (e) {
+      console.error("[CompuestoEditor] error guardando elemento:", e);
+    }
+  }
 
   React.useEffect(() => setLocal(compuesto), [compuesto]);
 
@@ -724,6 +766,7 @@ function CompuestoEditor({
                 setLocal((p) => ({ ...p, componentes }));
                 persist({ componentes });
               }}
+              onAbrirElemento={setEditandoElementoId}
             />
           </div>
 
@@ -766,6 +809,15 @@ function CompuestoEditor({
           </div>
         </div>
       </div>
+
+      {editandoElementoId && (
+        <ElementoPanelFlotante
+          elemento={elementos.find((e) => e.id === editandoElementoId)!}
+          todosLosElementos={elementos}
+          onCerrar={() => setEditandoElementoId(null)}
+          onActualizar={persistElemento}
+        />
+      )}
     </div>
   );
 }

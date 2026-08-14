@@ -333,7 +333,7 @@ function ElementoCasilla({
  * vez de sumarse al store global usePanelFlotante) porque ElementoEditor
  * necesita onActualizar/onEliminar, que son propios de esta página.
  */
-function ElementoPanelFlotante({
+export function ElementoPanelFlotante({
   elemento,
   todosLosElementos,
   onCerrar,
