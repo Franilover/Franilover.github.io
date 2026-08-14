@@ -323,7 +323,7 @@ function TodasLasBasesView({
               <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-start">
+            <div className="grid grid-cols-3 gap-2 items-start">
               {filas.map((f) => (
                 <div
                   key={f.nombre}
