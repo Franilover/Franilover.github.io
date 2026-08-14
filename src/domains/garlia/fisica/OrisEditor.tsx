@@ -85,10 +85,6 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
           </button>
         )}
 
-        <span className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/30 px-1.5 py-0.5 rounded border border-primary/15">
-          #{local.orden}
-        </span>
-
         <input
           value={local.nombre ?? ""}
           onChange={(e) => setLocal((p) => ({ ...p, nombre: e.target.value }))}
