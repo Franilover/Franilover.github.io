@@ -453,6 +453,39 @@ const PARTICLE_HUE_MIX = PARTICLE_TYPES.reduce<Record<string, number>>((acc, p, 
   return acc;
 }, {});
 
+/** Fórmula A/T/S (3 letras) de cada Partícula — mismo mapeo que
+ *  PARTICULA_QUIMICA_FORMULA en fisica/types.ts (misma capa conceptual,
+ *  duplicado acá como constante fija para no acoplar Elementos a Física).
+ *  Usado por el modo "ats" del toggle de AtomoVisual. */
+const PARTICLE_ATS_FORMULA: Record<ParticleType, string> = {
+  Masa: "AAA",
+  Cinética: "TTT",
+  Potencial: "TAA",
+  Información: "ATT",
+  Voluntad: "TTA",
+  Percepción: "AAT",
+  Transición: "ASA",
+  Ciclo: "TST",
+  Entropía: "SAT",
+  Catálisis: "ATS",
+  Equilibrio: "SSS",
+};
+
+const LETRA_ATS_COLOR: Record<"A" | "T" | "S", { bg: string; border: string; fg: string }> = {
+  A: { bg: "color-mix(in srgb, #22c55e 18%, transparent)", border: "#22c55e", fg: "#15803d" },
+  T: { bg: "color-mix(in srgb, #ef4444 18%, transparent)", border: "#ef4444", fg: "#b91c1c" },
+  S: { bg: "color-mix(in srgb, #3b82f6 18%, transparent)", border: "#3b82f6", fg: "#1d4ed8" },
+};
+
+function sectorPathAtomo(cx: number, cy: number, r: number, anguloIni: number, anguloFin: number): string {
+  const x1 = cx + r * Math.cos(anguloIni);
+  const y1 = cy + r * Math.sin(anguloIni);
+  const x2 = cx + r * Math.cos(anguloFin);
+  const y2 = cy + r * Math.sin(anguloFin);
+  const largo = anguloFin - anguloIni > Math.PI ? 1 : 0;
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largo} 1 ${x2} ${y2} Z`;
+}
+
 function colorDeParticula(particula: ParticleType): { fg: string; bg: string; border: string } {
   // Alterna entre --primary y --accent según la posición del tipo en
   // PARTICLE_TYPES, variando el porcentaje de mezcla — 100% dinámico
@@ -507,9 +540,12 @@ export function AtomoVisual({
    *  quedar chica por depender de una altura fija. */
   className?: string;
 }) {
+  const [modo, setModo] = useState<"inicial" | "ats">("inicial");
   const nucleares = useMemo(() => particulasDeCapa(elemento.nucleo), [elemento.nucleo]);
   const capaMedia = useMemo(() => particulasDeCapa(elemento.media), [elemento.media]);
   const capaExterna = useMemo(() => particulasDeCapa(elemento.externa), [elemento.externa]);
+
+  const hayParticulas = nucleares.length + capaMedia.length + capaExterna.length > 0;
 
   const size = 200;
   const cx = size / 2;
@@ -533,13 +569,82 @@ export function AtomoVisual({
     return { x: cx + Math.cos(angulo) * radio, y: cy + Math.sin(angulo) * radio };
   }
 
+  /** Dibuja el contenido de un círculo de partícula según el modo activo:
+   *  "inicial" = círculo sólido con la letra corta (M, C, P...); "ats" =
+   *  3 tercios A/T/S en miniatura, igual que ParticulaVisual en Física. */
+  function contenidoParticula(particula: ParticleType, r: number, font: number) {
+    if (modo === "inicial") {
+      const color = colorDeParticula(particula);
+      return (
+        <>
+          <circle r={r} strokeWidth={1.5} style={{ fill: color.bg, stroke: color.border }} />
+          <text textAnchor="middle" dominantBaseline="central" fontSize={font} fontWeight={900} style={{ fill: color.fg }}>
+            {PARTICLE_INITIAL[particula]}
+          </text>
+        </>
+      );
+    }
+    const formula = PARTICLE_ATS_FORMULA[particula] ?? "";
+    const letras = formula.split("").filter((c): c is "A" | "T" | "S" => c === "A" || c === "T" || c === "S");
+    const anguloTercio = (Math.PI * 2) / 3;
+    const miniFont = r * 0.62;
+    const labelR = r * 0.55;
+    return (
+      <>
+        {letras.map((letra, j) => {
+          const aIni = -Math.PI / 2 + j * anguloTercio;
+          const aFin = aIni + anguloTercio;
+          const aMedio = (aIni + aFin) / 2;
+          const color = LETRA_ATS_COLOR[letra];
+          return (
+            <g key={j}>
+              <path d={sectorPathAtomo(0, 0, r, aIni, aFin)} strokeWidth={1} style={{ fill: color.bg, stroke: color.border }} />
+              <text
+                x={labelR * Math.cos(aMedio)}
+                y={labelR * Math.sin(aMedio)}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={miniFont}
+                fontWeight={900}
+                style={{ fill: color.fg }}
+              >
+                {letra}
+              </text>
+            </g>
+          );
+        })}
+        <circle r={r} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} />
+      </>
+    );
+  }
+
   return (
     <div
-      className={`rounded-lg border border-primary/10 bg-primary/[0.02] flex items-center justify-center p-2 ${
+      className={`relative rounded-lg border border-primary/10 bg-primary/[0.02] flex items-center justify-center p-2 ${
         className ?? "shrink-0 aspect-square h-full"
       }`}
       title="Representación del átomo: núcleo + capas orbitales con las partículas propias del mundo"
     >
+      {hayParticulas && (
+        <button
+          type="button"
+          onClick={() => setModo((m) => (m === "inicial" ? "ats" : "inicial"))}
+          title={modo === "inicial" ? "Mostrar letras A/T/S" : "Mostrar iniciales de las Partículas"}
+          className="absolute bottom-1 right-1 z-10 flex items-center justify-center rounded-full border shadow-sm cursor-pointer transition-transform hover:scale-110"
+          style={{
+            width: 22,
+            height: 22,
+            fontSize: 10,
+            fontWeight: 900,
+            background: "var(--primary)",
+            color: "var(--btn-text)",
+            borderColor: "color-mix(in srgb, var(--primary) 90%, black)",
+          }}
+        >
+          {modo === "inicial" ? "∆" : "Aa"}
+        </button>
+      )}
+
       <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full max-w-full max-h-full">
         {/* Órbitas: solo el trazo, sin relleno */}
         {(["media", "externa"] as const).map((layer) => (
@@ -566,31 +671,14 @@ export function AtomoVisual({
             />
           ) : (
             nucleares.map((particula, i) => {
-              const color = colorDeParticula(particula);
               const pos =
                 nucleares.length === 1
                   ? { x: cx, y: cy }
                   : posicionEnOrbita(i, nucleares.length, nucleoOrbitRadius);
               return (
-                <g key={`${particula}-${i}`}>
-                  <circle
-                    cx={pos.x}
-                    cy={pos.y}
-                    r={particleRadius.nucleo}
-                    strokeWidth={1.5}
-                    style={{ fill: color.bg, stroke: color.border }}
-                  />
-                  <text
-                    x={pos.x}
-                    y={pos.y}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={fontSize.nucleo}
-                    fontWeight={900}
-                    style={{ fill: color.fg }}
-                  >
-                    {PARTICLE_INITIAL[particula]}
-                  </text>
+                <g key={`${particula}-${i}`} transform={`translate(${pos.x}, ${pos.y})`}>
+                  <title>{particula}</title>
+                  {contenidoParticula(particula, particleRadius.nucleo, fontSize.nucleo)}
                 </g>
               );
             })
@@ -605,28 +693,11 @@ export function AtomoVisual({
           ]
         ).map(({ layer, particulas, radio }) =>
           particulas.map((particula, i) => {
-            const color = colorDeParticula(particula);
             const pos = posicionEnOrbita(i, particulas.length, radio);
             return (
-              <g key={`${layer}-${particula}-${i}`}>
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={particleRadius.orbita}
-                  strokeWidth={1.5}
-                  style={{ fill: color.bg, stroke: color.border }}
-                />
-                <text
-                  x={pos.x}
-                  y={pos.y}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={fontSize.orbita}
-                  fontWeight={900}
-                  style={{ fill: color.fg }}
-                >
-                  {PARTICLE_INITIAL[particula]}
-                </text>
+              <g key={`${layer}-${particula}-${i}`} transform={`translate(${pos.x}, ${pos.y})`}>
+                <title>{particula}</title>
+                {contenidoParticula(particula, particleRadius.orbita, fontSize.orbita)}
               </g>
             );
           }),
