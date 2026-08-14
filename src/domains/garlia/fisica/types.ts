@@ -40,6 +40,12 @@ export const ORIS_CONFIG = {
   select: "id, orden, nombre, familia, formula, dominio, descripcion",
 };
 
+/** Adapta un Oris (Supabase) al shape FilaCatalogo usado por las vistas de
+ *  catálogo compartidas con Base/Ium/Partículas. */
+export function orisAFilaCatalogo(o: Oris): FilaCatalogo {
+  return { nombre: o.nombre, detalle: o.dominio || o.formula, extra: o.familia };
+}
+
 /** Fila cruda tal cual vive en Supabase (tabla "fisica_conceptos"). */
 export interface FisicaConcepto {
   id: string;
