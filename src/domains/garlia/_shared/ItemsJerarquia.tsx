@@ -22,16 +22,21 @@
  * categoría para reasignar Item.categoria (onMoverItem). Si no se pasa
  * onMoverItem, las cards no son arrastrables (comportamiento previo).
  *
- * Debajo, en el mismo criterio, se muestran aparte Flora y Minerales
- * (tampoco agrupados) — mismo catálogo que ya aparece en la vista "por
- * Criatura" (colgando de Ecosistema ahí), acá solo como bloques planos
- * informativos. Item, Flora y Mineral abren el panel flotante
- * (abrirPanel(kind, id)), igual que Personaje/Criatura/Reino en las otras
- * vistas jerárquicas.
+ * Debajo, en el mismo criterio, se muestran aparte Flora y Minerales — mismo
+ * catálogo que ya aparece en la vista "por Criatura". Por defecto: Items
+ * agrupados por categoría, Flora/Minerales planos. Un toggle "ojo" (mismo
+ * patrón que el de Personajes en EntidadesPage) alterna a agrupar por
+ * Criatura en su lugar: Items por su `criatura_id` (con bloque "Sin
+ * criatura" para los que no tengan) y Flora/Minerales por Ecosistema
+ * (Ecosistema.flora_ids / mineral_ids), todo en tarjetas simples de solo
+ * lectura + navegación (sin drag&drop ni edición de vínculo — eso vive en
+ * el editor de cada entidad). Item, Flora, Mineral y Criatura abren el
+ * panel flotante (abrirPanel(kind, id)), igual que Personaje/Criatura/Reino
+ * en las otras vistas jerárquicas.
  */
 
-import { Box } from "lucide-react";
-import React from "react";
+import { Box, Eye, EyeOff, Leaf as LeafIcon, Gem as GemIcon, Sprout } from "lucide-react";
+import React, { useState } from "react";
 
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -46,8 +51,22 @@ interface Item {
   nombre: string;
   imagen_url?: string | null;
   categoria?: string;
+  criatura_id?: string | null;
 }
 interface EntidadMin {
+  id: string;
+  nombre: string;
+  imagen_url?: string | null;
+}
+interface EcosistemaMin {
+  id: string;
+  nombre: string;
+  /** Flora presente en este ecosistema — opcional para no romper usos previos. */
+  flora_ids?: string[];
+  /** Minerales presentes en este ecosistema — opcional idem. */
+  mineral_ids?: string[];
+}
+interface CriaturaMin {
   id: string;
   nombre: string;
   imagen_url?: string | null;
@@ -64,13 +83,28 @@ interface Props {
    *  pasa, las cards no son arrastrables. */
   onMoverItem?: (itemId: string, categoria: string | null) => void;
   /** Flora — se muestra como bloque aparte debajo del grid de Items, sin
-   *  agrupar (no tiene campo `categoria`). Puramente informativo: reusa
-   *  el mismo catálogo que ya se muestra en la vista "por Criatura". */
+   *  agrupar por defecto (no tiene campo `categoria`). Puramente informativo:
+   *  reusa el mismo catálogo que ya se muestra en la vista "por Criatura". */
   flora?: EntidadMin[];
   loadingFlora?: boolean;
   /** Minerales — mismo criterio que `flora`. */
   minerales?: EntidadMin[];
   loadingMinerales?: boolean;
+  /** Ecosistemas — habilita el toggle "ojo" para agrupar Flora/Minerales por
+   *  Ecosistema en vez de mostrarlos planos (mismo patrón que el toggle de
+   *  Personajes en EntidadesPage). Si no se pasa, no aparece el toggle y
+   *  Flora/Minerales siempre se muestran planos (comportamiento previo). */
+  ecosistemas?: EcosistemaMin[];
+  loadingEcosistemas?: boolean;
+  /** Navega al editor de un Ecosistema (sección propia, no panel flotante —
+   *  mismo criterio que onOpenGrupo/onNavigateCriatura en otras vistas). */
+  onOpenEcosistema?: (id: string) => void;
+  /** Criaturas — con el toggle "ojo" activo, los Items se agrupan por
+   *  `criatura_id` en vez de por categoría (los que no tienen criatura caen
+   *  en un bloque "Sin criatura"). Si no se pasa, el ojo solo reagrupa
+   *  Flora/Minerales, dejando Items como están. */
+  criaturas?: CriaturaMin[];
+  loadingCriaturas?: boolean;
   /** Grupos de tipo "items" agrupados por subtipo, para el dropdown de
    *  filtro por grupo de la barra superior — mismo patrón que las otras
    *  vistas jerárquicas. */
@@ -190,6 +224,79 @@ function BloqueCategoria({
   );
 }
 
+/** Tarjeta simple de un Ecosistema con la Flora/Minerales que contiene —
+ *  solo lectura + navegación (sin drag&drop ni edición de vínculo, que vive
+ *  en PanelEcosistema / SelectorEcosistemasDeEntidad). Mismo lenguaje visual
+ *  liviano que BloqueEntidadesDeCriatura. */
+function BloqueEcosistemaFloraMinerales({
+  ecosistema,
+  flora,
+  minerales,
+  onOpenEcosistema,
+  onOpenFlora,
+  onOpenMineral,
+}: {
+  ecosistema: EcosistemaMin;
+  flora: EntidadMin[];
+  minerales: EntidadMin[];
+  onOpenEcosistema: (id: string) => void;
+  onOpenFlora: (id: string) => void;
+  onOpenMineral: (id: string) => void;
+}) {
+  return (
+    <div className="mb-6 break-inside-avoid">
+      {ecosistema.id === "__sin_ecosistema__" ? (
+        <div className="flex items-center gap-1.5 mb-2 px-1">
+          <Sprout size={11} className="text-primary/25 shrink-0" />
+          <h3 className="text-micro font-black uppercase tracking-[0.2em] text-primary/35">
+            {ecosistema.nombre}
+          </h3>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onOpenEcosistema(ecosistema.id)}
+          className="flex items-center gap-1.5 mb-2 px-1 group"
+        >
+          <Sprout size={11} className="text-primary/35 shrink-0" />
+          <h3 className="text-micro font-black uppercase tracking-[0.2em] text-primary/50 group-hover:text-primary transition-colors">
+            {ecosistema.nombre}
+          </h3>
+        </button>
+      )}
+
+      {flora.length === 0 && minerales.length === 0 ? (
+        <p className="text-micro text-primary/25 italic px-1">Sin flora ni minerales</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5 px-1">
+          {flora.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => onOpenFlora(f.id)}
+              className="flex items-center gap-1 px-2 py-1 rounded-full border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-micro font-semibold text-primary/70"
+            >
+              <LeafIcon size={9} className="text-primary/30 shrink-0" />
+              {f.nombre}
+            </button>
+          ))}
+          {minerales.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onOpenMineral(m.id)}
+              className="flex items-center gap-1 px-2 py-1 rounded-full border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-micro font-semibold text-primary/70"
+            >
+              <GemIcon size={9} className="text-primary/30 shrink-0" />
+              {m.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ItemsJerarquia({
   items,
   loading,
@@ -200,6 +307,11 @@ export function ItemsJerarquia({
   loadingFlora,
   minerales,
   loadingMinerales,
+  ecosistemas,
+  loadingEcosistemas,
+  onOpenEcosistema,
+  criaturas,
+  loadingCriaturas,
   gruposItemsPorSubtipo,
   grupoSeleccionadoId,
   onSeleccionarGrupo,
@@ -210,6 +322,7 @@ export function ItemsJerarquia({
   descargarDatosBoton,
 }: Props) {
   const abrirPanel = usePanelFlotante((s) => s.abrir);
+  const [porEcosistema, setPorEcosistema] = useState(false);
 
   const dragItem = useRightClickDrag<string>({
     label: (id) => items.find((i) => i.id === id)?.nombre ?? "",
@@ -248,11 +361,90 @@ export function ItemsJerarquia({
 
   const hayCategorias = categorias.conCategoria.length > 0;
 
+  // Agrupa Flora/Minerales por Ecosistema (Ecosistema.flora_ids/mineral_ids)
+  // cuando el toggle "ojo" está activo — mismo criterio de lectura que
+  // useEntidadesDeCriatura, pero acá resuelto localmente ya que se pasan los
+  // catálogos completos. Entidades sin ecosistema asignado caen aparte.
+  const porEcosistemaData = React.useMemo(() => {
+    if (!ecosistemas) return null;
+    const floraById = new Map((flora ?? []).map((f) => [f.id, f]));
+    const mineralById = new Map((minerales ?? []).map((m) => [m.id, m]));
+    const floraAsignada = new Set<string>();
+    const mineralAsignado = new Set<string>();
+
+    const bloques = ecosistemas
+      .map((eco) => {
+        const floraEco = (eco.flora_ids ?? [])
+          .map((id) => floraById.get(id))
+          .filter((f): f is EntidadMin => !!f);
+        const mineralesEco = (eco.mineral_ids ?? [])
+          .map((id) => mineralById.get(id))
+          .filter((m): m is EntidadMin => !!m);
+        floraEco.forEach((f) => floraAsignada.add(f.id));
+        mineralesEco.forEach((m) => mineralAsignado.add(m.id));
+        return { ecosistema: eco, flora: floraEco, minerales: mineralesEco };
+      })
+      .filter((b) => b.flora.length > 0 || b.minerales.length > 0)
+      .sort((a, b) => a.ecosistema.nombre.localeCompare(b.ecosistema.nombre, "es"));
+
+    const floraSinEco = (flora ?? []).filter((f) => !floraAsignada.has(f.id));
+    const mineralesSinEco = (minerales ?? []).filter((m) => !mineralAsignado.has(m.id));
+
+    return { bloques, floraSinEco, mineralesSinEco };
+  }, [ecosistemas, flora, minerales]);
+
+  // Agrupa Items por Criatura (item.criatura_id) cuando el toggle "ojo" está
+  // activo — reemplaza el agrupado por categoría. Los items sin criatura
+  // asignada caen en un bloque "Sin criatura" aparte, mismo criterio que
+  // "Sin categoría" en el agrupado por defecto.
+  const porCriaturaData = React.useMemo(() => {
+    if (!criaturas) return null;
+    const criaturaById = new Map(criaturas.map((c) => [c.id, c]));
+    const mapa = new Map<string, Item[]>();
+    const sinCriatura: Item[] = [];
+    for (const item of itemsFiltrados) {
+      if (item.criatura_id && criaturaById.has(item.criatura_id)) {
+        if (!mapa.has(item.criatura_id)) mapa.set(item.criatura_id, []);
+        mapa.get(item.criatura_id)!.push(item);
+      } else {
+        sinCriatura.push(item);
+      }
+    }
+    const bloques = [...mapa.entries()]
+      .map(([criaturaId, itemsCriatura]) => ({
+        criatura: criaturaById.get(criaturaId)!,
+        items: itemsCriatura,
+      }))
+      .sort((a, b) => a.criatura.nombre.localeCompare(b.criatura.nombre, "es"));
+    return { bloques, sinCriatura };
+  }, [criaturas, itemsFiltrados]);
+
+  const porCriatura = porEcosistema; // un solo toggle reagrupa Items + Flora/Minerales a la vez
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-3 px-1 flex-wrap">
         <div className="flex-1 flex items-center gap-2 flex-wrap">
           {agrupacionSelector}
+          {(ecosistemas || criaturas) && (
+            <button
+              type="button"
+              onClick={() => setPorEcosistema((v) => !v)}
+              title={
+                porEcosistema
+                  ? "Ver Items por categoría, Flora/Minerales sin agrupar"
+                  : "Ver Items por Criatura, Flora/Minerales por Ecosistema"
+              }
+              aria-pressed={porEcosistema}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border transition-colors ${
+                porEcosistema
+                  ? "bg-accent/10 border-accent/20 text-accent/80"
+                  : "bg-primary/[0.04] border-primary/10 text-primary/40 hover:bg-primary/10"
+              }`}
+            >
+              {porEcosistema ? <Eye size={12} /> : <EyeOff size={12} />}
+            </button>
+          )}
           <BuscadorInline
             value={busqueda}
             onChange={onBusquedaChange}
@@ -270,7 +462,41 @@ export function ItemsJerarquia({
         {descargarDatosBoton}
       </div>
 
-      {hayCategorias ? (
+
+      {porCriatura && porCriaturaData ? (
+        <div className="[column-fill:_balance]" style={{ columnWidth: 300, columnGap: 24 }}>
+          {(loadingCriaturas || loading) &&
+          porCriaturaData.bloques.length === 0 &&
+          porCriaturaData.sinCriatura.length === 0 ? (
+            <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
+          ) : (
+            <>
+              {porCriaturaData.bloques.map(({ criatura, items: itemsCriatura }) => (
+                <div key={criatura.id} className="break-inside-avoid">
+                  <BloqueCategoria
+                    titulo={criatura.nombre}
+                    categoria={criatura.id}
+                    items={itemsCriatura}
+                    loading={loading}
+                    onItemClick={(id) => abrirPanel("item", id)}
+                  />
+                </div>
+              ))}
+              <div className="break-inside-avoid">
+                <BloqueCategoria
+                  titulo="Sin criatura"
+                  categoria={null}
+                  items={porCriaturaData.sinCriatura}
+                  loading={loading}
+                  onItemClick={(id) => abrirPanel("item", id)}
+                  onCreate={onCreate}
+                  creating={creating}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      ) : hayCategorias ? (
         <div className="[column-fill:_balance]" style={{ columnWidth: 300, columnGap: 24 }}>
           {categorias.conCategoria.map(([categoria, itemsCategoria]) => (
             <div key={categoria} className="break-inside-avoid">
@@ -319,37 +545,78 @@ export function ItemsJerarquia({
       )}
       {dragItem.overlay}
 
-      {/* Flora y Minerales — bloques aparte, sin agrupar (no tienen
-          `categoria`), debajo del grid de Items. Mismo catálogo que ya se
-          ve en la vista "por Criatura", puramente informativo acá: solo
-          mostrarlos y poder abrir su editor. */}
-      {flora && flora.length > 0 && (
-        <EntityCardGrid
-          title="Flora"
-          variant="grid"
-          loading={loadingFlora}
-          items={flora.map((f) => ({
-            id: f.id,
-            nombre: f.nombre,
-            imageUrl: f.imagen_url || undefined,
-          }))}
-          onItemClick={(id) => abrirPanel("flora", id)}
-          section="flora"
-        />
-      )}
-      {minerales && minerales.length > 0 && (
-        <EntityCardGrid
-          title="Minerales"
-          variant="grid"
-          loading={loadingMinerales}
-          items={minerales.map((m) => ({
-            id: m.id,
-            nombre: m.nombre,
-            imageUrl: m.imagen_url || undefined,
-          }))}
-          onItemClick={(id) => abrirPanel("mineral", id)}
-          section="minerales"
-        />
+      {/* Flora y Minerales — por defecto bloques planos (sin agrupar,
+          mismo catálogo que ya se ve en la vista "por Criatura"); con el
+          toggle "ojo" activo se agrupan por Ecosistema en su lugar. */}
+      {porEcosistema && porEcosistemaData ? (
+        <div className="mt-2">
+          {(loadingEcosistemas || loadingFlora || loadingMinerales) &&
+          porEcosistemaData.bloques.length === 0 ? (
+            <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
+          ) : porEcosistemaData.bloques.length === 0 &&
+            porEcosistemaData.floraSinEco.length === 0 &&
+            porEcosistemaData.mineralesSinEco.length === 0 ? (
+            <div className="py-6 text-xs text-primary/25 text-center">
+              Sin flora ni minerales todavía
+            </div>
+          ) : (
+            <div className="[column-fill:_balance]" style={{ columnWidth: 300, columnGap: 24 }}>
+              {porEcosistemaData.bloques.map(({ ecosistema, flora: floraEco, minerales: mineralesEco }) => (
+                <BloqueEcosistemaFloraMinerales
+                  key={ecosistema.id}
+                  ecosistema={ecosistema}
+                  flora={floraEco}
+                  minerales={mineralesEco}
+                  onOpenEcosistema={(id) => onOpenEcosistema?.(id)}
+                  onOpenFlora={(id) => abrirPanel("flora", id)}
+                  onOpenMineral={(id) => abrirPanel("mineral", id)}
+                />
+              ))}
+              {(porEcosistemaData.floraSinEco.length > 0 ||
+                porEcosistemaData.mineralesSinEco.length > 0) && (
+                <BloqueEcosistemaFloraMinerales
+                  ecosistema={{ id: "__sin_ecosistema__", nombre: "Sin ecosistema" }}
+                  flora={porEcosistemaData.floraSinEco}
+                  minerales={porEcosistemaData.mineralesSinEco}
+                  onOpenEcosistema={() => {}}
+                  onOpenFlora={(id) => abrirPanel("flora", id)}
+                  onOpenMineral={(id) => abrirPanel("mineral", id)}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {flora && flora.length > 0 && (
+            <EntityCardGrid
+              title="Flora"
+              variant="grid"
+              loading={loadingFlora}
+              items={flora.map((f) => ({
+                id: f.id,
+                nombre: f.nombre,
+                imageUrl: f.imagen_url || undefined,
+              }))}
+              onItemClick={(id) => abrirPanel("flora", id)}
+              section="flora"
+            />
+          )}
+          {minerales && minerales.length > 0 && (
+            <EntityCardGrid
+              title="Minerales"
+              variant="grid"
+              loading={loadingMinerales}
+              items={minerales.map((m) => ({
+                id: m.id,
+                nombre: m.nombre,
+                imageUrl: m.imagen_url || undefined,
+              }))}
+              onItemClick={(id) => abrirPanel("mineral", id)}
+              section="minerales"
+            />
+          )}
+        </>
       )}
     </div>
   );
