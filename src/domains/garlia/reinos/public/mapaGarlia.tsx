@@ -326,7 +326,6 @@ function PanelContenido({
   criaturasCiudad,
   itemsCiudad,
   loadingCiudad,
-  onEntrarReino,
   librosVinculables,
   onVincularLibro,
   onDesvincularLibro,
@@ -593,26 +592,6 @@ function PanelContenido({
               </div>
             )}
           </div>
-        )}
-
-        {/* ── Entrar a editar las ciudades del reino (antes, un solo click bastaba;
-             ahora el click izquierdo abre el panel sin navegar, así que hace
-             falta este botón explícito) ── */}
-        {!puntoSeleccionado && onEntrarReino && (
-          <button
-            className="w-full justify-center flex items-center gap-2 text-micro font-bold uppercase py-3 border transition-opacity hover:opacity-80"
-            style={{
-              color: "var(--accent)",
-              borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
-              letterSpacing: "0.12em",
-              borderRadius: "1px",
-            }}
-            type="button"
-            onClick={() => onEntrarReino(reinoSeleccionado)}
-          >
-            <ArrowLeft className="rotate-180" size={13} />
-            Entrar y editar ciudades
-          </button>
         )}
 
         <button
@@ -2942,17 +2921,14 @@ export default function MapaInteractivo({
   // Carga datos del reino (ciudades, personajes, libros, capítulos) y entra
   // a su vista de detalle. Compartida por el click normal (navegación) y
   // por el arranque directo en modo edición (initialEditReinoId más abajo).
-  const abrirVistaDeReino = async (reino: any, navegar: boolean = true) => {
+  const abrirVistaDeReino = async (reino: any) => {
     // Marcar qué reino estamos cargando — cualquier respuesta async va a chequear esto
     currentReinoIdRef.current = reino.id;
 
     // Limpiar todo inmediatamente para no mostrar datos del reino anterior
     setReinoSeleccionado(reino);
     setPuntoSeleccionado(null);
-    // navegar=false → solo mostramos la info en el panel lateral, sin entrar
-    // a la vista de detalle del reino (ciudades). Se usa en el click
-    // izquierdo simple sobre el pin del mapa global.
-    if (navegar) setVistaActual("reino");
+    setVistaActual("reino");
     setPanelOpen(true);
     setDetallesReino([]);
     setPersonajesReino([]);
@@ -3084,23 +3060,17 @@ export default function MapaInteractivo({
     if (currentReinoIdRef.current === reino.id) setLoadingLibros(false);
   };
 
-  // Click izquierdo sobre un pin en el mapa global → abre la info del reino
-  // en el panel lateral, sin navegar a la vista de detalle (ciudades).
+  // Click izquierdo sobre un pin en el mapa global → entra a la vista de
+  // detalle del reino (su mapa/tile interno) y abre ahí el panel lateral
+  // con su info.
   const handleReinoClick = async (reino: any) => {
-    await abrirVistaDeReino(reino, false);
+    await abrirVistaDeReino(reino);
   };
 
   // Click derecho sobre un pin → activa/desactiva el modo "mover" para ese
   // reino (equivalente al viejo Ctrl+click, ahora accesible sin teclado).
   const handleReinoContextMenu = (reino: any) => {
     setReinoParaMover((prev) => (prev === reino.id ? null : reino.id));
-  };
-
-  // Botón "Entrar y editar ciudades" del panel — ahora que el click
-  // izquierdo simple ya no navega, este es el único punto de entrada a la
-  // vista de detalle del reino.
-  const handleEntrarReino = (reino: any) => {
-    void abrirVistaDeReino(reino, true);
   };
 
   // Vincular / desvincular un libro con el reino seleccionado — actualiza
@@ -3511,7 +3481,6 @@ export default function MapaInteractivo({
     criaturasCiudad,
     itemsCiudad,
     loadingCiudad,
-    onEntrarReino: handleEntrarReino,
     librosVinculables: todosLosLibros,
     onVincularLibro: handleVincularLibro,
     onDesvincularLibro: handleDesvincularLibro,
