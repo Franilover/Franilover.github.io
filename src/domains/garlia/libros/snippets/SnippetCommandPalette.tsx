@@ -72,6 +72,10 @@ interface PaletteProps {
    * caso; el padre es responsable de pasarlo si expone el grupo). */
   onFormatCommand?: (commandId: "align-right") => void;
   onClose: () => void;
+  /** Si se pasa, se muestra un botón "Eliminar" en el header del formulario
+   * de edición (solo aplica cuando la palette se abrió sobre un chip
+   * existente vía initialRaw — ver handleSnippetEdit en EditorCapitulos). */
+  onDelete?: () => void;
 }
 
 const CATS: {
@@ -350,6 +354,21 @@ const S = {
     display: "flex",
     alignItems: "center",
   } as React.CSSProperties,
+  deleteBtn: {
+    background:
+      "color-mix(in srgb, var(--color-destructive, #ef4444) 12%, transparent)",
+    border:
+      "1px solid color-mix(in srgb, var(--color-destructive, #ef4444) 30%, transparent)",
+    color: "var(--color-destructive, #ef4444)",
+    cursor: "pointer",
+    fontSize: 9,
+    fontWeight: 700,
+    textTransform: "uppercase" as const,
+    letterSpacing: ".05em",
+    borderRadius: 5,
+    padding: "3px 7px",
+    lineHeight: 1,
+  } as React.CSSProperties,
   fieldLabel: {
     fontSize: 9,
     fontWeight: 800,
@@ -409,10 +428,14 @@ function FormHeader({
   label,
   Icon,
   onBack,
+  onDelete,
 }: {
   label: string;
   Icon: typeof Swords;
   onBack: () => void;
+  /** Solo se pasa cuando se está editando un chip existente — ver
+   * PaletteProps.onDelete. Si está presente se muestra el botón. */
+  onDelete?: () => void;
 }) {
   return (
     <div style={S.header}>
@@ -436,10 +459,21 @@ function FormHeader({
           color: "color-mix(in srgb, var(--foreground, #fff) 55%, transparent)",
           textTransform: "uppercase" as const,
           letterSpacing: ".08em",
+          flex: 1,
         }}
       >
         {label}
       </span>
+      {onDelete && (
+        <button
+          style={S.deleteBtn}
+          title="Eliminar"
+          type="button"
+          onClick={onDelete}
+        >
+          Eliminar
+        </button>
+      )}
     </div>
   );
 }
@@ -450,11 +484,13 @@ function FormDrop({
   initialRaw,
   onInsert,
   onBack,
+  onDelete,
   query,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
   query?: string;
 }) {
   const init = parseSnippetRaw(initialRaw);
@@ -552,7 +588,7 @@ function FormDrop({
     const cfg = TIPO_CFG[selected.tipo];
     return (
       <>
-        <FormHeader Icon={Swords} label="Drop" onBack={onBack} />
+        <FormHeader Icon={Swords} label="Drop" onBack={onBack} onDelete={onDelete} />
         <div
           style={{
             padding: "10px 12px",
@@ -594,7 +630,13 @@ function FormDrop({
                 color: "color-mix(in srgb,var(--foreground) 35%,transparent)",
                 fontSize: 14,
               }}
-              onClick={() => setSelected(null)}
+              title="Cambiar entidad"
+              onClick={() => {
+                setSelected(null);
+                // Sin esto el foco quedaba en el botón ✕ tras volver al
+                // buscador — micro-fricción al querer escribir de una.
+                requestAnimationFrame(() => inputRef.current?.focus());
+              }}
             >
               ✕
             </button>
@@ -626,7 +668,7 @@ function FormDrop({
 
   return (
     <>
-      <FormHeader Icon={Swords} label="Drop" onBack={onBack} />
+      <FormHeader Icon={Swords} label="Drop" onBack={onBack} onDelete={onDelete} />
       <div style={{ padding: "10px 12px 6px" }}>
         <input
           ref={inputRef}
@@ -714,11 +756,13 @@ function FormDialogo({
   initialRaw,
   onInsert,
   onBack,
+  onDelete,
   query,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
   query?: string;
 }) {
   const init = parseSnippetRaw(initialRaw);
@@ -778,7 +822,7 @@ function FormDialogo({
   if (selected) {
     return (
       <>
-        <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} />
+        <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} onDelete={onDelete} />
         <div
           style={{
             padding: "10px 12px",
@@ -817,7 +861,11 @@ function FormDialogo({
                 color: "color-mix(in srgb,var(--foreground) 35%,transparent)",
                 fontSize: 14,
               }}
-              onClick={() => setSelected(null)}
+              title="Cambiar personaje"
+              onClick={() => {
+                setSelected(null);
+                requestAnimationFrame(() => inputRef.current?.focus());
+              }}
             >
               ✕
             </button>
@@ -849,7 +897,7 @@ function FormDialogo({
 
   return (
     <>
-      <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} />
+      <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} onDelete={onDelete} />
       <div style={{ padding: "10px 12px 6px" }}>
         <input
           ref={inputRef}
@@ -924,11 +972,13 @@ function FormChoice({
   listaSecciones = [],
   onInsert,
   onBack,
+  onDelete,
 }: {
   initialRaw?: string;
   listaSecciones?: { id: string; label: string }[];
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [texto, setTexto] = useState(
@@ -948,7 +998,7 @@ function FormChoice({
 
   return (
     <>
-      <FormHeader Icon={GitBranch} label="Choice" onBack={onBack} />
+      <FormHeader Icon={GitBranch} label="Choice" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -1045,10 +1095,12 @@ function FormEpigrafe({
   initialRaw,
   onInsert,
   onBack,
+  onDelete,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [texto, setTexto] = useState(
@@ -1068,7 +1120,7 @@ function FormEpigrafe({
 
   return (
     <>
-      <FormHeader Icon={Quote} label="Epígrafe" onBack={onBack} />
+      <FormHeader Icon={Quote} label="Epígrafe" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -1119,10 +1171,12 @@ function FormNota({
   initialRaw,
   onInsert,
   onBack,
+  onDelete,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [texto, setTexto] = useState(
@@ -1137,7 +1191,7 @@ function FormNota({
 
   return (
     <>
-      <FormHeader Icon={Superscript} label="Nota al pie" onBack={onBack} />
+      <FormHeader Icon={Superscript} label="Nota al pie" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -1179,10 +1233,12 @@ function FormSection({
   initialRaw,
   onInsert,
   onBack,
+  onDelete,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [label, setLabel] = useState(
@@ -1211,7 +1267,7 @@ function FormSection({
 
   return (
     <>
-      <FormHeader Icon={Bookmark} label="Sección" onBack={onBack} />
+      <FormHeader Icon={Bookmark} label="Sección" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -1264,11 +1320,13 @@ function FormUse({
   listaSecciones = [],
   onInsert,
   onBack,
+  onDelete,
 }: {
   initialRaw?: string;
   listaSecciones?: { id: string; label: string }[];
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [palabra, setPalabra] = useState(
@@ -1348,7 +1406,7 @@ function FormUse({
 
   return (
     <>
-      <FormHeader Icon={MousePointerClick} label="Use Ítem" onBack={onBack} />
+      <FormHeader Icon={MousePointerClick} label="Use Ítem" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -1465,11 +1523,13 @@ function FormCondicion({
   listaSecciones = [],
   onInsert,
   onBack,
+  onDelete,
 }: {
   initialRaw?: string;
   listaSecciones?: { id: string; label: string }[];
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const initCond = init?.kind === "condicion" ? init : null;
@@ -1584,7 +1644,7 @@ function FormCondicion({
 
   return (
     <>
-      <FormHeader Icon={DoorOpen} label="Condición" onBack={onBack} />
+      <FormHeader Icon={DoorOpen} label="Condición" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -1791,10 +1851,12 @@ function FormFlag({
   initialRaw,
   onInsert,
   onBack,
+  onDelete,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const initSet = init?.kind === "flag-set" ? init : null;
@@ -1809,7 +1871,7 @@ function FormFlag({
 
   return (
     <>
-      <FormHeader Icon={Flag} label="Acción" onBack={onBack} />
+      <FormHeader Icon={Flag} label="Acción" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -1858,11 +1920,13 @@ function FormImagen({
   initialRaw,
   onInsert,
   onBack,
+  onDelete,
   query,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
   query?: string;
 }) {
   const init = parseSnippetRaw(initialRaw);
@@ -1925,7 +1989,7 @@ function FormImagen({
 
   return (
     <>
-      <FormHeader Icon={ImageIcon} label="Imagen" onBack={onBack} />
+      <FormHeader Icon={ImageIcon} label="Imagen" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -2089,10 +2153,12 @@ function FormImagen({
 function FormSound({
   onInsert,
   onBack,
+  onDelete,
   query,
 }: {
   onInsert: (s: string) => void;
   onBack: () => void;
+  onDelete?: () => void;
   query?: string;
 }) {
   const [all, setAll] = useState<{ name: string; url: string; path: string }[]>(
@@ -2162,7 +2228,7 @@ function FormSound({
 
   return (
     <>
-      <FormHeader Icon={Music2} label="Sonido" onBack={onBack} />
+      <FormHeader Icon={Music2} label="Sonido" onBack={onBack} onDelete={onDelete} />
       <div
         style={{
           padding: "10px 12px",
@@ -2294,6 +2360,7 @@ export function SnippetCommandPalette({
   onInsert,
   onFormatCommand,
   onClose,
+  onDelete,
 }: PaletteProps) {
   const [q, setQ] = useState(initialQuery);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -2475,6 +2542,13 @@ export function SnippetCommandPalette({
     setQ("");
     setChildQuery("");
   }, []);
+  const handleDelete = useCallback(() => {
+    onDelete?.();
+    onClose();
+  }, [onDelete, onClose]);
+  // Solo se ofrece "Eliminar" cuando estamos editando un chip existente
+  // (initialRaw presente) y el caller nos dio un onDelete real.
+  const deleteHandler = initialRaw && onDelete ? handleDelete : undefined;
 
   return (
     <div
@@ -2584,6 +2658,7 @@ export function SnippetCommandPalette({
           query={childQuery}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "dialogo" && (
@@ -2592,6 +2667,7 @@ export function SnippetCommandPalette({
           query={childQuery}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "choice" && (
@@ -2600,6 +2676,7 @@ export function SnippetCommandPalette({
           listaSecciones={listaSecciones}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "section" && (
@@ -2607,6 +2684,7 @@ export function SnippetCommandPalette({
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "epigrafe" && (
@@ -2614,6 +2692,7 @@ export function SnippetCommandPalette({
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "nota" && (
@@ -2621,6 +2700,7 @@ export function SnippetCommandPalette({
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "use" && (
@@ -2629,6 +2709,7 @@ export function SnippetCommandPalette({
           listaSecciones={listaSecciones}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "condicion" && (
@@ -2637,6 +2718,7 @@ export function SnippetCommandPalette({
           listaSecciones={listaSecciones}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "flag" && (
@@ -2644,6 +2726,7 @@ export function SnippetCommandPalette({
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "imagen" && (
@@ -2652,6 +2735,7 @@ export function SnippetCommandPalette({
           query={childQuery}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
       {selectedType === "sound" && (
@@ -2659,6 +2743,7 @@ export function SnippetCommandPalette({
           query={childQuery}
           onBack={handleBack}
           onInsert={handleInsert}
+          onDelete={deleteHandler}
         />
       )}
     </div>

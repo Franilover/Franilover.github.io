@@ -45,12 +45,14 @@ import type { SnippetEditRequest } from "@/editor/lexical";
 import { RichEditor ,
   type RichEditorFormatCommand,
   dropPayloadToRaw,
+  dialogoPayloadToRaw,
   soundPayloadToRaw,
   imgPayloadToRaw,
   choicePayloadToRaw,
   parseUsePayloadToRaw,
   condicionPayloadToRaw,
   sectionPayloadToRaw,
+  lastSnippetClickRect,
 } from "@/editor/lexical";
 import type {
   Libro,
@@ -280,6 +282,10 @@ const PanelEditor = ({
   const closePaletteRef = useRef<(() => void) | null>(null);
   const pendingReplaceRef = useRef<((next: string) => void) | null>(null);
   const pendingSnippetRawRef = useRef<string | null>(null);
+  // Guarda req.remove() del chip que se está editando, para que el botón
+  // "Eliminar" del SnippetCommandPalette pueda borrarlo sin pasar por
+  // insertOrReplace — ver handleSnippetEdit.
+  const pendingRemoveRef = useRef<(() => void) | null>(null);
   const isMountedRef = useRef(true);
   // ── Capa de seguridad anti-pérdida-de-contenido ─────────────────────────
   // Bug que resuelve: RichEditor puede montar/emitir onChange ANTES de que
@@ -735,6 +741,8 @@ const PanelEditor = ({
       switch (kind) {
         case "drop":
           return dropPayloadToRaw(payload);
+        case "dialogo":
+          return dialogoPayloadToRaw(payload);
         case "sound":
           return soundPayloadToRaw(payload);
         case "img":
@@ -761,8 +769,13 @@ const PanelEditor = ({
     (req: SnippetEditRequest<any>) => {
       const raw = snippetPayloadToRaw(req.kind, req.payload);
       pendingReplaceRef.current = (next: string) => req.replace(next);
+      pendingRemoveRef.current = () => req.remove();
       pendingSnippetRawRef.current = raw;
-      openPalette(raw);
+      // El chip clickeado guardó su posición justo antes de llegar acá
+      // (ver captureSnippetClickRect en SnippetChip/SnippetBlockChip) —
+      // así la palette se abre anclada al chip real en vez de en la
+      // posición fija por defecto.
+      openPalette(raw, lastSnippetClickRect.current ?? undefined);
     },
     [openPalette, snippetPayloadToRaw],
   );
@@ -849,6 +862,7 @@ const PanelEditor = ({
     if (pendingReplaceRef.current) {
       pendingReplaceRef.current(s);
       pendingReplaceRef.current = null;
+      pendingRemoveRef.current = null;
       pendingSnippetRawRef.current = null;
     } else {
       mdInsertRef.current?.(s);
@@ -1502,6 +1516,7 @@ const PanelEditor = ({
           onClose={() => {
             setPalette(null);
             pendingReplaceRef.current = null;
+            pendingRemoveRef.current = null;
             pendingSnippetRawRef.current = null;
             // Le avisa al SlashCommandPlugin que puede volver a escuchar
             // el próximo "/" — sin esto quedaba trabado tras el primer uso.
@@ -1511,9 +1526,22 @@ const PanelEditor = ({
             insertOrReplace(raw);
             setPalette(null);
             pendingReplaceRef.current = null;
+            pendingRemoveRef.current = null;
             pendingSnippetRawRef.current = null;
             closePaletteRef.current?.();
           }}
+          onDelete={
+            pendingRemoveRef.current
+              ? () => {
+                  pendingRemoveRef.current?.();
+                  setPalette(null);
+                  pendingReplaceRef.current = null;
+                  pendingRemoveRef.current = null;
+                  pendingSnippetRawRef.current = null;
+                  closePaletteRef.current?.();
+                }
+              : undefined
+          }
           onFormatCommand={(commandId) => {
             formatCommandRef.current?.(commandId);
           }}

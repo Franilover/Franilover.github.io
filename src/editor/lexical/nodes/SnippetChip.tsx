@@ -14,6 +14,7 @@ import {
   chipColorStyle,
   chipDotStyle,
   chipDeleteBtnStyle,
+  captureSnippetClickRect,
 } from "./sharedTypes";
 
 export function SnippetChip({
@@ -36,6 +37,7 @@ export function SnippetChip({
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      captureSnippetClickRect(e.currentTarget as HTMLElement);
       onClick();
     },
     [onClick],

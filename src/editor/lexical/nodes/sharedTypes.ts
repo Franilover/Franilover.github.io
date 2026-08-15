@@ -47,6 +47,26 @@ export const snippetEditHandler: { current: SnippetEditHandler | null } = {
 };
 
 /**
+ * Rect del último chip clickeado, en coordenadas de viewport.
+ * SnippetChip/SnippetBlockChip lo setean en su handler de click nativo
+ * (donde sí tenemos e.currentTarget) justo antes de invocar
+ * snippetEditHandler — así EditorCapitulos.tsx puede leerlo en
+ * handleSnippetEdit y abrir la palette anclada al chip real en vez de
+ * en la posición fija por defecto. Se limpia solo (no hace falta borrarlo
+ * a mano): cada click nuevo lo pisa.
+ */
+export const lastSnippetClickRect: { current: { top: number; left: number } | null } = {
+  current: null,
+};
+
+/** Guarda el rect del elemento clickeado para que lo use el próximo
+ *  snippetEditHandler.current?.(...) — llamar justo antes de esa invocación. */
+export function captureSnippetClickRect(el: HTMLElement): void {
+  const r = el.getBoundingClientRect();
+  lastSnippetClickRect.current = { top: r.bottom + 4, left: r.left };
+}
+
+/**
  * Registro global del set de ids de sección presentes en el documento.
  * Se actualiza desde RichEditor.tsx en cada registerUpdateListener, y lo
  * leen los chips de choice/condicion/use para pintar el punto de estado
