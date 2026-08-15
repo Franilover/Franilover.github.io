@@ -1066,21 +1066,6 @@ export function UnifiedTileCanvas<
         }
       }
 
-      // ── Hint pin seleccionado ─────────────────────────────────────────────
-      if (selectedMarkerId) {
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.fillRect(0, canvas.height - 36, canvas.width, 36);
-        ctx.fillStyle = "#fff";
-        ctx.font = "700 10px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(
-          "Tocá el mapa para mover el punto",
-          canvas.width / 2,
-          canvas.height - 14,
-        );
-        ctx.textAlign = "left";
-      }
-
       animFrameRef.current = requestAnimationFrame(draw);
     };
 
@@ -1832,21 +1817,6 @@ export function UnifiedTileCanvas<
           >
             Sin tiles configurados
           </p>
-        </div>
-      )}
-
-      {/* Hints (solo editMode, con tiles) */}
-      {editMode && tiles.length > 0 && !drawTool && (
-        <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
-          <span
-            className="text-micro font-bold uppercase tracking-widest px-2 py-1 rounded-lg"
-            style={{
-              background: "color-mix(in srgb, var(--bg-main) 85%, transparent)",
-              color: "color-mix(in srgb, var(--foreground) 35%, transparent)",
-            }}
-          >
-            Click derecho en un pin para moverlo · Ctrl + click para editar tile · Ctrl + scroll para zoom
-          </span>
         </div>
       )}
 

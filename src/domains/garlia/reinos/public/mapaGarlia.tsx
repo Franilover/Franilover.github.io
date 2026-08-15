@@ -4776,16 +4776,6 @@ export default function MapaInteractivo({
                 <X size={10} />
               </button>
             )}
-
-            {/* Eyedropper hint */}
-            {eyedropperActive && (
-              <span
-                className="text-micro font-semibold uppercase animate-pulse whitespace-nowrap"
-                style={{ color: "var(--accent)", letterSpacing: "0.1em" }}
-              >
-                Clickeá el mapa
-              </span>
-            )}
           </div>
         )}
 
