@@ -3659,7 +3659,7 @@ export default function MapaInteractivo({
               selectedAreaId={editMode ? selectedAreaId : null}
               selectedMarkerId={editMode ? (reinoParaMover ?? null) : null}
               tiles={mapTiles}
-              onAreaLabelClick={(area) => void handleAreaLabelClick(area)}
+              onAreaClick={(area) => void handleAreaLabelClick(area)}
               onAreaDrawEnd={handleAreaDrawEnd}
               onAreaPointsChange={handleAreaPointsChange}
               onAreaSelect={setSelectedAreaId}
