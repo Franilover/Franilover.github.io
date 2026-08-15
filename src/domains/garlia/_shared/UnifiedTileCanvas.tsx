@@ -271,6 +271,18 @@ export function UnifiedTileCanvas<
     null,
   );
 
+  // Click derecho + mantener + arrastrar sobre un área → mueve la forma
+  // completa (traslada todos sus puntos), sin pisar la selección de
+  // vértices existente (esa sigue siendo click derecho suelto + izquierdo
+  // sobre un vértice). Guardamos los puntos originales y el punto mundo
+  // donde arrancó el drag para calcular el delta en cada pointermove.
+  const draggingAreaRef = useRef<{
+    areaId: string;
+    startWorld: WorldPoint;
+    originalPuntos: WorldPoint[];
+  } | null>(null);
+  const areaDragMovedRef = useRef(false);
+
   useEffect(() => {
     // Cambiar de herramienta (o desactivarla) cancela cualquier dibujo en curso.
     drawingPointsRef.current = [];
@@ -547,6 +559,15 @@ export function UnifiedTileCanvas<
     ux: p.col + p.x / 100,
     uy: p.row + p.y / 100,
   });
+
+  // Inversa de toTileUnits — reconstruye col/row/x/y a partir de unidades
+  // continuas. Usada al trasladar un área completa, donde el delta puede
+  // cruzar el borde de una celda de tile.
+  const fromTileUnits = (ux: number, uy: number): WorldPoint => {
+    const col = Math.floor(ux);
+    const row = Math.floor(uy);
+    return { col, row, x: (ux - col) * 100, y: (uy - row) * 100 };
+  };
 
   const isPointInArea = (wp: WorldPoint, area: BaseArea): boolean => {
     const p = toTileUnits(wp);
@@ -1069,6 +1090,29 @@ export function UnifiedTileCanvas<
     };
 
     const onPointerDown = (e: PointerEvent) => {
+      // ── Click derecho + mantener sobre un área (editMode, sin herramienta
+      // de dibujo activa) → arranca el drag para mover la forma completa.
+      // No reemplaza la selección por click derecho suelto (eso lo maneja
+      // onContextMenu más abajo); acá solo armamos el posible drag, y si
+      // el mouse nunca se mueve lo suficiente, dejamos que el contextmenu
+      // nativo siga su curso normal (selección de área para vértices).
+      if (e.button === 2 && editMode && !drawTool) {
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        if (wp) {
+          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
+          if (hitArea) {
+            draggingAreaRef.current = {
+              areaId: hitArea.id,
+              startWorld: wp,
+              originalPuntos: hitArea.puntos,
+            };
+            areaDragMovedRef.current = false;
+            canvas.setPointerCapture(e.pointerId);
+          }
+        }
+        return;
+      }
+
       if (e.button !== 0 && e.pointerType !== "touch") return;
 
       // ── Arrastrar un vértice del área seleccionada (editMode, sin herramienta activa) ──
@@ -1159,6 +1203,28 @@ export function UnifiedTileCanvas<
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      // ── Arrastrando un área completa (click derecho mantenido) ─────────────
+      if (draggingAreaRef.current) {
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        if (wp) {
+          const { areaId, startWorld, originalPuntos } = draggingAreaRef.current;
+          const startU = toTileUnits(startWorld);
+          const nowU = toTileUnits(wp);
+          const dux = nowU.ux - startU.ux;
+          const duy = nowU.uy - startU.uy;
+          if (Math.hypot(dux, duy) > 0.001) areaDragMovedRef.current = true;
+          if (areaDragMovedRef.current) {
+            const nuevosPuntos = originalPuntos.map((p) => {
+              const u = toTileUnits(p);
+              return fromTileUnits(u.ux + dux, u.uy + duy);
+            });
+            onAreaPointsChange?.(areaId, nuevosPuntos);
+            markDirty();
+          }
+        }
+        return;
+      }
+
       // ── Arrastrando un vértice de área existente ────────────────────────────
       if (draggingVertexRef.current) {
         const wp = clientToWorldPoint(e.clientX, e.clientY);
@@ -1246,6 +1312,15 @@ export function UnifiedTileCanvas<
     };
 
     const onPointerUp = (e: PointerEvent) => {
+      // ── Soltar el drag de área completa (click derecho) ─────────────────────
+      if (draggingAreaRef.current) {
+        draggingAreaRef.current = null;
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {}
+        return;
+      }
+
       // ── Soltar un vértice arrastrado ────────────────────────────────────────
       if (draggingVertexRef.current) {
         draggingVertexRef.current = null;
@@ -1359,8 +1434,9 @@ export function UnifiedTileCanvas<
       // ── Click izquierdo sobre un área (en cualquier punto de la forma,
       // no solo el texto) → navega al reino/ciudad vinculado. La edición
       // de la forma (mover vértices / arrastrar el área) se activa con
-      // click derecho — ver onContextMenu más abajo.
-      if (!drawTool && onAreaClick) {
+      // click derecho — ver onContextMenu más abajo. Chequeamos e.button
+      // acá porque pointerup no distingue el botón por sí solo.
+      if (!drawTool && onAreaClick && e.button === 0) {
         const wp = clientToWorldPoint(clientX, clientY);
         if (wp) {
           const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
@@ -1485,6 +1561,16 @@ export function UnifiedTileCanvas<
     // ── Click derecho sobre un pin → activa/desactiva modo mover ────────────
     const onContextMenu = (e: MouseEvent) => {
       if (!editMode) return;
+
+      // Si el botón derecho terminó en un drag real (mover la forma
+      // completa), no togglear la selección — solo queremos el efecto de
+      // mover, no que además se seleccione/deseleccione el área.
+      if (areaDragMovedRef.current) {
+        e.preventDefault();
+        areaDragMovedRef.current = false;
+        return;
+      }
+
       const marker = findMarkerAt(e.clientX, e.clientY);
       if (marker) {
         e.preventDefault();
