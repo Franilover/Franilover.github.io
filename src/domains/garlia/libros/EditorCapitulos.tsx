@@ -29,6 +29,11 @@ import {
   Ban,
   GripVertical,
   History,
+  User,
+  PawPrint,
+  Package,
+  Swords,
+  MessageCircle,
 } from "lucide-react";
 import React, {
   useState,
@@ -115,6 +120,7 @@ import {
   EntidadesLoreProvider,
   useEntidadesLore,
 } from "@/domains/garlia/_shared/EntidadesLoreContext";
+import { fetchEntidades } from "@/lib/api/queries/entidades";
 import {
   insertChoiceAtEndOfSection,
   type StoryGraph,
@@ -188,6 +194,191 @@ const DIALOG_COMMANDS: MdCommandItem[] = [
     snippet: "–",
   },
 ];
+
+// ─── PanelEntidadesFijadas ──────────────────────────────────────────────────
+// Franja fija arriba del área de escritura con los personajes/criaturas/
+// ítems ya vinculados al capítulo (vía PanelPersonajesCapitulo en el
+// sidebar). Un click inserta directo un Drop (o, para personajes, deja
+// elegir entre Drop/Diálogo) con la entidad ya preseleccionada — te
+// ahorra el paso de buscarla de nuevo en el SnippetCommandPalette.
+type EntidadFijada = {
+  id: string;
+  nombre: string;
+  tipo: "personaje" | "criatura" | "item";
+  subtipo?: string;
+  imagen_url?: string;
+};
+
+function PanelEntidadesFijadas({
+  personajesIds,
+  criaturasIds,
+  itemsIds,
+  onInsertDrop,
+  onInsertDialogo,
+}: {
+  personajesIds: string[];
+  criaturasIds: string[];
+  itemsIds: string[];
+  onInsertDrop: (e: EntidadFijada) => void;
+  onInsertDialogo: (e: EntidadFijada) => void;
+}) {
+  const [all, setAll] = useState<EntidadFijada[]>([]);
+  const [loading, setLoading] = useState(true);
+  // Id de la entidad con el mini-menú Drop/Diálogo abierto (solo aplica
+  // a personajes, que pueden ser cualquiera de los dos).
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchEntidades().then((d) => {
+      if (cancelled || !d.ok) return;
+      const list: EntidadFijada[] = [
+        ...(d.data?.personajes ?? []).map((x: any) => ({
+          id: x.id,
+          nombre: x.nombre,
+          tipo: "personaje" as const,
+          subtipo: x.ocupacion,
+          imagen_url: x.img_url || x.imagen_url,
+        })),
+        ...(d.data?.criaturas ?? []).map((x: any) => ({
+          id: x.id,
+          nombre: x.nombre,
+          tipo: "criatura" as const,
+          subtipo: x.habitat,
+          imagen_url: x.img_url || x.imagen_url,
+        })),
+        ...(d.data?.items ?? []).map((x: any) => ({
+          id: x.id,
+          nombre: x.nombre,
+          tipo: "item" as const,
+          subtipo: x.categoria,
+          imagen_url: x.imagen_url,
+        })),
+      ];
+      setAll(list);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const vinculadas = useMemo(() => {
+    const idsPersonajes = new Set(personajesIds);
+    const idsCriaturas = new Set(criaturasIds);
+    const idsItems = new Set(itemsIds);
+    return all.filter(
+      (e) =>
+        (e.tipo === "personaje" && idsPersonajes.has(e.id)) ||
+        (e.tipo === "criatura" && idsCriaturas.has(e.id)) ||
+        (e.tipo === "item" && idsItems.has(e.id)),
+    );
+  }, [all, personajesIds, criaturasIds, itemsIds]);
+
+  // Cierra el mini-menú al clickear afuera.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuFor) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setMenuFor(null);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [menuFor]);
+
+  if (loading || vinculadas.length === 0) return null;
+
+  const ICONS = { personaje: User, criatura: PawPrint, item: Package };
+
+  return (
+    <div
+      ref={wrapRef}
+      className="shrink-0 flex items-center gap-1.5 px-3 sm:px-8 py-2 border-b border-primary/5 overflow-x-auto"
+      style={{ WebkitOverflowScrolling: "touch" }}
+    >
+      {vinculadas.map((e) => {
+        const Icon = ICONS[e.tipo];
+        return (
+          <div key={`${e.tipo}-${e.id}`} style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              type="button"
+              title={
+                e.tipo === "personaje"
+                  ? `${e.nombre} — click para Diálogo o Drop`
+                  : `${e.nombre} — click para insertar Drop`
+              }
+              onClick={() => {
+                if (e.tipo === "personaje") {
+                  setMenuFor((cur) => (cur === e.id ? null : e.id));
+                } else {
+                  onInsertDrop(e);
+                }
+              }}
+              className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full border transition-colors"
+              style={{
+                background:
+                  menuFor === e.id
+                    ? "color-mix(in srgb, var(--color-primary, var(--primary)) 16%, transparent)"
+                    : "color-mix(in srgb, var(--color-primary, var(--primary)) 7%, transparent)",
+                borderColor:
+                  "color-mix(in srgb, var(--color-primary, var(--primary)) 22%, transparent)",
+                color: "var(--color-primary, var(--primary))",
+              }}
+            >
+              {e.imagen_url ? (
+                <img
+                  src={e.imagen_url}
+                  alt=""
+                  className="w-5 h-5 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 bg-primary/10">
+                  <Icon size={11} />
+                </span>
+              )}
+              <span className="text-[11px] font-semibold whitespace-nowrap">
+                {e.nombre}
+              </span>
+            </button>
+
+            {menuFor === e.id && (
+              <div
+                className="absolute left-0 top-full mt-1 z-20 flex flex-col gap-0.5 p-1 rounded-lg border shadow-lg"
+                style={{
+                  background: "var(--surface-1, #1a1a1a)",
+                  borderColor: "var(--border-strong, #444)",
+                  minWidth: 130,
+                }}
+              >
+                <button
+                  type="button"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-medium hover:bg-primary/10 text-left"
+                  onClick={() => {
+                    setMenuFor(null);
+                    onInsertDialogo(e);
+                  }}
+                >
+                  <MessageCircle size={12} /> Diálogo
+                </button>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-medium hover:bg-primary/10 text-left"
+                  onClick={() => {
+                    setMenuFor(null);
+                    onInsertDrop(e);
+                  }}
+                >
+                  <Swords size={12} /> Drop
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── PanelEditor ──────────────────────────────────────────────────────────────
 
@@ -831,6 +1022,24 @@ const PanelEditor = ({
     [openPalette, snippetPayloadToRaw, snippetRawToPayload],
   );
 
+  // Handlers del PanelEntidadesFijadas — abren la palette con la entidad
+  // ya preseleccionada (mismo mecanismo que editar un chip: initialRaw con
+  // el id relleno, palabra/texto vacíos). El usuario solo tiene que
+  // escribir la palabra en el texto / la línea de diálogo y confirmar,
+  // sin tener que volver a buscar la entidad.
+  const handleInsertDropFijado = useCallback(
+    (e: { id: string; nombre: string; tipo: "personaje" | "criatura" | "item" }) => {
+      openPalette(`[[drop||${e.tipo}|${e.id}|${e.nombre}]]`);
+    },
+    [openPalette],
+  );
+  const handleInsertDialogoFijado = useCallback(
+    (e: { id: string }) => {
+      openPalette(`[[dialogo|${e.id}|]]`);
+    },
+    [openPalette],
+  );
+
   const snippetCommands: MdCommandItem[] = useMemo(
     () => [
       {
@@ -1426,6 +1635,16 @@ const PanelEditor = ({
               </div>
             </div>
           </div>
+        )}
+
+        {vistaEditor === "escribir" && (
+          <PanelEntidadesFijadas
+            personajesIds={personajesIds}
+            criaturasIds={criaturasIds}
+            itemsIds={itemsIds}
+            onInsertDrop={handleInsertDropFijado}
+            onInsertDialogo={handleInsertDialogoFijado}
+          />
         )}
 
         <div className="flex-1 min-h-0 flex overflow-hidden">
