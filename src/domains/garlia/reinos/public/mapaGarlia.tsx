@@ -29,6 +29,7 @@ import {
   type MapTile,
 } from "@/domains/garlia/_shared/UnifiedTileCanvas";
 import { ModalDetalle } from "@/domains/garlia/perfil-jugador/PersonalComponents";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 import { useIsAdmin } from "@/domains/plataforma/auth/useIsAdmin";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { db } from "@/infra/supabase/db";
@@ -720,28 +721,35 @@ function PanelContenido({
                       borderRadius: "1px",
                     }}
                   >
-                    {p.img_url && (
-                      <div
-                        className="shrink-0 w-7 h-7 overflow-hidden border"
-                        style={{
-                          borderColor:
-                            "color-mix(in srgb, var(--accent) 20%, transparent)",
-                          borderRadius: "1px",
-                        }}
-                      >
-                        <Image
-                          alt={p.nombre}
-                          className="w-full h-full object-cover"
-                          src={p.img_url}
-                        />
-                      </div>
-                    )}
-                    <span
-                      className="text-micro font-semibold uppercase flex-1 min-w-0 truncate"
-                      style={{ color: "var(--foreground)" }}
+                    <button
+                      className="flex items-center gap-2 flex-1 min-w-0 text-left transition-opacity hover:opacity-80"
+                      title="Abrir editor de este personaje"
+                      type="button"
+                      onClick={() => handlePersonajeClick(p)}
                     >
-                      {p.nombre}
-                    </span>
+                      {p.img_url && (
+                        <div
+                          className="shrink-0 w-7 h-7 overflow-hidden border"
+                          style={{
+                            borderColor:
+                              "color-mix(in srgb, var(--accent) 20%, transparent)",
+                            borderRadius: "1px",
+                          }}
+                        >
+                          <Image
+                            alt={p.nombre}
+                            className="w-full h-full object-cover"
+                            src={p.img_url}
+                          />
+                        </div>
+                      )}
+                      <span
+                        className="text-micro font-semibold uppercase flex-1 min-w-0 truncate"
+                        style={{ color: "var(--foreground)" }}
+                      >
+                        {p.nombre}
+                      </span>
+                    </button>
                     <button
                       className="shrink-0 w-5 h-5 flex items-center justify-center transition-opacity hover:opacity-70"
                       disabled={vinculandoPersonajeId === p.id}
@@ -3611,7 +3619,17 @@ export default function MapaInteractivo({
     void abrirVistaDeReino(reino);
   }, [allowEdit, initialEditReinoId, isAdmin, reinos]);
 
+  const abrirPanelFlotante = usePanelFlotante((s) => s.abrir);
+
   const handlePersonajeClick = async (p: any) => {
+    // En modo edición, un click sobre un personaje abre directamente el
+    // editor completo (mismo panel flotante global que usan
+    // Ciudad/Reino/Criatura/Item editors — usePanelFlotante), en vez del
+    // modal de solo lectura que ven los jugadores.
+    if (editMode) {
+      if (p.id) abrirPanelFlotante("personaje", p.id);
+      return;
+    }
     setCancionesPersonaje([]);
     setModalEntidad({
       tipo: "personaje",
