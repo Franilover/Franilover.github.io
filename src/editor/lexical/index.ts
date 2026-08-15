@@ -22,12 +22,6 @@ export {
   dropRawToPayload,
 } from "./nodes/DropNode";
 export {
-  $createDialogoNode,
-  $isDialogoNode,
-  dialogoPayloadToRaw,
-  dialogoRawToPayload,
-} from "./nodes/DialogoNode";
-export {
   $createSoundNode,
   $isSoundNode,
   soundPayloadToRaw,
@@ -89,5 +83,4 @@ export { insertTable } from "./plugins/TablePlugin";
 
 // Tipos compartidos
 export type { SnippetEditRequest, SnippetKind } from "./nodes/sharedTypes";
-export { lastSnippetClickRect } from "./nodes/sharedTypes";
 export type { WikiEntity } from "./WikilinkMenuPanel";

@@ -18,8 +18,6 @@
  */
 import React, { useState, useRef, useEffect } from "react";
 
-import { captureSnippetClickRect } from "./sharedTypes";
-
 export interface BlockChipBranch {
   /** Texto corto de la rama, ej: "Girar a la izquierda" o "si tiene item". */
   label: string;
@@ -71,7 +69,6 @@ export function SnippetBlockChip({
   return (
     <div
       contentEditable={false}
-      data-snippet-block-chip
       style={{
         display: "block",
         border: "1px solid var(--border-strong, #B4B2A9)",
@@ -269,13 +266,6 @@ export function SnippetBlockChip({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              // Ancla la palette al chip completo (contenedor), no al
-              // botón "Editar" — se ve mejor el panel apareciendo desde
-              // la fila en vez de desde un botón interno diminuto.
-              const chipEl = (e.currentTarget as HTMLElement).closest(
-                "[data-snippet-block-chip]",
-              ) as HTMLElement | null;
-              captureSnippetClickRect(chipEl ?? (e.currentTarget as HTMLElement));
               onClick();
             }}
             style={{

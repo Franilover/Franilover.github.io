@@ -58,14 +58,6 @@ type SnippetType =
   | "align-right"
   | "parrafo";
 
-type EntidadVinculada = {
-  id: string;
-  nombre: string;
-  tipo: "personaje" | "criatura" | "item";
-  subtipo?: string;
-  imagen_url?: string;
-};
-
 interface PaletteProps {
   anchorRect: { top: number; left: number };
   initialRaw?: string;
@@ -73,14 +65,15 @@ interface PaletteProps {
   initialQuery?: string;
   listaCapitulos?: { id: string; orden: number; titulo_capitulo: string }[];
   listaSecciones?: { id: string; label: string }[];
-  /** IDs de personajes/criaturas/ítems ya vinculados al capítulo actual
-   * (gestionados en PanelPersonajesCapitulo, en el sidebar). Cuando se
-   * pasan, se muestra una sección "Vinculados" arriba de la lista de
-   * categorías con accesos directos a Drop/Diálogo ya preseleccionados
-   * para esas entidades — te ahorra buscarlas de nuevo. */
-  personajesVinculadosIds?: string[];
-  criaturasVinculadasIds?: string[];
-  itemsVinculadosIds?: string[];
+  /** IDs de personajes ya asignados al capítulo (panel lateral) — se
+   * muestran primero y destacados en los pickers de Diálogo y Drop. */
+  personajesFijadosIds?: string[];
+  /** IDs de criaturas ya asignadas al capítulo — se muestran primero en
+   * el picker de Drop. */
+  criaturasFijadasIds?: string[];
+  /** IDs de ítems ya asignados al capítulo — se muestran primero en el
+   * picker de Drop. */
+  itemsFijadosIds?: string[];
   onInsert: (raw: string) => void;
   /** Aplica un comando de formato de bloque (ej. "align-right") sobre el
    * párrafo actual — usado por directAction, ver CATS. Si no se pasa,
@@ -88,10 +81,6 @@ interface PaletteProps {
    * caso; el padre es responsable de pasarlo si expone el grupo). */
   onFormatCommand?: (commandId: "align-right") => void;
   onClose: () => void;
-  /** Si se pasa, se muestra un botón "Eliminar" en el header del formulario
-   * de edición (solo aplica cuando la palette se abrió sobre un chip
-   * existente vía initialRaw — ver handleSnippetEdit en EditorCapitulos). */
-  onDelete?: () => void;
 }
 
 const CATS: {
@@ -314,21 +303,6 @@ const S = {
     color: "var(--foreground, var(--foreground))",
     lineHeight: 1.2,
   } as React.CSSProperties,
-  iconTextBtn: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "6px 8px",
-    borderRadius: 6,
-    cursor: "pointer",
-    fontSize: 12.5,
-    fontWeight: 400,
-    color: "var(--foreground, var(--foreground))",
-    textAlign: "left" as const,
-    width: "100%",
-    background: "transparent",
-    border: "none",
-  } as React.CSSProperties,
   sublabel: {
     fontSize: 10,
     fontWeight: 400,
@@ -384,21 +358,6 @@ const S = {
     padding: "0 2px 0 0",
     display: "flex",
     alignItems: "center",
-  } as React.CSSProperties,
-  deleteBtn: {
-    background:
-      "color-mix(in srgb, var(--color-destructive, #ef4444) 12%, transparent)",
-    border:
-      "1px solid color-mix(in srgb, var(--color-destructive, #ef4444) 30%, transparent)",
-    color: "var(--color-destructive, #ef4444)",
-    cursor: "pointer",
-    fontSize: 9,
-    fontWeight: 700,
-    textTransform: "uppercase" as const,
-    letterSpacing: ".05em",
-    borderRadius: 5,
-    padding: "3px 7px",
-    lineHeight: 1,
   } as React.CSSProperties,
   fieldLabel: {
     fontSize: 9,
@@ -459,14 +418,10 @@ function FormHeader({
   label,
   Icon,
   onBack,
-  onDelete,
 }: {
   label: string;
   Icon: typeof Swords;
   onBack: () => void;
-  /** Solo se pasa cuando se está editando un chip existente — ver
-   * PaletteProps.onDelete. Si está presente se muestra el botón. */
-  onDelete?: () => void;
 }) {
   return (
     <div style={S.header}>
@@ -490,21 +445,10 @@ function FormHeader({
           color: "color-mix(in srgb, var(--foreground, #fff) 55%, transparent)",
           textTransform: "uppercase" as const,
           letterSpacing: ".08em",
-          flex: 1,
         }}
       >
         {label}
       </span>
-      {onDelete && (
-        <button
-          style={S.deleteBtn}
-          title="Eliminar"
-          type="button"
-          onClick={onDelete}
-        >
-          Eliminar
-        </button>
-      )}
     </div>
   );
 }
@@ -515,14 +459,20 @@ function FormDrop({
   initialRaw,
   onInsert,
   onBack,
-  onDelete,
   query,
+  fijadosIds,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
   query?: string;
+  /** IDs de entidades ya asignadas al capítulo (panel lateral), por tipo
+   * — se muestran primero, destacadas, en cada búsqueda. */
+  fijadosIds?: {
+    personaje?: string[];
+    criatura?: string[];
+    item?: string[];
+  };
 }) {
   const init = parseSnippetRaw(initialRaw);
   const initialId = init?.kind === "drop" ? (init as any).entidadId : undefined;
@@ -597,29 +547,52 @@ function FormDrop({
   }, [initialId]);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    // Mismo patrón que el input de nivel 1 (SnippetCommandPalette): un
+    // focus() síncrono acá perdía la carrera contra Lexical, que devuelve
+    // el foco a su contentEditable justo después de abrir la palette desde
+    // el "/". Sin este delay, el input nunca quedaba realmente enfocado y
+    // ArrowUp/ArrowDown/Enter terminaban yendo a Lexical en vez de mover
+    // la selección de esta lista.
+    const t = setTimeout(() => inputRef.current?.focus(), 30);
+    return () => clearTimeout(t);
   }, []);
   useEffect(() => {
     setActive(0);
   }, [q]);
 
-  const filtered = useMemo(
-    () =>
-      q
-        ? all.filter(
-            (e) =>
-              e.nombre.toLowerCase().includes(q.toLowerCase()) ||
-              e.tipo.includes(q.toLowerCase()),
-          )
-        : all,
-    [all, q],
-  );
+  // IDs fijados combinados (personaje+criatura+item), para saber rápido
+  // si una entidad va en el grupo "En este capítulo".
+  const fijadosSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const id of fijadosIds?.personaje ?? []) s.add(id);
+    for (const id of fijadosIds?.criatura ?? []) s.add(id);
+    for (const id of fijadosIds?.item ?? []) s.add(id);
+    return s;
+  }, [fijadosIds]);
+
+  // filtered: antes no existía esta variable pese a usarse más abajo
+  // (bug preexistente — el formulario de Drop tiraba ReferenceError al
+  // escribir o navegar con flechas). Ahora sí filtra por texto/tipo y
+  // antepone las entidades ya asignadas al capítulo.
+  const filtered = useMemo(() => {
+    const base = q
+      ? all.filter(
+          (e) =>
+            e.nombre.toLowerCase().includes(q.toLowerCase()) ||
+            e.tipo.includes(q.toLowerCase()),
+        )
+      : all;
+    if (fijadosSet.size === 0) return base;
+    const fijados = base.filter((e) => fijadosSet.has(e.id));
+    const resto = base.filter((e) => !fijadosSet.has(e.id));
+    return [...fijados, ...resto];
+  }, [all, q, fijadosSet]);
 
   if (selected) {
     const cfg = TIPO_CFG[selected.tipo];
     return (
       <>
-        <FormHeader Icon={Swords} label="Drop" onBack={onBack} onDelete={onDelete} />
+        <FormHeader Icon={Swords} label="Drop" onBack={onBack} />
         <div
           style={{
             padding: "10px 12px",
@@ -661,13 +634,7 @@ function FormDrop({
                 color: "color-mix(in srgb,var(--foreground) 35%,transparent)",
                 fontSize: 14,
               }}
-              title="Cambiar entidad"
-              onClick={() => {
-                setSelected(null);
-                // Sin esto el foco quedaba en el botón ✕ tras volver al
-                // buscador — micro-fricción al querer escribir de una.
-                requestAnimationFrame(() => inputRef.current?.focus());
-              }}
+              onClick={() => setSelected(null)}
             >
               ✕
             </button>
@@ -699,7 +666,7 @@ function FormDrop({
 
   return (
     <>
-      <FormHeader Icon={Swords} label="Drop" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={Swords} label="Drop" onBack={onBack} />
       <div style={{ padding: "10px 12px 6px" }}>
         <input
           ref={inputRef}
@@ -733,43 +700,56 @@ function FormDrop({
         )}
         {filtered.map((e, i) => {
           const cfg = TIPO_CFG[e.tipo];
+          const esFijado = !q && fijadosSet.has(e.id);
+          const esPrimerNoFijado =
+            !q &&
+            fijadosSet.size > 0 &&
+            !esFijado &&
+            (i === 0 || fijadosSet.has(filtered[i - 1]?.id));
           return (
-            <div
-              key={e.id}
-              data-idx={i}
-              style={S.row(i === active || e.id === initialId)}
-              onClick={() => {
-                setSelected(e);
-                setPalabra((p) => p || e.nombre);
-              }}
-              onMouseEnter={() => setActive(i)}
-            >
-              {e.imagen_url ? (
-                <Image
-                  alt=""
-                  src={e.imagen_url}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    objectFit: "cover",
-                    borderRadius: 6,
-                    flexShrink: 0,
-                  }}
-                />
-              ) : (
-                <span style={S.iconBox()}>
-                  <cfg.Icon size={13} />
-                </span>
+            <React.Fragment key={e.id}>
+              {i === 0 && esFijado && (
+                <div style={S.groupLabel}>En este capítulo</div>
               )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={S.label}>{e.nombre}</div>
-                <div style={S.sublabel}>
-                  {e.tipo}
-                  {e.subtipo ? ` · ${e.subtipo}` : ""}
+              {esPrimerNoFijado && (
+                <div style={S.groupLabel}>Todas las entidades</div>
+              )}
+              <div
+                data-idx={i}
+                style={S.row(i === active || e.id === initialId)}
+                onClick={() => {
+                  setSelected(e);
+                  setPalabra((p) => p || e.nombre);
+                }}
+                onMouseEnter={() => setActive(i)}
+              >
+                {e.imagen_url ? (
+                  <Image
+                    alt=""
+                    src={e.imagen_url}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      objectFit: "cover",
+                      borderRadius: 6,
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <span style={S.iconBox()}>
+                    <cfg.Icon size={13} />
+                  </span>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={S.label}>{e.nombre}</div>
+                  <div style={S.sublabel}>
+                    {e.tipo}
+                    {e.subtipo ? ` · ${e.subtipo}` : ""}
+                  </div>
                 </div>
+                {e.id === initialId && <span style={S.kbd}>actual</span>}
               </div>
-              {e.id === initialId && <span style={S.kbd}>actual</span>}
-            </div>
+            </React.Fragment>
           );
         })}
       </div>
@@ -787,14 +767,17 @@ function FormDialogo({
   initialRaw,
   onInsert,
   onBack,
-  onDelete,
   query,
+  fijadosIds = [],
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
   query?: string;
+  /** IDs de personajes ya asignados al capítulo (panel lateral) — se
+   * muestran primero, destacados, y las flechas los recorren igual que
+   * al resto de la lista. */
+  fijadosIds?: string[];
 }) {
   const init = parseSnippetRaw(initialRaw);
   const initialId = init?.kind === "dialogo" ? init.personajeId : undefined;
@@ -839,21 +822,37 @@ function FormDialogo({
   }, [initialId]);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    // Mismo fix que en FormDrop: focus() síncrono perdía la carrera
+    // contra Lexical devolviendo el foco a su contentEditable.
+    const t = setTimeout(() => inputRef.current?.focus(), 30);
+    return () => clearTimeout(t);
   }, []);
   useEffect(() => {
     setActive(0);
   }, [q]);
 
-  const filtered = useMemo(
-    () => (q ? all.filter((e) => e.nombre.toLowerCase().includes(q.toLowerCase())) : all),
-    [all, q],
-  );
+  const filtered = useMemo(() => {
+    const base = q
+      ? all.filter((e) => e.nombre.toLowerCase().includes(q.toLowerCase()))
+      : all;
+    if (fijadosIds.length === 0) return base;
+    // Fijados primero (en el orden en que están en el panel lateral),
+    // el resto después — así siguen alfabéticos entre sí. Un solo array
+    // final: las flechas (ArrowUp/ArrowDown) y el click navegan sobre
+    // esta misma lista, no hay dos grupos separados que se desincronicen.
+    const fijadosSet = new Set(fijadosIds);
+    const fijados = base.filter((e) => fijadosSet.has(e.id));
+    const resto = base.filter((e) => !fijadosSet.has(e.id));
+    fijados.sort(
+      (a, b) => fijadosIds.indexOf(a.id) - fijadosIds.indexOf(b.id),
+    );
+    return [...fijados, ...resto];
+  }, [all, q, fijadosIds]);
 
   if (selected) {
     return (
       <>
-        <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} onDelete={onDelete} />
+        <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} />
         <div
           style={{
             padding: "10px 12px",
@@ -892,11 +891,7 @@ function FormDialogo({
                 color: "color-mix(in srgb,var(--foreground) 35%,transparent)",
                 fontSize: 14,
               }}
-              title="Cambiar personaje"
-              onClick={() => {
-                setSelected(null);
-                requestAnimationFrame(() => inputRef.current?.focus());
-              }}
+              onClick={() => setSelected(null)}
             >
               ✕
             </button>
@@ -928,7 +923,7 @@ function FormDialogo({
 
   return (
     <>
-      <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={MessageCircle} label="Diálogo" onBack={onBack} />
       <div style={{ padding: "10px 12px 6px" }}>
         <input
           ref={inputRef}
@@ -959,38 +954,53 @@ function FormDialogo({
         {!loading && filtered.length === 0 && (
           <div style={S.empty}>Sin resultados</div>
         )}
-        {filtered.map((e, i) => (
-          <div
-            key={e.id}
-            data-idx={i}
-            style={S.row(i === active || e.id === initialId)}
-            onClick={() => setSelected(e)}
-            onMouseEnter={() => setActive(i)}
-          >
-            {e.imagen_url ? (
-              <Image
-                alt=""
-                src={e.imagen_url}
-                style={{
-                  width: 28,
-                  height: 28,
-                  objectFit: "cover",
-                  borderRadius: "50%",
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <span style={S.iconBox()}>
-                <User size={13} />
-              </span>
-            )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={S.label}>{e.nombre}</div>
-              {e.subtipo && <div style={S.sublabel}>{e.subtipo}</div>}
-            </div>
-            {e.id === initialId && <span style={S.kbd}>actual</span>}
-          </div>
-        ))}
+        {filtered.map((e, i) => {
+          const esFijado = !q && fijadosIds.includes(e.id);
+          const esPrimerNoFijado =
+            !q &&
+            fijadosIds.length > 0 &&
+            !esFijado &&
+            (i === 0 || (!q && fijadosIds.includes(filtered[i - 1]?.id)));
+          return (
+            <React.Fragment key={e.id}>
+              {esPrimerNoFijado && (
+                <div style={S.groupLabel}>Todos los personajes</div>
+              )}
+              {i === 0 && esFijado && (
+                <div style={S.groupLabel}>En este capítulo</div>
+              )}
+              <div
+                data-idx={i}
+                style={S.row(i === active || e.id === initialId)}
+                onClick={() => setSelected(e)}
+                onMouseEnter={() => setActive(i)}
+              >
+                {e.imagen_url ? (
+                  <Image
+                    alt=""
+                    src={e.imagen_url}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      objectFit: "cover",
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <span style={S.iconBox()}>
+                    <User size={13} />
+                  </span>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={S.label}>{e.nombre}</div>
+                  {e.subtipo && <div style={S.sublabel}>{e.subtipo}</div>}
+                </div>
+                {e.id === initialId && <span style={S.kbd}>actual</span>}
+              </div>
+            </React.Fragment>
+          );
+        })}
       </div>
     </>
   );
@@ -1003,13 +1013,11 @@ function FormChoice({
   listaSecciones = [],
   onInsert,
   onBack,
-  onDelete,
 }: {
   initialRaw?: string;
   listaSecciones?: { id: string; label: string }[];
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [texto, setTexto] = useState(
@@ -1029,7 +1037,7 @@ function FormChoice({
 
   return (
     <>
-      <FormHeader Icon={GitBranch} label="Choice" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={GitBranch} label="Choice" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -1126,12 +1134,10 @@ function FormEpigrafe({
   initialRaw,
   onInsert,
   onBack,
-  onDelete,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [texto, setTexto] = useState(
@@ -1151,7 +1157,7 @@ function FormEpigrafe({
 
   return (
     <>
-      <FormHeader Icon={Quote} label="Epígrafe" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={Quote} label="Epígrafe" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -1202,12 +1208,10 @@ function FormNota({
   initialRaw,
   onInsert,
   onBack,
-  onDelete,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [texto, setTexto] = useState(
@@ -1222,7 +1226,7 @@ function FormNota({
 
   return (
     <>
-      <FormHeader Icon={Superscript} label="Nota al pie" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={Superscript} label="Nota al pie" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -1264,12 +1268,10 @@ function FormSection({
   initialRaw,
   onInsert,
   onBack,
-  onDelete,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [label, setLabel] = useState(
@@ -1298,7 +1300,7 @@ function FormSection({
 
   return (
     <>
-      <FormHeader Icon={Bookmark} label="Sección" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={Bookmark} label="Sección" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -1351,13 +1353,11 @@ function FormUse({
   listaSecciones = [],
   onInsert,
   onBack,
-  onDelete,
 }: {
   initialRaw?: string;
   listaSecciones?: { id: string; label: string }[];
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const [palabra, setPalabra] = useState(
@@ -1437,7 +1437,7 @@ function FormUse({
 
   return (
     <>
-      <FormHeader Icon={MousePointerClick} label="Use Ítem" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={MousePointerClick} label="Use Ítem" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -1554,13 +1554,11 @@ function FormCondicion({
   listaSecciones = [],
   onInsert,
   onBack,
-  onDelete,
 }: {
   initialRaw?: string;
   listaSecciones?: { id: string; label: string }[];
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const initCond = init?.kind === "condicion" ? init : null;
@@ -1675,7 +1673,7 @@ function FormCondicion({
 
   return (
     <>
-      <FormHeader Icon={DoorOpen} label="Condición" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={DoorOpen} label="Condición" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -1882,12 +1880,10 @@ function FormFlag({
   initialRaw,
   onInsert,
   onBack,
-  onDelete,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
 }) {
   const init = parseSnippetRaw(initialRaw);
   const initSet = init?.kind === "flag-set" ? init : null;
@@ -1902,7 +1898,7 @@ function FormFlag({
 
   return (
     <>
-      <FormHeader Icon={Flag} label="Acción" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={Flag} label="Acción" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -1951,13 +1947,11 @@ function FormImagen({
   initialRaw,
   onInsert,
   onBack,
-  onDelete,
   query,
 }: {
   initialRaw?: string;
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
   query?: string;
 }) {
   const init = parseSnippetRaw(initialRaw);
@@ -2020,7 +2014,7 @@ function FormImagen({
 
   return (
     <>
-      <FormHeader Icon={ImageIcon} label="Imagen" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={ImageIcon} label="Imagen" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -2184,12 +2178,10 @@ function FormImagen({
 function FormSound({
   onInsert,
   onBack,
-  onDelete,
   query,
 }: {
   onInsert: (s: string) => void;
   onBack: () => void;
-  onDelete?: () => void;
   query?: string;
 }) {
   const [all, setAll] = useState<{ name: string; url: string; path: string }[]>(
@@ -2259,7 +2251,7 @@ function FormSound({
 
   return (
     <>
-      <FormHeader Icon={Music2} label="Sonido" onBack={onBack} onDelete={onDelete} />
+      <FormHeader Icon={Music2} label="Sonido" onBack={onBack} />
       <div
         style={{
           padding: "10px 12px",
@@ -2388,107 +2380,14 @@ export function SnippetCommandPalette({
   initialQuery = "",
   listaCapitulos: _listaCapitulos = [],
   listaSecciones = [],
-  personajesVinculadosIds = [],
-  criaturasVinculadasIds = [],
-  itemsVinculadosIds = [],
+  personajesFijadosIds = [],
+  criaturasFijadasIds = [],
+  itemsFijadosIds = [],
   onInsert,
   onFormatCommand,
   onClose,
-  onDelete,
 }: PaletteProps) {
   const [q, setQ] = useState(initialQuery);
-  // Entidades vinculadas al capítulo (personajes/criaturas/ítems), para
-  // la sección "Vinculados" arriba del listado. Se resuelven contra el
-  // mismo fetchEntidades() que ya usan FormDrop/FormDialogo, filtradas
-  // por los ids que llegan como prop.
-  const [entidadesAll, setEntidadesAll] = useState<EntidadVinculada[]>([]);
-  useEffect(() => {
-    if (
-      personajesVinculadosIds.length === 0 &&
-      criaturasVinculadasIds.length === 0 &&
-      itemsVinculadosIds.length === 0
-    ) {
-      return;
-    }
-    let cancelled = false;
-    void fetchEntidades().then((d) => {
-      if (cancelled || !d.ok) return;
-      const list: EntidadVinculada[] = [
-        ...(d.data?.personajes ?? []).map((x: any) => ({
-          id: x.id,
-          nombre: x.nombre,
-          tipo: "personaje" as const,
-          subtipo: x.ocupacion,
-          imagen_url: x.img_url || x.imagen_url,
-        })),
-        ...(d.data?.criaturas ?? []).map((x: any) => ({
-          id: x.id,
-          nombre: x.nombre,
-          tipo: "criatura" as const,
-          subtipo: x.habitat,
-          imagen_url: x.img_url || x.imagen_url,
-        })),
-        ...(d.data?.items ?? []).map((x: any) => ({
-          id: x.id,
-          nombre: x.nombre,
-          tipo: "item" as const,
-          subtipo: x.categoria,
-          imagen_url: x.imagen_url,
-        })),
-      ];
-      setEntidadesAll(list);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const entidadesVinculadas = useMemo(() => {
-    const idsPersonajes = new Set(personajesVinculadosIds);
-    const idsCriaturas = new Set(criaturasVinculadasIds);
-    const idsItems = new Set(itemsVinculadosIds);
-    return entidadesAll.filter(
-      (e) =>
-        (e.tipo === "personaje" && idsPersonajes.has(e.id)) ||
-        (e.tipo === "criatura" && idsCriaturas.has(e.id)) ||
-        (e.tipo === "item" && idsItems.has(e.id)),
-    );
-  }, [entidadesAll, personajesVinculadosIds, criaturasVinculadasIds, itemsVinculadosIds]);
-  // Id de la entidad con el mini-menú Drop/Diálogo abierto (solo aplica
-  // a personajes, que pueden ser cualquiera de los dos).
-  const [vinculadoMenuFor, setVinculadoMenuFor] = useState<string | null>(null);
-  const vinculadoMenuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!vinculadoMenuFor) return;
-    const onDocClick = (e: MouseEvent) => {
-      // Solo cierra si el click fue realmente fuera del menú — el propio
-      // trigger maneja su toggle en su onClick, así que no lo tocamos acá
-      // (evita la carrera mousedown-antes-que-click que reabría el menú).
-      if (!vinculadoMenuRef.current?.contains(e.target as Node)) {
-        setVinculadoMenuFor(null);
-      }
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [vinculadoMenuFor]);
-  // Cuando se clickea una entidad vinculada, guardamos acá el raw con el
-  // id ya preseleccionado (mismo formato que initialRaw al editar un chip
-  // existente) y lo usamos en vez de initialRaw al montar FormDrop/
-  // FormDialogo — initialRaw sigue intacto para el flujo de edición real.
-  const [vinculadoRaw, setVinculadoRaw] = useState<string | null>(null);
-  const handleClickVinculado = useCallback(
-    (e: EntidadVinculada, tipo: "drop" | "dialogo") => {
-      setVinculadoMenuFor(null);
-      if (tipo === "drop") {
-        setVinculadoRaw(`[[drop||${e.tipo}|${e.id}|${e.nombre}]]`);
-        setSelectedType("drop");
-      } else {
-        setVinculadoRaw(`[[dialogo|${e.id}|]]`);
-        setSelectedType("dialogo");
-      }
-    },
-    [],
-  );
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedType, setSelectedType] = useState<SnippetType | null>(() => {
     if (!initialRaw) return null;
@@ -2667,21 +2566,7 @@ export function SnippetCommandPalette({
     setSelectedType(null);
     setQ("");
     setChildQuery("");
-    setVinculadoRaw(null);
   }, []);
-  const handleDelete = useCallback(() => {
-    onDelete?.();
-    onClose();
-  }, [onDelete, onClose]);
-  // Solo se ofrece "Eliminar" cuando estamos editando un chip existente
-  // (initialRaw presente) y el caller nos dio un onDelete real — nunca
-  // cuando llegamos acá desde un "Vinculado" (eso siempre es insertar
-  // uno nuevo, no editar).
-  const deleteHandler = initialRaw && onDelete ? handleDelete : undefined;
-  // Si venimos de clickear un "Vinculado", ese raw preseleccionado manda
-  // sobre initialRaw (que en ese caso ni siquiera debería estar seteado,
-  // pero por las dudas prioriza el más específico a la acción del user).
-  const effectiveInitialRaw = vinculadoRaw ?? initialRaw;
 
   return (
     <div
@@ -2716,101 +2601,6 @@ export function SnippetCommandPalette({
           </div>
 
           <div ref={catListRef} style={S.list}>
-            {/* Vinculados: accesos directos a Drop/Diálogo para los
-                personajes/criaturas/ítems ya vinculados al capítulo. Solo
-                mientras no hay búsqueda activa, para no interferir con el
-                filtro normal. */}
-            {!searchQ && entidadesVinculadas.length > 0 && (
-              <div>
-                <div style={S.groupLabel}>Vinculados</div>
-                {entidadesVinculadas.map((e) => {
-                  const Icon =
-                    e.tipo === "personaje"
-                      ? User
-                      : e.tipo === "criatura"
-                        ? PawPrint
-                        : Package;
-                  const isMenuOpen = vinculadoMenuFor === e.id;
-                  return (
-                    <div
-                      key={`${e.tipo}-${e.id}`}
-                      ref={isMenuOpen ? vinculadoMenuRef : undefined}
-                      style={{ position: "relative" }}
-                    >
-                      <div
-                        style={S.row(isMenuOpen)}
-                        onClick={() => {
-                          if (e.tipo === "personaje") {
-                            setVinculadoMenuFor((cur) =>
-                              cur === e.id ? null : e.id,
-                            );
-                          } else {
-                            handleClickVinculado(e, "drop");
-                          }
-                        }}
-                      >
-                        {e.imagen_url ? (
-                          <img
-                            src={e.imagen_url}
-                            alt=""
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: "50%",
-                              objectFit: "cover",
-                              flexShrink: 0,
-                            }}
-                          />
-                        ) : (
-                          <span style={S.iconBox()}>
-                            <Icon size={14} />
-                          </span>
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={S.label}>{e.nombre}</div>
-                        </div>
-                      </div>
-                      {isMenuOpen && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            left: 0,
-                            top: "100%",
-                            zIndex: 20,
-                            marginTop: 2,
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 2,
-                            padding: 4,
-                            borderRadius: 8,
-                            background: "var(--surface-1, #1a1a1a)",
-                            border:
-                              "0.5px solid var(--border-strong, #444)",
-                            boxShadow: "0 4px 12px rgba(0,0,0,.2)",
-                            minWidth: 130,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            style={S.iconTextBtn}
-                            onClick={() => handleClickVinculado(e, "dialogo")}
-                          >
-                            <MessageCircle size={12} /> Diálogo
-                          </button>
-                          <button
-                            type="button"
-                            style={S.iconTextBtn}
-                            onClick={() => handleClickVinculado(e, "drop")}
-                          >
-                            <Swords size={12} /> Drop
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
             {filteredCats.length === 0 && (
               <div style={S.empty}>Sin resultados</div>
             )}
@@ -2882,20 +2672,24 @@ export function SnippetCommandPalette({
 
       {selectedType === "drop" && (
         <FormDrop
-          initialRaw={effectiveInitialRaw}
+          initialRaw={initialRaw}
           query={childQuery}
+          fijadosIds={{
+            personaje: personajesFijadosIds,
+            criatura: criaturasFijadasIds,
+            item: itemsFijadosIds,
+          }}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "dialogo" && (
         <FormDialogo
-          initialRaw={effectiveInitialRaw}
+          initialRaw={initialRaw}
           query={childQuery}
+          fijadosIds={personajesFijadosIds}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "choice" && (
@@ -2904,7 +2698,6 @@ export function SnippetCommandPalette({
           listaSecciones={listaSecciones}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "section" && (
@@ -2912,7 +2705,6 @@ export function SnippetCommandPalette({
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "epigrafe" && (
@@ -2920,7 +2712,6 @@ export function SnippetCommandPalette({
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "nota" && (
@@ -2928,7 +2719,6 @@ export function SnippetCommandPalette({
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "use" && (
@@ -2937,7 +2727,6 @@ export function SnippetCommandPalette({
           listaSecciones={listaSecciones}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "condicion" && (
@@ -2946,7 +2735,6 @@ export function SnippetCommandPalette({
           listaSecciones={listaSecciones}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "flag" && (
@@ -2954,7 +2742,6 @@ export function SnippetCommandPalette({
           initialRaw={initialRaw}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "imagen" && (
@@ -2963,7 +2750,6 @@ export function SnippetCommandPalette({
           query={childQuery}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
       {selectedType === "sound" && (
@@ -2971,7 +2757,6 @@ export function SnippetCommandPalette({
           query={childQuery}
           onBack={handleBack}
           onInsert={handleInsert}
-          onDelete={deleteHandler}
         />
       )}
     </div>

@@ -67,6 +67,8 @@ interface UnifiedTileCanvasProps<
     coord: { x: number; y: number; tile_col: number; tile_row: number },
   ) => void;
   onMarkerClick?: (marker: TMarker) => void;
+  /** Click derecho sobre un pin → activa/desactiva el modo "mover" para ese pin. */
+  onMarkerContextMenu?: (marker: TMarker) => void;
 
   // ── Tiles ───────────────────────────────────────────────────────────────
   /** Abre el picker de imagen para el tile indicado (existente). */
@@ -105,6 +107,7 @@ export function UnifiedTileCanvas<
   onMarkerSelect,
   onMarkerMove,
   onMarkerClick,
+  onMarkerContextMenu,
   onTilePick,
   onTileDelete,
   onTileCreate,
@@ -953,10 +956,11 @@ export function UnifiedTileCanvas<
       const marker = findMarkerAt(clientX, clientY);
       if (marker) {
         if (withCtrl && editMode) {
-          // Ctrl + click en pin → seleccionarlo para moverlo
+          // Ctrl + click en pin → seleccionarlo para moverlo (atajo de teclado,
+          // se mantiene por compatibilidad además del click derecho)
           onMarkerSelect(marker.id === selectedMarkerId ? null : marker.id);
         } else {
-          // Click simple en pin → abrir panel (solo notificar)
+          // Click izquierdo simple en pin → siempre abre el panel de info
           onMarkerClick?.(marker);
         }
         return;
@@ -1051,11 +1055,26 @@ export function UnifiedTileCanvas<
         activeTouchPointers.current.delete(e.pointerId);
     };
 
+    // ── Click derecho sobre un pin → activa/desactiva modo mover ────────────
+    const onContextMenu = (e: MouseEvent) => {
+      if (!editMode) return;
+      const marker = findMarkerAt(e.clientX, e.clientY);
+      if (marker) {
+        e.preventDefault();
+        if (onMarkerContextMenu) {
+          onMarkerContextMenu(marker);
+        } else {
+          onMarkerSelect(marker.id === selectedMarkerId ? null : marker.id);
+        }
+      }
+    };
+
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerCancel);
+    canvas.addEventListener("contextmenu", onContextMenu);
     canvas.addEventListener("touchstart", onTouchStart, { passive: true });
     canvas.addEventListener("touchmove", onTouchMove, { passive: true });
     canvas.addEventListener("touchend", onTouchEnd);
@@ -1066,6 +1085,7 @@ export function UnifiedTileCanvas<
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerCancel);
+      canvas.removeEventListener("contextmenu", onContextMenu);
       canvas.removeEventListener("touchstart", onTouchStart);
       canvas.removeEventListener("touchmove", onTouchMove);
       canvas.removeEventListener("touchend", onTouchEnd);
@@ -1083,6 +1103,7 @@ export function UnifiedTileCanvas<
     minRow,
     totalCols,
     totalRows,
+    onMarkerContextMenu,
   ]);
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
@@ -1171,7 +1192,7 @@ export function UnifiedTileCanvas<
               color: "color-mix(in srgb, var(--foreground) 35%, transparent)",
             }}
           >
-            Ctrl + click para editar · Ctrl + scroll para zoom
+            Click derecho en un pin para moverlo · Ctrl + click para editar tile · Ctrl + scroll para zoom
           </span>
         </div>
       )}

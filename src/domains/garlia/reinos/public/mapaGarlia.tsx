@@ -326,8 +326,15 @@ function PanelContenido({
   criaturasCiudad,
   itemsCiudad,
   loadingCiudad,
+  onEntrarReino,
+  librosVinculables,
+  onVincularLibro,
+  onDesvincularLibro,
+  vinculandoLibroId,
 }: any) {
   const router = useRouter();
+  const [buscadorLibrosOpen, setBuscadorLibrosOpen] = useState(false);
+  const [busquedaLibro, setBusquedaLibro] = useState("");
   if (editMode) {
     return (
       <div className="flex flex-col gap-4 grow">
@@ -413,6 +420,200 @@ function PanelContenido({
             }}
           />
         </div>
+
+        {/* ── Libros vinculados (solo para reinos, no para puntos de ciudad) ── */}
+        {!puntoSeleccionado && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between ml-1">
+              <label
+                className="text-micro font-bold uppercase tracking-widest"
+                style={{
+                  color: "color-mix(in srgb, var(--foreground) 60%, transparent)",
+                }}
+              >
+                <BookOpen className="inline mr-1 -mt-0.5" size={11} />
+                Libros vinculados
+              </label>
+              <button
+                className="text-micro font-bold uppercase flex items-center gap-1 px-2 py-1 transition-opacity hover:opacity-70"
+                style={{ color: "var(--accent)" }}
+                type="button"
+                onClick={() => setBuscadorLibrosOpen((v) => !v)}
+              >
+                <Plus size={10} />
+                Añadir
+              </button>
+            </div>
+
+            {loadingLibros ? (
+              <div
+                className="flex justify-center py-3"
+                style={{
+                  color: "color-mix(in srgb, var(--accent) 50%, transparent)",
+                }}
+              >
+                <Hourglass size={12} />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {[...(librosReino ?? []), ...(_librosColeccion ?? [])].length ===
+                  0 && (
+                  <p
+                    className="text-micro italic px-1"
+                    style={{
+                      color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                    }}
+                  >
+                    Sin libros vinculados todavía
+                  </p>
+                )}
+                {[...(librosReino ?? []), ...(_librosColeccion ?? [])].map(
+                  (libro: any) => (
+                    <div
+                      key={libro.id}
+                      className="flex items-center gap-2 px-3 py-2 border"
+                      style={{
+                        background:
+                          "color-mix(in srgb, var(--primary) 8%, transparent)",
+                        borderColor:
+                          "color-mix(in srgb, var(--accent) 15%, transparent)",
+                        borderRadius: "1px",
+                      }}
+                    >
+                      {libro.portada_url && (
+                        <img
+                          alt={libro.titulo}
+                          className="w-6 h-9 object-cover shrink-0"
+                          src={libro.portada_url}
+                        />
+                      )}
+                      <span
+                        className="text-micro font-semibold uppercase flex-1 min-w-0 truncate"
+                        style={{ color: "var(--foreground)" }}
+                      >
+                        {libro.titulo}
+                      </span>
+                      <button
+                        className="shrink-0 w-6 h-6 flex items-center justify-center transition-opacity hover:opacity-70"
+                        disabled={vinculandoLibroId === libro.id}
+                        style={{
+                          color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                        }}
+                        title="Quitar vínculo con este reino"
+                        type="button"
+                        onClick={() => onDesvincularLibro?.(libro)}
+                      >
+                        {vinculandoLibroId === libro.id ? (
+                          <Hourglass size={10} />
+                        ) : (
+                          <X size={12} />
+                        )}
+                      </button>
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+
+            {/* Buscador para vincular un libro existente */}
+            {buscadorLibrosOpen && (
+              <div
+                className="flex flex-col gap-2 p-3 border mt-1"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--bg-main) 60%, transparent)",
+                  borderColor:
+                    "color-mix(in srgb, var(--accent) 15%, transparent)",
+                  borderRadius: "1px",
+                }}
+              >
+                <input
+                  autoFocus
+                  className="input-brand text-micro px-3 py-2"
+                  placeholder="Buscar libro por título…"
+                  style={{ borderRadius: "1px" }}
+                  type="text"
+                  value={busquedaLibro}
+                  onChange={(e) => setBusquedaLibro(e.target.value)}
+                />
+                <div
+                  className="flex flex-col gap-1 max-h-40 overflow-y-auto"
+                  style={{ scrollbarWidth: "thin" }}
+                >
+                  {(librosVinculables ?? [])
+                    .filter((l: any) =>
+                      l.titulo
+                        .toLowerCase()
+                        .includes(busquedaLibro.toLowerCase()),
+                    )
+                    .filter(
+                      (l: any) =>
+                        !(librosReino ?? []).some((r: any) => r.id === l.id) &&
+                        !(_librosColeccion ?? []).some(
+                          (r: any) => r.id === l.id,
+                        ),
+                    )
+                    .slice(0, 30)
+                    .map((libro: any) => (
+                      <button
+                        key={libro.id}
+                        className="text-left text-micro font-semibold uppercase px-2 py-1.5 transition-colors hover:opacity-70 disabled:opacity-40"
+                        disabled={vinculandoLibroId === libro.id}
+                        style={{ color: "var(--foreground)" }}
+                        type="button"
+                        onClick={() => {
+                          onVincularLibro?.(libro);
+                          setBusquedaLibro("");
+                        }}
+                      >
+                        {vinculandoLibroId === libro.id ? (
+                          <Hourglass size={10} />
+                        ) : (
+                          libro.titulo
+                        )}
+                      </button>
+                    ))}
+                  {busquedaLibro &&
+                    (librosVinculables ?? []).filter((l: any) =>
+                      l.titulo
+                        .toLowerCase()
+                        .includes(busquedaLibro.toLowerCase()),
+                    ).length === 0 && (
+                      <p
+                        className="text-micro italic px-2 py-1"
+                        style={{
+                          color:
+                            "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                        }}
+                      >
+                        Sin resultados
+                      </p>
+                    )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Entrar a editar las ciudades del reino (antes, un solo click bastaba;
+             ahora el click izquierdo abre el panel sin navegar, así que hace
+             falta este botón explícito) ── */}
+        {!puntoSeleccionado && onEntrarReino && (
+          <button
+            className="w-full justify-center flex items-center gap-2 text-micro font-bold uppercase py-3 border transition-opacity hover:opacity-80"
+            style={{
+              color: "var(--accent)",
+              borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
+              letterSpacing: "0.12em",
+              borderRadius: "1px",
+            }}
+            type="button"
+            onClick={() => onEntrarReino(reinoSeleccionado)}
+          >
+            <ArrowLeft className="rotate-180" size={13} />
+            Entrar y editar ciudades
+          </button>
+        )}
 
         <button
           className="btn-brand w-full justify-center text-micro uppercase py-4 mt-auto disabled:opacity-50"
@@ -2372,6 +2573,12 @@ export default function MapaInteractivo({
   const [librosColeccion, setLibrosColeccion] = useState<any[]>([]); // One Shots, Poemarios, etc.
   const [capitulosReino, setCapitulosReino] = useState<any[]>([]);
   const [loadingLibros, setLoadingLibros] = useState(false);
+  // Catálogo completo de libros, para el picker de "vincular libro" del panel
+  // de edición del reino — se carga una sola vez en modo edición.
+  const [todosLosLibros, setTodosLosLibros] = useState<any[]>([]);
+  const [vinculandoLibroId, setVinculandoLibroId] = useState<string | null>(
+    null,
+  );
   // Habitantes de la ciudad seleccionada
   const [personajesCiudad, setPersonajesCiudad] = useState<any[]>([]);
   const [criaturasCiudad, setCriaturasCiudad] = useState<any[]>([]);
@@ -2542,19 +2749,48 @@ export default function MapaInteractivo({
       ? (reinoSeleccionado?.fondo_color ?? null)
       : fondoColorGlobal;
 
-  // Cargar color de fondo global desde Supabase al montar
+  // Cargar color de fondo global desde Supabase al montar.
+  // maybeSingle() en vez de single(): si todavía no existe la fila
+  // "fondo_color" en config_mapa (primera vez que se usa el picker), single()
+  // tira error y rompe la carga; maybeSingle() devuelve data:null sin fallar.
   useEffect(() => {
     supabase
       .from("config_mapa")
       .select("value")
       .eq("key", "fondo_color")
-      .single()
+      .maybeSingle()
       .then(({ data }) => {
         if (data?.value) setFondoColorGlobal(data.value);
       });
   }, []);
 
+  // Debounce del guardado en Supabase mientras se arrastra el selector de
+  // color — sin esto, cada pixel de movimiento del picker nativo dispararía
+  // un request. El preview (estado local) sigue siendo instantáneo.
+  const fondoColorSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const scheduleFondoColorSave = useCallback(
+    (color: string) => {
+      if (fondoColorSaveTimer.current)
+        clearTimeout(fondoColorSaveTimer.current);
+      fondoColorSaveTimer.current = setTimeout(() => {
+        void handleFondoColorChange(color);
+      }, 400);
+    },
+    // handleFondoColorChange se define más abajo pero es estable entre
+    // renders para el mismo vistaActual/reinoSeleccionado — se referencia
+    // vía closure, no hace falta declararla como dep porque se llama async
+    // luego del timeout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   const handleFondoColorChange = async (color: string) => {
+    if (fondoColorSaveTimer.current) {
+      clearTimeout(fondoColorSaveTimer.current);
+      fondoColorSaveTimer.current = null;
+    }
     setEyedropperActive(false);
     if (vistaActual === "reino" && reinoSeleccionado) {
       // Guardar en la columna fondo_color del reino activo
@@ -2706,14 +2942,17 @@ export default function MapaInteractivo({
   // Carga datos del reino (ciudades, personajes, libros, capítulos) y entra
   // a su vista de detalle. Compartida por el click normal (navegación) y
   // por el arranque directo en modo edición (initialEditReinoId más abajo).
-  const abrirVistaDeReino = async (reino: any) => {
+  const abrirVistaDeReino = async (reino: any, navegar: boolean = true) => {
     // Marcar qué reino estamos cargando — cualquier respuesta async va a chequear esto
     currentReinoIdRef.current = reino.id;
 
     // Limpiar todo inmediatamente para no mostrar datos del reino anterior
     setReinoSeleccionado(reino);
     setPuntoSeleccionado(null);
-    setVistaActual("reino");
+    // navegar=false → solo mostramos la info en el panel lateral, sin entrar
+    // a la vista de detalle del reino (ciudades). Se usa en el click
+    // izquierdo simple sobre el pin del mapa global.
+    if (navegar) setVistaActual("reino");
     setPanelOpen(true);
     setDetallesReino([]);
     setPersonajesReino([]);
@@ -2845,9 +3084,79 @@ export default function MapaInteractivo({
     if (currentReinoIdRef.current === reino.id) setLoadingLibros(false);
   };
 
+  // Click izquierdo sobre un pin en el mapa global → abre la info del reino
+  // en el panel lateral, sin navegar a la vista de detalle (ciudades).
   const handleReinoClick = async (reino: any) => {
-    await abrirVistaDeReino(reino);
+    await abrirVistaDeReino(reino, false);
   };
+
+  // Click derecho sobre un pin → activa/desactiva el modo "mover" para ese
+  // reino (equivalente al viejo Ctrl+click, ahora accesible sin teclado).
+  const handleReinoContextMenu = (reino: any) => {
+    setReinoParaMover((prev) => (prev === reino.id ? null : reino.id));
+  };
+
+  // Botón "Entrar y editar ciudades" del panel — ahora que el click
+  // izquierdo simple ya no navega, este es el único punto de entrada a la
+  // vista de detalle del reino.
+  const handleEntrarReino = (reino: any) => {
+    void abrirVistaDeReino(reino, true);
+  };
+
+  // Vincular / desvincular un libro con el reino seleccionado — actualiza
+  // libros.reino_id directamente en Supabase y refresca los estados locales.
+  const handleVincularLibro = async (libro: any) => {
+    if (!reinoSeleccionado) return;
+    setVinculandoLibroId(libro.id);
+    try {
+      const { error } = await supabase
+        .from("libros")
+        .update({ reino_id: reinoSeleccionado.id })
+        .eq("id", libro.id);
+      if (error) throw error;
+      const actualizado = { ...libro, reino_id: reinoSeleccionado.id };
+      if (libro.categoria === "Libro") {
+        setLibrosReino((prev) => [...prev, actualizado]);
+      } else {
+        setLibrosColeccion((prev) => [...prev, actualizado]);
+      }
+      showToast("Libro vinculado", "success");
+    } catch {
+      showToast("Error al vincular el libro", "error");
+    } finally {
+      setVinculandoLibroId(null);
+    }
+  };
+
+  const handleDesvincularLibro = async (libro: any) => {
+    setVinculandoLibroId(libro.id);
+    try {
+      const { error } = await supabase
+        .from("libros")
+        .update({ reino_id: null })
+        .eq("id", libro.id);
+      if (error) throw error;
+      setLibrosReino((prev) => prev.filter((l) => l.id !== libro.id));
+      setLibrosColeccion((prev) => prev.filter((l) => l.id !== libro.id));
+      showToast("Vínculo eliminado", "success");
+    } catch {
+      showToast("Error al desvincular el libro", "error");
+    } finally {
+      setVinculandoLibroId(null);
+    }
+  };
+
+  // Catálogo completo de libros para el picker — se carga una vez al entrar
+  // en modo edición (admin), no bloquea el resto del mapa.
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase
+      .from("libros")
+      .select("id, titulo, portada_url, categoria, reino_id")
+      .then(({ data, error }) => {
+        if (!error && data) setTodosLosLibros(data);
+      });
+  }, [isAdmin]);
 
   // Abrir un reino o ciudad ya desbloqueados cuando lo pide el
   // GlobalCommandPalette (evento "mapa-open-entity" o buzón en
@@ -3202,6 +3511,11 @@ export default function MapaInteractivo({
     criaturasCiudad,
     itemsCiudad,
     loadingCiudad,
+    onEntrarReino: handleEntrarReino,
+    librosVinculables: todosLosLibros,
+    onVincularLibro: handleVincularLibro,
+    onDesvincularLibro: handleDesvincularLibro,
+    vinculandoLibroId,
   };
 
   // Solo bloquea la UI si no hay absolutamente ningún dato todavía (primera carga ever)
@@ -3380,22 +3694,27 @@ export default function MapaInteractivo({
                 value={fondoColor || "#5a8fa8"}
                 onBlur={(e) => handleFondoColorChange(e.target.value)}
                 onChange={(e) => {
-                  // Preview en tiempo real sin guardar en Supabase todavía
+                  // Preview en tiempo real + guardado con debounce — antes
+                  // esto solo actualizaba el estado local y dependía de
+                  // onBlur (poco confiable con el picker nativo de color)
+                  // para persistir, así que el color a veces no se guardaba.
+                  const color = e.target.value;
                   if (vistaActual === "reino" && reinoSeleccionado) {
                     setReinoSeleccionado((prev: any) => ({
                       ...prev,
-                      fondo_color: e.target.value,
+                      fondo_color: color,
                     }));
                     setReinos((prev) =>
                       prev.map((r) =>
                         r.id === reinoSeleccionado.id
-                          ? { ...r, fondo_color: e.target.value }
+                          ? { ...r, fondo_color: color }
                           : r,
                       ),
                     );
                   } else {
-                    setFondoColorGlobal(e.target.value);
+                    setFondoColorGlobal(color);
                   }
+                  scheduleFondoColorSave(color);
                 }}
               />
             </div>
@@ -3486,6 +3805,7 @@ export default function MapaInteractivo({
               onEyedropperPick={handleFondoColorChange}
               onMapClick={handleMapClick}
               onMarkerClick={handleReinoClick}
+              onMarkerContextMenu={handleReinoContextMenu}
               onMarkerMove={handleReinoMarkerMove}
               onMarkerSelect={setReinoParaMover}
               onOpenPanel={
