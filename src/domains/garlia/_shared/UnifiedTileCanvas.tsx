@@ -1152,21 +1152,25 @@ export function UnifiedTileCanvas<
     };
 
     const onPointerDown = (e: PointerEvent) => {
-      // ── Botón derecho sobre el área seleccionada → arrancar drag de área
-      // completa (mousedown derecho + arrastre + soltar, sin paso de armar). ──
-      if (e.button === 2 && editMode && !drawTool && selectedAreaId) {
-        const area = areas.find((a) => a.id === selectedAreaId);
+      // ── Botón derecho sobre CUALQUIER área → la selecciona (si no lo
+      // estaba ya) y arranca el drag de área completa en el mismo gesto
+      // (mousedown derecho + arrastre + soltar, sin paso de "armar" extra).
+      if (e.button === 2 && editMode && !drawTool) {
         const wp = clientToWorldPoint(e.clientX, e.clientY);
-        if (area && wp && isPointInArea(wp, area)) {
-          draggingAreaRef.current = {
-            areaId: area.id,
-            startWorld: wp,
-            originalPuntos: area.puntos,
-          };
-          canvas.setPointerCapture(e.pointerId);
-          e.preventDefault();
+        if (wp) {
+          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
+          if (hitArea) {
+            if (hitArea.id !== selectedAreaId) onAreaSelect?.(hitArea.id);
+            draggingAreaRef.current = {
+              areaId: hitArea.id,
+              startWorld: wp,
+              originalPuntos: hitArea.puntos,
+            };
+            canvas.setPointerCapture(e.pointerId);
+            e.preventDefault();
+            return;
+          }
         }
-        return;
       }
       if (e.button !== 0 && e.pointerType !== "touch") return;
 
@@ -1480,9 +1484,11 @@ export function UnifiedTileCanvas<
         }
       }
 
-      // ── Click sobre la "pill" de un área vinculada → abre el panel ───────────
-      // Tiene prioridad tanto en editMode como fuera: la pill es el
-      // reemplazo directo del pin, así que se comporta igual en ambos modos.
+      // ── Click IZQUIERDO sobre un área vinculada (pill o relleno) → abre el
+      // reino/ciudad. Reemplaza por completo al click de pin para esa
+      // entidad — el click derecho es quien selecciona el área para
+      // moverla/editarla (ver onContextMenu), así que acá el izquierdo
+      // queda 100% libre para "abrir". ────────────────────────────────────
       {
         const rect = canvas.getBoundingClientRect();
         const s4 = cssToCanvasScale();
@@ -1491,20 +1497,36 @@ export function UnifiedTileCanvas<
         const hitPill = pillRectsRef.current.find(
           (p) => px >= p.x && px <= p.x + p.w && py >= p.y && py <= p.y + p.h,
         );
-        if (hitPill && onAreaClick) {
-          const area = areas.find((a) => a.id === hitPill.areaId);
-          if (area) {
-            onAreaClick(area);
-            return;
+        let areaClickeada = hitPill
+          ? areas.find((a) => a.id === hitPill.areaId)
+          : undefined;
+        if (!areaClickeada) {
+          // No cayó en la pill puntual, pero puede haber caído dentro del
+          // relleno de un área vinculada — también cuenta como "abrir".
+          const wp = clientToWorldPoint(clientX, clientY);
+          if (wp) {
+            areaClickeada = [...areas]
+              .reverse()
+              .find(
+                (a) => (a.reino_id || a.ciudad_id) && isPointInArea(wp, a),
+              );
           }
+        }
+        if (areaClickeada && onAreaClick) {
+          onAreaClick(areaClickeada);
+          return;
         }
       }
 
-      // ── Click sobre un área existente (sin herramienta activa) → seleccionarla ──
+      // ── Click sobre un área existente SIN vincular (sin herramienta
+      // activa) → seleccionarla. Las áreas vinculadas ya se manejaron
+      // arriba (abren su reino/ciudad); solo llegan acá las libres. ──────
       if (editMode && !drawTool && onAreaSelect) {
         const wp = clientToWorldPoint(clientX, clientY);
         if (wp) {
-          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
+          const hitArea = [...areas]
+            .reverse()
+            .find((a) => !a.reino_id && !a.ciudad_id && isPointInArea(wp, a));
           if (hitArea) {
             onAreaSelect(hitArea.id === selectedAreaId ? null : hitArea.id);
             return;
@@ -1626,14 +1648,13 @@ export function UnifiedTileCanvas<
     // ── Click derecho sobre un pin → activa/desactiva modo mover ────────────
     const onContextMenu = (e: MouseEvent) => {
       if (!editMode) return;
-      // El drag de área con botón derecho ya hizo su propio preventDefault
-      // en pointerdown, pero el navegador puede igual disparar "contextmenu"
-      // al soltar — lo bloqueamos también acá si hay (o hubo) un área
-      // seleccionada bajo el cursor, para que nunca se abra el menú nativo.
-      if (!drawTool && selectedAreaId) {
-        const area = areas.find((a) => a.id === selectedAreaId);
+      // El drag/selección de área con botón derecho ya hizo su propio
+      // preventDefault en pointerdown, pero el navegador puede igual
+      // disparar "contextmenu" al soltar — lo bloqueamos también acá para
+      // cualquier área bajo el cursor, para que nunca se abra el menú nativo.
+      if (!drawTool) {
         const wp = clientToWorldPoint(e.clientX, e.clientY);
-        if (area && wp && isPointInArea(wp, area)) {
+        if (wp && areas.some((a) => isPointInArea(wp, a))) {
           e.preventDefault();
           return;
         }
