@@ -37,6 +37,8 @@ import {
 import { useFlora } from "./useFlora";
 import { type Flora } from "./types";
 import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/SelectorEcosistemasDeEntidad";
+import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
+import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
 export function FloraEditor({
   flora: floraProp,
@@ -55,6 +57,13 @@ export function FloraEditor({
   const [form, setForm] = useState<Flora>(floraProp);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
+  // Popover flotante de ecosistema — mismo patrón que el chip de Ecosistema
+  // en CriaturasJerarquica/GeografiaJerarquica (PopoverFlotante anclado al
+  // elemento clickeado, sin navegar a pantalla completa).
+  const [ecosistemaAbierto, setEcosistemaAbierto] = useState<{
+    id: string;
+    anchor: HTMLElement;
+  } | null>(null);
 
   useEffect(() => {
     setForm(floraProp);
@@ -175,6 +184,7 @@ export function FloraEditor({
                   entidadId={form.id}
                   campo="flora_ids"
                   label="Ecosistemas donde crece"
+                  onSelectEcosistema={(id, anchor) => setEcosistemaAbierto({ id, anchor })}
                 />
               </div>
 
@@ -206,6 +216,22 @@ export function FloraEditor({
             setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
           }
         />
+      )}
+
+      {ecosistemaAbierto && (
+        <PopoverFlotante
+          anchor={ecosistemaAbierto.anchor}
+          onClose={() => setEcosistemaAbierto(null)}
+          width={640}
+          maxHeight={560}
+          centerVertically
+          centerHorizontally
+        >
+          <EcosistemaPopoverContent
+            ecosistemaId={ecosistemaAbierto.id}
+            onClose={() => setEcosistemaAbierto(null)}
+          />
+        </PopoverFlotante>
       )}
     </div>
   );

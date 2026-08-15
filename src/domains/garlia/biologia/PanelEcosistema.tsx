@@ -220,6 +220,8 @@ export function PanelEcosistema({
   onActualizarCadena,
   onEliminarCadena,
   onSelectCriatura,
+  onSelectFlora,
+  onSelectMineral,
   onSelectBioma,
   modoPopover = false,
 }: {
@@ -233,6 +235,10 @@ export function PanelEcosistema({
   onActualizarCadena: (id: string, updates: Partial<CadenaAlimenticia>) => void;
   onEliminarCadena: (id: string) => void;
   onSelectCriatura?: (id: string) => void;
+  /** Abre el editor/panel flotante de la Flora o Mineral clickeada en la
+   *  barra lateral — mismo patrón que onSelectCriatura. */
+  onSelectFlora?: (id: string) => void;
+  onSelectMineral?: (id: string) => void;
   /** Abre el editor completo del bioma actualmente seleccionado. */
   onSelectBioma?: (id: string) => void;
   /** true cuando se renderiza dentro de un popover flotante: el botón
@@ -336,6 +342,7 @@ export function PanelEcosistema({
         loading={loadingCatalogoFlora}
         saving={false}
         selectedIds={floraIds}
+        onEntityClick={onSelectFlora}
         onToggle={handleToggleFlora}
       />
       {sectionDivider}
@@ -353,6 +360,7 @@ export function PanelEcosistema({
         loading={loadingCatalogoMinerales}
         saving={false}
         selectedIds={mineralIds}
+        onEntityClick={onSelectMineral}
         onToggle={handleToggleMineral}
       />
       {sectionDivider}

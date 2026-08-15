@@ -31,8 +31,11 @@ export function SelectorEcosistemasDeEntidad({
   entidadId: string;
   /** Qué array del Ecosistema contiene esta entidad. */
   campo: Campo;
-  /** Se dispara al clickear el nombre de un ecosistema ya asignado. */
-  onSelectEcosistema?: (id: string) => void;
+  /** Se dispara al clickear el nombre de un ecosistema ya asignado —
+   *  recibe también el elemento clickeado como anchor para popovers
+   *  flotantes (mismo patrón que el chip de Ecosistema en
+   *  CriaturasJerarquica/GeografiaJerarquica). */
+  onSelectEcosistema?: (id: string, anchor: HTMLElement) => void;
   label?: string;
 }) {
   const { ecosistemas, loading, actualizar } = useEcosistemas();
@@ -87,7 +90,7 @@ export function SelectorEcosistemasDeEntidad({
                 type="button"
                 title={eco.nombre}
                 className="text-micro font-bold text-primary/70 truncate max-w-[140px] hover:opacity-80 transition-opacity"
-                onClick={() => onSelectEcosistema?.(eco.id)}
+                onClick={(e) => onSelectEcosistema?.(eco.id, e.currentTarget)}
               >
                 {eco.nombre}
               </button>

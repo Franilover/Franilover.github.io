@@ -39,6 +39,8 @@ export function EcosistemaEditor({ ecosistema }: { ecosistema: Ecosistema }) {
         onActualizarCadena={(id, updates) => void actualizarCadena(id, updates)}
         onEliminarCadena={(id) => void eliminarCadena(id)}
         onSelectCriatura={(id) => abrirPanel("criatura", id)}
+        onSelectFlora={(id) => abrirPanel("flora", id)}
+        onSelectMineral={(id) => abrirPanel("mineral", id)}
         onSelectBioma={(id) => openEntity("biomas", id)}
       />
     </div>

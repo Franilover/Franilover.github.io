@@ -24,6 +24,7 @@
 
 import { PanelEcosistema } from "@/domains/garlia/biologia/PanelEcosistema";
 import { useCadenasAlimenticias, useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
+import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 
 export function EcosistemaPopoverContent({
   ecosistemaId,
@@ -34,6 +35,7 @@ export function EcosistemaPopoverContent({
   onClose: () => void;
   onSelectCriatura?: (id: string) => void;
 }) {
+  const abrirPanel = usePanelFlotante((s) => s.abrir);
   const { ecosistemas, actualizar, eliminar } = useEcosistemas();
   const {
     cadenas,
@@ -63,6 +65,8 @@ export function EcosistemaPopoverContent({
       onActualizarCadena={(id, updates) => void actualizarCadena(id, updates)}
       onEliminarCadena={(id) => void eliminarCadena(id)}
       onSelectCriatura={onSelectCriatura}
+      onSelectFlora={(id) => abrirPanel("flora", id)}
+      onSelectMineral={(id) => abrirPanel("mineral", id)}
       modoPopover
     />
   );
