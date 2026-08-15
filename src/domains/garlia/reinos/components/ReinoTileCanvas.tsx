@@ -189,7 +189,7 @@ interface ReinoTileCanvasProps {
   drawTool?: DrawTool;
   onAreaDrawEnd?: (tipo: AreaTipo, puntos: WorldPoint[]) => void;
   onAreaPointsChange?: (areaId: string, puntos: WorldPoint[]) => void;
-  onAreaLabelClick?: (area: BaseArea) => void;
+  onAreaClick?: (area: BaseArea) => void;
 }
 
 export function ReinoTileCanvas({
@@ -215,7 +215,7 @@ export function ReinoTileCanvas({
   drawTool = null,
   onAreaDrawEnd,
   onAreaPointsChange,
-  onAreaLabelClick,
+  onAreaClick,
 }: ReinoTileCanvasProps) {
   const { tiles, loading, addTile, updateTileImage, deleteTile } =
     useReinoTiles(reinoId);
@@ -259,7 +259,7 @@ export function ReinoTileCanvas({
         tileSize={tileSize}
         tiles={tiles}
         onAreaDrawEnd={onAreaDrawEnd}
-        onAreaLabelClick={onAreaLabelClick}
+        onAreaClick={onAreaClick}
         onAreaPointsChange={onAreaPointsChange}
         onAreaSelect={onAreaSelect}
         onEyedropperPick={onEyedropperPick}

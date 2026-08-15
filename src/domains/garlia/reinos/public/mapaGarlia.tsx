@@ -3715,7 +3715,7 @@ export default function MapaInteractivo({
             selectedAreaId={editMode ? selectedAreaId : null}
             selectedMarkerId={editMode ? puntoParaMover : null}
             onAreaDrawEnd={handleAreaDrawEnd}
-            onAreaLabelClick={(area) => void handleAreaLabelClick(area)}
+            onAreaClick={(area) => void handleAreaLabelClick(area)}
             onAreaPointsChange={handleAreaPointsChange}
             onAreaSelect={setSelectedAreaId}
             onDetallesChange={(nuevos) => {
