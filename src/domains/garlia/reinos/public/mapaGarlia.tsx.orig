@@ -2664,16 +2664,13 @@ export default function MapaInteractivo({
   // Carga datos del reino (ciudades, personajes, libros, capítulos) y entra
   // a su vista de detalle. Compartida por el click normal (navegación) y
   // por el arranque directo en modo edición (initialEditReinoId más abajo).
-  const abrirVistaDeReino = async (reino: any, puntoInicial: any = null) => {
+  const abrirVistaDeReino = async (reino: any) => {
     // Marcar qué reino estamos cargando — cualquier respuesta async va a chequear esto
     currentReinoIdRef.current = reino.id;
 
-    // Limpiar todo inmediatamente para no mostrar datos del reino anterior.
-    // Si viene un puntoInicial (ej. una ciudad), lo seteamos ya mismo para
-    // no pasar por un frame intermedio de "reino sin selección" — evita el
-    // parpadeo reino→ciudad al clickear un área vinculada a una ciudad.
+    // Limpiar todo inmediatamente para no mostrar datos del reino anterior
     setReinoSeleccionado(reino);
-    setPuntoSeleccionado(puntoInicial);
+    setPuntoSeleccionado(null);
     setVistaActual("reino");
     setPanelOpen(true);
     setDetallesReino([]);
