@@ -154,6 +154,9 @@ interface Props {
   /** Elemento opcional pegado a la izquierda del buscador — usado por
    *  EntidadesPage para el dropdown de agrupación (Reino/Criatura). */
   agrupacionSelector?: React.ReactNode;
+  /** Ícono de descarga de datos (Items/Criaturas/Personajes), pegado a la
+   *  izquierda del AñadirDropdown — provisto por EntidadesPage. */
+  descargarDatosBoton?: React.ReactNode;
 }
 
 function NodoTitulo({
@@ -332,6 +335,7 @@ export function GeografiaJerarquica({
   busqueda = "",
   onBusquedaChange,
   agrupacionSelector,
+  descargarDatosBoton,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -753,13 +757,16 @@ export function GeografiaJerarquica({
             onOpenGrupo={onOpenGrupo}
           />
         </div>
-        {(onCreateReino || onCreatePersonaje) && (
-          <AñadirDropdown
-            onCreateReino={onCreateReino}
-            creatingReino={creatingReino}
-            onCreatePersonaje={onCreatePersonaje ? () => onCreatePersonaje(null) : undefined}
-          />
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {descargarDatosBoton}
+          {(onCreateReino || onCreatePersonaje) && (
+            <AñadirDropdown
+              onCreateReino={onCreateReino}
+              creatingReino={creatingReino}
+              onCreatePersonaje={onCreatePersonaje ? () => onCreatePersonaje(null) : undefined}
+            />
+          )}
+        </div>
       </div>
 
       {mostrarPersonajes ? (

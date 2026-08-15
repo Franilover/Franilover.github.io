@@ -18,9 +18,10 @@
  * muestra sin lógica extra acá.
  */
 
-import { Download, Eye, EyeOff, Gem, Leaf, Music, Plus, StickyNote } from "lucide-react";
+import { Eye, EyeOff, Gem, Leaf, Music, Plus, StickyNote } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
+import { DescargarDatosDropdown } from "./DescargarDatosDropdown";
 import { PanelEditor } from "@/domains/garlia/canciones/editor/PanelEditor";
 import { ModalNuevaCancion } from "@/domains/garlia/canciones/modals/ModalNuevaCancion";
 import { useCanciones } from "@/domains/garlia/canciones/useCanciones";
@@ -135,6 +136,10 @@ function descargarDatosReinos(datos: {
   personajes: Personaje[];
 }) {
   descargarUtil("reinos", datos);
+}
+
+function descargarDatosItems(datos: { items: Item[] }) {
+  descargarUtil("items", datos);
 }
 
 export function EntidadesPage({ section, selectedId }: Props) {
@@ -962,29 +967,20 @@ export function EntidadesPage({ section, selectedId }: Props) {
     </div>
   );
 
+  // Ícono compartido de descarga (Items / Criaturas / Personajes), se ubica
+  // pegado a la izquierda del botón "Añadir" en las 3 vistas jerárquicas.
+  const descargarDatosBoton = (
+    <DescargarDatosDropdown
+      onDescargarItems={() => descargarDatosItems({ items })}
+      onDescargarCriaturas={() =>
+        descargarDatosCriaturas({ criaturas, personajes, ecosistemas, biomas, flora, minerales })
+      }
+      onDescargarPersonajes={() => descargarDatosReinos({ reinos, ciudades, personajes })}
+    />
+  );
+
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-4">
-      {agrupacionPersonajes !== "items" && (
-        <div className="flex items-center justify-end mb-1">
-          <button
-            type="button"
-            onClick={() =>
-              agrupacionPersonajes === "criatura"
-                ? descargarDatosCriaturas({ criaturas, personajes, ecosistemas, biomas, flora, minerales })
-                : descargarDatosReinos({ reinos, ciudades, personajes })
-            }
-            title={
-              agrupacionPersonajes === "criatura"
-                ? "Descargar todos los datos de Criaturas (criaturas, personajes, ecosistemas, biomas, flora, minerales) como JSON"
-                : "Descargar todos los datos de Reinos (reinos, ciudades, personajes) como JSON"
-            }
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-          >
-            <Download size={10} />
-            <span className="hidden sm:inline">Descargar datos</span>
-          </button>
-        </div>
-      )}
       {agrupacionPersonajes === "items" ? (
         <ItemsJerarquia
           items={items}
@@ -998,11 +994,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
           loadingFlora={loadingFlora}
           minerales={minerales}
           loadingMinerales={loadingMinerales}
-          ecosistemas={ecosistemas}
-          loadingEcosistemas={loadingEco}
-          onOpenEcosistema={(id) => openEntity("ecosistemas", id)}
-          criaturas={criaturas}
-          loadingCriaturas={loadingC}
           gruposItemsPorSubtipo={gruposItemsPorSubtipo}
           grupoSeleccionadoId={grupoItemSeleccionadoId}
           onSeleccionarGrupo={setGrupoItemSeleccionadoId}
@@ -1010,6 +1001,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           busqueda={busquedaItem}
           onBusquedaChange={setBusquedaItem}
           agrupacionSelector={agrupacionSelector}
+          descargarDatosBoton={descargarDatosBoton}
         />
       ) : agrupacionPersonajes === "criatura" ? (
         <CriaturasJerarquica
@@ -1034,6 +1026,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           busqueda={busquedaCriatura}
           onBusquedaChange={setBusquedaCriatura}
           agrupacionSelector={agrupacionSelector}
+          descargarDatosBoton={descargarDatosBoton}
           onCreateCriatura={async () => {
             const { data } = await addCriatura({ nombre: "Nueva criatura" });
             if (data?.id) openEntity("criaturas", data.id);
@@ -1102,6 +1095,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           busqueda={busquedaReino}
           onBusquedaChange={setBusquedaReino}
           agrupacionSelector={agrupacionSelector}
+          descargarDatosBoton={descargarDatosBoton}
           onCreateReino={async () => {
             const { data } = await addReino({ nombre: "Nuevo reino" });
             if (data?.id) abrirPanel("reino", data.id);

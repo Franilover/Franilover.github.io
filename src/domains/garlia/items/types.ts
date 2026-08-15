@@ -13,13 +13,9 @@ export type Item = {
   reino_ids?: string[];
   criatura_id?: string | null;
   criatura?: { id: string; nombre: string; imagen_url?: string } | null;
-  /** @deprecated Legado: un solo compuesto. Se mantiene por compatibilidad
-   *  con datos viejos, pero la composición actual vive en `composicion`. */
+  /** Compuesto de la Tabla Química que compone este ítem (mismo patrón que
+   *  Flora/Mineral: se elige/crea vía SelectorCompuesto). */
   compuesto_id?: string | null;
-  /** Composición material del ítem: puede tener varias partes hechas de
-   *  compuestos distintos (ej: "Madera" en el tronco, "Resina" en la savia),
-   *  cada una con su propia etiqueta explicando dónde/por qué aplica. */
-  composicion?: { compuesto_id: string; tag: string }[];
   // ── Reglas D&D 2024 (fichas_dnd las lee al equipar/atacar) ────────────
   /** Si el ítem es un arma: habilita dado_dano/sutileza/distancia y el
    *  selector de Maestría de Arma al equiparlo en una ficha. */
