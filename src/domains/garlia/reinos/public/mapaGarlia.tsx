@@ -3923,6 +3923,18 @@ export default function MapaInteractivo({
     await abrirVistaDeReino(reino);
   };
 
+  // Click en la "pill" de un área vinculada a un reino (reemplazo del pin)
+  // → resuelve el reino real por id y abre la misma vista que un click de
+  // pin tradicional. Solo aplica acá porque el único <UnifiedTileCanvas> de
+  // este componente está en la vista "global" (reinos); si más adelante se
+  // agrega uno para la vista de detalle (ciudades), replicar este patrón
+  // resolviendo contra `detallesReino` en vez de `reinos`.
+  const handleAreaClick = (area: BaseArea) => {
+    if (!area.reino_id) return;
+    const reino = reinos.find((r) => r.id === area.reino_id);
+    if (reino) void handleReinoClick(reino);
+  };
+
   // Click derecho sobre un pin → activa/desactiva el modo "mover" para ese
   // reino (equivalente al viejo Ctrl+click, ahora accesible sin teclado).
   const handleReinoContextMenu = (reino: any) => {
@@ -4361,23 +4373,37 @@ export default function MapaInteractivo({
     onExitReino?.();
   };
 
-  // Visible markers: admins ven todos los reinos; usuarios solo los que desbloquearon
-  const visibleMarkers =
+  // IDs de reino/ciudad que ya tienen un área vinculada — sus pines se
+  // reemplazan por el área rellena + pill (ver más abajo), el pin deja de
+  // dibujarse por completo (no solo en editMode: el reemplazo es total,
+  // el pin queda de fallback únicamente para los que no tienen área aún).
+  const idsConAreaVinculada = new Set(
+    areas
+      .map((a) => a.reino_id || a.ciudad_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  // Visible markers: admins ven todos los reinos; usuarios solo los que desbloquearon.
+  // Se excluyen los que ya tienen área vinculada (pin → área+pill).
+  const visibleMarkers = (
     vistaActual === "global"
       ? reinos.filter((r) => (isAdmin ? true : reinosDesbloqueados.has(r.id)))
       : detallesReino.filter((l) =>
           isAdmin ? true : ciudadesDesbloqueadas.has(l.id),
-        );
+        )
+  ).filter((m: any) => !idsConAreaVinculada.has(m.id));
 
-  // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla)
-  const hiddenMarkers =
+  // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla).
+  // También se excluyen acá los que ya tienen área vinculada.
+  const hiddenMarkers = (
     vistaActual === "global"
       ? isAdmin
         ? []
         : reinos.filter((r) => !reinosDesbloqueados.has(r.id))
       : isAdmin
         ? []
-        : detallesReino.filter((l) => !ciudadesDesbloqueadas.has(l.id));
+        : detallesReino.filter((l) => !ciudadesDesbloqueadas.has(l.id))
+  ).filter((m: any) => !idsConAreaVinculada.has(m.id));
 
   const _currentImage =
     vistaActual === "reino" && reinoSeleccionado?.mapa_url
@@ -4727,6 +4753,7 @@ export default function MapaInteractivo({
               onAreaDrawEnd={handleAreaDrawEnd}
               onAreaPointsChange={handleAreaPointsChange}
               onAreaSelect={setSelectedAreaId}
+              onAreaClick={handleAreaClick}
               onEyedropperPick={handleFondoColorChange}
               onMapClick={handleMapClick}
               onMarkerClick={handleReinoClick}
