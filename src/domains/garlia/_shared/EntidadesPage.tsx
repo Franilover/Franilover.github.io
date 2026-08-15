@@ -1001,6 +1001,8 @@ export function EntidadesPage({ section, selectedId }: Props) {
           ecosistemas={ecosistemas}
           loadingEcosistemas={loadingEco}
           onOpenEcosistema={(id) => openEntity("ecosistemas", id)}
+          criaturas={criaturas}
+          loadingCriaturas={loadingC}
           gruposItemsPorSubtipo={gruposItemsPorSubtipo}
           grupoSeleccionadoId={grupoItemSeleccionadoId}
           onSeleccionarGrupo={setGrupoItemSeleccionadoId}
