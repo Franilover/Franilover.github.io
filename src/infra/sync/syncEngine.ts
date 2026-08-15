@@ -1462,3 +1462,36 @@ export async function loadReinoTiles(
 export async function invalidateReinoTiles(reinoId: string): Promise<void> {
   await invalidateSessionCache(`reino_tiles:${reinoId}`);
 }
+
+// ─── Áreas del mapa (círculo / rectángulo / polígono) ─────────────────────────
+// Mismo patrón que loadMapTiles: Dexie-first + revalidación en segundo plano.
+
+export async function loadMapAreas(
+  worldId: string = "garlia",
+  onUpdate?: (data: any[]) => void,
+): Promise<any[]> {
+  return loadWithCache(
+    {
+      cacheKey: `map_areas:${worldId}`,
+      dexieSource: () => dexieWhere(db?.map_areas, "world_id", worldId),
+      supabaseFetch: async () => {
+        const { data } = await supabase
+          .from("map_areas")
+          .select(
+            "id, world_id, reino_id, ciudad_id, tipo, puntos, color, label, orden",
+          )
+          .eq("world_id", worldId)
+          .order("orden");
+        return data ?? null;
+      },
+      persist: (rows) => persistReplace("map_areas", rows),
+    },
+    onUpdate,
+  );
+}
+
+export async function invalidateMapAreas(
+  worldId: string = "garlia",
+): Promise<void> {
+  await invalidateSessionCache(`map_areas:${worldId}`);
+}

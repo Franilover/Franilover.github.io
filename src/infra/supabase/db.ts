@@ -321,6 +321,25 @@ export interface ReinoTileLocal {
   order?: number;
 }
 
+// ─── Áreas del mapa (círculo / rectángulo / polígono libre) ───────────────────
+// Vinculan una zona dibujada en el mapa global a un reino o una ciudad.
+// Las coordenadas de los puntos son "mundo" (mismo sistema que tile_col/
+// tile_row + coord_x/coord_y en % dentro del tile) para que escalen igual
+// que los tiles al hacer pan/zoom — ver toWorldPoint/fromWorldPoint en
+// UnifiedTileCanvas.
+export interface MapAreaLocal {
+  id: string;
+  world_id: string;
+  reino_id?: string | null;
+  ciudad_id?: string | null;
+  tipo: "circulo" | "rectangulo" | "poligono";
+  /** Puntos en coordenadas mundo: [{x, y}, ...] — col/row absoluto + fracción. */
+  puntos: { x: number; y: number }[];
+  color?: string | null;
+  label?: string | null;
+  orden?: number;
+}
+
 // ─── Eras de personaje (arcos vitales en la línea de tiempo) ─────────────────
 export interface PersonajeEra {
   id: string; // uuid
@@ -552,6 +571,9 @@ class AgendaFraniDB extends Dexie {
   // Tiles de mapa global y de reinos
   map_tiles!: Table<MapTileLocal, string>;
   reino_tiles!: Table<ReinoTileLocal, string>;
+
+  // Áreas del mapa (círculo/rectángulo/polígono) vinculadas a reino o ciudad
+  map_areas!: Table<MapAreaLocal, string>;
 
   // Descubrimientos personales (cache offline para GlobalCommandPalette)
   descubrimientos!: Table<DescubrimientoLocal, string>;
@@ -1300,6 +1322,13 @@ class AgendaFraniDB extends Dexie {
       dones: null,
       personaje_hechizos: null,
       personaje_dones: null,
+    });
+
+    // ─── v29: áreas del mapa (círculo/rectángulo/polígono) ────────────────────
+    // Zonas dibujadas sobre el mapa global, vinculadas a un reino o ciudad —
+    // ver EditorMapa/MapaInteractivo y la nueva tabla map_areas en Supabase.
+    this.version(29).stores({
+      map_areas: "id, world_id, reino_id, ciudad_id",
     });
   }
 }

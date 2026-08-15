@@ -49,6 +49,30 @@ export type BaseMarker = {
   oculto?: boolean;
 };
 
+/** Punto en coordenadas "mundo": col/row absoluto de tile + offset 0-100
+ * dentro de ese tile (mismo sistema que coord_x/coord_y de los markers).
+ * Se guarda así (y no en col+localX/localY por separado) para poder
+ * serializar un área completa como un array plano en la columna `puntos`
+ * de map_areas. */
+export type WorldPoint = { col: number; row: number; x: number; y: number };
+
+export type AreaTipo = "circulo" | "rectangulo" | "poligono";
+
+export type BaseArea = {
+  id: string;
+  tipo: AreaTipo;
+  /** Para círculo: [centro, puntoDeRadio]. Para rectángulo: [esquinaA,
+   * esquinaB]. Para polígono: N vértices (mínimo 3). */
+  puntos: WorldPoint[];
+  color?: string | null;
+  label?: string | null;
+  reino_id?: string | null;
+  ciudad_id?: string | null;
+};
+
+/** Herramienta de dibujo activa. null = no se está dibujando nada. */
+export type DrawTool = "circulo" | "rectangulo" | "poligono" | null;
+
 interface UnifiedTileCanvasProps<
   TTile extends BaseTile,
   TMarker extends BaseMarker,
@@ -91,6 +115,21 @@ interface UnifiedTileCanvasProps<
   ) => void;
   onOpenPanel?: () => void;
 
+  // ── Áreas (círculo / rectángulo / polígono) ───────────────────────────────
+  /** Áreas ya guardadas, a dibujar sobre el mapa (siempre, editMode o no). */
+  areas?: BaseArea[];
+  /** Área seleccionada — se resalta y sus vértices se pueden arrastrar. */
+  selectedAreaId?: string | null;
+  onAreaSelect?: (id: string | null) => void;
+  /** Herramienta activa: si no es null, el próximo click/drag empieza (o
+   * continúa, para polígono) un dibujo nuevo. */
+  drawTool?: DrawTool;
+  /** Se llama con los puntos finales apenas el dibujo se completa (soltar
+   * el mouse en círculo/rectángulo, o doble-click / Enter en polígono). */
+  onAreaDrawEnd?: (tipo: AreaTipo, puntos: WorldPoint[]) => void;
+  /** El usuario arrastró un vértice de un área ya existente (edición). */
+  onAreaPointsChange?: (areaId: string, puntos: WorldPoint[]) => void;
+
   className?: string;
 }
 
@@ -117,6 +156,12 @@ export function UnifiedTileCanvas<
   onEyedropperPick,
   onMapClick,
   onOpenPanel: _onOpenPanel,
+  areas = [],
+  selectedAreaId = null,
+  onAreaSelect,
+  drawTool = null,
+  onAreaDrawEnd,
+  onAreaPointsChange,
   className,
 }: UnifiedTileCanvasProps<TTile, TMarker>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -204,6 +249,31 @@ export function UnifiedTileCanvas<
     h: number;
     tile: TTile;
   } | null>(null);
+
+  // ── Dibujo de áreas ────────────────────────────────────────────────────────
+  // Puntos "mundo" acumulados del dibujo en curso. Círculo/rectángulo usan
+  // drag (2 puntos); polígono acumula un punto por click hasta doble-click.
+  const drawingPointsRef = useRef<WorldPoint[]>([]);
+  const [drawingPoints, setDrawingPoints] = useState<WorldPoint[]>([]);
+  // Posición actual del mouse en coords mundo, para previsualizar el
+  // segmento/figura mientras se dibuja (círculo/rectángulo en drag, o el
+  // próximo lado de un polígono).
+  const drawCursorRef = useRef<WorldPoint | null>(null);
+  const isDrawingDragRef = useRef(false);
+
+  // Índice de vértice de un área existente que se está arrastrando
+  // (edición post-creación). areaId + índice dentro de puntos[].
+  const draggingVertexRef = useRef<{ areaId: string; index: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    // Cambiar de herramienta (o desactivarla) cancela cualquier dibujo en curso.
+    drawingPointsRef.current = [];
+    setDrawingPoints([]);
+    isDrawingDragRef.current = false;
+    markDirty();
+  }, [drawTool]);
 
   // ── Dimensiones del canvas virtual ────────────────────────────────────────
   const minCol = tiles.length > 0 ? Math.min(...tiles.map((t) => t.col)) : 0;
@@ -407,6 +477,20 @@ export function UnifiedTileCanvas<
     [minCol, minRow, tileSize, totalW, totalH],
   );
 
+  // Punto mundo → coords de pantalla dentro del transform (relativo a cx,cy=0,0;
+  // el caller suma cx/cy si necesita coords absolutas de canvas).
+  const worldToLocal = useCallback(
+    (p: WorldPoint, scale: number) => {
+      const tOx = (p.col - minCol) * tileSize * scale;
+      const tOy = (p.row - minRow) * tileSize * scale;
+      return {
+        lx: tOx + (p.x / 100) * tileSize * scale,
+        ly: tOy + (p.y / 100) * tileSize * scale,
+      };
+    },
+    [minCol, minRow, tileSize],
+  );
+
   const canvasToTileInfo = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -441,8 +525,60 @@ export function UnifiedTileCanvas<
     };
   };
 
+  const clientToWorldPoint = (
+    clientX: number,
+    clientY: number,
+  ): WorldPoint | null => {
+    const info = canvasToTileInfo(clientX, clientY);
+    if (!info) return null;
+    return { col: info.tile_col, row: info.tile_row, x: info.x, y: info.y };
+  };
+
   const findTileAt = (col: number, row: number) =>
     tiles.find((t) => t.col === col && t.row === row) ?? null;
+
+  // Convierte un WorldPoint a "unidades de tile" continuas (col + x/100),
+  // útil para hit-testing sin depender de escala de pantalla.
+  const toTileUnits = (p: WorldPoint) => ({
+    ux: p.col + p.x / 100,
+    uy: p.row + p.y / 100,
+  });
+
+  const isPointInArea = (wp: WorldPoint, area: BaseArea): boolean => {
+    const p = toTileUnits(wp);
+    if (area.tipo === "circulo" && area.puntos.length >= 2) {
+      const c = toTileUnits(area.puntos[0]);
+      const edge = toTileUnits(area.puntos[1]);
+      const r = Math.hypot(edge.ux - c.ux, edge.uy - c.uy);
+      return Math.hypot(p.ux - c.ux, p.uy - c.uy) <= r;
+    }
+    if (area.tipo === "rectangulo" && area.puntos.length >= 2) {
+      const a = toTileUnits(area.puntos[0]);
+      const b = toTileUnits(area.puntos[1]);
+      const minX = Math.min(a.ux, b.ux);
+      const maxX = Math.max(a.ux, b.ux);
+      const minY = Math.min(a.uy, b.uy);
+      const maxY = Math.max(a.uy, b.uy);
+      return p.ux >= minX && p.ux <= maxX && p.uy >= minY && p.uy <= maxY;
+    }
+    if (area.tipo === "poligono" && area.puntos.length >= 3) {
+      // Ray casting estándar
+      const pts = area.puntos.map(toTileUnits);
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const xi = pts[i].ux,
+          yi = pts[i].uy;
+        const xj = pts[j].ux,
+          yj = pts[j].uy;
+        const intersect =
+          yi > p.uy !== yj > p.uy &&
+          p.ux < ((xj - xi) * (p.uy - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+    return false;
+  };
 
   const findMarkerAt = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -505,6 +641,11 @@ export function UnifiedTileCanvas<
     labelCacheRef.current.clear();
     markDirty();
   }, [markers, hiddenMarkers]);
+
+  // Redibujar cuando cambian las áreas o la selección/herramienta de dibujo
+  useEffect(() => {
+    markDirty();
+  }, [areas, selectedAreaId, drawTool]);
 
   // ── Draw loop ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -665,6 +806,104 @@ export function UnifiedTileCanvas<
         ctx.strokeRect(tx, ty, ts, ts);
       }
 
+      // ── Áreas (círculo/rectángulo/polígono) ────────────────────────────────
+      const drawAreaShape = (
+        pts: { lx: number; ly: number }[],
+        tipo: AreaTipo,
+      ) => {
+        ctx.beginPath();
+        if (tipo === "circulo" && pts.length >= 2) {
+          const [c, edge] = pts;
+          const r = Math.hypot(edge.lx - c.lx, edge.ly - c.ly);
+          ctx.arc(c.lx, c.ly, r, 0, Math.PI * 2);
+        } else if (tipo === "rectangulo" && pts.length >= 2) {
+          const [a, b] = pts;
+          const x = Math.min(a.lx, b.lx);
+          const y = Math.min(a.ly, b.ly);
+          ctx.rect(x, y, Math.abs(b.lx - a.lx), Math.abs(b.ly - a.ly));
+        } else if (tipo === "poligono" && pts.length >= 2) {
+          ctx.moveTo(pts[0].lx, pts[0].ly);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].lx, pts[i].ly);
+          if (pts.length >= 3) ctx.closePath();
+        }
+      };
+
+      for (const area of areas) {
+        const localPts = area.puntos.map((p) => worldToLocal(p, scale));
+        const isSel = area.id === selectedAreaId;
+        const baseColor = area.color || accent;
+        drawAreaShape(localPts, area.tipo);
+        ctx.fillStyle = `${baseColor}${isSel ? "33" : "22"}`;
+        ctx.fill();
+        ctx.strokeStyle = isSel ? baseColor : `${baseColor}bb`;
+        ctx.lineWidth = isSel ? 2.5 : 1.5;
+        if (area.tipo === "poligono") ctx.setLineDash([]);
+        ctx.stroke();
+
+        // Vértices editables (solo en editMode + área seleccionada)
+        if (editMode && isSel) {
+          for (const p of localPts) {
+            ctx.beginPath();
+            ctx.arc(p.lx, p.ly, 5, 0, Math.PI * 2);
+            ctx.fillStyle = baseColor;
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+
+        // Label centrado (aprox: promedio de los puntos de forma, no de
+        // los 2 puntos de control de círculo/rectángulo)
+        if (area.label && localPts.length >= 2) {
+          let lx: number, ly: number;
+          if (area.tipo === "poligono") {
+            lx = localPts.reduce((s, p) => s + p.lx, 0) / localPts.length;
+            ly = localPts.reduce((s, p) => s + p.ly, 0) / localPts.length;
+          } else {
+            lx = (localPts[0].lx + localPts[1].lx) / 2;
+            ly = (localPts[0].ly + localPts[1].ly) / 2;
+          }
+          ctx.font = "700 11px 'Cinzel', serif";
+          ctx.textAlign = "center";
+          ctx.fillStyle = labelText;
+          ctx.globalAlpha = 0.85;
+          ctx.fillText(area.label, lx, ly);
+          ctx.globalAlpha = 1;
+          ctx.textAlign = "left";
+        }
+      }
+
+      // ── Dibujo en curso (herramienta activa) ────────────────────────────────
+      if (editMode && drawTool) {
+        const curPts = drawingPointsRef.current;
+        const cursor = drawCursorRef.current;
+        const previewPts = [...curPts];
+        if (cursor) previewPts.push(cursor);
+        if (previewPts.length >= 1) {
+          const localPts = previewPts.map((p) => worldToLocal(p, scale));
+          if (localPts.length >= 2) {
+            ctx.setLineDash(drawTool === "poligono" ? [5, 4] : []);
+            drawAreaShape(localPts, drawTool);
+            ctx.fillStyle = `${accent}22`;
+            ctx.fill();
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+          // Puntos ya fijados del polígono (antes del cursor)
+          if (drawTool === "poligono") {
+            for (const p of curPts.map((p) => worldToLocal(p, scale))) {
+              ctx.beginPath();
+              ctx.arc(p.lx, p.ly, 4, 0, Math.PI * 2);
+              ctx.fillStyle = accent;
+              ctx.fill();
+            }
+          }
+        }
+      }
+
       // ── Pins ─────────────────────────────────────────────────────────────
       const pulse = hasSelectedPin ? (Math.sin(t / 600) + 1) / 2 : 0;
       const allMarkers = editMode ? [...markers, ...hiddenMarkers] : markers;
@@ -790,6 +1029,11 @@ export function UnifiedTileCanvas<
     minRow,
     ghostHover,
     getMarkerScreenPos,
+    areas,
+    selectedAreaId,
+    drawTool,
+    drawingPoints,
+    worldToLocal,
   ]);
 
   // ── Detectar borde para doble-click de expansión ─────────────────────────
@@ -810,8 +1054,65 @@ export function UnifiedTileCanvas<
     let isPointerDown = false;
     let pointerDownCtrl = false;
 
+    // Radio de tolerancia (px de pantalla) para agarrar un vértice existente.
+    const VERTEX_HIT_RADIUS = 12;
+
+    const findVertexAt = (clientX: number, clientY: number) => {
+      const canvas2 = canvasRef.current;
+      if (!canvas2 || !selectedAreaId) return null;
+      const area = areas.find((a) => a.id === selectedAreaId);
+      if (!area) return null;
+      const rect = canvas2.getBoundingClientRect();
+      const s = cssToCanvasScale();
+      const px = (clientX - rect.left) * s;
+      const py = (clientY - rect.top) * s;
+      const { x: cx, y: cy, scale } = camRef.current;
+      for (let i = 0; i < area.puntos.length; i++) {
+        const { lx, ly } = worldToLocal(area.puntos[i], scale);
+        if (Math.hypot(px - (cx + lx), py - (cy + ly)) < VERTEX_HIT_RADIUS) {
+          return { areaId: area.id, index: i };
+        }
+      }
+      return null;
+    };
+
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0 && e.pointerType !== "touch") return;
+
+      // ── Arrastrar un vértice del área seleccionada (editMode, sin herramienta activa) ──
+      if (editMode && !drawTool && selectedAreaId) {
+        const v = findVertexAt(e.clientX, e.clientY);
+        if (v) {
+          draggingVertexRef.current = v;
+          canvas.setPointerCapture(e.pointerId);
+          return;
+        }
+      }
+
+      // ── Dibujo: círculo/rectángulo arrancan con drag ────────────────────────
+      if (editMode && (drawTool === "circulo" || drawTool === "rectangulo")) {
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        if (wp) {
+          drawingPointsRef.current = [wp];
+          setDrawingPoints([wp]);
+          isDrawingDragRef.current = true;
+          canvas.setPointerCapture(e.pointerId);
+          markDirty();
+        }
+        return;
+      }
+
+      // ── Dibujo: polígono acumula un vértice por click ───────────────────────
+      if (editMode && drawTool === "poligono") {
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        if (wp) {
+          const next = [...drawingPointsRef.current, wp];
+          drawingPointsRef.current = next;
+          setDrawingPoints(next);
+          markDirty();
+        }
+        return;
+      }
 
       if (e.pointerType === "touch") {
         activeTouchPointers.current.add(e.pointerId);
@@ -840,6 +1141,31 @@ export function UnifiedTileCanvas<
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      // ── Arrastrando un vértice de área existente ────────────────────────────
+      if (draggingVertexRef.current) {
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        if (wp) {
+          const { areaId, index } = draggingVertexRef.current;
+          const area = areas.find((a) => a.id === areaId);
+          if (area) {
+            const nuevosPuntos = area.puntos.map((p, i) =>
+              i === index ? wp : p,
+            );
+            onAreaPointsChange?.(areaId, nuevosPuntos);
+            markDirty();
+          }
+        }
+        return;
+      }
+
+      // ── Dibujando (drag de círculo/rectángulo, o preview de polígono) ──────
+      if (editMode && drawTool) {
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        drawCursorRef.current = wp;
+        markDirty();
+        return;
+      }
+
       // Durante un pinch de 2 dedos, el pan por Pointer Events se desactiva
       // — si no, pelea con el zoomAt del pinch (ver onTouchStart/Move/End) y
       // al levantar un dedo el mapa "salta" a la posición corrupta.
@@ -902,11 +1228,43 @@ export function UnifiedTileCanvas<
     };
 
     const onPointerUp = (e: PointerEvent) => {
+      // ── Soltar un vértice arrastrado ────────────────────────────────────────
+      if (draggingVertexRef.current) {
+        draggingVertexRef.current = null;
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {}
+        return;
+      }
+
+      // ── Terminar el drag de círculo/rectángulo ──────────────────────────────
+      if (editMode && isDrawingDragRef.current) {
+        isDrawingDragRef.current = false;
+        try {
+          canvas.releasePointerCapture(e.pointerId);
+        } catch {}
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        const start = drawingPointsRef.current[0];
+        if (wp && start && (drawTool === "circulo" || drawTool === "rectangulo")) {
+          onAreaDrawEnd?.(drawTool, [start, wp]);
+        }
+        drawingPointsRef.current = [];
+        setDrawingPoints([]);
+        drawCursorRef.current = null;
+        markDirty();
+        return;
+      }
+
       if (e.pointerType === "touch")
         activeTouchPointers.current.delete(e.pointerId);
       isPointerDown = false;
       if (isDragging.current) {
         isDragging.current = false;
+        return;
+      }
+
+      // ── Polígono: click sencillo mientras se dibuja no dispara pan/pin ──────
+      if (editMode && drawTool === "poligono") {
         return;
       }
 
@@ -977,6 +1335,18 @@ export function UnifiedTileCanvas<
         ) {
           onTileDelete(trash.tile);
           return;
+        }
+      }
+
+      // ── Click sobre un área existente (sin herramienta activa) → seleccionarla ──
+      if (editMode && !drawTool && onAreaSelect) {
+        const wp = clientToWorldPoint(clientX, clientY);
+        if (wp) {
+          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
+          if (hitArea) {
+            onAreaSelect(hitArea.id === selectedAreaId ? null : hitArea.id);
+            return;
+          }
         }
       }
 
@@ -1112,15 +1482,49 @@ export function UnifiedTileCanvas<
       }
     };
 
+    // ── Doble-click → cerrar el polígono en curso ────────────────────────────
+    const onDblClick = (e: MouseEvent) => {
+      if (!editMode || drawTool !== "poligono") return;
+      e.preventDefault();
+      const pts = drawingPointsRef.current;
+      if (pts.length >= 3) {
+        onAreaDrawEnd?.("poligono", pts);
+      }
+      drawingPointsRef.current = [];
+      setDrawingPoints([]);
+      drawCursorRef.current = null;
+      markDirty();
+    };
+
+    // ── Enter cierra el polígono, Escape cancela el dibujo en curso ─────────
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!editMode || !drawTool) return;
+      if (e.key === "Enter" && drawTool === "poligono") {
+        const pts = drawingPointsRef.current;
+        if (pts.length >= 3) onAreaDrawEnd?.("poligono", pts);
+        drawingPointsRef.current = [];
+        setDrawingPoints([]);
+        drawCursorRef.current = null;
+        markDirty();
+      } else if (e.key === "Escape") {
+        drawingPointsRef.current = [];
+        setDrawingPoints([]);
+        drawCursorRef.current = null;
+        markDirty();
+      }
+    };
+
     canvas.addEventListener("wheel", onWheel, { passive: false });
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerCancel);
     canvas.addEventListener("contextmenu", onContextMenu);
+    canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("touchstart", onTouchStart, { passive: true });
     canvas.addEventListener("touchmove", onTouchMove, { passive: true });
     canvas.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("keydown", onKeyDown);
 
     return () => {
       canvas.removeEventListener("wheel", onWheel);
@@ -1129,9 +1533,11 @@ export function UnifiedTileCanvas<
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerCancel);
       canvas.removeEventListener("contextmenu", onContextMenu);
+      canvas.removeEventListener("dblclick", onDblClick);
       canvas.removeEventListener("touchstart", onTouchStart);
       canvas.removeEventListener("touchmove", onTouchMove);
       canvas.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("keydown", onKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -1147,6 +1553,12 @@ export function UnifiedTileCanvas<
     totalCols,
     totalRows,
     onMarkerContextMenu,
+    areas,
+    selectedAreaId,
+    drawTool,
+    onAreaSelect,
+    onAreaDrawEnd,
+    onAreaPointsChange,
   ]);
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
@@ -1166,11 +1578,13 @@ export function UnifiedTileCanvas<
       style={{
         cursor: eyedropperActive
           ? "crosshair"
-          : selectedMarkerId
+          : drawTool
             ? "crosshair"
-            : hoverTile || ghostHover
-              ? "pointer"
-              : "default",
+            : selectedMarkerId
+              ? "crosshair"
+              : hoverTile || ghostHover
+                ? "pointer"
+                : "default",
       }}
     >
       <canvas
@@ -1226,7 +1640,7 @@ export function UnifiedTileCanvas<
       )}
 
       {/* Hints (solo editMode, con tiles) */}
-      {editMode && tiles.length > 0 && (
+      {editMode && tiles.length > 0 && !drawTool && (
         <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
           <span
             className="text-micro font-bold uppercase tracking-widest px-2 py-1 rounded-lg"
@@ -1236,6 +1650,23 @@ export function UnifiedTileCanvas<
             }}
           >
             Click derecho en un pin para moverlo · Ctrl + click para editar tile · Ctrl + scroll para zoom
+          </span>
+        </div>
+      )}
+
+      {/* Hint de dibujo de área (herramienta activa) */}
+      {editMode && drawTool && (
+        <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
+          <span
+            className="text-micro font-bold uppercase tracking-widest px-2 py-1 rounded-lg"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 85%, transparent)",
+              color: "#fff",
+            }}
+          >
+            {drawTool === "poligono"
+              ? "Click para agregar vértices · Doble-click o Enter para cerrar · Esc para cancelar"
+              : "Arrastrá para dibujar el área"}
           </span>
         </div>
       )}

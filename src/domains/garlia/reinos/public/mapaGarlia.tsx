@@ -16,6 +16,12 @@ import {
   Package,
   ImageIcon,
   Plus,
+  Circle,
+  Square,
+  Pentagon,
+  Trash2,
+  Link2,
+  Link2Off,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -27,6 +33,10 @@ import { ReinoTileCanvas } from "@garlia/reinos";
 import {
   UnifiedTileCanvas,
   type MapTile,
+  type BaseArea,
+  type AreaTipo,
+  type DrawTool,
+  type WorldPoint,
 } from "@/domains/garlia/_shared/UnifiedTileCanvas";
 import { ModalDetalle } from "@/domains/garlia/perfil-jugador/PersonalComponents";
 import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
@@ -35,7 +45,11 @@ import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { db } from "@/infra/supabase/db";
 import { supabase } from "@/infra/supabase/supabase";
 import SimpleImagePicker from "@/ui/SimpleImagePicker";
-import { invalidateMapTiles } from "@/infra/sync/syncEngine";
+import {
+  invalidateMapTiles,
+  loadMapAreas,
+  invalidateMapAreas,
+} from "@/infra/sync/syncEngine";
 
 // ─── Hourglass — reemplaza Loader2 en todos los indicadores de carga ──────────
 function Hourglass({ size = 14 }: { size?: number }) {
@@ -218,6 +232,183 @@ function ModalNuevoTile({
   );
 }
 
+// ─── ModalVincularArea ──────────────────────────────────────────────────────
+// Selector reino → (opcional) ciudad de ese reino, para vincular un área
+// recién dibujada o re-vincular una ya existente. "Sin vincular" es válida:
+// el área queda como zona decorativa/libre en el mapa.
+function ModalVincularArea({
+  reinos,
+  ciudades,
+  initialReinoId,
+  initialCiudadId,
+  initialLabel,
+  onClose,
+  onConfirm,
+}: {
+  reinos: any[];
+  ciudades: any[];
+  initialReinoId?: string | null;
+  initialCiudadId?: string | null;
+  initialLabel?: string;
+  onClose: () => void;
+  onConfirm: (
+    reinoId: string | null,
+    ciudadId: string | null,
+    label: string,
+  ) => void;
+}) {
+  const [reinoId, setReinoId] = useState<string | null>(
+    initialReinoId ?? null,
+  );
+  const [ciudadId, setCiudadId] = useState<string | null>(
+    initialCiudadId ?? null,
+  );
+  const [label, setLabel] = useState(initialLabel ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const ciudadesDelReino = reinoId
+    ? ciudades.filter((c) => c.reino_id === reinoId)
+    : [];
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    try {
+      await onConfirm(reinoId, ciudadId, label);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-200 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-96 p-6 flex flex-col gap-4"
+        style={{
+          background: "var(--white-custom)",
+          border:
+            "1px solid color-mix(in srgb, var(--primary) 20%, transparent)",
+          borderRadius: "2px",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          className="absolute top-3 right-3 opacity-50 hover:opacity-100"
+          onClick={onClose}
+        >
+          <X size={14} />
+        </button>
+
+        <h3
+          className="font-black uppercase text-sm tracking-[0.15em]"
+          style={{ fontFamily: "'Cinzel', serif", color: "var(--foreground)" }}
+        >
+          Vincular área
+        </h3>
+
+        <div className="flex flex-col gap-1">
+          <label
+            className="text-micro font-bold uppercase tracking-[0.15em]"
+            style={{
+              color: "color-mix(in srgb, var(--foreground) 50%, transparent)",
+            }}
+          >
+            Nombre del área
+          </label>
+          <input
+            className="input-brand text-sm py-1.5 px-2"
+            placeholder="Opcional — se muestra sobre la forma"
+            style={{ borderRadius: "1px" }}
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label
+            className="text-micro font-bold uppercase tracking-[0.15em]"
+            style={{
+              color: "color-mix(in srgb, var(--foreground) 50%, transparent)",
+            }}
+          >
+            Reino
+          </label>
+          <select
+            className="input-brand text-sm py-1.5 px-2"
+            style={{ borderRadius: "1px" }}
+            value={reinoId ?? ""}
+            onChange={(e) => {
+              const val = e.target.value || null;
+              setReinoId(val);
+              setCiudadId(null); // cambiar de reino invalida la ciudad elegida
+            }}
+          >
+            <option value="">— Sin vincular a un reino —</option>
+            {reinos.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {reinoId && (
+          <div className="flex flex-col gap-1">
+            <label
+              className="text-micro font-bold uppercase tracking-[0.15em]"
+              style={{
+                color:
+                  "color-mix(in srgb, var(--foreground) 50%, transparent)",
+              }}
+            >
+              Ciudad (opcional)
+            </label>
+            <select
+              className="input-brand text-sm py-1.5 px-2"
+              style={{ borderRadius: "1px" }}
+              value={ciudadId ?? ""}
+              onChange={(e) => setCiudadId(e.target.value || null)}
+            >
+              <option value="">
+                — Todo el reino, sin ciudad puntual —
+              </option>
+              {ciudadesDelReino.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+            {ciudadesDelReino.length === 0 && (
+              <p
+                className="text-micro"
+                style={{
+                  color:
+                    "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                }}
+              >
+                Este reino todavía no tiene ciudades cargadas.
+              </p>
+            )}
+          </div>
+        )}
+
+        <button
+          className="btn-brand w-full justify-center py-2.5 text-micro uppercase disabled:opacity-50"
+          disabled={saving}
+          onClick={handleConfirm}
+        >
+          {saving ? <Hourglass size={11} /> : <Link2 size={11} />}
+          {reinoId || ciudadId ? "Vincular" : "Guardar sin vincular"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── ImagePickerModal para tiles (portado de EditorMapa) ──────────────────────
 function TileImagePickerModal({
   title,
@@ -335,6 +526,8 @@ function PanelContenido({
   onVincularPersonaje,
   onDesvincularPersonaje,
   vinculandoPersonajeId,
+  onEditarArea,
+  areaVinculada,
 }: any) {
   const router = useRouter();
   const [buscadorLibrosOpen, setBuscadorLibrosOpen] = useState(false);
@@ -416,6 +609,90 @@ function PanelContenido({
             />
           </div>
         </div>
+
+        {/* Editar área del mapa (círculo/rectángulo/forma libre) — solo
+            visible en la vista global, vinculada al reino o ciudad abiertos
+            acá mismo en el panel. */}
+        {onEditarArea && (
+          <div
+            className="flex flex-col gap-2 p-3"
+            style={{
+              background:
+                "color-mix(in srgb, var(--accent) 6%, transparent)",
+              border:
+                "1px solid color-mix(in srgb, var(--accent) 20%, transparent)",
+              borderRadius: "2px",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className="text-micro font-bold uppercase tracking-[0.15em]"
+                style={{
+                  color:
+                    "color-mix(in srgb, var(--foreground) 55%, transparent)",
+                }}
+              >
+                Área en el mapa
+              </span>
+              {areaVinculada && (
+                <span
+                  className="text-micro font-bold uppercase"
+                  style={{ color: "var(--accent)" }}
+                >
+                  Ya tiene área
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-micro font-bold uppercase transition-opacity hover:opacity-80"
+                style={{
+                  background: "var(--accent)",
+                  color: "#fff",
+                  borderRadius: "2px",
+                }}
+                title="Dibujar un círculo para esta área"
+                onClick={() => onEditarArea("circulo")}
+              >
+                Círculo
+              </button>
+              <button
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-micro font-bold uppercase transition-opacity hover:opacity-80"
+                style={{
+                  background: "var(--accent)",
+                  color: "#fff",
+                  borderRadius: "2px",
+                }}
+                title="Dibujar un rectángulo para esta área"
+                onClick={() => onEditarArea("rectangulo")}
+              >
+                Rectángulo
+              </button>
+              <button
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-micro font-bold uppercase transition-opacity hover:opacity-80"
+                style={{
+                  background: "var(--accent)",
+                  color: "#fff",
+                  borderRadius: "2px",
+                }}
+                title="Dibujar una forma libre para esta área"
+                onClick={() => onEditarArea("poligono")}
+              >
+                Libre
+              </button>
+            </div>
+            <p
+              className="text-micro"
+              style={{
+                color:
+                  "color-mix(in srgb, var(--foreground) 40%, transparent)",
+              }}
+            >
+              Elegí una forma y dibujala sobre el mapa global — queda
+              vinculada automáticamente a {puntoSeleccionado ? "esta ciudad" : "este reino"}.
+            </p>
+          </div>
+        )}
 
         {/* Lore text — mismo marco decorativo con esquinas que el modo
             público, pero con un <textarea> editable adentro. */}
@@ -2897,6 +3174,41 @@ export default function MapaInteractivo({
     string | null
   >(null);
 
+  // ── Áreas del mapa (círculo/rectángulo/polígono) ──────────────────────────
+  const [areas, setAreas] = useState<BaseArea[]>([]);
+  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
+  const [drawTool, setDrawTool] = useState<DrawTool>(null);
+  // Cuando se termina de dibujar un área nueva, queda "pendiente de
+  // vincular" hasta que el admin elige reino/ciudad (o la deja libre).
+  const [areaPendiente, setAreaPendiente] = useState<{
+    tipo: AreaTipo;
+    puntos: WorldPoint[];
+  } | null>(null);
+  const [savingArea, setSavingArea] = useState(false);
+  const [vinculadorAreaOpen, setVinculadorAreaOpen] = useState(false);
+  // Catálogo completo de ciudades, para el selector del modal "vincular
+  // área" (una ciudad de cualquier reino, no solo la del reino abierto) —
+  // se carga una sola vez al entrar en modo edición, igual que
+  // todosLosLibros/todosLosPersonajes.
+  const [todasLasCiudades, setTodasLasCiudades] = useState<any[]>([]);
+
+  useEffect(() => {
+    void loadMapAreas("garlia", (fresh) => setAreas(fresh as BaseArea[])).then(
+      (data) => setAreas(data as BaseArea[]),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase
+      .from("ciudades")
+      .select("id, nombre, tipo, reino_id")
+      .order("nombre")
+      .then(({ data, error }) => {
+        if (!error && data) setTodasLasCiudades(data);
+      });
+  }, [isAdmin]);
+
   const imgInputRef = useRef<HTMLInputElement>(null);
   const currentReinoIdRef = useRef<string | null>(null);
   const showToast = (message: string, type: ToastType) =>
@@ -3012,6 +3324,200 @@ export default function MapaInteractivo({
       } finally {
         setTilePickerTarget(null);
       }
+    },
+    [],
+  );
+
+  // ── Gestión de áreas del mapa (círculo/rectángulo/polígono) ──────────────────
+  //
+  // Flujo "dibujo primero, vinculo después": onAreaDrawEnd deja el área en
+  // areaPendiente (sin persistir) y abre el selector de reino/ciudad. Si el
+  // admin elige "sin vincular", se guarda igual (label suelto).
+  //
+  // Flujo "reino/ciudad primero": handleEditarAreaDe activa drawTool con un
+  // reino/ciudad ya elegido guardado en areaVinculoPreseleccionado, y
+  // onAreaDrawEnd salta directo al guardado sin abrir el selector.
+  const [areaVinculoPreseleccionado, setAreaVinculoPreseleccionado] = useState<{
+    reino_id: string | null;
+    ciudad_id: string | null;
+    label: string;
+    color: string | null;
+  } | null>(null);
+
+  const persistArea = useCallback(
+    async (payload: {
+      tipo: AreaTipo;
+      puntos: WorldPoint[];
+      reino_id: string | null;
+      ciudad_id: string | null;
+      label: string | null;
+      color: string | null;
+    }) => {
+      setSavingArea(true);
+      try {
+        const { data, error } = await supabase
+          .from("map_areas")
+          .insert({
+            world_id: "garlia",
+            tipo: payload.tipo,
+            puntos: payload.puntos,
+            reino_id: payload.reino_id,
+            ciudad_id: payload.ciudad_id,
+            label: payload.label,
+            color: payload.color,
+            orden: areas.length,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        setAreas((prev) => [...prev, data as unknown as BaseArea]);
+        await invalidateMapAreas("garlia");
+        showToast("Área creada", "success");
+        return data;
+      } catch {
+        showToast("Error al crear el área", "error");
+        return null;
+      } finally {
+        setSavingArea(false);
+        setDrawTool(null);
+        setAreaPendiente(null);
+        setAreaVinculoPreseleccionado(null);
+      }
+    },
+    [areas.length],
+  );
+
+  const handleAreaDrawEnd = useCallback(
+    (tipo: AreaTipo, puntos: WorldPoint[]) => {
+      if (areaVinculoPreseleccionado) {
+        // Ya sabemos a qué reino/ciudad va — guardamos directo.
+        void persistArea({
+          tipo,
+          puntos,
+          reino_id: areaVinculoPreseleccionado.reino_id,
+          ciudad_id: areaVinculoPreseleccionado.ciudad_id,
+          label: areaVinculoPreseleccionado.label || null,
+          color: areaVinculoPreseleccionado.color,
+        });
+        return;
+      }
+      // Dibujo libre: dejamos pendiente y abrimos el selector de vínculo.
+      setAreaPendiente({ tipo, puntos });
+      setVinculadorAreaOpen(true);
+      setDrawTool(null);
+    },
+    [areaVinculoPreseleccionado, persistArea],
+  );
+
+  const handleAreaPointsChange = useCallback(
+    (areaId: string, puntos: WorldPoint[]) => {
+      // Optimista en memoria; el guardado real se dispara al soltar el
+      // vértice sería más chatty — en su lugar debounceamos guardando en
+      // Supabase cada vez que cambian los puntos (drag genera pocos eventos
+      // por soltar, uno por movimiento de mouse pero solo mientras se
+      // arrastra un vértice puntual).
+      setAreas((prev) =>
+        prev.map((a) => (a.id === areaId ? { ...a, puntos } : a)),
+      );
+    },
+    [],
+  );
+
+  // Al soltar el vértice (pointerup global ya lo maneja el canvas), persistimos
+  // el estado final. Como no tenemos un "onVertexDragEnd" explícito, guardamos
+  // con un debounce simple sobre el área seleccionada.
+  const areaSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!selectedAreaId) return;
+    const area = areas.find((a) => a.id === selectedAreaId);
+    if (!area) return;
+    if (areaSaveTimeoutRef.current) clearTimeout(areaSaveTimeoutRef.current);
+    areaSaveTimeoutRef.current = setTimeout(() => {
+      void supabase
+        .from("map_areas")
+        .update({ puntos: area.puntos })
+        .eq("id", area.id)
+        .then(({ error }) => {
+          if (error) showToast("Error al guardar el área", "error");
+          else void invalidateMapAreas("garlia");
+        });
+    }, 500);
+    return () => {
+      if (areaSaveTimeoutRef.current) clearTimeout(areaSaveTimeoutRef.current);
+    };
+    // Solo re-disparar cuando cambian los puntos del área seleccionada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areas, selectedAreaId]);
+
+  const handleDeleteArea = useCallback(async (areaId: string) => {
+    if (!confirm("¿Eliminar esta área?")) return;
+    try {
+      await supabase.from("map_areas").delete().eq("id", areaId);
+      setAreas((prev) => prev.filter((a) => a.id !== areaId));
+      setSelectedAreaId(null);
+      await invalidateMapAreas("garlia");
+      showToast("Área eliminada", "success");
+    } catch {
+      showToast("Error al eliminar el área", "error");
+    }
+  }, []);
+
+  const handleVincularAreaPendiente = useCallback(
+    async (reino_id: string | null, ciudad_id: string | null, label: string) => {
+      if (!areaPendiente) return;
+      await persistArea({
+        tipo: areaPendiente.tipo,
+        puntos: areaPendiente.puntos,
+        reino_id,
+        ciudad_id,
+        label: label || null,
+        color: null,
+      });
+      setVinculadorAreaOpen(false);
+    },
+    [areaPendiente, persistArea],
+  );
+
+  const handleVincularAreaExistente = useCallback(
+    async (
+      areaId: string,
+      reino_id: string | null,
+      ciudad_id: string | null,
+    ) => {
+      try {
+        const { error } = await supabase
+          .from("map_areas")
+          .update({ reino_id, ciudad_id })
+          .eq("id", areaId);
+        if (error) throw error;
+        setAreas((prev) =>
+          prev.map((a) => (a.id === areaId ? { ...a, reino_id, ciudad_id } : a)),
+        );
+        await invalidateMapAreas("garlia");
+        showToast("Vínculo actualizado", "success");
+      } catch {
+        showToast("Error al vincular", "error");
+      }
+    },
+    [],
+  );
+
+  // "Editar área" desde el pin de un reino/ciudad ya seleccionado: activa
+  // la herramienta de dibujo con el vínculo pre-cargado, para que
+  // onAreaDrawEnd guarde directo sin pasar por el selector.
+  const handleEditarAreaDe = useCallback(
+    (tool: Exclude<DrawTool, null>, entidad: { id: string; nombre?: string }, tipo: "reino" | "ciudad") => {
+      setAreaVinculoPreseleccionado({
+        reino_id: tipo === "reino" ? entidad.id : null,
+        ciudad_id: tipo === "ciudad" ? entidad.id : null,
+        label: entidad.nombre || "",
+        color: null,
+      });
+      setSelectedAreaId(null);
+      setPanelOpen(false);
+      setDrawTool(tool);
     },
     [],
   );
@@ -3911,6 +4417,24 @@ export default function MapaInteractivo({
     onVincularPersonaje: handleVincularPersonaje,
     onDesvincularPersonaje: handleDesvincularPersonaje,
     vinculandoPersonajeId,
+    // "Editar área": solo tiene sentido en la vista global (el área vive en
+    // map_areas, sobre el mapa del mundo) y solo para el reino/ciudad
+    // actualmente abierto en el panel.
+    onEditarArea:
+      vistaActual === "global"
+        ? (tool: Exclude<DrawTool, null>) => {
+            if (puntoSeleccionado) {
+              handleEditarAreaDe(tool, puntoSeleccionado, "ciudad");
+            } else if (reinoSeleccionado) {
+              handleEditarAreaDe(tool, reinoSeleccionado, "reino");
+            }
+          }
+        : undefined,
+    areaVinculada: areas.find((a) =>
+      puntoSeleccionado
+        ? a.ciudad_id === puntoSeleccionado.id
+        : a.reino_id === reinoSeleccionado?.id && !a.ciudad_id,
+    ),
   };
 
   // Solo bloquea la UI si no hay absolutamente ningún dato todavía (primera carga ever)
@@ -4184,7 +4708,9 @@ export default function MapaInteractivo({
         {vistaActual === "global" ? (
           <>
             <UnifiedTileCanvas
+              areas={areas}
               className="absolute inset-0"
+              drawTool={editMode ? drawTool : null}
               editMode={editMode}
               eyedropperActive={eyedropperActive}
               fondoColor={fondoColor}
@@ -4195,8 +4721,12 @@ export default function MapaInteractivo({
                   ? [...visibleMarkers, ...hiddenMarkers]
                   : visibleMarkers
               }
+              selectedAreaId={editMode ? selectedAreaId : null}
               selectedMarkerId={editMode ? (reinoParaMover ?? null) : null}
               tiles={mapTiles}
+              onAreaDrawEnd={handleAreaDrawEnd}
+              onAreaPointsChange={handleAreaPointsChange}
+              onAreaSelect={setSelectedAreaId}
               onEyedropperPick={handleFondoColorChange}
               onMapClick={handleMapClick}
               onMarkerClick={handleReinoClick}
@@ -4230,6 +4760,81 @@ export default function MapaInteractivo({
               >
                 <Plus size={14} />
               </button>
+            )}
+
+            {/* ── Barra de herramientas: dibujar áreas ── */}
+            {editMode && (
+              <div
+                className="absolute bottom-3 left-14 z-10 flex items-center gap-1 px-1.5 py-1.5"
+                style={{
+                  borderRadius: "8px",
+                  background: "color-mix(in srgb, var(--bg-menu) 90%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--primary) 25%, transparent)",
+                  backdropFilter: "blur(10px)",
+                }}
+              >
+                {(
+                  [
+                    { tool: "circulo" as const, Icon: Circle, title: "Dibujar círculo" },
+                    { tool: "rectangulo" as const, Icon: Square, title: "Dibujar rectángulo" },
+                    { tool: "poligono" as const, Icon: Pentagon, title: "Dibujar forma libre" },
+                  ]
+                ).map(({ tool, Icon, title }) => (
+                  <button
+                    key={tool}
+                    className="w-8 h-8 flex items-center justify-center transition-colors"
+                    style={{
+                      borderRadius: "6px",
+                      background:
+                        drawTool === tool
+                          ? "var(--accent)"
+                          : "transparent",
+                      color: drawTool === tool ? "#fff" : "var(--accent)",
+                    }}
+                    title={title}
+                    onClick={() => {
+                      setSelectedAreaId(null);
+                      setAreaVinculoPreseleccionado(null);
+                      setDrawTool((prev) => (prev === tool ? null : tool));
+                    }}
+                  >
+                    <Icon size={14} />
+                  </button>
+                ))}
+
+                {selectedAreaId && !drawTool && (
+                  <>
+                    <div
+                      className="w-px h-5 mx-0.5"
+                      style={{
+                        background:
+                          "color-mix(in srgb, var(--primary) 25%, transparent)",
+                      }}
+                    />
+                    <button
+                      className="w-8 h-8 flex items-center justify-center"
+                      style={{ borderRadius: "6px", color: "var(--accent)" }}
+                      title="Vincular esta área a un reino/ciudad"
+                      onClick={() => setVinculadorAreaOpen(true)}
+                    >
+                      {areas.find((a) => a.id === selectedAreaId)?.reino_id ||
+                      areas.find((a) => a.id === selectedAreaId)?.ciudad_id ? (
+                        <Link2 size={14} />
+                      ) : (
+                        <Link2Off size={14} />
+                      )}
+                    </button>
+                    <button
+                      className="w-8 h-8 flex items-center justify-center"
+                      style={{ borderRadius: "6px", color: "#ef4444" }}
+                      title="Eliminar área"
+                      onClick={() => void handleDeleteArea(selectedAreaId)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
             )}
           </>
         ) : (
@@ -4401,6 +5006,58 @@ export default function MapaInteractivo({
         <TileImagePickerModal
           onClose={() => setTilePickerTarget(null)}
           onSelect={(url) => void handleTileImageSelect(tilePickerTarget.id, url)}
+        />
+      )}
+
+      {vinculadorAreaOpen && (areaPendiente || selectedAreaId) && (
+        <ModalVincularArea
+          ciudades={todasLasCiudades}
+          initialCiudadId={
+            areaPendiente
+              ? null
+              : (areas.find((a) => a.id === selectedAreaId)?.ciudad_id ??
+                null)
+          }
+          initialLabel={
+            areaPendiente
+              ? ""
+              : (areas.find((a) => a.id === selectedAreaId)?.label ?? "")
+          }
+          initialReinoId={
+            areaPendiente
+              ? null
+              : (areas.find((a) => a.id === selectedAreaId)?.reino_id ??
+                null)
+          }
+          reinos={reinos}
+          onClose={() => {
+            setVinculadorAreaOpen(false);
+            setAreaPendiente(null);
+          }}
+          onConfirm={async (reinoId, ciudadId, label) => {
+            if (areaPendiente) {
+              await handleVincularAreaPendiente(reinoId, ciudadId, label);
+            } else if (selectedAreaId) {
+              await handleVincularAreaExistente(
+                selectedAreaId,
+                reinoId,
+                ciudadId,
+              );
+              if (label) {
+                await supabase
+                  .from("map_areas")
+                  .update({ label })
+                  .eq("id", selectedAreaId);
+                setAreas((prev) =>
+                  prev.map((a) =>
+                    a.id === selectedAreaId ? { ...a, label } : a,
+                  ),
+                );
+                await invalidateMapAreas("garlia");
+              }
+              setVinculadorAreaOpen(false);
+            }
+          }}
         />
       )}
     </div>

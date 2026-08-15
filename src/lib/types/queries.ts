@@ -48,6 +48,10 @@ export type Dibujo = QueryData<ReturnType<typeof dibujoFullQuery>>[number];
 export const reinoFullQuery = () => supabase.from('reinos').select('*');
 export type Reino = QueryData<ReturnType<typeof reinoFullQuery>>[number];
 
+// --- ÁREAS DEL MAPA (círculo / rectángulo / polígono, vinculadas a reino o ciudad) ---
+export const mapAreaFullQuery = () => supabase.from('map_areas').select('*');
+export type MapArea = QueryData<ReturnType<typeof mapAreaFullQuery>>[number];
+
 // --- ITEMS ---
 export const itemFullQuery = () => supabase.from('items').select('*');
 export type Item = QueryData<ReturnType<typeof itemFullQuery>>[number];
