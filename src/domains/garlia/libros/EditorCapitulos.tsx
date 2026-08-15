@@ -45,13 +45,21 @@ import type { SnippetEditRequest } from "@/editor/lexical";
 import { RichEditor ,
   type RichEditorFormatCommand,
   dropPayloadToRaw,
+  dropRawToPayload,
   dialogoPayloadToRaw,
+  dialogoRawToPayload,
   soundPayloadToRaw,
+  soundRawToPayload,
   imgPayloadToRaw,
+  imgRawToPayload,
   choicePayloadToRaw,
+  choiceRawToPayload,
   parseUsePayloadToRaw,
+  parseUseRawToPayload,
   condicionPayloadToRaw,
+  condicionRawToPayload,
   sectionPayloadToRaw,
+  sectionRawToPayload,
   lastSnippetClickRect,
 } from "@/editor/lexical";
 import type {
@@ -763,12 +771,55 @@ const PanelEditor = ({
     [],
   );
 
+  // Inverso de snippetPayloadToRaw: convierte el raw "[[kind|...]]" que
+  // devuelve la palette de vuelta al objeto payload que espera cada
+  // SnippetNode.setPayload(). Sin esto, req.replace() recibía el string
+  // crudo en vez del payload — el nodo terminaba con __payload = un
+  // string, y cualquier acceso a payload.campo (ej. payload.texto.length
+  // en el chip de Diálogo) explotaba en runtime.
+  const snippetRawToPayload = useCallback((kind: string, raw: string): any => {
+    switch (kind) {
+      case "drop":
+        return dropRawToPayload(raw);
+      case "dialogo":
+        return dialogoRawToPayload(raw);
+      case "sound":
+        return soundRawToPayload(raw);
+      case "img":
+      case "float":
+        return imgRawToPayload(raw);
+      case "choice":
+        return choiceRawToPayload(raw);
+      case "use":
+        return parseUseRawToPayload(raw);
+      case "condicion":
+        return condicionRawToPayload(raw);
+      case "section":
+        return sectionRawToPayload(raw);
+      default:
+        return null;
+    }
+  }, []);
+
   // Handler que RichEditor llama cuando el usuario hace click en un chip
   // existente para editarlo — abre la palette con el raw actual pre-llenado
   const handleSnippetEdit = useCallback(
     (req: SnippetEditRequest<any>) => {
       const raw = snippetPayloadToRaw(req.kind, req.payload);
-      pendingReplaceRef.current = (next: string) => req.replace(next);
+      pendingReplaceRef.current = (next: string) => {
+        const payload = snippetRawToPayload(req.kind, next);
+        if (payload) {
+          req.replace(payload);
+        } else {
+          // No debería pasar (la palette siempre devuelve un raw válido
+          // para el kind con el que se abrió), pero si el parseo falla
+          // preferimos no corromper el nodo con un string crudo.
+          console.error(
+            `[EditorCapitulos] no se pudo convertir raw a payload para kind="${req.kind}":`,
+            next,
+          );
+        }
+      };
       pendingRemoveRef.current = () => req.remove();
       pendingSnippetRawRef.current = raw;
       // El chip clickeado guardó su posición justo antes de llegar acá
@@ -777,7 +828,7 @@ const PanelEditor = ({
       // posición fija por defecto.
       openPalette(raw, lastSnippetClickRect.current ?? undefined);
     },
-    [openPalette, snippetPayloadToRaw],
+    [openPalette, snippetPayloadToRaw, snippetRawToPayload],
   );
 
   const snippetCommands: MdCommandItem[] = useMemo(
