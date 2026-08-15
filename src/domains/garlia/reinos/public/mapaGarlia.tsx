@@ -2834,12 +2834,9 @@ export default function MapaInteractivo({
   // (y no es admin), no navega — mismo criterio que oculta su pin.
   const handleAreaLabelClick = useCallback(
     async (area: BaseArea) => {
-      if (area.reino_id) {
-        if (!isAdmin && !reinosDesbloqueados.has(area.reino_id)) return;
-        const reino = reinos.find((r) => r.id === area.reino_id);
-        if (reino) await handleReinoClick(reino);
-        return;
-      }
+      // Ojo: un área de ciudad también trae reino_id seteado (persistArea
+      // guarda ambos), así que ciudad_id se chequea primero — si no, esta
+      // rama nunca se alcanza y el click siempre navega al reino.
       if (area.ciudad_id) {
         const { data: ciudad } = await supabase
           .from("ciudades")
@@ -2857,6 +2854,13 @@ export default function MapaInteractivo({
         await abrirVistaDeReino(reino);
         setPuntoSeleccionado(ciudad);
         setPanelOpen(true);
+        return;
+      }
+      if (area.reino_id) {
+        if (!isAdmin && !reinosDesbloqueados.has(area.reino_id)) return;
+        const reino = reinos.find((r) => r.id === area.reino_id);
+        if (reino) await handleReinoClick(reino);
+        return;
       }
     },
     [reinos, isAdmin, reinosDesbloqueados],
