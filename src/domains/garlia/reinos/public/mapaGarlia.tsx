@@ -344,18 +344,30 @@ function PanelContenido({
   if (editMode) {
     return (
       <div className="flex flex-col gap-4 grow">
-        <div className="flex flex-col gap-1">
-          <label
-            className="text-micro font-bold uppercase tracking-widest ml-1"
-            style={{
-              color: "color-mix(in srgb, var(--foreground) 60%, transparent)",
-            }}
-          >
-            Nombre
-          </label>
+        {/* Title with decorative line — mismo diseño que el modo público,
+            pero el <h2> se reemplaza por un <input> editable en su lugar. */}
+        <div className="relative mb-2">
+          <div className="flex items-center gap-3 mb-2">
+            <div
+              className="h-px flex-1"
+              style={{
+                background: `linear-gradient(to right, transparent, color-mix(in srgb, var(--accent) 40%, transparent))`,
+              }}
+            />
+            <div
+              className="w-1.5 h-1.5 rotate-45"
+              style={{ background: "var(--accent)" }}
+            />
+            <div
+              className="h-px flex-1"
+              style={{
+                background: `linear-gradient(to left, transparent, color-mix(in srgb, var(--accent) 40%, transparent))`,
+              }}
+            />
+          </div>
           <input
-            className="input-brand font-bold uppercase text-xl outline-none px-4 py-3"
-            style={{ borderRadius: "1px", letterSpacing: "0.08em" }}
+            className="w-full bg-transparent font-bold text-2xl uppercase tracking-[0.18em] leading-none text-center outline-none"
+            style={{ fontFamily: "'Cinzel', serif", color: "var(--foreground)" }}
             type="text"
             value={
               puntoSeleccionado
@@ -385,18 +397,64 @@ function PanelContenido({
                 });
             }}
           />
+          <div className="flex items-center gap-3 mt-2">
+            <div
+              className="h-px flex-1"
+              style={{
+                background: `linear-gradient(to right, transparent, color-mix(in srgb, var(--accent) 40%, transparent))`,
+              }}
+            />
+            <div
+              className="w-1.5 h-1.5 rotate-45"
+              style={{ background: "var(--accent)" }}
+            />
+            <div
+              className="h-px flex-1"
+              style={{
+                background: `linear-gradient(to left, transparent, color-mix(in srgb, var(--accent) 40%, transparent))`,
+              }}
+            />
+          </div>
         </div>
-        <div className="flex flex-col gap-1 grow">
-          <label
-            className="text-micro font-bold uppercase tracking-widest ml-1"
+
+        {/* Lore text — mismo marco decorativo con esquinas que el modo
+            público, pero con un <textarea> editable adentro. */}
+        <div
+          className="relative p-5 border"
+          style={{
+            borderColor: "color-mix(in srgb, var(--accent) 15%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+          }}
+        >
+          <div
+            className="absolute top-0 left-0 w-3 h-3 border-t border-l"
             style={{
-              color: "color-mix(in srgb, var(--foreground) 60%, transparent)",
+              borderColor: "color-mix(in srgb, var(--accent) 50%, transparent)",
             }}
-          >
-            Descripción / Lore
-          </label>
+          />
+          <div
+            className="absolute top-0 right-0 w-3 h-3 border-t border-r"
+            style={{
+              borderColor: "color-mix(in srgb, var(--accent) 50%, transparent)",
+            }}
+          />
+          <div
+            className="absolute bottom-0 left-0 w-3 h-3 border-b border-l"
+            style={{
+              borderColor: "color-mix(in srgb, var(--accent) 50%, transparent)",
+            }}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-3 h-3 border-b border-r"
+            style={{
+              borderColor: "color-mix(in srgb, var(--accent) 50%, transparent)",
+            }}
+          />
           <textarea
-            className="input-brand text-sm italic leading-relaxed h-36 resize-none outline-none px-4 py-3"
+            className="w-full bg-transparent text-sm italic leading-relaxed h-36 resize-none outline-none"
+            style={{
+              color: "color-mix(in srgb, var(--foreground) 70%, transparent)",
+            }}
             value={
               puntoSeleccionado
                 ? puntoSeleccionado.descripcion
