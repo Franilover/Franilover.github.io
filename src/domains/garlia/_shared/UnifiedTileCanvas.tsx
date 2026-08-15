@@ -1488,12 +1488,17 @@ export function UnifiedTileCanvas<
         if (!areaClickeada) {
           // No cayó en la pill puntual, pero puede haber caído dentro del
           // relleno de un área vinculada — también cuenta como "abrir".
+          // Solo si tiene label: sin label (no desbloqueada) el área se ve
+          // pero no se puede abrir ni se sabe a qué reino/ciudad pertenece.
           const wp = clientToWorldPoint(clientX, clientY);
           if (wp) {
             areaClickeada = [...areas]
               .reverse()
               .find(
-                (a) => (a.reino_id || a.ciudad_id) && isPointInArea(wp, a),
+                (a) =>
+                  (a.reino_id || a.ciudad_id) &&
+                  a.label &&
+                  isPointInArea(wp, a),
               );
           }
         }

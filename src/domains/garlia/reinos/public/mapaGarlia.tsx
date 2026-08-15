@@ -4443,6 +4443,22 @@ export default function MapaInteractivo({
       .filter((id): id is string => Boolean(id)),
   );
 
+  // Áreas tal como se pasan al canvas: la forma (relleno + contorno) se ve
+  // siempre para todos, pero si el reino/ciudad vinculado todavía NO está
+  // desbloqueado/descubierto por el usuario, se oculta el label — así no
+  // aparece la pill con el nombre (ni se puede abrir clickeándola) hasta
+  // que lo desbloquee. Admins ven todos los nombres siempre.
+  const areasParaCanvas = isAdmin
+    ? areas
+    : areas.map((a) => {
+        const desbloqueada = a.ciudad_id
+          ? ciudadesDesbloqueadas.has(a.ciudad_id)
+          : a.reino_id
+            ? reinosDesbloqueados.has(a.reino_id)
+            : true; // área libre, sin vínculo — no aplica ocultamiento
+        return desbloqueada ? a : { ...a, label: null };
+      });
+
   // Visible markers: admins ven todos los reinos; usuarios solo los que desbloquearon.
   // Se excluyen los que ya tienen área vinculada (pin → área+pill).
   const visibleMarkers = (
@@ -4782,7 +4798,7 @@ export default function MapaInteractivo({
         {vistaActual === "global" ? (
           <>
             <UnifiedTileCanvas
-              areas={areas}
+              areas={areasParaCanvas}
               className="absolute inset-0"
               drawTool={editMode ? drawTool : null}
               editMode={editMode}
