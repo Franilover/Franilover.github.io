@@ -330,10 +330,16 @@ function PanelContenido({
   onVincularLibro,
   onDesvincularLibro,
   vinculandoLibroId,
+  personajesVinculables,
+  onVincularPersonaje,
+  onDesvincularPersonaje,
+  vinculandoPersonajeId,
 }: any) {
   const router = useRouter();
   const [buscadorLibrosOpen, setBuscadorLibrosOpen] = useState(false);
   const [busquedaLibro, setBusquedaLibro] = useState("");
+  const [buscadorPersonajesOpen, setBuscadorPersonajesOpen] = useState(false);
+  const [busquedaPersonaje, setBusquedaPersonaje] = useState("");
   if (editMode) {
     return (
       <div className="flex flex-col gap-4 grow">
@@ -577,6 +583,185 @@ function PanelContenido({
                       l.titulo
                         .toLowerCase()
                         .includes(busquedaLibro.toLowerCase()),
+                    ).length === 0 && (
+                      <p
+                        className="text-micro italic px-2 py-1"
+                        style={{
+                          color:
+                            "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                        }}
+                      >
+                        Sin resultados
+                      </p>
+                    )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Habitantes (solo para ciudades, no para reinos) ── */}
+        {puntoSeleccionado && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between ml-1">
+              <label
+                className="text-micro font-bold uppercase tracking-widest"
+                style={{
+                  color: "color-mix(in srgb, var(--foreground) 60%, transparent)",
+                }}
+              >
+                <User className="inline mr-1 -mt-0.5" size={11} />
+                Habitantes
+              </label>
+              <button
+                className="text-micro font-bold uppercase flex items-center gap-1 px-2 py-1 transition-opacity hover:opacity-70"
+                style={{ color: "var(--accent)" }}
+                type="button"
+                onClick={() => setBuscadorPersonajesOpen((v) => !v)}
+              >
+                <Plus size={10} />
+                Añadir
+              </button>
+            </div>
+
+            {loadingCiudad ? (
+              <div
+                className="flex justify-center py-3"
+                style={{
+                  color: "color-mix(in srgb, var(--accent) 50%, transparent)",
+                }}
+              >
+                <Hourglass size={12} />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {(personajesCiudad ?? []).length === 0 && (
+                  <p
+                    className="text-micro italic px-1"
+                    style={{
+                      color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                    }}
+                  >
+                    Sin personajes vinculados todavía
+                  </p>
+                )}
+                {(personajesCiudad ?? []).map((p: any) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 px-3 py-2 border"
+                    style={{
+                      background:
+                        "color-mix(in srgb, var(--primary) 8%, transparent)",
+                      borderColor:
+                        "color-mix(in srgb, var(--accent) 15%, transparent)",
+                      borderRadius: "1px",
+                    }}
+                  >
+                    {p.img_url && (
+                      <div
+                        className="shrink-0 w-7 h-7 overflow-hidden border"
+                        style={{
+                          borderColor:
+                            "color-mix(in srgb, var(--accent) 20%, transparent)",
+                          borderRadius: "1px",
+                        }}
+                      >
+                        <Image
+                          alt={p.nombre}
+                          className="w-full h-full object-cover"
+                          src={p.img_url}
+                        />
+                      </div>
+                    )}
+                    <span
+                      className="text-micro font-semibold uppercase flex-1 min-w-0 truncate"
+                      style={{ color: "var(--foreground)" }}
+                    >
+                      {p.nombre}
+                    </span>
+                    <button
+                      className="shrink-0 w-6 h-6 flex items-center justify-center transition-opacity hover:opacity-70"
+                      disabled={vinculandoPersonajeId === p.id}
+                      style={{
+                        color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                      }}
+                      title="Quitar de esta ciudad"
+                      type="button"
+                      onClick={() => onDesvincularPersonaje?.(p)}
+                    >
+                      {vinculandoPersonajeId === p.id ? (
+                        <Hourglass size={10} />
+                      ) : (
+                        <X size={12} />
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Buscador para vincular un personaje existente */}
+            {buscadorPersonajesOpen && (
+              <div
+                className="flex flex-col gap-2 p-3 border mt-1"
+                style={{
+                  background:
+                    "color-mix(in srgb, var(--bg-main) 60%, transparent)",
+                  borderColor:
+                    "color-mix(in srgb, var(--accent) 15%, transparent)",
+                  borderRadius: "1px",
+                }}
+              >
+                <input
+                  autoFocus
+                  className="input-brand text-micro px-3 py-2"
+                  placeholder="Buscar personaje por nombre…"
+                  style={{ borderRadius: "1px" }}
+                  type="text"
+                  value={busquedaPersonaje}
+                  onChange={(e) => setBusquedaPersonaje(e.target.value)}
+                />
+                <div
+                  className="flex flex-col gap-1 max-h-40 overflow-y-auto"
+                  style={{ scrollbarWidth: "thin" }}
+                >
+                  {(personajesVinculables ?? [])
+                    .filter((p: any) =>
+                      p.nombre
+                        .toLowerCase()
+                        .includes(busquedaPersonaje.toLowerCase()),
+                    )
+                    .filter(
+                      (p: any) =>
+                        !(personajesCiudad ?? []).some(
+                          (c: any) => c.id === p.id,
+                        ),
+                    )
+                    .slice(0, 30)
+                    .map((p: any) => (
+                      <button
+                        key={p.id}
+                        className="text-left text-micro font-semibold uppercase px-2 py-1.5 transition-colors hover:opacity-70 disabled:opacity-40"
+                        disabled={vinculandoPersonajeId === p.id}
+                        style={{ color: "var(--foreground)" }}
+                        type="button"
+                        onClick={() => {
+                          onVincularPersonaje?.(p);
+                          setBusquedaPersonaje("");
+                        }}
+                      >
+                        {vinculandoPersonajeId === p.id ? (
+                          <Hourglass size={10} />
+                        ) : (
+                          p.nombre
+                        )}
+                      </button>
+                    ))}
+                  {busquedaPersonaje &&
+                    (personajesVinculables ?? []).filter((p: any) =>
+                      p.nombre
+                        .toLowerCase()
+                        .includes(busquedaPersonaje.toLowerCase()),
                     ).length === 0 && (
                       <p
                         className="text-micro italic px-2 py-1"
@@ -2563,6 +2748,12 @@ export default function MapaInteractivo({
   const [criaturasCiudad, setCriaturasCiudad] = useState<any[]>([]);
   const [itemsCiudad, setItemsCiudad] = useState<any[]>([]);
   const [loadingCiudad, setLoadingCiudad] = useState(false);
+  // Catálogo completo de personajes, para el picker de "vincular personaje"
+  // del panel de edición de una ciudad — se carga una sola vez en modo admin.
+  const [todosLosPersonajes, setTodosLosPersonajes] = useState<any[]>([]);
+  const [vinculandoPersonajeId, setVinculandoPersonajeId] = useState<
+    string | null
+  >(null);
 
   const imgInputRef = useRef<HTMLInputElement>(null);
   const currentReinoIdRef = useRef<string | null>(null);
@@ -3133,6 +3324,68 @@ export default function MapaInteractivo({
       });
   }, [isAdmin]);
 
+  // Catálogo completo de personajes para el picker de "vincular personaje" —
+  // misma lógica que los libros: se carga una vez al entrar en modo admin.
+  useEffect(() => {
+    if (!isAdmin) return;
+    supabase
+      .from("personajes")
+      .select("id, nombre, img_url, especie, ciudad_id")
+      .order("nombre")
+      .then(({ data, error }) => {
+        if (!error && data) setTodosLosPersonajes(data);
+      });
+  }, [isAdmin]);
+
+  // Vincular / desvincular un personaje con la ciudad seleccionada —
+  // actualiza personajes.ciudad_id directamente en Supabase, igual patrón
+  // que handleVincularLibro/handleDesvincularLibro.
+  const handleVincularPersonaje = async (personaje: any) => {
+    if (!puntoSeleccionado) return;
+    setVinculandoPersonajeId(personaje.id);
+    try {
+      const { error } = await supabase
+        .from("personajes")
+        .update({ ciudad_id: puntoSeleccionado.id })
+        .eq("id", personaje.id);
+      if (error) throw error;
+      const actualizado = { ...personaje, ciudad_id: puntoSeleccionado.id };
+      setPersonajesCiudad((prev) => [...prev, actualizado]);
+      setTodosLosPersonajes((prev) =>
+        prev.map((p) => (p.id === personaje.id ? actualizado : p)),
+      );
+      showToast("Personaje vinculado", "success");
+    } catch {
+      showToast("Error al vincular el personaje", "error");
+    } finally {
+      setVinculandoPersonajeId(null);
+    }
+  };
+
+  const handleDesvincularPersonaje = async (personaje: any) => {
+    setVinculandoPersonajeId(personaje.id);
+    try {
+      const { error } = await supabase
+        .from("personajes")
+        .update({ ciudad_id: null })
+        .eq("id", personaje.id);
+      if (error) throw error;
+      setPersonajesCiudad((prev) =>
+        prev.filter((p) => p.id !== personaje.id),
+      );
+      setTodosLosPersonajes((prev) =>
+        prev.map((p) =>
+          p.id === personaje.id ? { ...p, ciudad_id: null } : p,
+        ),
+      );
+      showToast("Vínculo eliminado", "success");
+    } catch {
+      showToast("Error al desvincular el personaje", "error");
+    } finally {
+      setVinculandoPersonajeId(null);
+    }
+  };
+
   // Abrir un reino o ciudad ya desbloqueados cuando lo pide el
   // GlobalCommandPalette (evento "mapa-open-entity" o buzón en
   // sessionStorage si la navegación llegó recién).
@@ -3490,6 +3743,10 @@ export default function MapaInteractivo({
     onVincularLibro: handleVincularLibro,
     onDesvincularLibro: handleDesvincularLibro,
     vinculandoLibroId,
+    personajesVinculables: todosLosPersonajes,
+    onVincularPersonaje: handleVincularPersonaje,
+    onDesvincularPersonaje: handleDesvincularPersonaje,
+    vinculandoPersonajeId,
   };
 
   // Solo bloquea la UI si no hay absolutamente ningún dato todavía (primera carga ever)
