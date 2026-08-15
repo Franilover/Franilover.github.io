@@ -2307,6 +2307,7 @@ export function SnippetCommandPalette({
     }
     const map: Record<string, SnippetType> = {
       drop: "drop",
+      dialogo: "dialogo",
       img: "imagen",
       float: "imagen",
       choice: "choice",
