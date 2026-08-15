@@ -240,6 +240,7 @@ function ModalVincularArea({
   initialReinoId,
   initialCiudadId,
   initialLabel,
+  reinoBloqueado,
   onClose,
   onConfirm,
 }: {
@@ -248,6 +249,10 @@ function ModalVincularArea({
   initialReinoId?: string | null;
   initialCiudadId?: string | null;
   initialLabel?: string;
+  /** Si viene seteado, el área se está creando dentro del mapa de ese
+   * reino: el selector de reino se oculta (ya lo sabemos) y se pide
+   * directo la ciudad, en vez de "elegí primero un reino". */
+  reinoBloqueado?: string | null;
   onClose: () => void;
   onConfirm: (
     reinoId: string | null,
@@ -256,7 +261,7 @@ function ModalVincularArea({
   ) => void;
 }) {
   const [reinoId, setReinoId] = useState<string | null>(
-    initialReinoId ?? null,
+    reinoBloqueado ?? initialReinoId ?? null,
   );
   const [ciudadId, setCiudadId] = useState<string | null>(
     initialCiudadId ?? null,
@@ -326,33 +331,59 @@ function ModalVincularArea({
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label
-            className="text-micro font-bold uppercase tracking-[0.15em]"
-            style={{
-              color: "color-mix(in srgb, var(--foreground) 50%, transparent)",
-            }}
-          >
-            Reino
-          </label>
-          <select
-            className="input-brand text-sm py-1.5 px-2"
-            style={{ borderRadius: "1px" }}
-            value={reinoId ?? ""}
-            onChange={(e) => {
-              const val = e.target.value || null;
-              setReinoId(val);
-              setCiudadId(null); // cambiar de reino invalida la ciudad elegida
-            }}
-          >
-            <option value="">— Sin vincular a un reino —</option>
-            {reinos.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
+        {reinoBloqueado ? (
+          <div className="flex flex-col gap-1">
+            <label
+              className="text-micro font-bold uppercase tracking-[0.15em]"
+              style={{
+                color: "color-mix(in srgb, var(--foreground) 50%, transparent)",
+              }}
+            >
+              Reino
+            </label>
+            <div
+              className="text-sm py-1.5 px-2"
+              style={{
+                borderRadius: "1px",
+                border:
+                  "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+                color: "var(--foreground)",
+                opacity: 0.75,
+              }}
+            >
+              {reinos.find((r) => r.id === reinoBloqueado)?.nombre ??
+                "Este reino"}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <label
+              className="text-micro font-bold uppercase tracking-[0.15em]"
+              style={{
+                color: "color-mix(in srgb, var(--foreground) 50%, transparent)",
+              }}
+            >
+              Reino
+            </label>
+            <select
+              className="input-brand text-sm py-1.5 px-2"
+              style={{ borderRadius: "1px" }}
+              value={reinoId ?? ""}
+              onChange={(e) => {
+                const val = e.target.value || null;
+                setReinoId(val);
+                setCiudadId(null); // cambiar de reino invalida la ciudad elegida
+              }}
+            >
+              <option value="">— Sin vincular a un reino —</option>
+              {reinos.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {reinoId && (
           <div className="flex flex-col gap-1">
@@ -363,7 +394,7 @@ function ModalVincularArea({
                   "color-mix(in srgb, var(--foreground) 50%, transparent)",
               }}
             >
-              Ciudad (opcional)
+              {reinoBloqueado ? "Ciudad" : "Ciudad (opcional)"}
             </label>
             <select
               className="input-brand text-sm py-1.5 px-2"
@@ -372,7 +403,9 @@ function ModalVincularArea({
               onChange={(e) => setCiudadId(e.target.value || null)}
             >
               <option value="">
-                — Todo el reino, sin ciudad puntual —
+                {reinoBloqueado
+                  ? "— Elegí una ciudad —"
+                  : "— Todo el reino, sin ciudad puntual —"}
               </option>
               {ciudadesDelReino.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -3968,9 +4001,14 @@ export default function MapaInteractivo({
           }
           initialReinoId={
             areaPendiente
-              ? null
+              ? (vistaActual !== "global" ? (reinoSeleccionado?.id ?? null) : null)
               : (areas.find((a) => a.id === selectedAreaId)?.reino_id ??
                 null)
+          }
+          reinoBloqueado={
+            areaPendiente && vistaActual !== "global"
+              ? (reinoSeleccionado?.id ?? null)
+              : null
           }
           reinos={reinos}
           onClose={() => {
