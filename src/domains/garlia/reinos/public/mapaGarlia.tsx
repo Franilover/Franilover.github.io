@@ -600,6 +600,69 @@ function PanelContenido({
           </div>
         )}
 
+        {/* ── Habitantes del reino (solo lectura — se gestionan desde cada ciudad) ── */}
+        {!puntoSeleccionado && personajesReino.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <label
+              className="text-micro font-bold uppercase tracking-widest ml-1"
+              style={{
+                color: "color-mix(in srgb, var(--foreground) 60%, transparent)",
+              }}
+            >
+              <User className="inline mr-1 -mt-0.5" size={11} />
+              Habitantes
+            </label>
+            <p
+              className="text-micro italic px-1 -mt-1"
+              style={{
+                color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
+              }}
+            >
+              Se gestionan desde cada ciudad
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {personajesReino.map((p: any) => (
+                <button
+                  key={p.id}
+                  className="flex items-center gap-2 px-2 py-2 border min-w-0 text-left transition-opacity hover:opacity-80"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--primary) 8%, transparent)",
+                    borderColor:
+                      "color-mix(in srgb, var(--accent) 15%, transparent)",
+                    borderRadius: "1px",
+                  }}
+                  type="button"
+                  onClick={() => handlePersonajeClick(p)}
+                >
+                  {p.img_url && (
+                    <div
+                      className="shrink-0 w-7 h-7 overflow-hidden border"
+                      style={{
+                        borderColor:
+                          "color-mix(in srgb, var(--accent) 20%, transparent)",
+                        borderRadius: "1px",
+                      }}
+                    >
+                      <Image
+                        alt={p.nombre}
+                        className="w-full h-full object-cover"
+                        src={p.img_url}
+                      />
+                    </div>
+                  )}
+                  <span
+                    className="text-micro font-semibold uppercase flex-1 min-w-0 truncate"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    {p.nombre}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Habitantes (solo para ciudades, no para reinos) ── */}
         {puntoSeleccionado && (
           <div className="flex flex-col gap-2">
@@ -634,10 +697,10 @@ function PanelContenido({
                 <Hourglass size={12} />
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-2 gap-1.5">
                 {(personajesCiudad ?? []).length === 0 && (
                   <p
-                    className="text-micro italic px-1"
+                    className="text-micro italic px-1 col-span-2"
                     style={{
                       color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
                     }}
@@ -648,7 +711,7 @@ function PanelContenido({
                 {(personajesCiudad ?? []).map((p: any) => (
                   <div
                     key={p.id}
-                    className="flex items-center gap-2 px-3 py-2 border"
+                    className="flex items-center gap-2 px-2 py-2 border min-w-0"
                     style={{
                       background:
                         "color-mix(in srgb, var(--primary) 8%, transparent)",
@@ -680,7 +743,7 @@ function PanelContenido({
                       {p.nombre}
                     </span>
                     <button
-                      className="shrink-0 w-6 h-6 flex items-center justify-center transition-opacity hover:opacity-70"
+                      className="shrink-0 w-5 h-5 flex items-center justify-center transition-opacity hover:opacity-70"
                       disabled={vinculandoPersonajeId === p.id}
                       style={{
                         color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
@@ -1219,6 +1282,19 @@ function PanelContenido({
                 }}
               />
             </div>
+            {/* Vista de solo lectura: reúne los habitantes de todas las
+                ciudades del reino. Añadir/quitar personajes se hace siempre
+                desde el panel de cada ciudad, nunca desde aquí. */}
+            {editMode && (
+              <p
+                className="text-micro italic mb-2 px-1"
+                style={{
+                  color: "color-mix(in srgb, var(--foreground) 40%, transparent)",
+                }}
+              >
+                Se gestionan desde cada ciudad
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               {personajesReino.map((p: any) => {
                 const desbloqueado =
@@ -3140,38 +3216,40 @@ export default function MapaInteractivo({
     // ── 1. Caché Dexie — mostrar lo que ya tenemos guardado ──────────────
     if (db) {
       try {
-        const [cachedDetalles, cachedPersonajes, _cachedLibros, _cachedCaps] =
-          await Promise.all([
-            (db as any).ciudades
-              .where("reino_id")
-              .equals(reino.id)
-              .toArray()
-              .catch(() => []) ?? [],
-            db.personajes
-              .filter(
-                (p: any) =>
-                  typeof p.reino === "string" &&
-                  p.reino.toLowerCase().includes(reino.nombre.toLowerCase()),
-              )
-              .toArray()
-              .catch(() => []),
-            db.libros
-              .filter((l: any) => l.reino_id === reino.id)
-              .toArray()
-              .catch(() => []),
-            db.capitulos
-              .filter(
-                (c: any) =>
-                  Array.isArray(c.reinos_ids) &&
-                  c.reinos_ids.includes(reino.id),
-              )
-              .toArray()
-              .catch(() => []),
-          ]);
-        apply(() => {
+        const [cachedDetalles, _cachedLibros, _cachedCaps] = await Promise.all([
+          (db as any).ciudades
+            .where("reino_id")
+            .equals(reino.id)
+            .toArray()
+            .catch(() => []) ?? [],
+          db.libros
+            .filter((l: any) => l.reino_id === reino.id)
+            .toArray()
+            .catch(() => []),
+          db.capitulos
+            .filter(
+              (c: any) =>
+                Array.isArray(c.reinos_ids) &&
+                c.reinos_ids.includes(reino.id),
+            )
+            .toArray()
+            .catch(() => []),
+        ]);
+        const cachedCiudadIds = cachedDetalles.map((d: any) => d.id);
+        apply(async () => {
           if (cachedDetalles.length > 0)
             setDetallesReino(cachedDetalles.filter((d: any) => !d.deleted));
-          if (cachedPersonajes.length > 0) setPersonajesReino(cachedPersonajes);
+          // Personajes cacheados = los que ya tenemos guardados con
+          // ciudad_id perteneciente a alguna ciudad cacheada de este reino.
+          if (cachedCiudadIds.length > 0) {
+            try {
+              const cachedPersonajes = await db.personajes
+                .filter((p: any) => cachedCiudadIds.includes(p.ciudad_id))
+                .toArray();
+              if (cachedPersonajes.length > 0)
+                setPersonajesReino(cachedPersonajes);
+            } catch {}
+          }
           // libros y capítulos NO se aplican desde caché para evitar spoilers —
           // se esperan los datos frescos de Supabase antes de mostrarlos
         });
@@ -3181,27 +3259,22 @@ export default function MapaInteractivo({
     }
 
     // ── 2. Fetch Supabase — siempre pisa el caché con datos frescos ──────
-    const [detallesRes, personajesRes, librosRes, capitulosRes] =
-      await Promise.all([
-        supabase.from("ciudades").select("*").eq("reino_id", reino.id),
-        supabase
-          .from("personajes")
-          .select("id, nombre, img_url, especie, reino, sobre, fecha_nacimiento")
-          .ilike("reino", reino.nombre),
-        supabase
-          .from("libros")
-          .select("id, titulo, portada_url, estado, categoria, sinopsis")
-          .eq("reino_id", reino.id)
-          .eq("visibilidad", "publico"),
-        supabase
-          .from("capitulos")
-          .select(
-            "id, titulo_capitulo, orden, libro_id, libros(titulo, tags, categoria)",
-          )
-          .contains("reinos_ids", [reino.id])
-          .eq("visibilidad", "publico")
-          .order("orden", { ascending: true }),
-      ]);
+    const [detallesRes, librosRes, capitulosRes] = await Promise.all([
+      supabase.from("ciudades").select("*").eq("reino_id", reino.id),
+      supabase
+        .from("libros")
+        .select("id, titulo, portada_url, estado, categoria, sinopsis")
+        .eq("reino_id", reino.id)
+        .eq("visibilidad", "publico"),
+      supabase
+        .from("capitulos")
+        .select(
+          "id, titulo_capitulo, orden, libro_id, libros(titulo, tags, categoria)",
+        )
+        .contains("reinos_ids", [reino.id])
+        .eq("visibilidad", "publico")
+        .order("orden", { ascending: true }),
+    ]);
 
     // Si el usuario ya clickeó otro reino, descartar todo
     if (currentReinoIdRef.current !== reino.id) return;
@@ -3214,6 +3287,21 @@ export default function MapaInteractivo({
           await (db as any).ciudades.bulkPut(detallesRes.data);
       } catch {}
     }
+
+    // Personajes del reino = unión de los habitantes de todas sus ciudades
+    // (personajes.ciudad_id), ya no por el campo de texto libre "reino".
+    // Se muestran en la barra lateral del reino en modo SOLO VISTA — la
+    // asignación real (añadir/quitar) se maneja siempre desde la ciudad.
+    const ciudadIds = (detallesRes.data ?? []).map((c: any) => c.id);
+    const personajesRes = ciudadIds.length
+      ? await supabase
+          .from("personajes")
+          .select(
+            "id, nombre, img_url, especie, ciudad_id, sobre, fecha_nacimiento",
+          )
+          .in("ciudad_id", ciudadIds)
+          .order("nombre")
+      : { data: [], error: null };
 
     if (!personajesRes.error) {
       setPersonajesReino(personajesRes.data ?? []);
