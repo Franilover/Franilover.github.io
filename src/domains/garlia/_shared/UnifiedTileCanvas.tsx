@@ -908,57 +908,8 @@ export function UnifiedTileCanvas<
         }
       }
 
-      // ── Pins ─────────────────────────────────────────────────────────────
-      const pulse = hasSelectedPin ? (Math.sin(t / 600) + 1) / 2 : 0;
-      const allMarkers = editMode ? [...markers, ...hiddenMarkers] : markers;
-
-      for (const m of allMarkers) {
-        const { mx, my } = getMarkerScreenPos(m, 0, 0, scale);
-        const isSelected = m.id === selectedMarkerId;
-        const isHidden = hiddenMarkers.some((h) => h.id === m.id);
-        const markerColor = isHidden ? "rgba(120,120,120,0.5)" : accent;
-
-        if (isSelected) {
-          const r = 14 + pulse * 4;
-          const grd = ctx.createRadialGradient(mx, my, 0, mx, my, r);
-          grd.addColorStop(0, `${accent}55`);
-          grd.addColorStop(1, `${accent}00`);
-          ctx.fillStyle = grd;
-          ctx.beginPath();
-          ctx.arc(mx, my, r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        ctx.beginPath();
-        ctx.arc(mx, my, isSelected ? 6 : 5, 0, Math.PI * 2);
-        ctx.fillStyle = markerColor;
-        ctx.fill();
-        ctx.strokeStyle = isDark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.8)";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-
+      // ── Pins: eliminados — los reinos ahora se manejan con áreas vinculadas ─
       ctx.restore();
-
-      // ── Labels (fuera del transform) — texto único básico, sin pill ────────
-      const allMarkers2 = editMode ? [...markers, ...hiddenMarkers] : markers;
-      ctx.font = "700 11px 'Cinzel', serif";
-      ctx.textAlign = "center";
-
-      for (const m of allMarkers2) {
-        if (hiddenMarkers.some((h) => h.id === m.id)) continue;
-        const label = m.nombre || m.name || "";
-        if (!label) continue;
-        const { mx, my } = getMarkerScreenPos(m, cx, cy, scale);
-        const ly = my + 18;
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = isDark ? "rgba(0,0,0,0.85)" : "rgba(255,255,255,0.85)";
-        ctx.strokeText(label, mx, ly);
-        ctx.fillStyle = labelText;
-        ctx.fillText(label, mx, ly);
-      }
-
-      ctx.textAlign = "left";
 
       // ── Papelera flotante ─────────────────────────────────────────────────
       trashRectRef.current = null;
