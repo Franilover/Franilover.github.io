@@ -257,13 +257,6 @@ export function UnifiedTileCanvas<
     tile: TTile;
   } | null>(null);
 
-  // Rects (en coords de canvas, no CSS) de las "pills" (etiqueta con nombre)
-  // dibujadas sobre las áreas con reino_id/ciudad_id, para detectar el click
-  // sobre ellas específicamente (y no sobre el área rellena en general).
-  const pillRectsRef = useRef<
-    { areaId: string; x: number; y: number; w: number; h: number }[]
-  >([]);
-
   // ── Dibujo de áreas ────────────────────────────────────────────────────────
   // Puntos "mundo" acumulados del dibujo en curso. Círculo/rectángulo usan
   // drag (2 puntos); polígono acumula un punto por click hasta doble-click.
@@ -853,7 +846,6 @@ export function UnifiedTileCanvas<
         }
       };
 
-      pillRectsRef.current = [];
       for (const area of areas) {
         const localPts = area.puntos.map((p) => worldToLocal(p, scale));
         const isSel = area.id === selectedAreaId;
@@ -891,61 +883,15 @@ export function UnifiedTileCanvas<
             ly = (localPts[0].ly + localPts[1].ly) / 2;
           }
 
-          const vinculada = Boolean(area.reino_id || area.ciudad_id);
-          if (vinculada) {
-            // ── Pill: cápsula rellena con el nombre, reemplaza al pin ──────
-            ctx.font = "700 12px 'Cinzel', serif";
-            const textW = ctx.measureText(area.label).width;
-            const padX = 14;
-            const padY = 7;
-            const pillW = textW + padX * 2;
-            const pillH = 24;
-            const px = lx - pillW / 2;
-            const py = ly - pillH / 2;
-            const r = pillH / 2;
-
-            ctx.beginPath();
-            ctx.moveTo(px + r, py);
-            ctx.lineTo(px + pillW - r, py);
-            ctx.arcTo(px + pillW, py, px + pillW, py + r, r);
-            ctx.lineTo(px + pillW, py + pillH - r);
-            ctx.arcTo(px + pillW, py + pillH, px + pillW - r, py + pillH, r);
-            ctx.lineTo(px + r, py + pillH);
-            ctx.arcTo(px, py + pillH, px, py + pillH - r, r);
-            ctx.lineTo(px, py + r);
-            ctx.arcTo(px, py, px + r, py, r);
-            ctx.closePath();
-            ctx.fillStyle = "rgba(20,16,12,0.82)";
-            ctx.fill();
-            ctx.strokeStyle = baseColor;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            ctx.font = "700 12px 'Cinzel', serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillStyle = "#fff";
-            ctx.globalAlpha = 1;
-            ctx.fillText(area.label, lx, ly + 0.5);
-            ctx.textAlign = "left";
-            ctx.textBaseline = "alphabetic";
-
-            pillRectsRef.current.push({
-              areaId: area.id,
-              x: px,
-              y: py,
-              w: pillW,
-              h: pillH,
-            });
-          } else {
-            ctx.font = "700 11px 'Cinzel', serif";
-            ctx.textAlign = "center";
-            ctx.fillStyle = labelText;
-            ctx.globalAlpha = 0.85;
-            ctx.fillText(area.label, lx, ly);
-            ctx.globalAlpha = 1;
-            ctx.textAlign = "left";
-          }
+          // Texto plano, sin cápsula/pill de fondo — mismo estilo tenga o no
+          // vínculo a reino/ciudad.
+          ctx.font = "700 11px 'Cinzel', serif";
+          ctx.textAlign = "center";
+          ctx.fillStyle = labelText;
+          ctx.globalAlpha = 0.85;
+          ctx.fillText(area.label, lx, ly);
+          ctx.globalAlpha = 1;
+          ctx.textAlign = "left";
         }
       }
 
@@ -1477,38 +1423,24 @@ export function UnifiedTileCanvas<
         }
       }
 
-      // ── Click IZQUIERDO sobre un área vinculada (pill o relleno) → abre el
+      // ── Click IZQUIERDO sobre el relleno de un área vinculada → abre el
       // reino/ciudad. Reemplaza por completo al click de pin para esa
       // entidad — el click derecho es quien selecciona el área para
       // moverla/editarla (ver onContextMenu), así que acá el izquierdo
       // queda 100% libre para "abrir". ────────────────────────────────────
       {
-        const rect = canvas.getBoundingClientRect();
-        const s4 = cssToCanvasScale();
-        const px = (clientX - rect.left) * s4;
-        const py = (clientY - rect.top) * s4;
-        const hitPill = pillRectsRef.current.find(
-          (p) => px >= p.x && px <= p.x + p.w && py >= p.y && py <= p.y + p.h,
-        );
-        let areaClickeada = hitPill
-          ? areas.find((a) => a.id === hitPill.areaId)
-          : undefined;
-        if (!areaClickeada) {
-          // No cayó en la pill puntual, pero puede haber caído dentro del
-          // relleno de un área vinculada — también cuenta como "abrir".
-          // Solo si tiene label: sin label (no desbloqueada) el área se ve
+        const wp = clientToWorldPoint(clientX, clientY);
+        let areaClickeada: BaseArea | undefined;
+        if (wp) {
+          // Cae dentro del relleno de un área vinculada (con label visible)
+          // → cuenta como "abrir". Sin label (no desbloqueada) el área se ve
           // pero no se puede abrir ni se sabe a qué reino/ciudad pertenece.
-          const wp = clientToWorldPoint(clientX, clientY);
-          if (wp) {
-            areaClickeada = [...areas]
-              .reverse()
-              .find(
-                (a) =>
-                  (a.reino_id || a.ciudad_id) &&
-                  a.label &&
-                  isPointInArea(wp, a),
-              );
-          }
+          areaClickeada = [...areas]
+            .reverse()
+            .find(
+              (a) =>
+                (a.reino_id || a.ciudad_id) && a.label && isPointInArea(wp, a),
+            );
         }
         if (areaClickeada && onAreaClick) {
           onAreaClick(areaClickeada);
