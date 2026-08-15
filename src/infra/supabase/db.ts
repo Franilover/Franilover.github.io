@@ -340,6 +340,21 @@ export interface MapAreaLocal {
   orden?: number;
 }
 
+// ─── Áreas del mapa INTERNO de un reino ──────────────────────────────────────
+// Mismo concepto que MapAreaLocal, pero scoped por reino_id en vez de
+// world_id — dibujadas sobre reino_tiles (ReinoTileCanvas) y vinculables a
+// una ciudad de ese reino.
+export interface ReinoAreaLocal {
+  id: string;
+  reino_id: string;
+  ciudad_id?: string | null;
+  tipo: "circulo" | "rectangulo" | "poligono";
+  puntos: { x: number; y: number }[];
+  color?: string | null;
+  label?: string | null;
+  orden?: number;
+}
+
 // ─── Eras de personaje (arcos vitales en la línea de tiempo) ─────────────────
 export interface PersonajeEra {
   id: string; // uuid
@@ -574,6 +589,7 @@ class AgendaFraniDB extends Dexie {
 
   // Áreas del mapa (círculo/rectángulo/polígono) vinculadas a reino o ciudad
   map_areas!: Table<MapAreaLocal, string>;
+  reino_areas!: Table<ReinoAreaLocal, string>;
 
   // Descubrimientos personales (cache offline para GlobalCommandPalette)
   descubrimientos!: Table<DescubrimientoLocal, string>;
@@ -1329,6 +1345,13 @@ class AgendaFraniDB extends Dexie {
     // ver EditorMapa/MapaInteractivo y la nueva tabla map_areas en Supabase.
     this.version(29).stores({
       map_areas: "id, world_id, reino_id, ciudad_id",
+    });
+
+    // ─── v30: áreas del mapa INTERNO de cada reino ─────────────────────────────
+    // Análogo a v29 pero scoped por reino_id — ver ReinoTileCanvas y la nueva
+    // tabla reino_areas en Supabase (domains/garlia/reinos/components/reino_areas.sql).
+    this.version(30).stores({
+      reino_areas: "id, reino_id, ciudad_id",
     });
   }
 }

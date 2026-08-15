@@ -1463,6 +1463,36 @@ export async function invalidateReinoTiles(reinoId: string): Promise<void> {
   await invalidateSessionCache(`reino_tiles:${reinoId}`);
 }
 
+// ─── Áreas del mapa interno de un reino (círculo/rectángulo/polígono) ─────────
+// Mismo patrón que loadMapAreas, scoped por reino_id en vez de world_id —
+// ver ReinoTileCanvas.
+
+export async function loadReinoAreas(
+  reinoId: string,
+  onUpdate?: (data: any[]) => void,
+): Promise<any[]> {
+  return loadWithCache(
+    {
+      cacheKey: `reino_areas:${reinoId}`,
+      dexieSource: () => dexieWhere(db?.reino_areas, "reino_id", reinoId),
+      supabaseFetch: async () => {
+        const { data } = await supabase
+          .from("reino_areas")
+          .select("id, reino_id, ciudad_id, tipo, puntos, color, label, orden")
+          .eq("reino_id", reinoId)
+          .order("orden");
+        return data ?? null;
+      },
+      persist: (rows) => persistReplace("reino_areas", rows),
+    },
+    onUpdate,
+  );
+}
+
+export async function invalidateReinoAreas(reinoId: string): Promise<void> {
+  await invalidateSessionCache(`reino_areas:${reinoId}`);
+}
+
 // ─── Áreas del mapa (círculo / rectángulo / polígono) ─────────────────────────
 // Mismo patrón que loadMapTiles: Dexie-first + revalidación en segundo plano.
 
