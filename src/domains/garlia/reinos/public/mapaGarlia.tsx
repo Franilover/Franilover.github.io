@@ -7,8 +7,6 @@ import {
   CheckCircle2,
   AlertCircle,
   UserX,
-  ZoomIn,
-  ZoomOut,
   User,
   BookOpen,
   BookMarked,
@@ -345,17 +343,6 @@ function ModalVincularArea({
               const val = e.target.value || null;
               setReinoId(val);
               setCiudadId(null); // cambiar de reino invalida la ciudad elegida
-              // Autocompletar el nombre del área con el del reino elegido —
-              // solo si el usuario no escribió algo distinto a mano todavía
-              // (si el label actual coincide con el nombre de OTRO reino o
-              // ciudad del catálogo, asumimos que es un resto de una
-              // selección anterior y lo pisamos igual).
-              const reino = reinos.find((r) => r.id === val);
-              const labelEsDeOtraEntidad =
-                !label ||
-                reinos.some((r) => r.nombre === label) ||
-                ciudades.some((c) => c.nombre === label);
-              if (reino && labelEsDeOtraEntidad) setLabel(reino.nombre);
             }}
           >
             <option value="">— Sin vincular a un reino —</option>
@@ -382,19 +369,7 @@ function ModalVincularArea({
               className="input-brand text-sm py-1.5 px-2"
               style={{ borderRadius: "1px" }}
               value={ciudadId ?? ""}
-              onChange={(e) => {
-                const val = e.target.value || null;
-                setCiudadId(val);
-                // Mismo autocompletado que el reino, pero con la ciudad —
-                // una ciudad elegida es más específica que el reino, así
-                // que su nombre gana si el usuario no personalizó el label.
-                const ciudad = ciudadesDelReino.find((c) => c.id === val);
-                const labelEsDeOtraEntidad =
-                  !label ||
-                  reinos.some((r) => r.nombre === label) ||
-                  ciudades.some((c) => c.nombre === label);
-                if (ciudad && labelEsDeOtraEntidad) setLabel(ciudad.nombre);
-              }}
+              onChange={(e) => setCiudadId(e.target.value || null)}
             >
               <option value="">
                 — Todo el reino, sin ciudad puntual —
@@ -1208,15 +1183,15 @@ function PanelContenido({
           </div>
         )}
 
-        {isSaving && (
-          <div
-            className="w-full flex items-center justify-center gap-2 text-micro uppercase py-3 mt-auto opacity-60"
-            style={{ letterSpacing: "0.12em" }}
-          >
-            <Hourglass size={12} />
-            Guardando…
-          </div>
-        )}
+        <button
+          className="btn-brand w-full justify-center text-micro uppercase py-4 mt-auto disabled:opacity-50"
+          disabled={isSaving}
+          style={{ letterSpacing: "0.12em" }}
+          onClick={handleSaveChanges}
+        >
+          {isSaving ? <Hourglass size={14} /> : <Save size={14} />}
+          Guardar cambios
+        </button>
       </div>
     );
   }
@@ -1952,1138 +1927,6 @@ function PanelContenido({
   );
 }
 
-// ─── Canvas Map ───────────────────────────────────────────────────────────────
-interface CanvasMapProps {
-  imageSrc: string;
-  markers: any[];
-  hiddenMarkers: any[]; // markers that are hidden (fog covered)
-  editMode: boolean;
-  onMarkerClick: (marker: any) => void;
-  onMapClick: (
-    x: number,
-    y: number,
-    tile_col?: number,
-    tile_row?: number,
-  ) => void;
-  selectedMarkerId?: string | null;
-  tipo: "global" | "reino";
-  isFirstOpen?: boolean; // true only the very first time the map opens in a session
-  fondoColor?: string | null; // color de fondo del mar (guardado en Supabase)
-  eyedropperActive?: boolean; // cuando está activo, el siguiente click samplea el color
-  onEyedropperPick?: (color: string) => void; // devuelve el hex del pixel clickeado
-}
-
-function CanvasMap({
-  imageSrc,
-  markers,
-  hiddenMarkers,
-  editMode,
-  onMarkerClick,
-  onMapClick,
-  selectedMarkerId,
-  tipo,
-  onOpenPanel,
-  isFirstOpen,
-  fondoColor,
-  eyedropperActive,
-  onEyedropperPick,
-}: CanvasMapProps & { onOpenPanel?: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [imgLoaded, setImgLoaded] = useState(false);
-  // showCompass: true while compass should be displayed (first open only, ≥5s)
-  const [showCompass, setShowCompass] = useState(true);
-  // mapFading: subtle fade overlay when switching maps (non-first transitions)
-  const [mapFading, setMapFading] = useState(false);
-  const compassTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // hasShownCompass: consumed once — prevents re-showing compass on subsequent imageSrc changes
-  const hasShownCompassRef = useRef(false);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const animFrameRef = useRef<number>(0);
-  // Camera state
-  const camRef = useRef({ x: 0, y: 0, scale: 1 });
-  // Factor backing-store/CSS del canvas, actualizado solo en resize — evita
-  // tener que leer el DOM (getBoundingClientRect, que fuerza reflow) en cada
-  // evento de mousemove/touchmove durante el pan.
-  const renderScaleRef = useRef(1);
-  const isDragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0, camX: 0, camY: 0 });
-  // Pinch
-  const lastPinchDist = useRef<number | null>(null);
-  // Pulse animation
-  const pulseRef = useRef(0);
-  const compassStartRef = useRef<number | null>(null); // timestamp when compass started spinning
-  // Theme CSS vars read at draw time
-  const cssColorsRef = useRef({
-    primary: "#6b4423",
-    accent: "#c08040",
-    bg: "#f0e6d0",
-    fg: "#2a1304",
-    bgMenu: "#3d2010",
-    parchBg: "#3d2010",
-    parchText: "#2a1304",
-    whiteCustom: "#fdf6ee",
-    isDark: false,
-    labelBg: "#fdf6ee",
-    labelText: "#2a1304",
-  });
-  // Fog cache — rebuilt only when markers/size change, not every frame
-  const fogCacheRef = useRef<{
-    canvas: OffscreenCanvas;
-    deep: OffscreenCanvas;
-    iw: number;
-    ih: number;
-    bg: string;
-  } | null>(null);
-
-  useEffect(() => {
-    const read = () => {
-      const s = getComputedStyle(document.documentElement);
-      const get = (v: string) => s.getPropertyValue(v).trim();
-      const bgMain = get("--bg-main") || "#f0e6d0";
-      const wc = get("--white-custom") || "#fdf6ee";
-      const fgColor = get("--foreground") || "#2a1304";
-      const bgMenuColor = get("--bg-menu") || "#3d2010";
-      // Detect dark theme by luminance of --bg-main
-      const hexToLuma = (hex: string) => {
-        const h = hex.replace("#", "");
-        if (h.length < 6) return 0.5;
-        const r = parseInt(h.slice(0, 2), 16) / 255;
-        const g = parseInt(h.slice(2, 4), 16) / 255;
-        const b = parseInt(h.slice(4, 6), 16) / 255;
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      };
-      const dark = hexToLuma(bgMain) < 0.35;
-      // In light themes: label bg = white-custom (light), text = foreground (dark)
-      // In dark themes:  label bg = bg-menu (dark), text = foreground (light)
-      cssColorsRef.current = {
-        primary: get("--primary") || "#6b4423",
-        accent: get("--accent") || "#c08040",
-        bg: bgMain,
-        fg: fgColor,
-        bgMenu: bgMenuColor,
-        parchBg: bgMenuColor,
-        parchText: fgColor,
-        whiteCustom: wc,
-        isDark: dark,
-        labelBg: dark ? bgMenuColor : wc,
-        labelText: fgColor,
-      };
-    };
-    read();
-    const obs = new MutationObserver(read);
-    obs.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme", "class"],
-    });
-    return () => obs.disconnect();
-  }, []);
-
-  const centerImage = useCallback(() => {
-    const canvas = canvasRef.current;
-    const img = imgRef.current;
-    if (!canvas || !img) return;
-    const scale =
-      Math.min(canvas.width / img.width, canvas.height / img.height) * 0.95;
-    camRef.current = {
-      x: (canvas.width - img.width * scale) / 2,
-      y: (canvas.height - img.height * scale) / 2,
-      scale,
-    };
-  }, []);
-
-  useEffect(() => {
-    // Clear any pending compass timer
-    if (compassTimerRef.current) clearTimeout(compassTimerRef.current);
-
-    // shouldShowCompass: only true the very first time this component loads
-    const shouldShowCompass = isFirstOpen && !hasShownCompassRef.current;
-
-    if (shouldShowCompass) {
-      // First open: show full compass animation — mark it as consumed immediately
-      hasShownCompassRef.current = true;
-      setShowCompass(true);
-      setMapFading(false);
-    } else {
-      // Any subsequent image change: subtle fade overlay, no compass
-      setShowCompass(false);
-      if (hasShownCompassRef.current) {
-        // Only fade if we've already shown the first load (not during initial mount)
-        setMapFading(true);
-        setTimeout(() => setMapFading(false), 600);
-      }
-    }
-
-    setImgLoaded(false);
-    compassStartRef.current = null;
-    imgRef.current = null;
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.src = imageSrc;
-    img.onload = () => {
-      imgRef.current = img;
-      centerImage();
-      setImgLoaded(true);
-      if (shouldShowCompass) {
-        // Keep compass visible for at least 5 seconds after the image is ready
-        compassTimerRef.current = setTimeout(() => setShowCompass(false), 5000);
-      } else {
-        setShowCompass(false);
-      }
-    };
-    img.onerror = () => {
-      setTimeout(() => {
-        const retry = new window.Image();
-        retry.crossOrigin = "anonymous";
-        retry.src =
-          imageSrc + (imageSrc.includes("?") ? "&" : "?") + "_r=" + Date.now();
-        retry.onload = () => {
-          imgRef.current = retry;
-          centerImage();
-          setImgLoaded(true);
-          if (shouldShowCompass) {
-            compassTimerRef.current = setTimeout(
-              () => setShowCompass(false),
-              5000,
-            );
-          } else {
-            setShowCompass(false);
-          }
-        };
-      }, 800);
-    };
-    return () => {
-      if (compassTimerRef.current) clearTimeout(compassTimerRef.current);
-    };
-  }, [imageSrc, centerImage, isFirstOpen]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    // En compu la ventana puede ser varias veces más grande (en px CSS) que
-    // una pantalla de celular — y el costo por frame (clearRect/fillRect/
-    // drawImage) escala directo con la cantidad de píxeles del canvas. Sin
-    // capar esto, una ventana grande de escritorio hace 5-6x más trabajo por
-    // frame que un celular, aunque el hardware sea mejor. Capamos la
-    // resolución interna y dejamos que el CSS (w-full h-full) estire el
-    // canvas para llenar el contenedor igual.
-    const MAX_DIM = 1400;
-    const capDims = (w: number, h: number) => {
-      const largest = Math.max(w, h);
-      if (largest <= MAX_DIM) return { w, h };
-      const f = MAX_DIM / largest;
-      return { w: Math.round(w * f), h: Math.round(h * f) };
-    };
-
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const updateScaleRef = (canvasW: number) => {
-      const cw = container.clientWidth;
-      renderScaleRef.current = cw ? canvasW / cw : 1;
-    };
-
-    const resize = () => {
-      const { w: newW, h: newH } = capDims(
-        container.clientWidth,
-        container.clientHeight,
-      );
-      // El factor de escala se actualiza siempre (es barato), aunque no haga
-      // falta reasignar canvas.width — si no, onMouseMove/onPointerMove
-      // quedarían con un factor viejo y el pan se desalinearía.
-      updateScaleRef(newW);
-      // Si el tamaño no cambió, no tocar el canvas — evita parpadeo por limpieza
-      if (canvas.width === newW && canvas.height === newH) return;
-      // Debounce: durante la animación del panel el contenedor cambia frame a frame.
-      // Esperamos a que se detenga antes de reasignar canvas.width (lo que lo borra).
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        const { w: finalW, h: finalH } = capDims(
-          container.clientWidth,
-          container.clientHeight,
-        );
-        updateScaleRef(finalW);
-        if (canvas.width === finalW && canvas.height === finalH) return;
-        canvas.width = finalW;
-        canvas.height = finalH;
-        if (imgRef.current) centerImage();
-      }, 150); // 150ms — más que un frame, menos que la animación del panel (350ms)
-    };
-
-    // Primera llamada inmediata (sin debounce, el panel no está animando todavía)
-    const initial = capDims(container.clientWidth, container.clientHeight);
-    canvas.width = initial.w;
-    canvas.height = initial.h;
-    updateScaleRef(initial.w);
-    if (imgRef.current) centerImage();
-
-    const ro = new ResizeObserver(resize);
-    ro.observe(container);
-    return () => {
-      ro.disconnect();
-      if (debounceTimer) clearTimeout(debounceTimer);
-    };
-  }, [centerImage]);
-
-  // ── Render loop with fog effect ──────────────────────────────────────────────
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Cap to ~30fps on mobile to avoid lag and battery drain
-    const isMobileDevice = /Mobi|Android|iPhone|iPad/i.test(
-      navigator.userAgent,
-    );
-    const FRAME_MS = isMobileDevice ? 34 : 16;
-    let lastFrameTime = 0;
-
-    // Cache vignette so it's not rebuilt every frame
-    let vignetteCanvas: OffscreenCanvas | null = null;
-    let vignetteW = 0;
-    let vignetteH = 0;
-    let vignetteBg = "";
-
-    const draw = (t: number) => {
-      // Throttle frame rate on mobile
-      if (t - lastFrameTime < FRAME_MS) {
-        animFrameRef.current = requestAnimationFrame(draw);
-        return;
-      }
-      lastFrameTime = t;
-
-      pulseRef.current = t;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const {
-        primary,
-        accent,
-        bg,
-        fg: _fg,
-        parchBg: _parchBg,
-        parchText: _parchText,
-        whiteCustom,
-        isDark: _isDark,
-        labelBg,
-        labelText,
-      } = cssColorsRef.current;
-
-      ctx.fillStyle = fondoColor || bg;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const { x: cx, y: cy, scale } = camRef.current;
-      const img = imgRef.current;
-
-      if (img && imgLoaded && !showCompass) {
-        const iw = img.width * scale;
-        const ih = img.height * scale;
-
-        ctx.save();
-        ctx.translate(cx, cy);
-
-        // ── Draw base map ──────────────────────────────────────────────────
-        // Este loop redibuja SIEMPRE (sin dirty-flag) por el pulso continuo de
-        // los pines, así que reescalar la imagen entera del mapa a resolución
-        // nativa en cada frame es carísimo. Recortamos al viewport visible y
-        // bajamos la calidad de resampling — el mapa no necesita reescalarse
-        // fuera de lo que efectivamente se ve en pantalla.
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "low";
-
-        const visX0 = Math.max(0, -cx);
-        const visY0 = Math.max(0, -cy);
-        const visX1 = Math.min(iw, canvas.width - cx);
-        const visY1 = Math.min(ih, canvas.height - cy);
-
-        if (visX1 > visX0 && visY1 > visY0) {
-          const srcX0 = visX0 / scale;
-          const srcY0 = visY0 / scale;
-          const srcW = (visX1 - visX0) / scale;
-          const srcH = (visY1 - visY0) / scale;
-          ctx.drawImage(
-            img,
-            srcX0,
-            srcY0,
-            srcW,
-            srcH,
-            visX0,
-            visY0,
-            visX1 - visX0,
-            visY1 - visY0,
-          );
-        }
-
-        // ── FOG OF WAR — cached, rebuilt only when markers/bg changes ─────
-        if (tipo === "global" && !editMode && hiddenMarkers.length > 0) {
-          const cache = fogCacheRef.current;
-          const FOG_W = Math.min(img.width, 1200);
-          const FOG_H = Math.round(FOG_W * (img.height / img.width));
-          const fogBg = fondoColor || bg;
-
-          const needsRebuild =
-            !cache ||
-            cache.iw !== FOG_W ||
-            cache.ih !== FOG_H ||
-            cache.bg !== fogBg;
-
-          if (needsRebuild) {
-            const maxDim = Math.max(FOG_W, FOG_H);
-            const clearRadius = maxDim * 0.05;
-            const fadeRadius = maxDim * 0.12;
-
-            // ── Layer 1: main opaque fog with reveal holes ────────────────
-            const fogCanvas = new OffscreenCanvas(FOG_W, FOG_H);
-            const fogCtx = fogCanvas.getContext("2d")!;
-
-            fogCtx.fillStyle = fogBg;
-            fogCtx.globalAlpha = 0.92;
-            fogCtx.fillRect(0, 0, FOG_W, FOG_H);
-            fogCtx.globalAlpha = 1;
-
-            fogCtx.globalCompositeOperation = "destination-out";
-            for (const m of markers) {
-              const mx = (m.coord_x / 100) * FOG_W;
-              const my = (m.coord_y / 100) * FOG_H;
-              const grad = fogCtx.createRadialGradient(
-                mx,
-                my,
-                clearRadius * 0.2,
-                mx,
-                my,
-                fadeRadius,
-              );
-              grad.addColorStop(0, "rgba(0,0,0,1)");
-              grad.addColorStop(0.45, "rgba(0,0,0,0.98)");
-              grad.addColorStop(0.72, "rgba(0,0,0,0.7)");
-              grad.addColorStop(0.88, "rgba(0,0,0,0.25)");
-              grad.addColorStop(1, "rgba(0,0,0,0)");
-              fogCtx.fillStyle = grad;
-              fogCtx.beginPath();
-              fogCtx.arc(mx, my, fadeRadius, 0, Math.PI * 2);
-              fogCtx.fill();
-            }
-            fogCtx.globalCompositeOperation = "source-over";
-
-            // ── Layer 2: semi-transparent overlay for depth ───────────────
-            const deepCanvas = new OffscreenCanvas(FOG_W, FOG_H);
-            const deepCtx = deepCanvas.getContext("2d")!;
-            deepCtx.fillStyle = fogBg;
-            deepCtx.globalAlpha = 0.45;
-            deepCtx.fillRect(0, 0, FOG_W, FOG_H);
-            deepCtx.globalAlpha = 1;
-            deepCtx.globalCompositeOperation = "destination-out";
-            for (const m of markers) {
-              const mx = (m.coord_x / 100) * FOG_W;
-              const my = (m.coord_y / 100) * FOG_H;
-              const grad2 = deepCtx.createRadialGradient(
-                mx,
-                my,
-                clearRadius * 0.5,
-                mx,
-                my,
-                fadeRadius * 0.7,
-              );
-              grad2.addColorStop(0, "rgba(0,0,0,1)");
-              grad2.addColorStop(0.6, "rgba(0,0,0,0.85)");
-              grad2.addColorStop(1, "rgba(0,0,0,0)");
-              deepCtx.fillStyle = grad2;
-              deepCtx.beginPath();
-              deepCtx.arc(mx, my, fadeRadius * 0.7, 0, Math.PI * 2);
-              deepCtx.fill();
-            }
-            deepCtx.globalCompositeOperation = "source-over";
-
-            fogCacheRef.current = {
-              canvas: fogCanvas,
-              deep: deepCanvas,
-              iw: FOG_W,
-              ih: FOG_H,
-              bg: fogBg,
-            };
-          }
-
-          const fc = fogCacheRef.current!;
-          ctx.drawImage(fc.canvas, 0, 0, iw, ih);
-          ctx.drawImage(fc.deep, 0, 0, iw, ih);
-        }
-
-        // No internal map vignette — edge fog handles blending instead
-
-        ctx.restore();
-
-        // ── Draw visible markers ──────────────────────────────────────────
-        for (const m of markers) {
-          const mx = cx + (m.coord_x / 100) * (img.width * scale);
-          const my = cy + (m.coord_y / 100) * (img.height * scale);
-          const isSelected = m.id === selectedMarkerId;
-          const pulse = (Math.sin(t * 0.002 + m.coord_x) + 1) / 2;
-
-          ctx.save();
-          ctx.translate(mx, my);
-
-          // ── Antique map pin — teardrop with body ─────────────────────────
-          // Pin body uses --white-custom, same as panel surfaces
-          const pinBody = whiteCustom;
-          const pinBorder = isSelected ? primary : `${primary}88`;
-          const pinRing = isSelected ? `${accent}99` : `${primary}55`;
-          const pinDot = accent;
-
-          // Pin dimensions
-          const headR = isSelected ? 9 : 7; // circle head radius
-          const tailH = isSelected ? 14 : 11; // tail length below head
-
-          // Drop shadow (offset, no blur on canvas so fake with alpha)
-          ctx.save();
-          ctx.translate(1.5, 2);
-          ctx.globalAlpha = 0.22;
-          ctx.beginPath();
-          ctx.arc(0, -tailH * 0.4, headR, 0, Math.PI * 2);
-          ctx.fillStyle = "#000";
-          ctx.fill();
-          ctx.beginPath();
-          ctx.moveTo(-headR * 0.4, -tailH * 0.15);
-          ctx.quadraticCurveTo(0, tailH * 0.6, 0, tailH * 0.85);
-          ctx.quadraticCurveTo(0, tailH * 0.6, headR * 0.4, -tailH * 0.15);
-          ctx.fillStyle = "#000";
-          ctx.fill();
-          ctx.restore();
-          ctx.globalAlpha = 1;
-
-          // Tail (teardrop point, drawn first so head covers seam)
-          ctx.beginPath();
-          ctx.moveTo(-headR * 0.42, -tailH * 0.18);
-          ctx.quadraticCurveTo(-headR * 0.15, tailH * 0.55, 0, tailH);
-          ctx.quadraticCurveTo(
-            headR * 0.15,
-            tailH * 0.55,
-            headR * 0.42,
-            -tailH * 0.18,
-          );
-          ctx.fillStyle = pinBody;
-          ctx.fill();
-          ctx.strokeStyle = pinBorder;
-          ctx.lineWidth = isSelected ? 1.2 : 0.9;
-          ctx.stroke();
-
-          // Head circle (filled)
-          ctx.beginPath();
-          ctx.arc(0, -tailH * 0.4, headR, 0, Math.PI * 2);
-          ctx.fillStyle = pinBody;
-          ctx.fill();
-          ctx.strokeStyle = pinBorder;
-          ctx.lineWidth = isSelected ? 1.4 : 1.0;
-          ctx.stroke();
-
-          // Inner ring — lighter, gives depth
-          ctx.beginPath();
-          ctx.arc(0, -tailH * 0.4, headR * 0.52, 0, Math.PI * 2);
-          ctx.strokeStyle = pinRing;
-          ctx.lineWidth = isSelected ? 1.0 : 0.7;
-          ctx.stroke();
-
-          // Center dot
-          ctx.beginPath();
-          ctx.arc(0, -tailH * 0.4, isSelected ? 2.2 : 1.6, 0, Math.PI * 2);
-          ctx.fillStyle = pinDot;
-          ctx.fill();
-
-          // Subtle pulsing outer ring (very faint, only visible)
-          if (!editMode) {
-            const haloR = headR + 3 + pulse * 3;
-            ctx.beginPath();
-            ctx.arc(0, -tailH * 0.4, haloR, 0, Math.PI * 2);
-            ctx.strokeStyle = isSelected
-              ? `${accent}${Math.round(0.22 * (1 - pulse) * 255)
-                  .toString(16)
-                  .padStart(2, "0")}`
-              : `${primary}${Math.round(0.15 * (1 - pulse) * 255)
-                  .toString(16)
-                  .padStart(2, "0")}`;
-            ctx.lineWidth = 0.7;
-            ctx.stroke();
-          }
-
-          if (editMode) {
-            ctx.beginPath();
-            ctx.arc(headR, -tailH * 0.4 - headR, 3, 0, Math.PI * 2);
-            ctx.fillStyle = accent;
-            ctx.fill();
-            if (true) {
-              ctx.beginPath();
-              ctx.arc(-headR, -tailH * 0.4 - headR, 3, 0, Math.PI * 2);
-              ctx.fillStyle = "#f97316";
-              ctx.fill();
-            }
-          }
-
-          // ── Label — themed background strip ──────────────────────────────
-          const fontSize = scale > 0.7 ? 10 : 9;
-          ctx.font = `${isSelected ? "600" : "500"} ${fontSize}px 'Cinzel', serif`;
-          ctx.textAlign = "center";
-          const label = m.nombre;
-          const metrics = ctx.measureText(label);
-          const lw = metrics.width + 12;
-          const lh = fontSize + 6;
-          const labelY = -(tailH * 0.4 + headR + lh + 5);
-
-          // Background from theme — smart light/dark
-          ctx.fillStyle = isSelected ? `${labelBg}f0` : `${labelBg}d8`;
-          ctx.beginPath();
-          ctx.rect(-lw / 2, labelY, lw, lh);
-          ctx.fill();
-
-          // Border from primary
-          ctx.strokeStyle = isSelected ? `${primary}88` : `${primary}44`;
-          ctx.lineWidth = 0.6;
-          ctx.stroke();
-
-          // Text — always contrasting with labelBg
-          ctx.fillStyle = isSelected ? labelText : `${labelText}ee`;
-          ctx.fillText(label, 0, labelY + lh - 4);
-
-          ctx.restore();
-        }
-
-        // ── Draw hidden markers (admin only, faded) ───────────────────────
-        if (editMode) {
-          for (const m of hiddenMarkers) {
-            const mx = cx + (m.coord_x / 100) * (img.width * scale);
-            const my = cy + (m.coord_y / 100) * (img.height * scale);
-            ctx.save();
-            ctx.globalAlpha = 0.35;
-            ctx.translate(mx, my);
-            ctx.save();
-            // Small teardrop, orange-tinted for hidden
-            const hR = 5;
-            const hT = 8;
-            ctx.beginPath();
-            ctx.moveTo(-hR * 0.4, -hT * 0.18);
-            ctx.quadraticCurveTo(-hR * 0.1, hT * 0.5, 0, hT);
-            ctx.quadraticCurveTo(hR * 0.1, hT * 0.5, hR * 0.4, -hT * 0.18);
-            ctx.fillStyle = "rgba(180,90,20,0.7)";
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(0, -hT * 0.4, hR, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(180,90,20,0.7)";
-            ctx.fill();
-            ctx.strokeStyle = "rgba(120,55,10,0.6)";
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
-            ctx.restore();
-            ctx.font = `bold 9px 'Cinzel', serif`;
-            ctx.textAlign = "center";
-            const label = m.nombre;
-            const metrics = ctx.measureText(label);
-            const lw = metrics.width + 12;
-            ctx.fillStyle = `${bg}cc`;
-            ctx.beginPath();
-            ctx.rect(-lw / 2, -27, lw, 14);
-            ctx.fill();
-            ctx.fillStyle = "#f97316";
-            ctx.fillText(label, 0, -17);
-            ctx.restore();
-          }
-        }
-      } else if (!img || !imgLoaded || showCompass) {
-        // ── Antique compass rose — shown on first open for ≥5s, or while image loads ──
-        const { accent, primary: _primary, isDark: _isDark } = cssColorsRef.current;
-        const cx2 = canvas.width / 2;
-        const cy2 = canvas.height / 2;
-
-        // Track when the compass first appeared
-        if (compassStartRef.current === null) compassStartRef.current = t;
-        const elapsed = t - compassStartRef.current;
-        const SPIN_DURATION = 9000; // ms to complete the spin
-        const progress = Math.min(elapsed / SPIN_DURATION, 1);
-        // ease-out quint: very gradual deceleration
-        const eased = 1 - Math.pow(1 - progress, 5);
-
-        // Outer ring: 1 full rotation; inner rose: 1.5 rotations (opposite)
-        const angleOuter = eased * Math.PI * 2;
-        const angleInner = -eased * Math.PI * 3;
-
-        // Pulse fades in, then settles once stopped
-        // When image is loaded but still in 5s hold window, fade the compass out
-        // compassStartRef tracks when compass first appeared; 5s hold starts at load
-        // We fade out in the last 1.2s of the 5s window via imgLoaded flag
-        const basePulse =
-          progress < 1 ? 0.55 + 0.2 * Math.sin(t * 0.0018) : 0.65;
-        const pulse = basePulse;
-
-        ctx.save();
-        ctx.globalAlpha = pulse;
-        ctx.translate(cx2, cy2);
-
-        const R = Math.min(canvas.width, canvas.height) * 0.22; // overall scale
-
-        // ── Outer ring with tick marks ──────────────────────────────────
-        ctx.save();
-        ctx.rotate(angleOuter);
-        ctx.beginPath();
-        ctx.arc(0, 0, R, 0, Math.PI * 2);
-        ctx.strokeStyle = `${accent}55`;
-        ctx.lineWidth = 0.8;
-        ctx.setLineDash([4, 9]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        // 16 tick marks
-        for (let i = 0; i < 16; i++) {
-          const a = (i / 16) * Math.PI * 2;
-          const long = i % 4 === 0;
-          const r1 = long ? R * 0.84 : R * 0.9;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1);
-          ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R);
-          ctx.strokeStyle = long ? `${accent}77` : `${accent}40`;
-          ctx.lineWidth = long ? 1.2 : 0.6;
-          ctx.stroke();
-        }
-        // Second inner ring
-        ctx.beginPath();
-        ctx.arc(0, 0, R * 0.72, 0, Math.PI * 2);
-        ctx.strokeStyle = `${accent}30`;
-        ctx.lineWidth = 0.6;
-        ctx.stroke();
-        ctx.restore();
-
-        // ── 8-pointed compass rose ────────────────────────────────────
-        ctx.save();
-        ctx.rotate(angleInner);
-        const drawPoint = (len: number, width: number, alpha: number) => {
-          ctx.beginPath();
-          ctx.moveTo(0, -len);
-          ctx.lineTo(-width, 0);
-          ctx.lineTo(0, len * 0.18);
-          ctx.lineTo(width, 0);
-          ctx.closePath();
-          ctx.fillStyle =
-            accent +
-            Math.round(alpha * 255)
-              .toString(16)
-              .padStart(2, "0");
-          ctx.fill();
-        };
-        // 4 cardinal points
-        for (let i = 0; i < 4; i++) {
-          ctx.save();
-          ctx.rotate((i / 4) * Math.PI * 2);
-          drawPoint(R * 0.62, R * 0.07, i === 0 ? 0.85 : 0.45);
-          ctx.restore();
-        }
-        // 4 diagonal points (smaller)
-        for (let i = 0; i < 4; i++) {
-          ctx.save();
-          ctx.rotate((i / 4) * Math.PI * 2 + Math.PI / 4);
-          drawPoint(R * 0.38, R * 0.045, 0.28);
-          ctx.restore();
-        }
-        // Center jewel
-        ctx.beginPath();
-        ctx.arc(0, 0, R * 0.09, 0, Math.PI * 2);
-        ctx.strokeStyle = `${accent}66`;
-        ctx.lineWidth = 0.8;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(0, 0, R * 0.045, 0, Math.PI * 2);
-        ctx.fillStyle = `${accent}cc`;
-        ctx.fill();
-        ctx.restore();
-
-        ctx.restore();
-      }
-
-      // ── Edge vignette — subtle fade at canvas borders ─────────────────
-      // Rebuild only when canvas size or bg color changes
-      const { bg: bgNow } = cssColorsRef.current;
-      const vigBg = fondoColor || bgNow;
-      if (
-        !vignetteCanvas ||
-        vignetteW !== canvas.width ||
-        vignetteH !== canvas.height ||
-        vignetteBg !== vigBg
-      ) {
-        vignetteW = canvas.width;
-        vignetteH = canvas.height;
-        vignetteBg = vigBg;
-        vignetteCanvas = new OffscreenCanvas(vignetteW, vignetteH);
-        const vc = vignetteCanvas.getContext("2d")!;
-        // Smaller fade zones — 18% of each dimension instead of 45%
-        const eT = vignetteH * 0.18;
-        const eS = vignetteW * 0.18;
-
-        const topFog = vc.createLinearGradient(0, 0, 0, eT);
-        topFog.addColorStop(0, `${vigBg}cc`);
-        topFog.addColorStop(0.4, `${vigBg}55`);
-        topFog.addColorStop(1, `${vigBg}00`);
-        vc.fillStyle = topFog;
-        vc.fillRect(0, 0, vignetteW, eT);
-
-        const botFog = vc.createLinearGradient(0, vignetteH - eT, 0, vignetteH);
-        botFog.addColorStop(0, `${vigBg}00`);
-        botFog.addColorStop(0.6, `${vigBg}55`);
-        botFog.addColorStop(1, `${vigBg}cc`);
-        vc.fillStyle = botFog;
-        vc.fillRect(0, vignetteH - eT, vignetteW, eT);
-
-        const leftFog = vc.createLinearGradient(0, 0, eS, 0);
-        leftFog.addColorStop(0, `${vigBg}cc`);
-        leftFog.addColorStop(0.4, `${vigBg}44`);
-        leftFog.addColorStop(1, `${vigBg}00`);
-        vc.fillStyle = leftFog;
-        vc.fillRect(0, 0, eS, vignetteH);
-
-        const rightFog = vc.createLinearGradient(
-          vignetteW - eS,
-          0,
-          vignetteW,
-          0,
-        );
-        rightFog.addColorStop(0, `${vigBg}00`);
-        rightFog.addColorStop(0.6, `${vigBg}44`);
-        rightFog.addColorStop(1, `${vigBg}cc`);
-        vc.fillStyle = rightFog;
-        vc.fillRect(vignetteW - eS, 0, eS, vignetteH);
-      }
-      ctx.drawImage(vignetteCanvas, 0, 0);
-
-      animFrameRef.current = requestAnimationFrame(draw);
-    };
-    animFrameRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animFrameRef.current);
-  }, [
-    imgLoaded,
-    showCompass,
-    markers,
-    hiddenMarkers,
-    editMode,
-    selectedMarkerId,
-    tipo,
-    fondoColor,
-  ]);
-
-  // Invalidate fog cache when markers, edit mode, or fondoColor changes
-  useEffect(() => {
-    fogCacheRef.current = null;
-  }, [markers, editMode, tipo, fondoColor]);
-
-  const hitTest = useCallback(
-    (clientX: number, clientY: number): any | null => {
-      const canvas = canvasRef.current;
-      if (!canvas || !imgRef.current) return null;
-      const rect = canvas.getBoundingClientRect();
-      const s = canvas.width / rect.width;
-      const px = (clientX - rect.left) * s;
-      const py = (clientY - rect.top) * s;
-      const { x: cx, y: cy, scale } = camRef.current;
-      const iw = imgRef.current.width * scale;
-      const ih = imgRef.current.height * scale;
-      for (const m of [...markers].reverse()) {
-        const mx = cx + (m.coord_x / 100) * iw;
-        const my = cy + (m.coord_y / 100) * ih;
-        const dist = Math.hypot(px - mx, py - my);
-        if (dist < 16) return m;
-      }
-      return null;
-    },
-    [markers],
-  );
-
-  const canvasToMapPct = useCallback(
-    (clientX: number, clientY: number): [number, number] => {
-      const canvas = canvasRef.current;
-      if (!canvas || !imgRef.current) return [0, 0];
-      const rect = canvas.getBoundingClientRect();
-      const s = canvas.width / rect.width;
-      const px = (clientX - rect.left) * s;
-      const py = (clientY - rect.top) * s;
-      const { x: cx, y: cy, scale } = camRef.current;
-      const iw = imgRef.current.width * scale;
-      const ih = imgRef.current.height * scale;
-      const x = parseFloat((((px - cx) / iw) * 100).toFixed(2));
-      const y = parseFloat((((py - cy) / ih) * 100).toFixed(2));
-      return [x, y];
-    },
-    [],
-  );
-
-  const zoom = useCallback(
-    (factor: number, pivotX?: number, pivotY?: number) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const px = pivotX ?? canvas.width / 2;
-      const py = pivotY ?? canvas.height / 2;
-      const cam = camRef.current;
-      const newScale = Math.min(8, Math.max(0.2, cam.scale * factor));
-      const sf = newScale / cam.scale;
-      cam.x = px - sf * (px - cam.x);
-      cam.y = py - sf * (py - cam.y);
-      cam.scale = newScale;
-    },
-    [],
-  );
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    isDragging.current = false;
-    dragStart.current = {
-      x: e.clientX,
-      y: e.clientY,
-      camX: camRef.current.x,
-      camY: camRef.current.y,
-    };
-  };
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (e.buttons !== 1) return;
-    const s = renderScaleRef.current;
-    const dx = (e.clientX - dragStart.current.x) * s;
-    const dy = (e.clientY - dragStart.current.y) * s;
-    if (Math.hypot(dx, dy) > 3) isDragging.current = true;
-    if (isDragging.current) {
-      camRef.current.x = dragStart.current.camX + dx;
-      camRef.current.y = dragStart.current.camY + dy;
-    }
-  };
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!isDragging.current) {
-      // ── Eyedropper mode — sample pixel color from the map image ──────
-      if (eyedropperActive && onEyedropperPick) {
-        const canvas = canvasRef.current;
-        const img = imgRef.current;
-        if (canvas && img) {
-          const rect = canvas.getBoundingClientRect();
-          const s = canvas.width / rect.width;
-          const px = (e.clientX - rect.left) * s;
-          const py = (e.clientY - rect.top) * s;
-          // Sample from the image at clicked position (account for camera transform)
-          const { x: cx, y: cy, scale } = camRef.current;
-          const imgX = Math.round((px - cx) / scale);
-          const imgY = Math.round((py - cy) / scale);
-          // Draw just the image to a tiny offscreen canvas to read pixel
-          const tmp = new OffscreenCanvas(img.width, img.height);
-          const tmpCtx = tmp.getContext("2d")!;
-          tmpCtx.drawImage(img, 0, 0);
-          const pixel = tmpCtx.getImageData(
-            Math.max(0, Math.min(imgX, img.width - 1)),
-            Math.max(0, Math.min(imgY, img.height - 1)),
-            1,
-            1,
-          ).data;
-          const hex =
-            "#" +
-            [pixel[0], pixel[1], pixel[2]]
-              .map((v) => v.toString(16).padStart(2, "0"))
-              .join("");
-          onEyedropperPick(hex);
-        }
-        return;
-      }
-      if (editMode) {
-        const hit = hitTest(e.clientX, e.clientY);
-        if (hit) {
-          onMarkerClick(hit);
-          return;
-        }
-        const [x, y] = canvasToMapPct(e.clientX, e.clientY);
-        onMapClick(x, y);
-      } else {
-        const hit = hitTest(e.clientX, e.clientY);
-        if (hit) onMarkerClick(hit);
-      }
-    }
-    isDragging.current = false;
-  };
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.12 : 0.9;
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    const s = canvas.width / rect.width;
-    zoom(factor, (e.clientX - rect.left) * s, (e.clientY - rect.top) * s);
-  };
-
-  const touchStartHandler = useCallback((e: TouchEvent) => {
-    if (e.touches.length === 1) {
-      e.preventDefault();
-      isDragging.current = false;
-      dragStart.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-        camX: camRef.current.x,
-        camY: camRef.current.y,
-      };
-      lastPinchDist.current = null;
-    } else if (e.touches.length === 2) {
-      e.preventDefault();
-      isDragging.current = false;
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      lastPinchDist.current = Math.hypot(dx, dy);
-    }
-  }, []);
-
-  const touchMoveHandler = useCallback(
-    (e: TouchEvent) => {
-      e.preventDefault();
-      const s = renderScaleRef.current;
-      if (e.touches.length === 1) {
-        const dx = (e.touches[0].clientX - dragStart.current.x) * s;
-        const dy = (e.touches[0].clientY - dragStart.current.y) * s;
-        if (Math.hypot(dx, dy) > 3) isDragging.current = true;
-        if (isDragging.current) {
-          camRef.current.x = dragStart.current.camX + dx;
-          camRef.current.y = dragStart.current.camY + dy;
-        }
-      } else if (e.touches.length === 2 && lastPinchDist.current !== null) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const dist = Math.hypot(dx, dy);
-        const pivotX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const pivotY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        const rect = canvasRef.current?.getBoundingClientRect();
-        if (rect)
-          zoom(
-            dist / lastPinchDist.current,
-            (pivotX - rect.left) * s,
-            (pivotY - rect.top) * s,
-          );
-        lastPinchDist.current = dist;
-      }
-    },
-    [zoom],
-  );
-
-  const touchEndHandler = useCallback(
-    (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        dragStart.current = {
-          x: e.touches[0].clientX,
-          y: e.touches[0].clientY,
-          camX: camRef.current.x,
-          camY: camRef.current.y,
-        };
-        isDragging.current = false;
-        lastPinchDist.current = null;
-        return;
-      }
-      if (
-        !isDragging.current &&
-        e.changedTouches.length === 1 &&
-        e.touches.length === 0
-      ) {
-        const t = e.changedTouches[0];
-        const hit = hitTest(t.clientX, t.clientY);
-        if (hit) onMarkerClick(hit);
-      }
-      isDragging.current = false;
-      lastPinchDist.current = null;
-    },
-    [hitTest, onMarkerClick],
-  );
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const opts = { passive: false };
-    canvas.addEventListener("touchstart", touchStartHandler, opts);
-    canvas.addEventListener("touchmove", touchMoveHandler, opts);
-    canvas.addEventListener("touchend", touchEndHandler, opts);
-    return () => {
-      canvas.removeEventListener("touchstart", touchStartHandler);
-      canvas.removeEventListener("touchmove", touchMoveHandler);
-      canvas.removeEventListener("touchend", touchEndHandler);
-    };
-  }, [touchStartHandler, touchMoveHandler, touchEndHandler]);
-
-  // Ctrl/Cmd + "+"/"-" para zoom desde teclado (desktop) — evita depender
-  // de los botones flotantes, que se ocultan en desktop en favor de esto.
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      if (e.key === "+" || e.key === "=") {
-        e.preventDefault();
-        zoom(1.25);
-      } else if (e.key === "-" || e.key === "_") {
-        e.preventDefault();
-        zoom(0.8);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [zoom]);
-
-  return (
-    <div ref={containerRef} className="relative w-full h-full">
-      <canvas
-        ref={canvasRef}
-        className={`w-full h-full block ${eyedropperActive ? "cursor-crosshair" : editMode ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
-        style={{ touchAction: "none" }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onWheel={handleWheel}
-      />
-
-      {/* ── Subtle map-switch fade overlay (non-first transitions) ── */}
-      {mapFading && (
-        <div
-          className="absolute inset-0 pointer-events-none z-20"
-          style={{
-            background: fondoColor || "var(--bg-main)",
-            animation: "mapFadeOut 0.6s ease-out forwards",
-          }}
-        />
-      )}
-
-      {/* ── Inline keyframes for fade overlay ── */}
-      <style>{`
-        @keyframes mapFadeOut {
-          0%   { opacity: 0.55; }
-          100% { opacity: 0; }
-        }
-      `}</style>
-
-      <div className="absolute right-4 bottom-[calc(56px+1rem)] md:bottom-6 flex flex-col gap-1.5 z-10">
-        {/* Zoom con botones — solo mobile, en desktop se usa Ctrl +/- */}
-        {[
-          { icon: <ZoomIn size={14} />, fn: () => zoom(1.25) },
-          { icon: <ZoomOut size={14} />, fn: () => zoom(0.8) },
-        ].map((btn, i) => (
-          <button
-            key={i}
-            className="w-9 h-9 flex md:hidden items-center justify-center transition-all border"
-            style={{
-              background: "color-mix(in srgb, var(--bg-menu) 88%, transparent)",
-              borderColor:
-                "color-mix(in srgb, var(--primary) 30%, transparent)",
-              color: "var(--accent)",
-              borderRadius: "2px",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-            }}
-            onClick={btn.fn}
-          >
-            {btn.icon}
-          </button>
-        ))}
-        {onOpenPanel && (
-          <button
-            className="w-9 h-9 flex items-center justify-center transition-all border md:hidden"
-            style={{
-              background: "color-mix(in srgb, var(--primary) 80%, transparent)",
-              borderColor: "color-mix(in srgb, var(--accent) 35%, transparent)",
-              color: "var(--btn-text, #fff)",
-              borderRadius: "2px",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-            }}
-            onClick={onOpenPanel}
-          >
-            <User size={14} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MapaInteractivo({
@@ -3460,7 +2303,7 @@ export default function MapaInteractivo({
     areaSaveTimeoutRef.current = setTimeout(() => {
       void supabase
         .from("map_areas")
-        .update({ puntos: area.puntos })
+        .update({ puntos: area.puntos, tipo: area.tipo })
         .eq("id", area.id)
         .then(({ error }) => {
           if (error) showToast("Error al guardar el área", "error");
@@ -3946,23 +2789,45 @@ export default function MapaInteractivo({
     await abrirVistaDeReino(reino);
   };
 
-  // Click en la "pill" de un área vinculada a un reino (reemplazo del pin)
-  // → resuelve el reino real por id y abre la misma vista que un click de
-  // pin tradicional. Solo aplica acá porque el único <UnifiedTileCanvas> de
-  // este componente está en la vista "global" (reinos); si más adelante se
-  // agrega uno para la vista de detalle (ciudades), replicar este patrón
-  // resolviendo contra `detallesReino` en vez de `reinos`.
-  const handleAreaClick = (area: BaseArea) => {
-    if (!area.reino_id) return;
-    const reino = reinos.find((r) => r.id === area.reino_id);
-    if (reino) void handleReinoClick(reino);
-  };
-
   // Click derecho sobre un pin → activa/desactiva el modo "mover" para ese
   // reino (equivalente al viejo Ctrl+click, ahora accesible sin teclado).
   const handleReinoContextMenu = (reino: any) => {
     setReinoParaMover((prev) => (prev === reino.id ? null : reino.id));
   };
+
+  // Click sobre el label de un área en el mapa global → abre el mapa del
+  // reino (o de la ciudad, si el área está vinculada a una ciudad) al que
+  // esa área está asociada. Si el reino no fue desbloqueado por el usuario
+  // (y no es admin), no navega — mismo criterio que oculta su pin.
+  const handleAreaLabelClick = useCallback(
+    async (area: BaseArea) => {
+      if (area.reino_id) {
+        if (!isAdmin && !reinosDesbloqueados.has(area.reino_id)) return;
+        const reino = reinos.find((r) => r.id === area.reino_id);
+        if (reino) await handleReinoClick(reino);
+        return;
+      }
+      if (area.ciudad_id) {
+        const { data: ciudad } = await supabase
+          .from("ciudades")
+          .select("*")
+          .eq("id", area.ciudad_id)
+          .maybeSingle();
+        if (!ciudad) return;
+        if (
+          !isAdmin &&
+          !(ciudad.reino_id && reinosDesbloqueados.has(ciudad.reino_id))
+        )
+          return;
+        const reino = reinos.find((r) => r.id === ciudad.reino_id);
+        if (!reino) return;
+        await abrirVistaDeReino(reino);
+        setPuntoSeleccionado(ciudad);
+        setPanelOpen(true);
+      }
+    },
+    [reinos, isAdmin, reinosDesbloqueados],
+  );
 
   // Vincular / desvincular un libro con el reino seleccionado — actualiza
   // libros.reino_id directamente en Supabase y refresca los estados locales.
@@ -4333,7 +3198,7 @@ export default function MapaInteractivo({
     }
   };
 
-  const handleSaveChanges = useCallback(async () => {
+  const handleSaveChanges = async () => {
     setIsSaving(true);
     try {
       if (vistaActual === "reino" && modifiedDetalles.size > 0) {
@@ -4373,52 +3238,15 @@ export default function MapaInteractivo({
           ),
         );
       }
+      showToast("Cambios guardados", "success");
     } catch {
       showToast("No se pudieron guardar los cambios", "error");
     } finally {
       setIsSaving(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vistaActual, modifiedDetalles, detallesReino, reinoSeleccionado]);
-
-  // ── Autoguardado ────────────────────────────────────────────────────────
-  // Reemplaza al botón "Guardar cambios": cualquier edición de nombre,
-  // descripción o posición de un reino/ciudad (modifiedDetalles.size > 0, o
-  // reinoSeleccionado editado en la vista global) se persiste sola 800ms
-  // después del último cambio, sin toast de éxito (silencioso, para no
-  // interrumpir mientras se sigue escribiendo) — solo avisa si falla.
-  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  useEffect(() => {
-    if (!editMode) return;
-    const hayPendiente =
-      (vistaActual === "reino" && modifiedDetalles.size > 0) ||
-      (vistaActual === "global" && reinoSeleccionado);
-    if (!hayPendiente) return;
-    if (autosaveTimeoutRef.current) clearTimeout(autosaveTimeoutRef.current);
-    autosaveTimeoutRef.current = setTimeout(() => {
-      void handleSaveChanges();
-    }, 800);
-    return () => {
-      if (autosaveTimeoutRef.current) clearTimeout(autosaveTimeoutRef.current);
-    };
-    // Dispara con cualquier cambio de contenido relevante — no con
-    // handleSaveChanges en sí (cambia de identidad en cada render por sus
-    // propias deps) para no re-armar el timer sin razón.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMode, vistaActual, modifiedDetalles, reinoSeleccionado]);
+  };
 
   const volverAlGlobal = () => {
-    // Si hay cambios pendientes de autoguardar (debounce todavía corriendo),
-    // los volcamos ya mismo antes de limpiar el estado — si no, se pierden.
-    if (autosaveTimeoutRef.current) {
-      clearTimeout(autosaveTimeoutRef.current);
-      autosaveTimeoutRef.current = null;
-      if (modifiedDetalles.size > 0 || reinoSeleccionado) {
-        void handleSaveChanges();
-      }
-    }
     setVistaActual("global");
     setReinoSeleccionado(null);
     setPuntoSeleccionado(null);
@@ -4433,53 +3261,47 @@ export default function MapaInteractivo({
     onExitReino?.();
   };
 
-  // IDs de reino/ciudad que ya tienen un área vinculada — sus pines se
-  // reemplazan por el área rellena + pill (ver más abajo), el pin deja de
-  // dibujarse por completo (no solo en editMode: el reemplazo es total,
-  // el pin queda de fallback únicamente para los que no tienen área aún).
-  const idsConAreaVinculada = new Set(
-    areas
-      .map((a) => a.reino_id || a.ciudad_id)
-      .filter((id): id is string => Boolean(id)),
-  );
-
-  // Áreas tal como se pasan al canvas: la forma (relleno + contorno) se ve
-  // siempre para todos, pero si el reino/ciudad vinculado todavía NO está
-  // desbloqueado/descubierto por el usuario, se oculta el label — así no
-  // aparece la pill con el nombre (ni se puede abrir clickeándola) hasta
-  // que lo desbloquee. Admins ven todos los nombres siempre.
-  const areasParaCanvas = isAdmin
-    ? areas
-    : areas.map((a) => {
-        const desbloqueada = a.ciudad_id
-          ? ciudadesDesbloqueadas.has(a.ciudad_id)
-          : a.reino_id
-            ? reinosDesbloqueados.has(a.reino_id)
-            : true; // área libre, sin vínculo — no aplica ocultamiento
-        return desbloqueada ? a : { ...a, label: null };
-      });
-
-  // Visible markers: admins ven todos los reinos; usuarios solo los que desbloquearon.
-  // Se excluyen los que ya tienen área vinculada (pin → área+pill).
-  const visibleMarkers = (
+  // Visible markers: admins ven todos los reinos; usuarios solo los que desbloquearon
+  const visibleMarkers =
     vistaActual === "global"
       ? reinos.filter((r) => (isAdmin ? true : reinosDesbloqueados.has(r.id)))
       : detallesReino.filter((l) =>
           isAdmin ? true : ciudadesDesbloqueadas.has(l.id),
-        )
-  ).filter((m: any) => !idsConAreaVinculada.has(m.id));
+        );
 
-  // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla).
-  // También se excluyen acá los que ya tienen área vinculada.
-  const hiddenMarkers = (
+  // En la vista global, un reino con un área vinculada ya muestra su nombre
+  // fijo dentro del área — el pin (punto + píldora) sería redundante. Solo
+  // se ocultan fuera de editMode: en edición conviene seguir viendo todos
+  // los pins para poder seleccionarlos/moverlos.
+  const reinoIdsConArea = new Set(
+    areas.map((a) => a.reino_id).filter((id): id is string => !!id),
+  );
+  const visibleMarkersSinDuplicado =
+    vistaActual === "global" && !editMode
+      ? visibleMarkers.filter((m) => !reinoIdsConArea.has(m.id))
+      : visibleMarkers;
+
+  // Áreas del mapa global tal como se muestran: si el reino vinculado no
+  // fue desbloqueado (y el usuario no es admin), se ve la forma pero sin
+  // nombre ni click — mismo criterio que oculta el pin de ese reino.
+  const areasParaMostrar =
+    vistaActual === "global" && !editMode && !isAdmin
+      ? areas.map((a) =>
+          a.reino_id && !reinosDesbloqueados.has(a.reino_id)
+            ? { ...a, label: null }
+            : a,
+        )
+      : areas;
+
+  // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla)
+  const hiddenMarkers =
     vistaActual === "global"
       ? isAdmin
         ? []
         : reinos.filter((r) => !reinosDesbloqueados.has(r.id))
       : isAdmin
         ? []
-        : detallesReino.filter((l) => !ciudadesDesbloqueadas.has(l.id))
-  ).filter((m: any) => !idsConAreaVinculada.has(m.id));
+        : detallesReino.filter((l) => !ciudadesDesbloqueadas.has(l.id));
 
   const _currentImage =
     vistaActual === "reino" && reinoSeleccionado?.mapa_url
@@ -4596,9 +3418,10 @@ export default function MapaInteractivo({
               transition: "top 0.2s ease",
             }}
           >
-            {editMode && isSaving && (
-              <div
-                className="flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest opacity-80"
+            {editMode && (
+              <button
+                className="flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest disabled:opacity-50 transition-all"
+                disabled={isSaving}
                 style={{
                   background: "color-mix(in srgb, var(--accent) 70%, #1a5c30)",
                   color: "var(--btn-text, #fff)",
@@ -4608,10 +3431,11 @@ export default function MapaInteractivo({
                   letterSpacing: "0.12em",
                   boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
                 }}
+                onClick={handleSaveChanges}
               >
-                <Hourglass size={14} />
-                Guardando…
-              </div>
+                {isSaving ? <Hourglass size={14} /> : <Save size={14} />}
+                Guardar
+              </button>
             )}
           </div>
         )}
@@ -4792,13 +3616,23 @@ export default function MapaInteractivo({
                 <X size={10} />
               </button>
             )}
+
+            {/* Eyedropper hint */}
+            {eyedropperActive && (
+              <span
+                className="text-micro font-semibold uppercase animate-pulse whitespace-nowrap"
+                style={{ color: "var(--accent)", letterSpacing: "0.1em" }}
+              >
+                Clickeá el mapa
+              </span>
+            )}
           </div>
         )}
 
         {vistaActual === "global" ? (
           <>
             <UnifiedTileCanvas
-              areas={areasParaCanvas}
+              areas={areasParaMostrar}
               className="absolute inset-0"
               drawTool={editMode ? drawTool : null}
               editMode={editMode}
@@ -4808,16 +3642,16 @@ export default function MapaInteractivo({
               isFirstOpen={isFirstOpen}
               markers={
                 editMode
-                  ? [...visibleMarkers, ...hiddenMarkers]
-                  : visibleMarkers
+                  ? [...visibleMarkersSinDuplicado, ...hiddenMarkers]
+                  : visibleMarkersSinDuplicado
               }
               selectedAreaId={editMode ? selectedAreaId : null}
               selectedMarkerId={editMode ? (reinoParaMover ?? null) : null}
               tiles={mapTiles}
+              onAreaLabelClick={(area) => void handleAreaLabelClick(area)}
               onAreaDrawEnd={handleAreaDrawEnd}
               onAreaPointsChange={handleAreaPointsChange}
               onAreaSelect={setSelectedAreaId}
-              onAreaClick={handleAreaClick}
               onEyedropperPick={handleFondoColorChange}
               onMapClick={handleMapClick}
               onMarkerClick={handleReinoClick}
