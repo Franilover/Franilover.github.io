@@ -451,8 +451,8 @@ export function ReinoTileCanvas({
   } | null>(null);
   const [vinculadorAreaOpen, setVinculadorAreaOpen] = useState(false);
 
-  // Debounce del guardado de puntos al arrastrar un vértice — mismo patrón
-  // que el mapa global (no hay "onVertexDragEnd" explícito).
+  // Debounce del guardado de puntos al arrastrar un vértice/mover el área —
+  // mismo patrón que el mapa global (no hay "onVertexDragEnd" explícito).
   const areaSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -488,6 +488,30 @@ export function ReinoTileCanvas({
     [deleteArea],
   );
 
+  // Click sobre la pill/relleno de un área vinculada a una ciudad (fuera de
+  // edición) → abre esa ciudad, mismo comportamiento que tenía el pin.
+  const handleAreaClick = useCallback(
+    (area: BaseArea) => {
+      if (!area.ciudad_id) return;
+      const ciudad = detalles.find((d) => d.id === area.ciudad_id);
+      if (ciudad) onPinClick?.(ciudad);
+    },
+    [detalles, onPinClick],
+  );
+
+  // IDs de ciudad que ya tienen un área vinculada — su pin deja de dibujarse
+  // fuera de edición (el área+pill ya muestra el nombre), igual que en el
+  // mapa global.
+  const ciudadIdsConArea = new Set(
+    areas.map((a) => a.ciudad_id).filter((id): id is string => !!id),
+  );
+  const detallesSinDuplicado = editMode
+    ? detalles
+    : detalles.filter((d) => !ciudadIdsConArea.has(d.id));
+  const hiddenMarkersSinDuplicado = editMode
+    ? hiddenMarkers
+    : hiddenMarkers?.filter((d) => !ciudadIdsConArea.has(d.id));
+
   const emptyState = !loading && tiles.length === 0;
 
   return (
@@ -499,13 +523,14 @@ export function ReinoTileCanvas({
         editMode={editMode}
         eyedropperActive={eyedropperActive}
         fondoColor={fondoColor}
-        hiddenMarkers={hiddenMarkers}
+        hiddenMarkers={hiddenMarkersSinDuplicado}
         isFirstOpen={isFirstOpen}
-        markers={detalles}
+        markers={detallesSinDuplicado}
         selectedAreaId={editMode ? selectedAreaId : null}
         selectedMarkerId={selectedPinId}
         tileSize={tileSize}
         tiles={tiles}
+        onAreaClick={handleAreaClick}
         onAreaDrawEnd={handleAreaDrawEnd}
         onAreaPointsChange={updateAreaPoints}
         onAreaSelect={setSelectedAreaId}

@@ -345,6 +345,17 @@ function ModalVincularArea({
               const val = e.target.value || null;
               setReinoId(val);
               setCiudadId(null); // cambiar de reino invalida la ciudad elegida
+              // Autocompletar el nombre del área con el del reino elegido —
+              // solo si el usuario no escribió algo distinto a mano todavía
+              // (si el label actual coincide con el nombre de OTRO reino o
+              // ciudad del catálogo, asumimos que es un resto de una
+              // selección anterior y lo pisamos igual).
+              const reino = reinos.find((r) => r.id === val);
+              const labelEsDeOtraEntidad =
+                !label ||
+                reinos.some((r) => r.nombre === label) ||
+                ciudades.some((c) => c.nombre === label);
+              if (reino && labelEsDeOtraEntidad) setLabel(reino.nombre);
             }}
           >
             <option value="">— Sin vincular a un reino —</option>
@@ -371,7 +382,19 @@ function ModalVincularArea({
               className="input-brand text-sm py-1.5 px-2"
               style={{ borderRadius: "1px" }}
               value={ciudadId ?? ""}
-              onChange={(e) => setCiudadId(e.target.value || null)}
+              onChange={(e) => {
+                const val = e.target.value || null;
+                setCiudadId(val);
+                // Mismo autocompletado que el reino, pero con la ciudad —
+                // una ciudad elegida es más específica que el reino, así
+                // que su nombre gana si el usuario no personalizó el label.
+                const ciudad = ciudadesDelReino.find((c) => c.id === val);
+                const labelEsDeOtraEntidad =
+                  !label ||
+                  reinos.some((r) => r.nombre === label) ||
+                  ciudades.some((c) => c.nombre === label);
+                if (ciudad && labelEsDeOtraEntidad) setLabel(ciudad.nombre);
+              }}
             >
               <option value="">
                 — Todo el reino, sin ciudad puntual —
@@ -1185,15 +1208,15 @@ function PanelContenido({
           </div>
         )}
 
-        <button
-          className="btn-brand w-full justify-center text-micro uppercase py-4 mt-auto disabled:opacity-50"
-          disabled={isSaving}
-          style={{ letterSpacing: "0.12em" }}
-          onClick={handleSaveChanges}
-        >
-          {isSaving ? <Hourglass size={14} /> : <Save size={14} />}
-          Guardar cambios
-        </button>
+        {isSaving && (
+          <div
+            className="w-full flex items-center justify-center gap-2 text-micro uppercase py-3 mt-auto opacity-60"
+            style={{ letterSpacing: "0.12em" }}
+          >
+            <Hourglass size={12} />
+            Guardando…
+          </div>
+        )}
       </div>
     );
   }
@@ -3437,7 +3460,7 @@ export default function MapaInteractivo({
     areaSaveTimeoutRef.current = setTimeout(() => {
       void supabase
         .from("map_areas")
-        .update({ puntos: area.puntos, tipo: area.tipo })
+        .update({ puntos: area.puntos })
         .eq("id", area.id)
         .then(({ error }) => {
           if (error) showToast("Error al guardar el área", "error");
@@ -3923,45 +3946,23 @@ export default function MapaInteractivo({
     await abrirVistaDeReino(reino);
   };
 
+  // Click en la "pill" de un área vinculada a un reino (reemplazo del pin)
+  // → resuelve el reino real por id y abre la misma vista que un click de
+  // pin tradicional. Solo aplica acá porque el único <UnifiedTileCanvas> de
+  // este componente está en la vista "global" (reinos); si más adelante se
+  // agrega uno para la vista de detalle (ciudades), replicar este patrón
+  // resolviendo contra `detallesReino` en vez de `reinos`.
+  const handleAreaClick = (area: BaseArea) => {
+    if (!area.reino_id) return;
+    const reino = reinos.find((r) => r.id === area.reino_id);
+    if (reino) void handleReinoClick(reino);
+  };
+
   // Click derecho sobre un pin → activa/desactiva el modo "mover" para ese
   // reino (equivalente al viejo Ctrl+click, ahora accesible sin teclado).
   const handleReinoContextMenu = (reino: any) => {
     setReinoParaMover((prev) => (prev === reino.id ? null : reino.id));
   };
-
-  // Click sobre el label de un área en el mapa global → abre el mapa del
-  // reino (o de la ciudad, si el área está vinculada a una ciudad) al que
-  // esa área está asociada. Si el reino no fue desbloqueado por el usuario
-  // (y no es admin), no navega — mismo criterio que oculta su pin.
-  const handleAreaLabelClick = useCallback(
-    async (area: BaseArea) => {
-      if (area.reino_id) {
-        if (!isAdmin && !reinosDesbloqueados.has(area.reino_id)) return;
-        const reino = reinos.find((r) => r.id === area.reino_id);
-        if (reino) await handleReinoClick(reino);
-        return;
-      }
-      if (area.ciudad_id) {
-        const { data: ciudad } = await supabase
-          .from("ciudades")
-          .select("*")
-          .eq("id", area.ciudad_id)
-          .maybeSingle();
-        if (!ciudad) return;
-        if (
-          !isAdmin &&
-          !(ciudad.reino_id && reinosDesbloqueados.has(ciudad.reino_id))
-        )
-          return;
-        const reino = reinos.find((r) => r.id === ciudad.reino_id);
-        if (!reino) return;
-        await abrirVistaDeReino(reino);
-        setPuntoSeleccionado(ciudad);
-        setPanelOpen(true);
-      }
-    },
-    [reinos, isAdmin, reinosDesbloqueados],
-  );
 
   // Vincular / desvincular un libro con el reino seleccionado — actualiza
   // libros.reino_id directamente en Supabase y refresca los estados locales.
@@ -4332,7 +4333,7 @@ export default function MapaInteractivo({
     }
   };
 
-  const handleSaveChanges = async () => {
+  const handleSaveChanges = useCallback(async () => {
     setIsSaving(true);
     try {
       if (vistaActual === "reino" && modifiedDetalles.size > 0) {
@@ -4372,15 +4373,52 @@ export default function MapaInteractivo({
           ),
         );
       }
-      showToast("Cambios guardados", "success");
     } catch {
       showToast("No se pudieron guardar los cambios", "error");
     } finally {
       setIsSaving(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vistaActual, modifiedDetalles, detallesReino, reinoSeleccionado]);
+
+  // ── Autoguardado ────────────────────────────────────────────────────────
+  // Reemplaza al botón "Guardar cambios": cualquier edición de nombre,
+  // descripción o posición de un reino/ciudad (modifiedDetalles.size > 0, o
+  // reinoSeleccionado editado en la vista global) se persiste sola 800ms
+  // después del último cambio, sin toast de éxito (silencioso, para no
+  // interrumpir mientras se sigue escribiendo) — solo avisa si falla.
+  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!editMode) return;
+    const hayPendiente =
+      (vistaActual === "reino" && modifiedDetalles.size > 0) ||
+      (vistaActual === "global" && reinoSeleccionado);
+    if (!hayPendiente) return;
+    if (autosaveTimeoutRef.current) clearTimeout(autosaveTimeoutRef.current);
+    autosaveTimeoutRef.current = setTimeout(() => {
+      void handleSaveChanges();
+    }, 800);
+    return () => {
+      if (autosaveTimeoutRef.current) clearTimeout(autosaveTimeoutRef.current);
+    };
+    // Dispara con cualquier cambio de contenido relevante — no con
+    // handleSaveChanges en sí (cambia de identidad en cada render por sus
+    // propias deps) para no re-armar el timer sin razón.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode, vistaActual, modifiedDetalles, reinoSeleccionado]);
 
   const volverAlGlobal = () => {
+    // Si hay cambios pendientes de autoguardar (debounce todavía corriendo),
+    // los volcamos ya mismo antes de limpiar el estado — si no, se pierden.
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+      autosaveTimeoutRef.current = null;
+      if (modifiedDetalles.size > 0 || reinoSeleccionado) {
+        void handleSaveChanges();
+      }
+    }
     setVistaActual("global");
     setReinoSeleccionado(null);
     setPuntoSeleccionado(null);
@@ -4395,47 +4433,53 @@ export default function MapaInteractivo({
     onExitReino?.();
   };
 
-  // Visible markers: admins ven todos los reinos; usuarios solo los que desbloquearon
-  const visibleMarkers =
+  // IDs de reino/ciudad que ya tienen un área vinculada — sus pines se
+  // reemplazan por el área rellena + pill (ver más abajo), el pin deja de
+  // dibujarse por completo (no solo en editMode: el reemplazo es total,
+  // el pin queda de fallback únicamente para los que no tienen área aún).
+  const idsConAreaVinculada = new Set(
+    areas
+      .map((a) => a.reino_id || a.ciudad_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  // Áreas tal como se pasan al canvas: la forma (relleno + contorno) se ve
+  // siempre para todos, pero si el reino/ciudad vinculado todavía NO está
+  // desbloqueado/descubierto por el usuario, se oculta el label — así no
+  // aparece la pill con el nombre (ni se puede abrir clickeándola) hasta
+  // que lo desbloquee. Admins ven todos los nombres siempre.
+  const areasParaCanvas = isAdmin
+    ? areas
+    : areas.map((a) => {
+        const desbloqueada = a.ciudad_id
+          ? ciudadesDesbloqueadas.has(a.ciudad_id)
+          : a.reino_id
+            ? reinosDesbloqueados.has(a.reino_id)
+            : true; // área libre, sin vínculo — no aplica ocultamiento
+        return desbloqueada ? a : { ...a, label: null };
+      });
+
+  // Visible markers: admins ven todos los reinos; usuarios solo los que desbloquearon.
+  // Se excluyen los que ya tienen área vinculada (pin → área+pill).
+  const visibleMarkers = (
     vistaActual === "global"
       ? reinos.filter((r) => (isAdmin ? true : reinosDesbloqueados.has(r.id)))
       : detallesReino.filter((l) =>
           isAdmin ? true : ciudadesDesbloqueadas.has(l.id),
-        );
-
-  // En la vista global, un reino con un área vinculada ya muestra su nombre
-  // fijo dentro del área — el pin (punto + píldora) sería redundante. Solo
-  // se ocultan fuera de editMode: en edición conviene seguir viendo todos
-  // los pins para poder seleccionarlos/moverlos.
-  const reinoIdsConArea = new Set(
-    areas.map((a) => a.reino_id).filter((id): id is string => !!id),
-  );
-  const visibleMarkersSinDuplicado =
-    vistaActual === "global" && !editMode
-      ? visibleMarkers.filter((m) => !reinoIdsConArea.has(m.id))
-      : visibleMarkers;
-
-  // Áreas del mapa global tal como se muestran: si el reino vinculado no
-  // fue desbloqueado (y el usuario no es admin), se ve la forma pero sin
-  // nombre ni click — mismo criterio que oculta el pin de ese reino.
-  const areasParaMostrar =
-    vistaActual === "global" && !editMode && !isAdmin
-      ? areas.map((a) =>
-          a.reino_id && !reinosDesbloqueados.has(a.reino_id)
-            ? { ...a, label: null }
-            : a,
         )
-      : areas;
+  ).filter((m: any) => !idsConAreaVinculada.has(m.id));
 
-  // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla)
-  const hiddenMarkers =
+  // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla).
+  // También se excluyen acá los que ya tienen área vinculada.
+  const hiddenMarkers = (
     vistaActual === "global"
       ? isAdmin
         ? []
         : reinos.filter((r) => !reinosDesbloqueados.has(r.id))
       : isAdmin
         ? []
-        : detallesReino.filter((l) => !ciudadesDesbloqueadas.has(l.id));
+        : detallesReino.filter((l) => !ciudadesDesbloqueadas.has(l.id))
+  ).filter((m: any) => !idsConAreaVinculada.has(m.id));
 
   const _currentImage =
     vistaActual === "reino" && reinoSeleccionado?.mapa_url
@@ -4552,10 +4596,9 @@ export default function MapaInteractivo({
               transition: "top 0.2s ease",
             }}
           >
-            {editMode && (
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest disabled:opacity-50 transition-all"
-                disabled={isSaving}
+            {editMode && isSaving && (
+              <div
+                className="flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest opacity-80"
                 style={{
                   background: "color-mix(in srgb, var(--accent) 70%, #1a5c30)",
                   color: "var(--btn-text, #fff)",
@@ -4565,11 +4608,10 @@ export default function MapaInteractivo({
                   letterSpacing: "0.12em",
                   boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
                 }}
-                onClick={handleSaveChanges}
               >
-                {isSaving ? <Hourglass size={14} /> : <Save size={14} />}
-                Guardar
-              </button>
+                <Hourglass size={14} />
+                Guardando…
+              </div>
             )}
           </div>
         )}
@@ -4750,23 +4792,13 @@ export default function MapaInteractivo({
                 <X size={10} />
               </button>
             )}
-
-            {/* Eyedropper hint */}
-            {eyedropperActive && (
-              <span
-                className="text-micro font-semibold uppercase animate-pulse whitespace-nowrap"
-                style={{ color: "var(--accent)", letterSpacing: "0.1em" }}
-              >
-                Clickeá el mapa
-              </span>
-            )}
           </div>
         )}
 
         {vistaActual === "global" ? (
           <>
             <UnifiedTileCanvas
-              areas={areasParaMostrar}
+              areas={areasParaCanvas}
               className="absolute inset-0"
               drawTool={editMode ? drawTool : null}
               editMode={editMode}
@@ -4776,16 +4808,16 @@ export default function MapaInteractivo({
               isFirstOpen={isFirstOpen}
               markers={
                 editMode
-                  ? [...visibleMarkersSinDuplicado, ...hiddenMarkers]
-                  : visibleMarkersSinDuplicado
+                  ? [...visibleMarkers, ...hiddenMarkers]
+                  : visibleMarkers
               }
               selectedAreaId={editMode ? selectedAreaId : null}
               selectedMarkerId={editMode ? (reinoParaMover ?? null) : null}
               tiles={mapTiles}
-              onAreaLabelClick={(area) => void handleAreaLabelClick(area)}
               onAreaDrawEnd={handleAreaDrawEnd}
               onAreaPointsChange={handleAreaPointsChange}
               onAreaSelect={setSelectedAreaId}
+              onAreaClick={handleAreaClick}
               onEyedropperPick={handleFondoColorChange}
               onMapClick={handleMapClick}
               onMarkerClick={handleReinoClick}
