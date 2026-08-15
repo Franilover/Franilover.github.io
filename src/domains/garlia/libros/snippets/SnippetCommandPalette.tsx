@@ -58,6 +58,14 @@ type SnippetType =
   | "align-right"
   | "parrafo";
 
+type EntidadVinculada = {
+  id: string;
+  nombre: string;
+  tipo: "personaje" | "criatura" | "item";
+  subtipo?: string;
+  imagen_url?: string;
+};
+
 interface PaletteProps {
   anchorRect: { top: number; left: number };
   initialRaw?: string;
@@ -65,6 +73,14 @@ interface PaletteProps {
   initialQuery?: string;
   listaCapitulos?: { id: string; orden: number; titulo_capitulo: string }[];
   listaSecciones?: { id: string; label: string }[];
+  /** IDs de personajes/criaturas/ítems ya vinculados al capítulo actual
+   * (gestionados en PanelPersonajesCapitulo, en el sidebar). Cuando se
+   * pasan, se muestra una sección "Vinculados" arriba de la lista de
+   * categorías con accesos directos a Drop/Diálogo ya preseleccionados
+   * para esas entidades — te ahorra buscarlas de nuevo. */
+  personajesVinculadosIds?: string[];
+  criaturasVinculadasIds?: string[];
+  itemsVinculadosIds?: string[];
   onInsert: (raw: string) => void;
   /** Aplica un comando de formato de bloque (ej. "align-right") sobre el
    * párrafo actual — usado por directAction, ver CATS. Si no se pasa,
@@ -297,6 +313,21 @@ const S = {
     fontWeight: 400,
     color: "var(--foreground, var(--foreground))",
     lineHeight: 1.2,
+  } as React.CSSProperties,
+  iconTextBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "6px 8px",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: 12.5,
+    fontWeight: 400,
+    color: "var(--foreground, var(--foreground))",
+    textAlign: "left" as const,
+    width: "100%",
+    background: "transparent",
+    border: "none",
   } as React.CSSProperties,
   sublabel: {
     fontSize: 10,
@@ -2357,12 +2388,107 @@ export function SnippetCommandPalette({
   initialQuery = "",
   listaCapitulos: _listaCapitulos = [],
   listaSecciones = [],
+  personajesVinculadosIds = [],
+  criaturasVinculadasIds = [],
+  itemsVinculadosIds = [],
   onInsert,
   onFormatCommand,
   onClose,
   onDelete,
 }: PaletteProps) {
   const [q, setQ] = useState(initialQuery);
+  // Entidades vinculadas al capítulo (personajes/criaturas/ítems), para
+  // la sección "Vinculados" arriba del listado. Se resuelven contra el
+  // mismo fetchEntidades() que ya usan FormDrop/FormDialogo, filtradas
+  // por los ids que llegan como prop.
+  const [entidadesAll, setEntidadesAll] = useState<EntidadVinculada[]>([]);
+  useEffect(() => {
+    if (
+      personajesVinculadosIds.length === 0 &&
+      criaturasVinculadasIds.length === 0 &&
+      itemsVinculadosIds.length === 0
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void fetchEntidades().then((d) => {
+      if (cancelled || !d.ok) return;
+      const list: EntidadVinculada[] = [
+        ...(d.data?.personajes ?? []).map((x: any) => ({
+          id: x.id,
+          nombre: x.nombre,
+          tipo: "personaje" as const,
+          subtipo: x.ocupacion,
+          imagen_url: x.img_url || x.imagen_url,
+        })),
+        ...(d.data?.criaturas ?? []).map((x: any) => ({
+          id: x.id,
+          nombre: x.nombre,
+          tipo: "criatura" as const,
+          subtipo: x.habitat,
+          imagen_url: x.img_url || x.imagen_url,
+        })),
+        ...(d.data?.items ?? []).map((x: any) => ({
+          id: x.id,
+          nombre: x.nombre,
+          tipo: "item" as const,
+          subtipo: x.categoria,
+          imagen_url: x.imagen_url,
+        })),
+      ];
+      setEntidadesAll(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const entidadesVinculadas = useMemo(() => {
+    const idsPersonajes = new Set(personajesVinculadosIds);
+    const idsCriaturas = new Set(criaturasVinculadasIds);
+    const idsItems = new Set(itemsVinculadosIds);
+    return entidadesAll.filter(
+      (e) =>
+        (e.tipo === "personaje" && idsPersonajes.has(e.id)) ||
+        (e.tipo === "criatura" && idsCriaturas.has(e.id)) ||
+        (e.tipo === "item" && idsItems.has(e.id)),
+    );
+  }, [entidadesAll, personajesVinculadosIds, criaturasVinculadasIds, itemsVinculadosIds]);
+  // Id de la entidad con el mini-menú Drop/Diálogo abierto (solo aplica
+  // a personajes, que pueden ser cualquiera de los dos).
+  const [vinculadoMenuFor, setVinculadoMenuFor] = useState<string | null>(null);
+  const vinculadoMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!vinculadoMenuFor) return;
+    const onDocClick = (e: MouseEvent) => {
+      // Solo cierra si el click fue realmente fuera del menú — el propio
+      // trigger maneja su toggle en su onClick, así que no lo tocamos acá
+      // (evita la carrera mousedown-antes-que-click que reabría el menú).
+      if (!vinculadoMenuRef.current?.contains(e.target as Node)) {
+        setVinculadoMenuFor(null);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [vinculadoMenuFor]);
+  // Cuando se clickea una entidad vinculada, guardamos acá el raw con el
+  // id ya preseleccionado (mismo formato que initialRaw al editar un chip
+  // existente) y lo usamos en vez de initialRaw al montar FormDrop/
+  // FormDialogo — initialRaw sigue intacto para el flujo de edición real.
+  const [vinculadoRaw, setVinculadoRaw] = useState<string | null>(null);
+  const handleClickVinculado = useCallback(
+    (e: EntidadVinculada, tipo: "drop" | "dialogo") => {
+      setVinculadoMenuFor(null);
+      if (tipo === "drop") {
+        setVinculadoRaw(`[[drop||${e.tipo}|${e.id}|${e.nombre}]]`);
+        setSelectedType("drop");
+      } else {
+        setVinculadoRaw(`[[dialogo|${e.id}|]]`);
+        setSelectedType("dialogo");
+      }
+    },
+    [],
+  );
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedType, setSelectedType] = useState<SnippetType | null>(() => {
     if (!initialRaw) return null;
@@ -2541,14 +2667,21 @@ export function SnippetCommandPalette({
     setSelectedType(null);
     setQ("");
     setChildQuery("");
+    setVinculadoRaw(null);
   }, []);
   const handleDelete = useCallback(() => {
     onDelete?.();
     onClose();
   }, [onDelete, onClose]);
   // Solo se ofrece "Eliminar" cuando estamos editando un chip existente
-  // (initialRaw presente) y el caller nos dio un onDelete real.
+  // (initialRaw presente) y el caller nos dio un onDelete real — nunca
+  // cuando llegamos acá desde un "Vinculado" (eso siempre es insertar
+  // uno nuevo, no editar).
   const deleteHandler = initialRaw && onDelete ? handleDelete : undefined;
+  // Si venimos de clickear un "Vinculado", ese raw preseleccionado manda
+  // sobre initialRaw (que en ese caso ni siquiera debería estar seteado,
+  // pero por las dudas prioriza el más específico a la acción del user).
+  const effectiveInitialRaw = vinculadoRaw ?? initialRaw;
 
   return (
     <div
@@ -2583,6 +2716,101 @@ export function SnippetCommandPalette({
           </div>
 
           <div ref={catListRef} style={S.list}>
+            {/* Vinculados: accesos directos a Drop/Diálogo para los
+                personajes/criaturas/ítems ya vinculados al capítulo. Solo
+                mientras no hay búsqueda activa, para no interferir con el
+                filtro normal. */}
+            {!searchQ && entidadesVinculadas.length > 0 && (
+              <div>
+                <div style={S.groupLabel}>Vinculados</div>
+                {entidadesVinculadas.map((e) => {
+                  const Icon =
+                    e.tipo === "personaje"
+                      ? User
+                      : e.tipo === "criatura"
+                        ? PawPrint
+                        : Package;
+                  const isMenuOpen = vinculadoMenuFor === e.id;
+                  return (
+                    <div
+                      key={`${e.tipo}-${e.id}`}
+                      ref={isMenuOpen ? vinculadoMenuRef : undefined}
+                      style={{ position: "relative" }}
+                    >
+                      <div
+                        style={S.row(isMenuOpen)}
+                        onClick={() => {
+                          if (e.tipo === "personaje") {
+                            setVinculadoMenuFor((cur) =>
+                              cur === e.id ? null : e.id,
+                            );
+                          } else {
+                            handleClickVinculado(e, "drop");
+                          }
+                        }}
+                      >
+                        {e.imagen_url ? (
+                          <img
+                            src={e.imagen_url}
+                            alt=""
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <span style={S.iconBox()}>
+                            <Icon size={14} />
+                          </span>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={S.label}>{e.nombre}</div>
+                        </div>
+                      </div>
+                      {isMenuOpen && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: "100%",
+                            zIndex: 20,
+                            marginTop: 2,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                            padding: 4,
+                            borderRadius: 8,
+                            background: "var(--surface-1, #1a1a1a)",
+                            border:
+                              "0.5px solid var(--border-strong, #444)",
+                            boxShadow: "0 4px 12px rgba(0,0,0,.2)",
+                            minWidth: 130,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            style={S.iconTextBtn}
+                            onClick={() => handleClickVinculado(e, "dialogo")}
+                          >
+                            <MessageCircle size={12} /> Diálogo
+                          </button>
+                          <button
+                            type="button"
+                            style={S.iconTextBtn}
+                            onClick={() => handleClickVinculado(e, "drop")}
+                          >
+                            <Swords size={12} /> Drop
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {filteredCats.length === 0 && (
               <div style={S.empty}>Sin resultados</div>
             )}
@@ -2654,7 +2882,7 @@ export function SnippetCommandPalette({
 
       {selectedType === "drop" && (
         <FormDrop
-          initialRaw={initialRaw}
+          initialRaw={effectiveInitialRaw}
           query={childQuery}
           onBack={handleBack}
           onInsert={handleInsert}
@@ -2663,7 +2891,7 @@ export function SnippetCommandPalette({
       )}
       {selectedType === "dialogo" && (
         <FormDialogo
-          initialRaw={initialRaw}
+          initialRaw={effectiveInitialRaw}
           query={childQuery}
           onBack={handleBack}
           onInsert={handleInsert}
