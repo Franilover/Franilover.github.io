@@ -3293,6 +3293,21 @@ export default function MapaInteractivo({
         )
       : areas;
 
+  // Áreas de las ciudades del reino actualmente abierto — mismo criterio
+  // que areasParaMostrar, pero filtradas por ciudad_id en vez de reino_id.
+  const ciudadIdsDelReino = new Set(detallesReino.map((c) => c.id));
+  const areasDelReino = areas.filter(
+    (a) => a.ciudad_id && ciudadIdsDelReino.has(a.ciudad_id),
+  );
+  const areasDelReinoParaMostrar =
+    !editMode && !isAdmin
+      ? areasDelReino.map((a) =>
+          a.ciudad_id && !ciudadesDesbloqueadas.has(a.ciudad_id)
+            ? { ...a, label: null }
+            : a,
+        )
+      : areasDelReino;
+
   // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla)
   const hiddenMarkers =
     vistaActual === "global"
@@ -3341,19 +3356,15 @@ export default function MapaInteractivo({
     onVincularPersonaje: handleVincularPersonaje,
     onDesvincularPersonaje: handleDesvincularPersonaje,
     vinculandoPersonajeId,
-    // "Editar área": solo tiene sentido en la vista global (el área vive en
-    // map_areas, sobre el mapa del mundo) y solo para el reino/ciudad
-    // actualmente abierto en el panel.
-    onEditarArea:
-      vistaActual === "global"
-        ? (tool: Exclude<DrawTool, null>) => {
-            if (puntoSeleccionado) {
-              handleEditarAreaDe(tool, puntoSeleccionado, "ciudad");
-            } else if (reinoSeleccionado) {
-              handleEditarAreaDe(tool, reinoSeleccionado, "reino");
-            }
-          }
-        : undefined,
+    // "Editar área": para el reino/ciudad actualmente abierto en el panel,
+    // tanto en la vista global (reinos) como en la vista de reino (ciudades).
+    onEditarArea: (tool: Exclude<DrawTool, null>) => {
+      if (puntoSeleccionado) {
+        handleEditarAreaDe(tool, puntoSeleccionado, "ciudad");
+      } else if (reinoSeleccionado) {
+        handleEditarAreaDe(tool, reinoSeleccionado, "reino");
+      }
+    },
     areaVinculada: areas.find((a) =>
       puntoSeleccionado
         ? a.ciudad_id === puntoSeleccionado.id
@@ -3686,95 +3697,27 @@ export default function MapaInteractivo({
                 <Plus size={14} />
               </button>
             )}
-
-            {/* ── Barra de herramientas: dibujar áreas ── */}
-            {editMode && (
-              <div
-                className="absolute bottom-3 left-14 z-10 flex items-center gap-1 px-1.5 py-1.5"
-                style={{
-                  borderRadius: "8px",
-                  background: "color-mix(in srgb, var(--bg-menu) 90%, transparent)",
-                  border: "1px solid color-mix(in srgb, var(--primary) 25%, transparent)",
-                  backdropFilter: "blur(10px)",
-                }}
-              >
-                {(
-                  [
-                    { tool: "circulo" as const, Icon: Circle, title: "Dibujar círculo" },
-                    { tool: "rectangulo" as const, Icon: Square, title: "Dibujar rectángulo" },
-                    { tool: "poligono" as const, Icon: Pentagon, title: "Dibujar forma libre" },
-                  ]
-                ).map(({ tool, Icon, title }) => (
-                  <button
-                    key={tool}
-                    className="w-8 h-8 flex items-center justify-center transition-colors"
-                    style={{
-                      borderRadius: "6px",
-                      background:
-                        drawTool === tool
-                          ? "var(--accent)"
-                          : "transparent",
-                      color: drawTool === tool ? "#fff" : "var(--accent)",
-                    }}
-                    title={title}
-                    onClick={() => {
-                      setSelectedAreaId(null);
-                      setAreaVinculoPreseleccionado(null);
-                      setDrawTool((prev) => (prev === tool ? null : tool));
-                    }}
-                  >
-                    <Icon size={14} />
-                  </button>
-                ))}
-
-                {selectedAreaId && !drawTool && (
-                  <>
-                    <div
-                      className="w-px h-5 mx-0.5"
-                      style={{
-                        background:
-                          "color-mix(in srgb, var(--primary) 25%, transparent)",
-                      }}
-                    />
-                    <button
-                      className="w-8 h-8 flex items-center justify-center"
-                      style={{ borderRadius: "6px", color: "var(--accent)" }}
-                      title="Vincular esta área a un reino/ciudad"
-                      onClick={() => setVinculadorAreaOpen(true)}
-                    >
-                      {areas.find((a) => a.id === selectedAreaId)?.reino_id ||
-                      areas.find((a) => a.id === selectedAreaId)?.ciudad_id ? (
-                        <Link2 size={14} />
-                      ) : (
-                        <Link2Off size={14} />
-                      )}
-                    </button>
-                    <button
-                      className="w-8 h-8 flex items-center justify-center"
-                      style={{ borderRadius: "6px", color: "#ef4444" }}
-                      title="Eliminar área"
-                      onClick={() => void handleDeleteArea(selectedAreaId)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
           </>
         ) : (
           <ReinoTileCanvas
+            areas={areasDelReinoParaMostrar}
             className="absolute inset-0"
             detalles={
               editMode ? [...visibleMarkers, ...hiddenMarkers] : visibleMarkers
             }
+            drawTool={editMode ? drawTool : null}
             editMode={editMode}
             eyedropperActive={eyedropperActive}
             fondoColor={fondoColor}
             hiddenMarkers={editMode ? [] : hiddenMarkers}
             isFirstOpen={isFirstOpen}
             reinoId={reinoSeleccionado.id}
+            selectedAreaId={editMode ? selectedAreaId : null}
             selectedMarkerId={editMode ? puntoParaMover : null}
+            onAreaDrawEnd={handleAreaDrawEnd}
+            onAreaLabelClick={(area) => void handleAreaLabelClick(area)}
+            onAreaPointsChange={handleAreaPointsChange}
+            onAreaSelect={setSelectedAreaId}
             onDetallesChange={(nuevos) => {
               setDetallesReino(nuevos);
               // Marcamos como modificados los que cambiaron de posición, para
@@ -3810,6 +3753,81 @@ export default function MapaInteractivo({
               setPanelOpen(true);
             }}
           />
+        )}
+
+        {/* ── Barra de herramientas: dibujar áreas — global y reino ── */}
+        {editMode && (
+          <div
+            className="absolute bottom-3 left-14 z-10 flex items-center gap-1 px-1.5 py-1.5"
+            style={{
+              borderRadius: "8px",
+              background: "color-mix(in srgb, var(--bg-menu) 90%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--primary) 25%, transparent)",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            {(
+              [
+                { tool: "circulo" as const, Icon: Circle, title: "Dibujar círculo" },
+                { tool: "rectangulo" as const, Icon: Square, title: "Dibujar rectángulo" },
+                { tool: "poligono" as const, Icon: Pentagon, title: "Dibujar forma libre" },
+              ]
+            ).map(({ tool, Icon, title }) => (
+              <button
+                key={tool}
+                className="w-8 h-8 flex items-center justify-center transition-colors"
+                style={{
+                  borderRadius: "6px",
+                  background:
+                    drawTool === tool
+                      ? "var(--accent)"
+                      : "transparent",
+                  color: drawTool === tool ? "#fff" : "var(--accent)",
+                }}
+                title={title}
+                onClick={() => {
+                  setSelectedAreaId(null);
+                  setAreaVinculoPreseleccionado(null);
+                  setDrawTool((prev) => (prev === tool ? null : tool));
+                }}
+              >
+                <Icon size={14} />
+              </button>
+            ))}
+
+            {selectedAreaId && !drawTool && (
+              <>
+                <div
+                  className="w-px h-5 mx-0.5"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--primary) 25%, transparent)",
+                  }}
+                />
+                <button
+                  className="w-8 h-8 flex items-center justify-center"
+                  style={{ borderRadius: "6px", color: "var(--accent)" }}
+                  title="Vincular esta área a un reino/ciudad"
+                  onClick={() => setVinculadorAreaOpen(true)}
+                >
+                  {areas.find((a) => a.id === selectedAreaId)?.reino_id ||
+                  areas.find((a) => a.id === selectedAreaId)?.ciudad_id ? (
+                    <Link2 size={14} />
+                  ) : (
+                    <Link2Off size={14} />
+                  )}
+                </button>
+                <button
+                  className="w-8 h-8 flex items-center justify-center"
+                  style={{ borderRadius: "6px", color: "#ef4444" }}
+                  title="Eliminar área"
+                  onClick={() => void handleDeleteArea(selectedAreaId)}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
+          </div>
         )}
       </div>
 
