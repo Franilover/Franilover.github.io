@@ -4,41 +4,31 @@
  * FloraEditor.tsx
  * ───────────────────────────────────────────────────────────────────────────
  * Editor liviano y self-contained de una entidad Flora: nombre, imagen,
- * descripción rica, composición material referenciando un Compuesto del
- * catálogo de Elementos (compuesto_id — elegido/creado vía SelectorCompuesto,
- * en vez de armar elementos sueltos uno a uno) con balance por capa /
- * reactividad / peso, y notas.
+ * descripción rica, composición material con una o varias partes (cada una
+ * referenciando un Compuesto del catálogo de Elementos + una etiqueta libre
+ * que explica dónde/por qué aplica, ej. "Tronco", "Hojas"), y notas.
  *
  * Molde: liviano como ItemEditor/EcosistemaEditor, no tan pesado como
  * EditorCriatura.tsx (sin personajes/reinos/ítems/grupos/D&D).
  */
 
 import { Leaf } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { type SaveStatus } from "@/ui/saveStatus";
 
-import {
-  calcularBalancePorCapa,
-  calcularPerfilAtomico,
-  calcularPeso,
-  calcularReactividad,
-} from "@/domains/garlia/elementos/afinidad";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
-import {
-  LAYER_LABEL,
-  REACTIVIDAD_LABEL,
-  formatLayer,
-  type Compuesto,
-  type LayerName,
-} from "@/domains/garlia/elementos/types";
+import { type Compuesto } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
-import { SelectorCompuesto } from "@/domains/garlia/_shared/SelectorCompuesto";
+import {
+  SelectorComposicionMultiple,
+  type ComposicionEntrada,
+} from "@/domains/garlia/_shared/SelectorComposicionMultiple";
 import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
@@ -47,47 +37,6 @@ import {
 import { useFlora } from "./useFlora";
 import { type Flora } from "./types";
 import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/SelectorEcosistemasDeEntidad";
-
-const LAYERS: LayerName[] = ["nucleo", "media", "externa"];
-
-// ─── Barra de balance de una capa (misma pieza que en PerfilAtomicoCriaturaPanel) ──
-function BarraCapa({
-  layer,
-  perfil,
-  total,
-  capacidad,
-}: {
-  layer: LayerName;
-  perfil: Record<string, number | undefined>;
-  total: number;
-  capacidad: number;
-}) {
-  const balance = total - capacidad;
-  const pct = capacidad > 0 ? Math.min(100, (total / capacidad) * 100) : 0;
-
-  return (
-    <div className="mb-2.5 last:mb-0">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-micro font-black uppercase tracking-wide text-primary/50">
-          {LAYER_LABEL[layer]}
-        </span>
-        <span className="text-micro font-bold text-primary/40">
-          {total}/{capacidad}{" "}
-          {balance === 0 ? "(saturada)" : balance > 0 ? `(+${balance})` : `(${balance})`}
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-primary/8 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${
-            balance < 0 ? "bg-amber-400/60" : balance > 0 ? "bg-accent/60" : "bg-emerald-400/60"
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="text-micro text-primary/35 mt-0.5 block">{formatLayer(perfil)}</span>
-    </div>
-  );
-}
 
 export function FloraEditor({
   flora: floraProp,
@@ -112,27 +61,6 @@ export function FloraEditor({
     setStatus("idle");
   }, [floraProp.id]);
 
-  const compuestoElegido = useMemo(
-    () => compuestos.find((c) => c.id === form.compuesto_id) ?? null,
-    [compuestos, form.compuesto_id],
-  );
-  const perfilAtomico = useMemo(
-    () => (compuestoElegido ? calcularPerfilAtomico(compuestoElegido, elementos) : null),
-    [compuestoElegido, elementos],
-  );
-  const balance = useMemo(
-    () => (perfilAtomico ? calcularBalancePorCapa(perfilAtomico) : null),
-    [perfilAtomico],
-  );
-  const reactividad = useMemo(
-    () => (compuestoElegido ? calcularReactividad(compuestoElegido, elementos) : null),
-    [compuestoElegido, elementos],
-  );
-  const peso = useMemo(
-    () => (compuestoElegido ? calcularPeso(compuestoElegido, elementos) : null),
-    [compuestoElegido, elementos],
-  );
-
   async function guardar(updates: Partial<Flora>) {
     setStatus("saving");
     try {
@@ -144,9 +72,9 @@ export function FloraEditor({
     }
   }
 
-  function cambiarCompuesto(compuestoId: string | null) {
-    setForm((f) => ({ ...f, compuesto_id: compuestoId }));
-    void guardar({ compuesto_id: compuestoId });
+  function cambiarComposicion(composicion: ComposicionEntrada[]) {
+    setForm((f) => ({ ...f, composicion }));
+    void guardar({ composicion });
   }
 
   function onCompuestoCreado(nuevo: Compuesto) {
@@ -215,60 +143,30 @@ export function FloraEditor({
                 />
               </div>
 
-              {/* Composición material — ahora se elige/crea un Compuesto del
-                  catálogo en vez de armar elementos sueltos uno a uno */}
+              {/* Composición material — puede tener varias partes hechas de
+                  compuestos distintos (ej: "Madera" en el tronco, "Resina"
+                  en la savia), cada una con su propia etiqueta */}
               <div className="pt-2 border-t border-primary/10">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-                    Composición (Compuesto)
+                    Composición (Compuestos)
                   </span>
                 </div>
                 <p className="text-micro text-primary/30 mb-1.5 -mt-1">
-                  Compuesto de la Tabla Química que forma esta planta.
+                  Compuestos de la Tabla Química que forman esta planta, por parte
+                  (tronco, hojas, raíz…).
                 </p>
 
-                <SelectorCompuesto
+                <SelectorComposicionMultiple
+                  composicion={form.composicion ?? []}
+                  onChange={cambiarComposicion}
                   compuestos={compuestos}
+                  elementos={elementos}
                   loadingCompuestos={loadingCompuestos}
-                  compuestoId={form.compuesto_id}
-                  onChange={cambiarCompuesto}
                   onCompuestoCreado={onCompuestoCreado}
                   onEditarCompuesto={setEditandoCompuestoId}
                 />
               </div>
-
-              {/* Balance por capa del compuesto elegido */}
-              {compuestoElegido && balance && perfilAtomico && (
-                <div className="p-3 rounded-xl border border-primary/10 bg-primary/[0.02]">
-                  {LAYERS.map((layer) => {
-                    const b = balance.find((x) => x.layer === layer)!;
-                    return (
-                      <BarraCapa
-                        key={layer}
-                        layer={layer}
-                        perfil={perfilAtomico[layer]}
-                        total={b.total}
-                        capacidad={b.capacidad}
-                      />
-                    );
-                  })}
-
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary/10">
-                    <span className="text-micro font-bold text-primary/50">
-                      Reactividad:{" "}
-                      <span className="text-primary/80">
-                        {reactividad ? REACTIVIDAD_LABEL[reactividad.nivel] : "—"}
-                      </span>
-                    </span>
-                    <span className="text-micro font-bold text-primary/50">
-                      Peso:{" "}
-                      <span className="text-primary/80">
-                        {peso ? `${peso.pesoTotal} (${peso.categoria})` : "—"}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              )}
 
               {/* Ecosistemas donde crece esta planta — edición inversa de
                   Ecosistema.flora_ids */}
