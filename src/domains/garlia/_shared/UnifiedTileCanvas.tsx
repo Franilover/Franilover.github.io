@@ -1356,55 +1356,16 @@ export function UnifiedTileCanvas<
         }
       }
 
-      // ── Click sobre el label de un área (siempre, editMode o no) ──────────
+      // ── Click izquierdo sobre un área (en cualquier punto de la forma,
+      // no solo el texto) → navega al reino/ciudad vinculado. La edición
+      // de la forma (mover vértices / arrastrar el área) se activa con
+      // click derecho — ver onContextMenu más abajo.
       if (!drawTool && onAreaClick) {
-        const canvasCtx = canvas.getContext("2d");
-        if (canvasCtx) {
-          const rect4 = canvas.getBoundingClientRect();
-          const s4 = cssToCanvasScale();
-          const px = (clientX - rect4.left) * s4;
-          const py = (clientY - rect4.top) * s4;
-          const { x: cx, y: cy, scale } = camRef.current;
-          canvasCtx.font = "700 11px 'Cinzel', serif";
-          const hitLabel = [...areas]
-            .reverse()
-            .find((area) => {
-              if (!area.label || area.puntos.length < 2) return false;
-              const localPts = area.puntos.map((p) => worldToLocal(p, scale));
-              let lx: number, ly: number;
-              if (area.tipo === "poligono") {
-                lx = localPts.reduce((s, p) => s + p.lx, 0) / localPts.length;
-                ly = localPts.reduce((s, p) => s + p.ly, 0) / localPts.length;
-              } else {
-                lx = (localPts[0].lx + localPts[1].lx) / 2;
-                ly = (localPts[0].ly + localPts[1].ly) / 2;
-              }
-              const tw = canvasCtx.measureText(area.label!).width;
-              const absX = cx + lx;
-              const absY = cy + ly;
-              // Hit box centrada en el texto (mismo textAlign "center" con
-              // el que se dibuja), con algo de margen vertical.
-              return (
-                px >= absX - tw / 2 - 4 &&
-                px <= absX + tw / 2 + 4 &&
-                py >= absY - 12 &&
-                py <= absY + 4
-              );
-            });
-          if (hitLabel) {
-            onAreaClick(hitLabel);
-            return;
-          }
-        }
-      }
-
-      // ── Click sobre un área existente (sin herramienta activa) → seleccionarla ──
-      if (editMode && !drawTool && onAreaSelect) {
         const wp = clientToWorldPoint(clientX, clientY);
         if (wp) {
           const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
           if (hitArea) {
-            onAreaSelect(hitArea.id === selectedAreaId ? null : hitArea.id);
+            onAreaClick(hitArea);
             return;
           }
         }
@@ -1538,6 +1499,21 @@ export function UnifiedTileCanvas<
             marker.id === markerParaMoverIdRef.current ? null : marker.id;
           setMarkerParaMoverId(next);
           onMarkerSelect(next);
+        }
+        return;
+      }
+
+      // ── Click derecho sobre un área → la selecciona para editar (mover
+      // vértices / arrastrar la forma). El izquierdo, en cambio, navega
+      // al reino/ciudad vinculado (ver onAreaClick más arriba). ─────────
+      if (!drawTool && onAreaSelect) {
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        if (wp) {
+          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
+          if (hitArea) {
+            e.preventDefault();
+            onAreaSelect(hitArea.id === selectedAreaId ? null : hitArea.id);
+          }
         }
       }
     };
