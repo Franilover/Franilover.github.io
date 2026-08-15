@@ -345,6 +345,17 @@ function ModalVincularArea({
               const val = e.target.value || null;
               setReinoId(val);
               setCiudadId(null); // cambiar de reino invalida la ciudad elegida
+              // Autocompletar el nombre del área con el del reino elegido —
+              // solo si el usuario no escribió algo distinto a mano todavía
+              // (si el label actual coincide con el nombre de OTRO reino o
+              // ciudad del catálogo, asumimos que es un resto de una
+              // selección anterior y lo pisamos igual).
+              const reino = reinos.find((r) => r.id === val);
+              const labelEsDeOtraEntidad =
+                !label ||
+                reinos.some((r) => r.nombre === label) ||
+                ciudades.some((c) => c.nombre === label);
+              if (reino && labelEsDeOtraEntidad) setLabel(reino.nombre);
             }}
           >
             <option value="">— Sin vincular a un reino —</option>
@@ -371,7 +382,19 @@ function ModalVincularArea({
               className="input-brand text-sm py-1.5 px-2"
               style={{ borderRadius: "1px" }}
               value={ciudadId ?? ""}
-              onChange={(e) => setCiudadId(e.target.value || null)}
+              onChange={(e) => {
+                const val = e.target.value || null;
+                setCiudadId(val);
+                // Mismo autocompletado que el reino, pero con la ciudad —
+                // una ciudad elegida es más específica que el reino, así
+                // que su nombre gana si el usuario no personalizó el label.
+                const ciudad = ciudadesDelReino.find((c) => c.id === val);
+                const labelEsDeOtraEntidad =
+                  !label ||
+                  reinos.some((r) => r.nombre === label) ||
+                  ciudades.some((c) => c.nombre === label);
+                if (ciudad && labelEsDeOtraEntidad) setLabel(ciudad.nombre);
+              }}
             >
               <option value="">
                 — Todo el reino, sin ciudad puntual —
