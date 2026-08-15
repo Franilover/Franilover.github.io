@@ -160,6 +160,11 @@ interface ReinoTileCanvasProps {
   hiddenMarkers?: CiudadConTile[];
   selectedMarkerId?: string | null;
   onMarkerSelect?: (id: string | null) => void;
+  /** Click derecho sobre un pin → activa/desactiva el modo "mover" para ese
+   * pin. Independiente de selectedMarkerId (que suele reflejar la ciudad
+   * abierta en el panel lateral) — sin esto, con el panel abierto un
+   * click izquierdo cualquiera en el canvas terminaba moviendo el pin. */
+  onMarkerContextMenu?: (ciudad: CiudadConTile) => void;
   fondoColor?: string | null;
   isFirstOpen?: boolean;
   eyedropperActive?: boolean;
@@ -178,6 +183,7 @@ export function ReinoTileCanvas({
   hiddenMarkers,
   selectedMarkerId: selectedMarkerIdProp,
   onMarkerSelect: onMarkerSelectProp,
+  onMarkerContextMenu: onMarkerContextMenuProp,
   fondoColor,
   isFirstOpen,
   eyedropperActive,
@@ -214,6 +220,7 @@ export function ReinoTileCanvas({
         tiles={tiles}
         onEyedropperPick={onEyedropperPick}
         onMarkerClick={(ciudad) => onPinClick?.(ciudad)}
+        onMarkerContextMenu={onMarkerContextMenuProp}
         onMarkerMove={(markerId, coord) => {
           onDetallesChange(
             detalles.map((d) =>

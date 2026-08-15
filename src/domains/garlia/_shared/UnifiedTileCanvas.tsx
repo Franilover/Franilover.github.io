@@ -172,6 +172,24 @@ export function UnifiedTileCanvas<
   // Tile bajo el cursor (para mostrar la papelera flotante)
   const [hoverTile, setHoverTile] = useState<TTile | null>(null);
   const hoverTileRef = useRef<TTile | null>(null);
+
+  // Marker "armado" para moverse — SOLO se activa con Ctrl+click o click
+  // derecho sobre un pin (ver más abajo). Es independiente de
+  // selectedMarkerId (prop), que el padre suele setear también cuando el
+  // panel de info de ese pin está abierto — si usáramos selectedMarkerId
+  // acá, con el panel abierto cualquier click izquierdo en el canvas
+  // movería el pin sin que el usuario lo pidiera. markerParaMoverId es el
+  // único que dispara "depositar el pin en la posición clickeada".
+  const [markerParaMoverId, setMarkerParaMoverId] = useState<string | null>(
+    null,
+  );
+  const markerParaMoverIdRef = useRef<string | null>(null);
+  markerParaMoverIdRef.current = markerParaMoverId;
+
+  useEffect(() => {
+    if (!editMode) setMarkerParaMoverId(null);
+  }, [editMode]);
+
   // Casilla fantasma bajo el cursor (col/row de celda vacía en editMode)
   const ghostHoverRef = useRef<{ col: number; row: number } | null>(null);
   const [ghostHover, setGhostHover] = useState<{
@@ -916,20 +934,30 @@ export function UnifiedTileCanvas<
         return;
       }
 
-      // ── Si hay pin seleccionado esperando ser movido → depositarlo ──────────
-      // (solo en editMode: fuera de edición, selectedMarkerId puede venir
-      // seteado por el panel de detalle abierto, y no debe interpretarse
-      // como "listo para moverse".)
-      if (editMode && selectedMarkerId) {
+      // ── Si hay pin armado para moverse → depositarlo ─────────────────────
+      // Dos fuentes posibles, según quién controla el modo "mover":
+      //   - markerParaMoverIdRef (interno): cuando el padre NO pasa
+      //     onMarkerContextMenu (ej. ReinoTileCanvas) — ahí selectedMarkerId
+      //     puede venir seteado solo porque el panel de detalle de ese pin
+      //     está abierto, y no debe interpretarse como "listo para moverse".
+      //   - selectedMarkerId (prop): cuando el padre SÍ pasa
+      //     onMarkerContextMenu (ej. mapa global, con reinoParaMover) — ahí
+      //     el padre garantiza que selectedMarkerId solo se setea vía ese
+      //     handler, así que es seguro usarlo directo como "para mover".
+      const idParaMover = onMarkerContextMenu
+        ? selectedMarkerId
+        : markerParaMoverIdRef.current;
+      if (editMode && idParaMover) {
         const info = canvasToTileInfo(clientX, clientY);
         if (info) {
-          onMarkerMove(selectedMarkerId, {
+          onMarkerMove(idParaMover, {
             x: info.x,
             y: info.y,
             tile_col: info.tile_col,
             tile_row: info.tile_row,
           });
         }
+        if (!onMarkerContextMenu) setMarkerParaMoverId(null);
         return;
       }
 
@@ -956,9 +984,17 @@ export function UnifiedTileCanvas<
       const marker = findMarkerAt(clientX, clientY);
       if (marker) {
         if (withCtrl && editMode) {
-          // Ctrl + click en pin → seleccionarlo para moverlo (atajo de teclado,
-          // se mantiene por compatibilidad además del click derecho)
-          onMarkerSelect(marker.id === selectedMarkerId ? null : marker.id);
+          // Ctrl + click en pin → armarlo para moverlo (atajo de teclado,
+          // se mantiene por compatibilidad además del click derecho). Misma
+          // dualidad que en "depositar": si el padre controla su propio
+          // onMarkerContextMenu, solo avisamos vía onMarkerSelect y es el
+          // padre quien decide selectedMarkerId; si no, lo armamos acá.
+          const current = onMarkerContextMenu
+            ? selectedMarkerId
+            : markerParaMoverIdRef.current;
+          const next = marker.id === current ? null : marker.id;
+          if (!onMarkerContextMenu) setMarkerParaMoverId(next);
+          onMarkerSelect(next);
         } else {
           // Click izquierdo simple en pin → siempre abre el panel de info
           onMarkerClick?.(marker);
@@ -1062,9 +1098,16 @@ export function UnifiedTileCanvas<
       if (marker) {
         e.preventDefault();
         if (onMarkerContextMenu) {
+          // El padre maneja su propio estado externo de "para mover" (ej.
+          // mapa global con reinoParaMover) — delegamos 100%.
           onMarkerContextMenu(marker);
         } else {
-          onMarkerSelect(marker.id === selectedMarkerId ? null : marker.id);
+          // Sin handler del padre (ej. ReinoTileCanvas): armamos el pin acá
+          // mismo con el estado interno, independiente de selectedMarkerId.
+          const next =
+            marker.id === markerParaMoverIdRef.current ? null : marker.id;
+          setMarkerParaMoverId(next);
+          onMarkerSelect(next);
         }
       }
     };

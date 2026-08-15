@@ -2616,6 +2616,11 @@ export default function MapaInteractivo({
     null,
   );
   const [reinoParaMover, setReinoParaMover] = useState<string | null>(null);
+  // Análogo a reinoParaMover pero para las ciudades DENTRO de un reino
+  // (ReinoTileCanvas) — separado de puntoSeleccionado (el punto abierto en
+  // el panel lateral) para que un click izquierdo normal con el panel
+  // abierto no mueva el pin sin que el usuario lo pida.
+  const [puntoParaMover, setPuntoParaMover] = useState<string | null>(null);
 
   const handleTileCreated = useCallback((tile: MapTile) => {
     setMapTiles((prev) => [...prev, tile]);
@@ -3818,7 +3823,7 @@ export default function MapaInteractivo({
             hiddenMarkers={editMode ? [] : hiddenMarkers}
             isFirstOpen={isFirstOpen}
             reinoId={reinoSeleccionado.id}
-            selectedMarkerId={editMode ? (puntoSeleccionado?.id ?? null) : null}
+            selectedMarkerId={editMode ? puntoParaMover : null}
             onDetallesChange={(nuevos) => {
               setDetallesReino(nuevos);
               // Marcamos como modificados los que cambiaron de posición, para
@@ -3840,11 +3845,10 @@ export default function MapaInteractivo({
               }
             }}
             onEyedropperPick={handleFondoColorChange}
-            onMarkerSelect={(id) =>
-              setPuntoSeleccionado(
-                id ? (detallesReino.find((d) => d.id === id) ?? null) : null,
-              )
+            onMarkerContextMenu={(m) =>
+              setPuntoParaMover((prev) => (prev === m.id ? null : m.id))
             }
+            onMarkerSelect={setPuntoParaMover}
             onOpenPanel={
               isMobile && (reinoSeleccionado || puntoSeleccionado)
                 ? () => setPanelOpen(true)
