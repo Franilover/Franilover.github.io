@@ -3931,10 +3931,12 @@ export default function MapaInteractivo({
 
   // Click sobre el label de un área en el mapa global → abre el mapa del
   // reino (o de la ciudad, si el área está vinculada a una ciudad) al que
-  // esa área está asociada.
+  // esa área está asociada. Si el reino no fue desbloqueado por el usuario
+  // (y no es admin), no navega — mismo criterio que oculta su pin.
   const handleAreaLabelClick = useCallback(
     async (area: BaseArea) => {
       if (area.reino_id) {
+        if (!isAdmin && !reinosDesbloqueados.has(area.reino_id)) return;
         const reino = reinos.find((r) => r.id === area.reino_id);
         if (reino) await handleReinoClick(reino);
         return;
@@ -3946,6 +3948,11 @@ export default function MapaInteractivo({
           .eq("id", area.ciudad_id)
           .maybeSingle();
         if (!ciudad) return;
+        if (
+          !isAdmin &&
+          !(ciudad.reino_id && reinosDesbloqueados.has(ciudad.reino_id))
+        )
+          return;
         const reino = reinos.find((r) => r.id === ciudad.reino_id);
         if (!reino) return;
         await abrirVistaDeReino(reino);
@@ -3953,7 +3960,7 @@ export default function MapaInteractivo({
         setPanelOpen(true);
       }
     },
-    [reinos],
+    [reinos, isAdmin, reinosDesbloqueados],
   );
 
   // Vincular / desvincular un libro con el reino seleccionado — actualiza
@@ -4408,6 +4415,18 @@ export default function MapaInteractivo({
       ? visibleMarkers.filter((m) => !reinoIdsConArea.has(m.id))
       : visibleMarkers;
 
+  // Áreas del mapa global tal como se muestran: si el reino vinculado no
+  // fue desbloqueado (y el usuario no es admin), se ve la forma pero sin
+  // nombre ni click — mismo criterio que oculta el pin de ese reino.
+  const areasParaMostrar =
+    vistaActual === "global" && !editMode && !isAdmin
+      ? areas.map((a) =>
+          a.reino_id && !reinosDesbloqueados.has(a.reino_id)
+            ? { ...a, label: null }
+            : a,
+        )
+      : areas;
+
   // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla)
   const hiddenMarkers =
     vistaActual === "global"
@@ -4747,7 +4766,7 @@ export default function MapaInteractivo({
         {vistaActual === "global" ? (
           <>
             <UnifiedTileCanvas
-              areas={areas}
+              areas={areasParaMostrar}
               className="absolute inset-0"
               drawTool={editMode ? drawTool : null}
               editMode={editMode}
