@@ -673,7 +673,7 @@ export function UnifiedTileCanvas<
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const { accent, bg, labelBg, labelText, isDark } = cssColorsRef.current;
+      const { accent, bg, labelText, isDark } = cssColorsRef.current;
       ctx.fillStyle = fondoColor || bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -940,34 +940,25 @@ export function UnifiedTileCanvas<
 
       ctx.restore();
 
-      // ── Labels (fuera del transform) ──────────────────────────────────────
+      // ── Labels (fuera del transform) — texto único básico, sin pill ────────
       const allMarkers2 = editMode ? [...markers, ...hiddenMarkers] : markers;
       ctx.font = "700 11px 'Cinzel', serif";
-      const cache = labelCacheRef.current;
+      ctx.textAlign = "center";
 
       for (const m of allMarkers2) {
         if (hiddenMarkers.some((h) => h.id === m.id)) continue;
         const label = m.nombre || m.name || "";
         if (!label) continue;
         const { mx, my } = getMarkerScreenPos(m, cx, cy, scale);
-        let tw = cache.get(m.id);
-        if (tw === undefined) {
-          tw = ctx.measureText(label).width;
-          cache.set(m.id, tw);
-        }
-        const pad = 5;
-        const lx = mx - tw / 2 - pad;
-        const ly = my + 10;
-        ctx.fillStyle = `${labelBg}ee`;
-        ctx.beginPath();
-        void (
-          (ctx as any).roundRect?.(lx, ly, tw + pad * 2, 18, 3) ??
-          ctx.rect(lx, ly, tw + pad * 2, 18)
-        );
-        ctx.fill();
+        const ly = my + 18;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = isDark ? "rgba(0,0,0,0.85)" : "rgba(255,255,255,0.85)";
+        ctx.strokeText(label, mx, ly);
         ctx.fillStyle = labelText;
-        ctx.fillText(label, mx - tw / 2, ly + 12);
+        ctx.fillText(label, mx, ly);
       }
+
+      ctx.textAlign = "left";
 
       // ── Papelera flotante ─────────────────────────────────────────────────
       trashRectRef.current = null;
