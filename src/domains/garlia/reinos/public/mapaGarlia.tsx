@@ -4396,6 +4396,18 @@ export default function MapaInteractivo({
           isAdmin ? true : ciudadesDesbloqueadas.has(l.id),
         );
 
+  // En la vista global, un reino con un área vinculada ya muestra su nombre
+  // fijo dentro del área — el pin (punto + píldora) sería redundante. Solo
+  // se ocultan fuera de editMode: en edición conviene seguir viendo todos
+  // los pins para poder seleccionarlos/moverlos.
+  const reinoIdsConArea = new Set(
+    areas.map((a) => a.reino_id).filter((id): id is string => !!id),
+  );
+  const visibleMarkersSinDuplicado =
+    vistaActual === "global" && !editMode
+      ? visibleMarkers.filter((m) => !reinoIdsConArea.has(m.id))
+      : visibleMarkers;
+
   // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla)
   const hiddenMarkers =
     vistaActual === "global"
@@ -4745,8 +4757,8 @@ export default function MapaInteractivo({
               isFirstOpen={isFirstOpen}
               markers={
                 editMode
-                  ? [...visibleMarkers, ...hiddenMarkers]
-                  : visibleMarkers
+                  ? [...visibleMarkersSinDuplicado, ...hiddenMarkers]
+                  : visibleMarkersSinDuplicado
               }
               selectedAreaId={editMode ? selectedAreaId : null}
               selectedMarkerId={editMode ? (reinoParaMover ?? null) : null}
