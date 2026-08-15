@@ -129,12 +129,10 @@ interface UnifiedTileCanvasProps<
   onAreaDrawEnd?: (tipo: AreaTipo, puntos: WorldPoint[]) => void;
   /** El usuario arrastró un vértice de un área ya existente (edición). */
   onAreaPointsChange?: (areaId: string, puntos: WorldPoint[]) => void;
-  /** Click específicamente sobre la "pill" (etiqueta con nombre) de un área
-   * vinculada a reino/ciudad — equivalente a onMarkerClick pero para áreas
-   * que ya reemplazaron su pin. Solo se dispara para áreas con reino_id o
-   * ciudad_id; el resto del área (relleno sin pill) no dispara nada, para
-   * dejarla libre para selección en modo edición. */
-  onAreaClick?: (area: BaseArea) => void;
+  /** El usuario convirtió un círculo/rectángulo en polígono editable (desde
+   * el botón flotante "Editar forma"). Se llama con los puntos del nuevo
+   * polígono — el padre debe persistir tipo:"poligono" + esos puntos. */
+  onAreaConvertToPolygon?: (areaId: string, puntos: WorldPoint[]) => void;
 
   className?: string;
 }
@@ -168,7 +166,7 @@ export function UnifiedTileCanvas<
   drawTool = null,
   onAreaDrawEnd,
   onAreaPointsChange,
-  onAreaClick,
+  onAreaConvertToPolygon,
   className,
 }: UnifiedTileCanvasProps<TTile, TMarker>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -257,13 +255,6 @@ export function UnifiedTileCanvas<
     tile: TTile;
   } | null>(null);
 
-  // Rects (en coords de canvas, no CSS) de las "pills" (etiqueta con nombre)
-  // dibujadas sobre las áreas con reino_id/ciudad_id, para detectar el click
-  // sobre ellas específicamente (y no sobre el área rellena en general).
-  const pillRectsRef = useRef<
-    { areaId: string; x: number; y: number; w: number; h: number }[]
-  >([]);
-
   // ── Dibujo de áreas ────────────────────────────────────────────────────────
   // Puntos "mundo" acumulados del dibujo en curso. Círculo/rectángulo usan
   // drag (2 puntos); polígono acumula un punto por click hasta doble-click.
@@ -281,15 +272,16 @@ export function UnifiedTileCanvas<
     null,
   );
 
-  // Drag de un área COMPLETA (todos sus vértices juntos) con botón derecho.
-  // Se arma directo en pointerdown (sin paso de "armar/desarmar" como los
-  // pines) mientras el botón derecho esté presionado sobre el área
-  // seleccionada. Guarda el punto de origen del drag y los puntos
-  // originales del área para calcular el delta en cada pointermove.
-  const draggingAreaRef = useRef<{
-    areaId: string;
-    startWorld: WorldPoint;
-    originalPuntos: WorldPoint[];
+  // ── Botón flotante "Editar forma" (click derecho sobre un área) ─────────
+  // Posición en coords CSS del contenedor (no canvas-pixel), recalculada
+  // cada frame mientras hay un área "armada" para mostrar el botón, así
+  // sigue al área durante pan/zoom.
+  const [areaEditButtonAreaId, setAreaEditButtonAreaId] = useState<
+    string | null
+  >(null);
+  const [areaEditButtonPos, setAreaEditButtonPos] = useState<{
+    x: number;
+    y: number;
   } | null>(null);
 
   useEffect(() => {
@@ -569,6 +561,19 @@ export function UnifiedTileCanvas<
     uy: p.row + p.y / 100,
   });
 
+  // Inverso de toTileUnits: unidades de tile continuas → WorldPoint (col/row
+  // entero + x/y 0-100 dentro del tile).
+  const fromTileUnits = (ux: number, uy: number): WorldPoint => {
+    const col = Math.floor(ux);
+    const row = Math.floor(uy);
+    return {
+      col,
+      row,
+      x: (ux - col) * 100,
+      y: (uy - row) * 100,
+    };
+  };
+
   const isPointInArea = (wp: WorldPoint, area: BaseArea): boolean => {
     const p = toTileUnits(wp);
     if (area.tipo === "circulo" && area.puntos.length >= 2) {
@@ -603,6 +608,137 @@ export function UnifiedTileCanvas<
       return inside;
     }
     return false;
+  };
+
+  // Bounding box de un área en "unidades de tile" continuas (ver
+  // toTileUnits) — usado para centrar la cámara al hacer zoom a un área.
+  const getAreaBoundsUnits = (area: BaseArea) => {
+    if (area.tipo === "circulo" && area.puntos.length >= 2) {
+      const c = toTileUnits(area.puntos[0]);
+      const edge = toTileUnits(area.puntos[1]);
+      const r = Math.hypot(edge.ux - c.ux, edge.uy - c.uy);
+      return { minX: c.ux - r, maxX: c.ux + r, minY: c.uy - r, maxY: c.uy + r };
+    }
+    const pts = area.puntos.map(toTileUnits);
+    if (pts.length === 0) return null;
+    return {
+      minX: Math.min(...pts.map((p) => p.ux)),
+      maxX: Math.max(...pts.map((p) => p.ux)),
+      minY: Math.min(...pts.map((p) => p.uy)),
+      maxY: Math.max(...pts.map((p) => p.uy)),
+    };
+  };
+
+  // Convierte un círculo/rectángulo a un polígono equivalente en puntos
+  // "mundo" (mismo formato que BaseArea.puntos), para edición punto por
+  // punto. Un polígono ya existente se devuelve tal cual.
+  const CIRCLE_SEGMENTS = 24;
+  const areaToPolygonPoints = (area: BaseArea): WorldPoint[] => {
+    if (area.tipo === "poligono") return area.puntos;
+    if (area.tipo === "circulo" && area.puntos.length >= 2) {
+      const c = toTileUnits(area.puntos[0]);
+      const edge = toTileUnits(area.puntos[1]);
+      const r = Math.hypot(edge.ux - c.ux, edge.uy - c.uy);
+      const pts: WorldPoint[] = [];
+      for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
+        const angle = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
+        const ux = c.ux + Math.cos(angle) * r;
+        const uy = c.uy + Math.sin(angle) * r;
+        pts.push(fromTileUnits(ux, uy));
+      }
+      return pts;
+    }
+    if (area.tipo === "rectangulo" && area.puntos.length >= 2) {
+      const a = toTileUnits(area.puntos[0]);
+      const b = toTileUnits(area.puntos[1]);
+      const minX = Math.min(a.ux, b.ux);
+      const maxX = Math.max(a.ux, b.ux);
+      const minY = Math.min(a.uy, b.uy);
+      const maxY = Math.max(a.uy, b.uy);
+      return [
+        fromTileUnits(minX, minY),
+        fromTileUnits(maxX, minY),
+        fromTileUnits(maxX, maxY),
+        fromTileUnits(minX, maxY),
+      ];
+    }
+    return area.puntos;
+  };
+
+  // Sigue la posición del área "armada" (click derecho) mientras el botón
+  // flotante está visible, recalculando en cada frame para que acompañe
+  // pan/zoom. Se apaga solo (sin RAF) cuando no hay botón que mostrar.
+  useEffect(() => {
+    if (!areaEditButtonAreaId) {
+      setAreaEditButtonPos(null);
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const canvas = canvasRef.current;
+      const area = areas.find((a) => a.id === areaEditButtonAreaId);
+      if (!canvas || !area) {
+        setAreaEditButtonAreaId(null);
+        return;
+      }
+      const bounds = getAreaBoundsUnits(area);
+      if (!bounds) {
+        setAreaEditButtonAreaId(null);
+        return;
+      }
+      const { x: cx, y: cy, scale } = camRef.current;
+      const topPoint = fromTileUnits((bounds.minX + bounds.maxX) / 2, bounds.minY);
+      const { lx, ly } = worldToLocal(topPoint, scale);
+      const s = cssToCanvasScale();
+      setAreaEditButtonPos({ x: (cx + lx) / s, y: (cy + ly) / s });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaEditButtonAreaId, areas]);
+
+  // Centra la cámara en un área y ajusta el zoom para que quede bien
+  // visible, dejando margen alrededor.
+  const zoomToArea = (area: BaseArea) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const bounds = getAreaBoundsUnits(area);
+    if (!bounds) return;
+    const w = Math.max(bounds.maxX - bounds.minX, 0.2);
+    const h = Math.max(bounds.maxY - bounds.minY, 0.2);
+    const cxUnits = (bounds.minX + bounds.maxX) / 2;
+    const cyUnits = (bounds.minY + bounds.maxY) / 2;
+    const MARGIN = 1.6; // deja ~60% de espacio extra alrededor del área
+    const targetScale = Math.max(
+      0.1,
+      Math.min(
+        10,
+        Math.min(
+          canvas.width / (w * MARGIN * tileSize),
+          canvas.height / (h * MARGIN * tileSize),
+        ),
+      ),
+    );
+    camRef.current = {
+      scale: targetScale,
+      x: canvas.width / 2 - (cxUnits - minCol) * tileSize * targetScale,
+      y: canvas.height / 2 - (cyUnits - minRow) * tileSize * targetScale,
+    };
+    markDirty();
+  };
+
+  // Convierte círculo/rectángulo → polígono (si hace falta) y hace zoom.
+  // Se llama desde el botón flotante "Editar forma".
+  const editAreaShape = (areaId: string) => {
+    const area = areas.find((a) => a.id === areaId);
+    if (!area) return;
+    if (area.tipo !== "poligono") {
+      const puntos = areaToPolygonPoints(area);
+      onAreaConvertToPolygon?.(areaId, puntos);
+    }
+    zoomToArea(area);
+    setAreaEditButtonAreaId(null);
   };
 
   const findMarkerAt = (clientX: number, clientY: number) => {
@@ -671,6 +807,15 @@ export function UnifiedTileCanvas<
   useEffect(() => {
     markDirty();
   }, [areas, selectedAreaId, drawTool]);
+
+  // El botón flotante "Editar forma" se cierra si el área deja de estar
+  // seleccionada o se activa una herramienta de dibujo.
+  useEffect(() => {
+    if (areaEditButtonAreaId && (selectedAreaId !== areaEditButtonAreaId || drawTool)) {
+      setAreaEditButtonAreaId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAreaId, drawTool]);
 
   // ── Draw loop ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -853,7 +998,6 @@ export function UnifiedTileCanvas<
         }
       };
 
-      pillRectsRef.current = [];
       for (const area of areas) {
         const localPts = area.puntos.map((p) => worldToLocal(p, scale));
         const isSel = area.id === selectedAreaId;
@@ -890,62 +1034,13 @@ export function UnifiedTileCanvas<
             lx = (localPts[0].lx + localPts[1].lx) / 2;
             ly = (localPts[0].ly + localPts[1].ly) / 2;
           }
-
-          const vinculada = Boolean(area.reino_id || area.ciudad_id);
-          if (vinculada) {
-            // ── Pill: cápsula rellena con el nombre, reemplaza al pin ──────
-            ctx.font = "700 12px 'Cinzel', serif";
-            const textW = ctx.measureText(area.label).width;
-            const padX = 14;
-            const padY = 7;
-            const pillW = textW + padX * 2;
-            const pillH = 24;
-            const px = lx - pillW / 2;
-            const py = ly - pillH / 2;
-            const r = pillH / 2;
-
-            ctx.beginPath();
-            ctx.moveTo(px + r, py);
-            ctx.lineTo(px + pillW - r, py);
-            ctx.arcTo(px + pillW, py, px + pillW, py + r, r);
-            ctx.lineTo(px + pillW, py + pillH - r);
-            ctx.arcTo(px + pillW, py + pillH, px + pillW - r, py + pillH, r);
-            ctx.lineTo(px + r, py + pillH);
-            ctx.arcTo(px, py + pillH, px, py + pillH - r, r);
-            ctx.lineTo(px, py + r);
-            ctx.arcTo(px, py, px + r, py, r);
-            ctx.closePath();
-            ctx.fillStyle = "rgba(20,16,12,0.82)";
-            ctx.fill();
-            ctx.strokeStyle = baseColor;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            ctx.font = "700 12px 'Cinzel', serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillStyle = "#fff";
-            ctx.globalAlpha = 1;
-            ctx.fillText(area.label, lx, ly + 0.5);
-            ctx.textAlign = "left";
-            ctx.textBaseline = "alphabetic";
-
-            pillRectsRef.current.push({
-              areaId: area.id,
-              x: px,
-              y: py,
-              w: pillW,
-              h: pillH,
-            });
-          } else {
-            ctx.font = "700 11px 'Cinzel', serif";
-            ctx.textAlign = "center";
-            ctx.fillStyle = labelText;
-            ctx.globalAlpha = 0.85;
-            ctx.fillText(area.label, lx, ly);
-            ctx.globalAlpha = 1;
-            ctx.textAlign = "left";
-          }
+          ctx.font = "700 11px 'Cinzel', serif";
+          ctx.textAlign = "center";
+          ctx.fillStyle = labelText;
+          ctx.globalAlpha = 0.85;
+          ctx.fillText(area.label, lx, ly);
+          ctx.globalAlpha = 1;
+          ctx.textAlign = "left";
         }
       }
 
@@ -1066,6 +1161,21 @@ export function UnifiedTileCanvas<
         }
       }
 
+      // ── Hint pin seleccionado ─────────────────────────────────────────────
+      if (selectedMarkerId) {
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(0, canvas.height - 36, canvas.width, 36);
+        ctx.fillStyle = "#fff";
+        ctx.font = "700 10px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          "Tocá el mapa para mover el punto",
+          canvas.width / 2,
+          canvas.height - 14,
+        );
+        ctx.textAlign = "left";
+      }
+
       animFrameRef.current = requestAnimationFrame(draw);
     };
 
@@ -1136,27 +1246,48 @@ export function UnifiedTileCanvas<
       return null;
     };
 
-    const onPointerDown = (e: PointerEvent) => {
-      // ── Botón derecho sobre CUALQUIER área → la selecciona (si no lo
-      // estaba ya) y arranca el drag de área completa en el mismo gesto
-      // (mousedown derecho + arrastre + soltar, sin paso de "armar" extra).
-      if (e.button === 2 && editMode && !drawTool) {
-        const wp = clientToWorldPoint(e.clientX, e.clientY);
-        if (wp) {
-          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
-          if (hitArea) {
-            if (hitArea.id !== selectedAreaId) onAreaSelect?.(hitArea.id);
-            draggingAreaRef.current = {
-              areaId: hitArea.id,
-              startWorld: wp,
-              originalPuntos: hitArea.puntos,
-            };
-            canvas.setPointerCapture(e.pointerId);
-            e.preventDefault();
-            return;
-          }
+    // Distancia de tolerancia (px de pantalla) para "pegarle" a un borde
+    // entre dos vértices consecutivos y así insertar un punto nuevo ahí.
+    const EDGE_HIT_RADIUS = 8;
+
+    // Solo aplica a polígonos: círculo/rectángulo no tienen "bordes entre
+    // vértices" en el sentido editable (se convierten a polígono primero,
+    // vía el botón flotante, antes de poder agregarles puntos).
+    const findEdgeAt = (clientX: number, clientY: number) => {
+      const canvas2 = canvasRef.current;
+      if (!canvas2 || !selectedAreaId) return null;
+      const area = areas.find((a) => a.id === selectedAreaId);
+      if (!area || area.tipo !== "poligono" || area.puntos.length < 2)
+        return null;
+      const rect = canvas2.getBoundingClientRect();
+      const s = cssToCanvasScale();
+      const px = (clientX - rect.left) * s;
+      const py = (clientY - rect.top) * s;
+      const { x: cx, y: cy, scale } = camRef.current;
+      const screenPts = area.puntos.map((p) => {
+        const { lx, ly } = worldToLocal(p, scale);
+        return { x: cx + lx, y: cy + ly };
+      });
+      const n = screenPts.length;
+      for (let i = 0; i < n; i++) {
+        const a = screenPts[i];
+        const b = screenPts[(i + 1) % n];
+        // Distancia punto-segmento
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const lenSq = dx * dx + dy * dy;
+        const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / lenSq));
+        const projX = a.x + t * dx;
+        const projY = a.y + t * dy;
+        const dist = Math.hypot(px - projX, py - projY);
+        if (dist < EDGE_HIT_RADIUS) {
+          return { areaId: area.id, insertAfterIndex: i };
         }
       }
+      return null;
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0 && e.pointerType !== "touch") return;
 
       // ── Arrastrar un vértice del área seleccionada (editMode, sin herramienta activa) ──
@@ -1165,6 +1296,32 @@ export function UnifiedTileCanvas<
         if (v) {
           draggingVertexRef.current = v;
           canvas.setPointerCapture(e.pointerId);
+          return;
+        }
+
+        // ── Click en el borde entre dos vértices → insertar uno nuevo ahí ──
+        const edge = findEdgeAt(e.clientX, e.clientY);
+        if (edge) {
+          const wp = clientToWorldPoint(e.clientX, e.clientY);
+          if (wp) {
+            const area = areas.find((a) => a.id === edge.areaId);
+            if (area) {
+              const nuevosPuntos = [
+                ...area.puntos.slice(0, edge.insertAfterIndex + 1),
+                wp,
+                ...area.puntos.slice(edge.insertAfterIndex + 1),
+              ];
+              onAreaPointsChange?.(edge.areaId, nuevosPuntos);
+              // Queda agarrado el punto recién insertado, así el mismo
+              // gesto de click+drag lo puede acomodar sin soltar el mouse.
+              draggingVertexRef.current = {
+                areaId: edge.areaId,
+                index: edge.insertAfterIndex + 1,
+              };
+              canvas.setPointerCapture(e.pointerId);
+              markDirty();
+            }
+          }
           return;
         }
       }
@@ -1221,48 +1378,6 @@ export function UnifiedTileCanvas<
     };
 
     const onPointerMove = (e: PointerEvent) => {
-      // ── Arrastrando un área completa (click derecho) ────────────────────────
-      if (draggingAreaRef.current) {
-        const wp = clientToWorldPoint(e.clientX, e.clientY);
-        if (wp) {
-          const { areaId, startWorld, originalPuntos } =
-            draggingAreaRef.current;
-          // Delta en unidades "mundo": (col*100 + x) es la coordenada
-          // continua real, ya que x/y van de 0-100 dentro de cada tile.
-          const dCol = wp.col - startWorld.col;
-          const dX = wp.x - startWorld.x;
-          const dRow = wp.row - startWorld.row;
-          const dY = wp.y - startWorld.y;
-          const nuevosPuntos = originalPuntos.map((p) => {
-            let col = p.col + dCol;
-            let x = p.x + dX;
-            // Normalizar overflow/underflow de x fuera de [0,100) hacia col.
-            while (x >= 100) {
-              x -= 100;
-              col += 1;
-            }
-            while (x < 0) {
-              x += 100;
-              col -= 1;
-            }
-            let row = p.row + dRow;
-            let y = p.y + dY;
-            while (y >= 100) {
-              y -= 100;
-              row += 1;
-            }
-            while (y < 0) {
-              y += 100;
-              row -= 1;
-            }
-            return { col, row, x, y };
-          });
-          onAreaPointsChange?.(areaId, nuevosPuntos);
-          markDirty();
-        }
-        return;
-      }
-
       // ── Arrastrando un vértice de área existente ────────────────────────────
       if (draggingVertexRef.current) {
         const wp = clientToWorldPoint(e.clientX, e.clientY);
@@ -1350,15 +1465,6 @@ export function UnifiedTileCanvas<
     };
 
     const onPointerUp = (e: PointerEvent) => {
-      // ── Soltar el drag de área completa (botón derecho) ─────────────────────
-      if (draggingAreaRef.current) {
-        draggingAreaRef.current = null;
-        try {
-          canvas.releasePointerCapture(e.pointerId);
-        } catch {}
-        return;
-      }
-
       // ── Soltar un vértice arrastrado ────────────────────────────────────────
       if (draggingVertexRef.current) {
         draggingVertexRef.current = null;
@@ -1469,54 +1575,11 @@ export function UnifiedTileCanvas<
         }
       }
 
-      // ── Click IZQUIERDO sobre un área vinculada (pill o relleno) → abre el
-      // reino/ciudad. Reemplaza por completo al click de pin para esa
-      // entidad — el click derecho es quien selecciona el área para
-      // moverla/editarla (ver onContextMenu), así que acá el izquierdo
-      // queda 100% libre para "abrir". ────────────────────────────────────
-      {
-        const rect = canvas.getBoundingClientRect();
-        const s4 = cssToCanvasScale();
-        const px = (clientX - rect.left) * s4;
-        const py = (clientY - rect.top) * s4;
-        const hitPill = pillRectsRef.current.find(
-          (p) => px >= p.x && px <= p.x + p.w && py >= p.y && py <= p.y + p.h,
-        );
-        let areaClickeada = hitPill
-          ? areas.find((a) => a.id === hitPill.areaId)
-          : undefined;
-        if (!areaClickeada) {
-          // No cayó en la pill puntual, pero puede haber caído dentro del
-          // relleno de un área vinculada — también cuenta como "abrir".
-          // Solo si tiene label: sin label (no desbloqueada) el área se ve
-          // pero no se puede abrir ni se sabe a qué reino/ciudad pertenece.
-          const wp = clientToWorldPoint(clientX, clientY);
-          if (wp) {
-            areaClickeada = [...areas]
-              .reverse()
-              .find(
-                (a) =>
-                  (a.reino_id || a.ciudad_id) &&
-                  a.label &&
-                  isPointInArea(wp, a),
-              );
-          }
-        }
-        if (areaClickeada && onAreaClick) {
-          onAreaClick(areaClickeada);
-          return;
-        }
-      }
-
-      // ── Click sobre un área existente SIN vincular (sin herramienta
-      // activa) → seleccionarla. Las áreas vinculadas ya se manejaron
-      // arriba (abren su reino/ciudad); solo llegan acá las libres. ──────
+      // ── Click sobre un área existente (sin herramienta activa) → seleccionarla ──
       if (editMode && !drawTool && onAreaSelect) {
         const wp = clientToWorldPoint(clientX, clientY);
         if (wp) {
-          const hitArea = [...areas]
-            .reverse()
-            .find((a) => !a.reino_id && !a.ciudad_id && isPointInArea(wp, a));
+          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
           if (hitArea) {
             onAreaSelect(hitArea.id === selectedAreaId ? null : hitArea.id);
             return;
@@ -1636,19 +1699,9 @@ export function UnifiedTileCanvas<
     };
 
     // ── Click derecho sobre un pin → activa/desactiva modo mover ────────────
+    // ── Click derecho sobre un área → arma el botón flotante "Editar forma" ──
     const onContextMenu = (e: MouseEvent) => {
       if (!editMode) return;
-      // El drag/selección de área con botón derecho ya hizo su propio
-      // preventDefault en pointerdown, pero el navegador puede igual
-      // disparar "contextmenu" al soltar — lo bloqueamos también acá para
-      // cualquier área bajo el cursor, para que nunca se abra el menú nativo.
-      if (!drawTool) {
-        const wp = clientToWorldPoint(e.clientX, e.clientY);
-        if (wp && areas.some((a) => isPointInArea(wp, a))) {
-          e.preventDefault();
-          return;
-        }
-      }
       const marker = findMarkerAt(e.clientX, e.clientY);
       if (marker) {
         e.preventDefault();
@@ -1663,6 +1716,19 @@ export function UnifiedTileCanvas<
             marker.id === markerParaMoverIdRef.current ? null : marker.id;
           setMarkerParaMoverId(next);
           onMarkerSelect(next);
+        }
+        return;
+      }
+
+      if (!drawTool) {
+        const wp = clientToWorldPoint(e.clientX, e.clientY);
+        if (wp) {
+          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
+          if (hitArea) {
+            e.preventDefault();
+            onAreaSelect?.(hitArea.id);
+            setAreaEditButtonAreaId(hitArea.id);
+          }
         }
       }
     };
@@ -1744,7 +1810,6 @@ export function UnifiedTileCanvas<
     onAreaSelect,
     onAreaDrawEnd,
     onAreaPointsChange,
-    onAreaClick,
   ]);
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
@@ -1798,6 +1863,29 @@ export function UnifiedTileCanvas<
         ))}
       </div>
 
+      {/* Botón flotante: editar forma del área (aparece con click derecho sobre un área) */}
+      {areaEditButtonAreaId && areaEditButtonPos && (
+        <button
+          className="absolute z-20 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-micro font-black uppercase shadow transition-transform hover:scale-105"
+          style={{
+            left: areaEditButtonPos.x,
+            top: areaEditButtonPos.y,
+            transform: "translate(-50%, calc(-100% - 10px))",
+            background: "var(--accent)",
+            color: "#fff",
+          }}
+          onClick={() => editAreaShape(areaEditButtonAreaId)}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="11" y1="8" x2="11" y2="14" />
+            <line x1="8" y1="11" x2="14" y2="11" />
+          </svg>
+          Editar forma
+        </button>
+      )}
+
       {/* Cancelar selección de pin */}
       {selectedMarkerId && (
         <button
@@ -1822,6 +1910,21 @@ export function UnifiedTileCanvas<
           >
             Sin tiles configurados
           </p>
+        </div>
+      )}
+
+      {/* Hints (solo editMode, con tiles) */}
+      {editMode && tiles.length > 0 && !drawTool && (
+        <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
+          <span
+            className="text-micro font-bold uppercase tracking-widest px-2 py-1 rounded-lg"
+            style={{
+              background: "color-mix(in srgb, var(--bg-main) 85%, transparent)",
+              color: "color-mix(in srgb, var(--foreground) 35%, transparent)",
+            }}
+          >
+            Click derecho en un pin para moverlo · Ctrl + click para editar tile · Ctrl + scroll para zoom
+          </span>
         </div>
       )}
 
