@@ -131,7 +131,7 @@ interface UnifiedTileCanvasProps<
   onAreaPointsChange?: (areaId: string, puntos: WorldPoint[]) => void;
   /** Click izquierdo sobre el label (texto) de un área — normalmente usado
    * para navegar al reino/ciudad al que esa área está vinculada. */
-  onAreaLabelClick?: (area: BaseArea) => void;
+  onAreaClick?: (area: BaseArea) => void;
 
   className?: string;
 }
@@ -165,7 +165,7 @@ export function UnifiedTileCanvas<
   drawTool = null,
   onAreaDrawEnd,
   onAreaPointsChange,
-  onAreaLabelClick,
+  onAreaClick,
   className,
 }: UnifiedTileCanvasProps<TTile, TMarker>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1357,7 +1357,7 @@ export function UnifiedTileCanvas<
       }
 
       // ── Click sobre el label de un área (siempre, editMode o no) ──────────
-      if (!drawTool && onAreaLabelClick) {
+      if (!drawTool && onAreaClick) {
         const canvasCtx = canvas.getContext("2d");
         if (canvasCtx) {
           const rect4 = canvas.getBoundingClientRect();
@@ -1392,7 +1392,7 @@ export function UnifiedTileCanvas<
               );
             });
           if (hitLabel) {
-            onAreaLabelClick(hitLabel);
+            onAreaClick(hitLabel);
             return;
           }
         }
@@ -1619,7 +1619,7 @@ export function UnifiedTileCanvas<
     onAreaSelect,
     onAreaDrawEnd,
     onAreaPointsChange,
-    onAreaLabelClick,
+    onAreaClick,
   ]);
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
