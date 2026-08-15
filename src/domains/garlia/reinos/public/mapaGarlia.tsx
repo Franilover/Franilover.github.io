@@ -3423,20 +3423,6 @@ export default function MapaInteractivo({
     [],
   );
 
-  // Círculo/rectángulo → polígono (desde el botón flotante "Editar forma").
-  // Igual que handleAreaPointsChange pero además cambia `tipo`; el
-  // useEffect de guardado de abajo persiste ambos campos en Supabase.
-  const handleAreaConvertToPolygon = useCallback(
-    (areaId: string, puntos: WorldPoint[]) => {
-      setAreas((prev) =>
-        prev.map((a) =>
-          a.id === areaId ? { ...a, tipo: "poligono" as AreaTipo, puntos } : a,
-        ),
-      );
-    },
-    [],
-  );
-
   // Al soltar el vértice (pointerup global ya lo maneja el canvas), persistimos
   // el estado final. Como no tenemos un "onVertexDragEnd" explícito, guardamos
   // con un debounce simple sobre el área seleccionada.
@@ -3942,6 +3928,33 @@ export default function MapaInteractivo({
   const handleReinoContextMenu = (reino: any) => {
     setReinoParaMover((prev) => (prev === reino.id ? null : reino.id));
   };
+
+  // Click sobre el label de un área en el mapa global → abre el mapa del
+  // reino (o de la ciudad, si el área está vinculada a una ciudad) al que
+  // esa área está asociada.
+  const handleAreaLabelClick = useCallback(
+    async (area: BaseArea) => {
+      if (area.reino_id) {
+        const reino = reinos.find((r) => r.id === area.reino_id);
+        if (reino) await handleReinoClick(reino);
+        return;
+      }
+      if (area.ciudad_id) {
+        const { data: ciudad } = await supabase
+          .from("ciudades")
+          .select("*")
+          .eq("id", area.ciudad_id)
+          .maybeSingle();
+        if (!ciudad) return;
+        const reino = reinos.find((r) => r.id === ciudad.reino_id);
+        if (!reino) return;
+        await abrirVistaDeReino(reino);
+        setPuntoSeleccionado(ciudad);
+        setPanelOpen(true);
+      }
+    },
+    [reinos],
+  );
 
   // Vincular / desvincular un libro con el reino seleccionado — actualiza
   // libros.reino_id directamente en Supabase y refresca los estados locales.
@@ -4738,7 +4751,7 @@ export default function MapaInteractivo({
               selectedAreaId={editMode ? selectedAreaId : null}
               selectedMarkerId={editMode ? (reinoParaMover ?? null) : null}
               tiles={mapTiles}
-              onAreaConvertToPolygon={handleAreaConvertToPolygon}
+              onAreaLabelClick={(area) => void handleAreaLabelClick(area)}
               onAreaDrawEnd={handleAreaDrawEnd}
               onAreaPointsChange={handleAreaPointsChange}
               onAreaSelect={setSelectedAreaId}

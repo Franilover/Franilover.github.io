@@ -129,10 +129,9 @@ interface UnifiedTileCanvasProps<
   onAreaDrawEnd?: (tipo: AreaTipo, puntos: WorldPoint[]) => void;
   /** El usuario arrastró un vértice de un área ya existente (edición). */
   onAreaPointsChange?: (areaId: string, puntos: WorldPoint[]) => void;
-  /** El usuario convirtió un círculo/rectángulo en polígono editable (desde
-   * el botón flotante "Editar forma"). Se llama con los puntos del nuevo
-   * polígono — el padre debe persistir tipo:"poligono" + esos puntos. */
-  onAreaConvertToPolygon?: (areaId: string, puntos: WorldPoint[]) => void;
+  /** Click izquierdo sobre el label (texto) de un área — normalmente usado
+   * para navegar al reino/ciudad al que esa área está vinculada. */
+  onAreaLabelClick?: (area: BaseArea) => void;
 
   className?: string;
 }
@@ -166,7 +165,7 @@ export function UnifiedTileCanvas<
   drawTool = null,
   onAreaDrawEnd,
   onAreaPointsChange,
-  onAreaConvertToPolygon,
+  onAreaLabelClick,
   className,
 }: UnifiedTileCanvasProps<TTile, TMarker>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -271,18 +270,6 @@ export function UnifiedTileCanvas<
   const draggingVertexRef = useRef<{ areaId: string; index: number } | null>(
     null,
   );
-
-  // ── Botón flotante "Editar forma" (click derecho sobre un área) ─────────
-  // Posición en coords CSS del contenedor (no canvas-pixel), recalculada
-  // cada frame mientras hay un área "armada" para mostrar el botón, así
-  // sigue al área durante pan/zoom.
-  const [areaEditButtonAreaId, setAreaEditButtonAreaId] = useState<
-    string | null
-  >(null);
-  const [areaEditButtonPos, setAreaEditButtonPos] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
 
   useEffect(() => {
     // Cambiar de herramienta (o desactivarla) cancela cualquier dibujo en curso.
@@ -561,19 +548,6 @@ export function UnifiedTileCanvas<
     uy: p.row + p.y / 100,
   });
 
-  // Inverso de toTileUnits: unidades de tile continuas → WorldPoint (col/row
-  // entero + x/y 0-100 dentro del tile).
-  const fromTileUnits = (ux: number, uy: number): WorldPoint => {
-    const col = Math.floor(ux);
-    const row = Math.floor(uy);
-    return {
-      col,
-      row,
-      x: (ux - col) * 100,
-      y: (uy - row) * 100,
-    };
-  };
-
   const isPointInArea = (wp: WorldPoint, area: BaseArea): boolean => {
     const p = toTileUnits(wp);
     if (area.tipo === "circulo" && area.puntos.length >= 2) {
@@ -608,137 +582,6 @@ export function UnifiedTileCanvas<
       return inside;
     }
     return false;
-  };
-
-  // Bounding box de un área en "unidades de tile" continuas (ver
-  // toTileUnits) — usado para centrar la cámara al hacer zoom a un área.
-  const getAreaBoundsUnits = (area: BaseArea) => {
-    if (area.tipo === "circulo" && area.puntos.length >= 2) {
-      const c = toTileUnits(area.puntos[0]);
-      const edge = toTileUnits(area.puntos[1]);
-      const r = Math.hypot(edge.ux - c.ux, edge.uy - c.uy);
-      return { minX: c.ux - r, maxX: c.ux + r, minY: c.uy - r, maxY: c.uy + r };
-    }
-    const pts = area.puntos.map(toTileUnits);
-    if (pts.length === 0) return null;
-    return {
-      minX: Math.min(...pts.map((p) => p.ux)),
-      maxX: Math.max(...pts.map((p) => p.ux)),
-      minY: Math.min(...pts.map((p) => p.uy)),
-      maxY: Math.max(...pts.map((p) => p.uy)),
-    };
-  };
-
-  // Convierte un círculo/rectángulo a un polígono equivalente en puntos
-  // "mundo" (mismo formato que BaseArea.puntos), para edición punto por
-  // punto. Un polígono ya existente se devuelve tal cual.
-  const CIRCLE_SEGMENTS = 24;
-  const areaToPolygonPoints = (area: BaseArea): WorldPoint[] => {
-    if (area.tipo === "poligono") return area.puntos;
-    if (area.tipo === "circulo" && area.puntos.length >= 2) {
-      const c = toTileUnits(area.puntos[0]);
-      const edge = toTileUnits(area.puntos[1]);
-      const r = Math.hypot(edge.ux - c.ux, edge.uy - c.uy);
-      const pts: WorldPoint[] = [];
-      for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
-        const angle = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
-        const ux = c.ux + Math.cos(angle) * r;
-        const uy = c.uy + Math.sin(angle) * r;
-        pts.push(fromTileUnits(ux, uy));
-      }
-      return pts;
-    }
-    if (area.tipo === "rectangulo" && area.puntos.length >= 2) {
-      const a = toTileUnits(area.puntos[0]);
-      const b = toTileUnits(area.puntos[1]);
-      const minX = Math.min(a.ux, b.ux);
-      const maxX = Math.max(a.ux, b.ux);
-      const minY = Math.min(a.uy, b.uy);
-      const maxY = Math.max(a.uy, b.uy);
-      return [
-        fromTileUnits(minX, minY),
-        fromTileUnits(maxX, minY),
-        fromTileUnits(maxX, maxY),
-        fromTileUnits(minX, maxY),
-      ];
-    }
-    return area.puntos;
-  };
-
-  // Sigue la posición del área "armada" (click derecho) mientras el botón
-  // flotante está visible, recalculando en cada frame para que acompañe
-  // pan/zoom. Se apaga solo (sin RAF) cuando no hay botón que mostrar.
-  useEffect(() => {
-    if (!areaEditButtonAreaId) {
-      setAreaEditButtonPos(null);
-      return;
-    }
-    let raf = 0;
-    const tick = () => {
-      const canvas = canvasRef.current;
-      const area = areas.find((a) => a.id === areaEditButtonAreaId);
-      if (!canvas || !area) {
-        setAreaEditButtonAreaId(null);
-        return;
-      }
-      const bounds = getAreaBoundsUnits(area);
-      if (!bounds) {
-        setAreaEditButtonAreaId(null);
-        return;
-      }
-      const { x: cx, y: cy, scale } = camRef.current;
-      const topPoint = fromTileUnits((bounds.minX + bounds.maxX) / 2, bounds.minY);
-      const { lx, ly } = worldToLocal(topPoint, scale);
-      const s = cssToCanvasScale();
-      setAreaEditButtonPos({ x: (cx + lx) / s, y: (cy + ly) / s });
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [areaEditButtonAreaId, areas]);
-
-  // Centra la cámara en un área y ajusta el zoom para que quede bien
-  // visible, dejando margen alrededor.
-  const zoomToArea = (area: BaseArea) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const bounds = getAreaBoundsUnits(area);
-    if (!bounds) return;
-    const w = Math.max(bounds.maxX - bounds.minX, 0.2);
-    const h = Math.max(bounds.maxY - bounds.minY, 0.2);
-    const cxUnits = (bounds.minX + bounds.maxX) / 2;
-    const cyUnits = (bounds.minY + bounds.maxY) / 2;
-    const MARGIN = 1.6; // deja ~60% de espacio extra alrededor del área
-    const targetScale = Math.max(
-      0.1,
-      Math.min(
-        10,
-        Math.min(
-          canvas.width / (w * MARGIN * tileSize),
-          canvas.height / (h * MARGIN * tileSize),
-        ),
-      ),
-    );
-    camRef.current = {
-      scale: targetScale,
-      x: canvas.width / 2 - (cxUnits - minCol) * tileSize * targetScale,
-      y: canvas.height / 2 - (cyUnits - minRow) * tileSize * targetScale,
-    };
-    markDirty();
-  };
-
-  // Convierte círculo/rectángulo → polígono (si hace falta) y hace zoom.
-  // Se llama desde el botón flotante "Editar forma".
-  const editAreaShape = (areaId: string) => {
-    const area = areas.find((a) => a.id === areaId);
-    if (!area) return;
-    if (area.tipo !== "poligono") {
-      const puntos = areaToPolygonPoints(area);
-      onAreaConvertToPolygon?.(areaId, puntos);
-    }
-    zoomToArea(area);
-    setAreaEditButtonAreaId(null);
   };
 
   const findMarkerAt = (clientX: number, clientY: number) => {
@@ -807,15 +650,6 @@ export function UnifiedTileCanvas<
   useEffect(() => {
     markDirty();
   }, [areas, selectedAreaId, drawTool]);
-
-  // El botón flotante "Editar forma" se cierra si el área deja de estar
-  // seleccionada o se activa una herramienta de dibujo.
-  useEffect(() => {
-    if (areaEditButtonAreaId && (selectedAreaId !== areaEditButtonAreaId || drawTool)) {
-      setAreaEditButtonAreaId(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAreaId, drawTool]);
 
   // ── Draw loop ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1575,6 +1409,48 @@ export function UnifiedTileCanvas<
         }
       }
 
+      // ── Click sobre el label de un área (siempre, editMode o no) ──────────
+      if (!drawTool && onAreaLabelClick) {
+        const canvasCtx = canvas.getContext("2d");
+        if (canvasCtx) {
+          const rect4 = canvas.getBoundingClientRect();
+          const s4 = cssToCanvasScale();
+          const px = (clientX - rect4.left) * s4;
+          const py = (clientY - rect4.top) * s4;
+          const { x: cx, y: cy, scale } = camRef.current;
+          canvasCtx.font = "700 11px 'Cinzel', serif";
+          const hitLabel = [...areas]
+            .reverse()
+            .find((area) => {
+              if (!area.label || area.puntos.length < 2) return false;
+              const localPts = area.puntos.map((p) => worldToLocal(p, scale));
+              let lx: number, ly: number;
+              if (area.tipo === "poligono") {
+                lx = localPts.reduce((s, p) => s + p.lx, 0) / localPts.length;
+                ly = localPts.reduce((s, p) => s + p.ly, 0) / localPts.length;
+              } else {
+                lx = (localPts[0].lx + localPts[1].lx) / 2;
+                ly = (localPts[0].ly + localPts[1].ly) / 2;
+              }
+              const tw = canvasCtx.measureText(area.label!).width;
+              const absX = cx + lx;
+              const absY = cy + ly;
+              // Hit box centrada en el texto (mismo textAlign "center" con
+              // el que se dibuja), con algo de margen vertical.
+              return (
+                px >= absX - tw / 2 - 4 &&
+                px <= absX + tw / 2 + 4 &&
+                py >= absY - 12 &&
+                py <= absY + 4
+              );
+            });
+          if (hitLabel) {
+            onAreaLabelClick(hitLabel);
+            return;
+          }
+        }
+      }
+
       // ── Click sobre un área existente (sin herramienta activa) → seleccionarla ──
       if (editMode && !drawTool && onAreaSelect) {
         const wp = clientToWorldPoint(clientX, clientY);
@@ -1699,7 +1575,6 @@ export function UnifiedTileCanvas<
     };
 
     // ── Click derecho sobre un pin → activa/desactiva modo mover ────────────
-    // ── Click derecho sobre un área → arma el botón flotante "Editar forma" ──
     const onContextMenu = (e: MouseEvent) => {
       if (!editMode) return;
       const marker = findMarkerAt(e.clientX, e.clientY);
@@ -1716,19 +1591,6 @@ export function UnifiedTileCanvas<
             marker.id === markerParaMoverIdRef.current ? null : marker.id;
           setMarkerParaMoverId(next);
           onMarkerSelect(next);
-        }
-        return;
-      }
-
-      if (!drawTool) {
-        const wp = clientToWorldPoint(e.clientX, e.clientY);
-        if (wp) {
-          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
-          if (hitArea) {
-            e.preventDefault();
-            onAreaSelect?.(hitArea.id);
-            setAreaEditButtonAreaId(hitArea.id);
-          }
         }
       }
     };
@@ -1810,6 +1672,7 @@ export function UnifiedTileCanvas<
     onAreaSelect,
     onAreaDrawEnd,
     onAreaPointsChange,
+    onAreaLabelClick,
   ]);
 
   // ── Zoom buttons ──────────────────────────────────────────────────────────
@@ -1862,29 +1725,6 @@ export function UnifiedTileCanvas<
           </button>
         ))}
       </div>
-
-      {/* Botón flotante: editar forma del área (aparece con click derecho sobre un área) */}
-      {areaEditButtonAreaId && areaEditButtonPos && (
-        <button
-          className="absolute z-20 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-micro font-black uppercase shadow transition-transform hover:scale-105"
-          style={{
-            left: areaEditButtonPos.x,
-            top: areaEditButtonPos.y,
-            transform: "translate(-50%, calc(-100% - 10px))",
-            background: "var(--accent)",
-            color: "#fff",
-          }}
-          onClick={() => editAreaShape(areaEditButtonAreaId)}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            <line x1="11" y1="8" x2="11" y2="14" />
-            <line x1="8" y1="11" x2="14" y2="11" />
-          </svg>
-          Editar forma
-        </button>
-      )}
 
       {/* Cancelar selección de pin */}
       {selectedMarkerId && (
