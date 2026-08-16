@@ -29,6 +29,7 @@ import {
 } from "@/infra/sync/syncEngine";
 
 import { UnifiedTileCanvas } from "@/domains/garlia/_shared/UnifiedTileCanvas";
+import { TileCanvasView } from "@/domains/garlia/_shared/TileCanvasView";
 import type {
   BaseArea,
   AreaTipo,
@@ -244,49 +245,67 @@ export function ReinoTileCanvas({
 
   return (
     <div className="relative w-full h-full flex flex-col overflow-hidden">
-      <UnifiedTileCanvas<ReinoTile, CiudadConTile>
-        areas={areas}
-        className={className}
-        drawTool={editMode ? drawTool : null}
-        editMode={editMode}
-        eyedropperActive={eyedropperActive}
-        fondoColor={fondoColor}
-        hiddenMarkers={hiddenMarkers}
-        isFirstOpen={isFirstOpen}
-        markers={detallesSinDuplicado}
-        selectedAreaId={editMode ? selectedAreaId : null}
-        selectedMarkerId={selectedPinId}
-        tileSize={tileSize}
-        tiles={tiles}
-        onAreaDrawEnd={onAreaDrawEnd}
-        onAreaClick={onAreaClick}
-        onAreaPointsChange={onAreaPointsChange}
-        onAreaSelect={onAreaSelect}
-        onEyedropperPick={onEyedropperPick}
-        onMarkerClick={(ciudad) => onPinClick?.(ciudad)}
-        onMarkerContextMenu={onMarkerContextMenuProp}
-        onMarkerMove={(markerId, coord) => {
-          onDetallesChange(
-            detalles.map((d) =>
-              d.id === markerId
-                ? {
-                    ...d,
-                    coord_x: coord.x,
-                    coord_y: coord.y,
-                    tile_col: coord.tile_col,
-                    tile_row: coord.tile_row,
-                  }
-                : d,
-            ),
-          );
-          setSelectedPinId(null);
-        }}
-        onMarkerSelect={setSelectedPinId}
-        onOpenPanel={onOpenPanel}
-        onTileCreate={(col, row) => addTile(col, row)}
-        onTileDelete={(tile) => deleteTile(tile.id)}
-        onTilePick={(tile) => setPickerTile(tile)}
-      />
+      {editMode ? (
+        <UnifiedTileCanvas<ReinoTile, CiudadConTile>
+          areas={areas}
+          className={className}
+          drawTool={drawTool}
+          editMode={true}
+          eyedropperActive={eyedropperActive}
+          fondoColor={fondoColor}
+          hiddenMarkers={hiddenMarkers}
+          isFirstOpen={isFirstOpen}
+          markers={detallesSinDuplicado}
+          selectedAreaId={selectedAreaId}
+          selectedMarkerId={selectedPinId}
+          tileSize={tileSize}
+          tiles={tiles}
+          onAreaDrawEnd={onAreaDrawEnd}
+          onAreaClick={onAreaClick}
+          onAreaPointsChange={onAreaPointsChange}
+          onAreaSelect={onAreaSelect}
+          onEyedropperPick={onEyedropperPick}
+          onMarkerClick={(ciudad) => onPinClick?.(ciudad)}
+          onMarkerContextMenu={onMarkerContextMenuProp}
+          onMarkerMove={(markerId, coord) => {
+            onDetallesChange(
+              detalles.map((d) =>
+                d.id === markerId
+                  ? {
+                      ...d,
+                      coord_x: coord.x,
+                      coord_y: coord.y,
+                      tile_col: coord.tile_col,
+                      tile_row: coord.tile_row,
+                    }
+                  : d,
+              ),
+            );
+            setSelectedPinId(null);
+          }}
+          onMarkerSelect={setSelectedPinId}
+          onOpenPanel={onOpenPanel}
+          onTileCreate={(col, row) => addTile(col, row)}
+          onTileDelete={(tile) => deleteTile(tile.id)}
+          onTilePick={(tile) => setPickerTile(tile)}
+        />
+      ) : (
+        // ── Modo lectura: TileCanvasView no carga ni un byte de código de
+        // edición (drag de vértices, dibujo de áreas, papelera, etc.) — solo
+        // pan/zoom/click. Reduce el bundle real en las vistas donde el mapa
+        // nunca se edita (o donde editMode está apagado en este render). ───
+        <TileCanvasView<ReinoTile, CiudadConTile>
+          areas={areas}
+          className={className}
+          fondoColor={fondoColor}
+          hiddenMarkers={hiddenMarkers}
+          markers={detallesSinDuplicado}
+          tileSize={tileSize}
+          tiles={tiles}
+          onAreaClick={onAreaClick}
+          onMarkerClick={(ciudad) => onPinClick?.(ciudad)}
+        />
+      )}
 
       {/* Estado vacío — overlay centrado sobre el canvas */}
       {emptyState && editMode && (
