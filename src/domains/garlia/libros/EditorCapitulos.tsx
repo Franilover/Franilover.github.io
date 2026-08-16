@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Loader2,
   Plus,
-  Save,
   Trash2,
   X,
   Check,
@@ -883,19 +882,6 @@ const PanelEditor = ({
     setSavingMeta(false);
   };
 
-  const handleDelete = async () => {
-    const ok = await confirm({
-      message: `¿Eliminar permanentemente "${cap?.titulo_capitulo}"?`,
-      danger: true,
-      confirmLabel: "Eliminar",
-    });
-    if (!ok) return;
-    try {
-      await capDelete(capId);
-      onCapitulosChange();
-    } catch {}
-  };
-
   const handleRestaurarVersion = async (version: {
     id: string;
     contenido_delta: string;
@@ -1203,14 +1189,6 @@ const PanelEditor = ({
               <div className="flex items-center gap-0.5 shrink-0">
                 <SaveIndicator status={saveStatus} />
                 <button
-                  className="p-1.5 rounded hover:bg-primary/8 text-primary/25 hover:text-primary transition-all disabled:opacity-30"
-                  disabled={saveStatus === "saving"}
-                  title="Guardar (Ctrl+S)"
-                  onClick={() => doSave(contenido)}
-                >
-                  <Save size={11} />
-                </button>
-                <button
                   className="p-1.5 rounded hover:bg-primary/8 text-primary/25 hover:text-primary transition-all"
                   title="Vista previa"
                   onClick={() => setPreviewOpen(true)}
@@ -1344,13 +1322,6 @@ const PanelEditor = ({
                     </>
                   )}
                 </div>
-                <button
-                  className="p-1.5 rounded hover:bg-red-500/10 text-primary/20 hover:text-red-400 transition-all"
-                  title="Eliminar capítulo"
-                  onClick={handleDelete}
-                >
-                  <Trash2 size={11} />
-                </button>
                 <button
                   className="lg:hidden p-1.5 rounded hover:bg-primary/8 text-primary/25 hover:text-primary transition-all"
                   title="Metadatos"
