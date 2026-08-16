@@ -36,10 +36,12 @@ function applyInlinePlainMarkdown(text: string): string {
   return renderInlineMarkdownSafe(text, { withWikilinks: true });
 }
 
-// Detecta "# ".."#### " al inicio de un bloque (1 a 4 "#", con espacio) —
-// mismo límite de niveles que expone MarkdownCommandPalette (H1-H4).
-// "#####"/"######" (h5/h6) caen al párrafo normal, igual que antes.
-const HEADING_LINE_RE = /^(#{1,4})\s+(.*)$/;
+// Nota: el reconocimiento de headings ("#".."######" ATX) vive ahora en
+// splitMarkdownBlocks (ui/Markdown/inlineMarkdown.ts) como su propio tipo
+// de bloque, línea por línea — no como regex sobre el bloque de texto
+// completo. Esto es lo que permite detectar un heading aunque esté pegado
+// (sin línea en blanco) a la línea siguiente, que es el caso real que
+// antes se mostraba como "# Chile" literal en vez de un <h1>.
 
 // Cada nivel de heading tiene su propio lenguaje visual — no un único
 // patrón escalado por tamaño — para que la jerarquía se lea de un
@@ -324,7 +326,23 @@ function renderBlock(block: MarkdownBlock, key: number, prevHeadingLevel: { curr
     );
   }
 
-  // block.type === "text": mismo camino que antes (heading o párrafo).
+  if (block.type === "heading") {
+    // h5/h6 (nivel 5-6) caen al mismo tratamiento visual que h4 — mismo
+    // límite que exponía antes HEADING_LINE_RE (H1-H4 con estilos propios;
+    // niveles mayores no tienen un lenguaje visual dedicado en este preview).
+    const level = Math.min(4, block.level) as 1 | 2 | 3 | 4;
+    const rendered = renderHeadingBlock(
+      level,
+      block.text,
+      key,
+      prevHeadingLevel.current,
+    );
+    prevHeadingLevel.current = level;
+    return rendered;
+  }
+
+  // block.type === "text": párrafo normal (headings ya se resuelven arriba
+  // como su propio tipo de bloque, línea por línea, en splitMarkdownBlocks).
   const bloque = block.raw;
   if (bloque.trim() === "") {
     prevHeadingLevel.current = null;
@@ -333,18 +351,6 @@ function renderBlock(block: MarkdownBlock, key: number, prevHeadingLevel: { curr
     );
   }
 
-  const headingMatch = HEADING_LINE_RE.exec(bloque);
-  if (headingMatch) {
-    const level = Math.min(4, headingMatch[1].length) as 1 | 2 | 3 | 4;
-    const rendered = renderHeadingBlock(
-      level,
-      headingMatch[2],
-      key,
-      prevHeadingLevel.current,
-    );
-    prevHeadingLevel.current = level;
-    return rendered;
-  }
   prevHeadingLevel.current = null;
 
   const lineas = bloque.split("\n");

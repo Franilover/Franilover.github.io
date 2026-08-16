@@ -123,7 +123,17 @@ export type MarkdownBlock =
   | { type: "quote"; raw: string }
   | { type: "list"; ordered: boolean; items: MarkdownListItem[] }
   | { type: "table"; header: string[]; rows: string[][] }
+  | { type: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; text: string }
   | { type: "text"; raw: string };
+
+// Heading ATX: "#".."######" seguido de espacio — reconocido como línea
+// propia (línea completa), igual que quote/list/table, en vez de depender
+// de estar rodeado por líneas en blanco. Antes un heading pegado a la
+// línea siguiente sin blank line ("# Chile\n## Fuentes\nFiscalía") caía
+// entero dentro de un mismo bloque "text" y el "#" se mostraba literal,
+// porque el único criterio de heading vivía en el consumidor (regex sobre
+// el bloque COMPLETO) y solo bloques de una sola línea coincidían.
+const HEADING_RE = /^ {0,3}(#{1,6})\s+(.*)$/;
 
 /**
  * Parte un documento markdown en bloques de nivel superior, reconociendo
@@ -196,6 +206,18 @@ export function splitMarkdownBlocks(value: string): MarkdownBlock[] {
     if (HR_RE.test(linea)) {
       flushTexto();
       blocks.push({ type: "hr" });
+      i++;
+      continue;
+    }
+
+    // Heading: se reconoce por línea propia, con la misma prioridad que
+    // hr/code — así corta cualquier acumulación de texto en curso aunque
+    // no haya línea en blanco antes o después (el caso real que fallaba).
+    const headingMatch = HEADING_RE.exec(linea);
+    if (headingMatch) {
+      flushTexto();
+      const level = Math.min(6, headingMatch[1].length) as 1 | 2 | 3 | 4 | 5 | 6;
+      blocks.push({ type: "heading", level, text: headingMatch[2] });
       i++;
       continue;
     }

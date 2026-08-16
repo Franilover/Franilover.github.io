@@ -106,6 +106,29 @@ function TextoMarkdown({
           );
         }
 
+        if (block.type === "heading") {
+          // Antes de agregar "heading" como su propio tipo de bloque, un
+          // "# Título" en un capítulo nunca se reconocía acá (splitMarkdownBlocks
+          // solo separaba code/hr) — se veía como texto plano con el "#"
+          // literal. Estilos discretos, sin el tratamiento elaborado de
+          // PlainMarkdownPreview, para no cambiar el look ya establecido
+          // de los capítulos de Garlia.
+          const HeadingTag = (`h${block.level}` as const);
+          const sizeClass =
+            block.level === 1
+              ? "text-2xl font-black mt-8 mb-3"
+              : block.level === 2
+                ? "text-xl font-bold mt-6 mb-2.5"
+                : block.level === 3
+                  ? "text-lg font-bold mt-5 mb-2"
+                  : "text-base font-bold mt-4 mb-1.5";
+          return (
+            <HeadingTag key={bi} className={`${sizeClass} text-primary`}>
+              {renderLineaConNotas(block.text, `${bi}-h`)}
+            </HeadingTag>
+          );
+        }
+
         if (block.type === "quote") {
           return (
             <blockquote
