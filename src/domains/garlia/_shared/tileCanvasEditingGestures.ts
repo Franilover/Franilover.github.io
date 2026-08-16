@@ -610,7 +610,10 @@ export function useTileCanvasEditingState<
         markDirty();
         handled = true;
       }
-      if (markerParaMoverIdRef.current !== null) {
+      const idParaMoverActual = onMarkerContextMenu
+        ? selectedMarkerId
+        : markerParaMoverIdRef.current;
+      if (idParaMoverActual !== null) {
         if (!onMarkerContextMenu) setMarkerParaMoverId(null);
         onMarkerSelect(null);
         handled = true;
