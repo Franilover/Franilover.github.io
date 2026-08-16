@@ -721,10 +721,12 @@ export function DialogoBlock({
   personajeId,
   texto,
   acotacion,
+  mostrarImg = true,
 }: {
   personajeId: string;
   texto: string;
   acotacion?: string;
+  mostrarImg?: boolean;
 }) {
   const [personaje, setPersonaje] = useState<DialogoPersonaje | null>(
     dialogoPersonajeCache.get(personajeId) ?? null,
@@ -771,19 +773,21 @@ export function DialogoBlock({
 
   return (
     <div className="flex items-start gap-3 my-4">
-      <div className="shrink-0 w-11 h-11 rounded-full overflow-hidden bg-surface-1 border border-primary/15 flex items-center justify-center">
-        {personaje?.img_url ? (
-          <Image
-            alt={nombre}
-            className="w-full h-full object-cover"
-            height={44}
-            src={personaje.img_url}
-            width={44}
-          />
-        ) : (
-          <User className="text-primary/40" size={18} />
-        )}
-      </div>
+      {mostrarImg && (
+        <div className="shrink-0 w-11 h-11 rounded-full overflow-hidden bg-surface-1 border border-primary/15 flex items-center justify-center">
+          {personaje?.img_url ? (
+            <Image
+              alt={nombre}
+              className="w-full h-full object-cover"
+              height={44}
+              src={personaje.img_url}
+              width={44}
+            />
+          ) : (
+            <User className="text-primary/40" size={18} />
+          )}
+        </div>
+      )}
       <div className="min-w-0 flex-1 pt-0.5">
         <div className="text-xs font-semibold text-primary/70 mb-0.5">
           {nombre}

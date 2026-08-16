@@ -18,10 +18,13 @@
  *
  * Render: en vez de un chip/pill que abre un panel flotante para editar,
  * el nodo renderiza DE UNA el mismo bloque visual que la página pública
- * (avatar + nombre + texto) pero con el texto editable in-place vía
- * textarea autoexpandible. El avatar/nombre siguen abriendo el panel
- * flotante (SnippetCommandPalette) — eso es exclusivamente para cambiar
- * de personaje, no para editar el texto.
+ * (avatar + nombre + texto) pero editable in-place:
+ *   - Click en el AVATAR → oculta/muestra el retrato (ícono de ojo
+ *     tachado al pasar el mouse). "Oculto" también aplica en modo
+ *     lectura — ver mostrarImg en DialogoPayload y DialogoBlock.
+ *   - Click en el NOMBRE → abre el panel flotante (SnippetCommandPalette)
+ *     para cambiar de personaje.
+ *   - El texto y la acotación se escriben directo en sus textareas.
  */
 import type {
   EditorConfig,
@@ -34,7 +37,7 @@ import type {
 import { $getNodeByKey, $createParagraphNode, DecoratorNode } from "lexical";
 import Image from "next/image";
 import React, { useEffect, useRef, useState } from "react";
-import { User } from "lucide-react";
+import { User, EyeOff } from "lucide-react";
 
 import { db } from "@/infra/supabase/db";
 
@@ -46,6 +49,10 @@ export interface DialogoPayload {
   /** Acotación/didascalia opcional — ej: "dijo mientras se acercaba".
    *  Se muestra en cursiva, debajo del texto del diálogo. */
   acotacion?: string;
+  /** Si es false, el retrato se oculta (tanto en el editor como en modo
+   *  lectura) — el nombre y el texto se siguen mostrando igual. Default
+   *  true (undefined = mostrar) para no romper diálogos ya guardados. */
+  mostrarImg?: boolean;
 }
 
 export type SerializedDialogoNode = Spread<
@@ -150,6 +157,9 @@ function DialogoInlineView({
   };
 
   const nombre = personaje?.nombre?.trim() || "…";
+  const mostrarImg = payload.mostrarImg !== false;
+
+  const toggleImg = () => commit({ mostrarImg: !mostrarImg });
 
   const focusEditorNext = () => {
     editor.update(() => {
@@ -220,26 +230,35 @@ function DialogoInlineView({
       contentEditable={false}
     >
       <button
-        className="shrink-0 w-11 h-11 rounded-full overflow-hidden bg-surface-1 border border-primary/15 flex items-center justify-center cursor-pointer hover:border-primary/40 transition-colors"
-        title="Cambiar personaje"
+        className="group/avatar shrink-0 w-11 h-11 rounded-full overflow-hidden bg-surface-1 border border-primary/15 flex items-center justify-center cursor-pointer hover:border-primary/40 transition-colors relative"
+        title={mostrarImg ? "Ocultar retrato" : "Mostrar retrato"}
         type="button"
-        onClick={openPersonajePicker}
+        onClick={toggleImg}
       >
-        {personaje?.img_url ? (
-          <Image
-            alt={nombre}
-            className="w-full h-full object-cover"
-            height={44}
-            src={personaje.img_url}
-            width={44}
-          />
+        {mostrarImg ? (
+          personaje?.img_url ? (
+            <Image
+              alt={nombre}
+              className="w-full h-full object-cover"
+              height={44}
+              src={personaje.img_url}
+              width={44}
+            />
+          ) : (
+            <User className="text-primary/40" size={18} />
+          )
         ) : (
-          <User className="text-primary/40" size={18} />
+          <EyeOff className="text-foreground/30" size={16} />
+        )}
+        {mostrarImg && (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+            <EyeOff className="text-white" size={16} />
+          </span>
         )}
       </button>
       <div className="min-w-0 flex-1 pt-0.5">
         <button
-          className="text-xs font-semibold text-primary/70 mb-0.5 hover:text-primary transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-primary/70 mb-0.5 hover:text-primary transition-colors cursor-pointer"
           title="Cambiar personaje"
           type="button"
           onClick={openPersonajePicker}
@@ -327,9 +346,9 @@ export class DialogoNode extends DecoratorNode<React.ReactNode> {
   static importJSON(
     serialized: SerializedLexicalNode & Record<string, unknown>,
   ): DialogoNode {
-    const { personajeId, texto, acotacion } =
+    const { personajeId, texto, acotacion, mostrarImg } =
       serialized as unknown as SerializedDialogoNode;
-    return $createDialogoNode({ personajeId, texto, acotacion });
+    return $createDialogoNode({ personajeId, texto, acotacion, mostrarImg });
   }
 
   exportJSON(): SerializedDialogoNode {
@@ -386,31 +405,37 @@ export function $isDialogoNode(
   return node instanceof DialogoNode;
 }
 
-// raw = "[[dialogo|personaje_id|texto¦acotacion]]" — texto/acotación pueden
-// contener "|" real (diálogo con guiones, citas dentro de la línea, etc.),
-// así que solo el primer "|" después del personaje_id es estructural; el
-// resto se une de vuelta con join("|") y luego se separa texto/acotación
-// por DIALOGO_ACOTACION_SEP (ver su comentario más arriba). Mismo criterio
-// que parseContenido en types.ts. Retrocompatible: raws viejos sin el
-// separador simplemente no tienen acotación.
+// raw = "[[dialogo|personaje_id|texto¦acotacion¦mostrarImg]]" — texto y
+// acotación pueden contener "|" real (diálogo con guiones, citas dentro de
+// la línea, etc.), así que solo el primer "|" después del personaje_id es
+// estructural; el resto se une de vuelta con join("|") y luego se separa
+// en sus 3 sub-campos por DIALOGO_ACOTACION_SEP (ver su comentario más
+// arriba). mostrarImg se guarda como "0" (oculto) — su ausencia (raws
+// viejos sin el separador, o el campo vacío) significa "mostrar" por
+// default, así ningún diálogo ya escrito cambia de comportamiento. Mismo
+// criterio que parseContenido en types.ts.
 export function dialogoRawToPayload(raw: string): DialogoPayload | null {
   const inner = raw.startsWith("[[") && raw.endsWith("]]") ? raw.slice(2, -2) : raw;
   const parts = inner.split("|");
   if (parts[0]?.trim() !== "dialogo") return null;
   const personajeId = parts[1]?.trim() ?? "";
   const rest = parts.slice(2).join("|");
-  const [texto, acotacion] = rest.split(DIALOGO_ACOTACION_SEP);
+  const [texto, acotacion, mostrarImgFlag] = rest.split(DIALOGO_ACOTACION_SEP);
   if (!personajeId) return null;
   return {
     personajeId,
     texto: (texto ?? "").trim(),
     ...(acotacion?.trim() ? { acotacion: acotacion.trim() } : {}),
+    ...(mostrarImgFlag?.trim() === "0" ? { mostrarImg: false } : {}),
   };
 }
 
 export function dialogoPayloadToRaw(p: DialogoPayload): string {
-  const rest = p.acotacion?.trim()
-    ? `${p.texto}${DIALOGO_ACOTACION_SEP}${p.acotacion.trim()}`
-    : p.texto;
+  const acotacionPart = p.acotacion?.trim() ?? "";
+  const mostrarImgPart = p.mostrarImg === false ? "0" : "";
+  const rest =
+    acotacionPart || mostrarImgPart
+      ? `${p.texto}${DIALOGO_ACOTACION_SEP}${acotacionPart}${DIALOGO_ACOTACION_SEP}${mostrarImgPart}`
+      : p.texto;
   return `[[dialogo|${p.personajeId}|${rest}]]`;
 }

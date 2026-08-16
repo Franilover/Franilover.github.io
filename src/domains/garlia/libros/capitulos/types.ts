@@ -55,11 +55,12 @@ export type TreeNode = FileEntry | FolderEntry;
 // Segmentos de contenido
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Separador reservado entre "texto" y "acotacion" dentro del raw de diálogo
-// [[dialogo|personajeId|texto¦acotacion]] — mismo valor que
-// DIALOGO_ACOTACION_SEP en editor/lexical/nodes/DialogoNode.tsx (duplicado
-// acá a propósito para no crear un import cruzado editor↔lector desde este
-// archivo, que consumen ambos lados).
+// Separador reservado entre los sub-campos (texto/acotacion/mostrarImg)
+// dentro del raw de diálogo [[dialogo|personajeId|texto¦acotacion¦0]] —
+// mismo valor que DIALOGO_ACOTACION_SEP en
+// editor/lexical/nodes/DialogoNode.tsx (duplicado acá a propósito para no
+// crear un import cruzado editor↔lector desde este archivo, que consumen
+// ambos lados).
 export const DIALOGO_ACOTACION_SEP = "\u241E";
 
 export type Segment =
@@ -69,7 +70,14 @@ export type Segment =
   | { type: "img"; url: string; caption?: string }
   | { type: "float"; word: string; url: string; caption?: string }
   | { type: "sound"; url: string; volume: number }
-  | { type: "dialogo"; personajeId: string; texto: string; acotacion?: string }
+  | {
+      type: "dialogo";
+      personajeId: string;
+      texto: string;
+      acotacion?: string;
+      /** false = retrato oculto (default true/mostrar si no viene). */
+      mostrarImg?: boolean;
+    }
   | {
       type: "drop";
       word: string;
@@ -331,18 +339,21 @@ export function parseContenido(texto: string): Segment[] {
         volume: parseFloat(parts[1] ?? "0.5"),
       });
     else if (kind === "dialogo") {
-      // parts[0] = personaje_id, resto = texto[¦acotacion] del diálogo. Se
-      // reúne con join("|") en vez de tomar solo parts[1] porque puede
-      // contener "|" real (diálogo con guiones, citas, etc.) — solo el
-      // primer "|" (id | resto) es estructural. Luego texto/acotación se
-      // separan por DIALOGO_ACOTACION_SEP.
+      // parts[0] = personaje_id, resto = texto[¦acotacion¦mostrarImg] del
+      // diálogo. Se reúne con join("|") en vez de tomar solo parts[1]
+      // porque puede contener "|" real (diálogo con guiones, citas, etc.)
+      // — solo el primer "|" (id | resto) es estructural. Luego los
+      // sub-campos se separan por DIALOGO_ACOTACION_SEP.
       const rest = parts.slice(1).join("|");
-      const [texto, acotacion] = rest.split(DIALOGO_ACOTACION_SEP);
+      const [texto, acotacion, mostrarImgFlag] = rest.split(
+        DIALOGO_ACOTACION_SEP,
+      );
       segs.push({
         type: "dialogo",
         personajeId: parts[0] ?? "",
         texto: texto ?? "",
         ...(acotacion?.trim() ? { acotacion: acotacion.trim() } : {}),
+        ...(mostrarImgFlag?.trim() === "0" ? { mostrarImg: false } : {}),
       });
     }
     else if (kind === "drop")

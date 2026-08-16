@@ -349,6 +349,7 @@ export function RenderSegmentos({
             <DialogoBlock
               key={i}
               acotacion={seg.acotacion}
+              mostrarImg={seg.mostrarImg}
               personajeId={seg.personajeId}
               texto={seg.texto}
             />
