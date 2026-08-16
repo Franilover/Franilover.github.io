@@ -36,6 +36,7 @@ import {
   type DrawTool,
   type WorldPoint,
 } from "@/domains/garlia/_shared/UnifiedTileCanvas";
+import { TileCanvasView } from "@/domains/garlia/_shared/TileCanvasView";
 import { ModalDetalle } from "@/domains/garlia/perfil-jugador/PersonalComponents";
 import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
 import { useIsAdmin } from "@/domains/plataforma/auth/useIsAdmin";
@@ -3682,42 +3683,54 @@ export default function MapaInteractivo({
 
         {vistaActual === "global" ? (
           <>
-            <UnifiedTileCanvas
-              areas={areasParaMostrar}
-              className="absolute inset-0"
-              drawTool={editMode ? drawTool : null}
-              editMode={editMode}
-              eyedropperActive={eyedropperActive}
-              fondoColor={fondoColor}
-              hiddenMarkers={hiddenMarkers}
-              isFirstOpen={isFirstOpen}
-              markers={
-                editMode
-                  ? [...visibleMarkersSinDuplicado, ...hiddenMarkers]
-                  : visibleMarkersSinDuplicado
-              }
-              selectedAreaId={editMode ? selectedAreaId : null}
-              selectedMarkerId={editMode ? (reinoParaMover ?? null) : null}
-              tiles={mapTiles}
-              onAreaClick={(area) => void handleAreaLabelClick(area)}
-              onAreaDrawEnd={handleAreaDrawEnd}
-              onAreaPointsChange={handleAreaPointsChange}
-              onAreaSelect={setSelectedAreaId}
-              onEyedropperPick={handleFondoColorChange}
-              onMapClick={handleMapClick}
-              onMarkerClick={handleReinoClick}
-              onMarkerContextMenu={handleReinoContextMenu}
-              onMarkerMove={handleReinoMarkerMove}
-              onMarkerSelect={setReinoParaMover}
-              onOpenPanel={
-                isMobile && reinoSeleccionado
-                  ? () => setPanelOpen(true)
-                  : undefined
-              }
-              onTileCreate={handleTileCreateAt}
-              onTileDelete={(tile) => void handleTileDelete(tile.id)}
-              onTilePick={(tile) => setTilePickerTarget(tile)}
-            />
+            {editMode ? (
+              <UnifiedTileCanvas
+                areas={areasParaMostrar}
+                className="absolute inset-0"
+                drawTool={drawTool}
+                editMode={true}
+                eyedropperActive={eyedropperActive}
+                fondoColor={fondoColor}
+                hiddenMarkers={hiddenMarkers}
+                isFirstOpen={isFirstOpen}
+                markers={[...visibleMarkersSinDuplicado, ...hiddenMarkers]}
+                selectedAreaId={selectedAreaId}
+                selectedMarkerId={reinoParaMover ?? null}
+                tiles={mapTiles}
+                onAreaClick={(area) => void handleAreaLabelClick(area)}
+                onAreaDrawEnd={handleAreaDrawEnd}
+                onAreaPointsChange={handleAreaPointsChange}
+                onAreaSelect={setSelectedAreaId}
+                onEyedropperPick={handleFondoColorChange}
+                onMapClick={handleMapClick}
+                onMarkerClick={handleReinoClick}
+                onMarkerContextMenu={handleReinoContextMenu}
+                onMarkerMove={handleReinoMarkerMove}
+                onMarkerSelect={setReinoParaMover}
+                onOpenPanel={
+                  isMobile && reinoSeleccionado
+                    ? () => setPanelOpen(true)
+                    : undefined
+                }
+                onTileCreate={handleTileCreateAt}
+                onTileDelete={(tile) => void handleTileDelete(tile.id)}
+                onTilePick={(tile) => setTilePickerTarget(tile)}
+              />
+            ) : (
+              // ── Modo lectura: TileCanvasView, sin código de edición en el
+              // bundle (drag de vértices, dibujo, papelera, etc.). ─────────
+              <TileCanvasView
+                areas={areasParaMostrar}
+                className="absolute inset-0"
+                fondoColor={fondoColor}
+                hiddenMarkers={hiddenMarkers}
+                markers={visibleMarkersSinDuplicado}
+                tiles={mapTiles}
+                onAreaClick={(area) => void handleAreaLabelClick(area)}
+                onMapClick={handleMapClick}
+                onMarkerClick={handleReinoClick}
+              />
+            )}
 
             {editMode && (
               <button
