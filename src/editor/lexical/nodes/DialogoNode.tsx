@@ -31,7 +31,7 @@ import type {
   SerializedLexicalNode,
   Spread,
 } from "lexical";
-import { $getNodeByKey, DecoratorNode } from "lexical";
+import { $getNodeByKey, $createParagraphNode, DecoratorNode } from "lexical";
 import Image from "next/image";
 import React, { useEffect, useRef, useState } from "react";
 import { User } from "lucide-react";
@@ -127,6 +127,33 @@ function DialogoInlineView({
 
   const nombre = personaje?.nombre?.trim() || "…";
 
+  // Enter (sin shift) sale del diálogo: crea (o reusa) un párrafo vacío
+  // inmediatamente después del bloque y mueve el foco ahí — así siempre
+  // se puede "bajar" y seguir escribiendo fuera del diálogo, incluso si
+  // es el último nodo del documento. Shift+Enter sigue siendo salto de
+  // línea normal DENTRO del texto del diálogo.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    commitTexto(texto);
+    editor.update(() => {
+      const node = $getNodeByKey(nodeKey);
+      if (!$isDialogoNode(node)) return;
+      const next = node.getNextSibling();
+      if (next) {
+        next.selectStart();
+        return;
+      }
+      const paragraph = $createParagraphNode();
+      node.insertAfter(paragraph);
+      paragraph.selectStart();
+    });
+    // Lexical necesita que el foco DOM vuelva a su contentEditable para
+    // que la selección recién movida sea efectiva (el textarea es un
+    // elemento nativo ajeno al árbol, así que no lo tiene por defecto).
+    requestAnimationFrame(() => editor.focus());
+  };
+
   const openPersonajePicker = () =>
     snippetEditHandler.current?.({
       kind: "dialogo" as any,
@@ -186,6 +213,7 @@ function DialogoInlineView({
             setTexto(e.target.value);
             autoResize();
           }}
+          onKeyDown={handleKeyDown}
           onBlur={() => commitTexto(texto)}
         />
       </div>
