@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CheckCheck, Paperclip, Pencil, Phone, Plus, Reply, Send, SmilePlus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Mic, Paperclip, Pencil, Phone, Plus, Reply, Send, Trash2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -40,6 +40,7 @@ import {
 import { supabase } from "@/infra/supabase/supabase";
 import { useAuth } from "@/providers/AuthProvider";
 import { ExplosionEmoji } from "./ExplosionEmoji";
+import { formatearDuracion, useGrabadorAudio } from "./useGrabadorAudio";
 
 /** Texto corto para mostrar como preview de un mensaje citado (reply). */
 function previsualizarMensaje(m: Mensaje): string {
@@ -101,60 +102,121 @@ const CATEGORIAS_EMOJI: { nombre: string; emojis: string[] }[] = [
 ];
 
 /**
+ * Handlers de long-press reusables para un emoji dentro de cualquier picker
+ * (rápido o completo): tap normal reacciona, mantener presionado dispara la
+ * explosión. Unifica pointer+mouse en un solo lugar para no duplicar la
+ * lógica entre el picker rápido y el selector completo.
+ */
+function useLongPressEmoji({
+  onTap,
+  onLongPress,
+  ms = 350,
+}: {
+  onTap: (emoji: string) => void;
+  onLongPress: (emoji: string) => void;
+  ms?: number;
+}) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disparadoRef = useRef(false);
+
+  const cancelar = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const onDown = (emoji: string) => {
+    disparadoRef.current = false;
+    cancelar();
+    timerRef.current = setTimeout(() => {
+      disparadoRef.current = true;
+      onLongPress(emoji);
+    }, ms);
+  };
+
+  const onUp = (emoji: string) => {
+    cancelar();
+    if (disparadoRef.current) return;
+    onTap(emoji);
+  };
+
+  return { onDown, onUp, onLeave: cancelar };
+}
+
+/**
  * Selector completo de emojis, agrupado por categorías, para cuando los 6
  * emojis rápidos no alcanzan. Se abre desde el botón "+" del picker rápido.
- * No depende de ninguna librería externa: es una lista curada suficiente
- * para reacciones de chat (no un input de texto con emojis arbitrarios).
+ * Ocupa buena parte de la pantalla (bottom-sheet en mobile, panel grande
+ * centrado en desktop) para que los emojis sean cómodos de tocar. No
+ * depende de ninguna librería externa: es una lista curada suficiente para
+ * reacciones de chat (no un input de texto con emojis arbitrarios).
+ * Soporta el mismo gesto de mantener-presionado que el picker rápido: tap
+ * reacciona, long-press dispara la explosión.
  */
 function SelectorEmojisCompleto({
-  alineacion,
   onSeleccionar,
+  onExplosion,
   onCerrar,
 }: {
-  alineacion: "left" | "right";
   onSeleccionar: (emoji: string) => void;
+  onExplosion: (emoji: string) => void;
   onCerrar: () => void;
 }) {
+  const lp = useLongPressEmoji({ onTap: onSeleccionar, onLongPress: onExplosion });
+
   return (
     <div
-      data-mensaje-burbuja
-      className={`absolute top-0 ${alineacion === "right" ? "right-0" : "left-0"} z-20 rounded-[var(--radius-btn)] overflow-hidden`}
-      style={{
-        width: 260,
-        maxHeight: 280,
-        background: "var(--bg-main)",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-        border: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
-      }}
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+      onClick={onCerrar}
     >
       <div
-        className="flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)" }}
+        data-mensaje-burbuja
+        className="w-full md:w-[520px] rounded-t-[var(--radius-btn)] md:rounded-[var(--radius-btn)] overflow-hidden flex flex-col"
+        style={{
+          maxHeight: "80vh",
+          background: "var(--bg-main)",
+          boxShadow: "0 -4px 32px rgba(0,0,0,0.35)",
+          border: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-micro font-black uppercase tracking-wide text-primary/60">Reaccionar</p>
-        <button onClick={onCerrar} aria-label="Cerrar selector de emojis">
-          <X className="text-primary/40" size={13} />
-        </button>
-      </div>
-      <div className="overflow-y-auto px-2 py-2" style={{ maxHeight: 230 }}>
-        {CATEGORIAS_EMOJI.map((cat) => (
-          <div key={cat.nombre} className="mb-2">
-            <p className="text-micro font-bold text-primary/40 uppercase tracking-wide mb-1 px-1">
-              {cat.nombre}
-            </p>
-            <div className="grid grid-cols-8 gap-0.5">
-              {cat.emojis.map((emoji) => (
-                <button
-                  key={emoji}
-                  className="text-base leading-none py-1 rounded hover:scale-125 transition-transform"
-                  onClick={() => onSeleccionar(emoji)}
-                >
-                  {emoji}
-                </button>
-              ))}
+        <div
+          className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+          style={{ borderBottom: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)" }}
+        >
+          <p className="text-sm font-black uppercase tracking-wide text-primary/60">Reaccionar</p>
+          <button className="p-1" onClick={onCerrar} aria-label="Cerrar selector de emojis">
+            <X className="text-primary/40" size={18} />
+          </button>
+        </div>
+        <div className="overflow-y-auto px-3 py-3">
+          {CATEGORIAS_EMOJI.map((cat) => (
+            <div key={cat.nombre} className="mb-4">
+              <p className="text-micro font-bold text-primary/40 uppercase tracking-wide mb-2 px-1">
+                {cat.nombre}
+              </p>
+              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1">
+                {cat.emojis.map((emoji) => (
+                  <button
+                    key={emoji}
+                    className="text-3xl leading-none py-2 rounded-[var(--radius-btn)] hover:scale-125 active:scale-95 transition-transform select-none"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onMouseDown={() => lp.onDown(emoji)}
+                    onMouseLeave={lp.onLeave}
+                    onMouseUp={() => lp.onUp(emoji)}
+                    onPointerDown={() => lp.onDown(emoji)}
+                    onPointerLeave={lp.onLeave}
+                    onPointerUp={() => lp.onUp(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -233,7 +295,10 @@ export default function DetalleConversacion() {
     cancelarLongPress();
     longPressTimerRef.current = setTimeout(() => {
       longPressDisparadoRef.current = true;
+      // El long-press abre directo el picker rápido de reacciones, en vez
+      // de solo mostrar el menú con el ícono de carita — un paso menos.
       setMenuTactilPara(mensajeId);
+      setPickerAbiertoPara(mensajeId);
       if (navigator.vibrate) navigator.vibrate(10);
     }, 450);
   };
@@ -244,6 +309,22 @@ export default function DetalleConversacion() {
 
   const handleTouchMoveMensaje = () => {
     // Si el dedo se mueve (empieza a scrollear), no es un long-press: cancelamos.
+    cancelarLongPress();
+  };
+
+  // En desktop no existe "mantener presionado" táctil: replicamos el mismo
+  // gesto con el mouse para que también abra directo el picker.
+  const handleMouseDownMensaje = (mensajeId: string) => {
+    longPressDisparadoRef.current = false;
+    cancelarLongPress();
+    longPressTimerRef.current = setTimeout(() => {
+      longPressDisparadoRef.current = true;
+      setMenuTactilPara(mensajeId);
+      setPickerAbiertoPara(mensajeId);
+    }, 450);
+  };
+
+  const handleMouseUpOrLeaveMensaje = () => {
     cancelarLongPress();
   };
 
@@ -940,6 +1021,47 @@ export default function DetalleConversacion() {
     }
   };
 
+  // ── Grabador de audio ────────────────────────────────────────────────
+  const grabador = useGrabadorAudio();
+  const [enviandoAudio, setEnviandoAudio] = useState(false);
+  // Umbral corto de grabación: si soltaste antes de esto, lo tratamos como
+  // un toque accidental y descartamos en vez de mandar un audio de medio
+  // segundo — igual que WhatsApp con su "deslizá para cancelar".
+  const DURACION_MINIMA_MS = 700;
+  const inicioGrabacionRef = useRef(0);
+
+  const handleIniciarGrabacion = async () => {
+    inicioGrabacionRef.current = Date.now();
+    await grabador.iniciar();
+  };
+
+  const handleDetenerYEnviarAudio = async () => {
+    const duro = Date.now() - inicioGrabacionRef.current;
+    const blob = await grabador.detenerYObtener();
+    if (!blob || duro < DURACION_MINIMA_MS) return;
+
+    setEnviandoAudio(true);
+    try {
+      const extension = blob.type.includes("mp4") ? "m4a" : "webm";
+      const archivo = new File([blob], `audio-${Date.now()}.${extension}`, { type: blob.type });
+      const adjunto = await subirAdjunto(conversacionId, archivo);
+      const enviado = await enviarMensaje(conversacionId, "", adjunto);
+      setMensajes((prev) => (prev.some((p) => p.id === enviado.id) ? prev : [...prev, enviado]));
+    } catch (err: any) {
+      setError(err?.message ?? "No se pudo enviar el audio.");
+    } finally {
+      setEnviandoAudio(false);
+    }
+  };
+
+  const handleCancelarGrabacion = () => {
+    grabador.cancelar();
+  };
+
+  useEffect(() => {
+    if (grabador.errorMensaje) setError(grabador.errorMensaje);
+  }, [grabador.errorMensaje]);
+
   if (!user) {
     return (
       <div className="min-h-screen md:min-h-0 md:h-full bg-bg-main flex items-center justify-center">
@@ -1079,6 +1201,9 @@ export default function DetalleConversacion() {
                   onTouchStart={() => handleTouchStartMensaje(m.id)}
                   onTouchEnd={handleTouchEndMensaje}
                   onTouchMove={handleTouchMoveMensaje}
+                  onMouseDown={() => handleMouseDownMensaje(m.id)}
+                  onMouseLeave={handleMouseUpOrLeaveMensaje}
+                  onMouseUp={handleMouseUpOrLeaveMensaje}
                   onContextMenu={(e) => {
                     // Evita el menú contextual nativo (copiar/seleccionar) en
                     // mobile, que es lo que se disparaba en vez de nuestro menú.
@@ -1179,17 +1304,6 @@ export default function DetalleConversacion() {
                     >
                       <Reply className="text-primary/60" size={13} />
                     </button>
-                    <button
-                      aria-label="Reaccionar"
-                      onClick={() => {
-                        setPickerAbiertoPara(pickerAbiertoPara === m.id ? null : m.id);
-                        setMenuTactilPara(null);
-                      }}
-                      className="p-1 rounded-full"
-                      style={{ background: "color-mix(in srgb, var(--primary) 10%, transparent)" }}
-                    >
-                      <SmilePlus className="text-primary/60" size={13} />
-                    </button>
                     {esMio && (
                       <>
                         <button
@@ -1221,17 +1335,20 @@ export default function DetalleConversacion() {
                   {/* Picker de emojis rápidos + botón "+" para el selector completo */}
                   {pickerAbiertoPara === m.id && (
                     <div
-                      className={`absolute -top-9 ${esMio ? "right-0" : "left-0"} flex items-center gap-1 px-2 py-1 rounded-full z-10`}
+                      className={`absolute -top-12 ${esMio ? "right-0" : "left-0"} flex items-center gap-1.5 px-3 py-2 rounded-full z-10`}
                       style={{ background: "var(--bg-main)", boxShadow: "0 2px 12px rgba(0,0,0,0.15)" }}
                     >
                       {EMOJIS_RAPIDOS.map((emoji) => (
                         <button
                           key={emoji}
-                          className="text-sm hover:scale-125 transition-transform select-none"
-                          onPointerDown={() => handlePointerDownEmojiPicker(m.id, emoji)}
-                          onPointerUp={() => handlePointerUpEmojiPicker(m.id, emoji)}
-                          onPointerLeave={cancelarExplosionLongPress}
+                          className="text-2xl leading-none hover:scale-125 active:scale-95 transition-transform select-none"
                           onContextMenu={(e) => e.preventDefault()}
+                          onMouseDown={() => handlePointerDownEmojiPicker(m.id, emoji)}
+                          onMouseLeave={cancelarExplosionLongPress}
+                          onMouseUp={() => handlePointerUpEmojiPicker(m.id, emoji)}
+                          onPointerDown={() => handlePointerDownEmojiPicker(m.id, emoji)}
+                          onPointerLeave={cancelarExplosionLongPress}
+                          onPointerUp={() => handlePointerUpEmojiPicker(m.id, emoji)}
                         >
                           {emoji}
                         </button>
@@ -1240,8 +1357,8 @@ export default function DetalleConversacion() {
                         aria-label="Más emojis"
                         className="flex items-center justify-center rounded-full hover:scale-110 transition-transform"
                         style={{
-                          width: 18,
-                          height: 18,
+                          width: 26,
+                          height: 26,
                           background: "color-mix(in srgb, var(--primary) 12%, transparent)",
                         }}
                         onClick={() => {
@@ -1249,7 +1366,7 @@ export default function DetalleConversacion() {
                           setSelectorCompletoAbiertoPara(m.id);
                         }}
                       >
-                        <Plus className="text-primary/60" size={12} />
+                        <Plus className="text-primary/60" size={16} />
                       </button>
                     </div>
                   )}
@@ -1257,9 +1374,12 @@ export default function DetalleConversacion() {
                   {/* Selector completo de emojis (todas las categorías) */}
                   {selectorCompletoAbiertoPara === m.id && (
                     <SelectorEmojisCompleto
-                      alineacion={esMio ? "right" : "left"}
                       onSeleccionar={(emoji) => {
                         void handleToggleReaccion(m.id, emoji);
+                        setSelectorCompletoAbiertoPara(null);
+                      }}
+                      onExplosion={(emoji) => {
+                        dispararExplosionEmoji(m.id, emoji);
                         setSelectorCompletoAbiertoPara(null);
                       }}
                       onCerrar={() => setSelectorCompletoAbiertoPara(null)}
@@ -1401,50 +1521,112 @@ export default function DetalleConversacion() {
           type="file"
           onChange={handleArchivo}
         />
-        <button
-          disabled={subiendoArchivo}
-          onClick={() => fileInputRef.current?.click()}
-          aria-label="Adjuntar archivo"
-        >
-          <Paperclip
-            className={subiendoArchivo ? "text-primary/20 animate-pulse" : "text-primary/50"}
-            size={18}
-          />
-        </button>
-        <input
-          autoFocus={!!respondiendoA}
-          className="flex-1 px-4 py-2.5 rounded-[var(--radius-btn)] bg-transparent outline-none text-sm font-medium text-primary placeholder:text-primary/30"
-          placeholder={respondiendoA ? "Escribí tu respuesta…" : "Escribí un mensaje…"}
-          style={{
-            background: "color-mix(in srgb, var(--primary) 5%, transparent)",
-          }}
-          value={texto}
-          onChange={(e) => handleCambioTexto(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void handleEnviar();
-            }
-            if (e.key === "Escape" && respondiendoA) {
-              setRespondiendoA(null);
-            }
-          }}
-        />
-        <button
-          className="flex items-center justify-center rounded-full flex-shrink-0"
-          disabled={!texto.trim() || enviando}
-          style={{
-            width: 36,
-            height: 36,
-            background: "var(--primary)",
-            color: "var(--btn-text)",
-            opacity: !texto.trim() || enviando ? 0.4 : 1,
-          }}
-          onClick={() => void handleEnviar()}
-          aria-label="Enviar"
-        >
-          <Send size={14} />
-        </button>
+
+        {grabador.estado === "grabando" ? (
+          // ── Modo grabando: reemplaza el resto del input (texto, adjuntar)
+          // mientras se está grabando — igual que WhatsApp: el foco pasa
+          // por completo a "grabando... / cancelar / soltar para enviar".
+          <div
+            className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-btn)]"
+            style={{ background: "color-mix(in srgb, var(--primary) 5%, transparent)" }}
+          >
+            <span
+              className="rounded-full flex-shrink-0 animate-pulse"
+              style={{ width: 10, height: 10, background: "#ef4444" }}
+            />
+            <span className="text-sm font-bold text-primary tabular-nums">
+              {formatearDuracion(grabador.duracionSegundos)}
+            </span>
+            <span className="flex-1 text-micro text-primary/40 italic">Grabando audio…</span>
+            <button
+              onClick={handleCancelarGrabacion}
+              aria-label="Cancelar grabación"
+              className="text-micro font-black uppercase tracking-wide text-primary/50"
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              disabled={subiendoArchivo}
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Adjuntar archivo"
+            >
+              <Paperclip
+                className={subiendoArchivo ? "text-primary/20 animate-pulse" : "text-primary/50"}
+                size={18}
+              />
+            </button>
+            <input
+              autoFocus={!!respondiendoA}
+              className="flex-1 px-4 py-2.5 rounded-[var(--radius-btn)] bg-transparent outline-none text-sm font-medium text-primary placeholder:text-primary/30"
+              placeholder={respondiendoA ? "Escribí tu respuesta…" : "Escribí un mensaje…"}
+              style={{
+                background: "color-mix(in srgb, var(--primary) 5%, transparent)",
+              }}
+              value={texto}
+              onChange={(e) => handleCambioTexto(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleEnviar();
+                }
+                if (e.key === "Escape" && respondiendoA) {
+                  setRespondiendoA(null);
+                }
+              }}
+            />
+          </>
+        )}
+
+        {/* Botón de acción principal: enviar texto si hay algo escrito,
+            micrófono (mantener presionado para grabar) si el input está
+            vacío — mismo patrón que WhatsApp/Instagram/Telegram. Con
+            texto: comportamiento de siempre. Sin texto: mantener
+            presionado arranca a grabar, soltar corta y manda el audio;
+            soltar afuera del botón (pointerleave) también lo corta y
+            manda, para no perder la grabación por accidente. */}
+        {texto.trim() ? (
+          <button
+            className="flex items-center justify-center rounded-full flex-shrink-0"
+            disabled={enviando}
+            style={{
+              width: 36,
+              height: 36,
+              background: "var(--primary)",
+              color: "var(--btn-text)",
+              opacity: enviando ? 0.4 : 1,
+            }}
+            onClick={() => void handleEnviar()}
+            aria-label="Enviar"
+          >
+            <Send size={14} />
+          </button>
+        ) : (
+          <button
+            className="flex items-center justify-center rounded-full flex-shrink-0 select-none"
+            disabled={enviandoAudio || grabador.estado === "pidiendo_permiso"}
+            style={{
+              width: 36,
+              height: 36,
+              background: grabador.estado === "grabando" ? "#ef4444" : "var(--primary)",
+              color: "var(--btn-text)",
+              opacity: enviandoAudio || grabador.estado === "pidiendo_permiso" ? 0.4 : 1,
+              transform: grabador.estado === "grabando" ? "scale(1.1)" : "scale(1)",
+              transition: "transform 0.15s ease, background 0.15s ease",
+            }}
+            onPointerDown={() => void handleIniciarGrabacion()}
+            onPointerUp={() => void handleDetenerYEnviarAudio()}
+            onPointerLeave={() => {
+              if (grabador.estado === "grabando") void handleDetenerYEnviarAudio();
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-label={grabador.estado === "grabando" ? "Soltar para enviar audio" : "Mantené presionado para grabar audio"}
+          >
+            <Mic size={14} />
+          </button>
+        )}
       </div>
     </div>
   );
