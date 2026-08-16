@@ -112,9 +112,17 @@ export function renderInlineMarkdownSafe(
 // se mostraba como texto plano. Se consolida acá el reconocimiento de
 // bloques para que ambos renderers los soporten sin duplicar la lógica,
 // igual que ya se hizo con el parser inline arriba.
+export interface MarkdownListItem {
+  text: string;
+  children: MarkdownListItem[];
+}
+
 export type MarkdownBlock =
   | { type: "code"; lang: string; code: string }
   | { type: "hr" }
+  | { type: "quote"; raw: string }
+  | { type: "list"; ordered: boolean; items: MarkdownListItem[] }
+  | { type: "table"; header: string[]; rows: string[][] }
   | { type: "text"; raw: string };
 
 /**
@@ -145,6 +153,25 @@ export function splitMarkdownBlocks(value: string): MarkdownBlock[] {
   // (y el que ya reconoce @lexical/markdown al escribir en el editor).
   const HR_RE = /^ {0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/;
 
+  // Cita: "> texto" — mismo formato que produce serializeBlock($isQuoteNode)
+  // en richTextSerializer.ts (cada línea del quote prefijada con "> ").
+  const QUOTE_RE = /^ {0,3}>\s?(.*)$/;
+
+  // Item de lista: "- texto" (bullet) o "1. texto" (ordenada), con
+  // indentación de espacios para anidar — igual que serializeBlock
+  // ($isListNode), que indenta listas anidadas con "\n" + su propio
+  // serializeBlock recursivo (2 espacios por nivel, criterio estándar).
+  const LIST_ITEM_RE = /^( *)(?:[-*]|(\d+)\.)\s+(.*)$/;
+
+  // Fila de pipe-table: "| a | b |" — mismo formato que serializeTableNode.
+  const TABLE_ROW_RE = /^ {0,3}\|(.+)\|\s*$/;
+  const TABLE_SEP_RE = /^ {0,3}\|?[\s:|-]+\|?\s*$/;
+
+  const parseTableCells = (linea: string): string[] => {
+    const inner = linea.trim().replace(/^\|/, "").replace(/\|$/, "");
+    return inner.split("|").map((c) => c.trim());
+  };
+
   let i = 0;
   while (i < lineas.length) {
     const linea = lineas[i];
@@ -173,10 +200,99 @@ export function splitMarkdownBlocks(value: string): MarkdownBlock[] {
       continue;
     }
 
+    // Tabla: línea de header "| a | b |" seguida de una línea separadora
+    // "|---|---|" — sin la separadora no es una tabla (podría ser un
+    // párrafo que usa "|" por otra razón), igual que GFM estándar.
+    if (
+      TABLE_ROW_RE.test(linea) &&
+      i + 1 < lineas.length &&
+      TABLE_SEP_RE.test(lineas[i + 1]) &&
+      lineas[i + 1].includes("-")
+    ) {
+      flushTexto();
+      const header = parseTableCells(linea);
+      const rows: string[][] = [];
+      let j = i + 2;
+      while (j < lineas.length && TABLE_ROW_RE.test(lineas[j])) {
+        rows.push(parseTableCells(lineas[j]));
+        j++;
+      }
+      blocks.push({ type: "table", header, rows });
+      i = j;
+      continue;
+    }
+
+    if (QUOTE_RE.test(linea)) {
+      flushTexto();
+      const quoteLineas: string[] = [];
+      let j = i;
+      while (j < lineas.length && QUOTE_RE.test(lineas[j])) {
+        quoteLineas.push(QUOTE_RE.exec(lineas[j])![1]);
+        j++;
+      }
+      blocks.push({ type: "quote", raw: quoteLineas.join("\n") });
+      i = j;
+      continue;
+    }
+
+    if (LIST_ITEM_RE.test(linea)) {
+      flushTexto();
+      const listLineas: string[] = [];
+      let j = i;
+      while (j < lineas.length && (LIST_ITEM_RE.test(lineas[j]) || lineas[j].trim() === "")) {
+        // Una línea en blanco solo pertenece a la lista si sigue habiendo
+        // items de lista después (evita tragarse el próximo párrafo).
+        if (lineas[j].trim() === "") {
+          const next = lineas[j + 1];
+          if (next === undefined || !LIST_ITEM_RE.test(next)) break;
+          j++;
+          continue;
+        }
+        listLineas.push(lineas[j]);
+        j++;
+      }
+      const firstMatch = LIST_ITEM_RE.exec(listLineas[0])!;
+      const ordered = !!firstMatch[2];
+      blocks.push({ type: "list", ordered, items: parseListItems(listLineas) });
+      i = j;
+      continue;
+    }
+
     textoAcumulado.push(linea);
     i++;
   }
 
   flushTexto();
   return blocks;
+}
+
+// Construye el árbol de items (con anidado) a partir de las líneas crudas
+// de una lista, usando la indentación (espacios antes del marcador) para
+// determinar profundidad — simétrico con cómo serializeBlock($isListNode)
+// indenta listas anidadas recursivamente al serializar.
+function parseListItems(lineas: string[]): MarkdownListItem[] {
+  const LIST_ITEM_RE = /^( *)(?:[-*]|(\d+)\.)\s+(.*)$/;
+  type Entry = { indent: number; text: string; children: MarkdownListItem[] };
+
+  const root: MarkdownListItem[] = [];
+  const stack: { indent: number; items: MarkdownListItem[] }[] = [
+    { indent: -1, items: root },
+  ];
+
+  for (const linea of lineas) {
+    const match = LIST_ITEM_RE.exec(linea);
+    if (!match) continue;
+    const indent = match[1].length;
+    const text = match[3];
+
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+      stack.pop();
+    }
+
+    const item: MarkdownListItem = { text, children: [] };
+    stack[stack.length - 1].items.push(item);
+    stack.push({ indent, items: item.children });
+  }
+
+  return root;
 }

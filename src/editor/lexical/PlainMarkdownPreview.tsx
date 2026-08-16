@@ -15,7 +15,12 @@
  * de editor/lexical/, igual que el fallback que reemplaza.
  */
 import React from "react";
-import { renderInlineMarkdownSafe } from "@/ui/Markdown/inlineMarkdown";
+import {
+  renderInlineMarkdownSafe,
+  splitMarkdownBlocks,
+  type MarkdownBlock,
+  type MarkdownListItem,
+} from "@/ui/Markdown/inlineMarkdown";
 
 const ACCENT = "var(--color-primary, #7c6af7)";
 
@@ -189,6 +194,176 @@ function renderHeadingBlock(
   );
 }
 
+// Renderiza recursivamente los items de una lista (con anidado), en la
+// misma jerarquía que produce parseListItems a partir de la indentación.
+function renderListItems(items: MarkdownListItem[], ordered: boolean) {
+  const Tag = ordered ? "ol" : "ul";
+  return (
+    <Tag style={{ margin: "0 0 0.6em 1.4em", padding: 0 }}>
+      {items.map((item, i) => (
+        <li key={i} style={{ margin: "0.15em 0" }}>
+          <span
+            dangerouslySetInnerHTML={{
+              __html: applyInlinePlainMarkdown(item.text),
+            }}
+          />
+          {item.children.length > 0 &&
+            renderListItems(item.children, ordered)}
+        </li>
+      ))}
+    </Tag>
+  );
+}
+
+function renderBlock(block: MarkdownBlock, key: number, prevHeadingLevel: { current: 1 | 2 | 3 | 4 | null }) {
+  if (block.type === "hr") {
+    return (
+      <hr
+        key={key}
+        style={{
+          margin: "20px 0",
+          border: "none",
+          borderTop:
+            "1px solid color-mix(in srgb, " + ACCENT + " 25%, transparent)",
+        }}
+      />
+    );
+  }
+
+  if (block.type === "code") {
+    return (
+      <pre
+        key={key}
+        style={{
+          margin: "0 0 0.8em 0",
+          padding: "12px 14px",
+          borderRadius: 8,
+          overflowX: "auto",
+          fontSize: "0.85em",
+          lineHeight: 1.5,
+          background: "color-mix(in srgb, " + ACCENT + " 8%, transparent)",
+        }}
+      >
+        <code>{block.code}</code>
+      </pre>
+    );
+  }
+
+  if (block.type === "quote") {
+    return (
+      <blockquote
+        key={key}
+        style={{
+          margin: "0 0 0.8em 0",
+          padding: "2px 16px",
+          borderLeft:
+            "3px solid color-mix(in srgb, " + ACCENT + " 45%, transparent)",
+          opacity: 0.85,
+          fontStyle: "italic",
+        }}
+      >
+        {block.raw.split("\n").map((linea, li) => (
+          <React.Fragment key={li}>
+            {li > 0 && <br />}
+            <span
+              dangerouslySetInnerHTML={{
+                __html: applyInlinePlainMarkdown(linea),
+              }}
+            />
+          </React.Fragment>
+        ))}
+      </blockquote>
+    );
+  }
+
+  if (block.type === "list") {
+    return (
+      <React.Fragment key={key}>
+        {renderListItems(block.items, block.ordered)}
+      </React.Fragment>
+    );
+  }
+
+  if (block.type === "table") {
+    return (
+      <div key={key} style={{ overflowX: "auto", margin: "0 0 0.8em 0" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%" }}>
+          <thead>
+            <tr>
+              {block.header.map((cell, ci) => (
+                <th
+                  key={ci}
+                  style={{
+                    textAlign: "left",
+                    padding: "6px 10px",
+                    borderBottom: "2px solid color-mix(in srgb, " + ACCENT + " 40%, transparent)",
+                  }}
+                  dangerouslySetInnerHTML={{ __html: applyInlinePlainMarkdown(cell) }}
+                />
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row, ri) => (
+              <tr key={ri}>
+                {row.map((cell, ci) => (
+                  <td
+                    key={ci}
+                    style={{
+                      padding: "6px 10px",
+                      borderBottom: "1px solid color-mix(in srgb, " + ACCENT + " 15%, transparent)",
+                    }}
+                    dangerouslySetInnerHTML={{ __html: applyInlinePlainMarkdown(cell) }}
+                  />
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // block.type === "text": mismo camino que antes (heading o párrafo).
+  const bloque = block.raw;
+  if (bloque.trim() === "") {
+    prevHeadingLevel.current = null;
+    return (
+      <p key={key} aria-hidden style={{ margin: 0, minHeight: "1em" }} />
+    );
+  }
+
+  const headingMatch = HEADING_LINE_RE.exec(bloque);
+  if (headingMatch) {
+    const level = Math.min(4, headingMatch[1].length) as 1 | 2 | 3 | 4;
+    const rendered = renderHeadingBlock(
+      level,
+      headingMatch[2],
+      key,
+      prevHeadingLevel.current,
+    );
+    prevHeadingLevel.current = level;
+    return rendered;
+  }
+  prevHeadingLevel.current = null;
+
+  const lineas = bloque.split("\n");
+  return (
+    <p key={key} style={{ margin: "0 0 0.6em 0" }}>
+      {lineas.map((linea, li) => (
+        <React.Fragment key={li}>
+          {li > 0 && <br />}
+          <span
+            dangerouslySetInnerHTML={{
+              __html: applyInlinePlainMarkdown(linea),
+            }}
+          />
+        </React.Fragment>
+      ))}
+    </p>
+  );
+}
+
 export interface PlainMarkdownPreviewProps {
   value: string;
   className?: string;
@@ -202,11 +377,13 @@ export function PlainMarkdownPreview({
   style,
   onWikilinkNavigate,
 }: PlainMarkdownPreviewProps) {
-  const bloques = value.split(/\n{2,}/);
+  const blocks = splitMarkdownBlocks(value);
   // Rastrea el nivel del ÚLTIMO heading renderizado (bloques vacíos o de
   // texto normal no lo tocan) para que renderHeadingBlock pueda achicar el
   // margen cuando dos headings de niveles específicos quedan adyacentes.
-  let prevHeadingLevel: 1 | 2 | 3 | 4 | null = null;
+  // Usa un ref-like mutable object porque renderBlock se llama desde un
+  // .map() y necesita mutar el valor entre iteraciones.
+  const prevHeadingLevel = { current: null as 1 | 2 | 3 | 4 | null };
 
   return (
     <div
@@ -228,43 +405,7 @@ export function PlainMarkdownPreview({
         if (target) onWikilinkNavigate?.(target);
       }}
     >
-      {bloques.map((bloque, bi) => {
-        if (bloque.trim() === "") {
-          return (
-            <p key={bi} aria-hidden style={{ margin: 0, minHeight: "1em" }} />
-          );
-        }
-
-        const headingMatch = HEADING_LINE_RE.exec(bloque);
-        if (headingMatch) {
-          const level = Math.min(4, headingMatch[1].length) as 1 | 2 | 3 | 4;
-          const block = renderHeadingBlock(
-            level,
-            headingMatch[2],
-            bi,
-            prevHeadingLevel,
-          );
-          prevHeadingLevel = level;
-          return block;
-        }
-        prevHeadingLevel = null;
-
-        const lineas = bloque.split("\n");
-        return (
-          <p key={bi} style={{ margin: "0 0 0.6em 0" }}>
-            {lineas.map((linea, li) => (
-              <React.Fragment key={li}>
-                {li > 0 && <br />}
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: applyInlinePlainMarkdown(linea),
-                  }}
-                />
-              </React.Fragment>
-            ))}
-          </p>
-        );
-      })}
+      {blocks.map((block, bi) => renderBlock(block, bi, prevHeadingLevel))}
     </div>
   );
 }

@@ -106,6 +106,82 @@ function TextoMarkdown({
           );
         }
 
+        if (block.type === "quote") {
+          return (
+            <blockquote
+              key={bi}
+              className="my-3 border-l-[3px] border-primary/45 pl-4 italic opacity-85"
+            >
+              {block.raw.split("\n").map((linea, li) => (
+                <React.Fragment key={li}>
+                  {li > 0 && <br />}
+                  {renderLineaConNotas(linea, `${bi}-${li}`)}
+                </React.Fragment>
+              ))}
+            </blockquote>
+          );
+        }
+
+        if (block.type === "list") {
+          const renderItems = (
+            items: typeof block.items,
+            ordered: boolean,
+          ): React.ReactNode => {
+            const Tag = ordered ? "ol" : "ul";
+            return (
+              <Tag className="my-2 ml-6 list-outside space-y-1">
+                {items.map((item, ii) => (
+                  <li key={ii}>
+                    {renderLineaConNotas(item.text, `${bi}-li-${ii}`)}
+                    {item.children.length > 0 &&
+                      renderItems(item.children, ordered)}
+                  </li>
+                ))}
+              </Tag>
+            );
+          };
+          return (
+            <React.Fragment key={bi}>
+              {renderItems(block.items, block.ordered)}
+            </React.Fragment>
+          );
+        }
+
+        if (block.type === "table") {
+          return (
+            <div key={bi} className="my-4 overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    {block.header.map((cell, ci) => (
+                      <th
+                        key={ci}
+                        className="border-b-2 border-primary/40 px-2.5 py-1.5 text-left"
+                      >
+                        {renderLineaConNotas(cell, `${bi}-th-${ci}`)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, ri) => (
+                    <tr key={ri}>
+                      {row.map((cell, ci) => (
+                        <td
+                          key={ci}
+                          className="border-b border-primary/15 px-2.5 py-1.5"
+                        >
+                          {renderLineaConNotas(cell, `${bi}-td-${ri}-${ci}`)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
         const bloque = block.raw;
         if (bloque.trim() === "") {
           return (
