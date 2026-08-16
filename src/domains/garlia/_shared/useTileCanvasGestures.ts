@@ -153,14 +153,21 @@ export function useTileCanvasGestures<
     };
 
     const onPointerUp = (e: PointerEvent) => {
-      // ── Edición tiene primera prioridad ───────────────────────────────────
-      if (editing?.handlePointerUp(e)) return;
-
+      // ── Siempre limpiar el estado de "botón apretado" del gesto público,
+      // pase lo que pase con edición. Si no se limpia acá antes del early
+      // return de edición, isPointerDown queda pegado en true y el próximo
+      // pointermove sigue interpretando cualquier movimiento como pan,
+      // aunque el botón ya esté soltado (bug: "modo movimiento" atascado). ──
       if (e.pointerType === "touch")
         activeTouchPointers.current.delete(e.pointerId);
       isPointerDown = false;
-      if (isDragging.current) {
-        isDragging.current = false;
+      const wasDragging = isDragging.current;
+      isDragging.current = false;
+
+      // ── Edición tiene primera prioridad ───────────────────────────────────
+      if (editing?.handlePointerUp(e)) return;
+
+      if (wasDragging) {
         return;
       }
 
@@ -238,8 +245,13 @@ export function useTileCanvasGestures<
     };
 
     const onPointerCancel = (e: PointerEvent) => {
+      // Mismo motivo que en onPointerUp: si no se limpia acá, un pointer
+      // cancelado (ej. el navegador pierde el foco a mitad de un drag) deja
+      // isPointerDown pegado en true para siempre.
       if (e.pointerType === "touch")
         activeTouchPointers.current.delete(e.pointerId);
+      isPointerDown = false;
+      isDragging.current = false;
     };
 
     const onContextMenu = (e: MouseEvent) => {
