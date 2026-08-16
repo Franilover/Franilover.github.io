@@ -3812,7 +3812,22 @@ export default function MapaInteractivo({
             selectedAreaId={editMode ? selectedAreaId : null}
             selectedMarkerId={editMode ? puntoParaMover : null}
             onAreaDrawEnd={handleAreaDrawEnd}
-            onAreaClick={(area) => void handleAreaLabelClick(area)}
+            onAreaClick={(area) => {
+              // Ya estamos DENTRO de un reino: acá un área siempre es una
+              // ciudad de este mismo reino, nunca otro reino. Antes esto
+              // reusaba handleAreaLabelClick (pensado para el mapa global,
+              // donde área = reino) — pasaba por abrirVistaDeReino(reino),
+              // que resetea reinoSeleccionado/puntoSeleccionado y recarga
+              // todo desde cero antes de mostrar la ciudad. Eso generaba el
+              // frame intermedio "se abre el panel del reino, después la
+              // ciudad". Acá el click debe comportarse EXACTAMENTE como
+              // onPinClick: abrir directo la ciudad, sin reentrar al reino.
+              if (!area.ciudad_id) return;
+              const ciudad = detallesReino.find((d) => d.id === area.ciudad_id);
+              if (!ciudad) return;
+              setPuntoSeleccionado(ciudad);
+              setPanelOpen(true);
+            }}
             onAreaPointsChange={handleAreaPointsChange}
             onAreaSelect={setSelectedAreaId}
             onDetallesChange={(nuevos) => {
