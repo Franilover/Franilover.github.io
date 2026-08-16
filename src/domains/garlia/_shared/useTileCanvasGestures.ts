@@ -21,7 +21,7 @@
  * pan/zoom/click de siempre, sin ninguna rama de edición evaluada.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { BaseArea, BaseMarker, BaseTile } from "./UnifiedTileCanvas";
 import type { useTileCanvasEngine } from "./useTileCanvasEngine";
@@ -112,6 +112,17 @@ export function useTileCanvasGestures<
   onAreaClickRef.current = onAreaClick;
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
+  const areasRef = useRef(areas);
+  areasRef.current = areas;
+
+  // ── Cursor público: true cuando el mouse está sobre un área o un marker
+  // clickeable, en cualquier modo. Antes no existía nada calculando esto en
+  // modo lectura, así que el cursor quedaba fijo en "pointer" siempre (o lo
+  // que sea que herede por CSS), sin reflejar la posición real del mouse.
+  // Se recalcula en cada pointermove contra la misma geometría que decide
+  // el click real (isPointInArea / findMarkerAt), para que cursor y click
+  // respondan siempre a exactamente lo mismo. ──────────────────────────────
+  const [isHoveringClickable, setIsHoveringClickable] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -181,6 +192,25 @@ export function useTileCanvasGestures<
       if (editMode && editingRef.current && !isDragging.current) {
         editingRef.current.handleHover(e);
       }
+
+      // ── Hover público (cursor pointer/default) — misma geometría que el
+      // click real: área primero (es lo único que se ve dibujado hoy), pin
+      // como fallback. No corre mientras se está paneando. ─────────────────
+      if (!isDragging.current) {
+        let clickable = false;
+        if (onAreaClickRef.current) {
+          const wp = clientToWorldPoint(e.clientX, e.clientY);
+          if (wp) {
+            clickable = areasRef.current.some((a) => isPointInArea(wp, a));
+          }
+        }
+        if (!clickable && findMarkerAt(e.clientX, e.clientY)) {
+          clickable = true;
+        }
+        setIsHoveringClickable((prev) =>
+          prev === clickable ? prev : clickable,
+        );
+      }
     };
 
     const onPointerUp = (e: PointerEvent) => {
@@ -206,28 +236,33 @@ export function useTileCanvasGestures<
       const clientX = e.clientX;
       const clientY = e.clientY;
 
-      // ── Click sobre un pin (ciudad/marcador) → prioridad sobre el área.
-      // Un pin casi siempre está geográficamente adentro del área de su
-      // propio reino, así que si el área se revisara primero, el click en
-      // el pin quedaría siempre "tapado" por el área y nunca abriría la
-      // ciudad. El pin es el blanco más específico: gana. ──────────────────
-      const marker = findMarkerAt(clientX, clientY);
-      if (marker) {
-        onMarkerClickRef.current?.(marker);
-        return;
-      }
-
-      // ── Si no hay pin bajo el click, revisar si cayó sobre un área →
-      // navega al reino/ciudad vinculado. ──────────────────────────────────
+      // ── Prioridad de click: ÁREA primero, no marker. ──────────────────────
+      // El engine ya no dibuja pines (ver comentario "Los pines... se
+      // eliminaron" en useTileCanvasEngine.ts) — lo único que el usuario ve
+      // en pantalla es el área (círculo/rectángulo/polígono) con su label.
+      // findMarkerAt sigue haciendo hit-test contra coord_x/coord_y del
+      // marker, una posición que ya no tiene ninguna representación visual
+      // y que normalmente NO coincide con la geometría real del área/label
+      // — por eso "clickear cerca del nombre" solo funcionaba a veces, por
+      // pura coincidencia con esa posición fantasma. El área es hoy la
+      // única geometría real y visible: debe revisarse primero. ────────────
       if (onAreaClickRef.current && e.button === 0) {
         const wp = clientToWorldPoint(clientX, clientY);
         if (wp) {
-          const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
+          const hitArea = [...areasRef.current].reverse().find((a) => isPointInArea(wp, a));
           if (hitArea) {
             onAreaClickRef.current(hitArea);
             return;
           }
         }
+      }
+
+      // ── Fallback: pin real (solo relevante si en el futuro se reintroduce
+      // un marker dibujado visualmente en coord_x/coord_y). ────────────────
+      const marker = findMarkerAt(clientX, clientY);
+      if (marker) {
+        onMarkerClickRef.current?.(marker);
+        return;
       }
 
       // ── Fallback: notificar posición (mapa del mundo, fuera de editMode) ──
@@ -288,6 +323,12 @@ export function useTileCanvasGestures<
         activeTouchPointers.current.delete(e.pointerId);
       isPointerDown = false;
       isDragging.current = false;
+      setIsHoveringClickable(false);
+    };
+
+    const onPointerLeave = () => {
+      // El mouse salió del canvas: no hay nada bajo el cursor.
+      setIsHoveringClickable(false);
     };
 
     const onContextMenu = (e: MouseEvent) => {
@@ -307,6 +348,7 @@ export function useTileCanvasGestures<
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerCancel);
+    canvas.addEventListener("pointerleave", onPointerLeave);
     canvas.addEventListener("contextmenu", onContextMenu);
     canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -320,6 +362,7 @@ export function useTileCanvasGestures<
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerCancel);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("contextmenu", onContextMenu);
       canvas.removeEventListener("dblclick", onDblClick);
       canvas.removeEventListener("touchstart", onTouchStart);
@@ -327,6 +370,11 @@ export function useTileCanvasGestures<
       canvas.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("keydown", onKeyDown);
     };
+    // areas también se lee vía areasRef.current dentro de los handlers, no
+    // hace falta como dep — evita recrear listeners si el padre pasa un
+    // array de áreas con nueva referencia en cada render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editMode, selectedMarkerId, areas, selectedAreaId]);
+  }, [editMode, selectedMarkerId, selectedAreaId]);
+
+  return { isHoveringClickable };
 }
