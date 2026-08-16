@@ -1769,6 +1769,71 @@ export const PanelPersonajesCapitulo = ({
   const { estados: estadoMundo, loading: loadingEstadoMundo } =
     useEstadoMundoCapitulo(value, diaAbsolutoCap, diasPorAnioNarrador);
 
+  // Índice por id para el tooltip de hover de la barra de Personajes — la
+  // misma info que ya muestra el bloque "Estado del mundo", pero al pasar
+  // el mouse sobre el personaje en vez de tener que abrir ese bloque.
+  const estadoMundoPorId = useMemo(() => {
+    const m = new Map<string, (typeof estadoMundo)[number]>();
+    for (const e of estadoMundo) m.set(e.id, e);
+    return m;
+  }, [estadoMundo]);
+
+  const renderHoverExtraPersonaje = (id: string) => {
+    const e = estadoMundoPorId.get(id);
+    if (!e) return null;
+    if (e.edad == null && !e.eraLabel && e.rasgos.length === 0 && !e.notas) {
+      return null;
+    }
+    return (
+      <div className="space-y-1">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-micro font-black text-primary/70">
+            {e.nombre}
+          </span>
+          {e.edad != null && (
+            <span
+              className="text-micro font-bold tabular-nums"
+              style={{ color: "var(--accent)" }}
+            >
+              {e.edad} años
+            </span>
+          )}
+          {e.eraLabel && (
+            <span className="text-micro font-bold italic text-primary/35 truncate">
+              {e.eraLabel}
+            </span>
+          )}
+        </div>
+        {e.rasgos.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {e.rasgos.map((rasgo) => (
+              <span
+                key={rasgo}
+                className="px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide border"
+                style={{
+                  background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+                  borderColor:
+                    "color-mix(in srgb, var(--primary) 14%, transparent)",
+                  color: "color-mix(in srgb, var(--primary) 55%, transparent)",
+                }}
+              >
+                {rasgo}
+              </span>
+            ))}
+          </div>
+        )}
+        {e.notas && (
+          <p
+            className="text-[10px] leading-relaxed"
+            style={{ color: "color-mix(in srgb, var(--primary) 40%, transparent)" }}
+          >
+            {e.notas}
+          </p>
+        )}
+      </div>
+    );
+  };
+
 
   const _handleSaveOrdenCap = async () => {
     const num = parseInt(ordenCap.trim(), 10);
@@ -2406,6 +2471,7 @@ export const PanelPersonajesCapitulo = ({
         icon={<UserCircle2 size={9} />}
         label="Personajes"
         loading={loadingP}
+        renderHoverExtra={renderHoverExtraPersonaje}
         saving={savingP}
         selectedIds={value}
         onEntityClick={(id) => dispatchOpen("personajes", id)}

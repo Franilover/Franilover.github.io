@@ -1,6 +1,14 @@
 "use client";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import Image from "next/image";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    SeccionEntidad — sección de barra lateral con mini combo multi-selector
@@ -51,6 +59,15 @@ type SeccionEntidadProps = {
    *  contenedores externos ajusten su ancho/alto proporcional al contenido. */
   onSelectedCountChange?: (count: number) => void;
   onEntityClick?: (id: string) => void;
+  /**
+   * Contenido opcional a mostrar en un tooltip flotante al pasar el mouse
+   * sobre una entidad ya seleccionada — ej. edad/era vigente de un
+   * personaje en la fecha del capítulo. Devolver `null` omite el tooltip
+   * para esa entidad puntual (ej. sin datos todavía). No afecta a
+   * consumidores que no pasan esta prop (reinos, ciudades, criaturas,
+   * items siguen exactamente igual).
+   */
+  renderHoverExtra?: (id: string) => React.ReactNode;
   /** Mostrar entidades seleccionadas en grid de N columnas en vez de lista (1 fila c/u) */
   columns?: number;
   /**
@@ -61,6 +78,77 @@ type SeccionEntidadProps = {
    */
   fill?: boolean;
 };
+
+/**
+ * HoverTooltip — envuelve un trigger (una fila de entidad seleccionada) y
+ * muestra `content` en un popover flotante (portal a document.body, mismo
+ * patrón anti-clip que el dropdown del combo) mientras el mouse está
+ * encima. Si `content` es null/undefined no envuelve nada — el trigger se
+ * renderiza tal cual, sin overhead.
+ */
+function HoverTooltip({
+  content,
+  children,
+}: {
+  content: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    openUp: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!hovered || !anchorRef.current) {
+      setPos(null);
+      return;
+    }
+    const MARGIN = 8;
+    const r = anchorRef.current.getBoundingClientRect();
+    const espacioAbajo = window.innerHeight - r.bottom - MARGIN;
+    const espacioArriba = r.top - MARGIN;
+    const openUp = espacioAbajo < 160 && espacioArriba > espacioAbajo;
+    setPos({
+      top: openUp ? r.top - MARGIN : r.bottom + MARGIN,
+      left: Math.min(r.left, window.innerWidth - 260 - MARGIN),
+      openUp,
+    });
+  }, [hovered]);
+
+  if (content == null) return <>{children}</>;
+
+  return (
+    <div
+      ref={anchorRef}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {children}
+      {hovered &&
+        pos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed z-[100] w-64 rounded-lg p-2.5 shadow-lg pointer-events-none"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              transform: pos.openUp ? "translateY(-100%)" : undefined,
+              background: "var(--surface-1, var(--background))",
+              border:
+                "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+            }}
+          >
+            {content}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
 
 export const SeccionEntidad = ({
   label,
@@ -74,6 +162,7 @@ export const SeccionEntidad = ({
   saving,
   onToggle,
   onEntityClick,
+  renderHoverExtra,
   columns,
   fill = true,
   onSelectedCountChange,
@@ -638,8 +727,8 @@ export const SeccionEntidad = ({
             }}
           >
             {selected.map((e) => (
+              <HoverTooltip key={e.id} content={renderHoverExtra?.(e.id)}>
               <div
-                key={e.id}
                 className="group relative flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all hover:bg-primary/5"
                 style={{ cursor: onEntityClick ? "pointer" : "default" }}
                 onClick={() => onEntityClick?.(e.id)}
@@ -692,6 +781,7 @@ export const SeccionEntidad = ({
                   <X size={8} />
                 </button>
               </div>
+              </HoverTooltip>
             ))}
           </div>
         ) : groups && groups.length > 0 ? (
@@ -706,8 +796,8 @@ export const SeccionEntidad = ({
               .filter((g) => g.items.length > 0);
 
             const renderSelItem = (e: EntidadBase) => (
+              <HoverTooltip key={e.id} content={renderHoverExtra?.(e.id)}>
               <div
-                key={e.id}
                 className="group flex items-center gap-2 px-2.5 py-1.5 transition-all hover:bg-primary/[0.04]"
                 style={{ cursor: onEntityClick ? "pointer" : "default" }}
                 onClick={() => onEntityClick?.(e.id)}
@@ -760,6 +850,7 @@ export const SeccionEntidad = ({
                   <X size={9} />
                 </button>
               </div>
+              </HoverTooltip>
             );
 
             return (
@@ -799,8 +890,8 @@ export const SeccionEntidad = ({
         ) : (
           /* ── Lista simple (default) ── */
           selected.map((e) => (
+            <HoverTooltip key={e.id} content={renderHoverExtra?.(e.id)}>
             <div
-              key={e.id}
               className="group flex items-center gap-2 px-2.5 py-1.5 transition-all hover:bg-primary/[0.04]"
               style={{ cursor: onEntityClick ? "pointer" : "default" }}
               onClick={() => onEntityClick?.(e.id)}
@@ -851,20 +942,12 @@ export const SeccionEntidad = ({
                 <X size={9} />
               </button>
             </div>
+            </HoverTooltip>
           ))
         )}
       </div>
     </div>
   );
 };
-
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
 
 export default SeccionEntidad;
