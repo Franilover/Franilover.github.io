@@ -33,6 +33,7 @@ import type {
   Estacion,
   CalendarioConfig,
   EraMundo,
+  FechaMundo,
 } from "@/lib/utils/calendario";
 import {
   diaAbsolutoAFecha,
@@ -65,6 +66,260 @@ function etiquetaEstacionCorta(estOrden: number, estaciones: Estacion[]): string
     abrev.charAt(0).toUpperCase() + abrev.slice(1).toLowerCase();
 
   return `${abrevCapitalizada} ${idx || 1}`;
+}
+
+// ─── CompactTrigger ─────────────────────────────────────────────────────────
+// Trigger compacto (Año / Estación / Día) del selector de fecha. A
+// diferencia del trigger no-compact, cada campo es editable por su cuenta
+// sin pasar por el panel completo:
+//   - Año y Día: click para escribir el número directo (input inline).
+//   - Estación: click para elegir de un <select> con todas las estaciones.
+//   - Ícono de calendario: sigue abriendo el panel completo (FechaMundoEditor)
+//     como antes — año + estación + grilla de días juntos.
+function CompactTrigger({
+  cal,
+  fecha,
+  loading,
+  open,
+  triggerRef,
+  onChange,
+  onOpenIcon,
+}: {
+  cal: { estaciones: Estacion[]; config: CalendarioConfig } | null;
+  fecha: FechaMundo | null;
+  loading: boolean;
+  open: boolean;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
+  onChange: (diaAbsoluto: number | null) => void;
+  onOpenIcon: () => void;
+}) {
+  const [editandoAnio, setEditandoAnio] = useState(false);
+  const [anioStr, setAnioStr] = useState("");
+  const [editandoDia, setEditandoDia] = useState(false);
+  const [diaStr, setDiaStr] = useState("");
+
+  const estOrdenadas = React.useMemo(
+    () => [...(cal?.estaciones ?? [])].sort((a, b) => a.orden - b.orden),
+    [cal],
+  );
+
+  // Recalcula el día absoluto con un campo cambiado y el resto tal cual
+  // está hoy (si no hay fecha previa, arranca desde el año base / primera
+  // estación / día 1 — así el trigger sirve también para asignar la
+  // primera fecha, no solo para editar una existente).
+  const commit = (
+    partial: Partial<{ anio: number; estacionOrden: number; dia: number }>,
+  ) => {
+    if (!cal) return;
+    const base = fecha ?? {
+      anio: cal.config.anio_inicio,
+      estacion: estOrdenadas[0],
+      dia_en_estacion: 1,
+    };
+    const anio = partial.anio ?? base.anio;
+    const estacionOrden = partial.estacionOrden ?? base.estacion.orden;
+    const dia = partial.dia ?? base.dia_en_estacion;
+    // Acotar el día a la duración real de la estación elegida, para no
+    // generar una fecha inválida al cambiar de estación con un día que
+    // no le cabe (ej. día 30 en una estación de 20 días).
+    const est = estOrdenadas.find((e) => e.orden === estacionOrden);
+    const diaAcotado = est ? Math.min(Math.max(1, dia), est.duracion_dias) : dia;
+    try {
+      const diaAbsoluto = fechaADiaAbsoluto(
+        { anio, estacion_orden: estacionOrden, dia_en_estacion: diaAcotado },
+        cal.estaciones,
+        cal.config,
+      );
+      onChange(diaAbsoluto);
+    } catch {}
+  };
+
+  const abrirEdicionAnio = () => {
+    setAnioStr(String(fecha?.anio ?? cal?.config.anio_inicio ?? 0));
+    setEditandoAnio(true);
+  };
+  const confirmarAnio = () => {
+    const n = parseInt(anioStr, 10);
+    if (!isNaN(n)) commit({ anio: n });
+    setEditandoAnio(false);
+  };
+
+  const abrirEdicionDia = () => {
+    setDiaStr(String(fecha?.dia_en_estacion ?? 1));
+    setEditandoDia(true);
+  };
+  const confirmarDia = () => {
+    const n = parseInt(diaStr, 10);
+    if (!isNaN(n)) commit({ dia: n });
+    setEditandoDia(false);
+  };
+
+  return (
+    <div className="inline-flex items-center gap-1">
+      {/* Botón — SOLO el ícono de calendario, sigue abriendo el panel
+          completo (año + estación + grilla de días juntos) */}
+      <button
+        ref={triggerRef}
+        className="flex items-center justify-center w-6 h-6 rounded-md border shrink-0 transition-all"
+        style={{
+          background: open
+            ? "color-mix(in srgb, var(--primary) 8%, transparent)"
+            : "transparent",
+          borderColor: open
+            ? "color-mix(in srgb, var(--primary) 25%, transparent)"
+            : "color-mix(in srgb, var(--primary) 14%, transparent)",
+          color: "color-mix(in srgb, var(--primary) 55%, transparent)",
+        }}
+        title="Abrir calendario"
+        type="button"
+        onClick={onOpenIcon}
+      >
+        {loading ? (
+          <Loader2 className="animate-spin" size={9} />
+        ) : (
+          <CalendarDays size={11} />
+        )}
+      </button>
+
+      {!fecha && !cal ? (
+        <span
+          className="text-micro font-black tabular-nums"
+          style={{ color: "color-mix(in srgb, var(--primary) 30%, transparent)" }}
+        >
+          —
+        </span>
+      ) : (
+        <div className="flex items-center gap-0.5">
+          {/* Año — click para escribir el número */}
+          {editandoAnio ? (
+            <input
+              autoFocus
+              className="w-10 text-center rounded text-micro font-black tabular-nums outline-none selector-fecha-anio-input"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+                color: "var(--primary)",
+              }}
+              type="number"
+              value={anioStr}
+              onBlur={confirmarAnio}
+              onChange={(e) => setAnioStr(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") setEditandoAnio(false);
+              }}
+            />
+          ) : (
+            <button
+              className="px-0.5 rounded text-micro font-black tabular-nums transition-colors hover:bg-primary/8"
+              style={{
+                color: fecha
+                  ? "var(--primary)"
+                  : "color-mix(in srgb, var(--primary) 30%, transparent)",
+              }}
+              title="Click para escribir el año"
+              type="button"
+              onClick={abrirEdicionAnio}
+            >
+              {fecha ? fecha.anio : "—"}
+            </button>
+          )}
+
+          <span
+            className="text-micro font-black"
+            style={{ color: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
+          >
+            /
+          </span>
+
+          {/* Estación — click para elegir de un dropdown con todas */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-transparent text-micro font-black uppercase tracking-wide outline-none cursor-pointer hover:bg-primary/8 rounded px-0.5"
+              style={{
+                color: fecha
+                  ? "var(--primary)"
+                  : "color-mix(in srgb, var(--primary) 30%, transparent)",
+                // El <select> nativo necesita algo de padding-right propio
+                // para no tapar el texto con la flechita nativa; como el
+                // resto del trigger es angosto, se acepta ese ancho extra.
+                paddingRight: 2,
+              }}
+              title="Click para elegir la estación"
+              value={fecha?.estacion.orden ?? ""}
+              onChange={(e) =>
+                commit({ estacionOrden: parseInt(e.target.value, 10) })
+              }
+              onClick={(e) => e.stopPropagation()}
+            >
+              {!fecha && (
+                <option disabled value="">
+                  —
+                </option>
+              )}
+              {estOrdenadas.map((est) => (
+                <option key={est.id} value={est.orden}>
+                  {etiquetaEstacionCorta(est.orden, estOrdenadas)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <span
+            className="text-micro font-black"
+            style={{ color: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
+          >
+            /
+          </span>
+
+          {/* Día — click para escribir el número */}
+          {editandoDia ? (
+            <input
+              autoFocus
+              className="w-8 text-center rounded text-micro font-black tabular-nums outline-none selector-fecha-anio-input"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 6%, transparent)",
+                color: "var(--primary)",
+              }}
+              type="number"
+              value={diaStr}
+              onBlur={confirmarDia}
+              onChange={(e) => setDiaStr(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") setEditandoDia(false);
+              }}
+            />
+          ) : (
+            <button
+              className="px-0.5 rounded text-micro font-black tabular-nums transition-colors hover:bg-primary/8"
+              style={{
+                color: fecha
+                  ? "var(--primary)"
+                  : "color-mix(in srgb, var(--primary) 30%, transparent)",
+              }}
+              title="Click para escribir el día"
+              type="button"
+              onClick={abrirEdicionDia}
+            >
+              {fecha ? fecha.dia_en_estacion : "—"}
+            </button>
+          )}
+        </div>
+      )}
+      <style>{`
+        .selector-fecha-anio-input::-webkit-outer-spin-button,
+        .selector-fecha-anio-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .selector-fecha-anio-input {
+          -moz-appearance: textfield;
+        }
+      `}</style>
+    </div>
+  );
 }
 
 // value: día absoluto | null
@@ -220,45 +475,15 @@ export function SelectorFechaMundo({
           onClick={() => setOpenNotify(!open)}
         />
       ) : compact ? (
-        <div className="inline-flex items-center gap-1.5">
-          {/* Botón — SOLO el ícono de calendario */}
-          <button
-            ref={triggerRef}
-            className="flex items-center justify-center w-6 h-6 rounded-md border shrink-0 transition-all"
-            style={{
-              background: open
-                ? "color-mix(in srgb, var(--primary) 8%, transparent)"
-                : "transparent",
-              borderColor: open
-                ? "color-mix(in srgb, var(--primary) 25%, transparent)"
-                : "color-mix(in srgb, var(--primary) 14%, transparent)",
-              color: "color-mix(in srgb, var(--primary) 55%, transparent)",
-            }}
-            type="button"
-            onClick={() => setOpenNotify(!open)}
-          >
-            {loading ? (
-              <Loader2 className="animate-spin" size={9} />
-            ) : (
-              <CalendarDays size={11} />
-            )}
-          </button>
-          {/* Fuera del botón — solo números: Año / Estación / Día */}
-          <button
-            className="text-micro font-black tabular-nums transition-colors"
-            style={{
-              color: fecha
-                ? "var(--primary)"
-                : "color-mix(in srgb, var(--primary) 30%, transparent)",
-            }}
-            type="button"
-            onClick={() => setOpenNotify(!open)}
-          >
-            {fecha
-              ? `${fecha.anio} / ${etiquetaEstacionCorta(fecha.estacion.orden, cal?.estaciones ?? [])} / ${fecha.dia_en_estacion}`
-              : "—"}
-          </button>
-        </div>
+        <CompactTrigger
+          cal={cal}
+          fecha={fecha}
+          loading={loading}
+          open={open}
+          triggerRef={triggerRef}
+          onChange={onChange}
+          onOpenIcon={() => setOpenNotify(!open)}
+        />
       ) : (
         <button
           ref={triggerRef}
