@@ -1667,7 +1667,9 @@ export const PanelPersonajesCapitulo = ({
     if (s.tipo === "item") void handleToggleItem(s.id, false);
   };
 
-  const bloqueSugerenciasInversas =
+  const [sugerenciasAbiertas, setSugerenciasAbiertas] = useState(false);
+
+  const bloqueSugerenciasInversasContenido =
     sugerenciasInversas.length > 0 ? (
       <div
         className="shrink-0 px-3 py-2.5 border-b space-y-1.5"
@@ -1715,7 +1717,7 @@ export const PanelPersonajesCapitulo = ({
       </div>
     ) : null;
 
-  const bloqueSugerencias =
+  const bloqueSugerenciasContenido =
     sugerencias.length > 0 ? (
       <div
         className="shrink-0 px-3 py-2.5 border-b space-y-1.5"
@@ -1759,12 +1761,56 @@ export const PanelPersonajesCapitulo = ({
       </div>
     ) : null;
 
+  const totalSugerencias = sugerencias.length + sugerenciasInversas.length;
+
+  // Botón que agrupa ambos tipos de sugerencia (detectados sin vincular +
+  // vinculados sin mencionar). Nunca se muestran solos: solo aparecen al
+  // desplegar este botón, y solo si hay algo que mostrar.
+  const bloqueSugerencias =
+    totalSugerencias > 0 ? (
+      <div
+        className="shrink-0 border-b"
+        style={{
+          borderColor: "color-mix(in srgb, var(--primary) 10%, transparent)",
+        }}
+      >
+        <button
+          className="w-full flex items-center gap-1.5 px-3 py-2 text-micro font-black uppercase tracking-[0.15em] transition-all"
+          style={{
+            color: sugerenciasAbiertas
+              ? "var(--primary)"
+              : "color-mix(in srgb, var(--primary) 45%, transparent)",
+          }}
+          onClick={() => setSugerenciasAbiertas((v) => !v)}
+        >
+          <AlertTriangle size={10} />
+          <span className="flex-1 text-left">
+            Sugerencias · {totalSugerencias}
+          </span>
+          <ChevronDown
+            size={10}
+            style={{
+              transform: sugerenciasAbiertas
+                ? "rotate(180deg)"
+                : "rotate(0deg)",
+              transition: "transform 0.15s ease",
+            }}
+          />
+        </button>
+        {sugerenciasAbiertas && (
+          <div className="flex flex-col">
+            {bloqueSugerenciasContenido}
+            {bloqueSugerenciasInversasContenido}
+          </div>
+        )}
+      </div>
+    ) : null;
+
   // Contenido único del panel: narrador + fecha compactos arriba,
   // seguidos de las secciones de entidades vinculadas al capítulo.
   const contenidoPanel = (
     <>
       {bloqueSugerencias}
-      {bloqueSugerenciasInversas}
 
       {/* ── Narrador + fecha, compactos, sin título de sección ─────────── */}
       <div
