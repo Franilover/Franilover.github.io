@@ -130,6 +130,12 @@ export function useTileCanvasEditingState<
   const markerParaMoverIdRef = useRef<string | null>(null);
   markerParaMoverIdRef.current = markerParaMoverId;
 
+  // El orquestador (useTileCanvasGestures) escribe acá en cada pointermove
+  // si hubo pan en curso. Sirve para que "mover marker" nunca se dispare
+  // como efecto colateral de haber arrastrado el mapa — solo debe aplicar
+  // en un click limpio (down+up sin desplazamiento).
+  const isDraggingRef = useRef(false);
+
   useEffect(() => {
     if (!editMode) setMarkerParaMoverId(null);
   }, [editMode]);
@@ -450,10 +456,13 @@ export function useTileCanvasEditingState<
       return true;
     }
 
+    // Si hubo arrastre (pan), no es un click de "colocar marker" — el pan
+    // ya movió el mapa, esto no debe interpretarse como mover el marker.
+    // El estado "para mover" se mantiene armado para el próximo click real.
     const idParaMover = onMarkerContextMenu
       ? selectedMarkerId
       : markerParaMoverIdRef.current;
-    if (idParaMover) {
+    if (idParaMover && !isDraggingRef.current) {
       const info = canvasToTileInfo(clientX, clientY);
       if (info) {
         onMarkerMove(idParaMover, {
@@ -588,16 +597,30 @@ export function useTileCanvasEditingState<
   };
 
   const handleKeyDown = (e: KeyboardEvent): boolean => {
+    if (e.key === "Escape") {
+      // Cancela cualquier estado "armado" pendiente: dibujo de polígono en
+      // curso y/o marker en modo mover (Ctrl+click). Antes Escape solo
+      // limpiaba el dibujo, así que un marker "para mover" quedaba pegado
+      // sin forma de cancelarlo sin moverlo.
+      let handled = false;
+      if (drawTool && drawingPointsRef.current.length > 0) {
+        drawingPointsRef.current = [];
+        setDrawingPoints([]);
+        drawCursorRef.current = null;
+        markDirty();
+        handled = true;
+      }
+      if (markerParaMoverIdRef.current !== null) {
+        if (!onMarkerContextMenu) setMarkerParaMoverId(null);
+        onMarkerSelect(null);
+        handled = true;
+      }
+      return handled;
+    }
     if (!drawTool) return false;
     if (e.key === "Enter" && drawTool === "poligono") {
       const pts = drawingPointsRef.current;
       if (pts.length >= 3) onAreaDrawEnd?.("poligono", pts);
-      drawingPointsRef.current = [];
-      setDrawingPoints([]);
-      drawCursorRef.current = null;
-      markDirty();
-      return true;
-    } else if (e.key === "Escape") {
       drawingPointsRef.current = [];
       setDrawingPoints([]);
       drawCursorRef.current = null;
@@ -613,6 +636,7 @@ export function useTileCanvasEditingState<
     drawingPoints,
     drawCursorRef,
     markerParaMoverId,
+    isDraggingRef,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,

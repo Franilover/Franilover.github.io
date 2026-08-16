@@ -135,6 +135,10 @@ export function useTileCanvasGestures<
         const dx = (e.clientX - dragStart.current.x) * s;
         const dy = (e.clientY - dragStart.current.y) * s;
         if (Math.hypot(dx, dy) > 6) isDragging.current = true;
+        // Mantenemos a `editing` al tanto de si hubo pan en curso, para que
+        // "mover marker" (armado con Ctrl+click) nunca se dispare como
+        // efecto colateral de un arrastre del mapa.
+        if (editing) editing.isDraggingRef.current = isDragging.current;
         if (isDragging.current) {
           camRef.current = {
             ...camRef.current,
@@ -154,11 +158,20 @@ export function useTileCanvasGestures<
 
     const onPointerUp = (e: PointerEvent) => {
       // ── Edición tiene primera prioridad ───────────────────────────────────
-      if (editing?.handlePointerUp(e)) return;
+      if (editing?.handlePointerUp(e)) {
+        // Pase lo que pase dentro de edición, un pointerup SIEMPRE cierra
+        // cualquier drag en curso del orquestador. Antes, si editing
+        // devolvía true (p.ej. "mover marker" pegado), este reseteo nunca
+        // se ejecutaba y el mapa quedaba trabado en modo pan para siempre.
+        isDragging.current = false;
+        if (editing) editing.isDraggingRef.current = false;
+        return;
+      }
 
       if (e.pointerType === "touch")
         activeTouchPointers.current.delete(e.pointerId);
       isPointerDown = false;
+      if (editing) editing.isDraggingRef.current = false;
       if (isDragging.current) {
         isDragging.current = false;
         return;
