@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CheckCheck, Cloud, Megaphone, MessageSquareText, Mic, NotebookPen, Paperclip, Pencil, Phone, Plus, Reply, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Cloud, Heart, Megaphone, MessageSquareText, Mic, NotebookPen, Paperclip, Pencil, Phone, Plus, Reply, Send, Sparkle, Trash2, Waves, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -26,6 +26,7 @@ import {
   suscribirseAMensajesEditados,
   suscribirseAMensajesEliminados,
   suscribirseAReacciones,
+  type AnimacionBurbuja,
   type EstiloBurbuja,
   type Mensaje,
   type MensajeReaccion,
@@ -50,6 +51,45 @@ function previsualizarMensaje(m: Mensaje): string {
   if (m.adjunto_tipo === "audio") return "🎵 Audio";
   if (m.adjunto_tipo === "archivo") return "📎 Archivo";
   return "Mensaje";
+}
+
+/**
+ * Detecta si un texto es "solo un kaomoji" — una carita hecha con
+ * paréntesis/símbolos tipo (⁠◡⁠ ⁠ω⁠ ⁠◡⁠) o ʕ⁠·⁠ᴥ⁠·⁠ʔ — para poder mostrarlo sin
+ * la caja de burbuja normal. No es una lista cerrada de caritas: en vez de
+ * eso, rechaza el texto si contiene letras latinas "de verdad" (a-z, con
+ * o sin tilde) fuera de las pocas que sí aparecen en kaomojis comunes
+ * (ω, ᴥ, ಥ, etc. son símbolos, no letras latinas, así que pasan). Con eso
+ * alcanza para separar "mensaje de texto normal" de "carita ASCII/Unicode".
+ */
+function esSoloKaomoji(texto: string): boolean {
+  const limpio = texto.trim();
+  if (!limpio) return false;
+  // Si tiene letras latinas (a-z, con tildes/ñ) es texto normal, no kaomoji.
+  if (/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(limpio)) return false;
+  // Tiene que haber al menos un símbolo "de cara" típico (ojos/boca) para
+  // no confundir un mensaje que es solo puntuación suelta con una carita.
+  const tieneRasgoDeCara = /[◡ω⁠ᴥಥ•̀́^><≧≦｡ﾟ✧☆*＾｀´¯()ノシ੭]/.test(limpio);
+  if (!tieneRasgoDeCara) return false;
+  // El resto del contenido debe ser puramente símbolos/espacios (nada de
+  // dígitos largos ni texto): esto ya lo cubre el chequeo de letras arriba,
+  // así que si llegamos hasta acá es una carita.
+  return limpio.length <= 40; // las caritas son cortas; esto evita falsos positivos con arte ASCII largo
+}
+
+/** Animaciones disponibles para aplicar a un kaomoji. */
+const ANIMACIONES_KAOMOJI: { id: AnimacionBurbuja; label: string; Icono: typeof Waves }[] = [
+  { id: "flotar", label: "Flotar", Icono: Waves },
+  { id: "latido", label: "Latido", Icono: Heart },
+  { id: "parpadeo", label: "Parpadeo", Icono: Sparkle },
+];
+
+/** className de la animación CSS (definida como keyframes globales más abajo). */
+function claseAnimacion(animacion: AnimacionBurbuja | null | undefined): string {
+  if (animacion === "flotar") return "animate-kaomoji-flotar";
+  if (animacion === "latido") return "animate-kaomoji-latido";
+  if (animacion === "parpadeo") return "animate-kaomoji-parpadeo";
+  return "";
 }
 
 /**
@@ -182,6 +222,7 @@ const DISENOS_BURBUJA: { id: EstiloBurbuja; label: string; Icono: typeof Cloud }
   { id: "pensamiento", label: "Pensamiento", Icono: Cloud },
   { id: "grito", label: "Grito", Icono: Megaphone },
   { id: "experimental", label: "Nota a mano", Icono: NotebookPen },
+  { id: "kaomoji", label: "Kaomoji", Icono: Sparkle },
 ];
 
 /**
@@ -418,6 +459,7 @@ export default function DetalleConversacion() {
   //    mensaje de texto a enviar. Se elige desde un mini-selector en la
   //    barra de input y se resetea a "normal" después de cada envío.
   const [estiloSeleccionado, setEstiloSeleccionado] = useState<EstiloBurbuja | null>(null);
+  const [animacionSeleccionada, setAnimacionSeleccionada] = useState<AnimacionBurbuja | null>(null);
   const [selectorDisenoAbierto, setSelectorDisenoAbierto] = useState(false);
 
   // ── Paginación "cargar mensajes anteriores" ─────────────────────────
@@ -926,10 +968,20 @@ export default function DetalleConversacion() {
     setEnviando(true);
     const contenido = texto;
     const respuestaAId = respondiendoA?.id ?? null;
-    const estiloAEnviar = estiloSeleccionado;
+    // Si el usuario no forzó un diseño a mano pero el mensaje es solo un
+    // kaomoji tipo (⁠◡⁠ ⁠ω⁠ ⁠◡⁠) o ʕ⁠·⁠ᴥ⁠·⁠ʔ, lo mandamos como "kaomoji"
+    // automáticamente (sin burbuja, con animación) — el selector manual
+    // sigue pudiendo forzar cualquier otro diseño en su lugar.
+    const esAutoKaomoji = !estiloSeleccionado && esSoloKaomoji(contenido);
+    const estiloAEnviar: EstiloBurbuja | null = esAutoKaomoji ? "kaomoji" : estiloSeleccionado;
+    const esKaomojiFinal = estiloAEnviar === "kaomoji";
+    const animacionAEnviar = esKaomojiFinal
+      ? (animacionSeleccionada ?? ANIMACIONES_KAOMOJI[Math.floor(Math.random() * ANIMACIONES_KAOMOJI.length)].id)
+      : null;
     setTexto("");
     setRespondiendoA(null);
     setEstiloSeleccionado(null);
+    setAnimacionSeleccionada(null);
     if (escribiendoOffRef.current) {
       clearTimeout(escribiendoOffRef.current);
       escribiendoOffRef.current = null;
@@ -942,6 +994,7 @@ export default function DetalleConversacion() {
         undefined,
         respuestaAId,
         estiloAEnviar,
+        animacionAEnviar,
       );
       // Optimista: lo agregamos ya mismo al estado local en vez de esperar
       // a que vuelva por la suscripción realtime. Antes, quien enviaba
@@ -956,7 +1009,8 @@ export default function DetalleConversacion() {
       setError("No se pudo enviar el mensaje.");
       setTexto(contenido);
       setRespondiendoA(respondiendoA);
-      setEstiloSeleccionado(estiloAEnviar);
+      setEstiloSeleccionado(estiloSeleccionado);
+      setAnimacionSeleccionada(animacionSeleccionada);
     } finally {
       setEnviando(false);
     }
@@ -1284,20 +1338,34 @@ export default function DetalleConversacion() {
               : null;
 
             const disenoBurbuja = estiloExtraBurbuja(m.estilo, esMio, m.id);
+            const esKaomoji = m.estilo === "kaomoji";
 
             return (
               <div key={m.id} className={`flex flex-col ${esMio ? "items-end" : "items-start"} group`}>
                 <div
                   data-mensaje-burbuja
-                  className={`max-w-[75%] px-4 py-2.5 rounded-[var(--radius-btn)] relative select-none md:select-text ${disenoBurbuja.className}`}
-                  style={{
-                    background: esMio
-                      ? "var(--primary)"
-                      : "color-mix(in srgb, var(--primary) 6%, transparent)",
-                    color: esMio ? "var(--btn-text)" : "var(--foreground)",
-                    WebkitTouchCallout: "none",
-                    ...disenoBurbuja.style,
-                  }}
+                  className={`max-w-[75%] relative select-none md:select-text ${
+                    esKaomoji
+                      ? `px-2 py-1 text-3xl ${claseAnimacion(m.animacion)}`
+                      : `px-4 py-2.5 rounded-[var(--radius-btn)] ${disenoBurbuja.className}`
+                  }`}
+                  style={
+                    esKaomoji
+                      ? {
+                          background: "transparent",
+                          color: "var(--foreground)",
+                          WebkitTouchCallout: "none",
+                          lineHeight: 1,
+                        }
+                      : {
+                          background: esMio
+                            ? "var(--primary)"
+                            : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                          color: esMio ? "var(--btn-text)" : "var(--foreground)",
+                          WebkitTouchCallout: "none",
+                          ...disenoBurbuja.style,
+                        }
+                  }
                   onTouchStart={() => handleTouchStartMensaje(m.id)}
                   onTouchEnd={handleTouchEndMensaje}
                   onTouchMove={handleTouchMoveMensaje}
@@ -1730,6 +1798,7 @@ export default function DetalleConversacion() {
                       }}
                       onClick={() => {
                         setEstiloSeleccionado(null);
+                        setAnimacionSeleccionada(null);
                         setSelectorDisenoAbierto(false);
                       }}
                     >
@@ -1748,13 +1817,44 @@ export default function DetalleConversacion() {
                         }}
                         onClick={() => {
                           setEstiloSeleccionado(d.id);
-                          setSelectorDisenoAbierto(false);
+                          // Para "kaomoji" dejamos el popover abierto: pasa
+                          // a mostrar el submenú de animación en vez de
+                          // cerrarse, así se elige todo en el mismo click.
+                          if (d.id !== "kaomoji") setSelectorDisenoAbierto(false);
                         }}
                       >
                         <d.Icono className="text-primary/60 flex-shrink-0" size={16} />
                         {d.label}
                       </button>
                     ))}
+                    {estiloSeleccionado === "kaomoji" && (
+                      <div
+                        style={{ borderTop: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)" }}
+                      >
+                        <p className="text-micro font-bold text-primary/40 uppercase tracking-wide px-3 pt-2 pb-1">
+                          Animación
+                        </p>
+                        {ANIMACIONES_KAOMOJI.map((a) => (
+                          <button
+                            key={a.id}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm font-medium"
+                            style={{
+                              background:
+                                animacionSeleccionada === a.id
+                                  ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+                                  : "transparent",
+                            }}
+                            onClick={() => {
+                              setAnimacionSeleccionada(a.id);
+                              setSelectorDisenoAbierto(false);
+                            }}
+                          >
+                            <a.Icono className="text-primary/60 flex-shrink-0" size={16} />
+                            {a.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
