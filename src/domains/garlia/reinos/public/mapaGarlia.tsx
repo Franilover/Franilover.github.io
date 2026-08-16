@@ -560,8 +560,6 @@ function PanelContenido({
   onVincularPersonaje,
   onDesvincularPersonaje,
   vinculandoPersonajeId,
-  onEditarArea,
-  areaVinculada,
 }: any) {
   const router = useRouter();
   const [buscadorLibrosOpen, setBuscadorLibrosOpen] = useState(false);
@@ -645,89 +643,10 @@ function PanelContenido({
           </div>
         </div>
 
-        {/* Editar área del mapa (círculo/rectángulo/forma libre) — solo
-            visible en la vista global, vinculada al reino o ciudad abiertos
-            acá mismo en el panel. */}
-        {onEditarArea && (
-          <div
-            className="flex flex-col gap-2 p-3"
-            style={{
-              background:
-                "color-mix(in srgb, var(--accent) 6%, transparent)",
-              border:
-                "1px solid color-mix(in srgb, var(--accent) 20%, transparent)",
-              borderRadius: "2px",
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <span
-                className="text-micro font-bold uppercase tracking-[0.15em]"
-                style={{
-                  color:
-                    "color-mix(in srgb, var(--foreground) 55%, transparent)",
-                }}
-              >
-                Área en el mapa
-              </span>
-              {areaVinculada && (
-                <span
-                  className="text-micro font-bold uppercase"
-                  style={{ color: "var(--accent)" }}
-                >
-                  Ya tiene área
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-micro font-bold uppercase transition-opacity hover:opacity-80"
-                style={{
-                  background: "var(--accent)",
-                  color: "#fff",
-                  borderRadius: "2px",
-                }}
-                title="Dibujar un círculo para esta área"
-                onClick={() => onEditarArea("circulo")}
-              >
-                Círculo
-              </button>
-              <button
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-micro font-bold uppercase transition-opacity hover:opacity-80"
-                style={{
-                  background: "var(--accent)",
-                  color: "#fff",
-                  borderRadius: "2px",
-                }}
-                title="Dibujar un rectángulo para esta área"
-                onClick={() => onEditarArea("rectangulo")}
-              >
-                Rectángulo
-              </button>
-              <button
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-micro font-bold uppercase transition-opacity hover:opacity-80"
-                style={{
-                  background: "var(--accent)",
-                  color: "#fff",
-                  borderRadius: "2px",
-                }}
-                title="Dibujar una forma libre para esta área"
-                onClick={() => onEditarArea("poligono")}
-              >
-                Libre
-              </button>
-            </div>
-            <p
-              className="text-micro"
-              style={{
-                color:
-                  "color-mix(in srgb, var(--foreground) 40%, transparent)",
-              }}
-            >
-              Elegí una forma y dibujala sobre el mapa global — queda
-              vinculada automáticamente a {puntoSeleccionado ? "esta ciudad" : "este reino"}.
-            </p>
-          </div>
-        )}
+        {/* Editar área del mapa (círculo/rectángulo/forma libre) se sacó de
+            acá — quedaba duplicado con la barra de herramientas flotante
+            sobre el mapa (que ya cubre reino y ciudad) y generaba errores
+            por dos flujos de dibujo compitiendo entre sí. */}
 
         {/* Lore text — mismo marco decorativo con esquinas que el modo
             público, pero con un <textarea> editable adentro. */}
@@ -2421,24 +2340,6 @@ export default function MapaInteractivo({
     [],
   );
 
-  // "Editar área" desde el pin de un reino/ciudad ya seleccionado: activa
-  // la herramienta de dibujo con el vínculo pre-cargado, para que
-  // onAreaDrawEnd guarde directo sin pasar por el selector.
-  const handleEditarAreaDe = useCallback(
-    (tool: Exclude<DrawTool, null>, entidad: { id: string; nombre?: string }, tipo: "reino" | "ciudad") => {
-      setAreaVinculoPreseleccionado({
-        reino_id: tipo === "reino" ? entidad.id : null,
-        ciudad_id: tipo === "ciudad" ? entidad.id : null,
-        label: entidad.nombre || "",
-        color: null,
-      });
-      setSelectedAreaId(null);
-      setPanelOpen(false);
-      setDrawTool(tool);
-    },
-    [],
-  );
-
   // Mover un reino en el mapa global: seleccionar con onMarkerSelect
   // (Ctrl+click), luego onMarkerMove al soltar en la celda destino.
   const handleReinoMarkerMove = useCallback(
@@ -3441,20 +3342,6 @@ export default function MapaInteractivo({
     onVincularPersonaje: handleVincularPersonaje,
     onDesvincularPersonaje: handleDesvincularPersonaje,
     vinculandoPersonajeId,
-    // "Editar área": para el reino/ciudad actualmente abierto en el panel,
-    // tanto en la vista global (reinos) como en la vista de reino (ciudades).
-    onEditarArea: (tool: Exclude<DrawTool, null>) => {
-      if (puntoSeleccionado) {
-        handleEditarAreaDe(tool, puntoSeleccionado, "ciudad");
-      } else if (reinoSeleccionado) {
-        handleEditarAreaDe(tool, reinoSeleccionado, "reino");
-      }
-    },
-    areaVinculada: areas.find((a) =>
-      puntoSeleccionado
-        ? a.ciudad_id === puntoSeleccionado.id
-        : a.reino_id === reinoSeleccionado?.id && !a.ciudad_id,
-    ),
   };
 
   // Solo bloquea la UI si no hay absolutamente ningún dato todavía (primera carga ever)
