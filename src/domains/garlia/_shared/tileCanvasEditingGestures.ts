@@ -130,6 +130,16 @@ export function useTileCanvasEditingState<
   const markerParaMoverIdRef = useRef<string | null>(null);
   markerParaMoverIdRef.current = markerParaMoverId;
 
+  // Flag interno, SIEMPRE separado de selectedMarkerId: solo se activa por
+  // una acción explícita (Ctrl+click o click derecho), nunca por una
+  // selección normal de marker (que abre el panel). Antes, cuando el
+  // consumidor pasaba onMarkerContextMenu, "para mover" reusaba
+  // selectedMarkerId directamente — y como selectedMarkerId también cambia
+  // al simplemente abrir/seleccionar una ciudad (onMarkerSelect), CUALQUIER
+  // click izquierdo posterior con una ciudad ya seleccionada terminaba
+  // moviéndola en vez de solo paniar el mapa.
+  const armadoParaMoverRef = useRef(false);
+
   // El orquestador (useTileCanvasGestures) escribe acá en cada pointermove
   // si hubo pan en curso. Sirve para que "mover marker" nunca se dispare
   // como efecto colateral de haber arrastrado el mapa — solo debe aplicar
@@ -137,7 +147,10 @@ export function useTileCanvasEditingState<
   const isDraggingRef = useRef(false);
 
   useEffect(() => {
-    if (!editMode) setMarkerParaMoverId(null);
+    if (!editMode) {
+      setMarkerParaMoverId(null);
+      armadoParaMoverRef.current = false;
+    }
   }, [editMode]);
 
   const hoverTileRef = useRef<TTile | null>(hoverTile);
@@ -459,10 +472,14 @@ export function useTileCanvasEditingState<
     // Si hubo arrastre (pan), no es un click de "colocar marker" — el pan
     // ya movió el mapa, esto no debe interpretarse como mover el marker.
     // El estado "para mover" se mantiene armado para el próximo click real.
+    // CRÍTICO: exigimos armadoParaMoverRef (siempre por acción explícita:
+    // Ctrl+click o contextmenu) — nunca alcanza con que selectedMarkerId
+    // no sea null, porque eso también pasa con solo tener una ciudad
+    // seleccionada/abierta en el panel, sin intención de moverla.
     const idParaMover = onMarkerContextMenu
       ? selectedMarkerId
       : markerParaMoverIdRef.current;
-    if (idParaMover && !isDraggingRef.current) {
+    if (idParaMover && armadoParaMoverRef.current && !isDraggingRef.current) {
       const info = canvasToTileInfo(clientX, clientY);
       if (info) {
         onMarkerMove(idParaMover, {
@@ -473,6 +490,7 @@ export function useTileCanvasEditingState<
         });
       }
       if (!onMarkerContextMenu) setMarkerParaMoverId(null);
+      armadoParaMoverRef.current = false;
       return true;
     }
 
@@ -504,6 +522,7 @@ export function useTileCanvasEditingState<
         : markerParaMoverIdRef.current;
       const next = marker.id === current ? null : marker.id;
       if (!onMarkerContextMenu) setMarkerParaMoverId(next);
+      armadoParaMoverRef.current = next !== null;
       onMarkerSelect(next);
       return true;
     }
@@ -558,11 +577,21 @@ export function useTileCanvasEditingState<
     if (marker) {
       e.preventDefault();
       if (onMarkerContextMenu) {
+        // El toggle real (armar/desarmar) vive en el callback externo
+        // (mapaGarlia.tsx). Acá solo reflejamos: si después de este
+        // contextmenu selectedMarkerId sigue siendo este marker, fue un
+        // "armado"; si el callback ya lo desarmó, no. Como el callback
+        // corre síncronamente antes del próximo render, chequeamos contra
+        // el valor previo para decidir el nuevo estado del flag.
+        const wasArmedForThisMarker =
+          armadoParaMoverRef.current && selectedMarkerId === marker.id;
         onMarkerContextMenu(marker);
+        armadoParaMoverRef.current = !wasArmedForThisMarker;
       } else {
         const next =
           marker.id === markerParaMoverIdRef.current ? null : marker.id;
         setMarkerParaMoverId(next);
+        armadoParaMoverRef.current = next !== null;
         onMarkerSelect(next);
       }
       return true;
@@ -613,8 +642,9 @@ export function useTileCanvasEditingState<
       const idParaMoverActual = onMarkerContextMenu
         ? selectedMarkerId
         : markerParaMoverIdRef.current;
-      if (idParaMoverActual !== null) {
+      if (idParaMoverActual !== null && armadoParaMoverRef.current) {
         if (!onMarkerContextMenu) setMarkerParaMoverId(null);
+        armadoParaMoverRef.current = false;
         onMarkerSelect(null);
         handled = true;
       }
