@@ -37,13 +37,20 @@ import {
   type Spread,
 } from "lexical";
 import { $createMathNode, $isMathNode, MathNode } from "./MathNode";
-import type { HeadingVariant } from "./headingVariant";
-export type { HeadingVariant } from "./headingVariant";
-export {
+import {
   VARIANT_SUFFIX_RE,
   stripVariantSuffix,
   appendVariantSuffix,
+  type HeadingVariant,
 } from "./headingVariant";
+// Reexport: "export { x } from y" NO crea un binding local usable dentro
+// de este mismo archivo (es solo un pase-directo para quien importe desde
+// acá) — por eso además se importa arriba con nombre, ya que este módulo
+// también USA appendVariantSuffix/stripVariantSuffix más abajo (serialize()
+// del transformer). Sin el import normal, el build fallaba con "Cannot
+// find name 'appendVariantSuffix'" en tiempo de compilación.
+export type { HeadingVariant } from "./headingVariant";
+export { VARIANT_SUFFIX_RE, stripVariantSuffix, appendVariantSuffix } from "./headingVariant";
 
 export type SerializedVariantHeadingNode = Spread<
   { variant: HeadingVariant },
