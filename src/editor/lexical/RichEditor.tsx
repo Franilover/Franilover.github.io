@@ -104,7 +104,6 @@ import {
 import { SlashCommandPlugin, type SlashMatch } from "./plugins/SlashCommandPlugin";
 import { TABLE_NODES, TablePlugin, insertTable } from "./plugins/TablePlugin";
 import { TableControlsPlugin } from "./plugins/TableControlsPlugin";
-import { TocPanel } from "./plugins/TocPlugin";
 import { WikilinkMenuPanel, type WikiEntity } from "./WikilinkMenuPanel";
 import { WikilinkPlugin, type WikilinkMatch } from "./plugins/WikilinkPlugin";
 
@@ -1186,7 +1185,6 @@ export function RichEditor({
   const [findReplace, setFindReplace] = useState<FindReplaceState>(
     initialFindReplaceState,
   );
-  const [tocOpen, setTocOpen] = useState(false);
 
   // Ref interno para insertar snippets (si el padre no pasa el suyo)
   const internalInsertRef = useRef<((raw: string) => void) | null>(null);
@@ -1558,11 +1556,6 @@ export function RichEditor({
             gap: 4,
           }}
         >
-          <TocPanel
-            open={tocOpen}
-            onClose={() => setTocOpen(false)}
-            onToggle={() => setTocOpen((o) => !o)}
-          />
           <button
             style={{
               display: "flex",

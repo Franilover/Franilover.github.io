@@ -37,7 +37,6 @@ import React, {
   useMemo,
 } from "react";
 
-import { AddLayoutBoxButton } from "@/editor/layout-boxes/AddLayoutBoxButton";
 import { LayoutCanvas, type LayoutCanvasHandle } from "@/editor/layout-boxes/LayoutCanvas";
 import { parseLayoutBoxes, type LayoutBox } from "@/editor/layout-boxes/types";
 import type { SnippetEditRequest } from "@/editor/lexical";
@@ -1406,11 +1405,6 @@ const PanelEditor = ({
                     // más arriba para la segunda capa de esta protección.
                     closePaletteRef={closePaletteRef}
                     editable={!loading && initializedCapId === cap?.id}
-                    extraToolbarAction={
-                      <AddLayoutBoxButton
-                        onClick={() => layoutCanvasRef.current?.addBox()}
-                      />
-                    }
                     formatCommandRef={formatCommandRef}
                     insertRef={mdInsertRef}
                     minHeight={focusMode ? "30rem" : "20rem"}
