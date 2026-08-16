@@ -742,13 +742,24 @@ export function useTileCanvasEngine<
           }
         }
 
-        // Label centrado (aprox: promedio de los puntos de forma, no de
-        // los 2 puntos de control de círculo/rectángulo)
+        // Label centrado en el centro geométrico real del área. Antes, para
+        // círculo/rectángulo, se usaba el punto medio entre los 2 puntos de
+        // control (puntos[0], puntos[1]). Para rectángulo eso SÍ es el
+        // centro real (son las esquinas opuestas). Pero para círculo,
+        // puntos[0] es el CENTRO y puntos[1] es un punto en el BORDE — el
+        // punto medio entre ambos cae a mitad de camino del radio, no en el
+        // centro. El label quedaba dibujado desplazado del centro real del
+        // círculo (aunque el hit-test de isPointInArea sí usa el centro
+        // real correctamente) — visualmente engañoso: el texto no estaba
+        // en el centro de la forma que realmente delimita el área.
         if (area.label && localPts.length >= 2) {
           let lx: number, ly: number;
           if (area.tipo === "poligono") {
             lx = localPts.reduce((s, p) => s + p.lx, 0) / localPts.length;
             ly = localPts.reduce((s, p) => s + p.ly, 0) / localPts.length;
+          } else if (area.tipo === "circulo") {
+            lx = localPts[0].lx;
+            ly = localPts[0].ly;
           } else {
             lx = (localPts[0].lx + localPts[1].lx) / 2;
             ly = (localPts[0].ly + localPts[1].ly) / 2;

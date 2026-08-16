@@ -173,11 +173,27 @@ export function useTileCanvasGestures<
 
       // Durante un pinch de 2 dedos, el pan por Pointer Events se desactiva.
       if (isPointerDown && touchCountRef.current < 2) {
-        const s = cssToCanvasScale();
-        const dx = (e.clientX - dragStart.current.x) * s;
-        const dy = (e.clientY - dragStart.current.y) * s;
-        if (Math.hypot(dx, dy) > 6) isDragging.current = true;
+        // ── Umbral de "esto ya es un drag, no un click" ─────────────────────
+        // Antes: se medía dx/dy en unidades de canvas (multiplicadas por
+        // `s` = cssToCanvasScale) pero se comparaba contra un umbral fijo de
+        // 6. Como `s` cambia según la resolución del canvas (recortada a
+        // MAX_DIM en pantallas grandes, o inflada por devicePixelRatio en
+        // mobile), el umbral real en movimiento de MOUSE/DEDO variaba según
+        // el dispositivo — en desktop grande equivalía a ~7px CSS reales,
+        // un umbral tan bajo que el temblor natural de una mano al hacer
+        // click lo superaba seguido, arrancando un "pan" no intencional
+        // (exactamente el síntoma: "a veces no toma el click y encima se
+        // pone en modo difícil de destrabar"). Ahora se mide el movimiento
+        // en píxeles CSS reales (sin *s) contra un umbral fijo más alto
+        // (10px, estándar de la industria para distinguir click de drag),
+        // consistente sin importar la resolución del canvas. ───────────────
+        const dxCss = e.clientX - dragStart.current.x;
+        const dyCss = e.clientY - dragStart.current.y;
+        if (Math.hypot(dxCss, dyCss) > 10) isDragging.current = true;
         if (isDragging.current) {
+          const s = cssToCanvasScale();
+          const dx = dxCss * s;
+          const dy = dyCss * s;
           camRef.current = {
             ...camRef.current,
             x: dragStart.current.camX + dx,
