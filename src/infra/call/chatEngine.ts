@@ -27,6 +27,9 @@ export interface PerfilResumen {
   avatar_url: string | null;
 }
 
+/** Diseño visual de la burbuja del mensaje. null/undefined = burbuja normal. */
+export type EstiloBurbuja = "pensamiento" | "grito" | "experimental";
+
 export interface Mensaje {
   id: string;
   conversacion_id: string;
@@ -38,6 +41,7 @@ export interface Mensaje {
   editado: boolean;
   eliminado: boolean;
   respuesta_a: string | null;
+  estilo: EstiloBurbuja | null;
 }
 
 export interface MensajeReaccion {
@@ -306,6 +310,7 @@ export async function enviarMensaje(
   contenido: string,
   adjunto?: { url: string; tipo: "imagen" | "audio" | "archivo" },
   respuestaAId?: string | null,
+  estilo?: EstiloBurbuja | null,
 ): Promise<Mensaje> {
   const {
     data: { user },
@@ -322,6 +327,7 @@ export async function enviarMensaje(
       adjunto_url: adjunto?.url ?? null,
       adjunto_tipo: adjunto?.tipo ?? null,
       respuesta_a: respuestaAId ?? null,
+      estilo: estilo ?? null,
     })
     .select("*")
     .single();

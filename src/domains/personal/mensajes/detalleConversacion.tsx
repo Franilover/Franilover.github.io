@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CheckCheck, Mic, Paperclip, Pencil, Phone, Plus, Reply, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Mic, Paperclip, Pencil, Phone, Plus, Reply, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -26,6 +26,7 @@ import {
   suscribirseAMensajesEditados,
   suscribirseAMensajesEliminados,
   suscribirseAReacciones,
+  type EstiloBurbuja,
   type Mensaje,
   type MensajeReaccion,
   type PerfilResumen,
@@ -49,6 +50,60 @@ function previsualizarMensaje(m: Mensaje): string {
   if (m.adjunto_tipo === "audio") return "🎵 Audio";
   if (m.adjunto_tipo === "archivo") return "📎 Archivo";
   return "Mensaje";
+}
+
+/**
+ * clip-path en forma de estrella/explosión de cómic para el diseño "grito".
+ * Generado a mano como polígono de puntas alternadas (16 puntos): da el
+ * efecto de burbuja de grito sin depender de ninguna imagen o librería.
+ */
+const CLIP_PATH_GRITO =
+  "polygon(50% 0%, 61% 12%, 75% 2%, 78% 18%, 93% 10%, 89% 27%, 100% 32%, 88% 42%, 98% 55%, 84% 58%, 88% 74%, 73% 68%, 72% 85%, 60% 74%, 52% 100%, 44% 76%, 30% 88%, 28% 70%, 12% 78%, 18% 60%, 2% 58%, 15% 45%, 0% 33%, 14% 27%, 8% 11%, 25% 18%, 28% 2%, 40% 13%)";
+
+/**
+ * Devuelve className/style extra para aplicar sobre la burbuja del mensaje
+ * según su diseño elegido. "pensamiento" y "grito" cambian la forma del
+ * contenedor (nube / estallido de cómic); "experimental" es una variante
+ * más libre con gradiente e inclinación, pensada como opción "para jugar".
+ * null/undefined = sin cambios (burbuja normal, ya maneja el caller).
+ */
+function estiloExtraBurbuja(
+  estilo: EstiloBurbuja | null | undefined,
+  esMio: boolean,
+): { className: string; style: React.CSSProperties } {
+  if (estilo === "pensamiento") {
+    return {
+      className: "",
+      style: {
+        borderRadius: "42% 46% 44% 40% / 55% 48% 52% 45%",
+        border: `2px solid ${esMio ? "color-mix(in srgb, var(--btn-text) 35%, transparent)" : "color-mix(in srgb, var(--primary) 20%, transparent)"}`,
+      },
+    };
+  }
+  if (estilo === "grito") {
+    return {
+      className: "",
+      style: {
+        clipPath: CLIP_PATH_GRITO,
+        padding: "1.75rem 2.25rem",
+        fontWeight: 800,
+      },
+    };
+  }
+  if (estilo === "experimental") {
+    return {
+      className: "italic",
+      style: {
+        background: esMio
+          ? "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 55%, #7c3aed))"
+          : "linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, var(--primary) 4%, transparent))",
+        borderRadius: "4px 20px 4px 20px",
+        transform: esMio ? "rotate(-1deg)" : "rotate(1deg)",
+        boxShadow: "0 3px 0 color-mix(in srgb, var(--primary) 30%, transparent)",
+      },
+    };
+  }
+  return { className: "", style: {} };
 }
 
 /** Lista de emojis por categoría para el selector completo (botón "+"). */
@@ -99,6 +154,16 @@ const CATEGORIAS_EMOJI: { nombre: string; emojis: string[] }[] = [
       "🎨", "📸", "🔥", "✨", "⭐", "🌟", "💯", "✅", "❌", "⚡",
     ],
   },
+];
+
+/**
+ * Diseños de burbuja disponibles para elegir al escribir un mensaje.
+ * "normal" (null) no aparece acá — es la opción implícita/por defecto.
+ */
+const DISENOS_BURBUJA: { id: EstiloBurbuja; label: string; emoji: string }[] = [
+  { id: "pensamiento", label: "Pensamiento", emoji: "💭" },
+  { id: "grito", label: "Grito", emoji: "📢" },
+  { id: "experimental", label: "Experimental", emoji: "✨" },
 ];
 
 /**
@@ -330,6 +395,12 @@ export default function DetalleConversacion() {
 
   // ── Responder a un mensaje (quote/reply) ────────────────────────────
   const [respondiendoA, setRespondiendoA] = useState<Mensaje | null>(null);
+
+  // ── Diseño de burbuja (pensamiento/grito/experimental) para el próximo
+  //    mensaje de texto a enviar. Se elige desde un mini-selector en la
+  //    barra de input y se resetea a "normal" después de cada envío.
+  const [estiloSeleccionado, setEstiloSeleccionado] = useState<EstiloBurbuja | null>(null);
+  const [selectorDisenoAbierto, setSelectorDisenoAbierto] = useState(false);
 
   // ── Paginación "cargar mensajes anteriores" ─────────────────────────
   const [cargandoAnteriores, setCargandoAnteriores] = useState(false);
@@ -832,21 +903,28 @@ export default function DetalleConversacion() {
       escribiendoOffRef.current = null;
     }, 1500);
   };
-
   const handleEnviar = async () => {
     if (!texto.trim() || enviando) return;
     setEnviando(true);
     const contenido = texto;
     const respuestaAId = respondiendoA?.id ?? null;
+    const estiloAEnviar = estiloSeleccionado;
     setTexto("");
     setRespondiendoA(null);
+    setEstiloSeleccionado(null);
     if (escribiendoOffRef.current) {
       clearTimeout(escribiendoOffRef.current);
       escribiendoOffRef.current = null;
       void emitirEscribiendo(conversacionId, user.id, false);
     }
     try {
-      const enviado = await enviarMensaje(conversacionId, contenido, undefined, respuestaAId);
+      const enviado = await enviarMensaje(
+        conversacionId,
+        contenido,
+        undefined,
+        respuestaAId,
+        estiloAEnviar,
+      );
       // Optimista: lo agregamos ya mismo al estado local en vez de esperar
       // a que vuelva por la suscripción realtime. Antes, quien enviaba
       // dependía 100% de ver su propio INSERT reflejado por Realtime — si
@@ -860,6 +938,7 @@ export default function DetalleConversacion() {
       setError("No se pudo enviar el mensaje.");
       setTexto(contenido);
       setRespondiendoA(respondiendoA);
+      setEstiloSeleccionado(estiloAEnviar);
     } finally {
       setEnviando(false);
     }
@@ -1190,13 +1269,14 @@ export default function DetalleConversacion() {
               <div key={m.id} className={`flex flex-col ${esMio ? "items-end" : "items-start"} group`}>
                 <div
                   data-mensaje-burbuja
-                  className="max-w-[75%] px-4 py-2.5 rounded-[var(--radius-btn)] relative select-none md:select-text"
+                  className={`max-w-[75%] px-4 py-2.5 rounded-[var(--radius-btn)] relative select-none md:select-text ${estiloExtraBurbuja(m.estilo, esMio).className}`}
                   style={{
                     background: esMio
                       ? "var(--primary)"
                       : "color-mix(in srgb, var(--primary) 6%, transparent)",
                     color: esMio ? "var(--btn-text)" : "var(--foreground)",
                     WebkitTouchCallout: "none",
+                    ...estiloExtraBurbuja(m.estilo, esMio).style,
                   }}
                   onTouchStart={() => handleTouchStartMensaje(m.id)}
                   onTouchEnd={handleTouchEndMensaje}
@@ -1210,6 +1290,37 @@ export default function DetalleConversacion() {
                     e.preventDefault();
                   }}
                 >
+                  {/* Colita de burbujitas decrecientes para el diseño
+                      "pensamiento", estilo nube de cómic clásica. */}
+                  {m.estilo === "pensamiento" && (
+                    <div
+                      className={`absolute flex flex-col gap-0.5 ${esMio ? "items-end -right-1" : "items-start -left-1"}`}
+                      style={{ bottom: -14, [esMio ? "right" : "left"]: 8 } as React.CSSProperties}
+                    >
+                      <span
+                        className="rounded-full"
+                        style={{
+                          width: 9,
+                          height: 9,
+                          background: esMio
+                            ? "var(--primary)"
+                            : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                          border: "1.5px solid color-mix(in srgb, var(--primary) 20%, transparent)",
+                        }}
+                      />
+                      <span
+                        className="rounded-full"
+                        style={{
+                          width: 5,
+                          height: 5,
+                          background: esMio
+                            ? "var(--primary)"
+                            : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                          border: "1.5px solid color-mix(in srgb, var(--primary) 20%, transparent)",
+                        }}
+                      />
+                    </div>
+                  )}
                   {/* Preview del mensaje citado, si este mensaje es una
                       respuesta a otro. Si el citado ya no está entre los
                       mensajes cargados (se borró, o quedó fuera de la
@@ -1558,6 +1669,73 @@ export default function DetalleConversacion() {
                 size={18}
               />
             </button>
+            <div className="relative flex-shrink-0">
+              <button
+                aria-label="Elegir diseño de burbuja"
+                className="flex items-center justify-center"
+                onClick={() => setSelectorDisenoAbierto((v) => !v)}
+              >
+                {estiloSeleccionado ? (
+                  <span className="text-base leading-none">
+                    {DISENOS_BURBUJA.find((d) => d.id === estiloSeleccionado)?.emoji}
+                  </span>
+                ) : (
+                  <Sparkles className="text-primary/50" size={18} />
+                )}
+              </button>
+              {selectorDisenoAbierto && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setSelectorDisenoAbierto(false)}
+                  />
+                  <div
+                    className="absolute bottom-full left-0 mb-2 z-20 rounded-[var(--radius-btn)] overflow-hidden flex-shrink-0"
+                    style={{
+                      width: 180,
+                      background: "var(--bg-main)",
+                      boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+                      border: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
+                    }}
+                  >
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm font-medium"
+                      style={{
+                        background: !estiloSeleccionado
+                          ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+                          : "transparent",
+                      }}
+                      onClick={() => {
+                        setEstiloSeleccionado(null);
+                        setSelectorDisenoAbierto(false);
+                      }}
+                    >
+                      <span className="text-base leading-none">💬</span>
+                      Normal
+                    </button>
+                    {DISENOS_BURBUJA.map((d) => (
+                      <button
+                        key={d.id}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm font-medium"
+                        style={{
+                          background:
+                            estiloSeleccionado === d.id
+                              ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+                              : "transparent",
+                        }}
+                        onClick={() => {
+                          setEstiloSeleccionado(d.id);
+                          setSelectorDisenoAbierto(false);
+                        }}
+                      >
+                        <span className="text-base leading-none">{d.emoji}</span>
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <input
               autoFocus={!!respondiendoA}
               className="flex-1 px-4 py-2.5 rounded-[var(--radius-btn)] bg-transparent outline-none text-sm font-medium text-primary placeholder:text-primary/30"
