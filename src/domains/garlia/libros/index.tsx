@@ -1471,7 +1471,6 @@ export const PanelPersonajesCapitulo = ({
   const handleSaveNarrador = async (id: string | null) => {
     setNarradorId(id);
     setSavingNarr(true);
-    setErasNarrador([]);
     try {
       await capUpdateMeta(capId, { narrador_id: id } as any);
     } catch {}
