@@ -160,9 +160,15 @@ export function useTileCanvasGestures<
       // ── Edición tiene primera prioridad ───────────────────────────────────
       if (editing?.handlePointerUp(e)) {
         // Pase lo que pase dentro de edición, un pointerup SIEMPRE cierra
-        // cualquier drag en curso del orquestador. Antes, si editing
-        // devolvía true (p.ej. "mover marker" pegado), este reseteo nunca
-        // se ejecutaba y el mapa quedaba trabado en modo pan para siempre.
+        // cualquier drag/press en curso del orquestador. Antes solo se
+        // reseteaba isDragging.current, pero isPointerDown (la variable que
+        // realmente gobierna si el próximo pointermove sigue paneando)
+        // quedaba en true — así que si editing interceptaba el pointerup
+        // (p.ej. click sobre un tile), el mapa seguía "pegado" al cursor
+        // en el próximo movimiento aunque ya se había soltado el botón.
+        if (e.pointerType === "touch")
+          activeTouchPointers.current.delete(e.pointerId);
+        isPointerDown = false;
         isDragging.current = false;
         if (editing) editing.isDraggingRef.current = false;
         return;
