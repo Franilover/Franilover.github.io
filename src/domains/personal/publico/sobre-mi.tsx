@@ -29,11 +29,7 @@ const fade = (delay = 0) => ({
 
 
 
-const TOOLS = [
-  { num: "01", title: "Arch Linux",       },
-  { num: "02",  title: "Krita", },
-  { num: "03",  title: "Reaper", },
-];
+
 
 
 
@@ -115,46 +111,74 @@ export default function SobreMi() {
               </MotionSection>
             </div>
 
-            {/* Columna derecha: herramientas en columna */}
+            {/* Columna derecha: enlaces internos en columna */}
+            {/* Antes vivía acá el bloque "Herramientas" (TOOLS); se
+                reemplazó por Galería/Ensayos, que antes vivían en la
+                sidebar/navbar principal (personalLinks en
+                layout/navbar.tsx) y se sacaron de ahí para vivir acá,
+                al lado de "Sobre Mí". Mismo layout de card que tenía
+                Herramientas — ícono + label — pero ahora como Link
+                real (Herramientas era decorativo, sin href). */}
             <MotionSection {...fade(0.24)} className="mt-10 md:mt-0 md:w-[28%] shrink-0">
               <div
                 className="flex items-center justify-center gap-2 text-sm font-black uppercase tracking-[0.4em] mb-6"
                 style={{ color: "var(--primary)", opacity: 0.3 }}
               >
-                Herramientas
+                Explorar
               </div>
 
               <div className="flex flex-col gap-4">
-                {TOOLS.map((tool, i) => {
-                  return (
-                    <MotionDiv
-                      key={tool.num}
-                      {...fade(0.28 + i * 0.07)}
-                      className="group relative flex items-center justify-center gap-4 p-5 overflow-hidden cursor-default text-center"
+                {[
+                  {
+                    href: "/personal/galeria",
+                    title: "Galería",
+                    icon: <Palette size={18} strokeWidth={1.5} />,
+                  },
+                  {
+                    href: "/personal/ensayos",
+                    title: "Ensayos",
+                    icon: <NotebookPen size={18} strokeWidth={1.5} />,
+                  },
+                ].map((item, i) => (
+                  <MotionDiv
+                    key={item.href}
+                    {...fade(0.28 + i * 0.07)}
+                    transition={{ duration: 0.22 }}
+                    whileHover={{ x: 4 }}
+                  >
+                    <Link
+                      href={item.href}
+                      className="group relative flex items-center justify-center gap-3 p-5 overflow-hidden no-underline"
                       style={{
                         background: "var(--white-custom)",
                         borderRadius: "var(--radius-card)",
                         border: "var(--border-width) solid color-mix(in srgb, var(--primary) 10%, transparent)",
                         boxShadow: "var(--shadow-card)",
                       }}
-                      transition={{ duration: 0.22 }}
-                      whileHover={{ x: 4 }}
                     >
-
-                      <div className="relative z-10 space-y-0.5 text-left">
+                      <div
+                        className="relative z-10 flex items-center gap-3"
+                        style={{ color: "var(--primary)" }}
+                      >
+                        <span
+                          className="flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                          style={{ opacity: 0.65 }}
+                        >
+                          {item.icon}
+                        </span>
                         <h4
                           className="font-black text-l leading-snug"
-                          style={{ color: "var(--primary)", letterSpacing: "-0.02em" }}
-                        >{tool.title}</h4>
+                          style={{ letterSpacing: "-0.02em" }}
+                        >{item.title}</h4>
                       </div>
 
                       <div
                         className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full transition-all duration-500 ease-out rounded-full"
                         style={{ background: "color-mix(in srgb, var(--primary) 30%, transparent)" }}
                       />
-                    </MotionDiv>
-                  );
-                })}
+                    </Link>
+                  </MotionDiv>
+                ))}
               </div>
             </MotionSection>
 
@@ -228,66 +252,6 @@ export default function SobreMi() {
               </MotionDiv>
             </div>
 
-          </div>
-        </MotionSection>
-
-        {/* ── ENLACES INTERNOS: Galería y Ensayos ── */}
-        {/* Antes vivían en la sidebar/navbar principal (personalLinks en
-            layout/navbar.tsx); se sacaron de ahí y se muestran acá como
-            botones — mismo patrón visual de card que "Redes Sociales" más
-            abajo, para que la sección se sienta parte del mismo bloque,
-            justo arriba de ese grid. */}
-        <MotionSection {...fade(0.33)} className="flex flex-col items-center text-center space-y-10 mb-24 md:mb-32">
-          <div className="w-full grid grid-cols-2 gap-4 max-w-md">
-            {[
-              {
-                label: "Galería",
-                href: "/personal/galeria",
-                icon: <Palette size={20} strokeWidth={1.5} style={{ opacity: 0.65 }} />,
-              },
-              {
-                label: "Ensayos",
-                href: "/personal/ensayos",
-                icon: <NotebookPen size={20} strokeWidth={1.5} style={{ opacity: 0.65 }} />,
-              },
-            ].map((item, i) => (
-              <MotionDiv
-                key={item.label}
-                {...fade(0.35 + i * 0.06)}
-                transition={{ duration: 0.22 }}
-                whileHover={{ y: -4 }}
-              >
-                <Link
-                  href={item.href}
-                  className="group relative flex flex-col items-center gap-3 p-6 overflow-hidden cursor-pointer no-underline"
-                  style={{
-                    background: "var(--white-custom)",
-                    borderRadius: "var(--radius-card)",
-                    border: "var(--border-width) solid color-mix(in srgb, var(--primary) 10%, transparent)",
-                    boxShadow: "var(--shadow-card)",
-                  }}
-                >
-                  <div
-                    className="w-10 h-10 flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                    style={{
-                      borderRadius: "var(--radius-btn)",
-                      background: "color-mix(in srgb, var(--primary) 8%, transparent)",
-                      color: "var(--primary)",
-                    }}
-                  >
-                    {item.icon}
-                  </div>
-                  <p
-                    className="font-black text-sm leading-snug"
-                    style={{ color: "var(--primary)", letterSpacing: "-0.01em" }}
-                  >{item.label}</p>
-                  <div
-                    className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full transition-all duration-500 ease-out rounded-full"
-                    style={{ background: "color-mix(in srgb, var(--primary) 30%, transparent)" }}
-                  />
-                </Link>
-              </MotionDiv>
-            ))}
           </div>
         </MotionSection>
 
