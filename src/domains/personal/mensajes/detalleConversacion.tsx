@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CheckCheck, Mic, Paperclip, Pencil, Phone, Plus, Reply, Send, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Cloud, Megaphone, MessageSquareText, Mic, Paperclip, Pencil, Phone, Plus, Reply, Send, Trash2, Wand2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -160,10 +160,10 @@ const CATEGORIAS_EMOJI: { nombre: string; emojis: string[] }[] = [
  * Diseños de burbuja disponibles para elegir al escribir un mensaje.
  * "normal" (null) no aparece acá — es la opción implícita/por defecto.
  */
-const DISENOS_BURBUJA: { id: EstiloBurbuja; label: string; emoji: string }[] = [
-  { id: "pensamiento", label: "Pensamiento", emoji: "💭" },
-  { id: "grito", label: "Grito", emoji: "📢" },
-  { id: "experimental", label: "Experimental", emoji: "✨" },
+const DISENOS_BURBUJA: { id: EstiloBurbuja; label: string; Icono: typeof Cloud }[] = [
+  { id: "pensamiento", label: "Pensamiento", Icono: Cloud },
+  { id: "grito", label: "Grito", Icono: Megaphone },
+  { id: "experimental", label: "Experimental", Icono: Wand2 },
 ];
 
 /**
@@ -1675,13 +1675,16 @@ export default function DetalleConversacion() {
                 className="flex items-center justify-center"
                 onClick={() => setSelectorDisenoAbierto((v) => !v)}
               >
-                {estiloSeleccionado ? (
-                  <span className="text-base leading-none">
-                    {DISENOS_BURBUJA.find((d) => d.id === estiloSeleccionado)?.emoji}
-                  </span>
-                ) : (
-                  <Sparkles className="text-primary/50" size={18} />
-                )}
+                {(() => {
+                  const activo = DISENOS_BURBUJA.find((d) => d.id === estiloSeleccionado);
+                  const IconoActivo = activo?.Icono ?? MessageSquareText;
+                  return (
+                    <IconoActivo
+                      className={estiloSeleccionado ? "text-primary" : "text-primary/50"}
+                      size={18}
+                    />
+                  );
+                })()}
               </button>
               {selectorDisenoAbierto && (
                 <>
@@ -1710,7 +1713,7 @@ export default function DetalleConversacion() {
                         setSelectorDisenoAbierto(false);
                       }}
                     >
-                      <span className="text-base leading-none">💬</span>
+                      <MessageSquareText className="text-primary/60 flex-shrink-0" size={16} />
                       Normal
                     </button>
                     {DISENOS_BURBUJA.map((d) => (
@@ -1728,7 +1731,7 @@ export default function DetalleConversacion() {
                           setSelectorDisenoAbierto(false);
                         }}
                       >
-                        <span className="text-base leading-none">{d.emoji}</span>
+                        <d.Icono className="text-primary/60 flex-shrink-0" size={16} />
                         {d.label}
                       </button>
                     ))}
