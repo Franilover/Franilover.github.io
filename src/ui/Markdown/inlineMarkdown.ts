@@ -20,6 +20,10 @@
  * en el proyecto: `npm install dompurify @types/dompurify`.
  */
 import DOMPurify from "dompurify";
+import {
+  stripVariantSuffix,
+  type HeadingVariant,
+} from "@/editor/lexical/nodes/headingVariant";
 
 export interface InlineMarkdownOptions {
   /** Habilita el parseo de [[wikilink]] / [[wikilink|alias]]. */
@@ -123,7 +127,7 @@ export type MarkdownBlock =
   | { type: "quote"; raw: string }
   | { type: "list"; ordered: boolean; items: MarkdownListItem[] }
   | { type: "table"; header: string[]; rows: string[][] }
-  | { type: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; text: string }
+  | { type: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; text: string; variant: HeadingVariant }
   | { type: "text"; raw: string };
 
 // Heading ATX: "#".."######" seguido de espacio — reconocido como línea
@@ -217,7 +221,13 @@ export function splitMarkdownBlocks(value: string): MarkdownBlock[] {
     if (headingMatch) {
       flushTexto();
       const level = Math.min(6, headingMatch[1].length) as 1 | 2 | 3 | 4 | 5 | 6;
-      blocks.push({ type: "heading", level, text: headingMatch[2] });
+      // El sufijo "{variante}" (linea/barra/portada/dropcap/primeramayuscula)
+      // es la misma sintaxis que produce richTextSerializer.ts al serializar
+      // un VariantHeadingNode — se extrae acá con la misma función que usa
+      // el editor (stripVariantSuffix) para que el preview aplique el mismo
+      // ornamento visual que se ve en modo edición, no solo nivel/tamaño.
+      const { text, variant } = stripVariantSuffix(headingMatch[2]);
+      blocks.push({ type: "heading", level, text, variant });
       i++;
       continue;
     }

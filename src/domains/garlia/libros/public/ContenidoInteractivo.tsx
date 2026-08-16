@@ -111,8 +111,11 @@ function TextoMarkdown({
           // "# Título" en un capítulo nunca se reconocía acá (splitMarkdownBlocks
           // solo separaba code/hr) — se veía como texto plano con el "#"
           // literal. Estilos discretos, sin el tratamiento elaborado de
-          // PlainMarkdownPreview, para no cambiar el look ya establecido
-          // de los capítulos de Garlia.
+          // PlainMarkdownPreview/RichEditor, para no cambiar el look ya
+          // establecido de los capítulos de Garlia — el sufijo "{variante}"
+          // (block.variant) ya viene separado de block.text por
+          // splitMarkdownBlocks, así que simplemente se ignora acá en vez
+          // de mostrarse como texto literal.
           const HeadingTag = (`h${block.level}` as const);
           const sizeClass =
             block.level === 1

@@ -37,14 +37,13 @@ import {
   type Spread,
 } from "lexical";
 import { $createMathNode, $isMathNode, MathNode } from "./MathNode";
-
-export type HeadingVariant =
-  | "none"
-  | "linea"
-  | "barra"
-  | "portada"
-  | "dropcap"
-  | "primeramayuscula";
+import type { HeadingVariant } from "./headingVariant";
+export type { HeadingVariant } from "./headingVariant";
+export {
+  VARIANT_SUFFIX_RE,
+  stripVariantSuffix,
+  appendVariantSuffix,
+} from "./headingVariant";
 
 export type SerializedVariantHeadingNode = Spread<
   { variant: HeadingVariant },
@@ -177,25 +176,10 @@ export function $createVariantHeadingNode(
 // colisiona con ninguna sintaxis markdown estándar que
 // $convertFromMarkdownString ya interprete, y es fácil de
 // detectar/quitar con una regex simple sobre la línea cruda.
-export const VARIANT_SUFFIX_RE =
-  /\s*\{(linea|barra|portada|dropcap|primeramayuscula)\}\s*$/;
-
-export function stripVariantSuffix(text: string): {
-  text: string;
-  variant: HeadingVariant;
-} {
-  const match = VARIANT_SUFFIX_RE.exec(text);
-  if (!match) return { text, variant: "none" };
-  return {
-    text: text.slice(0, match.index),
-    variant: match[1] as HeadingVariant,
-  };
-}
-
-export function appendVariantSuffix(text: string, variant: HeadingVariant): string {
-  if (variant === "none") return text;
-  return `${text} {${variant}}`;
-}
+//
+// VARIANT_SUFFIX_RE/stripVariantSuffix/appendVariantSuffix ahora viven en
+// ./headingVariant (sin dependencias de Lexical) y se reexportan arriba —
+// ver el comentario en ese archivo para el porqué de la extracción.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Set de TRANSFORMERS compartido: idéntico al default de @lexical/markdown
