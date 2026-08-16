@@ -1397,46 +1397,45 @@ export const PanelPersonajesCapitulo = ({
       return null;
     }
     return (
-      <div className="space-y-1">
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-micro font-black text-primary/70">
+      <div className="space-y-1.5">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-xs font-black text-primary/70">
             {e.nombre}
           </span>
           {e.edad != null && (
             <span
-              className="text-micro font-bold tabular-nums"
+              className="text-xs font-bold tabular-nums"
               style={{ color: "var(--accent)" }}
             >
               {e.edad} años
             </span>
           )}
           {e.eraLabel && (
-            <span className="text-micro font-bold italic text-primary/35 truncate">
+            <span className="text-xs font-bold italic text-primary/35 truncate">
               {e.eraLabel}
             </span>
           )}
         </div>
         {e.rasgos.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {e.rasgos.map((rasgo) => (
-              <span
-                key={rasgo}
-                className="px-1.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide border"
-                style={{
-                  background: "color-mix(in srgb, var(--primary) 6%, transparent)",
-                  borderColor:
-                    "color-mix(in srgb, var(--primary) 14%, transparent)",
-                  color: "color-mix(in srgb, var(--primary) 55%, transparent)",
-                }}
-              >
-                {rasgo}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {e.rasgos.map((rasgo, i) => (
+              <span key={rasgo} className="flex items-center gap-2">
+                <span
+                  className="text-[11px] font-black uppercase tracking-wide"
+                  style={{ color: "var(--accent)" }}
+                >
+                  {rasgo}
+                </span>
+                {i < e.rasgos.length - 1 && (
+                  <span className="text-primary/15 text-[11px]">·</span>
+                )}
               </span>
             ))}
           </div>
         )}
         {e.notas && (
           <p
-            className="text-[10px] leading-relaxed"
+            className="text-[11px] leading-relaxed"
             style={{ color: "color-mix(in srgb, var(--primary) 40%, transparent)" }}
           >
             {e.notas}

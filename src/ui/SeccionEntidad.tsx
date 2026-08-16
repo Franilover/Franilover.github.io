@@ -113,7 +113,7 @@ function HoverTooltip({
     const openUp = espacioAbajo < 160 && espacioArriba > espacioAbajo;
     setPos({
       top: openUp ? r.top - MARGIN : r.bottom + MARGIN,
-      left: Math.min(r.left, window.innerWidth - 260 - MARGIN),
+      left: Math.min(r.left, window.innerWidth - 288 - MARGIN),
       openUp,
     });
   }, [hovered]);
@@ -132,7 +132,7 @@ function HoverTooltip({
         typeof document !== "undefined" &&
         createPortal(
           <div
-            className="fixed z-[100] w-64 rounded-lg p-2.5 shadow-lg pointer-events-none"
+            className="fixed z-[100] w-72 rounded-lg p-3 shadow-lg pointer-events-none"
             style={{
               top: pos.top,
               left: pos.left,
