@@ -1316,12 +1316,6 @@ const BloqueEstadoMundo = ({
         title="Edad y era de cada personaje vinculado, en este punto de la historia"
         onClick={() => setAbierto((v) => !v)}
       >
-        <Sparkles
-          size={8}
-          style={{
-            color: "color-mix(in srgb, var(--primary) 35%, transparent)",
-          }}
-        />
         <span
           className="text-micro font-black uppercase tracking-[0.2em] flex-1 text-left"
           style={{
@@ -2011,7 +2005,7 @@ export const PanelPersonajesCapitulo = ({
           className="text-micro font-black uppercase tracking-[0.2em] flex items-center gap-1"
           style={{ color: "var(--callout-warning-title, var(--primary))" }}
         >
-          <AlertTriangle size={9} /> Vinculados sin aparecer ·{" "}
+          Vinculados sin aparecer ·{" "}
           {sugerenciasInversas.length}
         </span>
         <div className="flex flex-col gap-1">
@@ -2058,7 +2052,7 @@ export const PanelPersonajesCapitulo = ({
           className="text-micro font-black uppercase tracking-[0.2em] flex items-center gap-1"
           style={{ color: "var(--callout-info-title, var(--primary))" }}
         >
-          <Sparkles size={9} /> Detectados · {sugerencias.length}
+          Detectados · {sugerencias.length}
         </span>
         <div className="flex flex-col gap-1">
           {sugerencias.map((s) => (
@@ -2162,12 +2156,6 @@ export const PanelPersonajesCapitulo = ({
         }}
       >
         <div className="flex items-center gap-1 mb-1.5">
-          <Mic2
-            size={8}
-            style={{
-              color: "color-mix(in srgb, var(--primary) 35%, transparent)",
-            }}
-          />
           <span
             className="text-micro font-black uppercase tracking-[0.2em] flex-1"
             style={{
@@ -2202,12 +2190,6 @@ export const PanelPersonajesCapitulo = ({
         }}
       >
         <div className="flex items-center gap-1">
-          <Clock
-            size={8}
-            style={{
-              color: "color-mix(in srgb, var(--primary) 35%, transparent)",
-            }}
-          />
           <span
             className="text-micro font-black uppercase tracking-[0.2em]"
             style={{
