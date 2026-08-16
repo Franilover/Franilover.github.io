@@ -29,7 +29,6 @@ import {
   Shirt,
   Upload,
   Wand2,
-  NotebookPen,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -627,20 +626,6 @@ const Navbar = () => {
       icon: Star,
       active: currentPath?.startsWith("/personal/sobre-mi") ?? false,
       fillActive: true,
-    },
-    {
-      href: "/personal/galeria",
-      label: "Galería",
-      icon: Palette,
-      active: currentPath?.startsWith("/personal/galeria") ?? false,
-      fillActive: false,
-    },
-    {
-      href: "/personal/ensayos",
-      label: "Ensayos",
-      icon: NotebookPen,
-      active: currentPath?.startsWith("/personal/ensayos") ?? false,
-      fillActive: false,
     },
     ...(user
       ? [

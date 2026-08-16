@@ -3,7 +3,8 @@
 
 
 
-import { Instagram, Youtube } from "lucide-react";
+import { Instagram, Youtube, Palette, NotebookPen } from "lucide-react";
+import Link from "next/link";
 import React, { useState } from "react";
 
 
@@ -227,6 +228,66 @@ export default function SobreMi() {
               </MotionDiv>
             </div>
 
+          </div>
+        </MotionSection>
+
+        {/* ── ENLACES INTERNOS: Galería y Ensayos ── */}
+        {/* Antes vivían en la sidebar/navbar principal (personalLinks en
+            layout/navbar.tsx); se sacaron de ahí y se muestran acá como
+            botones — mismo patrón visual de card que "Redes Sociales" más
+            abajo, para que la sección se sienta parte del mismo bloque,
+            justo arriba de ese grid. */}
+        <MotionSection {...fade(0.33)} className="flex flex-col items-center text-center space-y-10 mb-24 md:mb-32">
+          <div className="w-full grid grid-cols-2 gap-4 max-w-md">
+            {[
+              {
+                label: "Galería",
+                href: "/personal/galeria",
+                icon: <Palette size={20} strokeWidth={1.5} style={{ opacity: 0.65 }} />,
+              },
+              {
+                label: "Ensayos",
+                href: "/personal/ensayos",
+                icon: <NotebookPen size={20} strokeWidth={1.5} style={{ opacity: 0.65 }} />,
+              },
+            ].map((item, i) => (
+              <MotionDiv
+                key={item.label}
+                {...fade(0.35 + i * 0.06)}
+                transition={{ duration: 0.22 }}
+                whileHover={{ y: -4 }}
+              >
+                <Link
+                  href={item.href}
+                  className="group relative flex flex-col items-center gap-3 p-6 overflow-hidden cursor-pointer no-underline"
+                  style={{
+                    background: "var(--white-custom)",
+                    borderRadius: "var(--radius-card)",
+                    border: "var(--border-width) solid color-mix(in srgb, var(--primary) 10%, transparent)",
+                    boxShadow: "var(--shadow-card)",
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                    style={{
+                      borderRadius: "var(--radius-btn)",
+                      background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+                      color: "var(--primary)",
+                    }}
+                  >
+                    {item.icon}
+                  </div>
+                  <p
+                    className="font-black text-sm leading-snug"
+                    style={{ color: "var(--primary)", letterSpacing: "-0.01em" }}
+                  >{item.label}</p>
+                  <div
+                    className="absolute bottom-0 left-0 h-[2px] w-0 group-hover:w-full transition-all duration-500 ease-out rounded-full"
+                    style={{ background: "color-mix(in srgb, var(--primary) 30%, transparent)" }}
+                  />
+                </Link>
+              </MotionDiv>
+            ))}
           </div>
         </MotionSection>
 
