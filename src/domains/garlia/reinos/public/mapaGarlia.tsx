@@ -3823,6 +3823,13 @@ export default function MapaInteractivo({
               // ciudad". Acá el click debe comportarse EXACTAMENTE como
               // onPinClick: abrir directo la ciudad, sin reentrar al reino.
               if (!area.ciudad_id) return;
+              // Mismo criterio que reinos (ver handleAreaLabelClick): una
+              // ciudad no desbloqueada no debe abrir su panel con el
+              // nombre real — el área ya se ve sin label (areasDelReino-
+              // ParaMostrar), pero sin este chequeo el click igual la
+              // abría, mostrando el nombre adentro del panel.
+              if (!isAdmin && !ciudadesDesbloqueadas.has(area.ciudad_id))
+                return;
               const ciudad = detallesReino.find((d) => d.id === area.ciudad_id);
               if (!ciudad) return;
               setPuntoSeleccionado(ciudad);
