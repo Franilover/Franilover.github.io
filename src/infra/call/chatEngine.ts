@@ -2,13 +2,21 @@
  * chatEngine.ts
  * ─────────────────────────────────────────────────────────────────────────────
  * Lógica de mensajería: conversaciones, mensajes, adjuntos y suscripciones
- * en tiempo real. No usa caché offline (Dexie) a propósito — los mensajes
- * necesitan estar siempre al día, así que van directo contra Supabase +
- * Realtime.
+ * en tiempo real.
+ *
+ * Los mensajes ahora sí usan un caché local (Dexie/IndexedDB, tabla
+ * `mensajes_cache`) para la carga inicial: `cargarMensajesConCache` devuelve
+ * primero lo que ya está guardado del último visitado a esa conversación
+ * (instantáneo, sin esperar red) y en paralelo dispara la query real contra
+ * Supabase para revalidar — igual que el patrón que ya usa el resto de la
+ * app (ver useSupabaseData). Realtime sigue siendo la fuente de verdad para
+ * mensajes nuevos mientras el chat está abierto; el caché solo acelera el
+ * primer pintado al entrar.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { supabase } from "@/infra/supabase/supabase";
+import { db } from "@/infra/supabase/db";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
@@ -221,6 +229,78 @@ export async function cargarMensajes(
   return ((data ?? []) as Mensaje[]).reverse();
 }
 
+// ─── Caché local (Dexie) para carga inicial rápida ─────────────────────────
+
+/** Lee del caché local los últimos `limite` mensajes de una conversación,
+ *  ya ordenados de más viejo a más nuevo (mismo formato que cargarMensajes). */
+async function leerMensajesDeCache(
+  conversacionId: string,
+  limite: number,
+): Promise<Mensaje[]> {
+  try {
+    if (!db) return [];
+    const rows = await (db as any).mensajes_cache
+      .where("conversacion_id")
+      .equals(conversacionId)
+      .toArray();
+    return (rows as Mensaje[])
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .slice(-limite);
+  } catch {
+    return [];
+  }
+}
+
+/** Guarda/actualiza en caché los mensajes traídos de Supabase, sin bloquear
+ *  el flujo principal (falla en silencio si Dexie no está disponible). */
+async function guardarMensajesEnCache(mensajes: Mensaje[]): Promise<void> {
+  if (mensajes.length === 0) return;
+  try {
+    if (!db) return;
+    await (db as any).mensajes_cache.bulkPut(mensajes);
+  } catch {}
+}
+
+async function borrarMensajeDeCache(mensajeId: string): Promise<void> {
+  try {
+    if (!db) return;
+    await (db as any).mensajes_cache.delete(mensajeId);
+  } catch {}
+}
+
+/**
+ * Carga "cache-first" pensada para el montaje inicial del chat: devuelve
+ * primero lo que ya tengamos en Dexie (si hay algo, instantáneo — sin
+ * esperar red) y llama a `onRevalidado` cuando la respuesta real de
+ * Supabase esté lista, con los datos frescos ya sincronizados al caché.
+ *
+ * Si no hay nada en caché todavía (primera vez que se abre esa conversación
+ * en este dispositivo), `mensajesIniciales` viene vacío y hay que esperar
+ * igual a `onRevalidado` — no hay forma de evitar ese primer round-trip.
+ */
+export async function cargarMensajesConCache(
+  conversacionId: string,
+  onRevalidado: (mensajes: Mensaje[]) => void,
+  limite = 50,
+): Promise<{ mensajesIniciales: Mensaje[]; desdeCache: boolean }> {
+  const cacheados = await leerMensajesDeCache(conversacionId, limite);
+
+  // Dispara la query real en paralelo, sin esperarla si ya teníamos algo
+  // que mostrar. Si el caché estaba vacío, esta promesa es la única fuente
+  // de datos y el llamador debe esperarla igual.
+  void cargarMensajes(conversacionId, limite)
+    .then((frescos) => {
+      void guardarMensajesEnCache(frescos);
+      onRevalidado(frescos);
+    })
+    .catch(() => {
+      // Si falla la revalidación y no había caché, el error ya lo maneja
+      // el llamador vía cargarMensajes() directo (ver detalleConversacion).
+    });
+
+  return { mensajesIniciales: cacheados, desdeCache: cacheados.length > 0 };
+}
+
 export async function enviarMensaje(
   conversacionId: string,
   contenido: string,
@@ -254,6 +334,7 @@ export async function enviarMensaje(
   // no muestra la notificación si la pestaña está enfocada y visible.
   if (nuevoMensaje?.id) {
     void dispararNotificacionMensaje(conversacionId, nuevoMensaje.id, user.id);
+    void guardarMensajesEnCache([nuevoMensaje as Mensaje]);
   }
 
   return nuevoMensaje as Mensaje;
@@ -299,6 +380,15 @@ export async function editarMensaje(mensajeId: string, contenido: string): Promi
     .eq("remitente_id", user.id);
   if (error) throw error;
   if (!count) throw new Error("No se pudo editar el mensaje.");
+
+  try {
+    if (db) {
+      const fila = await (db as any).mensajes_cache.get(mensajeId);
+      if (fila) {
+        await (db as any).mensajes_cache.put({ ...fila, contenido: contenido.trim(), editado: true });
+      }
+    }
+  } catch {}
 }
 
 /**
@@ -321,6 +411,8 @@ export async function eliminarMensaje(mensajeId: string): Promise<void> {
     .eq("remitente_id", user.id);
   if (error) throw error;
   if (!count) throw new Error("No se pudo eliminar el mensaje.");
+
+  void borrarMensajeDeCache(mensajeId);
 }
 
 export async function marcarComoLeido(conversacionId: string): Promise<void> {

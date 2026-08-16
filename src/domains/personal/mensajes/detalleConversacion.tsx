@@ -10,6 +10,7 @@ import { useLlamadaStore } from "@/infra/realtime/useLlamadaStore";
 import { useEstaEnLinea } from "@/infra/realtime/useEnLinea";
 import {
   cargarMensajes,
+  cargarMensajesConCache,
   cargarReacciones,
   editarMensaje,
   eliminarMensaje,
@@ -298,22 +299,52 @@ export default function DetalleConversacion() {
     setHayMasAnteriores(true);
 
     (async () => {
-      setLoading(true);
       try {
-        const data = await cargarMensajes(conversacionId);
-        if (mounted) {
-          setMensajes(data);
-          setHayMasAnteriores(data.length >= 50);
+        // Cache-first: si ya visitamos esta conversación antes, tenemos los
+        // últimos mensajes guardados en Dexie y podemos pintarlos ya mismo,
+        // sin esperar el round-trip a Supabase — así el chat abre al
+        // instante en vez de mostrar el spinner cada vez. La revalidación
+        // real llega poco después vía onRevalidado y reemplaza los datos.
+        const { mensajesIniciales, desdeCache } = await cargarMensajesConCache(
+          conversacionId,
+          (frescos) => {
+            if (!mounted) return;
+            setMensajes(frescos);
+            setHayMasAnteriores(frescos.length >= 50);
+            setLoading(false);
+            if (frescos.length > 0) {
+              void cargarReacciones(frescos.map((m) => m.id)).then((reacc) => {
+                if (mounted) setReacciones(reacc);
+              });
+            }
+          },
+        );
+
+        if (!mounted) return;
+
+        if (desdeCache) {
+          // Había caché: pintamos de inmediato y dejamos que onRevalidado
+          // se encargue de refrescar cuando llegue la respuesta real.
+          setMensajes(mensajesIniciales);
+          setHayMasAnteriores(mensajesIniciales.length >= 50);
+          setLoading(false);
+          if (mensajesIniciales.length > 0) {
+            const reacc = await cargarReacciones(mensajesIniciales.map((m) => m.id));
+            if (mounted) setReacciones(reacc);
+          }
+        } else {
+          // No había nada en caché (primera vez en este dispositivo): no
+          // hay forma de evitar esperar la respuesta real, así que seguimos
+          // mostrando el loading hasta que onRevalidado la resuelva arriba.
+          setLoading(true);
         }
+
         void marcarComoLeido(conversacionId);
-        if (data.length > 0) {
-          const reacc = await cargarReacciones(data.map((m) => m.id));
-          if (mounted) setReacciones(reacc);
-        }
       } catch {
-        if (mounted) setError("No se pudo cargar la conversación.");
-      } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setError("No se pudo cargar la conversación.");
+          setLoading(false);
+        }
       }
     })();
 
@@ -474,9 +505,14 @@ export default function DetalleConversacion() {
   // arriba cada vez que entra a un chat con historial. Para mensajes nuevos
   // que llegan mientras ya está abierto, el scroll es suave.
   const scrolleoInicialHechoRef = useRef(false);
+  // Marca de tiempo de cuándo se abrió/cambió de conversación — usada para
+  // distinguir "la revalidación del caché acaba de llegar" (mismo gesto de
+  // abrir el chat) de "llegó un mensaje nuevo mientras leía" (ver más abajo).
+  const momentoAperturaRef = useRef(0);
 
   useEffect(() => {
     scrolleoInicialHechoRef.current = false;
+    momentoAperturaRef.current = Date.now();
   }, [conversacionId]);
 
   useEffect(() => {
@@ -516,7 +552,17 @@ export default function DetalleConversacion() {
       const distanciaAlFondo = contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight;
       const ultimoMensaje = mensajes[mensajes.length - 1];
       const esMio = ultimoMensaje?.remitente_id === user?.id;
-      if (esMio || distanciaAlFondo <= 150) irAlFondo("smooth");
+      // Si la revalidación contra Supabase llega justo después del pintado
+      // inicial desde caché (menos de 1s), el usuario todavía no tuvo
+      // tiempo de scrollear a propósito — tratamos ese refresh como parte
+      // del "abrir el chat" y vamos al fondo sin animación, no con "smooth"
+      // (evita un salto visible apenas se abre la conversación).
+      const revalidacionRecienAbierto = Date.now() - momentoAperturaRef.current < 1000;
+      if (revalidacionRecienAbierto) {
+        irAlFondo("auto");
+      } else if (esMio || distanciaAlFondo <= 150) {
+        irAlFondo("smooth");
+      }
     }
   }, [mensajes.length]);
 

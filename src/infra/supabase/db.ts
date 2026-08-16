@@ -1353,6 +1353,19 @@ class AgendaFraniDB extends Dexie {
     this.version(30).stores({
       reino_areas: "id, reino_id, ciudad_id",
     });
+
+    // ─── v31: caché local de mensajes de chat ─────────────────────────────────
+    // Antes el chat (chatEngine.ts) iba siempre directo contra Supabase, sin
+    // ningún cache local — de ahí que abrir una conversación tardara en
+    // mostrar algo (esperaba el round-trip completo antes de pintar). Con
+    // esta tabla, igual que el resto de entidades (ver useSupabaseData),
+    // pintamos primero lo que ya tenemos guardado localmente y revalidamos
+    // contra Supabase en segundo plano — ver cargarMensajesConCache en
+    // chatEngine.ts. Indexado por conversacion_id (la query más común) y por
+    // created_at (para poder traer "los últimos N" ya ordenados).
+    this.version(31).stores({
+      mensajes_cache: "id, conversacion_id, created_at",
+    });
   }
 }
 
