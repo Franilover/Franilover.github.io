@@ -185,3 +185,65 @@ export async function emitirEscribiendo(
     console.warn("No se pudo emitir la señal de 'escribiendo':", err);
   }
 }
+
+// ─── Explosión de emojis (mantener presionado un emoji del picker) ────────
+
+interface SenalExplosionEmoji {
+  perfilId: string;
+  mensajeId: string;
+  emoji: string;
+  /** Identificador único por disparo, para poder distinguir dos explosiones
+   *  seguidas del mismo emoji sobre el mismo mensaje (si no, React podría
+   *  no darse cuenta de que hay que reanimar si el payload es idéntico). */
+  disparoId: string;
+}
+
+/**
+ * Se suscribe a las "explosiones" de emoji de una conversación — el efecto
+ * estilo Instagram de mantener presionado un emoji del picker de reacciones
+ * para mandar una lluvia grande de ese emoji, visible también para el otro
+ * participante. Broadcast efímero puro (no se persiste ni cuenta como
+ * reacción real, ver reaccionarAMensaje para eso) sobre el mismo canal
+ * compartido que ya usa chatEngine.
+ */
+export function suscribirseAExplosionEmoji(
+  conversacionId: string,
+  onExplosion: (senal: SenalExplosionEmoji) => void,
+): () => void {
+  const entrada = _obtenerCanalConversacion(conversacionId);
+  entrada.canal.on("broadcast", { event: "explosion_emoji" }, (payload) => {
+    onExplosion(payload.payload as SenalExplosionEmoji);
+  });
+  return () => _liberarCanalConversacion(conversacionId);
+}
+
+/**
+ * Dispara una explosión de emoji hacia la conversación (para el otro
+ * participante) — el propio disparador ya la anima localmente al toque,
+ * sin esperar el viaje de ida y vuelta por el canal (ver
+ * `handleLongPressEmoji` en detalleConversacion.tsx).
+ */
+export async function emitirExplosionEmoji(
+  conversacionId: string,
+  perfilId: string,
+  mensajeId: string,
+  emoji: string,
+): Promise<void> {
+  const entrada = _usarCanalConversacionSinRef(conversacionId);
+  if (!entrada) return;
+  try {
+    await entrada.listo;
+    await entrada.canal.send({
+      type: "broadcast",
+      event: "explosion_emoji",
+      payload: {
+        perfilId,
+        mensajeId,
+        emoji,
+        disparoId: `${perfilId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      } as SenalExplosionEmoji,
+    });
+  } catch (err) {
+    console.warn("No se pudo emitir la explosión de emoji:", err);
+  }
+}

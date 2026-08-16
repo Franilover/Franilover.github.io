@@ -33,10 +33,13 @@ import {
 import { crearLlamada, ofrecerLlamada } from "@/infra/call/callEngine";
 import {
   emitirEscribiendo,
+  emitirExplosionEmoji,
   suscribirseAEscribiendo,
+  suscribirseAExplosionEmoji,
 } from "@/infra/call/presenceEngine";
 import { supabase } from "@/infra/supabase/supabase";
 import { useAuth } from "@/providers/AuthProvider";
+import { ExplosionEmoji } from "./ExplosionEmoji";
 
 /** Texto corto para mostrar como preview de un mensaje citado (reply). */
 function previsualizarMensaje(m: Mensaje): string {
@@ -187,6 +190,21 @@ export default function DetalleConversacion() {
   const [pickerAbiertoPara, setPickerAbiertoPara] = useState<string | null>(null);
   const [selectorCompletoAbiertoPara, setSelectorCompletoAbiertoPara] = useState<string | null>(null);
   const EMOJIS_RAPIDOS = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
+
+  // ── Explosión de emojis (mantener presionado un emoji del picker) ──────
+  // Estilo Instagram: al mantener presionado (o hacer click sostenido en
+  // desktop) sobre un emoji del picker rápido, en vez de solo reaccionar
+  // se dispara una lluvia grande de ese emoji sobre el mensaje — tanto
+  // localmente (al toque, sin esperar red) como para el otro participante
+  // (vía broadcast efímero, ver presenceEngine.ts). Puede haber como mucho
+  // una explosión visible por mensaje a la vez; una nueva reemplaza la
+  // anterior en vez de acumularse.
+  const [explosionPorMensaje, setExplosionPorMensaje] = useState<
+    Record<string, { emoji: string; disparoId: string }>
+  >({});
+  const explosionLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const explosionDisparadaRef = useRef(false);
+  const EXPLOSION_LONG_PRESS_MS = 350;
 
   // ── Editar / eliminar mensaje propio ────────────────────────────────
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -399,6 +417,20 @@ export default function DetalleConversacion() {
       desuscribirReacciones();
     };
   }, [conversacionId]);
+
+  // Explosión de emojis mandada por el OTRO participante (la propia ya se
+  // dispara al toque en dispararExplosionEmoji, sin pasar por acá).
+  useEffect(() => {
+    if (!conversacionId || !user) return;
+    const desuscribirExplosion = suscribirseAExplosionEmoji(conversacionId, (senal) => {
+      if (senal.perfilId === user.id) return; // la propia ya se animó localmente
+      setExplosionPorMensaje((prev) => ({
+        ...prev,
+        [senal.mensajeId]: { emoji: senal.emoji, disparoId: senal.disparoId },
+      }));
+    });
+    return () => desuscribirExplosion();
+  }, [conversacionId, user]);
 
   // Doble check / visto: leemos el estado inicial y escuchamos cambios en
   // `conversacion_participantes` (ultimo_leido_at del otro participante),
@@ -800,6 +832,46 @@ export default function DetalleConversacion() {
     }
   };
 
+  /** Dispara localmente la animación de explosión para un mensaje/emoji, y
+   *  la manda por broadcast al otro participante — no espera esa llamada
+   *  (fire-and-forget, es puramente cosmético: si falla, como mucho el
+   *  otro no ve la lluvia, pero no rompe nada del chat). */
+  const dispararExplosionEmoji = (mensajeId: string, emoji: string) => {
+    const disparoId = `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setExplosionPorMensaje((prev) => ({ ...prev, [mensajeId]: { emoji, disparoId } }));
+    if (navigator.vibrate) navigator.vibrate(15);
+    void emitirExplosionEmoji(conversacionId, user.id, mensajeId, emoji);
+  };
+
+  const cancelarExplosionLongPress = () => {
+    if (explosionLongPressTimerRef.current) {
+      clearTimeout(explosionLongPressTimerRef.current);
+      explosionLongPressTimerRef.current = null;
+    }
+  };
+
+  /** Se engancha en onPointerDown de cada emoji del picker rápido: si se
+   *  suelta antes de EXPLOSION_LONG_PRESS_MS es un tap normal (reacciona
+   *  como siempre); si se sostiene, dispara la explosión y NO reacciona
+   *  además — son dos gestos distintos, igual que en Instagram. */
+  const handlePointerDownEmojiPicker = (mensajeId: string, emoji: string) => {
+    explosionDisparadaRef.current = false;
+    cancelarExplosionLongPress();
+    explosionLongPressTimerRef.current = setTimeout(() => {
+      explosionDisparadaRef.current = true;
+      setPickerAbiertoPara(null);
+      dispararExplosionEmoji(mensajeId, emoji);
+    }, EXPLOSION_LONG_PRESS_MS);
+  };
+
+  const handlePointerUpEmojiPicker = (mensajeId: string, emoji: string) => {
+    cancelarExplosionLongPress();
+    // Si ya se disparó la explosión durante este mismo gesto, no además
+    // togglear la reacción al soltar — son mutuamente excluyentes.
+    if (explosionDisparadaRef.current) return;
+    void handleToggleReaccion(mensajeId, emoji);
+  };
+
   const handleToggleReaccion = async (mensajeId: string, emoji: string) => {
     setPickerAbiertoPara(null);
     const yaReaccione = reacciones.some(
@@ -1155,8 +1227,11 @@ export default function DetalleConversacion() {
                       {EMOJIS_RAPIDOS.map((emoji) => (
                         <button
                           key={emoji}
-                          className="text-sm hover:scale-125 transition-transform"
-                          onClick={() => void handleToggleReaccion(m.id, emoji)}
+                          className="text-sm hover:scale-125 transition-transform select-none"
+                          onPointerDown={() => handlePointerDownEmojiPicker(m.id, emoji)}
+                          onPointerUp={() => handlePointerUpEmojiPicker(m.id, emoji)}
+                          onPointerLeave={cancelarExplosionLongPress}
+                          onContextMenu={(e) => e.preventDefault()}
                         >
                           {emoji}
                         </button>
@@ -1188,6 +1263,21 @@ export default function DetalleConversacion() {
                         setSelectorCompletoAbiertoPara(null);
                       }}
                       onCerrar={() => setSelectorCompletoAbiertoPara(null)}
+                    />
+                  )}
+
+                  {/* Explosión de emojis (long-press estilo Instagram) —
+                      propia o mandada por el otro participante */}
+                  {explosionPorMensaje[m.id] && (
+                    <ExplosionEmoji
+                      emoji={explosionPorMensaje[m.id].emoji}
+                      disparoId={explosionPorMensaje[m.id].disparoId}
+                      onTerminar={() =>
+                        setExplosionPorMensaje((prev) => {
+                          const { [m.id]: _quitado, ...resto } = prev;
+                          return resto;
+                        })
+                      }
                     />
                   )}
                 </div>
