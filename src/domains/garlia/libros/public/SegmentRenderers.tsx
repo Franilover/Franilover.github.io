@@ -720,9 +720,11 @@ const dialogoPersonajeCache = new Map<string, DialogoPersonaje>();
 export function DialogoBlock({
   personajeId,
   texto,
+  acotacion,
 }: {
   personajeId: string;
   texto: string;
+  acotacion?: string;
 }) {
   const [personaje, setPersonaje] = useState<DialogoPersonaje | null>(
     dialogoPersonajeCache.get(personajeId) ?? null,
@@ -792,6 +794,11 @@ export function DialogoBlock({
             __html: renderInlineMarkdownSafe(texto),
           }}
         />
+        {acotacion?.trim() ? (
+          <div className="text-[0.8em] italic text-foreground/45 mt-0.5">
+            {acotacion.trim()}
+          </div>
+        ) : null}
       </div>
     </div>
   );

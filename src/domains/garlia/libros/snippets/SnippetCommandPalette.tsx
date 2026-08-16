@@ -38,7 +38,10 @@ import React, {
   useMemo,
 } from "react";
 
-import { parseSnippetRaw } from "@/domains/garlia/libros/capitulos/types";
+import {
+  parseSnippetRaw,
+  DIALOGO_ACOTACION_SEP,
+} from "@/domains/garlia/libros/capitulos/types";
 
 type SnippetType =
   | "drop"
@@ -781,6 +784,7 @@ function FormDialogo({
 }) {
   const init = parseSnippetRaw(initialRaw);
   const initialId = init?.kind === "dialogo" ? init.personajeId : undefined;
+  const initialAcotacion = init?.kind === "dialogo" ? init.acotacion : undefined;
   const [texto, setTexto] = useState<string>(
     init?.kind === "dialogo" ? init.texto : "",
   );
@@ -911,7 +915,13 @@ function FormDialogo({
             disabled={!texto.trim()}
             style={S.insertBtn("#a09af0")}
             onClick={() =>
-              onInsert(`[[dialogo|${selected.id}|${texto.trim()}]]`)
+              onInsert(
+                `[[dialogo|${selected.id}|${texto.trim()}${
+                  initialAcotacion
+                    ? `${DIALOGO_ACOTACION_SEP}${initialAcotacion}`
+                    : ""
+                }]]`,
+              )
             }
           >
             <MessageCircle size={12} /> Insertar Diálogo

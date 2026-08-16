@@ -55,6 +55,13 @@ export type TreeNode = FileEntry | FolderEntry;
 // Segmentos de contenido
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Separador reservado entre "texto" y "acotacion" dentro del raw de diálogo
+// [[dialogo|personajeId|texto¦acotacion]] — mismo valor que
+// DIALOGO_ACOTACION_SEP en editor/lexical/nodes/DialogoNode.tsx (duplicado
+// acá a propósito para no crear un import cruzado editor↔lector desde este
+// archivo, que consumen ambos lados).
+export const DIALOGO_ACOTACION_SEP = "\u241E";
+
 export type Segment =
   | { type: "text"; value: string }
   | { type: "cita"; content: string }
@@ -62,7 +69,7 @@ export type Segment =
   | { type: "img"; url: string; caption?: string }
   | { type: "float"; word: string; url: string; caption?: string }
   | { type: "sound"; url: string; volume: number }
-  | { type: "dialogo"; personajeId: string; texto: string }
+  | { type: "dialogo"; personajeId: string; texto: string; acotacion?: string }
   | {
       type: "drop";
       word: string;
@@ -323,16 +330,21 @@ export function parseContenido(texto: string): Segment[] {
         url: parts[0],
         volume: parseFloat(parts[1] ?? "0.5"),
       });
-    else if (kind === "dialogo")
-      // parts[0] = personaje_id, resto = texto del diálogo. El texto se
+    else if (kind === "dialogo") {
+      // parts[0] = personaje_id, resto = texto[¦acotacion] del diálogo. Se
       // reúne con join("|") en vez de tomar solo parts[1] porque puede
       // contener "|" real (diálogo con guiones, citas, etc.) — solo el
-      // primer "|" (id | texto) es estructural.
+      // primer "|" (id | resto) es estructural. Luego texto/acotación se
+      // separan por DIALOGO_ACOTACION_SEP.
+      const rest = parts.slice(1).join("|");
+      const [texto, acotacion] = rest.split(DIALOGO_ACOTACION_SEP);
       segs.push({
         type: "dialogo",
         personajeId: parts[0] ?? "",
-        texto: parts.slice(1).join("|"),
+        texto: texto ?? "",
+        ...(acotacion?.trim() ? { acotacion: acotacion.trim() } : {}),
       });
+    }
     else if (kind === "drop")
       segs.push({
         type: "drop",
@@ -385,7 +397,7 @@ export type ParsedSnippet =
   | { kind: "img"; url: string; alt: string; float: boolean }
   | { kind: "float"; url: string; alt: string; float: true }
   | { kind: "choice"; texto: string; target: string }
-  | { kind: "dialogo"; personajeId: string; texto: string }
+  | { kind: "dialogo"; personajeId: string; texto: string; acotacion?: string }
   | {
       kind: "use";
       itemId: string;
@@ -428,13 +440,18 @@ export function parseSnippetRaw(raw: string | undefined): ParsedSnippet | null {
         entidadTipo: parts[2] ?? "",
         entidadId: parts[3] ?? "",
       };
-    case "dialogo":
-      // [[dialogo|personaje_id|texto]] — texto puede contener "|" real.
+    case "dialogo": {
+      // [[dialogo|personaje_id|texto¦acotacion]] — texto/acotación pueden
+      // contener "|" real.
+      const rest = parts.slice(2).join("|");
+      const [texto, acotacion] = rest.split(DIALOGO_ACOTACION_SEP);
       return {
         kind: "dialogo",
         personajeId: parts[1] ?? "",
-        texto: parts.slice(2).join("|"),
+        texto: texto ?? "",
+        ...(acotacion?.trim() ? { acotacion: acotacion.trim() } : {}),
       };
+    }
     case "img":
       return {
         kind: "img",
