@@ -82,6 +82,37 @@ export function useTileCanvasGestures<
   const touchCountRef = useRef(0);
   const activeTouchPointers = useRef<Set<number>>(new Set());
 
+  // ── editing es un objeto NUEVO en cada render de UnifiedTileCanvas (no
+  // está memoizado: hoverTile/ghostHover/drawingPoints cambian con cada
+  // movimiento del mouse en modo edición). Si `editing` estuviera en el
+  // array de deps del useEffect de abajo, ese efecto se destruiría y
+  // recrearía (remove+add de TODOS los listeners) en cada uno de esos
+  // renders — perdiendo cualquier pointerdown en curso a mitad de gesto.
+  // Eso es exactamente lo que causaba "hay que dar muchos clicks para que
+  // tome el click": el listener que capturó el pointerdown podía ser
+  // reemplazado por uno nuevo antes de que llegara su pointerup. La
+  // solución es leer `editing` siempre a través de un ref actualizado en
+  // cada render (sin pasar por deps), para que el useEffect que registra
+  // los listeners no dependa de la identidad de `editing`. ─────────────────
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+
+  // ── Mismo motivo que editingRef: onMarkerClick/onAreaClick/onMapClick
+  // suelen pasarse como funciones flecha inline desde el componente padre
+  // (ej. ReinoTileCanvas: `onMarkerClick={(ciudad) => onPinClick?.(ciudad)}`),
+  // lo que las hace una referencia nueva en cada render del padre — sin
+  // relación con si el usuario realmente clickeó algo. Si quedaran en las
+  // deps del useEffect, cualquier render del padre (hover, cualquier
+  // setState ajeno) recrearía los listeners a mitad de un gesto. Se leen
+  // siempre a través de refs, así los listeners se registran una sola vez
+  // por combinación real de editMode/áreas/etc. ────────────────────────────
+  const onMarkerClickRef = useRef(onMarkerClick);
+  onMarkerClickRef.current = onMarkerClick;
+  const onAreaClickRef = useRef(onAreaClick);
+  onAreaClickRef.current = onAreaClick;
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -99,7 +130,7 @@ export function useTileCanvasGestures<
 
     const onPointerDown = (e: PointerEvent) => {
       // ── Edición tiene primera prioridad ───────────────────────────────────
-      if (editing?.handlePointerDown(e)) return;
+      if (editingRef.current?.handlePointerDown(e)) return;
 
       if (e.button !== 0 && e.pointerType !== "touch") return;
 
@@ -127,7 +158,7 @@ export function useTileCanvasGestures<
 
     const onPointerMove = (e: PointerEvent) => {
       // ── Edición tiene primera prioridad ───────────────────────────────────
-      if (editing?.handlePointerMove(e)) return;
+      if (editingRef.current?.handlePointerMove(e)) return;
 
       // Durante un pinch de 2 dedos, el pan por Pointer Events se desactiva.
       if (isPointerDown && touchCountRef.current < 2) {
@@ -147,8 +178,8 @@ export function useTileCanvasGestures<
 
       // Hover de edición (tile/papelera/casilla fantasma) — solo si no se
       // está paneando, igual que el original (`!isDragging.current`).
-      if (editMode && editing && !isDragging.current) {
-        editing.handleHover(e);
+      if (editMode && editingRef.current && !isDragging.current) {
+        editingRef.current.handleHover(e);
       }
     };
 
@@ -165,7 +196,7 @@ export function useTileCanvasGestures<
       isDragging.current = false;
 
       // ── Edición tiene primera prioridad ───────────────────────────────────
-      if (editing?.handlePointerUp(e)) return;
+      if (editingRef.current?.handlePointerUp(e)) return;
 
       if (wasDragging) {
         return;
@@ -182,18 +213,18 @@ export function useTileCanvasGestures<
       // ciudad. El pin es el blanco más específico: gana. ──────────────────
       const marker = findMarkerAt(clientX, clientY);
       if (marker) {
-        onMarkerClick?.(marker);
+        onMarkerClickRef.current?.(marker);
         return;
       }
 
       // ── Si no hay pin bajo el click, revisar si cayó sobre un área →
       // navega al reino/ciudad vinculado. ──────────────────────────────────
-      if (onAreaClick && e.button === 0) {
+      if (onAreaClickRef.current && e.button === 0) {
         const wp = clientToWorldPoint(clientX, clientY);
         if (wp) {
           const hitArea = [...areas].reverse().find((a) => isPointInArea(wp, a));
           if (hitArea) {
-            onAreaClick(hitArea);
+            onAreaClickRef.current(hitArea);
             return;
           }
         }
@@ -202,7 +233,7 @@ export function useTileCanvasGestures<
       // ── Fallback: notificar posición (mapa del mundo, fuera de editMode) ──
       if (!editMode) {
         const info = canvasToTileInfo(clientX, clientY);
-        if (info) onMapClick?.(info.x, info.y, info.tile_col, info.tile_row);
+        if (info) onMapClickRef.current?.(info.x, info.y, info.tile_col, info.tile_row);
       }
       void withCtrl; // reservado (paridad con la firma original; sin uso público hoy)
     };
@@ -260,15 +291,15 @@ export function useTileCanvasGestures<
     };
 
     const onContextMenu = (e: MouseEvent) => {
-      if (editing?.handleContextMenu(e)) return;
+      if (editingRef.current?.handleContextMenu(e)) return;
     };
 
     const onDblClick = (e: MouseEvent) => {
-      if (editing?.handleDblClick(e)) return;
+      if (editingRef.current?.handleDblClick(e)) return;
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (editing?.handleKeyDown(e)) return;
+      if (editingRef.current?.handleKeyDown(e)) return;
     };
 
     canvas.addEventListener("wheel", onWheel, { passive: false });
@@ -297,14 +328,5 @@ export function useTileCanvasGestures<
       window.removeEventListener("keydown", onKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    editMode,
-    editing,
-    selectedMarkerId,
-    areas,
-    selectedAreaId,
-    onAreaClick,
-    onMarkerClick,
-    onMapClick,
-  ]);
+  }, [editMode, selectedMarkerId, areas, selectedAreaId]);
 }
