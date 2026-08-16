@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CheckCheck, Cloud, Megaphone, MessageSquareText, Mic, Paperclip, Pencil, Phone, Plus, Reply, Send, Trash2, Wand2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Cloud, Megaphone, MessageSquareText, Mic, NotebookPen, Paperclip, Pencil, Phone, Plus, Reply, Send, Trash2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -61,15 +61,29 @@ const CLIP_PATH_GRITO =
   "polygon(50% 0%, 61% 12%, 75% 2%, 78% 18%, 93% 10%, 89% 27%, 100% 32%, 88% 42%, 98% 55%, 84% 58%, 88% 74%, 73% 68%, 72% 85%, 60% 74%, 52% 100%, 44% 76%, 30% 88%, 28% 70%, 12% 78%, 18% 60%, 2% 58%, 15% 45%, 0% 33%, 14% 27%, 8% 11%, 25% 18%, 28% 2%, 40% 13%)";
 
 /**
+ * Rotación pseudo-aleatoria pero determinística por mensaje (misma semilla
+ * = mismo ángulo siempre, para que no "tiemble" entre renders): entre -3°
+ * y 3°, derivada del id del mensaje.
+ */
+function rotacionManuscrita(mensajeId: string): number {
+  let hash = 0;
+  for (let i = 0; i < mensajeId.length; i++) {
+    hash = (hash * 31 + mensajeId.charCodeAt(i)) | 0;
+  }
+  return ((Math.abs(hash) % 600) - 300) / 100; // entre -3 y 3 grados
+}
+
+/**
  * Devuelve className/style extra para aplicar sobre la burbuja del mensaje
  * según su diseño elegido. "pensamiento" y "grito" cambian la forma del
- * contenedor (nube / estallido de cómic); "experimental" es una variante
- * más libre con gradiente e inclinación, pensada como opción "para jugar".
+ * contenedor (nube / estallido de cómic); "experimental" simula una nota
+ * escrita a mano (post-it), con la fuente Caveat ya cargada en el proyecto.
  * null/undefined = sin cambios (burbuja normal, ya maneja el caller).
  */
 function estiloExtraBurbuja(
   estilo: EstiloBurbuja | null | undefined,
   esMio: boolean,
+  mensajeId: string,
 ): { className: string; style: React.CSSProperties } {
   if (estilo === "pensamiento") {
     return {
@@ -91,15 +105,19 @@ function estiloExtraBurbuja(
     };
   }
   if (estilo === "experimental") {
+    // Nota a mano estilo post-it: fondo papel amarillento, rotación leve
+    // (fija por mensaje, no cambia entre renders), tipografía manuscrita
+    // Caveat, y una sombra dura para dar volumen de papel apoyado.
     return {
-      className: "italic",
+      className: "font-[family-name:var(--font-caveat)]",
       style: {
-        background: esMio
-          ? "linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 55%, #7c3aed))"
-          : "linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, var(--primary) 4%, transparent))",
-        borderRadius: "4px 20px 4px 20px",
-        transform: esMio ? "rotate(-1deg)" : "rotate(1deg)",
-        boxShadow: "0 3px 0 color-mix(in srgb, var(--primary) 30%, transparent)",
+        background: esMio ? "#f5e6a8" : "#faf0c8",
+        color: "#3a3226",
+        borderRadius: "2px",
+        transform: `rotate(${rotacionManuscrita(mensajeId)}deg)`,
+        boxShadow: "2px 3px 6px rgba(0,0,0,0.18), 0 1px 0 rgba(255,255,255,0.4) inset",
+        fontSize: "1.15rem",
+        lineHeight: 1.3,
       },
     };
   }
@@ -163,7 +181,7 @@ const CATEGORIAS_EMOJI: { nombre: string; emojis: string[] }[] = [
 const DISENOS_BURBUJA: { id: EstiloBurbuja; label: string; Icono: typeof Cloud }[] = [
   { id: "pensamiento", label: "Pensamiento", Icono: Cloud },
   { id: "grito", label: "Grito", Icono: Megaphone },
-  { id: "experimental", label: "Experimental", Icono: Wand2 },
+  { id: "experimental", label: "Nota a mano", Icono: NotebookPen },
 ];
 
 /**
@@ -1265,18 +1283,20 @@ export default function DetalleConversacion() {
               ? mensajes.find((c) => c.id === m.respuesta_a) ?? null
               : null;
 
+            const disenoBurbuja = estiloExtraBurbuja(m.estilo, esMio, m.id);
+
             return (
               <div key={m.id} className={`flex flex-col ${esMio ? "items-end" : "items-start"} group`}>
                 <div
                   data-mensaje-burbuja
-                  className={`max-w-[75%] px-4 py-2.5 rounded-[var(--radius-btn)] relative select-none md:select-text ${estiloExtraBurbuja(m.estilo, esMio).className}`}
+                  className={`max-w-[75%] px-4 py-2.5 rounded-[var(--radius-btn)] relative select-none md:select-text ${disenoBurbuja.className}`}
                   style={{
                     background: esMio
                       ? "var(--primary)"
                       : "color-mix(in srgb, var(--primary) 6%, transparent)",
                     color: esMio ? "var(--btn-text)" : "var(--foreground)",
                     WebkitTouchCallout: "none",
-                    ...estiloExtraBurbuja(m.estilo, esMio).style,
+                    ...disenoBurbuja.style,
                   }}
                   onTouchStart={() => handleTouchStartMensaje(m.id)}
                   onTouchEnd={handleTouchEndMensaje}
