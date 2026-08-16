@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Check, CheckCheck, Paperclip, Pencil, Phone, Plus, Reply, Send, SmilePlus, Trash2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Loading } from "@/ui";
 import { SmartImage } from "@/ui/SmartImage";
@@ -374,7 +374,16 @@ export default function DetalleConversacion() {
     const desuscribirReacciones = suscribirseAReacciones(conversacionId, (evento, r) => {
       setReacciones((prev) => {
         if (evento === "INSERT") {
-          return prev.some((p) => p.id === r.id) ? prev : [...prev, r];
+          // Reemplazamos por (mensaje_id, perfil_id, emoji) en vez de
+          // filtrar solo por id: si esta reacción la pusimos nosotros
+          // mismos, ya existe una fila "optimista" con un id temporal
+          // distinto (ver handleToggleReaccion) — sin este reemplazo
+          // quedaría duplicada (la optimista + la real) apenas llega el
+          // evento realtime de vuelta.
+          const sinDuplicada = prev.filter(
+            (p) => !(p.mensaje_id === r.mensaje_id && p.perfil_id === r.perfil_id && p.emoji === r.emoji),
+          );
+          return [...sinDuplicada, r];
         }
         return prev.filter(
           (p) => !(p.mensaje_id === r.mensaje_id && p.perfil_id === r.perfil_id && p.emoji === r.emoji),
@@ -504,7 +513,25 @@ export default function DetalleConversacion() {
   // salto es instantáneo — nadie quiere ver la animación subiendo desde
   // arriba cada vez que entra a un chat con historial. Para mensajes nuevos
   // que llegan mientras ya está abierto, el scroll es suave.
+  //
+  // CLAVE: esto usa useLayoutEffect (no useEffect). Con useEffect, React
+  // pinta primero el frame con scrollTop=0 (arriba del todo) y RECIÉN
+  // DESPUÉS corre el efecto que mueve el scroll — eso es exactamente el
+  // "aparece arriba y después baja" que se veía, con o sin caché de por
+  // medio: no era un problema de velocidad de datos, sino de en qué
+  // momento del ciclo de render se movía el scroll. useLayoutEffect corre
+  // sincrónicamente después de que el DOM se actualiza pero ANTES de que
+  // el navegador pinte esa actualización en pantalla, así que alcanzamos a
+  // corregir el scroll sin que el usuario llegue a ver el frame de arriba.
+  //
+  // Además, mientras no hicimos el primer scroll de esta conversación,
+  // mantenemos el contenedor con visibility:hidden (ver el estilo del
+  // contenedor más abajo) — así, si por lo que sea el layout todavía no
+  // está listo en este primer pase y hace falta un frame extra, tampoco se
+  // alcanza a ver ningún salto: simplemente no se ve nada hasta que el
+  // scroll ya quedó bien posicionado.
   const scrolleoInicialHechoRef = useRef(false);
+  const [scrollListo, setScrollListo] = useState(false);
   // Marca de tiempo de cuándo se abrió/cambió de conversación — usada para
   // distinguir "la revalidación del caché acaba de llegar" (mismo gesto de
   // abrir el chat) de "llegó un mensaje nuevo mientras leía" (ver más abajo).
@@ -512,10 +539,11 @@ export default function DetalleConversacion() {
 
   useEffect(() => {
     scrolleoInicialHechoRef.current = false;
+    setScrollListo(false);
     momentoAperturaRef.current = Date.now();
   }, [conversacionId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!scrollRef.current || mensajes.length === 0) return;
     // Si el cambio vino de "cargar anteriores", el otro efecto ya se encarga
     // de reposicionar el scroll — no lo pisamos saltando al fondo.
@@ -523,22 +551,23 @@ export default function DetalleConversacion() {
 
     const esInicial = !scrolleoInicialHechoRef.current;
     const irAlFondo = (comportamiento: ScrollBehavior) => {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: comportamiento });
+      if (!scrollRef.current) return;
+      if (comportamiento === "auto") {
+        // Asignación directa (no scrollTo) para que el cambio sea parte del
+        // mismo paso síncrono de layout — scrollTo con behavior:"auto" en
+        // algunos navegadores igual difiere el efecto al siguiente frame.
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      } else {
+        scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: comportamiento });
+      }
     };
 
     if (esInicial) {
-      // El contenedor de mensajes recién se montó en este mismo commit (antes
-      // se mostraba <Loading /> en su lugar), así que el navegador puede no
-      // haber terminado el layout todavía — hacer scrollTo ya mismo a veces
-      // calcula contra un scrollHeight incompleto y el chat queda "a medias"
-      // arriba, obligando a scrollear a mano. Un solo rAF no alcanza porque
-      // el layout puede seguir cambiando por imágenes (avatares, adjuntos)
-      // que todavía no bajaron su primer frame; usamos dos rAF encadenados
-      // para asegurarnos de correr después de un paint real ya estabilizado.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => irAlFondo("auto"));
-      });
+      irAlFondo("auto");
       scrolleoInicialHechoRef.current = true;
+      // Recién ahora es seguro mostrar el contenedor: el scroll ya está
+      // posicionado abajo antes de que el navegador pinte este frame.
+      setScrollListo(true);
     } else {
       // Mensajes nuevos con el chat ya abierto: si el usuario está cerca del
       // fondo (leyendo la conversación al día), lo seguimos bajando en
@@ -565,6 +594,14 @@ export default function DetalleConversacion() {
       }
     }
   }, [mensajes.length]);
+
+  // Red de seguridad: si por algún motivo mensajes.length nunca cambió (por
+  // ejemplo, la conversación no tiene ningún mensaje todavía) el efecto de
+  // arriba nunca corre y scrollListo se quedaría en false para siempre,
+  // dejando el chat invisible. En ese caso lo mostramos igual.
+  useEffect(() => {
+    if (mensajes.length === 0 && !loading) setScrollListo(true);
+  }, [mensajes.length, loading]);
 
   // Al aparecer la burbuja de "escribiendo…", la acercamos a la vista con
   // scroll suave — pero solo si el usuario ya estaba cerca del fondo (si
@@ -768,6 +805,39 @@ export default function DetalleConversacion() {
     const yaReaccione = reacciones.some(
       (r) => r.mensaje_id === mensajeId && r.perfil_id === user.id && r.emoji === emoji,
     );
+
+    // Optimista: la ponemos/sacamos ya mismo en el estado local, sin
+    // esperar la vuelta de Supabase — antes esto tardaba ese tick de red
+    // porque solo se actualizaba cuando llegaba el evento realtime de
+    // vuelta. Guardamos la reacción/versión anterior para poder revertir
+    // si la escritura real termina fallando.
+    const reaccionesPrevias = reacciones;
+    if (yaReaccione) {
+      setReacciones((prev) =>
+        prev.filter(
+          (r) => !(r.mensaje_id === mensajeId && r.perfil_id === user.id && r.emoji === emoji),
+        ),
+      );
+    } else {
+      const reaccionOptimista: MensajeReaccion = {
+        // id temporal (prefijo distinguible) — cuando llegue el INSERT real
+        // por realtime con el id verdadero, el evento no matchea este id
+        // así que técnicamente quedarían las dos; lo evitamos abajo
+        // filtrando por (mensaje_id, perfil_id, emoji) antes de insertar.
+        id: `optimista-${mensajeId}-${emoji}-${Date.now()}`,
+        mensaje_id: mensajeId,
+        perfil_id: user.id,
+        emoji,
+        created_at: new Date().toISOString(),
+      };
+      setReacciones((prev) => [
+        ...prev.filter(
+          (r) => !(r.mensaje_id === mensajeId && r.perfil_id === user.id && r.emoji === emoji),
+        ),
+        reaccionOptimista,
+      ]);
+    }
+
     try {
       if (yaReaccione) {
         await quitarReaccion(mensajeId, emoji);
@@ -775,6 +845,10 @@ export default function DetalleConversacion() {
         await reaccionarAMensaje(mensajeId, emoji, conversacionId);
       }
     } catch {
+      // Si falló de verdad (no solo lento), revertimos al estado anterior
+      // y avisamos — no queremos dejar una reacción "fantasma" puesta en
+      // pantalla que en realidad nunca se guardó.
+      setReacciones(reaccionesPrevias);
       setError("No se pudo actualizar la reacción.");
     }
   };
@@ -880,9 +954,16 @@ export default function DetalleConversacion() {
       </div>
 
       {/* ── Mensajes ── */}
+      {/* visibility (no display:none) para que el contenedor SÍ tenga
+          layout real y scrollHeight calculable mientras el useLayoutEffect
+          de arriba decide dónde poner el scroll — con display:none el
+          navegador no calcula nada y el primer scrollTo quedaría mal. Una
+          vez que scrollListo es true (ya posicionado, mismo paso síncrono
+          previo al paint) se revela sin que se haya visto ningún salto. */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2"
+        style={{ visibility: scrollListo ? "visible" : "hidden" }}
         onScroll={handleScrollMensajes}
       >
         {cargandoAnteriores && (
