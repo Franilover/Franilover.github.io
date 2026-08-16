@@ -315,21 +315,6 @@ export function UnifiedTileCanvas<
         </div>
       )}
 
-      {/* Hints (solo editMode, con tiles) */}
-      {editMode && tiles.length > 0 && !drawTool && (
-        <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
-          <span
-            className="text-micro font-bold uppercase tracking-widest px-2 py-1 rounded-lg"
-            style={{
-              background: "color-mix(in srgb, var(--bg-main) 85%, transparent)",
-              color: "color-mix(in srgb, var(--foreground) 35%, transparent)",
-            }}
-          >
-            Click derecho en un pin para moverlo · Ctrl + click para editar tile · Ctrl + scroll para zoom · Los cambios se guardan solos
-          </span>
-        </div>
-      )}
-
       {/* Hint de dibujo de área (herramienta activa) */}
       {editMode && drawTool && (
         <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
