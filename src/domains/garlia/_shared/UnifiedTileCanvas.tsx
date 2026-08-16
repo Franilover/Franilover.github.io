@@ -235,7 +235,7 @@ export function UnifiedTileCanvas<
   });
 
   // ── Único orquestador de listeners (pan/zoom/pinch/click público + edición) ──
-  const { isHoveringClickable } = useTileCanvasGestures<TTile, TMarker>({
+  useTileCanvasGestures<TTile, TMarker>({
     engine,
     editing,
     editMode,
@@ -258,7 +258,7 @@ export function UnifiedTileCanvas<
             ? "crosshair"
             : selectedMarkerId
               ? "crosshair"
-              : hoverTile || ghostHover || isHoveringClickable
+              : hoverTile || ghostHover
                 ? "pointer"
                 : "default",
       }}

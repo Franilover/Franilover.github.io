@@ -91,7 +91,7 @@ export function TileCanvasView<
 
   // ── Único orquestador de gestos, sin `editing` (null) → nunca evalúa ni
   // importa una sola línea de lógica de edición. ───────────────────────────
-  const { isHoveringClickable } = useTileCanvasGestures<TTile, TMarker>({
+  useTileCanvasGestures<TTile, TMarker>({
     engine,
     editing: null,
     editMode: false,
@@ -107,13 +107,6 @@ export function TileCanvasView<
     <div
       ref={containerRef}
       className={`overflow-hidden min-h-0 ${className ?? "relative flex-1"}`}
-      style={{
-        // Antes no había ningún cursor dinámico acá: el div quedaba con el
-        // cursor por defecto del navegador/CSS heredado (por eso se veía
-        // "pointer" siempre, sin importar la posición). Ahora refleja
-        // exactamente la misma geometría que decide el click real.
-        cursor: isHoveringClickable ? "pointer" : "default",
-      }}
     >
       <canvas
         ref={canvasRef}

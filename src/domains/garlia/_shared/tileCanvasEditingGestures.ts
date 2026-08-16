@@ -503,8 +503,20 @@ export function useTileCanvasEditingState<
     const info = canvasToTileInfo(clientX, clientY);
     const tile = info ? findTileAt(info.tile_col, info.tile_row) : null;
     if (tile) {
-      if (withCtrl) onTilePick(tile);
-      return true; // sobre tile existente, con o sin Ctrl: no es click público
+      if (withCtrl) {
+        onTilePick(tile);
+        return true;
+      }
+      // Sin Ctrl: si hay un área (ciudad) dibujada sobre este tile, no es
+      // edición de terreno — dejamos pasar (return false) para que el
+      // orquestador público maneje el click de área/panel, igual que con
+      // un marker. Solo tragamos el click si es terreno vacío de verdad.
+      const wp = clientToWorldPoint(clientX, clientY);
+      const hitArea = wp
+        ? [...areas].reverse().find((a) => isPointInArea(wp, a))
+        : null;
+      if (hitArea) return false;
+      return true; // terreno puro sin área encima: no es click público
     }
 
     if (info && withCtrl && ghostGridRef.current) {
