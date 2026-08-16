@@ -325,7 +325,7 @@ export function UnifiedTileCanvas<
               color: "color-mix(in srgb, var(--foreground) 35%, transparent)",
             }}
           >
-            Click derecho en un pin para moverlo · Ctrl + click para editar tile · Ctrl + scroll para zoom
+            Click derecho en un pin para moverlo · Ctrl + click para editar tile · Ctrl + scroll para zoom · Los cambios se guardan solos
           </span>
         </div>
       )}

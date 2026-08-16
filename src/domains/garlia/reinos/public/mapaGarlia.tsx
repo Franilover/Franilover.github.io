@@ -539,6 +539,8 @@ function PanelContenido({
   _modifiedDetalles,
   isSaving,
   handleSaveChanges,
+  hayPendiente,
+  setReinoModificado,
   _isUploadingImg,
   _handleImageUpload,
   _imgInputRef,
@@ -620,6 +622,7 @@ function PanelContenido({
                   ...reinoSeleccionado,
                   nombre: e.target.value,
                 });
+              if (!puntoSeleccionado) setReinoModificado(true);
             }}
           />
           <div className="flex items-center gap-3 mt-2">
@@ -790,6 +793,7 @@ function PanelContenido({
                   ...reinoSeleccionado,
                   descripcion: e.target.value,
                 });
+              if (!puntoSeleccionado) setReinoModificado(true);
             }}
           />
         </div>
@@ -1217,15 +1221,22 @@ function PanelContenido({
           </div>
         )}
 
-        <button
-          className="btn-brand w-full justify-center text-micro uppercase py-4 mt-auto disabled:opacity-50"
-          disabled={isSaving}
-          style={{ letterSpacing: "0.12em" }}
-          onClick={handleSaveChanges}
-        >
-          {isSaving ? <Hourglass size={14} /> : <Save size={14} />}
-          Guardar cambios
-        </button>
+        {(isSaving || hayPendiente) && (
+          <div
+            className="flex items-center justify-center gap-2 text-micro uppercase py-3 mt-auto opacity-50"
+            style={{ letterSpacing: "0.12em" }}
+          >
+            {isSaving ? (
+              <>
+                <Hourglass size={12} /> Guardando…
+              </>
+            ) : (
+              <>
+                <Save size={12} /> Guardado automático
+              </>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -2031,6 +2042,12 @@ export default function MapaInteractivo({
   const [modifiedDetalles, setModifiedDetalles] = useState<Set<string>>(
     new Set(),
   );
+  // Marca que reinoSeleccionado tiene cambios sin guardar (nombre,
+  // descripción, coords, mapa_url). Análogo a modifiedDetalles pero para
+  // el reino en sí, ya que antes se guardaba "siempre que existe" sin
+  // distinguir si realmente cambió — necesario para el autosave, que solo
+  // debe disparar cuando hay algo nuevo que persistir.
+  const [reinoModificado, setReinoModificado] = useState(false);
   const [isUploadingImg, setIsUploadingImg] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -3201,6 +3218,7 @@ export default function MapaInteractivo({
             : r,
         ),
       );
+      setReinoModificado(true);
     }
   };
 
@@ -3239,7 +3257,7 @@ export default function MapaInteractivo({
     }
   };
 
-  const handleSaveChanges = async () => {
+  const handleSaveChanges = async (opts?: { silent?: boolean }) => {
     setIsSaving(true);
     try {
       if (vistaActual === "reino" && modifiedDetalles.size > 0) {
@@ -3260,7 +3278,11 @@ export default function MapaInteractivo({
           ),
         );
         setModifiedDetalles(new Set());
-      } else if (reinoSeleccionado && vistaActual === "global") {
+      } else if (
+        reinoSeleccionado &&
+        vistaActual === "global" &&
+        reinoModificado
+      ) {
         const { error } = await supabase
           .from("reinos")
           .update({
@@ -3278,14 +3300,34 @@ export default function MapaInteractivo({
             r.id === reinoSeleccionado.id ? reinoSeleccionado : r,
           ),
         );
+        setReinoModificado(false);
+      } else {
+        setIsSaving(false);
+        return; // nada que guardar — evita el toast "Cambios guardados" en falso
       }
-      showToast("Cambios guardados", "success");
+      if (!opts?.silent) showToast("Cambios guardados", "success");
     } catch {
       showToast("No se pudieron guardar los cambios", "error");
     } finally {
       setIsSaving(false);
     }
   };
+
+  // ── Autosave ──────────────────────────────────────────────────────────
+  // Reemplaza el botón "Guardar" manual: cada cambio (nombre, descripción,
+  // mover un pin/reino) dispara este efecto; se debounce 1s desde el
+  // último cambio para no guardar en cada tecla, y es silencioso (sin
+  // toast) salvo que falle, para no interrumpir mientras se edita texto.
+  const hayPendiente =
+    editMode && (modifiedDetalles.size > 0 || reinoModificado);
+  useEffect(() => {
+    if (!hayPendiente) return;
+    const timer = setTimeout(() => {
+      void handleSaveChanges({ silent: true });
+    }, 1000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modifiedDetalles, reinoSeleccionado, reinoModificado, editMode]);
 
   const volverAlGlobal = () => {
     setVistaActual("global");
@@ -3378,6 +3420,8 @@ export default function MapaInteractivo({
     modifiedDetalles,
     isSaving,
     handleSaveChanges,
+    hayPendiente,
+    setReinoModificado,
     isUploadingImg,
     handleImageUpload,
     imgInputRef,
@@ -3470,24 +3514,24 @@ export default function MapaInteractivo({
               transition: "top 0.2s ease",
             }}
           >
-            {editMode && (
-              <button
-                className="flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest disabled:opacity-50 transition-all"
-                disabled={isSaving}
+            {editMode && (isSaving || hayPendiente) && (
+              <div
+                className="flex items-center gap-2 px-4 py-2 text-micro font-semibold uppercase tracking-widest transition-all"
                 style={{
-                  background: "color-mix(in srgb, var(--accent) 70%, #1a5c30)",
-                  color: "var(--btn-text, #fff)",
+                  background: "color-mix(in srgb, var(--bg-menu) 90%, transparent)",
+                  color: isSaving
+                    ? "var(--accent)"
+                    : "color-mix(in srgb, var(--foreground) 45%, transparent)",
                   border:
-                    "1px solid color-mix(in srgb, var(--accent) 40%, #1a5c30)",
+                    "1px solid color-mix(in srgb, var(--primary) 20%, transparent)",
                   borderRadius: "2px",
                   letterSpacing: "0.12em",
                   boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
                 }}
-                onClick={handleSaveChanges}
               >
                 {isSaving ? <Hourglass size={14} /> : <Save size={14} />}
-                Guardar
-              </button>
+                {isSaving ? "Guardando…" : "Guardado automático"}
+              </div>
             )}
           </div>
         )}
