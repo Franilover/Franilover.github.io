@@ -3079,9 +3079,16 @@ function SidebarLibros({
                             }}
                           >
                             {/* Handle de drag — visible en hover, evita arrastrar
-                                toda la fila por error al querer solo abrir el capítulo */}
+                                toda la fila por error al querer solo abrir el capítulo.
+                                Usamos opacity en vez de display:none/hidden: un
+                                elemento con display:none no dispara eventos de drag
+                                nativo de forma confiable (el navegador no llega a
+                                registrar el drag porque el nodo no está pintado en
+                                el momento del mousedown), lo que hacía que arrastrar
+                                pareciera "no hacer nada". Con opacity siempre está
+                                en el DOM y renderizado, solo invisible hasta hover. */}
                             <span
-                              className="shrink-0 hidden group-hover:flex items-center justify-center text-primary/20 hover:text-primary/50 cursor-grab active:cursor-grabbing"
+                              className="shrink-0 flex items-center justify-center text-primary/20 hover:text-primary/50 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
                               draggable
                               title="Arrastrar para reordenar"
                               onClick={(e) => e.stopPropagation()}
@@ -3090,7 +3097,9 @@ function SidebarLibros({
                                 setOverCapId(null);
                               }}
                               onDragStart={(e) => {
+                                e.stopPropagation();
                                 e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData("text/plain", cap.id);
                                 setDragCapId(cap.id);
                               }}
                             >
