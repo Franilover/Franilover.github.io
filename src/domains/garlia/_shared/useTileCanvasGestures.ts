@@ -175,7 +175,19 @@ export function useTileCanvasGestures<
       const clientX = e.clientX;
       const clientY = e.clientY;
 
-      // ── Click izquierdo sobre un área → navega al reino/ciudad vinculado.
+      // ── Click sobre un pin (ciudad/marcador) → prioridad sobre el área.
+      // Un pin casi siempre está geográficamente adentro del área de su
+      // propio reino, así que si el área se revisara primero, el click en
+      // el pin quedaría siempre "tapado" por el área y nunca abriría la
+      // ciudad. El pin es el blanco más específico: gana. ──────────────────
+      const marker = findMarkerAt(clientX, clientY);
+      if (marker) {
+        onMarkerClick?.(marker);
+        return;
+      }
+
+      // ── Si no hay pin bajo el click, revisar si cayó sobre un área →
+      // navega al reino/ciudad vinculado. ──────────────────────────────────
       if (onAreaClick && e.button === 0) {
         const wp = clientToWorldPoint(clientX, clientY);
         if (wp) {
@@ -185,13 +197,6 @@ export function useTileCanvasGestures<
             return;
           }
         }
-      }
-
-      // ── Click sobre un pin → abre el panel de info ───────────────────────
-      const marker = findMarkerAt(clientX, clientY);
-      if (marker) {
-        onMarkerClick?.(marker);
-        return;
       }
 
       // ── Fallback: notificar posición (mapa del mundo, fuera de editMode) ──
