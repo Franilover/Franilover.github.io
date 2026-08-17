@@ -32,18 +32,20 @@ import { OrisEditor } from "./OrisEditor";
 import { IumVisual, ParticulaVisual } from "./ParticulaVisual";
 import {
   FISICA_CONCEPTOS_CONFIG,
-  IUMS,
-  PARTICULAS_BASE,
   agruparPorBloque,
+  iumAFilaIum,
   orisAFilaCatalogo,
   particulaAFilaCatalogo,
+  particulaBaseAFilaCatalogo,
   particulasDeIum,
   type FilaCatalogo,
   type FilaIum,
   type FilaParticulaBase,
   type FisicaConcepto,
+  type Ium,
   type Oris,
   type Particula,
+  type ParticulaBase,
 } from "./types";
 import { PanelEditorSubsistema } from "@/domains/garlia/runas/BloqueSubsistemasMagia";
 import type { SubsistemaMagia } from "@/domains/garlia/runas/useSubsistemasMagia";
@@ -55,8 +57,14 @@ function subsistemaAFilaCatalogo(s: SubsistemaMagia): FilaCatalogo {
 }
 
 interface Props {
+  particulaBase: ParticulaBase[];
+  loadingParticulaBase?: boolean;
+
   particulas: Particula[];
   loadingParticulas?: boolean;
+
+  iums: Ium[];
+  loadingIums?: boolean;
 
   oris: Oris[];
   loadingOris?: boolean;
@@ -116,12 +124,18 @@ type Seleccion =
   | null;
 
 // ─── Descarga: todo el contenido de Física en un solo JSON ────────────────
-function descargarDatosFisica(particulas: Particula[], oris: Oris[], conceptos: FisicaConcepto[]) {
+function descargarDatosFisica(
+  particulaBase: ParticulaBase[],
+  particulas: Particula[],
+  iums: Ium[],
+  oris: Oris[],
+  conceptos: FisicaConcepto[],
+) {
   const payload = {
     exportado_en: new Date().toISOString(),
-    particula_base: PARTICULAS_BASE,
+    particula_base: particulaBase,
     particulas,
-    iums: IUMS,
+    iums,
     oris,
     conceptos,
   };
@@ -226,18 +240,24 @@ export function parsearArchivoFisicaJSON(
 type ClaveCatalogo = "particula-base" | "particulas" | "iums" | "oris" | "subsistemas";
 
 function catalogosBases(
+  particulaBase: ParticulaBase[],
   particulas: Particula[],
+  iums: Ium[],
   oris: Oris[],
   subsistemas: SubsistemaMagia[],
 ): { key: ClaveCatalogo; titulo: string; filas: FilaCatalogo[] }[] {
   return [
-    { key: "particula-base", titulo: "Partícula Base", filas: PARTICULAS_BASE },
+    {
+      key: "particula-base",
+      titulo: "Partícula Base",
+      filas: particulaBase.map(particulaBaseAFilaCatalogo),
+    },
     {
       key: "particulas",
       titulo: "Partículas",
       filas: particulas.map(particulaAFilaCatalogo),
     },
-    { key: "iums", titulo: "Iums", filas: IUMS },
+    { key: "iums", titulo: "Iums", filas: iums.map(iumAFilaIum) },
     { key: "oris", titulo: "Oris", filas: oris.map(orisAFilaCatalogo) },
     { key: "subsistemas", titulo: "Subsistemas", filas: subsistemas.map(subsistemaAFilaCatalogo) },
   ];
@@ -323,7 +343,7 @@ function TodasLasBasesView({
   onCrearSubsistema: (nombre: string) => Promise<SubsistemaMagia | null>;
   creandoSubsistema?: boolean;
 }) {
-  const catalogos = catalogosBases(particulas, oris, subsistemas);
+  const catalogos = catalogosBases(particulaBase, particulas, iums, oris, subsistemas);
   const [nombreNuevoSubsistema, setNombreNuevoSubsistema] = useState("");
   const [creandoAbierto, setCreandoAbierto] = useState(false);
   // Cuando se crea un subsistema nuevo, abrimos su popover automáticamente
@@ -890,8 +910,12 @@ function ConceptoEditor({
 // ─── Página principal ───────────────────────────────────────────────────────
 
 export function FisicaPage({
+  particulaBase,
+  loadingParticulaBase,
   particulas,
   loadingParticulas,
+  iums,
+  loadingIums,
   oris,
   loadingOris,
   creatingOris,
@@ -1116,7 +1140,7 @@ export function FisicaPage({
             )}
             <button
               type="button"
-              onClick={() => descargarDatosFisica(particulas, oris, conceptosLocal)}
+              onClick={() => descargarDatosFisica(particulaBase, particulas, iums, oris, conceptosLocal)}
               title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
               className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
             >

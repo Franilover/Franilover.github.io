@@ -80,10 +80,11 @@ export function agruparPorBloque(
   return grupos;
 }
 
-// ─── Catálogos fijos: Partícula Base e Iums ────────────────────────────────
-// No tienen CRUD ni tabla propia — son constantes del sistema, igual que
-// PARTICLE_TYPES en elementos/types.ts. Se muestran como referencia fija
-// arriba de los Oris en la tab Física.
+// ─── Catálogos: Partícula Base e Iums ──────────────────────────────────────
+// Viven en Supabase (tablas "particulas_base" e "iums") — mismo criterio que
+// "particulas": son catálogos fijos en contenido pero editables desde ahí,
+// no constantes hardcodeadas. Se muestran como referencia fija arriba de
+// los Oris en la tab Física.
 
 export interface FilaCatalogo {
   nombre: string;
@@ -98,15 +99,25 @@ export interface FilaParticulaBase extends FilaCatalogo {
   letra: "A" | "T" | "S";
 }
 
-export const PARTICULAS_BASE: FilaParticulaBase[] = [
-  { nombre: "Tesis (A)", detalle: "Impulso, voluntad, lo que empuja.", letra: "A" },
-  { nombre: "Antítesis (T)", detalle: "Inercia, resistencia, lo que limita.", letra: "T" },
-  {
-    nombre: "Síntesis (S)",
-    detalle: "Transformación, equilibrio, lo que surge del choque entre A y T.",
-    letra: "S",
-  },
-];
+/** Fila cruda tal cual vive en Supabase (tabla "particulas_base"). */
+export interface ParticulaBase {
+  id: string;
+  orden: number;
+  letra: "T" | "A" | "S";
+  nombre: string;
+  detalle: string;
+}
+
+export const PARTICULAS_BASE_CONFIG = {
+  tabla: "particulas_base",
+  select: "id, orden, letra, nombre, detalle",
+};
+
+/** Adapta una ParticulaBase (Supabase) al shape FilaParticulaBase usado por
+ *  las vistas de catálogo. */
+export function particulaBaseAFilaCatalogo(p: ParticulaBase): FilaParticulaBase {
+  return { nombre: p.nombre, detalle: p.detalle, letra: p.letra };
+}
 
 // ─── Partículas (capa intermedia Base → Partículas → Ium) ─────────────────
 // A diferencia de Base/Ium, esta capa SÍ vive en Supabase (tabla
@@ -156,131 +167,54 @@ export interface FilaIum extends FilaCatalogo {
   composicion: { particula: string; cantidad: number }[];
 }
 
-export const IUMS: FilaIum[] = [
-  {
-    id: "pondus",
-    nombre: "Pondus",
-    detalle: "3 Masa",
-    extra: "Peso puro, lo que ancla",
-    composicion: [{ particula: "Masa", cantidad: 3 }],
-  },
-  {
-    id: "velox",
-    nombre: "Velox",
-    detalle: "3 Cinética",
-    extra: "Movimiento puro",
-    composicion: [{ particula: "Cinética", cantidad: 3 }],
-  },
-  {
-    id: "fluxor",
-    nombre: "Fluxor",
-    detalle: "2 Cinética + 1 Masa",
-    extra: "Flujo que arrastra",
-    composicion: [
-      { particula: "Cinética", cantidad: 2 },
-      { particula: "Masa", cantidad: 1 },
-    ],
-  },
-  {
-    id: "fulgor",
-    nombre: "Fulgor",
-    detalle: "2 Potencial + 1 Cinética",
-    extra: "Carga que estalla en movimiento",
-    composicion: [
-      { particula: "Potencial", cantidad: 2 },
-      { particula: "Cinética", cantidad: 1 },
-    ],
-  },
-  {
-    id: "patrix",
-    nombre: "Patrix",
-    detalle: "2 Información + 1 Potencial",
-    extra: "Patrón que espera activarse",
-    composicion: [
-      { particula: "Información", cantidad: 2 },
-      { particula: "Potencial", cantidad: 1 },
-    ],
-  },
-  {
-    id: "tensia",
-    nombre: "Tensia",
-    detalle: "3 Potencial",
-    extra: "Tensión latente sin liberar",
-    composicion: [{ particula: "Potencial", cantidad: 3 }],
-  },
-  {
-    id: "formix",
-    nombre: "Formix",
-    detalle: "2 Masa + 1 Información",
-    extra: "Estructura que se repite",
-    composicion: [
-      { particula: "Masa", cantidad: 2 },
-      { particula: "Información", cantidad: 1 },
-    ],
-  },
-  {
-    id: "voluntas",
-    nombre: "Voluntas",
-    detalle: "2 Voluntad + 1 Percepción",
-    extra: "Impulso con conciencia de objetivo",
-    composicion: [
-      { particula: "Voluntad", cantidad: 2 },
-      { particula: "Percepción", cantidad: 1 },
-    ],
-  },
-  {
-    id: "sensia",
-    nombre: "Sensia",
-    detalle: "2 Percepción + 1 Voluntad",
-    extra: "Conciencia que absorbe antes de actuar",
-    composicion: [
-      { particula: "Percepción", cantidad: 2 },
-      { particula: "Voluntad", cantidad: 1 },
-    ],
-  },
-  {
-    id: "metus",
-    nombre: "Metus",
-    detalle: "2 Transición + 1 Catálisis",
-    extra: "Cambio de estado que se dispara y se sostiene",
-    composicion: [
-      { particula: "Transición", cantidad: 2 },
-      { particula: "Catálisis", cantidad: 1 },
-    ],
-  },
-  {
-    id: "ruina",
-    nombre: "Ruina",
-    detalle: "2 Entropía + 1 Ciclo",
-    extra: "Desorden que se repite, desgaste constante",
-    composicion: [
-      { particula: "Entropía", cantidad: 2 },
-      { particula: "Ciclo", cantidad: 1 },
-    ],
-  },
-];
+/** Fila cruda tal cual vive en Supabase (tabla "iums"). */
+export interface Ium {
+  id: string;
+  orden: number;
+  nombre: string;
+  detalle: string;
+  extra?: string | null;
+  composicion: { particula: string; cantidad: number }[];
+}
 
-export const IUM_POR_ID: Record<string, FilaIum> = Object.fromEntries(IUMS.map((i) => [i.id, i]));
+export const IUMS_CONFIG = {
+  tabla: "iums",
+  select: "id, orden, nombre, detalle, extra, composicion",
+};
+
+/** Adapta un Ium (Supabase) al shape FilaIum usado por las vistas de
+ *  catálogo y por las funciones utilitarias de este archivo. */
+export function iumAFilaIum(i: Ium): FilaIum {
+  return {
+    id: i.id,
+    nombre: i.nombre,
+    detalle: i.detalle,
+    extra: i.extra ?? undefined,
+    composicion: i.composicion,
+  };
+}
 
 /**
  * Fórmula A/T/S (3 letras) de cada una de las 11 Partículas de Química —
  * mismo nombre que ParticleType en elementos/types.ts, pero acá es el
- * mapeo hacia el sistema de Física (tabla "particulas" en Supabase).
- * Duplicado como constante fija en vez de fetch porque no cambia (mismo
- * criterio que PARTICULAS_BASE/IUMS) y evita acoplar este archivo al
- * fetch de useParticulas() solo para dibujar íconos.
+ * mapeo hacia el sistema de Física. Refleja la convención actual
+ * (T=Tesis/impulso, A=Antítesis/resistencia) ya aplicada en la tabla
+ * "particulas" de Supabase — ver migración de convención A↔T.
+ * Duplicado como constante fija en vez de fetch porque no cambia y evita
+ * acoplar este archivo al fetch de useParticulas() solo para dibujar
+ * íconos.
  */
 export const PARTICULA_QUIMICA_FORMULA: Record<string, string> = {
-  Masa: "AAA",
-  Cinética: "TTT",
-  Potencial: "TAA",
-  Información: "ATT",
-  Voluntad: "TTA",
-  Percepción: "AAT",
-  Transición: "ASA",
-  Ciclo: "TST",
-  Entropía: "SAT",
-  Catálisis: "ATS",
+  Masa: "TTT",
+  Cinética: "AAA",
+  Potencial: "ATT",
+  Información: "TAA",
+  Voluntad: "AAT",
+  Percepción: "TTA",
+  Transición: "TST",
+  Ciclo: "ASA",
+  Entropía: "STA",
+  Catálisis: "TAS",
   Equilibrio: "SSS",
 };
 
@@ -345,13 +279,16 @@ export function particulasDeIum(
 /** Lista de partículas componentes de un Oris a partir de iums_composicion,
  *  expandida en entradas individuales: cada Ium aporta sus propias
  *  Partículas (ya expandidas), repetidas tantas veces como el Ium aparezca
- *  en el Oris. Sin agrupar — se muestran siempre las partículas reales. */
+ *  en el Oris. Sin agrupar — se muestran siempre las partículas reales.
+ *  Recibe iumPorId (armado desde useIums()) en vez de leer una constante
+ *  global, ya que Iums ahora vive en Supabase. */
 export function particulasDeOris(
   iumsComposicion: Record<string, number>,
+  iumPorId: Record<string, FilaIum>,
 ): { nombre: string; formula: string }[] {
   const out: { nombre: string; formula: string }[] = [];
   for (const [iumId, cantidadIum] of Object.entries(iumsComposicion)) {
-    const ium = IUM_POR_ID[iumId];
+    const ium = iumPorId[iumId];
     if (!ium || !cantidadIum) continue;
     const particulas = particulasDeIum(ium);
     for (let i = 0; i < cantidadIum; i++) {
@@ -362,15 +299,20 @@ export function particulasDeOris(
 }
 
 /** Conteo de letras A/T/S de un Oris a partir de iums_composicion
- *  ({ [iumId]: cantidad }): cada Ium aporta su propio conteo × cantidad. */
-export function contarLetrasDeOris(iumsComposicion: Record<string, number>): {
+ *  ({ [iumId]: cantidad }): cada Ium aporta su propio conteo × cantidad.
+ *  Recibe iumPorId (armado desde useIums()) en vez de leer una constante
+ *  global, ya que Iums ahora vive en Supabase. */
+export function contarLetrasDeOris(
+  iumsComposicion: Record<string, number>,
+  iumPorId: Record<string, FilaIum>,
+): {
   A: number;
   T: number;
   S: number;
 } {
   const out = { A: 0, T: 0, S: 0 };
   for (const [iumId, cantidad] of Object.entries(iumsComposicion)) {
-    const ium = IUM_POR_ID[iumId];
+    const ium = iumPorId[iumId];
     if (!ium || !cantidad) continue;
     const letras = contarLetrasDeIum(ium);
     out.A += letras.A * cantidad;

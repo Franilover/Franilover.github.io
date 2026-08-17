@@ -16,7 +16,8 @@ import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
 import { IumVisual } from "./ParticulaVisual";
-import { IUM_POR_ID, ORIS_CONFIG, ORIS_FAMILIAS, particulasDeOris, type Oris, type OrisFamilia } from "./types";
+import { ORIS_CONFIG, ORIS_FAMILIAS, iumAFilaIum, particulasDeOris, type Oris, type OrisFamilia } from "./types";
+import { useIums } from "./useFisica";
 
 interface Props {
   oris: Oris;
@@ -36,8 +37,17 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
 
   useEffect(() => setLocal(oris), [oris]);
 
+  const { items: iums } = useIums();
+  const iumPorId = useMemo(
+    () => Object.fromEntries(iums.map((i) => [i.id, iumAFilaIum(i)])),
+    [iums],
+  );
+
   const iumsComposicion = local.iums_composicion ?? {};
-  const particulasOris = useMemo(() => particulasDeOris(iumsComposicion), [iumsComposicion]);
+  const particulasOris = useMemo(
+    () => particulasDeOris(iumsComposicion, iumPorId),
+    [iumsComposicion, iumPorId],
+  );
   // Lista de solo-lectura de los Iums presentes en la composición (con su
   // cantidad) — ya no hay selectores +/- para editarla a mano: la fuente
   // de verdad es la Fórmula de texto, iums_composicion se sincroniza desde
@@ -46,10 +56,10 @@ export function OrisEditor({ oris, onBack, onActualizar, onEliminar, embedded }:
     () =>
       Object.entries(iumsComposicion)
         .filter(([, cantidad]) => cantidad > 0)
-        .map(([iumId, cantidad]) => ({ ium: IUM_POR_ID[iumId], cantidad }))
+        .map(([iumId, cantidad]) => ({ ium: iumPorId[iumId], cantidad }))
         .filter((x) => x.ium)
         .sort((a, b) => b.cantidad - a.cantidad || a.ium.nombre.localeCompare(b.ium.nombre)),
-    [iumsComposicion],
+    [iumsComposicion, iumPorId],
   );
 
   async function persist(cambios: Partial<Oris>) {
