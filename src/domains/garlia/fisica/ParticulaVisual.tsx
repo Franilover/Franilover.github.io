@@ -32,8 +32,8 @@ export const LETRA_COLOR: Record<LetraATS, { bg: string; border: string; fg: str
 };
 
 export const LETRA_NOMBRE: Record<LetraATS, string> = {
-  A: "Tesis",
-  T: "Antítesis",
+  T: "Tesis",
+  A: "Antítesis",
   S: "Síntesis",
 };
 

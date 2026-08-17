@@ -42,6 +42,7 @@ import {
   type ParticleMap,
   type ParticleType,
 } from "./types";
+import { useParticulas } from "../fisica/useFisica";
 
 interface Props {
   elemento: Elemento;
@@ -453,24 +454,6 @@ const PARTICLE_HUE_MIX = PARTICLE_TYPES.reduce<Record<string, number>>((acc, p, 
   return acc;
 }, {});
 
-/** Fórmula A/T/S (3 letras) de cada Partícula — mismo mapeo que
- *  PARTICULA_QUIMICA_FORMULA en fisica/types.ts (misma capa conceptual,
- *  duplicado acá como constante fija para no acoplar Elementos a Física).
- *  Usado por el modo "ats" del toggle de AtomoVisual. */
-const PARTICLE_ATS_FORMULA: Record<ParticleType, string> = {
-  Masa: "AAA",
-  Cinética: "TTT",
-  Potencial: "TAA",
-  Información: "ATT",
-  Voluntad: "TTA",
-  Percepción: "AAT",
-  Transición: "ASA",
-  Ciclo: "TST",
-  Entropía: "SAT",
-  Catálisis: "ATS",
-  Equilibrio: "SSS",
-};
-
 const LETRA_ATS_COLOR: Record<"A" | "T" | "S", { bg: string; border: string; fg: string }> = {
   A: { bg: "color-mix(in srgb, #22c55e 18%, transparent)", border: "#22c55e", fg: "#15803d" },
   T: { bg: "color-mix(in srgb, #ef4444 18%, transparent)", border: "#ef4444", fg: "#b91c1c" },
@@ -545,6 +528,21 @@ export function AtomoVisual({
   const capaMedia = useMemo(() => particulasDeCapa(elemento.media), [elemento.media]);
   const capaExterna = useMemo(() => particulasDeCapa(elemento.externa), [elemento.externa]);
 
+  // Fórmula A/T/S real leída de la tabla "particulas" en Supabase (misma
+  // fuente que usa Física) en vez de una constante fija en el frontend —
+  // así el modo "ats" refleja siempre la convención vigente sin necesidad
+  // de tocar código cuando cambia en la base de datos.
+  const { items: particulasDb } = useParticulas();
+  const formulaPorNombre = useMemo(() => {
+    const out: Partial<Record<ParticleType, string>> = {};
+    for (const p of particulasDb) {
+      if (PARTICLE_TYPES.includes(p.nombre as ParticleType)) {
+        out[p.nombre as ParticleType] = p.formula;
+      }
+    }
+    return out;
+  }, [particulasDb]);
+
   const hayParticulas = nucleares.length + capaMedia.length + capaExterna.length > 0;
 
   const size = 200;
@@ -584,7 +582,7 @@ export function AtomoVisual({
         </>
       );
     }
-    const formula = PARTICLE_ATS_FORMULA[particula] ?? "";
+    const formula = formulaPorNombre[particula] ?? "";
     const letras = formula.split("").filter((c): c is "A" | "T" | "S" => c === "A" || c === "T" || c === "S");
     const anguloTercio = (Math.PI * 2) / 3;
     const miniFont = r * 0.62;
