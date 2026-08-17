@@ -321,7 +321,9 @@ function BasesRowTitle({
 }
 
 function TodasLasBasesView({
+  particulaBase,
   particulas,
+  iums,
   oris,
   subsistemas,
   onActualizarOris,
@@ -332,7 +334,9 @@ function TodasLasBasesView({
   onCrearSubsistema,
   creandoSubsistema,
 }: {
+  particulaBase: ParticulaBase[];
   particulas: Particula[];
+  iums: Ium[];
   oris: Oris[];
   subsistemas: SubsistemaMagia[];
   onActualizarOris: (id: string, cambios: Partial<Oris>) => void;
@@ -1186,7 +1190,9 @@ export function FisicaPage({
           <div className="flex-1 min-h-0 flex flex-row">
             <div className="w-1/2 min-w-0 min-h-0 overflow-y-auto border-r border-primary/10">
               <TodasLasBasesView
+                particulaBase={particulaBase}
                 particulas={particulas}
+                iums={iums}
                 oris={oris}
                 subsistemas={subsistemas}
                 onActualizarOris={onActualizarOris}
