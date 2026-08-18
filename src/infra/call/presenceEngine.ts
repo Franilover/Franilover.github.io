@@ -10,11 +10,13 @@
  *     (cuando se cierra la pestaña / se cae la conexión, Supabase lo saca
  *     del `presenceState()` automáticamente).
  *
- *   - "Escribiendo…": un broadcast efímero por conversación, sobre el mismo
- *     canal `mensajes:<conversacion_id>` que ya usa chatEngine para las
- *     inserciones. No se persiste en ningún lado — si el que lee no está
- *     conectado en ese momento, simplemente no lo ve, e igual que en
- *     WhatsApp el indicador tiene un timeout corto por si el evento de
+ *   - "Escribiendo…" y "explosión de emoji": broadcast efímero, cada uno con
+ *     su propio canal dedicado por conversación (ver `_suscribirCanalDedicado`
+ *     en chatEngine.ts). No se persisten (salvo el resultado final de la
+ *     explosión, que sí queda guardado — ver `mensaje_explosiones` en
+ *     chatEngine.ts) — si el que lee no está conectado en ese momento,
+ *     simplemente no ve la animación en vivo, e igual que en WhatsApp el
+ *     indicador de "escribiendo" tiene un timeout corto por si el evento de
  *     "paró de escribir" se pierde (typing se apaga solo a los 4s).
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -32,11 +34,46 @@ import {
 let canalPresenciaGlobal: RealtimeChannel | null = null;
 let subscriptoresPresencia = 0;
 
+/** @internal callbacks de `suscribirseAPresencia` que llegaron ANTES de que
+ *  `conectarPresencia` creara el canal (o antes de que hubiera terminado de
+ *  unirse) — se registran igual apenas el canal exista. */
+type ListenerPresencia = () => void;
+const listenersPresenciaPendientes = new Set<ListenerPresencia>();
+
+/** @internal serializa los re-subscribes de `suscribirseAPresencia` cuando
+ *  se engancha tarde a un canal ya `joined` (ver comentario en
+ *  `registrar` más abajo) — mismo motivo que `entrada.listo` en
+ *  chatEngine.ts: nunca dos `.subscribe()` en vuelo al mismo tiempo para el
+ *  mismo canal. */
+let colaResubscribePresencia: Promise<void> = Promise.resolve();
+
 /**
  * Se conecta al canal de presencia global y empieza a trackear al usuario
  * actual como "en línea". Se debe llamar una sola vez (desde un componente
  * montado siempre, como el layout raíz) y se limpia con la función que
  * devuelve. Si se llama más de una vez, reutiliza el mismo canal.
+ *
+ * BUG que esto arregla: nadie veía nunca a nadie "en línea". El canal se
+ * creaba acá y se hacía `.subscribe()` de inmediato — pero
+ * `suscribirseAPresencia` (llamado por los hooks `useUsuariosEnLinea`/
+ * `useEstaEnLinea` desde componentes que montan más tarde, como la lista de
+ * conversaciones o el chat abierto) agregaba sus `.on("presence", ...)`
+ * DESPUÉS de ese primer `.subscribe()`, sobre un canal que ya estaba
+ * `joined`. Mismo mecanismo que el mismatch de bindings que ya arreglamos
+ * en chatEngine.ts para postgres_changes: Phoenix/Realtime negocia qué
+ * eventos escucha el cliente en el momento del join, así que un `.on()`
+ * agregado después de esa negociación nunca le llega al servidor sin un
+ * segundo `.subscribe()` — el canal seguía "joined" sin ningún error
+ * visible, pero los eventos `sync`/`join`/`leave` jamás disparaban.
+ *
+ * El fix: los `.on("presence", ...)` de `suscribirseAPresencia` ahora se
+ * cuelgan del canal ANTES de su primer `.subscribe()` (acá, en
+ * `conectarPresencia`) en vez de después. Como el orden de montaje entre
+ * `<PresenciaActivator />` (que llama a esto) y los hooks que leen presencia
+ * no está garantizado, `suscribirseAPresencia` puede llegar antes o después
+ * de que este canal exista — por eso hay una cola (`listenersPresenciaPendientes`)
+ * de callbacks "quiero que me registres apenas el canal esté armado", que
+ * se vacía acá mismo antes de suscribir.
  */
 export function conectarPresencia(perfilId: string): () => void {
   subscriptoresPresencia++;
@@ -45,6 +82,9 @@ export function conectarPresencia(perfilId: string): () => void {
     canalPresenciaGlobal = supabase.channel("presencia:global", {
       config: { presence: { key: perfilId } },
     });
+    // Enganchamos TODOS los listeners que ya estaban esperando, antes del
+    // primer subscribe — así el servidor los conoce desde el join inicial.
+    listenersPresenciaPendientes.forEach((registrar) => registrar());
     canalPresenciaGlobal.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
         await canalPresenciaGlobal?.track({
@@ -66,64 +106,71 @@ export function conectarPresencia(perfilId: string): () => void {
 
 /**
  * Suscribe un callback a cambios en quién está en línea. Devuelve una
- * función de limpieza. Requiere que `conectarPresencia` ya se haya llamado
- * (si no, el set siempre viene vacío).
+ * función de limpieza.
  *
- * IMPORTANTE: esta función es solo LECTORA del canal global de presencia —
- * a diferencia del canal reference-counted por conversación de chatEngine,
- * el canal de presencia global vive y muere exclusivamente a través de
- * `conectarPresencia` / su función de limpieza (llamado una sola vez desde
- * `<PresenciaActivator />` en el layout raíz). Antes, el cleanup de acá
- * evaluaba `subscriptoresPresencia <= 0` y, si daba true, destruía
- * `canalPresenciaGlobal` con `supabase.removeChannel` — pero
- * `subscriptoresPresencia` es el contador de `conectarPresencia`, esta
- * función nunca lo incrementaba. Como `useUsuariosEnLinea` (que llama a
- * esta función) se monta y desmonta en cada pantalla que muestra el
- * indicador "en línea" (lista de mensajes, detalle de conversación, etc.),
- * cualquiera de esos desmontajes podía terminar destruyendo el canal
- * global compartido mientras otras pantallas seguían usándolo — y como
- * `canalPresenciaGlobal` quedaba en `null` sin que nada lo recreara (salvo
- * que cambie `user?.id`), el estado de "en línea" quedaba muerto para toda
- * la sesión hasta un refresh completo (F5). Ahora el cleanup solo remueve
- * los listeners que esta suscripción puntual agregó, y nunca toca el ciclo
- * de vida del canal en sí.
+ * Si `canalPresenciaGlobal` todavía no existe (este hook montó antes que
+ * `<PresenciaActivator />`, o antes de que `conectarPresencia` corriera),
+ * encolamos el registro de los listeners para que `conectarPresencia` los
+ * cuelgue del canal en el momento correcto (antes de su `.subscribe()`) en
+ * cuanto lo cree — ver el comentario largo ahí para el porqué. Si el canal
+ * ya existe, nos enganchamos directo (esto puede pasar si el canal ya
+ * estaba `joined` de una sesión anterior sin haberse limpiado del todo,
+ * pero es el caso raro; el flujo normal siempre pasa por la cola porque
+ * `<PresenciaActivator />` vive en el layout raíz y monta antes que
+ * cualquier pantalla que use este hook).
  */
 export function suscribirseAPresencia(
   onCambio: (idsEnLinea: Set<string>) => void,
 ): () => void {
-  if (!canalPresenciaGlobal) {
-    onCambio(new Set());
-    return () => {};
-  }
-
-  const canal = canalPresenciaGlobal;
-
-  // RealtimeChannel no expone una forma pública de desregistrar un único
-  // listener puntual (no hay `.off(event, cb)`) — la única API soportada
-  // para "dejar de escuchar" es unsubscribe/removeChannel del canal
-  // entero, que acá NO nos corresponde tocar (ver comentario arriba). Por
-  // eso usamos un flag local: el listener queda colgado del canal para
-  // siempre (mismo costo que tenía antes), pero deja de propagar eventos
-  // en cuanto el componente se desmonta.
   let activo = true;
+  let canalEnganchado: RealtimeChannel | null = null;
 
   const leerEstado = () => {
-    if (!activo) return;
-    const estado = canal.presenceState() ?? {};
+    if (!activo || !canalEnganchado) return;
+    const estado = canalEnganchado.presenceState() ?? {};
     onCambio(new Set(Object.keys(estado)));
   };
 
-  canal.on("presence", { event: "sync" }, leerEstado);
-  canal.on("presence", { event: "join" }, leerEstado);
-  canal.on("presence", { event: "leave" }, leerEstado);
+  const registrar = () => {
+    if (!canalPresenciaGlobal) return;
+    const yaEstabaJoined =
+      canalPresenciaGlobal.state === "joined" || canalPresenciaGlobal.state === "joining";
+    canalEnganchado = canalPresenciaGlobal;
+    canalEnganchado.on("presence", { event: "sync" }, leerEstado);
+    canalEnganchado.on("presence", { event: "join" }, leerEstado);
+    canalEnganchado.on("presence", { event: "leave" }, leerEstado);
+    // Si el canal ya estaba unido antes de que este listener se agregara
+    // (caso: `<PresenciaActivator />` montó y ya terminó su `.subscribe()`
+    // antes de que este hook llegara a registrarse — el mismo escenario que
+    // el bug original, solo que acá ya lo esperamos), hace falta un
+    // re-subscribe para que el servidor renegocie la lista de eventos de
+    // presence con este nuevo binding incluido. Si todavía no estaba
+    // joined, no hace falta: quedará incluido en el primer subscribe.
+    if (yaEstabaJoined) {
+      const canalActual = canalEnganchado;
+      colaResubscribePresencia = colaResubscribePresencia
+        .catch(() => {})
+        .then(() => {
+          canalActual.subscribe();
+        });
+    }
+    leerEstado();
+  };
 
-  // Estado inicial, por si ya había datos al momento de suscribirse.
-  leerEstado();
+  if (canalPresenciaGlobal) {
+    registrar();
+  } else {
+    listenersPresenciaPendientes.add(registrar);
+    onCambio(new Set());
+  }
 
   return () => {
-    // Nunca tocamos el canal en sí acá — ver nota arriba y en el docstring
-    // de esta función. Solo dejamos de reenviar eventos a este callback.
+    // Nunca tocamos el canal en sí acá — solo dejamos de reenviar eventos a
+    // este callback puntual y sacamos el registro pendiente si nunca llegó
+    // a engancharse (ej: el componente se desmontó antes de que
+    // conectarPresencia creara el canal).
     activo = false;
+    listenersPresenciaPendientes.delete(registrar);
   };
 }
 
