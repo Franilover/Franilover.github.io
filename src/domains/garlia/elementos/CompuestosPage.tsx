@@ -1396,6 +1396,38 @@ export function CompuestosPage({
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
   const [laboratorioAbierto, setLaboratorioAbierto] = useState(false);
 
+  // Agrupamiento por Naturaleza (eje "naturaleza" del sistema de tags) —
+  // mismo espíritu que Personajes/Criaturas agrupados por su jerarquía:
+  // una sección por cada tag de naturaleza que tenga al menos un compuesto,
+  // más un bloque final "Sin naturaleza" para los que no tienen tag de ese
+  // eje asignado. Se arma acá (y no en useTagsCompuestos) porque es una
+  // vista, no un dato — la fuente de verdad sigue siendo la tabla relacional.
+  const { porCategoria: tagsPorCategoria } = useTagsCatalogo();
+  const { tagIdsDe } = useCompuestoTags();
+  const tagsNaturaleza = tagsPorCategoria.naturaleza;
+
+  const gruposPorNaturaleza = useMemo(() => {
+    const mapa = new Map<string, Compuesto[]>();
+    for (const tag of tagsNaturaleza) mapa.set(tag.id, []);
+    const sinNaturaleza: Compuesto[] = [];
+
+    for (const c of compuestos) {
+      const tagIds = tagIdsDe(c.id);
+      const tagNaturaleza = tagsNaturaleza.find((t) => tagIds.has(t.id));
+      if (tagNaturaleza) {
+        mapa.get(tagNaturaleza.id)!.push(c);
+      } else {
+        sinNaturaleza.push(c);
+      }
+    }
+
+    const grupos = tagsNaturaleza
+      .map((tag) => ({ id: tag.id, nombre: tag.nombre, compuestos: mapa.get(tag.id)! }))
+      .filter((g) => g.compuestos.length > 0);
+
+    return { grupos, sinNaturaleza };
+  }, [compuestos, tagsNaturaleza, tagIdsDe]);
+
   // Permite que el caller fuerce la apertura de un compuesto específico
   // desde afuera (ej. al navegar desde "Usado en compuestos" en el editor
   // de un Elemento). seleccionadoId pasa a ser la única fuente de verdad
@@ -1469,21 +1501,57 @@ export function CompuestosPage({
             Todavía no hay compuestos creados.
           </div>
         ) : (
-          <div
-            className="grid gap-1"
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
-          >
-            {compuestos.map((c) => (
-              <CompuestoCasilla
-                key={c.id}
-                compuesto={c}
-                elementos={elementos}
-                seleccionado={c.id === activoId}
-                onClick={() =>
-                  setSeleccionadoId((actual) => (actual === c.id ? null : c.id))
-                }
-              />
+          <div className="flex flex-col gap-3">
+            {gruposPorNaturaleza.grupos.map((grupo) => (
+              <div key={grupo.id}>
+                <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                  {grupo.nombre}
+                </div>
+                <div
+                  className="grid gap-1"
+                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
+                >
+                  {grupo.compuestos.map((c) => (
+                    <CompuestoCasilla
+                      key={c.id}
+                      compuesto={c}
+                      elementos={elementos}
+                      seleccionado={c.id === activoId}
+                      onClick={() =>
+                        setSeleccionadoId((actual) => (actual === c.id ? null : c.id))
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
+
+            {gruposPorNaturaleza.sinNaturaleza.length > 0 && (
+              <div>
+                {gruposPorNaturaleza.grupos.length > 0 && (
+                  <div className="h-px mb-2 bg-primary/10" />
+                )}
+                <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                  Sin naturaleza
+                </div>
+                <div
+                  className="grid gap-1"
+                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
+                >
+                  {gruposPorNaturaleza.sinNaturaleza.map((c) => (
+                    <CompuestoCasilla
+                      key={c.id}
+                      compuesto={c}
+                      elementos={elementos}
+                      seleccionado={c.id === activoId}
+                      onClick={() =>
+                        setSeleccionadoId((actual) => (actual === c.id ? null : c.id))
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
