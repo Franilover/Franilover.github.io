@@ -460,6 +460,16 @@ interface EntradaCanalConversacion {
 const canalesConversacion = new Map<string, EntradaCanalConversacion>();
 
 /**
+ * @internal Set síncrono de topics para los que ya se disparó un
+ * `.subscribe()` de reconexión en el "ciclo" de reconexión actual, para que
+ * llamadas concurrentes a `reconectarRealtimeSiHaceFalta` no vuelvan a
+ * resuscribir el mismo canal antes de que el primer intento termine de
+ * negociar bindings con el servidor. Ver comentario de la función para el
+ * bug que esto evita.
+ */
+const _topicsReconectandoseAhora = new Set<string>();
+
+/**
  * Fuerza la reconexión del socket de Realtime si se cayó (típico en mobile:
  * el browser suspende/mata el WebSocket cuando la pestaña pasa a background
  * o la pantalla se bloquea, y no siempre dispara un evento que el código
@@ -470,14 +480,41 @@ const canalesConversacion = new Map<string, EntradaCanalConversacion>();
  * que ya estaban unidos — hay que volver a unirlos. Como acá los canales
  * son reference-counted y viven en `canalesConversacion`, re-unimos todos
  * los que sigan activos.
+ *
+ * BUG que esto arregla: hay más de un listener de `visibilitychange` en la
+ * app (uno global en PresenciaActivator, otro puntual en
+ * detalleConversacion mientras el chat está abierto) y ambos llaman a esta
+ * función para el mismo evento de "volver a la pestaña". Como
+ * `supabase.realtime.connect()` y el join del canal son asíncronos,
+ * `supabase.realtime.isConnected()` todavía puede devolver `false` cuando
+ * el segundo listener corre justo después del primero — así que el guard
+ * de arriba no alcanzaba para evitar una doble llamada. El resultado eran
+ * DOS `.subscribe()` sobre el mismo canal ya "joining", compitiendo por
+ * negociar bindings con el servidor — el mismo mismatch cliente/servidor
+ * que agregarBindingYResuscribirSiHaceFalta arregla para el bind inicial,
+ * pero disparado acá por el evento de visibilidad en vez de por el mount.
+ * Como la app hacía polling/otros pedidos igual, esto pasaba desapercibido
+ * en la red (200/204 normales) — el canal terminaba "joined" pero sordo,
+ * sin ningún error visible más allá de la consola.
+ *
+ * El fix: un guard síncrono por topic. La primera llamada en el ciclo
+ * "reserva" el topic antes de llamar a `.subscribe()`; cualquier llamada
+ * concurrente para el mismo topic lo salta. El guard se libera cuando ese
+ * `.subscribe()` conecta (según el callback de estado del canal).
  */
 export function reconectarRealtimeSiHaceFalta(): void {
-  if (supabase.realtime.isConnected()) return;
-  supabase.realtime.connect();
-  canalesConversacion.forEach((entrada) => {
-    if (entrada.canal.state !== "joined" && entrada.canal.state !== "joining") {
-      entrada.canal.subscribe();
-    }
+  if (!supabase.realtime.isConnected()) {
+    supabase.realtime.connect();
+  }
+  canalesConversacion.forEach((entrada, topic) => {
+    if (entrada.canal.state === "joined" || entrada.canal.state === "joining") return;
+    if (_topicsReconectandoseAhora.has(topic)) return;
+    _topicsReconectandoseAhora.add(topic);
+    entrada.canal.subscribe((status) => {
+      if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        _topicsReconectandoseAhora.delete(topic);
+      }
+    });
   });
 }
 
