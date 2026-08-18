@@ -38,7 +38,7 @@ import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/Selector
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
-export function FloraEditor({
+export function FloraEditorMejorado({
   flora: floraProp,
   onDeleted,
   onHeaderControlsChange,
@@ -71,7 +71,7 @@ export function FloraEditor({
     crearProceso,
     actualizarProceso,
     eliminarProceso,
-  } = usePlantaOrganosProcesos(flora.id);
+  } = usePlantaOrganosProcesos(floraProp.id);
 
   const [tabActiva, setTabActiva] = useState<"composicion" | "organos" | "procesos">(
     "composicion",
@@ -521,3 +521,6 @@ function ProcesoCard({
     </div>
   );
 }
+
+
+export { FloraEditorMejorado as FloraEditor };
