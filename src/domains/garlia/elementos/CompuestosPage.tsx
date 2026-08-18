@@ -785,14 +785,6 @@ function CompuestoEditor({
           </div>
         )}
 
-        <SelectorTagsCompuesto
-          compuestoId={compuesto.id}
-          porCategoria={tagsPorCategoria}
-          tagIdsAsignados={tagIdsAsignados}
-          onToggle={(tagId) => toggleTag(compuesto.id, tagId)}
-          loading={tagsLoading || compuestoTagsLoading}
-        />
-
         {/* Tres columnas: Elementos que lo componen (izquierda) · análisis
             del compuesto — estequiometría, reactividad/peso, balance
             (centro) · Notas con RichEditor (derecha). */}
@@ -855,7 +847,15 @@ function CompuestoEditor({
           </div>
 
           <div className="flex flex-col gap-0.5 min-w-0">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            <SelectorTagsCompuesto
+              compuestoId={compuesto.id}
+              porCategoria={tagsPorCategoria}
+              tagIdsAsignados={tagIdsAsignados}
+              onToggle={(tagId) => toggleTag(compuesto.id, tagId)}
+              loading={tagsLoading || compuestoTagsLoading}
+            />
+
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30 mt-2">
               Notas
             </label>
             <RichEditor

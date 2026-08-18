@@ -4,18 +4,18 @@
  * SelectorTagsCompuesto.tsx
  * ───────────────────────────────────────────────────────────────────────────
  * Bloque de tags dentro del editor de un Compuesto (CompuestosPage.tsx):
- * lista minimalista de Chips agrupados por eje (naturaleza / oris / uso),
- * sin colores propios — solo el estado activo/inactivo de Chip (bg-primary
- * cuando está activo, borde sutil primary/10 cuando no), mismo lenguaje
- * visual que el resto del editor. Sin colorDot ni el campo "color" de la
- * tabla tags: el catálogo puede tenerlo, acá simplemente se ignora.
- * Click en un tag lo prende/apaga vía toggleTag de useCompuestoTags.
+ * 3 dropdowns nativos en fila, uno por eje (naturaleza / oris / uso), justo
+ * arriba de "Notas". Elegir una opción activa ese tag y desactiva cualquier
+ * otro tag de la MISMA categoría que estuviera prendido — un dropdown solo
+ * puede tener un valor a la vez, así que acá cada eje admite como máximo un
+ * tag activo (si el compuesto tenía 2+ tags de un mismo eje por fuera de
+ * este selector, se resuelve tomando el primero como valor mostrado).
+ * Sin colores propios: <select> nativo con el mismo lenguaje visual que el
+ * resto del editor (fondo primary/5, borde primary/10).
  */
 
 import { Loader2 } from "lucide-react";
 import React from "react";
-
-import { Chip } from "@/ui/Chip";
 
 import {
   CATEGORIAS_TAG,
@@ -40,33 +40,45 @@ export function SelectorTagsCompuesto({
   loading,
 }: Props) {
   const totalTags = CATEGORIAS_TAG.reduce((acc, cat) => acc + porCategoria[cat].length, 0);
+  if (totalTags === 0 && !loading) return null;
 
   return (
-    <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
-      {totalTags === 0 && !loading ? null : (
-        CATEGORIAS_TAG.map((categoria) => {
-          const tags = porCategoria[categoria];
-          if (tags.length === 0) return null;
-          return (
-            <div key={categoria} className="flex items-center flex-wrap gap-1">
-              <span className="text-micro font-black uppercase tracking-wide text-primary/20">
-                {CATEGORIA_TAG_LABEL[categoria]}
-              </span>
+    <div className="grid grid-cols-3 gap-1.5">
+      {CATEGORIAS_TAG.map((categoria) => {
+        const tags = porCategoria[categoria];
+        const activo = tags.find((t) => tagIdsAsignados.has(t.id));
+
+        function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+          const nuevoId = e.target.value;
+          // Apaga el tag previamente activo de este eje (si había uno) y
+          // prende el elegido — así el dropdown queda como única fuente de
+          // verdad para esta categoría.
+          if (activo && activo.id !== nuevoId) onToggle(activo.id);
+          if (nuevoId) onToggle(nuevoId);
+        }
+
+        return (
+          <div key={categoria} className="flex flex-col gap-0.5 min-w-0">
+            <label className="text-micro font-black uppercase tracking-wide text-primary/20 truncate">
+              {CATEGORIA_TAG_LABEL[categoria]}
+            </label>
+            <select
+              value={activo?.id ?? ""}
+              onChange={handleChange}
+              disabled={tags.length === 0}
+              className="w-full bg-primary/5 border border-primary/10 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none focus:border-primary/30 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed truncate"
+            >
+              <option value="">—</option>
               {tags.map((tag) => (
-                <Chip
-                  key={tag.id}
-                  active={tagIdsAsignados.has(tag.id)}
-                  title={tag.descripcion ?? tag.nombre}
-                  onClick={() => onToggle(tag.id)}
-                >
+                <option key={tag.id} value={tag.id}>
                   {tag.nombre}
-                </Chip>
+                </option>
               ))}
-            </div>
-          );
-        })
-      )}
-      {loading && <Loader2 size={10} className="animate-spin text-primary/20" />}
+            </select>
+          </div>
+        );
+      })}
+      {loading && <Loader2 size={10} className="animate-spin text-primary/20 col-span-3 justify-self-end" />}
     </div>
   );
 }
