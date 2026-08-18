@@ -605,18 +605,45 @@ function suscribirCanal(canal: RealtimeChannel, topic: string): Promise<void> {
  * de bindings. Todas las funciones `suscribirseA*` de este archivo deben
  * pasar por acá en vez de llamar `entrada.canal.on(...)` directamente —
  * ver el comentario de `suscribirCanal` arriba para el bug que esto evita.
+ *
+ * BUG que esto arregla (segunda vuelta): la versión anterior chequeaba
+ * `entrada.canal.state` de forma síncrona e inmediata para decidir si hacía
+ * falta un resubscribe. Si el canal estaba "joining" (un primer
+ * `.subscribe()` ya en curso, todavía sin `SUBSCRIBED` confirmado) y
+ * llegaba un SEGUNDO binding antes de que ese primer join terminara —cosa
+ * común acá, porque suscribirseAMensajes/Editados/Eliminados/Reacciones,
+ * suscribirseAExplosionEmoji, suscribirseALecturas y suscribirseAEscribiendo
+ * viven en efectos DISTINTOS con dependencias distintas, así que no
+ * garantizan correr en el mismo tick—, esta función disparaba un SEGUNDO
+ * `.subscribe()` sobre el mismo canal mientras el primero seguía en vuelo.
+ * Eso es exactamente el "mismatch between server and client bindings for
+ * postgres changes" que se ve en consola (con CLOSED primero y luego
+ * CHANNEL_ERROR): dos joins peleando por negociar bindings, y el servidor
+ * termina confirmando una lista que no coincide con la que el cliente
+ * quedó esperando.
+ *
+ * El fix: en vez de decidir "hace falta resubscribe sí/no" mirando el
+ * estado en el momento, encadenamos SIEMPRE sobre `entrada.listo` (la
+ * promesa del intento de suscripción anterior, sea cual sea su estado).
+ * Así nunca hay dos `.subscribe()` en vuelo al mismo tiempo para el mismo
+ * canal — cada nuevo binding espera a que el anterior termine de resolver
+ * (con éxito o no) antes de negociar la lista actualizada.
  */
-function agregarBindingYResuscribirSiHaceFalta(
+export function _agregarBindingYResuscribirSiHaceFalta(
   conversacionId: string,
   entrada: EntradaCanalConversacion,
   registrarBinding: (canal: RealtimeChannel) => void,
 ): void {
-  const yaEstabaUnido = entrada.canal.state === "joined" || entrada.canal.state === "joining";
   registrarBinding(entrada.canal);
-  if (yaEstabaUnido) {
-    const topic = `mensajes:${conversacionId}`;
-    entrada.listo = suscribirCanal(entrada.canal, topic);
-  }
+  const topic = `mensajes:${conversacionId}`;
+  entrada.listo = entrada.listo
+    .catch(() => {
+      // Si el intento anterior falló, igual seguimos: puede que este nuevo
+      // binding sea justo lo que hacía falta para que el próximo intento
+      // ande. No queremos que un fallo previo bloquee para siempre los
+      // resubscribes futuros.
+    })
+    .then(() => suscribirCanal(entrada.canal, topic));
 }
 
 /** @internal contraparte de _obtenerCanalConversacion
@@ -672,7 +699,7 @@ export function suscribirseAMensajes(
   onNuevoMensaje: (mensaje: Mensaje) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
     canal.on(
       "postgres_changes",
       {
@@ -697,7 +724,7 @@ export function suscribirseAMensajesEditados(
   onMensajeActualizado: (mensaje: Mensaje) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
     canal.on(
       "postgres_changes",
       {
@@ -723,7 +750,7 @@ export function suscribirseAMensajesEliminados(
   onMensajeEliminado: (mensajeId: string) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
     canal.on(
       "postgres_changes",
       {
@@ -750,7 +777,7 @@ export function suscribirseALecturas(
   onLectura: (participacion: { perfil_id: string; ultimo_leido_at: string | null }) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
     canal.on(
       "postgres_changes",
       {
@@ -928,7 +955,7 @@ export function suscribirseAReacciones(
   onCambio: (evento: "INSERT" | "DELETE", reaccion: MensajeReaccion) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
     canal
       .on(
         "postgres_changes",

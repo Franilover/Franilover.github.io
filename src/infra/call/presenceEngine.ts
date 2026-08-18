@@ -26,6 +26,7 @@ import {
   _obtenerCanalConversacion,
   _liberarCanalConversacion,
   _usarCanalConversacionSinRef,
+  _agregarBindingYResuscribirSiHaceFalta,
 } from "@/infra/call/chatEngine";
 
 // ─── Presencia global ("en línea") ─────────────────────────────────────────
@@ -150,8 +151,19 @@ export function suscribirseAEscribiendo(
   onCambio: (senal: SenalEscribiendo) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  entrada.canal.on("broadcast", { event: "escribiendo" }, (payload) => {
-    onCambio(payload.payload as SenalEscribiendo);
+  // BUG que esto arregla: antes se llamaba `entrada.canal.on(...)`
+  // directamente. Si el canal ya estaba `joined` (típico: chatEngine ya lo
+  // dejó unido con sus bindings de `postgres_changes` antes de que este
+  // efecto monte), el servidor nunca se enteraba de este binding de
+  // `broadcast` nuevo — mismo bug de mismatch de bindings que
+  // agregarBindingYResuscribirSiHaceFalta arregla para mensajes/lecturas/
+  // reacciones, pero acá faltaba pasar por esa misma función. Resultado:
+  // "escribiendo…" nunca llegaba, sin ningún error visible (el canal sigue
+  // "joined" y postgres_changes sigue andando normal).
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+    canal.on("broadcast", { event: "escribiendo" }, (payload) => {
+      onCambio(payload.payload as SenalEscribiendo);
+    });
   });
   return () => _liberarCanalConversacion(conversacionId);
 }
@@ -211,8 +223,13 @@ export function suscribirseAExplosionEmoji(
   onExplosion: (senal: SenalExplosionEmoji) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  entrada.canal.on("broadcast", { event: "explosion_emoji" }, (payload) => {
-    onExplosion(payload.payload as SenalExplosionEmoji);
+  // Mismo bug y mismo fix que suscribirseAEscribiendo arriba: hay que pasar
+  // por agregarBindingYResuscribirSiHaceFalta para que el binding de
+  // broadcast se renegocie con el servidor si el canal ya estaba joined.
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+    canal.on("broadcast", { event: "explosion_emoji" }, (payload) => {
+      onExplosion(payload.payload as SenalExplosionEmoji);
+    });
   });
   return () => _liberarCanalConversacion(conversacionId);
 }
