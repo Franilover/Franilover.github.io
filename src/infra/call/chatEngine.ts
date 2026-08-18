@@ -510,31 +510,76 @@ export function _obtenerCanalConversacion(conversacionId: string): EntradaCanalC
   let entrada = canalesConversacion.get(topic);
   if (!entrada) {
     const canal = supabase.channel(topic);
-    const listo = new Promise<void>((resolve) => {
-      queueMicrotask(() => {
-        canal.subscribe((status, err) => {
-          // Diagnóstico: si el canal no llega a "SUBSCRIBED" (por ejemplo
-          // CHANNEL_ERROR o TIMED_OUT), acá queda registrado en consola.
-          // CHANNEL_ERROR suele significar que la policy de RLS de Realtime
-          // sobre la tabla está rechazando al usuario actual (no puede leer
-          // esa fila/conversación), no un problema de red — conviene mirar
-          // la consola de quien reporta no ver mensajes.
-          if (status === "SUBSCRIBED") {
-            resolve();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-            console.warn(
-              `[chatEngine] Canal "${topic}" no se pudo suscribir (status: ${status}).`,
-              err ?? "",
-            );
-          }
-        });
-      });
-    });
+    const listo = suscribirCanal(canal, topic);
     entrada = { canal, refs: 0, listo };
     canalesConversacion.set(topic, entrada);
   }
   entrada.refs++;
   return entrada;
+}
+
+/**
+ * BUG que esto arregla: Realtime/Phoenix negocia la lista de bindings
+ * (los `.on("postgres_changes", ...)`) con el servidor en el momento del
+ * primer `.subscribe()` de ese join. Si después de ese `.subscribe()`
+ * alguien llama a `.on()` de nuevo sobre el MISMO canal ya `joined` (por
+ * ejemplo: distintos hooks/efectos con distintas dependencias —
+ * `suscribirseAMensajes` corre en un efecto que depende de
+ * `[conversacionId]`, pero `suscribirseALecturas` corre en OTRO efecto que
+ * además depende de `otroParticipante`, que suele resolverse un render
+ * más tarde), el cliente termina con bindings que el servidor nunca
+ * confirmó — de ahí el "mismatch between server and client bindings for
+ * postgres changes" en consola, y ese canal queda roto para esa sesión sin
+ * ningún error visible más allá del warning.
+ *
+ * El fix: cada vez que se agrega un `.on()` a un canal que ya está
+ * `joined` (o a medio unir), se vuelve a suscribir para que el cliente
+ * renegocie la lista completa de bindings con el servidor. `channel.on()`
+ * ya devuelve el mismo channel con el binding agregado; solo hace falta
+ * volver a llamar `.subscribe()` para que viaje al servidor.
+ */
+function suscribirCanal(canal: RealtimeChannel, topic: string): Promise<void> {
+  return new Promise<void>((resolve) => {
+    queueMicrotask(() => {
+      canal.subscribe((status, err) => {
+        // Diagnóstico: si el canal no llega a "SUBSCRIBED" (por ejemplo
+        // CHANNEL_ERROR o TIMED_OUT), acá queda registrado en consola.
+        // CHANNEL_ERROR suele significar que la policy de RLS de Realtime
+        // sobre la tabla está rechazando al usuario actual (no puede leer
+        // esa fila/conversación), no un problema de red — conviene mirar
+        // la consola de quien reporta no ver mensajes.
+        if (status === "SUBSCRIBED") {
+          resolve();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          console.warn(
+            `[chatEngine] Canal "${topic}" no se pudo suscribir (status: ${status}).`,
+            err ?? "",
+          );
+        }
+      });
+    });
+  });
+}
+
+/**
+ * @internal Registra un binding (`.on("postgres_changes", ...)`) en el
+ * canal de la conversación y, si el canal ya estaba `joined`/`joining`,
+ * fuerza un re-subscribe para que el servidor reciba la lista actualizada
+ * de bindings. Todas las funciones `suscribirseA*` de este archivo deben
+ * pasar por acá en vez de llamar `entrada.canal.on(...)` directamente —
+ * ver el comentario de `suscribirCanal` arriba para el bug que esto evita.
+ */
+function agregarBindingYResuscribirSiHaceFalta(
+  conversacionId: string,
+  entrada: EntradaCanalConversacion,
+  registrarBinding: (canal: RealtimeChannel) => void,
+): void {
+  const yaEstabaUnido = entrada.canal.state === "joined" || entrada.canal.state === "joining";
+  registrarBinding(entrada.canal);
+  if (yaEstabaUnido) {
+    const topic = `mensajes:${conversacionId}`;
+    entrada.listo = suscribirCanal(entrada.canal, topic);
+  }
 }
 
 /** @internal contraparte de _obtenerCanalConversacion
@@ -590,16 +635,18 @@ export function suscribirseAMensajes(
   onNuevoMensaje: (mensaje: Mensaje) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  entrada.canal.on(
-    "postgres_changes",
-    {
-      event: "INSERT",
-      schema: "public",
-      table: "mensajes",
-      filter: `conversacion_id=eq.${conversacionId}`,
-    },
-    (payload) => onNuevoMensaje(payload.new as Mensaje),
-  );
+  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+    canal.on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "mensajes",
+        filter: `conversacion_id=eq.${conversacionId}`,
+      },
+      (payload) => onNuevoMensaje(payload.new as Mensaje),
+    );
+  });
   return () => _liberarCanalConversacion(conversacionId);
 }
 
@@ -613,16 +660,18 @@ export function suscribirseAMensajesEditados(
   onMensajeActualizado: (mensaje: Mensaje) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  entrada.canal.on(
-    "postgres_changes",
-    {
-      event: "UPDATE",
-      schema: "public",
-      table: "mensajes",
-      filter: `conversacion_id=eq.${conversacionId}`,
-    },
-    (payload) => onMensajeActualizado(payload.new as Mensaje),
-  );
+  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+    canal.on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "mensajes",
+        filter: `conversacion_id=eq.${conversacionId}`,
+      },
+      (payload) => onMensajeActualizado(payload.new as Mensaje),
+    );
+  });
   return () => _liberarCanalConversacion(conversacionId);
 }
 
@@ -637,16 +686,18 @@ export function suscribirseAMensajesEliminados(
   onMensajeEliminado: (mensajeId: string) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  entrada.canal.on(
-    "postgres_changes",
-    {
-      event: "DELETE",
-      schema: "public",
-      table: "mensajes",
-      filter: `conversacion_id=eq.${conversacionId}`,
-    },
-    (payload) => onMensajeEliminado((payload.old as Mensaje).id),
-  );
+  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+    canal.on(
+      "postgres_changes",
+      {
+        event: "DELETE",
+        schema: "public",
+        table: "mensajes",
+        filter: `conversacion_id=eq.${conversacionId}`,
+      },
+      (payload) => onMensajeEliminado((payload.old as Mensaje).id),
+    );
+  });
   return () => _liberarCanalConversacion(conversacionId);
 }
 
@@ -662,19 +713,21 @@ export function suscribirseALecturas(
   onLectura: (participacion: { perfil_id: string; ultimo_leido_at: string | null }) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  entrada.canal.on(
-    "postgres_changes",
-    {
-      event: "UPDATE",
-      schema: "public",
-      table: "conversacion_participantes",
-      filter: `conversacion_id=eq.${conversacionId}`,
-    },
-    (payload) => {
-      const fila = payload.new as { perfil_id: string; ultimo_leido_at: string | null };
-      onLectura(fila);
-    },
-  );
+  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+    canal.on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "conversacion_participantes",
+        filter: `conversacion_id=eq.${conversacionId}`,
+      },
+      (payload) => {
+        const fila = payload.new as { perfil_id: string; ultimo_leido_at: string | null };
+        onLectura(fila);
+      },
+    );
+  });
   return () => _liberarCanalConversacion(conversacionId);
 }
 
@@ -838,17 +891,19 @@ export function suscribirseAReacciones(
   onCambio: (evento: "INSERT" | "DELETE", reaccion: MensajeReaccion) => void,
 ): () => void {
   const entrada = _obtenerCanalConversacion(conversacionId);
-  entrada.canal
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "mensaje_reacciones" },
-      (payload) => onCambio("INSERT", payload.new as MensajeReaccion),
-    )
-    .on(
-      "postgres_changes",
-      { event: "DELETE", schema: "public", table: "mensaje_reacciones" },
-      (payload) => onCambio("DELETE", payload.old as MensajeReaccion),
-    );
+  agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+    canal
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "mensaje_reacciones" },
+        (payload) => onCambio("INSERT", payload.new as MensajeReaccion),
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "mensaje_reacciones" },
+        (payload) => onCambio("DELETE", payload.old as MensajeReaccion),
+      );
+  });
   return () => _liberarCanalConversacion(conversacionId);
 }
 
