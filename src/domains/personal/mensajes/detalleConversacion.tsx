@@ -350,6 +350,171 @@ function SelectorEmojisCompleto({
   );
 }
 
+/**
+ * Constructor de kaomojis por partes: elegís ojos, boca y brazos (opcional)
+ * por separado y se arma el resultado en vivo en un preview grande. Al
+ * confirmar, inserta el kaomoji armado en el input de texto — la detección
+ * automática de "esto es un kaomoji" (`esSoloKaomoji`) ya se encarga de
+ * mandarlo con el estilo/animación kaomoji sin que haga falta elegir nada
+ * más a mano.
+ */
+const OJOS_KAOMOJI = ["⁠◕⁠‿⁠◕⁠", "⁠•⁠ᴗ⁠•⁠", "⁠^⁠‿⁠^⁠", "⁠´⁠⌣⁠`⁠", "⁠>⁠‿⁠<⁠", "⁠╥⁠‿⁠╥⁠", "⁠ಠ⁠‿⁠ಠ⁠", "⁠✧⁠‿⁠✧⁠", "⁠˘⁠‿⁠˘⁠", "⁠ó⁠‿⁠ò⁠"];
+const BOCAS_KAOMOJI = ["⁠ω⁠", "⁠▽⁠", "⁠へ⁠", "⁠3⁠", "⁠o⁠", "⁠д⁠", "⁠_⁠", "⁠∀⁠"];
+const BRAZOS_KAOMOJI: { id: string; label: string; izq: string; der: string }[] = [
+  { id: "ninguno", label: "Sin brazos", izq: "", der: "" },
+  { id: "festejo", label: "Festejo", izq: "⁠ヽ⁠(⁠ ", der: "⁠ ⁠)⁠ノ⁠" },
+  { id: "encogido", label: "Encogido de hombros", izq: "⁠¯⁠\\⁠_⁠(⁠", der: "⁠)⁠_⁠/⁠¯⁠" },
+  { id: "abrazo", label: "Abrazo", izq: "⁠(⁠っ⁠", der: "⁠⁠)⁠っ⁠" },
+  { id: "aplauso", label: "Aplauso", izq: "⁠(⁠", der: "⁠)⁠パチパチ" },
+];
+
+function ConstructorKaomoji({
+  onInsertar,
+  onCerrar,
+}: {
+  onInsertar: (kaomoji: string) => void;
+  onCerrar: () => void;
+}) {
+  const [ojos, setOjos] = useState(OJOS_KAOMOJI[0]);
+  const [boca, setBoca] = useState(BOCAS_KAOMOJI[0]);
+  const [brazos, setBrazos] = useState(BRAZOS_KAOMOJI[0]);
+
+  const kaomoji = `${brazos.izq}(${ojos} ${boca} ${ojos})${brazos.der}`;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+      onClick={onCerrar}
+    >
+      <div
+        data-mensaje-burbuja
+        className="w-full md:w-[420px] rounded-t-[var(--radius-btn)] md:rounded-[var(--radius-btn)] overflow-hidden flex flex-col"
+        style={{
+          maxHeight: "85vh",
+          background: "var(--bg-main)",
+          boxShadow: "0 -4px 32px rgba(0,0,0,0.35)",
+          border: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+          style={{ borderBottom: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)" }}
+        >
+          <p className="text-sm font-black uppercase tracking-wide text-primary/60">
+            Armar kaomoji
+          </p>
+          <button className="p-1" onClick={onCerrar} aria-label="Cerrar constructor de kaomojis">
+            <X className="text-primary/40" size={18} />
+          </button>
+        </div>
+
+        {/* Preview en vivo, grande, del kaomoji que se está armando */}
+        <div
+          className="flex items-center justify-center py-6 text-3xl flex-shrink-0"
+          style={{ background: "color-mix(in srgb, var(--primary) 4%, transparent)" }}
+        >
+          {kaomoji}
+        </div>
+
+        <div className="overflow-y-auto px-4 py-3 flex flex-col gap-4">
+          <div>
+            <p className="text-micro font-bold text-primary/40 uppercase tracking-wide mb-2">
+              Ojos
+            </p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {OJOS_KAOMOJI.map((o) => (
+                <button
+                  key={o}
+                  onClick={() => setOjos(o)}
+                  className="text-sm py-2 rounded-[var(--radius-btn)] select-none"
+                  style={{
+                    background:
+                      ojos === o
+                        ? "color-mix(in srgb, var(--primary) 20%, transparent)"
+                        : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                    border: ojos === o ? "1px solid var(--primary)" : "1px solid transparent",
+                  }}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-micro font-bold text-primary/40 uppercase tracking-wide mb-2">
+              Boca
+            </p>
+            <div className="grid grid-cols-6 gap-1.5">
+              {BOCAS_KAOMOJI.map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setBoca(b)}
+                  className="text-lg py-2 rounded-[var(--radius-btn)] select-none"
+                  style={{
+                    background:
+                      boca === b
+                        ? "color-mix(in srgb, var(--primary) 20%, transparent)"
+                        : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                    border: boca === b ? "1px solid var(--primary)" : "1px solid transparent",
+                  }}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-micro font-bold text-primary/40 uppercase tracking-wide mb-2">
+              Brazos
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {BRAZOS_KAOMOJI.map((br) => (
+                <button
+                  key={br.id}
+                  onClick={() => setBrazos(br)}
+                  className="text-left px-3 py-2 rounded-[var(--radius-btn)] text-sm font-medium flex items-center justify-between"
+                  style={{
+                    background:
+                      brazos.id === br.id
+                        ? "color-mix(in srgb, var(--primary) 20%, transparent)"
+                        : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                    border: brazos.id === br.id ? "1px solid var(--primary)" : "1px solid transparent",
+                  }}
+                >
+                  <span>{br.label}</span>
+                  <span className="text-primary/40 text-xs">
+                    {br.izq}‿{br.der}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="px-4 py-3 flex-shrink-0"
+          style={{ borderTop: "1px solid color-mix(in srgb, var(--primary) 10%, transparent)" }}
+        >
+          <button
+            onClick={() => {
+              onInsertar(kaomoji);
+              onCerrar();
+            }}
+            className="w-full py-2.5 rounded-[var(--radius-btn)] text-sm font-black uppercase tracking-wide"
+            style={{ background: "var(--primary)", color: "var(--btn-text)" }}
+          >
+            Usar este kaomoji
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DetalleConversacion() {
   const searchParams = useSearchParams();
   // El id real de la conversación viaja siempre como ?id=..., leído con
@@ -485,6 +650,7 @@ export default function DetalleConversacion() {
   const [estiloSeleccionado, setEstiloSeleccionado] = useState<EstiloBurbuja | null>(null);
   const [animacionSeleccionada, setAnimacionSeleccionada] = useState<AnimacionBurbuja | null>(null);
   const [selectorDisenoAbierto, setSelectorDisenoAbierto] = useState(false);
+  const [constructorKaomojiAbierto, setConstructorKaomojiAbierto] = useState(false);
 
   // ── Paginación "cargar mensajes anteriores" ─────────────────────────
   const [cargandoAnteriores, setCargandoAnteriores] = useState(false);
@@ -1933,6 +2099,13 @@ export default function DetalleConversacion() {
                 size={18}
               />
             </button>
+            <button
+              onClick={() => setConstructorKaomojiAbierto(true)}
+              aria-label="Armar kaomoji"
+              className="flex items-center justify-center flex-shrink-0"
+            >
+              <span className="text-primary/50 text-base leading-none select-none">⁠(⁠･⁠ω⁠･⁠)⁠</span>
+            </button>
             <div className="relative flex-shrink-0">
               <button
                 aria-label="Elegir diseño de burbuja"
@@ -2105,6 +2278,18 @@ export default function DetalleConversacion() {
           </button>
         )}
       </div>
+
+      {constructorKaomojiAbierto && (
+        <ConstructorKaomoji
+          onInsertar={(kaomoji) => {
+            // Insertamos al final de lo que ya haya escrito, con un espacio
+            // separador solo si ya había texto — así se puede armar el
+            // kaomoji solo, o pegarlo al final de una frase.
+            handleCambioTexto(texto ? `${texto} ${kaomoji}` : kaomoji);
+          }}
+          onCerrar={() => setConstructorKaomojiAbierto(false)}
+        />
+      )}
     </div>
   );
 }
