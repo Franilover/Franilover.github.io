@@ -62,6 +62,11 @@ function ListaConversacionesInner({ variante = "pagina", className = "" }: Props
   const [resultados, setResultados] = useState<PerfilResumen[]>([]);
   const [buscando, setBuscando] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Contador de la búsqueda "vigente": si una respuesta lenta llega
+  // después de que el usuario ya disparó una búsqueda más nueva, la
+  // descartamos en vez de pisar los resultados en pantalla con datos
+  // obsoletos.
+  const busquedaVigenteRef = useRef(0);
 
   const cargar = async () => {
     const data = await listarConversaciones();
@@ -87,11 +92,16 @@ function ListaConversacionesInner({ variante = "pagina", className = "" }: Props
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!busqueda.trim()) {
       setResultados([]);
+      busquedaVigenteRef.current++; // invalida cualquier búsqueda en vuelo
       return;
     }
     setBuscando(true);
+    const miId = ++busquedaVigenteRef.current;
     debounceRef.current = setTimeout(async () => {
       const r = await buscarPerfiles(busqueda);
+      // Si mientras esperábamos la respuesta el usuario ya disparó otra
+      // búsqueda más nueva, esta quedó obsoleta — no pisamos resultados.
+      if (miId !== busquedaVigenteRef.current) return;
       setResultados(r.filter((p) => p.id !== user?.id));
       setBuscando(false);
     }, 300);

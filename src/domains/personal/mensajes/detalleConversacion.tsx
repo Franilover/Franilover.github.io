@@ -356,6 +356,16 @@ export default function DetalleConversacion() {
   const { user } = useAuth() as { user: any };
 
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
+  // Espejo de `mensajes` en un ref: handleVisibilidad (más abajo) se
+  // registra una sola vez por conversacionId y de otro modo quedaría con
+  // un closure viejo del array de mensajes — necesitamos el valor más
+  // reciente ahí sin tener que re-registrar el listener en cada mensaje
+  // nuevo (eso reintroduciría el mismo problema de over-re-render que
+  // tiene el efecto de refuerzo de scroll de más abajo).
+  const mensajesRef = useRef<Mensaje[]>([]);
+  useEffect(() => {
+    mensajesRef.current = mensajes;
+  }, [mensajes]);
   const [loading, setLoading] = useState(true);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -686,16 +696,36 @@ export default function DetalleConversacion() {
       (async () => {
         try {
           const data = await cargarMensajes(conversacionId);
-          setMensajes((prev) => {
-            // Si mientras tanto el usuario scrolleó y cargó mensajes más
-            // viejos que los últimos 50, no los pisamos: solo refrescamos
-            // los últimos 50 y dejamos el resto del historial ya cargado.
-            const idsNuevos = new Set(data.map((m) => m.id));
-            const previosNoTraidos = prev.filter((p) => !idsNuevos.has(p.id));
-            return [...previosNoTraidos, ...data].sort(
+          const idsNuevos = new Set(data.map((m) => m.id));
+          const posiblesViejos = mensajesRef.current.filter((p) => !idsNuevos.has(p.id));
+
+          // BUG que esto arregla: antes se asumía que todo mensaje fuera del
+          // rango de los últimos 50 frescos seguía vivo tal cual estaba en
+          // pantalla. Si el canal realtime estuvo pausado mientras la
+          // pestaña estaba en background (típico en mobile) y el otro
+          // participante borró un mensaje viejo en ese lapso, el evento
+          // DELETE nunca llegó — y como este refresh solo trae los últimos
+          // 50, ese mensaje borrado quedaba "resucitado" en pantalla
+          // indefinidamente. Ahora confirmamos contra el servidor cuáles de
+          // esos mensajes viejos siguen existiendo antes de conservarlos.
+          let viejosConfirmados = posiblesViejos;
+          if (posiblesViejos.length > 0) {
+            const { data: existentes } = await supabase
+              .from("mensajes")
+              .select("id")
+              .in(
+                "id",
+                posiblesViejos.map((p) => p.id),
+              );
+            const idsVivos = new Set((existentes ?? []).map((m: any) => m.id as string));
+            viejosConfirmados = posiblesViejos.filter((p) => idsVivos.has(p.id));
+          }
+
+          setMensajes(
+            [...viejosConfirmados, ...data].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-            );
-          });
+            ),
+          );
           void marcarComoLeido(conversacionId);
           if (data.length > 0) {
             const reacc = await cargarReacciones(data.map((m) => m.id));
@@ -864,9 +894,19 @@ export default function DetalleConversacion() {
   // inicial y empujan el contenido, dejando el scroll corto. Mientras seguimos
   // en la carga inicial de esta conversación, cualquier <img> que termine de
   // cargar dentro del contenedor vuelve a fijar el scroll al fondo.
+  //
+  // RENDIMIENTO: antes este efecto dependía de [conversacionId,
+  // mensajes.length], así que se desmontaba y volvía a montar en CADA
+  // mensaje nuevo — y al montar, volvía a escanear con querySelectorAll
+  // TODAS las <img> del contenedor (no solo la nueva), lo cual es trabajo
+  // de layout repetido e innecesario en conversaciones activas con mucha
+  // imagen. Ahora el efecto se registra una sola vez por conversación y
+  // usa un MutationObserver para engancharse puntualmente solo a los
+  // nodos <img> que se van agregando al DOM (mensajes nuevos), sin volver
+  // a tocar las que ya estaban.
   useEffect(() => {
     const contenedor = scrollRef.current;
-    if (!contenedor || mensajes.length === 0) return;
+    if (!contenedor) return;
 
     let yaLlego = false;
     const reforzarScroll = () => {
@@ -880,25 +920,39 @@ export default function DetalleConversacion() {
     const marcarLlegada = () => {
       yaLlego = true;
     };
+    const engancharSiEsImagenIncompleta = (nodo: Node) => {
+      if (!(nodo instanceof HTMLImageElement)) return;
+      if (!nodo.complete) nodo.addEventListener("load", reforzarScroll, { once: true });
+    };
 
-    const imgs = Array.from(contenedor.querySelectorAll("img"));
-    imgs.forEach((img) => {
-      if (!img.complete) img.addEventListener("load", reforzarScroll);
+    // Imágenes que ya estaban en el DOM al montar (ej. al abrir el chat).
+    contenedor.querySelectorAll("img").forEach(engancharSiEsImagenIncompleta);
+
+    // Imágenes que se agreguen después (mensajes nuevos), sin re-escanear
+    // el contenedor entero cada vez.
+    const observer = new MutationObserver((mutaciones) => {
+      for (const mutacion of mutaciones) {
+        mutacion.addedNodes.forEach((nodo) => {
+          engancharSiEsImagenIncompleta(nodo);
+          if (nodo instanceof HTMLElement) {
+            nodo.querySelectorAll("img").forEach(engancharSiEsImagenIncompleta);
+          }
+        });
+      }
     });
+    observer.observe(contenedor, { childList: true, subtree: true });
+
     // Si el usuario scrollea a mano mientras las imágenes siguen cargando,
     // dejamos de "pelearle" el scroll.
     contenedor.addEventListener("wheel", marcarLlegada, { passive: true });
     contenedor.addEventListener("touchmove", marcarLlegada, { passive: true });
 
     return () => {
-      imgs.forEach((img) => img.removeEventListener("load", reforzarScroll));
+      observer.disconnect();
       contenedor.removeEventListener("wheel", marcarLlegada);
       contenedor.removeEventListener("touchmove", marcarLlegada);
     };
-    // Solo re-evaluamos cuando cambia la conversación o llega un mensaje
-    // nuevo (nuevo adjunto potencial) — no en cada re-render por otros estados.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversacionId, mensajes.length]);
+  }, [conversacionId]);
 
   // Cierra cualquier menú/picker abierto al tocar o clickear fuera de una
   // burbuja de mensaje (afecta tanto al hover-menu de desktop como al menú
