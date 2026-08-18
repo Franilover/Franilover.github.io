@@ -9,9 +9,11 @@ import { SmartImage } from "@/ui/SmartImage";
 import { useLlamadaStore } from "@/infra/realtime/useLlamadaStore";
 import { useEstaEnLinea } from "@/infra/realtime/useEnLinea";
 import {
+  cargarExplosiones,
   cargarMensajes,
   cargarMensajesConCache,
   cargarReacciones,
+  dispararExplosion,
   editarMensaje,
   eliminarMensaje,
   enviarMensaje,
@@ -25,10 +27,12 @@ import {
   suscribirseAMensajes,
   suscribirseAMensajesEditados,
   suscribirseAMensajesEliminados,
+  suscribirseAExplosiones,
   suscribirseAReacciones,
   type AnimacionBurbuja,
   type EstiloBurbuja,
   type Mensaje,
+  type MensajeExplosion,
   type MensajeReaccion,
   type PerfilResumen,
 } from "@/infra/call/chatEngine";
@@ -402,6 +406,16 @@ export default function DetalleConversacion() {
   const explosionDisparadaRef = useRef(false);
   const EXPLOSION_LONG_PRESS_MS = 350;
 
+  // Explosiones PERSISTIDAS (la "pill" con varios emojis apilados, ej.
+  // ❤️❤️❤️❤️❤️, que queda en el mensaje después de la lluvia). A diferencia
+  // de `explosionPorMensaje` de arriba (la animación efímera en vivo), esto
+  // se carga al entrar al chat y sobrevive aunque nadie haya estado mirando
+  // en el momento exacto de la explosión.
+  const [explosiones, setExplosiones] = useState<MensajeExplosion[]>([]);
+  /** Tope de emojis repetidos en la pill, para que una explosión de 500 no
+   *  rompa el layout — a partir de ahí se corta y se muestra "+N". */
+  const MAX_EMOJIS_EN_PILL = 12;
+
   // ── Editar / eliminar mensaje propio ────────────────────────────────
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [textoEdicion, setTextoEdicion] = useState("");
@@ -556,6 +570,9 @@ export default function DetalleConversacion() {
               void cargarReacciones(frescos.map((m) => m.id)).then((reacc) => {
                 if (mounted) setReacciones(reacc);
               });
+              void cargarExplosiones(frescos.map((m) => m.id)).then((expl) => {
+                if (mounted) setExplosiones(expl);
+              });
             }
           },
         );
@@ -571,6 +588,8 @@ export default function DetalleConversacion() {
           if (mensajesIniciales.length > 0) {
             const reacc = await cargarReacciones(mensajesIniciales.map((m) => m.id));
             if (mounted) setReacciones(reacc);
+            const expl = await cargarExplosiones(mensajesIniciales.map((m) => m.id));
+            if (mounted) setExplosiones(expl);
           }
         } else {
           // No había nada en caché (primera vez en este dispositivo): no
@@ -608,6 +627,7 @@ export default function DetalleConversacion() {
           .map((p) => (p.respuesta_a === mensajeId ? { ...p, respuesta_a: null } : p)),
       );
       setReacciones((prev) => prev.filter((r) => r.mensaje_id !== mensajeId));
+      setExplosiones((prev) => prev.filter((e) => e.mensaje_id !== mensajeId));
       setRespondiendoA((prev) => (prev?.id === mensajeId ? null : prev));
     });
 
@@ -631,12 +651,28 @@ export default function DetalleConversacion() {
       });
     });
 
+    // Explosiones PERSISTIDAS (la pill con varios emojis apilados). Igual
+    // patrón que reacciones: canal dedicado, INSERT/UPDATE actualizan o
+    // reemplazan la fila local (por id, ya que acá no hay optimismo de id
+    // temporal distinto — dispararExplosionEmoji ya actualiza el estado
+    // local directo), DELETE la saca.
+    const desuscribirExplosionesDb = suscribirseAExplosiones(conversacionId, (evento, e) => {
+      setExplosiones((prev) => {
+        if (evento === "DELETE") {
+          return prev.filter((p) => p.id !== e.id);
+        }
+        const sinDuplicada = prev.filter((p) => p.id !== e.id);
+        return [...sinDuplicada, e];
+      });
+    });
+
     return () => {
       mounted = false;
       desuscribirMensajes();
       desuscribirEditados();
       desuscribirEliminados();
       desuscribirReacciones();
+      desuscribirExplosionesDb();
     };
   }, [conversacionId]);
 
@@ -736,6 +772,14 @@ export default function DetalleConversacion() {
               );
               return [...previasFueraDelRango, ...reacc];
             });
+            const expl = await cargarExplosiones(data.map((m) => m.id));
+            setExplosiones((prev) => {
+              const idsMensajesRefrescados = new Set(data.map((m) => m.id));
+              const previasFueraDelRango = prev.filter(
+                (p) => !idsMensajesRefrescados.has(p.mensaje_id),
+              );
+              return [...previasFueraDelRango, ...expl];
+            });
           }
         } catch {
           // Silencioso: si esto falla, las suscripciones realtime (ya
@@ -766,6 +810,8 @@ export default function DetalleConversacion() {
         if (masViejos.length < 50) setHayMasAnteriores(false);
         const reacc = await cargarReacciones(masViejos.map((m) => m.id));
         setReacciones((prev) => [...prev, ...reacc]);
+        const expl = await cargarExplosiones(masViejos.map((m) => m.id));
+        setExplosiones((prev) => [...prev, ...expl]);
       }
     } catch {
       setError("No se pudieron cargar los mensajes anteriores.");
@@ -1118,15 +1164,54 @@ export default function DetalleConversacion() {
     }
   };
 
-  /** Dispara localmente la animación de explosión para un mensaje/emoji, y
-   *  la manda por broadcast al otro participante — no espera esa llamada
-   *  (fire-and-forget, es puramente cosmético: si falla, como mucho el
-   *  otro no ve la lluvia, pero no rompe nada del chat). */
+  /** Cuántos emojis "quedan pegados" en la pill por cada explosión — simula
+   *  la lluvia sin tener que contar el detalle exacto de cada partícula
+   *  animada. Si el mismo usuario dispara varias explosiones seguidas sobre
+   *  el mismo mensaje+emoji, se van sumando (ver dispararExplosion en
+   *  chatEngine.ts). */
+  const EXPLOSION_INCREMENTO = 5;
+
+  /** Dispara localmente la animación de explosión para un mensaje/emoji, la
+   *  manda por broadcast al otro participante para que la vea en vivo si
+   *  tiene el chat abierto, y en paralelo la PERSISTE (tabla
+   *  mensaje_explosiones) para que quede como una pill con varios emojis
+   *  apilados aunque el otro no haya estado mirando en el momento — tanto
+   *  la animación como el broadcast son fire-and-forget (cosmético puro),
+   *  pero la persistencia si falla sí queda logueada. */
   const dispararExplosionEmoji = (mensajeId: string, emoji: string) => {
     const disparoId = `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setExplosionPorMensaje((prev) => ({ ...prev, [mensajeId]: { emoji, disparoId } }));
     if (navigator.vibrate) navigator.vibrate(15);
     void emitirExplosionEmoji(conversacionId, user.id, mensajeId, emoji);
+
+    // Optimista: actualizamos/creamos la pill local ya mismo, sin esperar
+    // el round-trip — igual que reacciones. El evento realtime de vuelta
+    // (suscribirseAExplosiones) reemplaza por la fila real cuando llega.
+    setExplosiones((prev) => {
+      const existente = prev.find(
+        (e) => e.mensaje_id === mensajeId && e.perfil_id === user.id && e.emoji === emoji,
+      );
+      if (existente) {
+        return prev.map((e) =>
+          e.id === existente.id ? { ...e, cantidad: e.cantidad + EXPLOSION_INCREMENTO } : e,
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: `optimista-${disparoId}`,
+          mensaje_id: mensajeId,
+          perfil_id: user.id,
+          emoji,
+          cantidad: EXPLOSION_INCREMENTO,
+          created_at: new Date().toISOString(),
+        },
+      ];
+    });
+
+    void dispararExplosion(mensajeId, conversacionId, emoji, EXPLOSION_INCREMENTO).catch((err) => {
+      console.warn("No se pudo persistir la explosión de emoji:", err);
+    });
   };
 
   const cancelarExplosionLongPress = () => {
@@ -1384,6 +1469,14 @@ export default function DetalleConversacion() {
             const reaccionesDelMensaje = reacciones.filter((r) => r.mensaje_id === m.id);
             const reaccionesAgrupadas = reaccionesDelMensaje.reduce<Record<string, number>>(
               (acc, r) => ({ ...acc, [r.emoji]: (acc[r.emoji] ?? 0) + 1 }),
+              {},
+            );
+            // Explosiones persistidas de este mensaje, agrupadas por emoji
+            // (sumando la cantidad de todos los que la dispararon, sin
+            // importar quién) para la pill "lluvia de corazones".
+            const explosionesDelMensaje = explosiones.filter((e) => e.mensaje_id === m.id);
+            const explosionesAgrupadas = explosionesDelMensaje.reduce<Record<string, number>>(
+              (acc, e) => ({ ...acc, [e.emoji]: (acc[e.emoji] ?? 0) + e.cantidad }),
               {},
             );
             const enEdicion = editandoId === m.id;
@@ -1679,6 +1772,35 @@ export default function DetalleConversacion() {
                         </button>
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Explosiones de emoji persistidas — pill con el emoji
+                    repetido varias veces para simular la lluvia (ej.
+                    ❤️❤️❤️❤️❤️), en vez de un simple contador numérico. Se ve
+                    tanto para quien la mandó como para el otro participante,
+                    incluso si no estaba con el chat abierto en el momento
+                    (a diferencia de la animación en vivo de arriba, esto
+                    queda guardado). Click también suma otra tanda. */}
+                {Object.keys(explosionesAgrupadas).length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-0.5 max-w-[75%]">
+                    {Object.entries(explosionesAgrupadas).map(([emoji, cantidad]) => (
+                      <button
+                        key={emoji}
+                        onClick={() => dispararExplosionEmoji(m.id, emoji)}
+                        title={`${cantidad} ${emoji}`}
+                        className="text-micro px-1.5 py-0.5 rounded-full flex items-center flex-wrap gap-0"
+                        style={{
+                          background: "color-mix(in srgb, var(--primary) 10%, transparent)",
+                          border: "1px solid color-mix(in srgb, var(--primary) 25%, transparent)",
+                        }}
+                      >
+                        {emoji.repeat(Math.min(cantidad, MAX_EMOJIS_EN_PILL))}
+                        {cantidad > MAX_EMOJIS_EN_PILL && (
+                          <span className="text-primary/60 ml-0.5">+{cantidad - MAX_EMOJIS_EN_PILL}</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 )}
 

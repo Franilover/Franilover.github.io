@@ -23,10 +23,8 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 import { supabase } from "@/infra/supabase/supabase";
 import {
-  _obtenerCanalConversacion,
-  _liberarCanalConversacion,
-  _usarCanalConversacionSinRef,
-  _agregarBindingYResuscribirSiHaceFalta,
+  _suscribirCanalDedicado,
+  _obtenerCanalDedicadoParaEnviar,
 } from "@/infra/call/chatEngine";
 
 // ─── Presencia global ("en línea") ─────────────────────────────────────────
@@ -138,57 +136,51 @@ interface SenalEscribiendo {
 
 /**
  * Se suscribe a los eventos de "escribiendo" de una conversación puntual.
- * Usa el mismo canal compartido `mensajes:<conversacionId>` que chatEngine
- * (vía `_obtenerCanalConversacion`, reference-counted), así no duplicamos
- * el join al topic — antes cada módulo abría su propio canal con el mismo
- * nombre, lo que generaba conexiones que competían entre sí.
  *
- * Devuelve una función de limpieza; llamarla en el cleanup del efecto en
- * vez de `supabase.removeChannel`.
+ * BUG que esto arregla: antes vivía en el canal compartido
+ * `mensajes:<conversacionId>` (vía `_obtenerCanalConversacion`,
+ * reference-counted), el mismo mecanismo que causaba el mismatch de
+ * bindings en chatEngine. Cuando chatEngine migró sus suscripciones
+ * críticas a canales dedicados (ver `suscribirseAMensajes` y compañía en
+ * chatEngine.ts), ese canal compartido dejó de tener ningún
+ * `postgres_changes` bind — pero "escribiendo" seguía dependiendo de él
+ * igual, y sin nadie más manteniéndolo vivo de forma confiable, el
+ * broadcast dejó de llegar (a nadie: ni emisor ni receptor lo veían).
+ *
+ * El fix: mismo patrón simple que ya usa el resto — canal PROPIO y
+ * dedicado (topic `escribiendo:<id>`), con un solo `.on("broadcast", ...)`
+ * seguido de un `.subscribe()` inmediato. Nada compartido, nada que
+ * renegociar.
  */
 export function suscribirseAEscribiendo(
   conversacionId: string,
   onCambio: (senal: SenalEscribiendo) => void,
 ): () => void {
-  const entrada = _obtenerCanalConversacion(conversacionId);
-  // BUG que esto arregla: antes se llamaba `entrada.canal.on(...)`
-  // directamente. Si el canal ya estaba `joined` (típico: chatEngine ya lo
-  // dejó unido con sus bindings de `postgres_changes` antes de que este
-  // efecto monte), el servidor nunca se enteraba de este binding de
-  // `broadcast` nuevo — mismo bug de mismatch de bindings que
-  // agregarBindingYResuscribirSiHaceFalta arregla para mensajes/lecturas/
-  // reacciones, pero acá faltaba pasar por esa misma función. Resultado:
-  // "escribiendo…" nunca llegaba, sin ningún error visible (el canal sigue
-  // "joined" y postgres_changes sigue andando normal).
-  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+  return _suscribirCanalDedicado("escribiendo", conversacionId, (canal) =>
     canal.on("broadcast", { event: "escribiendo" }, (payload) => {
       onCambio(payload.payload as SenalEscribiendo);
-    });
-  });
-  return () => _liberarCanalConversacion(conversacionId);
+    }),
+  );
 }
 
 /**
  * Avisa a la conversación que el usuario actual está (o dejó de estar)
- * escribiendo. NO usa `_obtenerCanalConversacion`/`_liberarCanalConversacion`
- * — esta es una operación fugaz de una sola vez, y pisar el contador de refs
- * del canal compartido en cada tecleo podía destruir el canal mientras el
- * componente seguía montado (ver comentario en
- * `_usarCanalConversacionSinRef` en chatEngine.ts). Si todavía no hay una
- * suscripción real activa para esta conversación, no hay canal al que
- * mandarle nada — se ignora en silencio (no vale la pena crear un canal
- * solo para esto).
+ * escribiendo. Manda el broadcast por el canal dedicado `escribiendo:<id>`
+ * que ya debe estar vivo porque este mismo componente llamó a
+ * `suscribirseAEscribiendo` al montar. Si por algún motivo ese canal
+ * todavía no existe (por ejemplo, se llama antes de que el efecto de
+ * suscripción corra), se ignora en silencio — no vale la pena crear un
+ * canal solo para esto.
  */
 export async function emitirEscribiendo(
   conversacionId: string,
   perfilId: string,
   escribiendo: boolean,
 ): Promise<void> {
-  const entrada = _usarCanalConversacionSinRef(conversacionId);
-  if (!entrada) return;
+  const canal = _obtenerCanalDedicadoParaEnviar("escribiendo", conversacionId);
+  if (!canal) return;
   try {
-    await entrada.listo;
-    await entrada.canal.send({
+    await canal.send({
       type: "broadcast",
       event: "escribiendo",
       payload: { perfilId, escribiendo } as SenalEscribiendo,
@@ -199,6 +191,21 @@ export async function emitirEscribiendo(
 }
 
 // ─── Explosión de emojis (mantener presionado un emoji del picker) ────────
+//
+// NOTA: la explosión en sí (la animación de "lluvia" de emojis) sigue
+// siendo un efecto puramente visual y efímero — eso vive acá, como
+// broadcast, para que se vea la animación en vivo mientras la otra persona
+// tiene el chat abierto. Pero el RESULTADO de la explosión (cuántos
+// corazones/emojis quedaron "pegados" al mensaje) ahora SÍ se persiste, en
+// la tabla `mensaje_explosiones` (ver chatEngine.ts: `dispararExplosion`,
+// `cargarExplosiones`, `suscribirseAExplosiones`) — así, si el otro
+// participante no estaba con el chat abierto en el momento exacto de la
+// explosión, igual la ve como una "pill" con varios emojis apilados al
+// entrar a la conversación, en vez de perderse el evento para siempre.
+//
+// BUG que esto arregla (mismo que "escribiendo" arriba): vivía en el canal
+// compartido `mensajes:<id>` que ya no tiene ningún binding activo del
+// lado de chatEngine — ahora usa su propio canal dedicado.
 
 interface SenalExplosionEmoji {
   perfilId: string;
@@ -211,34 +218,31 @@ interface SenalExplosionEmoji {
 }
 
 /**
- * Se suscribe a las "explosiones" de emoji de una conversación — el efecto
- * estilo Instagram de mantener presionado un emoji del picker de reacciones
- * para mandar una lluvia grande de ese emoji, visible también para el otro
- * participante. Broadcast efímero puro (no se persiste ni cuenta como
- * reacción real, ver reaccionarAMensaje para eso) sobre el mismo canal
- * compartido que ya usa chatEngine.
+ * Se suscribe a las "explosiones" de emoji EN VIVO de una conversación —
+ * solo la animación efímera, para verla en el momento si el chat está
+ * abierto. El resultado persistido (la "pill" con el conteo) llega por
+ * `suscribirseAExplosiones` (postgres_changes sobre `mensaje_explosiones`,
+ * en chatEngine.ts), no por acá.
  */
 export function suscribirseAExplosionEmoji(
   conversacionId: string,
   onExplosion: (senal: SenalExplosionEmoji) => void,
 ): () => void {
-  const entrada = _obtenerCanalConversacion(conversacionId);
-  // Mismo bug y mismo fix que suscribirseAEscribiendo arriba: hay que pasar
-  // por agregarBindingYResuscribirSiHaceFalta para que el binding de
-  // broadcast se renegocie con el servidor si el canal ya estaba joined.
-  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+  return _suscribirCanalDedicado("explosion", conversacionId, (canal) =>
     canal.on("broadcast", { event: "explosion_emoji" }, (payload) => {
       onExplosion(payload.payload as SenalExplosionEmoji);
-    });
-  });
-  return () => _liberarCanalConversacion(conversacionId);
+    }),
+  );
 }
 
 /**
- * Dispara una explosión de emoji hacia la conversación (para el otro
- * participante) — el propio disparador ya la anima localmente al toque,
- * sin esperar el viaje de ida y vuelta por el canal (ver
- * `handleLongPressEmoji` en detalleConversacion.tsx).
+ * Dispara la animación de explosión de emoji EN VIVO hacia la conversación
+ * (para que el otro participante, si tiene el chat abierto, vea la lluvia
+ * en el momento) — el propio disparador ya la anima localmente al toque,
+ * sin esperar el viaje de ida y vuelta por el canal. Esto es puramente
+ * cosmético y no persiste nada; para que la explosión quede guardada como
+ * una "pill" de reacciones múltiples, ver `dispararExplosion` en
+ * chatEngine.ts, que se llama en paralelo desde la UI.
  */
 export async function emitirExplosionEmoji(
   conversacionId: string,
@@ -246,11 +250,10 @@ export async function emitirExplosionEmoji(
   mensajeId: string,
   emoji: string,
 ): Promise<void> {
-  const entrada = _usarCanalConversacionSinRef(conversacionId);
-  if (!entrada) return;
+  const canal = _obtenerCanalDedicadoParaEnviar("explosion", conversacionId);
+  if (!canal) return;
   try {
-    await entrada.listo;
-    await entrada.canal.send({
+    await canal.send({
       type: "broadcast",
       event: "explosion_emoji",
       payload: {

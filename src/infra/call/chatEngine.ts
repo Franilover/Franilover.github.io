@@ -56,6 +56,24 @@ export interface MensajeReaccion {
   created_at: string;
 }
 
+/**
+ * Una "explosión" de emoji persistida sobre un mensaje: quién la mandó, con
+ * qué emoji, y cuántas veces "cayó" en esa tanda (para simular la lluvia
+ * como una pill con varios emojis apilados, ej: "❤️❤️❤️❤️❤️" en vez de un
+ * simple contador numérico). A diferencia de `mensaje_reacciones` (que es
+ * como/quién reaccionó, una fila por persona+emoji), esto vive en su propia
+ * tabla porque es un concepto distinto: no es "reaccioné", es "mandé una
+ * lluvia de N corazones".
+ */
+export interface MensajeExplosion {
+  id: string;
+  mensaje_id: string;
+  perfil_id: string;
+  emoji: string;
+  cantidad: number;
+  created_at: string;
+}
+
 export interface ConversacionResumen {
   id: string;
   es_grupo: boolean;
@@ -730,7 +748,24 @@ export function _liberarCanalConversacion(conversacionId: string): void {
  * conversación (mensajes, editados, eliminados, reacciones, lecturas)
  * pasan por acá.
  */
-function _suscribirCanalDedicado(
+/**
+ * @internal Acceso de solo-lectura a un canal dedicado ya vivo (registrado
+ * por `_suscribirCanalDedicado`), para mandar un `broadcast` puntual (por
+ * ejemplo "escribiendo" o una explosión de emoji) sin crear un segundo
+ * canal ni tocar ningún reference-count. Si todavía no hay una suscripción
+ * activa para ese topic (el componente que la crea no montó, o ya se
+ * desmontó), devuelve `null` y quien llama debe ignorar el envío en
+ * silencio — igual que hacía `_usarCanalConversacionSinRef` antes.
+ */
+export function _obtenerCanalDedicadoParaEnviar(
+  topicPrefix: string,
+  conversacionId: string,
+): RealtimeChannel | null {
+  const topic = `${topicPrefix}:${conversacionId}`;
+  return canalesDedicados.get(topic) ?? null;
+}
+
+export function _suscribirCanalDedicado(
   topicPrefix: string,
   conversacionId: string,
   registrarBindings: (canal: RealtimeChannel) => RealtimeChannel,
@@ -1057,6 +1092,129 @@ export function suscribirseAReacciones(
     canalesDedicados.delete(topic);
     void supabase.removeChannel(canal);
   };
+}
+
+// ─── Explosión de emojis (persistida) ──────────────────────────────────────
+//
+// La animación en vivo de la explosión (la lluvia de emojis que se ve al
+// momento) sigue siendo un broadcast efímero — ver presenceEngine.ts. Pero
+// el RESULTADO (cuántos emojis "quedaron pegados" al mensaje) se guarda acá,
+// en `mensaje_explosiones`, para que quien no tenía el chat abierto en ese
+// momento la vea igual como una pill al entrar — mismo lugar donde se
+// muestran las reacciones normales, pero repitiendo el emoji `cantidad`
+// veces para simular la lluvia (ej: "❤️❤️❤️❤️❤️").
+//
+// Requiere la tabla (ver migración sugerida al pie de este archivo):
+//
+//   create table mensaje_explosiones (
+//     id uuid primary key default gen_random_uuid(),
+//     mensaje_id uuid not null references mensajes(id) on delete cascade,
+//     conversacion_id uuid not null references conversaciones(id) on delete cascade,
+//     perfil_id uuid not null references perfiles(id) on delete cascade,
+//     emoji text not null,
+//     cantidad int not null default 1,
+//     created_at timestamptz not null default now()
+//   );
+
+/**
+ * Registra (o acumula) una explosión de emoji sobre un mensaje. Si el mismo
+ * usuario ya había mandado una explosión del mismo emoji sobre el mismo
+ * mensaje, suma a la cantidad existente en vez de crear una fila nueva —
+ * así mantener presionado varias veces "acumula" corazones en la misma
+ * pill en vez de crear pills duplicadas.
+ */
+export async function dispararExplosion(
+  mensajeId: string,
+  conversacionId: string,
+  emoji: string,
+  incremento = 1,
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("No hay sesión activa.");
+
+  const { data: existente } = await supabase
+    .from("mensaje_explosiones")
+    .select("id, cantidad")
+    .eq("mensaje_id", mensajeId)
+    .eq("perfil_id", user.id)
+    .eq("emoji", emoji)
+    .maybeSingle();
+
+  if (existente) {
+    const { error } = await supabase
+      .from("mensaje_explosiones")
+      .update({ cantidad: existente.cantidad + incremento })
+      .eq("id", existente.id);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from("mensaje_explosiones").insert({
+    mensaje_id: mensajeId,
+    conversacion_id: conversacionId,
+    perfil_id: user.id,
+    emoji,
+    cantidad: incremento,
+  });
+  if (error) throw error;
+}
+
+/** Trae todas las explosiones persistidas de los mensajes visibles actualmente (carga inicial). */
+export async function cargarExplosiones(mensajeIds: string[]): Promise<MensajeExplosion[]> {
+  if (mensajeIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("mensaje_explosiones")
+    .select("*")
+    .in("mensaje_id", mensajeIds);
+  if (error) throw error;
+  return (data ?? []) as MensajeExplosion[];
+}
+
+/**
+ * Suscripción en vivo a explosiones nuevas/actualizadas/borradas de la
+ * conversación — mismo patrón de canal dedicado que `suscribirseAReacciones`,
+ * para que la pill persistida aparezca al toque también en quien ya tiene
+ * el chat abierto (sin depender solo del broadcast efímero de la animación).
+ */
+export function suscribirseAExplosiones(
+  conversacionId: string,
+  onCambio: (evento: "INSERT" | "UPDATE" | "DELETE", explosion: MensajeExplosion) => void,
+): () => void {
+  return _suscribirCanalDedicado("explosiones-db", conversacionId, (canal) =>
+    canal
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "mensaje_explosiones",
+          filter: `conversacion_id=eq.${conversacionId}`,
+        },
+        (payload) => onCambio("INSERT", payload.new as MensajeExplosion),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "mensaje_explosiones",
+          filter: `conversacion_id=eq.${conversacionId}`,
+        },
+        (payload) => onCambio("UPDATE", payload.new as MensajeExplosion),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "mensaje_explosiones",
+          filter: `conversacion_id=eq.${conversacionId}`,
+        },
+        (payload) => onCambio("DELETE", payload.old as MensajeExplosion),
+      ),
+  );
 }
 
 // ─── Búsqueda de usuarios (para iniciar conversación) ────────────────────────
