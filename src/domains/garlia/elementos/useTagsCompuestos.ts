@@ -142,12 +142,13 @@ export function useCompuestoTags() {
           .from(CONFIG_COMPUESTO_TAGS.tabla)
           .insert([{ compuesto_id: compuestoId, tag_id: tagId }])
           .select(CONFIG_COMPUESTO_TAGS.select)
-          .single();
+          .single<CompuestoTag>();
         if (error) {
           console.error("[useCompuestoTags] error agregando tag:", error);
           setData((prev) => prev.filter((r) => r.id !== optimista.id));
         } else if (inserted) {
-          setData((prev) => prev.map((r) => (r.id === optimista.id ? inserted : r)));
+          const fila: CompuestoTag = inserted;
+          setData((prev) => prev.map((r) => (r.id === optimista.id ? fila : r)));
         }
       }
     },
