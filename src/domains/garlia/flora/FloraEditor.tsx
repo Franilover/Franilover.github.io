@@ -1,18 +1,15 @@
 "use client";
 
 /**
- * FloraEditor.tsx
+ * FloraEditor mejorado
  * ───────────────────────────────────────────────────────────────────────────
- * Editor liviano y self-contained de una entidad Flora: nombre, imagen,
- * descripción rica, composición material con una o varias partes (cada una
- * referenciando un Compuesto del catálogo de Elementos + una etiqueta libre
- * que explica dónde/por qué aplica, ej. "Tronco", "Hojas"), y notas.
- *
- * Molde: liviano como ItemEditor/EcosistemaEditor, no tan pesado como
- * EditorCriatura.tsx (sin personajes/reinos/ítems/grupos/D&D).
+ * Ahora con tres secciones principales:
+ * 1. Composición general (campo legado, mantener compatibilidad)
+ * 2. Órganos individuales (hoja, pétalo, raíz, fruto, tallo)
+ * 3. Procesos del ciclo de vida (fotosíntesis, floración, fructificación, etc)
  */
 
-import { Leaf } from "lucide-react";
+import { Leaf, Plus, Trash2, ChevronDown } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -35,12 +32,13 @@ import {
 } from "@/domains/garlia/_shared/useEditorHeaderControls";
 
 import { useFlora } from "./useFlora";
-import { type Flora } from "./types";
+import { usePlantaOrganosProcesos } from "./usePlantaOrganosProcesos";
+import { type Flora, type PlantaOrgano, type PlantaProceso } from "./types";
 import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/SelectorEcosistemasDeEntidad";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
-export function FloraEditor({
+export function FloraEditorMejorado({
   flora: floraProp,
   onDeleted,
   onHeaderControlsChange,
@@ -57,13 +55,29 @@ export function FloraEditor({
   const [form, setForm] = useState<Flora>(floraProp);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
-  // Popover flotante de ecosistema — mismo patrón que el chip de Ecosistema
-  // en CriaturasJerarquica/GeografiaJerarquica (PopoverFlotante anclado al
-  // elemento clickeado, sin navegar a pantalla completa).
   const [ecosistemaAbierto, setEcosistemaAbierto] = useState<{
     id: string;
     anchor: HTMLElement;
   } | null>(null);
+
+  // Órganos y procesos
+  const {
+    organos,
+    procesos,
+    loading: loadingOrganosProcesos,
+    crearOrgano,
+    actualizarOrgano,
+    eliminarOrgano,
+    crearProceso,
+    actualizarProceso,
+    eliminarProceso,
+  } = usePlantaOrganosProcesos(flora.id);
+
+  const [tabActiva, setTabActiva] = useState<"composicion" | "organos" | "procesos">(
+    "composicion",
+  );
+  const [expandidosOrganos, setExpandidosOrganos] = useState<Set<string>>(new Set());
+  const [expandidosProcesos, setExpandidosProcesos] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setForm(floraProp);
@@ -106,8 +120,6 @@ export function FloraEditor({
     nombre: form.nombre ?? "",
     placeholderNombre: "Nombre de la planta",
     onChangeNombre: (nombre: string) => setForm((f) => ({ ...f, nombre })),
-    // Flora autoguarda el nombre on-blur (comportamiento previo) además de
-    // permitir Guardar explícito para el resto de campos.
     onBlurNombre: () => guardar({ nombre: form.nombre }),
     status,
     onGuardar: () => guardar({ nombre: form.nombre, descripcion: form.descripcion }),
@@ -124,7 +136,8 @@ export function FloraEditor({
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-4">
-          <div className="flex flex-col sm:flex-row gap-5">
+          {/* Layout principal: imagen + descripción */}
+          <div className="flex flex-col sm:flex-row gap-5 mb-6">
             {/* Columna izquierda: imagen */}
             <div className="w-full sm:w-72 sm:shrink-0">
               <SelectorImagen
@@ -138,74 +151,211 @@ export function FloraEditor({
               />
             </div>
 
-            {/* Columna derecha: descripción + composición + notas */}
-            <div className="flex-1 min-w-0 space-y-4">
+            {/* Columna derecha: descripción */}
+            <div className="flex-1 min-w-0">
               <div className="space-y-1.5">
                 <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
                   Descripción
                 </label>
                 <RichEditor
-                  minHeight="10rem"
+                  minHeight="8rem"
                   placeholder="Qué es, dónde crece, usos, apariencia…"
                   value={form.descripcion ?? ""}
                   onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
                 />
               </div>
+            </div>
+          </div>
 
-              {/* Composición material — puede tener varias partes hechas de
-                  compuestos distintos (ej: "Madera" en el tronco, "Resina"
-                  en la savia), cada una con su propia etiqueta */}
-              <div className="pt-2 border-t border-primary/10">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+          {/* ── TABS ──────────────────────────────────────────────────────── */}
+          <div className="border-t border-primary/10 pt-4">
+            <div className="flex gap-2 mb-4 border-b border-primary/10">
+              <button
+                onClick={() => setTabActiva("composicion")}
+                className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
+                  tabActiva === "composicion"
+                    ? "text-primary border-b-2 border-primary"
+                    : "text-primary/50 hover:text-primary/70"
+                }`}
+              >
+                Composición
+              </button>
+              <button
+                onClick={() => setTabActiva("organos")}
+                className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
+                  tabActiva === "organos"
+                    ? "text-primary border-b-2 border-primary"
+                    : "text-primary/50 hover:text-primary/70"
+                }`}
+              >
+                Órganos ({organos.length})
+              </button>
+              <button
+                onClick={() => setTabActiva("procesos")}
+                className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
+                  tabActiva === "procesos"
+                    ? "text-primary border-b-2 border-primary"
+                    : "text-primary/50 hover:text-primary/70"
+                }`}
+              >
+                Procesos ({procesos.length})
+              </button>
+            </div>
+
+            {/* ── TAB: Composición ──────────────────────────────────────── */}
+            {tabActiva === "composicion" && (
+              <div className="space-y-4">
+                <div>
+                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-2">
                     Composición (Compuestos)
                   </span>
+                  <p className="text-micro text-primary/30 mb-3">
+                    Compuestos de la Tabla Química que forman esta planta, por parte.
+                  </p>
+
+                  <SelectorComposicionMultiple
+                    composicion={form.composicion ?? []}
+                    onChange={cambiarComposicion}
+                    compuestos={compuestos}
+                    elementos={elementos}
+                    loadingCompuestos={loadingCompuestos}
+                    onCompuestoCreado={onCompuestoCreado}
+                    onEditarCompuesto={setEditandoCompuestoId}
+                  />
                 </div>
-                <p className="text-micro text-primary/30 mb-1.5 -mt-1">
-                  Compuestos de la Tabla Química que forman esta planta, por parte
-                  (tronco, hojas, raíz…).
-                </p>
 
-                <SelectorComposicionMultiple
-                  composicion={form.composicion ?? []}
-                  onChange={cambiarComposicion}
-                  compuestos={compuestos}
-                  elementos={elementos}
-                  loadingCompuestos={loadingCompuestos}
-                  onCompuestoCreado={onCompuestoCreado}
-                  onEditarCompuesto={setEditandoCompuestoId}
-                />
-              </div>
+                {/* Ecosistemas */}
+                <div className="pt-4 border-t border-primary/10">
+                  <SelectorEcosistemasDeEntidad
+                    entidadId={form.id}
+                    campo="flora_ids"
+                    label="Ecosistemas donde crece"
+                    onSelectEcosistema={(id, anchor) => setEcosistemaAbierto({ id, anchor })}
+                  />
+                </div>
 
-              {/* Ecosistemas donde crece esta planta — edición inversa de
-                  Ecosistema.flora_ids */}
-              <div className="pt-2 border-t border-primary/10">
-                <SelectorEcosistemasDeEntidad
-                  entidadId={form.id}
-                  campo="flora_ids"
-                  label="Ecosistemas donde crece"
-                  onSelectEcosistema={(id, anchor) => setEcosistemaAbierto({ id, anchor })}
-                />
+                {/* Notas */}
+                <div className="pt-4 border-t border-primary/10">
+                  <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35 block mb-1.5">
+                    Notas
+                  </label>
+                  <textarea
+                    className="w-full min-h-[4.5rem] bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/70 outline-none placeholder:text-primary/30 resize-y"
+                    placeholder="Cualquier otra nota libre…"
+                    value={form.notas ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
+                    onBlur={() => guardar({ notas: form.notas })}
+                  />
+                </div>
               </div>
+            )}
 
-              {/* Notas libres */}
-              <div className="space-y-1.5">
-                <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
-                  Notas
-                </label>
-                <textarea
-                  className="w-full min-h-[4.5rem] bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/70 outline-none placeholder:text-primary/30 resize-y"
-                  placeholder="Cualquier otra nota libre…"
-                  value={form.notas ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
-                  onBlur={() => guardar({ notas: form.notas })}
-                />
+            {/* ── TAB: Órganos ──────────────────────────────────────────── */}
+            {tabActiva === "organos" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-primary/50">ÓRGANOS</span>
+                  <button
+                    onClick={async () => {
+                      const tiposDisponibles = [
+                        "hoja",
+                        "petalo",
+                        "raiz",
+                        "fruto",
+                        "tallo",
+                        "semilla",
+                        "corteza",
+                        "otro",
+                      ] as const;
+                      // En producción, usar un selector modal
+                      const tipo = tiposDisponibles[0];
+                      await crearOrgano(tipo);
+                    }}
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-primary/10 hover:bg-primary/20 text-primary/70 hover:text-primary transition"
+                  >
+                    <Plus size={14} /> Nuevo órgano
+                  </button>
+                </div>
+
+                {loadingOrganosProcesos ? (
+                  <p className="text-xs text-primary/40">Cargando órganos…</p>
+                ) : organos.length === 0 ? (
+                  <p className="text-xs text-primary/40 italic">Sin órganos. Crea uno para empezar.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {organos.map((organo) => (
+                      <OrganoCard
+                        key={organo.id}
+                        organo={organo}
+                        isExpanded={expandidosOrganos.has(organo.id)}
+                        onToggle={() => {
+                          setExpandidosOrganos((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(organo.id)) next.delete(organo.id);
+                            else next.add(organo.id);
+                            return next;
+                          });
+                        }}
+                        onUpdate={actualizarOrgano}
+                        onDelete={() => eliminarOrgano(organo.id)}
+                        compuestos={compuestos}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            {/* ── TAB: Procesos ────────────────────────────────────────── */}
+            {tabActiva === "procesos" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-primary/50">PROCESOS DEL CICLO</span>
+                  <button
+                    onClick={async () => {
+                      const tipo = "fotosintesis" as const;
+                      await crearProceso(tipo);
+                    }}
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-primary/10 hover:bg-primary/20 text-primary/70 hover:text-primary transition"
+                  >
+                    <Plus size={14} /> Nuevo proceso
+                  </button>
+                </div>
+
+                {loadingOrganosProcesos ? (
+                  <p className="text-xs text-primary/40">Cargando procesos…</p>
+                ) : procesos.length === 0 ? (
+                  <p className="text-xs text-primary/40 italic">Sin procesos. Crea uno para empezar.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {procesos.map((proceso) => (
+                      <ProcesoCard
+                        key={proceso.id}
+                        proceso={proceso}
+                        isExpanded={expandidosProcesos.has(proceso.id)}
+                        onToggle={() => {
+                          setExpandidosProcesos((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(proceso.id)) next.delete(proceso.id);
+                            else next.add(proceso.id);
+                            return next;
+                          });
+                        }}
+                        onUpdate={actualizarProceso}
+                        onDelete={() => eliminarProceso(proceso.id)}
+                        compuestos={compuestos}
+                        elementos={elementos}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Popovers flotantes */}
       {editandoCompuestoId && (
         <CompuestoPanelFlotante
           compuesto={compuestos.find((c) => c.id === editandoCompuestoId)!}
@@ -232,6 +382,141 @@ export function FloraEditor({
             onClose={() => setEcosistemaAbierto(null)}
           />
         </PopoverFlotante>
+      )}
+    </div>
+  );
+}
+
+// ── Componente auxiliar: Tarjeta de órgano ─────────────────────────────────
+interface OrganoCardProps {
+  organo: PlantaOrgano;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onUpdate: (id: string, updates: any) => void;
+  onDelete: () => void;
+  compuestos: Compuesto[];
+}
+
+function OrganoCard({
+  organo,
+  isExpanded,
+  onToggle,
+  onUpdate,
+  onDelete,
+  compuestos,
+}: OrganoCardProps) {
+  return (
+    <div className="border border-primary/10 rounded-lg bg-primary/[0.02] overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full px-3 py-2 flex items-center justify-between hover:bg-primary/[0.05] transition"
+      >
+        <span className="flex items-center gap-2">
+          <ChevronDown
+            size={14}
+            className={`transition ${isExpanded ? "rotate-180" : ""}`}
+          />
+          <span className="text-xs font-semibold text-primary/70 capitalize">
+            {organo.tipo_organo}
+          </span>
+        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="p-1 rounded hover:bg-red-500/10 text-red-500/50 hover:text-red-500 transition"
+        >
+          <Trash2 size={14} />
+        </button>
+      </button>
+
+      {isExpanded && (
+        <div className="px-3 py-2 border-t border-primary/10 space-y-2 text-xs">
+          <textarea
+            className="w-full bg-primary/[0.02] border border-primary/10 rounded px-2 py-1 text-primary/70 resize-none"
+            placeholder="Notas del órgano…"
+            value={organo.notas ?? ""}
+            onChange={(e) =>
+              onUpdate(organo.id, { notas: e.target.value })
+            }
+            rows={2}
+          />
+          <div className="text-primary/50 italic">
+            Fórmula: {organo.componentes ? JSON.stringify(organo.componentes) : "Sin definir"}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Componente auxiliar: Tarjeta de proceso ────────────────────────────────
+interface ProcesoCardProps {
+  proceso: PlantaProceso;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onUpdate: (id: string, updates: any) => void;
+  onDelete: () => void;
+  compuestos: Compuesto[];
+  elementos: any[];
+}
+
+function ProcesoCard({
+  proceso,
+  isExpanded,
+  onToggle,
+  onUpdate,
+  onDelete,
+  compuestos,
+}: ProcesoCardProps) {
+  return (
+    <div className="border border-primary/10 rounded-lg bg-primary/[0.02] overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full px-3 py-2 flex items-center justify-between hover:bg-primary/[0.05] transition"
+      >
+        <span className="flex items-center gap-2">
+          <ChevronDown
+            size={14}
+            className={`transition ${isExpanded ? "rotate-180" : ""}`}
+          />
+          <span className="text-xs font-semibold text-primary/70 capitalize">
+            {proceso.tipo_proceso}
+          </span>
+          {proceso.condiciones && (
+            <span className="text-xs text-primary/40">({proceso.condiciones})</span>
+          )}
+        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="p-1 rounded hover:bg-red-500/10 text-red-500/50 hover:text-red-500 transition"
+        >
+          <Trash2 size={14} />
+        </button>
+      </button>
+
+      {isExpanded && (
+        <div className="px-3 py-2 border-t border-primary/10 space-y-2 text-xs">
+          <textarea
+            className="w-full bg-primary/[0.02] border border-primary/10 rounded px-2 py-1 text-primary/70 resize-none"
+            placeholder="Descripción del proceso…"
+            value={proceso.descripcion ?? ""}
+            onChange={(e) =>
+              onUpdate(proceso.id, { descripcion: e.target.value })
+            }
+            rows={2}
+          />
+          <div className="text-primary/50 italic">
+            Consume: {proceso.consume ? JSON.stringify(proceso.consume) : "—"}
+          </div>
+          <div className="text-primary/50 italic">
+            Produce: {proceso.produce ? JSON.stringify(proceso.produce) : "—"}
+          </div>
+        </div>
       )}
     </div>
   );
