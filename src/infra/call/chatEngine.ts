@@ -460,6 +460,16 @@ interface EntradaCanalConversacion {
 const canalesConversacion = new Map<string, EntradaCanalConversacion>();
 
 /**
+ * @internal Registro de canales DEDICADOS (no compartidos, un bind por
+ * canal — ver `suscribirseAMensajes`) que necesitan volver a unirse al
+ * reconectar tras `visibilitychange`. Separado de `canalesConversacion`
+ * porque estos no tienen reference-counting ni cola de resubscribe: cada
+ * uno es efímero y se cierra directo con `removeChannel` en su cleanup, así
+ * que acá solo guardamos la referencia mientras están vivos.
+ */
+const canalesDedicados = new Map<string, RealtimeChannel>();
+
+/**
  * Fuerza la reconexión del socket de Realtime si se cayó (típico en mobile:
  * el browser suspende/mata el WebSocket cuando la pestaña pasa a background
  * o la pantalla se bloquea, y no siempre dispara un evento que el código
@@ -501,6 +511,12 @@ export function reconectarRealtimeSiHaceFalta(): void {
         // un fallo previo no debe bloquear intentos futuros.
       })
       .then(() => suscribirCanal(entrada.canal, topic));
+  });
+  // Canales dedicados (ver suscribirseAMensajes): no tienen cola que
+  // encadenar, así que alcanza con re-suscribir directo si se cayeron.
+  canalesDedicados.forEach((canal) => {
+    if (canal.state === "joined" || canal.state === "joining") return;
+    canal.subscribe();
   });
 }
 
@@ -679,14 +695,40 @@ export function _liberarCanalConversacion(conversacionId: string): void {
  * Suscripción en vivo a mensajes nuevos de una conversación.
  * Devuelve una función de limpieza (ya NO un RealtimeChannel crudo) —
  * llamarla en el cleanup del efecto en vez de `supabase.removeChannel`.
+ *
+ * BUG que esto arregla (tercera vuelta): las funciones `suscribirseA*` de
+ * este archivo compartían todas un único canal por conversación
+ * (`_obtenerCanalConversacion`/`_agregarBindingYResuscribirSiHaceFalta`),
+ * reference-counted entre 6 suscripciones distintas que viven en efectos de
+ * React separados con dependencias distintas (mensajes, editados,
+ * eliminados, reacciones, lecturas, escribiendo, explosión de emoji). Cada
+ * intento de arreglar el mismatch de bindings terminaba siendo un parche
+ * más sobre ese mecanismo compartido (resubscribe condicional, luego cola
+ * serializada, luego unificar con la reconexión de visibilidad) — y
+ * seguía fallando en producción porque la superficie de cosas que pueden
+ * llegar a pisarse entre sí es grande.
+ *
+ * En cambio, `suscribirseAConversaciones` (la de la barra lateral, que
+ * SIEMPRE funcionó sin este problema) usa un canal propio y exclusivo, con
+ * un solo `.on()` seguido de un `.subscribe()` inmediato — no hay nada que
+ * pueda competir con nada, porque no hay nada compartido.
+ *
+ * El fix: mensajes nuevos (lo más crítico — es lo que se ve/no se ve en el
+ * chat) ahora usa exactamente ese mismo patrón simple, con su PROPIO canal
+ * dedicado (topic distinto: `mensajes-nuevos:<id>`, para no chocar con el
+ * canal compartido que las demás suscripciones —de menor criticidad—
+ * siguen usando). Sin reference-counting, sin cola de resubscribe, sin
+ * ningún otro binding compitiendo por ese canal: no hay mismatch posible
+ * porque nunca hay un segundo `.on()` después del primer `.subscribe()`.
  */
 export function suscribirseAMensajes(
   conversacionId: string,
   onNuevoMensaje: (mensaje: Mensaje) => void,
 ): () => void {
-  const entrada = _obtenerCanalConversacion(conversacionId);
-  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
-    canal.on(
+  const topic = `mensajes-nuevos:${conversacionId}`;
+  const canal = supabase
+    .channel(topic)
+    .on(
       "postgres_changes",
       {
         event: "INSERT",
@@ -695,9 +737,20 @@ export function suscribirseAMensajes(
         filter: `conversacion_id=eq.${conversacionId}`,
       },
       (payload) => onNuevoMensaje(payload.new as Mensaje),
-    );
-  });
-  return () => _liberarCanalConversacion(conversacionId);
+    )
+    .subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        console.warn(
+          `[chatEngine] Canal dedicado "${topic}" no se pudo suscribir (status: ${status}).`,
+          err ?? "",
+        );
+      }
+    });
+  canalesDedicados.set(topic, canal);
+  return () => {
+    canalesDedicados.delete(topic);
+    void supabase.removeChannel(canal);
+  };
 }
 
 /**
