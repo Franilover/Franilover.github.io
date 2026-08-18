@@ -38,9 +38,9 @@ export interface Tag {
   color?: string | null;
 }
 
-/** Fila cruda tal cual vive en Supabase (tabla "compuesto_tags"). */
+/** Fila cruda tal cual vive en Supabase (tabla "compuesto_tags"). PK
+ *  compuesta (compuesto_id, tag_id) — no tiene columna "id" propia. */
 export interface CompuestoTag {
-  id: string;
   compuesto_id: string;
   tag_id: string;
 }
@@ -52,7 +52,7 @@ export const CONFIG_TAGS = {
 
 export const CONFIG_COMPUESTO_TAGS = {
   tabla: "compuesto_tags",
-  select: "id, compuesto_id, tag_id",
+  select: "compuesto_id, tag_id",
 };
 
 /**
@@ -110,15 +110,14 @@ export function useCompuestoTags() {
   );
 
   /** Prende/apaga un tag en un compuesto: inserta o borra la fila relacional
-   *  en Supabase y refleja el cambio en memoria al toque (optimista). */
+   *  en Supabase y refleja el cambio en memoria al toque (optimista). La
+   *  fila no tiene "id" propio — se identifica por el par (compuesto_id,
+   *  tag_id), que es la PK compuesta real de la tabla. */
   const toggleTag = useCallback(
     async (compuestoId: string, tagId: string) => {
       const yaTiene = (tagIdsPorCompuesto.get(compuestoId) ?? new Set()).has(tagId);
 
       if (yaTiene) {
-        const existente = data.find(
-          (r) => r.compuesto_id === compuestoId && r.tag_id === tagId,
-        );
         setData((prev) =>
           prev.filter((r) => !(r.compuesto_id === compuestoId && r.tag_id === tagId)),
         );
@@ -129,30 +128,22 @@ export function useCompuestoTags() {
           .eq("tag_id", tagId);
         if (error) {
           console.error("[useCompuestoTags] error quitando tag:", error);
-          if (existente) setData((prev) => [...prev, existente]);
+          setData((prev) => [...prev, { compuesto_id: compuestoId, tag_id: tagId }]);
         }
       } else {
-        const optimista: CompuestoTag = {
-          id: `__pending__${compuestoId}__${tagId}`,
-          compuesto_id: compuestoId,
-          tag_id: tagId,
-        };
-        setData((prev) => [...prev, optimista]);
-        const { data: inserted, error } = await supabase
+        setData((prev) => [...prev, { compuesto_id: compuestoId, tag_id: tagId }]);
+        const { error } = await supabase
           .from(CONFIG_COMPUESTO_TAGS.tabla)
-          .insert([{ compuesto_id: compuestoId, tag_id: tagId }])
-          .select(CONFIG_COMPUESTO_TAGS.select)
-          .single<CompuestoTag>();
+          .insert([{ compuesto_id: compuestoId, tag_id: tagId }]);
         if (error) {
           console.error("[useCompuestoTags] error agregando tag:", error);
-          setData((prev) => prev.filter((r) => r.id !== optimista.id));
-        } else if (inserted) {
-          const fila: CompuestoTag = inserted;
-          setData((prev) => prev.map((r) => (r.id === optimista.id ? fila : r)));
+          setData((prev) =>
+            prev.filter((r) => !(r.compuesto_id === compuestoId && r.tag_id === tagId)),
+          );
         }
       }
     },
-    [data, tagIdsPorCompuesto, setData],
+    [tagIdsPorCompuesto, setData],
   );
 
   return { relaciones: data, tagIdsDe, toggleTag, loading };
