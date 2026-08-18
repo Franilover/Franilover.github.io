@@ -358,14 +358,43 @@ function SelectorEmojisCompleto({
  * mandarlo con el estilo/animación kaomoji sin que haga falta elegir nada
  * más a mano.
  */
-const OJOS_KAOMOJI = ["⁠◕⁠‿⁠◕⁠", "⁠•⁠ᴗ⁠•⁠", "⁠^⁠‿⁠^⁠", "⁠´⁠⌣⁠`⁠", "⁠>⁠‿⁠<⁠", "⁠╥⁠‿⁠╥⁠", "⁠ಠ⁠‿⁠ಠ⁠", "⁠✧⁠‿⁠✧⁠", "⁠˘⁠‿⁠˘⁠", "⁠ó⁠‿⁠ò⁠"];
-const BOCAS_KAOMOJI = ["⁠ω⁠", "⁠▽⁠", "⁠へ⁠", "⁠3⁠", "⁠o⁠", "⁠д⁠", "⁠_⁠", "⁠∀⁠"];
+/**
+ * Constructor de kaomojis por partes: elegís ojos, boca y brazos (opcional)
+ * por separado y se arma el resultado en vivo en un preview grande. Al
+ * confirmar, inserta el kaomoji armado en el input de texto — la detección
+ * automática de "esto es un kaomoji" (`esSoloKaomoji`) ya se encarga de
+ * mandarlo con el estilo/animación kaomoji sin que haga falta elegir nada
+ * más a mano.
+ *
+ * Cada ojo es un SÍMBOLO SUELTO (no un par ya armado con boca incluida):
+ * el template arma `brazoIzq(ojo boca ojo)brazoDer`, así que si un ojo ya
+ * traía boca adentro (como pasaba antes, ej. "◕‿◕") terminaba duplicando
+ * la cara entera: "(◕‿◕ 3 ◕‿◕)" en vez de "(◕3◕)".
+ *
+ * Los brazos son solo el símbolo — nada de texto descriptivo (antes
+ * "aplauso" insertaba literalmente "パチパチ" en el mensaje) ni el
+ * paréntesis del rostro incluido (antes "abrazo" traía su propio "(" y ")"
+ * y se sumaba a los del template, dando "((...))").
+ */
+const OJOS_KAOMOJI = [
+  "⁠◕", "⁠•", "⁠^", "⁠´", "⁠>", "⁠╥", "⁠ಠ", "⁠✧", "⁠˘", "⁠ó",
+  "⁠T", "⁠×", "⁠@", "⁠ʘ", "⁠¬", "⁠ゝ", "⁠★", "⁠⊙", "⁠¯", "⁠£",
+];
+const BOCAS_KAOMOJI = [
+  "⁠‿", "⁠ω", "⁠▽", "⁠へ", "⁠3", "⁠o", "⁠д", "⁠_",
+  "⁠∀", "⁠ロ", "⁠ｖ", "⁠人", "⁠皿", "⁠ｕ", "⁠∇", "⁠ｍ",
+];
 const BRAZOS_KAOMOJI: { id: string; label: string; izq: string; der: string }[] = [
   { id: "ninguno", label: "Sin brazos", izq: "", der: "" },
-  { id: "festejo", label: "Festejo", izq: "⁠ヽ⁠(⁠ ", der: "⁠ ⁠)⁠ノ⁠" },
-  { id: "encogido", label: "Encogido de hombros", izq: "⁠¯⁠\\⁠_⁠(⁠", der: "⁠)⁠_⁠/⁠¯⁠" },
-  { id: "abrazo", label: "Abrazo", izq: "⁠(⁠っ⁠", der: "⁠⁠)⁠っ⁠" },
-  { id: "aplauso", label: "Aplauso", izq: "⁠(⁠", der: "⁠)⁠パチパチ" },
+  { id: "festejo", label: "Festejo", izq: "⁠ヽ", der: "⁠ノ" },
+  { id: "festejo2", label: "Festejo (doble)", izq: "⁠\\", der: "⁠/" },
+  { id: "encogido", label: "Encogido de hombros", izq: "⁠¯\\_", der: "⁠_/¯" },
+  { id: "abrazo", label: "Abrazo", izq: "⁠っ", der: "⁠っ" },
+  { id: "aplauso", label: "Aplauso", izq: "⁠", der: "⁠👏" },
+  { id: "flexion", label: "Flexión", izq: "⁠ᕙ", der: "⁠ᕗ" },
+  { id: "vuelco", label: "Vuelco de mesa", izq: "⁠(╯°□°）╯︵ ", der: "⁠" },
+  { id: "aprobacion", label: "Aprobación", izq: "⁠", der: "⁠✧" },
+  { id: "timidez", label: "Timidez", izq: "⁠", der: "⁠;;" },
 ];
 
 function ConstructorKaomoji({
@@ -379,7 +408,7 @@ function ConstructorKaomoji({
   const [boca, setBoca] = useState(BOCAS_KAOMOJI[0]);
   const [brazos, setBrazos] = useState(BRAZOS_KAOMOJI[0]);
 
-  const kaomoji = `${brazos.izq}(${ojos} ${boca} ${ojos})${brazos.der}`;
+  const kaomoji = `${brazos.izq}(${ojos}${boca}${ojos})${brazos.der}`;
 
   return (
     <div
@@ -487,7 +516,7 @@ function ConstructorKaomoji({
                 >
                   <span>{br.label}</span>
                   <span className="text-primary/40 text-xs">
-                    {br.izq}‿{br.der}
+                    {br.izq}( ⁠• )‿( ⁠• ){br.der}
                   </span>
                 </button>
               ))}
