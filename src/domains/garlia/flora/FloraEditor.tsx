@@ -38,7 +38,7 @@ import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/Selector
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
-export function FloraEditorMejorado({
+export function FloraEditor({
   flora: floraProp,
   onDeleted,
   onHeaderControlsChange,
