@@ -721,42 +721,14 @@ export function _liberarCanalConversacion(conversacionId: string): void {
  * ningún otro binding compitiendo por ese canal: no hay mismatch posible
  * porque nunca hay un segundo `.on()` después del primer `.subscribe()`.
  */
-/**
- * @internal Helper compartido para las suscripciones "dedicadas" (un canal
- * propio por suscripción, sin reference-counting ni cola de resubscribe —
- * ver el comentario largo en `suscribirseAMensajes` para el porqué). Arma
- * el canal, cuelga el/los binding(s), hace `.subscribe()` una sola vez, y
- * devuelve la función de limpieza. Todas las suscripciones puntuales de una
- * conversación (mensajes, editados, eliminados, reacciones, lecturas)
- * pasan por acá.
- */
-function _suscribirCanalDedicado(
-  topicPrefix: string,
-  conversacionId: string,
-  registrarBindings: (canal: RealtimeChannel) => RealtimeChannel,
-): () => void {
-  const topic = `${topicPrefix}:${conversacionId}`;
-  const canal = registrarBindings(supabase.channel(topic)).subscribe((status, err) => {
-    if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-      console.warn(
-        `[chatEngine] Canal dedicado "${topic}" no se pudo suscribir (status: ${status}).`,
-        err ?? "",
-      );
-    }
-  });
-  canalesDedicados.set(topic, canal);
-  return () => {
-    canalesDedicados.delete(topic);
-    void supabase.removeChannel(canal);
-  };
-}
-
 export function suscribirseAMensajes(
   conversacionId: string,
   onNuevoMensaje: (mensaje: Mensaje) => void,
 ): () => void {
-  return _suscribirCanalDedicado("mensajes-nuevos", conversacionId, (canal) =>
-    canal.on(
+  const topic = `mensajes-nuevos:${conversacionId}`;
+  const canal = supabase
+    .channel(topic)
+    .on(
       "postgres_changes",
       {
         event: "INSERT",
@@ -765,20 +737,33 @@ export function suscribirseAMensajes(
         filter: `conversacion_id=eq.${conversacionId}`,
       },
       (payload) => onNuevoMensaje(payload.new as Mensaje),
-    ),
-  );
+    )
+    .subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        console.warn(
+          `[chatEngine] Canal dedicado "${topic}" no se pudo suscribir (status: ${status}).`,
+          err ?? "",
+        );
+      }
+    });
+  canalesDedicados.set(topic, canal);
+  return () => {
+    canalesDedicados.delete(topic);
+    void supabase.removeChannel(canal);
+  };
 }
 
 /**
  * Suscripción en vivo a ediciones de mensajes existentes de la conversación
- * (columna `editado`). Canal dedicado propio — ver comentario en
- * `suscribirseAMensajes`.
+ * (columna `editado`). Comparte el mismo canal reference-counted que el
+ * resto.
  */
 export function suscribirseAMensajesEditados(
   conversacionId: string,
   onMensajeActualizado: (mensaje: Mensaje) => void,
 ): () => void {
-  return _suscribirCanalDedicado("mensajes-editados", conversacionId, (canal) =>
+  const entrada = _obtenerCanalConversacion(conversacionId);
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
     canal.on(
       "postgres_changes",
       {
@@ -788,22 +773,23 @@ export function suscribirseAMensajesEditados(
         filter: `conversacion_id=eq.${conversacionId}`,
       },
       (payload) => onMensajeActualizado(payload.new as Mensaje),
-    ),
-  );
+    );
+  });
+  return () => _liberarCanalConversacion(conversacionId);
 }
 
 /**
  * Suscripción en vivo a mensajes eliminados de la conversación. Como
  * eliminarMensaje ahora borra la fila de verdad (no soft-delete), esto es
  * lo que le avisa al otro participante que el mensaje desapareció, para
- * sacarlo de su pantalla también en tiempo real. Canal dedicado propio —
- * ver comentario en `suscribirseAMensajes`.
+ * sacarlo de su pantalla también en tiempo real.
  */
 export function suscribirseAMensajesEliminados(
   conversacionId: string,
   onMensajeEliminado: (mensajeId: string) => void,
 ): () => void {
-  return _suscribirCanalDedicado("mensajes-eliminados", conversacionId, (canal) =>
+  const entrada = _obtenerCanalConversacion(conversacionId);
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
     canal.on(
       "postgres_changes",
       {
@@ -813,8 +799,9 @@ export function suscribirseAMensajesEliminados(
         filter: `conversacion_id=eq.${conversacionId}`,
       },
       (payload) => onMensajeEliminado((payload.old as Mensaje).id),
-    ),
-  );
+    );
+  });
+  return () => _liberarCanalConversacion(conversacionId);
 }
 
 /**
@@ -822,14 +809,14 @@ export function suscribirseAMensajesEliminados(
  * la conversación — es lo que dispara el doble check / "visto" en la UI.
  * No filtra por perfil porque el filtro de postgres_changes no puede andar
  * sobre `conversacion_id` de esta tabla combinado con excluir al usuario
- * propio; el callback filtra eso del lado del cliente. Canal dedicado
- * propio — ver comentario en `suscribirseAMensajes`.
+ * propio; el callback filtra eso del lado del cliente.
  */
 export function suscribirseALecturas(
   conversacionId: string,
   onLectura: (participacion: { perfil_id: string; ultimo_leido_at: string | null }) => void,
 ): () => void {
-  return _suscribirCanalDedicado("lecturas", conversacionId, (canal) =>
+  const entrada = _obtenerCanalConversacion(conversacionId);
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
     canal.on(
       "postgres_changes",
       {
@@ -842,10 +829,10 @@ export function suscribirseALecturas(
         const fila = payload.new as { perfil_id: string; ultimo_leido_at: string | null };
         onLectura(fila);
       },
-    ),
-  );
+    );
+  });
+  return () => _liberarCanalConversacion(conversacionId);
 }
-
 
 /** Suscripción en vivo a nuevas conversaciones/actividad, para la lista general. */
 export function suscribirseAConversaciones(
@@ -1000,63 +987,27 @@ export async function cargarReacciones(mensajeIds: string[]): Promise<MensajeRea
 
 /**
  * Suscripción en vivo a reacciones nuevas/borradas de la conversación.
- *
- * BUG que esto arregla: igual que suscribirseAMensajes (ver su comentario
- * para el detalle completo), esto vivía en el canal compartido
- * reference-counted junto con editados/eliminados/lecturas/escribiendo/
- * explosión — mismo mecanismo propenso al mismatch de bindings. Ahora tiene
- * su propio canal dedicado, con el mismo patrón simple y siempre confiable
- * que usa la barra lateral: un solo `.on()` (bueno, dos — INSERT y DELETE,
- * pero ambos agregados ANTES del primer `.subscribe()`, nunca después)
- * seguido de un `.subscribe()` inmediato, sin nada más compartiendo ese
- * canal que pueda pisar la negociación de bindings.
- *
- * De paso, se agrega el filtro `conversacion_id=eq.<id>` que antes faltaba
- * (el bind viejo no filtraba porque "heredaba" el alcance del canal
- * compartido de esa conversación puntual; ahora que el canal es propio,
- * hace falta filtrar explícitamente para no recibir reacciones de otras
- * conversaciones del usuario).
+ * Comparte el mismo canal reference-counted que el resto de chatEngine.
  */
 export function suscribirseAReacciones(
   conversacionId: string,
   onCambio: (evento: "INSERT" | "DELETE", reaccion: MensajeReaccion) => void,
 ): () => void {
-  const topic = `reacciones:${conversacionId}`;
-  const canal = supabase
-    .channel(topic)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "mensaje_reacciones",
-        filter: `conversacion_id=eq.${conversacionId}`,
-      },
-      (payload) => onCambio("INSERT", payload.new as MensajeReaccion),
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "DELETE",
-        schema: "public",
-        table: "mensaje_reacciones",
-        filter: `conversacion_id=eq.${conversacionId}`,
-      },
-      (payload) => onCambio("DELETE", payload.old as MensajeReaccion),
-    )
-    .subscribe((status, err) => {
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        console.warn(
-          `[chatEngine] Canal dedicado "${topic}" no se pudo suscribir (status: ${status}).`,
-          err ?? "",
-        );
-      }
-    });
-  canalesDedicados.set(topic, canal);
-  return () => {
-    canalesDedicados.delete(topic);
-    void supabase.removeChannel(canal);
-  };
+  const entrada = _obtenerCanalConversacion(conversacionId);
+  _agregarBindingYResuscribirSiHaceFalta(conversacionId, entrada, (canal) => {
+    canal
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "mensaje_reacciones" },
+        (payload) => onCambio("INSERT", payload.new as MensajeReaccion),
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "mensaje_reacciones" },
+        (payload) => onCambio("DELETE", payload.old as MensajeReaccion),
+      );
+  });
+  return () => _liberarCanalConversacion(conversacionId);
 }
 
 // ─── Búsqueda de usuarios (para iniciar conversación) ────────────────────────
