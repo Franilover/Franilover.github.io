@@ -460,16 +460,6 @@ interface EntradaCanalConversacion {
 const canalesConversacion = new Map<string, EntradaCanalConversacion>();
 
 /**
- * @internal Set síncrono de topics para los que ya se disparó un
- * `.subscribe()` de reconexión en el "ciclo" de reconexión actual, para que
- * llamadas concurrentes a `reconectarRealtimeSiHaceFalta` no vuelvan a
- * resuscribir el mismo canal antes de que el primer intento termine de
- * negociar bindings con el servidor. Ver comentario de la función para el
- * bug que esto evita.
- */
-const _topicsReconectandoseAhora = new Set<string>();
-
-/**
  * Fuerza la reconexión del socket de Realtime si se cayó (típico en mobile:
  * el browser suspende/mata el WebSocket cuando la pestaña pasa a background
  * o la pantalla se bloquea, y no siempre dispara un evento que el código
@@ -481,26 +471,23 @@ const _topicsReconectandoseAhora = new Set<string>();
  * son reference-counted y viven en `canalesConversacion`, re-unimos todos
  * los que sigan activos.
  *
- * BUG que esto arregla: hay más de un listener de `visibilitychange` en la
- * app (uno global en PresenciaActivator, otro puntual en
- * detalleConversacion mientras el chat está abierto) y ambos llaman a esta
- * función para el mismo evento de "volver a la pestaña". Como
- * `supabase.realtime.connect()` y el join del canal son asíncronos,
- * `supabase.realtime.isConnected()` todavía puede devolver `false` cuando
- * el segundo listener corre justo después del primero — así que el guard
- * de arriba no alcanzaba para evitar una doble llamada. El resultado eran
- * DOS `.subscribe()` sobre el mismo canal ya "joining", compitiendo por
- * negociar bindings con el servidor — el mismo mismatch cliente/servidor
- * que agregarBindingYResuscribirSiHaceFalta arregla para el bind inicial,
- * pero disparado acá por el evento de visibilidad en vez de por el mount.
- * Como la app hacía polling/otros pedidos igual, esto pasaba desapercibido
- * en la red (200/204 normales) — el canal terminaba "joined" pero sordo,
- * sin ningún error visible más allá de la consola.
+ * BUG que esto arregla (segunda vuelta): la versión anterior tenía su
+ * PROPIO guard (`_topicsReconectandoseAhora`), separado por completo de la
+ * cola `entrada.listo` que usa `_agregarBindingYResuscribirSiHaceFalta`.
+ * Ese guard evitaba que ESTA función se llamara a sí misma dos veces en
+ * paralelo para el mismo canal, pero no tenía forma de enterarse si un
+ * `.subscribe()` disparado por OTRO camino (un efecto de React montando/
+ * remontando bindings justo en el mismo momento en que la pestaña vuelve a
+ * primer plano — que es común, porque volver de background dispara re-
+ * renders) ya estaba en vuelo. Dos mecanismos de resubscribe distintos,
+ * cada uno "seguro" puertas adentro, pero sin coordinarse entre sí —
+ * mismo mismatch de bindings, ahora gatillado por el evento de visibilidad
+ * en vez de por el mount inicial.
  *
- * El fix: un guard síncrono por topic. La primera llamada en el ciclo
- * "reserva" el topic antes de llamar a `.subscribe()`; cualquier llamada
- * concurrente para el mismo topic lo salta. El guard se libera cuando ese
- * `.subscribe()` conecta (según el callback de estado del canal).
+ * El fix: un único punto de verdad. Acá también encadenamos sobre
+ * `entrada.listo`, la misma cola que usa `_agregarBindingYResuscribirSiHaceFalta` —
+ * así NINGÚN camino puede disparar un `.subscribe()` mientras otro sigue
+ * en vuelo para ese canal, sea cual sea el evento que lo originó.
  */
 export function reconectarRealtimeSiHaceFalta(): void {
   if (!supabase.realtime.isConnected()) {
@@ -508,13 +495,12 @@ export function reconectarRealtimeSiHaceFalta(): void {
   }
   canalesConversacion.forEach((entrada, topic) => {
     if (entrada.canal.state === "joined" || entrada.canal.state === "joining") return;
-    if (_topicsReconectandoseAhora.has(topic)) return;
-    _topicsReconectandoseAhora.add(topic);
-    entrada.canal.subscribe((status) => {
-      if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        _topicsReconectandoseAhora.delete(topic);
-      }
-    });
+    entrada.listo = entrada.listo
+      .catch(() => {
+        // Ver comentario equivalente en _agregarBindingYResuscribirSiHaceFalta:
+        // un fallo previo no debe bloquear intentos futuros.
+      })
+      .then(() => suscribirCanal(entrada.canal, topic));
   });
 }
 
