@@ -457,6 +457,7 @@ function ConstructorKaomoji({
                 <button
                   key={o}
                   onClick={() => setOjos(o)}
+                  aria-label={`Ojo ${o}`}
                   className="text-sm py-2 rounded-[var(--radius-btn)] select-none"
                   style={{
                     background:
@@ -481,6 +482,7 @@ function ConstructorKaomoji({
                 <button
                   key={b}
                   onClick={() => setBoca(b)}
+                  aria-label={`Boca ${b}`}
                   className="text-lg py-2 rounded-[var(--radius-btn)] select-none"
                   style={{
                     background:
@@ -500,12 +502,14 @@ function ConstructorKaomoji({
             <p className="text-micro font-bold text-primary/40 uppercase tracking-wide mb-2">
               Brazos
             </p>
-            <div className="flex flex-col gap-1.5">
+            <div className="grid grid-cols-5 gap-1.5">
               {BRAZOS_KAOMOJI.map((br) => (
                 <button
                   key={br.id}
                   onClick={() => setBrazos(br)}
-                  className="text-left px-3 py-2 rounded-[var(--radius-btn)] text-sm font-medium flex items-center justify-between"
+                  aria-label={br.label}
+                  title={br.label}
+                  className="text-sm py-2 rounded-[var(--radius-btn)] select-none"
                   style={{
                     background:
                       brazos.id === br.id
@@ -514,10 +518,7 @@ function ConstructorKaomoji({
                     border: brazos.id === br.id ? "1px solid var(--primary)" : "1px solid transparent",
                   }}
                 >
-                  <span>{br.label}</span>
-                  <span className="text-primary/40 text-xs">
-                    {br.izq}( ⁠• )‿( ⁠• ){br.der}
-                  </span>
+                  {br.id === "ninguno" ? "—" : `${br.izq}‿${br.der}`}
                 </button>
               ))}
             </div>
