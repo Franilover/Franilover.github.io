@@ -42,6 +42,8 @@ import {
 } from "../_shared/useEditorHeaderControls";
 import { ElementoPanelFlotante } from "./ElementosPage";
 import { AtomoVisual } from "./ElementoEditor";
+import { SelectorTagsCompuesto } from "./SelectorTagsCompuesto";
+import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
 
 import {
   autocompletarHastaEstable,
@@ -652,6 +654,10 @@ function CompuestoEditor({
   const [local, setLocal] = useState(compuesto);
   const [editandoElementoId, setEditandoElementoId] = useState<string | null>(null);
 
+  const { porCategoria: tagsPorCategoria, loading: tagsLoading } = useTagsCatalogo();
+  const { tagIdsDe, toggleTag, loading: compuestoTagsLoading } = useCompuestoTags();
+  const tagIdsAsignados = tagIdsDe(compuesto.id);
+
   async function persistElemento(id: string, cambios: Partial<Elemento>) {
     try {
       const { error } = await supabase.from("elementos").update(cambios).eq("id", id);
@@ -778,6 +784,14 @@ function CompuestoEditor({
             </span>
           </div>
         )}
+
+        <SelectorTagsCompuesto
+          compuestoId={compuesto.id}
+          porCategoria={tagsPorCategoria}
+          tagIdsAsignados={tagIdsAsignados}
+          onToggle={(tagId) => toggleTag(compuesto.id, tagId)}
+          loading={tagsLoading || compuestoTagsLoading}
+        />
 
         {/* Tres columnas: Elementos que lo componen (izquierda) · análisis
             del compuesto — estequiometría, reactividad/peso, balance
