@@ -16,7 +16,6 @@
 
 import {
   Beaker,
-  ChevronDown,
   Droplet,
   Flower2,
   GripVertical,
@@ -120,8 +119,6 @@ export function FloraEditorMejorado({
   const [tabActiva, setTabActiva] = useState<"composicion" | "organos" | "procesos">(
     "composicion",
   );
-  const [expandidosOrganos, setExpandidosOrganos] = useState<Set<string>>(new Set());
-  const [expandidosProcesos, setExpandidosProcesos] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setForm(floraProp);
@@ -318,15 +315,6 @@ export function FloraEditorMejorado({
                       <OrganoCard
                         key={organo.id}
                         organo={organo}
-                        isExpanded={expandidosOrganos.has(organo.id)}
-                        onToggle={() => {
-                          setExpandidosOrganos((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(organo.id)) next.delete(organo.id);
-                            else next.add(organo.id);
-                            return next;
-                          });
-                        }}
                         onUpdate={actualizarOrgano}
                         onDelete={() => eliminarOrgano(organo.id)}
                         compuestos={compuestos}
@@ -361,8 +349,6 @@ export function FloraEditorMejorado({
                 ) : (
                   <ListaProcesosReordenable
                     procesos={procesos}
-                    expandidos={expandidosProcesos}
-                    setExpandidos={setExpandidosProcesos}
                     onUpdate={actualizarProceso}
                     onDelete={eliminarProceso}
                     onReorder={reordenarProcesos}
@@ -412,77 +398,62 @@ export function FloraEditorMejorado({
 // ── Componente auxiliar: Tarjeta de órgano ─────────────────────────────────
 interface OrganoCardProps {
   organo: PlantaOrgano;
-  isExpanded: boolean;
-  onToggle: () => void;
   onUpdate: (id: string, updates: Partial<PlantaOrgano>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
 }
 
-function OrganoCard({ organo, isExpanded, onToggle, onUpdate, onDelete, compuestos }: OrganoCardProps) {
+function OrganoCard({ organo, onUpdate, onDelete, compuestos }: OrganoCardProps) {
   const opcionActual = TIPOS_ORGANO.find((o) => o.value === organo.tipo_organo);
   const Icon = opcionActual?.icon ?? Leaf;
 
   return (
     <div className="border border-primary/10 rounded-lg bg-primary/[0.02] overflow-hidden">
-      <div className="w-full px-3 py-2 flex items-center justify-between hover:bg-primary/[0.05] transition">
-        <button
-          onClick={onToggle}
-          className="flex items-center gap-2 flex-1 min-w-0 text-left"
-        >
-          <ChevronDown
-            size={14}
-            className={`shrink-0 transition ${isExpanded ? "rotate-180" : ""}`}
-          />
+      {/* Header compacto: ícono + selector de tipo + eliminar */}
+      <div className="w-full px-3 py-2 flex items-center justify-between border-b border-primary/10 bg-primary/[0.015]">
+        <div className="flex items-center gap-2 min-w-0">
           <Icon size={13} className="shrink-0 text-primary/40" />
-        </button>
-
-        <div className="flex items-center gap-2">
           <SelectorTipo
             variant="chip"
             valor={organo.tipo_organo}
             opciones={TIPOS_ORGANO}
             onSelect={(tipo) => onUpdate(organo.id, { tipo_organo: tipo })}
           />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="p-1 rounded hover:bg-red-500/10 text-red-500/50 hover:text-red-500 transition"
-          >
-            <Trash2 size={14} />
-          </button>
         </div>
+        <button
+          onClick={onDelete}
+          className="p-1 rounded hover:bg-red-500/10 text-red-500/50 hover:text-red-500 transition shrink-0"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
 
-      {isExpanded && (
-        <div className="px-3 py-2.5 border-t border-primary/10 space-y-3 text-xs">
-          <div>
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
-              Fórmula química
-            </span>
-            <SelectorFormulaOrgano
-              compuestos={compuestos}
-              componentes={(organo.componentes ?? []) as ComponenteOrgano[]}
-              onChange={(componentes) => onUpdate(organo.id, { componentes })}
-            />
-          </div>
-
-          <div>
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
-              Notas
-            </span>
-            <textarea
-              className="w-full bg-primary/[0.02] border border-primary/10 rounded px-2 py-1 text-primary/70 resize-none outline-none"
-              placeholder="Notas del órgano…"
-              value={organo.notas ?? ""}
-              onChange={(e) => onUpdate(organo.id, { notas: e.target.value })}
-              rows={2}
-            />
-          </div>
+      {/* Contenido: grid de 2 columnas cuando hay ancho — fórmula ocupa más
+          espacio (es lo principal), notas queda al lado. */}
+      <div className="p-3 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-3 text-xs items-start">
+        <div>
+          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+            Fórmula química
+          </span>
+          <SelectorFormulaOrgano
+            compuestos={compuestos}
+            componentes={(organo.componentes ?? []) as ComponenteOrgano[]}
+            onChange={(componentes) => onUpdate(organo.id, { componentes })}
+          />
         </div>
-      )}
+
+        <div>
+          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+            Notas
+          </span>
+          <textarea
+            className="w-full h-full min-h-[4.5rem] bg-primary/[0.02] border border-primary/10 rounded px-2 py-1 text-primary/70 resize-none outline-none"
+            placeholder="Notas del órgano…"
+            value={organo.notas ?? ""}
+            onChange={(e) => onUpdate(organo.id, { notas: e.target.value })}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -493,8 +464,6 @@ function OrganoCard({ organo, isExpanded, onToggle, onUpdate, onDelete, compuest
 // está arrastrando; `overId` el que está debajo del cursor.
 function ListaProcesosReordenable({
   procesos,
-  expandidos,
-  setExpandidos,
   onUpdate,
   onDelete,
   onReorder,
@@ -502,8 +471,6 @@ function ListaProcesosReordenable({
   elementos,
 }: {
   procesos: PlantaProceso[];
-  expandidos: Set<string>;
-  setExpandidos: React.Dispatch<React.SetStateAction<Set<string>>>;
   onUpdate: (id: string, updates: Partial<PlantaProceso>) => void;
   onDelete: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
@@ -565,15 +532,6 @@ function ListaProcesosReordenable({
           >
             <ProcesoCard
               proceso={proceso}
-              isExpanded={expandidos.has(proceso.id)}
-              onToggle={() => {
-                setExpandidos((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(proceso.id)) next.delete(proceso.id);
-                  else next.add(proceso.id);
-                  return next;
-                });
-              }}
               onUpdate={onUpdate}
               onDelete={() => onDelete(proceso.id)}
               compuestos={compuestos}
@@ -600,8 +558,6 @@ function ListaProcesosReordenable({
 // ── Componente auxiliar: Tarjeta de proceso ────────────────────────────────
 interface ProcesoCardProps {
   proceso: PlantaProceso;
-  isExpanded: boolean;
-  onToggle: () => void;
   onUpdate: (id: string, updates: Partial<PlantaProceso>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
@@ -615,8 +571,6 @@ interface ProcesoCardProps {
 
 function ProcesoCard({
   proceso,
-  isExpanded,
-  onToggle,
   onUpdate,
   onDelete,
   compuestos,
@@ -625,11 +579,9 @@ function ProcesoCard({
 }: ProcesoCardProps) {
   return (
     <div className="border border-primary/10 rounded-lg bg-primary/[0.02] overflow-hidden">
-      <div className="w-full px-2 py-2 flex items-center justify-between hover:bg-primary/[0.05] transition">
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          {/* Handle de drag — visible siempre, mismo espíritu que
-              EditorCapitulos (evita arrastrar accidentalmente desde
-              cualquier punto de la tarjeta). */}
+      {/* Header compacto: drag handle + selector de tipo real + eliminar */}
+      <div className="w-full px-2 py-2 flex items-center justify-between border-b border-primary/10 bg-primary/[0.015]">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span
             {...dragHandleProps}
             title="Arrastrar para reordenar"
@@ -637,56 +589,42 @@ function ProcesoCard({
           >
             <GripVertical size={13} />
           </span>
-
-          <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
-            <ChevronDown
-              size={14}
-              className={`shrink-0 transition ${isExpanded ? "rotate-180" : ""}`}
-            />
-            {proceso.condiciones && (
-              <span className="text-xs text-primary/40 truncate">({proceso.condiciones})</span>
-            )}
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
           <SelectorTipo
             variant="chip"
             valor={proceso.tipo_proceso}
             opciones={TIPOS_PROCESO}
             onSelect={(tipo) => onUpdate(proceso.id, { tipo_proceso: tipo })}
           />
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="p-1 rounded hover:bg-red-500/10 text-red-500/50 hover:text-red-500 transition"
-          >
-            <Trash2 size={14} />
-          </button>
         </div>
+        <button
+          onClick={onDelete}
+          className="p-1 rounded hover:bg-red-500/10 text-red-500/50 hover:text-red-500 transition shrink-0"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
 
-      {isExpanded && (
-        <div className="px-3 py-2.5 border-t border-primary/10 space-y-3 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <SelectorConsumeProduce
-              label="Consume"
-              items={(proceso.consume ?? []) as ItemProceso[]}
-              onChange={(consume) => onUpdate(proceso.id, { consume })}
-              elementos={elementos}
-              compuestos={compuestos}
-            />
-            <SelectorConsumeProduce
-              label="Produce"
-              items={(proceso.produce ?? []) as ItemProceso[]}
-              onChange={(produce) => onUpdate(proceso.id, { produce })}
-              elementos={elementos}
-              compuestos={compuestos}
-            />
-          </div>
+      {/* Contenido: consume/produce lado a lado, condiciones + descripción
+          también en columnas cuando el ancho lo permite. */}
+      <div className="p-3 space-y-3 text-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <SelectorConsumeProduce
+            label="Consume"
+            items={(proceso.consume ?? []) as ItemProceso[]}
+            onChange={(consume) => onUpdate(proceso.id, { consume })}
+            elementos={elementos}
+            compuestos={compuestos}
+          />
+          <SelectorConsumeProduce
+            label="Produce"
+            items={(proceso.produce ?? []) as ItemProceso[]}
+            onChange={(produce) => onUpdate(proceso.id, { produce })}
+            elementos={elementos}
+            compuestos={compuestos}
+          />
+        </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-3 items-start">
           <div>
             <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
               Condiciones
@@ -712,7 +650,7 @@ function ProcesoCard({
             />
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
