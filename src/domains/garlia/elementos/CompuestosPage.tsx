@@ -25,7 +25,7 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { RichEditor } from "@/editor/lexical";
@@ -142,7 +142,12 @@ function nombreElemento(elementos: Elemento[], id: string): string {
   return el ? `${el.simbolo || "??"} · ${el.nombre}` : "(elemento eliminado)";
 }
 
-/** Tarjeta de compuesto: nombre + símbolo + resumen de sus componentes. */
+/**
+ * Pill de compuesto: solo el nombre, formato chip compacto (mismo espíritu
+ * que NodoTitulo en GeografiaJerarquica) — se prioriza legibilidad y
+ * densidad sobre el detalle de componentes, que ya se ve al abrir el panel.
+ * El punto de "estable" se conserva como señal rápida sin abrir nada.
+ */
 function CompuestoCasilla({
   compuesto,
   elementos,
@@ -165,51 +170,20 @@ function CompuestoCasilla({
     <button
       type="button"
       onClick={onClick}
-      className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
+      title={compuesto.nombre}
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-micro font-bold tracking-wide transition-colors truncate max-w-full ${
         seleccionado
-          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
-          : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+          ? "bg-primary/20 text-primary border border-primary/40 ring-2 ring-primary/30"
+          : "bg-primary/10 hover:bg-primary/20 text-primary/70 border border-primary/15"
       }`}
     >
-      <div className="flex items-start justify-between">
-        <span className="text-micro font-black text-primary/30 tabular-nums">
-          {compuesto.componentes?.length ?? 0}×
-        </span>
-        <div className="flex items-center gap-0.5">
-          {estable && (
-            <span
-              title="Estructura atómica completa"
-              className="w-1.5 h-1.5 rounded-full bg-accent/70 shrink-0 mt-0.5"
-            />
-          )}
-          <Beaker size={10} className="text-accent/60 shrink-0 mt-0.5" />
-        </div>
-      </div>
-
-      <span className="text-base font-black text-primary text-center leading-none py-0.5">
-        {compuesto.simbolo || "??"}
-      </span>
-
-      <span className="text-micro font-bold text-primary/80 truncate text-center leading-tight">
-        {compuesto.nombre}
-      </span>
-
-      <div className="mt-0.5 pt-0.5 border-t border-primary/10 flex flex-col gap-0.5">
-        {(compuesto.componentes ?? []).slice(0, 3).map((c) => (
-          <span
-            key={c.elemento_id}
-            className="text-micro text-primary/40 truncate leading-tight"
-          >
-            <span className="text-primary/25">{c.cantidad}×</span>{" "}
-            {nombreElemento(elementos, c.elemento_id)}
-          </span>
-        ))}
-        {(compuesto.componentes?.length ?? 0) > 3 && (
-          <span className="text-micro text-primary/25 leading-tight">
-            +{(compuesto.componentes?.length ?? 0) - 3} más
-          </span>
-        )}
-      </div>
+      {estable && (
+        <span
+          title="Estructura atómica completa"
+          className="w-1.5 h-1.5 rounded-full bg-accent/70 shrink-0"
+        />
+      )}
+      <span className="truncate">{compuesto.nombre}</span>
     </button>
   );
 }
@@ -1381,6 +1355,127 @@ function LaboratorioModal({
   );
 }
 
+/**
+ * MasonryGruposNaturaleza
+ * ───────────────────────────────────────────────────────────────────────────
+ * Reparte los grupos de compuestos (por Naturaleza) en columnas de igual
+ * ancho, cada grupo asignado a la columna con menor altura acumulada
+ * (masonry greedy, mismo criterio que distribuirEnColumnas en
+ * GeografiaJerarquica.tsx). Como ahora cada compuesto es solo una pill de
+ * texto, la altura de un grupo depende de cuántas pills entran por fila
+ * dado el ancho de columna — se estima con el mismo enfoque de "simular el
+ * wrap" en vez de medir el DOM, para poder recalcular las columnas antes
+ * de pintar.
+ */
+function MasonryGruposNaturaleza({
+  grupos,
+  elementos,
+  activoId,
+  onSeleccionar,
+}: {
+  grupos: { id: string; nombre: string; compuestos: Compuesto[] }[];
+  elementos: Elemento[];
+  activoId: string | null;
+  onSeleccionar: (id: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width) setContainerWidth(width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const GAP = 16;
+  const ANCHO_MIN_COLUMNA = 240;
+  const anchoDisponible = containerWidth || 900;
+  const numColumnas = Math.max(
+    1,
+    Math.floor((anchoDisponible + GAP) / (ANCHO_MIN_COLUMNA + GAP)),
+  );
+  const anchoColumna = (anchoDisponible - GAP * (numColumnas - 1)) / numColumnas;
+
+  // Estimación de altura de una pill según su ancho de texto (aprox. 6.2px
+  // por carácter a este tamaño de fuente + padding del chip), para simular
+  // el flex-wrap real sin medir el DOM.
+  const PILL_ALTO = 24;
+  const PILL_GAP = 4;
+  const anchoPill = (nombre: string) => Math.min(Math.max(nombre.length * 6.2 + 28, 60), anchoColumna);
+
+  const altoGrupo = (grupo: { nombre: string; compuestos: Compuesto[] }) => {
+    const tituloAlto = 20;
+    let filas = 1;
+    let anchoFila = 0;
+    for (const c of grupo.compuestos) {
+      const w = anchoPill(c.nombre);
+      const necesario = anchoFila === 0 ? w : anchoFila + PILL_GAP + w;
+      if (anchoFila === 0 || necesario <= anchoColumna) {
+        anchoFila = necesario;
+      } else {
+        filas += 1;
+        anchoFila = w;
+      }
+    }
+    return tituloAlto + filas * PILL_ALTO + (filas - 1) * PILL_GAP;
+  };
+
+  function distribuirEnColumnas() {
+    const columnas: { id: string; nombre: string; compuestos: Compuesto[] }[][] = Array.from(
+      { length: numColumnas },
+      () => [],
+    );
+    const alturas = new Array(numColumnas).fill(0);
+    for (const grupo of grupos) {
+      let idxMin = 0;
+      for (let i = 1; i < numColumnas; i++) {
+        if (alturas[i] < alturas[idxMin]) idxMin = i;
+      }
+      columnas[idxMin].push(grupo);
+      alturas[idxMin] += altoGrupo(grupo) + GAP;
+    }
+    return columnas;
+  }
+
+  const columnas = useMemo(
+    () => distribuirEnColumnas(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [grupos, numColumnas, anchoColumna],
+  );
+
+  return (
+    <div ref={containerRef} className="flex gap-4 items-start">
+      {columnas.map((columna, i) => (
+        <div key={i} className="flex flex-col gap-4 min-w-0" style={{ width: anchoColumna }}>
+          {columna.map((grupo) => (
+            <div key={grupo.id}>
+              <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                {grupo.nombre}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {grupo.compuestos.map((c) => (
+                  <CompuestoCasilla
+                    key={c.id}
+                    compuesto={c}
+                    elementos={elementos}
+                    seleccionado={c.id === activoId}
+                    onClick={() => onSeleccionar(c.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CompuestosPage({
   compuestos,
   elementos,
@@ -1424,6 +1519,10 @@ export function CompuestosPage({
     const grupos = tagsNaturaleza
       .map((tag) => ({ id: tag.id, nombre: tag.nombre, compuestos: mapa.get(tag.id)! }))
       .filter((g) => g.compuestos.length > 0);
+
+    if (sinNaturaleza.length > 0) {
+      grupos.push({ id: "__sin-naturaleza__", nombre: "Sin naturaleza", compuestos: sinNaturaleza });
+    }
 
     return { grupos, sinNaturaleza };
   }, [compuestos, tagsNaturaleza, tagIdsDe]);
@@ -1501,58 +1600,14 @@ export function CompuestosPage({
             Todavía no hay compuestos creados.
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {gruposPorNaturaleza.grupos.map((grupo) => (
-              <div key={grupo.id}>
-                <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
-                  {grupo.nombre}
-                </div>
-                <div
-                  className="grid gap-1"
-                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
-                >
-                  {grupo.compuestos.map((c) => (
-                    <CompuestoCasilla
-                      key={c.id}
-                      compuesto={c}
-                      elementos={elementos}
-                      seleccionado={c.id === activoId}
-                      onClick={() =>
-                        setSeleccionadoId((actual) => (actual === c.id ? null : c.id))
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            {gruposPorNaturaleza.sinNaturaleza.length > 0 && (
-              <div>
-                {gruposPorNaturaleza.grupos.length > 0 && (
-                  <div className="h-px mb-2 bg-primary/10" />
-                )}
-                <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
-                  Sin naturaleza
-                </div>
-                <div
-                  className="grid gap-1"
-                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
-                >
-                  {gruposPorNaturaleza.sinNaturaleza.map((c) => (
-                    <CompuestoCasilla
-                      key={c.id}
-                      compuesto={c}
-                      elementos={elementos}
-                      seleccionado={c.id === activoId}
-                      onClick={() =>
-                        setSeleccionadoId((actual) => (actual === c.id ? null : c.id))
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <MasonryGruposNaturaleza
+            grupos={gruposPorNaturaleza.grupos}
+            elementos={elementos}
+            activoId={activoId}
+            onSeleccionar={(id) =>
+              setSeleccionadoId((actual) => (actual === id ? null : id))
+            }
+          />
         )}
       </div>
 
