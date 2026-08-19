@@ -52,7 +52,7 @@ export function useConfirm() {
     return createPortal(
       <AnimatePresence>
         {state && (
-          <div className="fixed inset-0 z-[9998] flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
             <MotionDiv
               animate={{ opacity: 1 }}
               className="absolute inset-0 bg-primary/20 backdrop-blur-sm"
