@@ -99,6 +99,7 @@ function FilaItemProceso({
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
+  const [activo, setActivo] = useState(0);
 
   const catalogo = item.tipo === "elemento" ? elementos : compuestos;
   const elegido = useMemo(
@@ -112,11 +113,36 @@ function FilaItemProceso({
     return catalogo.filter((c) => c.nombre.toLowerCase().includes(q));
   }, [catalogo, busqueda]);
 
+  const opciones = filtrados.slice(0, 30);
+
+  function elegir(c: Elemento | Compuesto) {
+    onChange({ id: c.id });
+    setBusqueda("");
+    setBuscando(false);
+  }
+
   function cambiarTipo(tipo: "elemento" | "compuesto") {
     const nuevoCatalogo = tipo === "elemento" ? elementos : compuestos;
     const primero = nuevoCatalogo[0];
     onChange({ tipo, id: primero?.id ?? "" });
     setBusqueda("");
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!buscando || opciones.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActivo((i) => (i + 1) % opciones.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActivo((i) => (i - 1 + opciones.length) % opciones.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const c = opciones[activo];
+      if (c) elegir(c);
+    } else if (e.key === "Escape") {
+      setBuscando(false);
+    }
   }
 
   return (
@@ -157,12 +183,17 @@ function FilaItemProceso({
             onFocus={() => {
               setBuscando(true);
               setBusqueda("");
+              setActivo(0);
             }}
             onBlur={() => {
               // Da tiempo a que el onMouseDown de una opción se dispare antes de cerrar
               setTimeout(() => setBuscando(false), 120);
             }}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setActivo(0);
+            }}
+            onKeyDown={onKeyDown}
             placeholder={`Buscar ${item.tipo}…`}
             className="w-full bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/30 placeholder:font-normal"
           />
@@ -174,19 +205,18 @@ function FilaItemProceso({
                 borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
               }}
             >
-              {filtrados.length === 0 ? (
+              {opciones.length === 0 ? (
                 <p className="text-micro text-primary/25 italic text-center py-2">Sin resultados</p>
               ) : (
-                filtrados.slice(0, 30).map((c) => (
+                opciones.map((c, i) => (
                   <button
                     key={c.id}
                     type="button"
-                    onMouseDown={() => {
-                      onChange({ id: c.id });
-                      setBusqueda("");
-                      setBuscando(false);
-                    }}
-                    className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold text-primary/75 hover:bg-primary/6 hover:text-primary transition-colors truncate"
+                    onMouseEnter={() => setActivo(i)}
+                    onMouseDown={() => elegir(c)}
+                    className={`w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold transition-colors truncate ${
+                      i === activo ? "bg-primary/10 text-primary" : "text-primary/75 hover:bg-primary/6 hover:text-primary"
+                    }`}
                   >
                     {c.nombre}
                   </button>

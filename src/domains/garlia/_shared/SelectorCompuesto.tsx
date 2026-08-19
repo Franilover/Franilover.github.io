@@ -51,6 +51,7 @@ export function SelectorCompuesto({
   const [busqueda, setBusqueda] = useState("");
   const [creando, setCreando] = useState(false);
   const [abierto, setAbierto] = useState(false);
+  const [activo, setActivo] = useState(0);
 
   const elegido = useMemo(
     () => compuestos.find((c) => c.id === compuestoId) ?? null,
@@ -65,6 +66,27 @@ export function SelectorCompuesto({
         c.nombre.toLowerCase().includes(q) || (c.simbolo ?? "").toLowerCase().includes(q),
     );
   }, [compuestos, busqueda]);
+
+  function elegirCompuesto(c: Compuesto) {
+    onChange(c.id);
+    setAbierto(false);
+    setBusqueda("");
+  }
+
+  function onKeyDownBusqueda(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (filtrados.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActivo((i) => (i + 1) % filtrados.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActivo((i) => (i - 1 + filtrados.length) % filtrados.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const c = filtrados[activo];
+      if (c) elegirCompuesto(c);
+    }
+  }
 
   async function crearCompuesto(nombreBase: string) {
     setCreando(true);
@@ -137,7 +159,11 @@ export function SelectorCompuesto({
           <Search size={11} className="text-primary/30 shrink-0" />
           <input
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setActivo(0);
+            }}
+            onKeyDown={onKeyDownBusqueda}
             placeholder="Buscar compuesto por nombre o símbolo…"
             className="flex-1 min-w-0 bg-transparent text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal"
           />
@@ -169,16 +195,15 @@ export function SelectorCompuesto({
             Ningún compuesto coincide con "{busqueda}".
           </div>
         ) : (
-          filtrados.map((c) => (
+          filtrados.map((c, i) => (
             <button
               key={c.id}
               type="button"
-              onClick={() => {
-                onChange(c.id);
-                setAbierto(false);
-                setBusqueda("");
-              }}
-              className="flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-primary/5 transition-colors cursor-pointer"
+              onMouseEnter={() => setActivo(i)}
+              onClick={() => elegirCompuesto(c)}
+              className={`flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors cursor-pointer ${
+                i === activo ? "bg-primary/8" : "hover:bg-primary/5"
+              }`}
             >
               {c.id === compuestoId ? (
                 <Check size={12} className="text-accent shrink-0" />
