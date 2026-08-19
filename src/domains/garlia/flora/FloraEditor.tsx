@@ -180,7 +180,7 @@ export function FloraEditorMejorado({
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-4">
-          {/* Layout principal: imagen + descripción */}
+          {/* Layout principal: imagen + tabs */}
           <div className="flex flex-col sm:flex-row gap-5 mb-6">
             {/* Columna izquierda: imagen */}
             <div className="w-full sm:w-72 sm:shrink-0">
@@ -195,25 +195,10 @@ export function FloraEditorMejorado({
               />
             </div>
 
-            {/* Columna derecha: descripción */}
+            {/* Columna derecha: tabs */}
             <div className="flex-1 min-w-0">
-              <div className="space-y-1.5">
-                <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
-                  Descripción
-                </label>
-                <RichEditor
-                  minHeight="8rem"
-                  placeholder="Qué es, dónde crece, usos, apariencia…"
-                  value={form.descripcion ?? ""}
-                  onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* ── TABS ──────────────────────────────────────────────────────── */}
-          <div className="border-t border-primary/10 pt-4">
-            <div className="flex gap-2 mb-4 border-b border-primary/10">
+              {/* ── TABS ──────────────────────────────────────────────────── */}
+              <div className="flex gap-2 mb-4 border-b border-primary/10">
               <button
                 onClick={() => setTabActiva("composicion")}
                 className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
@@ -249,6 +234,18 @@ export function FloraEditorMejorado({
             {/* ── TAB: Composición ──────────────────────────────────────── */}
             {tabActiva === "composicion" && (
               <div className="space-y-4">
+                <div>
+                  <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35 block mb-1.5">
+                    Descripción
+                  </label>
+                  <RichEditor
+                    minHeight="8rem"
+                    placeholder="Qué es, dónde crece, usos, apariencia…"
+                    value={form.descripcion ?? ""}
+                    onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
+                  />
+                </div>
+
                 <div>
                   <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-2">
                     Composición (Compuestos)
@@ -375,6 +372,7 @@ export function FloraEditorMejorado({
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>
