@@ -332,7 +332,7 @@ export function FloraEditorMejorado({
                         }}
                         onUpdate={actualizarOrgano}
                         onDelete={() => eliminarOrgano(organo.id)}
-                        elementos={elementos}
+                        compuestos={compuestos}
                       />
                     ))}
                   </div>
@@ -418,10 +418,10 @@ interface OrganoCardProps {
   onToggle: () => void;
   onUpdate: (id: string, updates: Partial<PlantaOrgano>) => void;
   onDelete: () => void;
-  elementos: Elemento[];
+  compuestos: Compuesto[];
 }
 
-function OrganoCard({ organo, isExpanded, onToggle, onUpdate, onDelete, elementos }: OrganoCardProps) {
+function OrganoCard({ organo, isExpanded, onToggle, onUpdate, onDelete, compuestos }: OrganoCardProps) {
   const opcionActual = TIPOS_ORGANO.find((o) => o.value === organo.tipo_organo);
   const Icon = opcionActual?.icon ?? Leaf;
 
@@ -465,7 +465,7 @@ function OrganoCard({ organo, isExpanded, onToggle, onUpdate, onDelete, elemento
               Fórmula química
             </span>
             <SelectorFormulaOrgano
-              elementos={elementos}
+              compuestos={compuestos}
               componentes={(organo.componentes ?? []) as ComponenteOrgano[]}
               onChange={(componentes) => onUpdate(organo.id, { componentes })}
             />

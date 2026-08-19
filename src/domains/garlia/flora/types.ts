@@ -27,8 +27,8 @@ export interface PlantaOrgano {
   id: string;
   planta_id: string;
   tipo_organo: "hoja" | "petalo" | "raiz" | "fruto" | "tallo" | "semilla" | "corteza" | "otro";
-  /** Fórmula química propia del órgano (mismo formato JSONB que compuestos) */
-  componentes: Array<{ elemento: string; cantidad: number }> | null;
+  /** Fórmula del órgano: mezcla de Compuestos + cantidad (mismo lenguaje que consume/produce de Procesos y Composición de Flora) */
+  componentes: Array<{ compuesto_id: string; cantidad: number }> | null;
   /** ID opcional de compuesto base (para derivar fórmulas sin escribir todo) */
   compuesto_base_id: string | null;
   notas: string | null;
