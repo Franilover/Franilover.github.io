@@ -75,6 +75,19 @@ const DEXIE_TABLES = new Set([
   "runas",
   "grupos_mundo",
   "ciudades",
+  // ─── EditorMundo: Química, Física, Biología (antes sin cache local) ─────────
+  "elementos",
+  "compuestos",
+  "oris",
+  "particulas",
+  "particulas_base",
+  "iums",
+  "fisica_conceptos",
+  "biomas",
+  "clados",
+  "ecosistemas",
+  "cadenas_alimenticias",
+  "perfiles_atomicos_criatura",
 ]);
 
 const OFFLINE_WRITABLE = new Set([
@@ -105,6 +118,19 @@ const OFFLINE_WRITABLE = new Set([
   "runas",
   "grupos_mundo",
   "ciudades",
+  // ─── EditorMundo: Química, Física, Biología (antes sin cache local) ─────────
+  "elementos",
+  "compuestos",
+  "oris",
+  "particulas",
+  "particulas_base",
+  "iums",
+  "fisica_conceptos",
+  "biomas",
+  "clados",
+  "ecosistemas",
+  "cadenas_alimenticias",
+  "perfiles_atomicos_criatura",
 ]);
 
 // Tablas con ID numérico autogenerado por la DB — no se pueden crear offline

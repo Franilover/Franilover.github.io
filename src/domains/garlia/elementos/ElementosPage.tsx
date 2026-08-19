@@ -202,6 +202,13 @@ interface Props {
    * vez de saltarlos. Devuelve cuántos quedaron actualizados.
    */
   onActualizarVarios?: (elementos: (Partial<Elemento> & { id: string })[]) => Promise<number>;
+  /**
+   * Notifica cada vez que cambia el elemento abierto en el panel (o se
+   * cierra, con null) — usado por RunasPage para persistir el último
+   * elemento visto en useMagiaSeccionStore y reabrirlo tras un refresh.
+   * Opcional: si no se pasa, el comportamiento es igual que antes.
+   */
+  onSeleccionarIdChange?: (id: string | null) => void;
 }
 
 // ─── Grupo (columna) tipo tabla periódica real ─────────────────────────────
@@ -673,8 +680,18 @@ export function ElementosPage({
   seleccionarId,
   onImportarElementos,
   onActualizarVarios,
+  onSeleccionarIdChange,
 }: Props) {
-  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [seleccionadoId, setSeleccionadoIdRaw] = useState<string | null>(null);
+  const setSeleccionadoId = (
+    valor: string | null | ((actual: string | null) => string | null),
+  ) => {
+    setSeleccionadoIdRaw((actual) => {
+      const nuevo = typeof valor === "function" ? valor(actual) : valor;
+      onSeleccionarIdChange?.(nuevo);
+      return nuevo;
+    });
+  };
   // Al clickear un compuesto en "Usado en compuestos" desde el editor de un
   // Elemento: cierra el panel de Elemento y fuerza la apertura de este
   // compuesto en CompuestosPage (más abajo en la misma página).

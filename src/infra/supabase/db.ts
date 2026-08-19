@@ -522,6 +522,93 @@ export interface NodoPosicionLocal {
   updated_at?: number;
 }
 
+// ─── Química: Tabla Alquímica (elementos) y Compuestos ────────────────────
+export interface ElementoLocal {
+  id: string;
+  nombre?: string;
+  simbolo?: string;
+  numero_atomico?: number;
+  [key: string]: any;
+}
+
+export interface CompuestoLocal {
+  id: string;
+  nombre?: string;
+  simbolo?: string;
+  componentes?: any;
+  created_at?: string;
+  [key: string]: any;
+}
+
+// ─── Física: Oris, Partículas, IUMs, Conceptos ─────────────────────────────
+export interface OrisLocal {
+  id: string;
+  orden?: number;
+  [key: string]: any;
+}
+
+export interface ParticulaLocal {
+  id: string;
+  orden?: number;
+  [key: string]: any;
+}
+
+export interface ParticulaBaseLocal {
+  id: string;
+  orden?: number;
+  [key: string]: any;
+}
+
+export interface IumLocal {
+  id: string;
+  orden?: number;
+  [key: string]: any;
+}
+
+export interface FisicaConceptoLocal {
+  id: string;
+  orden?: number;
+  [key: string]: any;
+}
+
+// ─── Biología: Biomas, Clados, Ecosistemas, Cadenas, Perfiles atómicos ─────
+export interface BiomaLocal {
+  id: string;
+  nombre?: string;
+  orden?: number;
+  [key: string]: any;
+}
+
+export interface CladoLocal {
+  id: string;
+  nombre?: string;
+  padre_id?: string | null;
+  orden?: number;
+  [key: string]: any;
+}
+
+export interface EcosistemaLocal {
+  id: string;
+  nombre?: string;
+  bioma_id?: string | null;
+  orden?: number;
+  [key: string]: any;
+}
+
+export interface CadenaAlimenticiaLocal {
+  id: string;
+  nombre?: string;
+  ecosistema_id?: string | null;
+  orden?: number;
+  [key: string]: any;
+}
+
+export interface PerfilAtomicoCriaturaLocal {
+  id: string;
+  criatura_id?: string;
+  [key: string]: any;
+}
+
 class AgendaFraniDB extends Dexie {
   personajes!: Table<Personaje, string>;
   criaturas!: Table<Criatura, string>;
@@ -595,6 +682,24 @@ class AgendaFraniDB extends Dexie {
   descubrimientos!: Table<DescubrimientoLocal, string>;
   flagsNarrativos!: Table<FlagLocal, string>;
   nodoPosiciones!: Table<NodoPosicionLocal, string>;
+
+  // Química: Tabla Alquímica + Compuestos
+  elementos!: Table<ElementoLocal, string>;
+  compuestos!: Table<CompuestoLocal, string>;
+
+  // Física: Oris, Partículas, IUMs, Conceptos
+  oris!: Table<OrisLocal, string>;
+  particulas!: Table<ParticulaLocal, string>;
+  particulas_base!: Table<ParticulaBaseLocal, string>;
+  iums!: Table<IumLocal, string>;
+  fisica_conceptos!: Table<FisicaConceptoLocal, string>;
+
+  // Biología: Biomas, Clados, Ecosistemas, Cadenas, Perfiles atómicos
+  biomas!: Table<BiomaLocal, string>;
+  clados!: Table<CladoLocal, string>;
+  ecosistemas!: Table<EcosistemaLocal, string>;
+  cadenas_alimenticias!: Table<CadenaAlimenticiaLocal, string>;
+  perfiles_atomicos_criatura!: Table<PerfilAtomicoCriaturaLocal, string>;
 
   constructor() {
     super("AgendaFranilover");
@@ -1365,6 +1470,29 @@ class AgendaFraniDB extends Dexie {
     // created_at (para poder traer "los últimos N" ya ordenados).
     this.version(31).stores({
       mensajes_cache: "id, conversacion_id, created_at",
+    });
+
+    // ─── v32: cache offline de Química (elementos/compuestos), Física
+    // (oris/partículas/iums/conceptos) y Biología (biomas/clados/
+    // ecosistemas/cadenas/perfiles atómicos) — antes solo pegaban directo
+    // a Supabase sin ningún fallback local, de ahí que la Tabla Química/
+    // Física/Biología se reiniciara en blanco al recargar sin conexión (o
+    // simplemente tardara el round-trip completo). Mismo patrón que el
+    // resto de tablas: useSupabaseData ya sabe leer/escribir acá, solo
+    // faltaba declararlas.
+    this.version(32).stores({
+      elementos: "id, nombre, numero_atomico",
+      compuestos: "id, nombre, created_at",
+      oris: "id, orden",
+      particulas: "id, orden",
+      particulas_base: "id, orden",
+      iums: "id, orden",
+      fisica_conceptos: "id, orden",
+      biomas: "id, nombre, orden",
+      clados: "id, nombre, padre_id, orden",
+      ecosistemas: "id, nombre, bioma_id, orden",
+      cadenas_alimenticias: "id, nombre, ecosistema_id, orden",
+      perfiles_atomicos_criatura: "id, criatura_id",
     });
   }
 }

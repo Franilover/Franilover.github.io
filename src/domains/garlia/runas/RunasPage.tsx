@@ -55,6 +55,7 @@ import { RANGOS_ACIERTO } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
 import { useGruposRunas } from "./useGruposRunas";
 import { useSubsistemasMagia } from "./useSubsistemasMagia";
+import { useMagiaSeccionStore, type SeccionMagia } from "./useMagiaSeccionStore";
 
 interface EntidadMagicaMin {
   id: string;
@@ -350,9 +351,13 @@ function BloqueEnsayoEnergias(_props: { onOpenEnsayo?: (id: string) => void }) {
 // firma de Props de RunasPage con otro bloque de campos opcionales.
 function BloqueFisica({
   seleccionarOrisId,
+  onOrisSeleccionadoChange,
   onSelectCriatura,
 }: {
   seleccionarOrisId?: string | null;
+  /** Notifica cada vez que cambia el Oris abierto — RunasPage lo persiste
+   *  en useMagiaSeccionStore para reabrirlo tras un refresh. */
+  onOrisSeleccionadoChange?: (id: string | null) => void;
   onSelectCriatura?: (id: string) => void;
 }) {
   const { items: particulaBase, loading: loadingParticulaBase } = useParticulasBase();
@@ -496,6 +501,7 @@ function BloqueFisica({
         }
         onEliminarOris={handleEliminar}
         seleccionarOrisId={seleccionarOrisId}
+        onOrisSeleccionadoChange={onOrisSeleccionadoChange}
         conceptos={conceptos}
         loadingConceptos={loadingConceptos}
         onActualizarConcepto={(id, cambios) =>
@@ -656,7 +662,8 @@ function BloqueEnsayoConSubBloques({
 // fijos + conceptos, y al final los Subsistemas de Magia (chips que abren
 // en modal flotante) — ver BloqueFisica más abajo. Biología:
 // taxonomía/ecosistemas/perfiles.
-type SeccionMagia = "runas" | "tabla" | "fisica" | "biologia";
+// SeccionMagia se importa (y persiste) desde useMagiaSeccionStore.ts —
+// arriba, junto al resto de imports del store.
 
 const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
   { key: "runas", label: "Runas", Icon: Waypoints },
@@ -727,12 +734,27 @@ export function RunasPage({
   // de grupos se hace acá mismo, en el panel derecho.
   const { grupos, loading: loadingGrupos, sincronizarGruposDeRuna } = useGruposRunas();
 
+  // Sub-tab activa de Magia (Runas/Química/Física/Biología) + item
+  // seleccionado dentro de cada una — persistidos vía useMagiaSeccionStore
+  // (Zustand + localStorage) para sobrevivir a un refresh de página; antes
+  // eran useState locales que se perdían siempre al recargar.
+  const seccionMagia = useMagiaSeccionStore((s) => s.seccion);
+  const setSeccionMagia = useMagiaSeccionStore((s) => s.setSeccion);
+  const itemPorSeccion = useMagiaSeccionStore((s) => s.itemPorSeccion);
+  const setItemDeSeccion = useMagiaSeccionStore((s) => s.setItem);
+
   // Runa actualmente seleccionada en el grid (click para mostrar su
   // patrón + explicación/grupos, click de nuevo para esconder). Reemplaza
   // al editor aparte: ya no se navega a otra pantalla, todo pasa acá
   // mismo — el patrón ocupa el lugar del Probador y la explicación +
   // grupos ocupan la columna derecha.
-  const [runaSeleccionadaId, setRunaSeleccionadaId] = useState<string | null>(null);
+  const runaSeleccionadaId = itemPorSeccion.runas ?? null;
+  const setRunaSeleccionadaId = (
+    valor: string | null | ((actual: string | null) => string | null),
+  ) => {
+    const nuevo = typeof valor === "function" ? valor(runaSeleccionadaId) : valor;
+    setItemDeSeccion("runas", nuevo);
+  };
   const runaSeleccionada = useMemo(
     () => todasLasRunas?.find((r) => r.id === runaSeleccionadaId) ?? null,
     [todasLasRunas, runaSeleccionadaId],
@@ -801,7 +823,8 @@ export function RunasPage({
   // tablero de la columna 1.
   const [previewCombinacion, setPreviewCombinacion] = useState<PreviewCombinacion>(null);
 
-  const [seccionMagia, setSeccionMagia] = useState<SeccionMagia>("runas");
+  // seccionMagia ahora vive en useMagiaSeccionStore (ver arriba, junto a
+  // runaSeleccionadaId) — persiste entre recargas.
 
   // Modo pantalla completa: "probador" agranda el Probador de
   // reconocimiento solo; "combinaciones" agranda el render (preview) y
@@ -891,14 +914,19 @@ export function RunasPage({
             onCreate={onCreateElemento}
             onActualizar={onActualizarElemento ?? (() => {})}
             onEliminar={onEliminarElemento}
-            seleccionarId={seleccionarElementoId}
+            seleccionarId={seleccionarElementoId ?? itemPorSeccion.tabla ?? null}
+            onSeleccionarIdChange={(id) => setItemDeSeccion("tabla", id)}
             onImportarElementos={onImportarElementos}
             onEliminarVarios={onEliminarVariosElementos}
           />
         </div>
       ) : seccionMagia === "fisica" ? (
         <div className="mt-4">
-          <BloqueFisica onSelectCriatura={(id) => abrirPanel("criatura", id)} />
+          <BloqueFisica
+            seleccionarOrisId={itemPorSeccion.fisica ?? null}
+            onOrisSeleccionadoChange={(id) => setItemDeSeccion("fisica", id)}
+            onSelectCriatura={(id) => abrirPanel("criatura", id)}
+          />
         </div>
       ) : seccionMagia === "biologia" ? (
         <div className="mt-4">

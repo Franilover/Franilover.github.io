@@ -73,6 +73,14 @@ interface Props {
   onActualizarOris: (id: string, cambios: Partial<Oris>) => void;
   onEliminarOris?: (id: string) => void;
   seleccionarOrisId?: string | null;
+  /**
+   * Notifica cada vez que cambia el Oris abierto en el panel (o se
+   * cierra, con null) — usado por RunasPage para persistir el último
+   * Oris visto en useMagiaSeccionStore y reabrirlo tras un refresh.
+   * Solo cubre el caso "oris" (no concepto/subsistema/todas-bases), que
+   * es el único con deep-link de entrada hoy (seleccionarOrisId).
+   */
+  onOrisSeleccionadoChange?: (id: string | null) => void;
 
   conceptos: FisicaConcepto[];
   loadingConceptos?: boolean;
@@ -945,10 +953,24 @@ export function FisicaPage({
   onActualizarSubsistema,
   onEliminarSubsistema,
   onSelectCriatura,
+  onOrisSeleccionadoChange,
 }: Props) {
-  const [seleccion, setSeleccion] = useState<Seleccion>(
+  const [seleccion, setSeleccionRaw] = useState<Seleccion>(
     seleccionarOrisId ? { tipo: "oris", id: seleccionarOrisId } : null,
   );
+  // Notifica hacia afuera (RunasPage → useMagiaSeccionStore) solo cuando
+  // el Oris seleccionado cambia — no cuando se selecciona un concepto,
+  // subsistema o "todas-bases", que no tienen deep-link propio hoy.
+  const setSeleccion = (valor: Seleccion | ((actual: Seleccion) => Seleccion)) => {
+    setSeleccionRaw((actual) => {
+      const nuevo = typeof valor === "function" ? valor(actual) : valor;
+      if (onOrisSeleccionadoChange) {
+        if (nuevo?.tipo === "oris") onOrisSeleccionadoChange(nuevo.id);
+        else if (actual?.tipo === "oris") onOrisSeleccionadoChange(null);
+      }
+      return nuevo;
+    });
+  };
   const [conceptosLocal, setConceptosLocal] = useState<FisicaConcepto[]>(conceptos);
   useEffect(() => setConceptosLocal(conceptos), [conceptos]);
 
