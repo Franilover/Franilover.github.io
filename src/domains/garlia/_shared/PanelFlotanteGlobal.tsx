@@ -24,7 +24,7 @@
  * click en el backdrop.
  */
 
-import { Bug, Crown, Diamond, Gem, Leaf, Save, Trash2, Users, X } from "lucide-react";
+import { Bug, Check, Crown, Diamond, Gem, Leaf, Save, Trash2, Users, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -59,12 +59,16 @@ export function PanelFlotanteGlobal() {
   // editor solía renderizar, así solo hay UNA barra superior en la vista
   // rápida en vez de dos casi idénticas apiladas.
   const [headerControls, setHeaderControls] = useState<EditorHeaderControls | null>(null);
+  // Confirmación inline (ver EditorHeaderBar): evita el modal centrado que
+  // parpadeaba al chocar con el backdrop-filter de este mismo panel.
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
 
   // Al cambiar de entidad (o cerrar), se limpia lo publicado por la
   // anterior para no arrastrar controles obsoletos mientras el nuevo
   // editor todavía no publica los suyos.
   useEffect(() => {
     setHeaderControls(null);
+    setConfirmandoEliminar(false);
   }, [entidad?.kind, entidad?.id]);
 
   const { data: personajes } = useSupabaseData<Personaje>("personajes");
@@ -197,13 +201,40 @@ export function PanelFlotanteGlobal() {
               {headerControls.extra}
               <div className="shrink-0 flex items-center gap-1.5">
                 <SaveIndicatorInline status={headerControls.status} />
-                <button
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
-                  type="button"
-                  onClick={headerControls.onEliminar}
-                >
-                  <Trash2 size={10} />
-                </button>
+                {confirmandoEliminar ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-micro font-black uppercase text-red-400 tracking-wide">
+                      ¿Eliminar?
+                    </span>
+                    <button
+                      className="flex items-center justify-center w-6 h-6 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all"
+                      title="Confirmar"
+                      type="button"
+                      onClick={() => {
+                        setConfirmandoEliminar(false);
+                        headerControls.onEliminar();
+                      }}
+                    >
+                      <Check size={11} />
+                    </button>
+                    <button
+                      className="flex items-center justify-center w-6 h-6 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/30 transition-all"
+                      title="Cancelar"
+                      type="button"
+                      onClick={() => setConfirmandoEliminar(false)}
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
+                    type="button"
+                    onClick={() => setConfirmandoEliminar(true)}
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                )}
                 <button
                   className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
                   disabled={headerControls.status === "saving"}

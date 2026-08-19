@@ -27,7 +27,6 @@ import React, { useEffect, useState } from "react";
 import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
 import { ComboSelector } from "@/ui/ComboSelector";
-import { useConfirm } from "@/ui/ConfirmModal";
 import { PanelReglasDnd } from "@/domains/garlia/items/PanelReglasDnd";
 import { PickerImagenItemBtn } from "@/domains/garlia/items/PickerImagenItemBtn";
 import { SelectorGrupoUnico } from "@/domains/garlia/items/SelectorGrupoUnico";
@@ -82,7 +81,6 @@ export function EditorItem({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [showModalDnd, setShowModalDnd] = useState(false);
   const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
-  const { confirm, ConfirmModal } = useConfirm();
   const { onWikilink } = useWikilink();
 
   // Catálogo de criaturas para el selector "Criatura" (origen del ítem)
@@ -140,12 +138,10 @@ export function EditorItem({
     }
   };
 
+  // La confirmación ya la pide el header compartido (EditorHeaderBar /
+  // PanelFlotanteGlobal) de forma inline antes de llamar a onEliminar, así
+  // que acá se borra directo — ver useEditorHeaderControls.ts.
   const del = async () => {
-    const ok = await confirm({
-      message: `¿Eliminar "${form.nombre}"?`,
-      danger: true,
-    });
-    if (!ok) return;
     await supabase.from(tabla).delete().eq("id", form.id);
     void dexieDelete(tabla, form.id);
     onDeleted(form.id);
@@ -179,8 +175,6 @@ export function EditorItem({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <ConfirmModal />
-
       {/* Barra superior: si hay un contenedor escuchando (panel flotante),
           los controles ya se publicaron arriba y este editor no dibuja su
           propia barra — evita la duplicación. Si se usa standalone, se

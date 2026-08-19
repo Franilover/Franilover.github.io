@@ -17,7 +17,8 @@
  *     igual, con los mismos controles.
  */
 
-import { Save, Trash2 } from "lucide-react";
+import { Check, Save, Trash2, X } from "lucide-react";
+import { useState } from "react";
 
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 
@@ -37,6 +38,13 @@ export function EditorHeaderBar({ controls }: { controls: EditorHeaderControls }
     onEliminar,
     extra,
   } = controls;
+
+  // Confirmación inline en vez de modal aparte: el modal centrado (portal a
+  // document.body) quedaba atrapado por el backdrop-filter del panel
+  // flotante ancestro (crea su propio containing block para todo lo
+  // `fixed` dentro), lo que hacía que apareciera y desapareciera sin
+  // parar. Un texto + botón inline no depende de z-index ni de portales.
+  const [confirmando, setConfirmando] = useState(false);
 
   return (
     <div
@@ -71,13 +79,40 @@ export function EditorHeaderBar({ controls }: { controls: EditorHeaderControls }
 
       <div className="shrink-0 flex items-center gap-1.5">
         <SaveIndicator status={status} />
-        <button
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
-          type="button"
-          onClick={onEliminar}
-        >
-          <Trash2 size={10} />
-        </button>
+        {confirmando ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-micro font-black uppercase text-red-400 tracking-wide">
+              ¿Eliminar?
+            </span>
+            <button
+              className="flex items-center justify-center w-6 h-6 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all"
+              title="Confirmar"
+              type="button"
+              onClick={() => {
+                setConfirmando(false);
+                onEliminar();
+              }}
+            >
+              <Check size={11} />
+            </button>
+            <button
+              className="flex items-center justify-center w-6 h-6 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/30 transition-all"
+              title="Cancelar"
+              type="button"
+              onClick={() => setConfirmando(false)}
+            >
+              <X size={11} />
+            </button>
+          </div>
+        ) : (
+          <button
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all"
+            type="button"
+            onClick={() => setConfirmando(true)}
+          >
+            <Trash2 size={10} />
+          </button>
+        )}
         <button
           className="flex items-center gap-1 px-3 py-1 rounded-lg text-micro font-black uppercase tracking-widest bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-md shadow-primary/20 disabled:opacity-50"
           disabled={status === "saving"}

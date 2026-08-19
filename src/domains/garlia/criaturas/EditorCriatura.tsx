@@ -48,7 +48,6 @@ import {
 
 import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
-import { useConfirm } from "@/ui/ConfirmModal";
 import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import {
   BloqueGrupoCategoria,
@@ -117,7 +116,6 @@ export function EditorCriatura({
   const [panelActivo, setPanelActivo] = useState<
     "clasificacion" | "ilustraciones" | "perfilAtomico" | null
   >(null);
-  const { confirm, ConfirmModal } = useConfirm();
   const { onWikilink } = useWikilink();
 
   // ── Grupos ────────────────────────────────────────────────────────────────
@@ -239,12 +237,8 @@ export function EditorCriatura({
     }
   };
 
+  // Confirmación inline en el header compartido — ver EditorHeaderBar.
   const del = async () => {
-    const ok = await confirm({
-      message: `¿Eliminar a "${form.nombre}"?`,
-      danger: true,
-    });
-    if (!ok) return;
     await supabase.from("criaturas").delete().eq("id", form.id);
     void dexieDelete("criaturas", form.id);
     onDeleted(form.id);
@@ -367,8 +361,6 @@ export function EditorCriatura({
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden relative">
-      <ConfirmModal />
-
       {/* ── CONTENIDO PRINCIPAL ──────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}

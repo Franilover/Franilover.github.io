@@ -29,7 +29,6 @@ import {
 import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
-import { useConfirm } from "@/ui/ConfirmModal";
 import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
@@ -92,7 +91,6 @@ export function FloraEditorMejorado({
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos, loading: loadingCompuestos } = useCompuestos();
   const { actualizar, eliminar } = useFlora();
-  const { confirm, ConfirmModal } = useConfirm();
 
   const [form, setForm] = useState<Flora>(floraProp);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -145,12 +143,8 @@ export function FloraEditorMejorado({
     setCompuestos((prev) => [...prev, nuevo]);
   }
 
+  // Confirmación inline en el header compartido — ver EditorHeaderBar.
   async function eliminarFlora() {
-    const ok = await confirm({
-      message: `¿Eliminar "${form.nombre}"?`,
-      danger: true,
-    });
-    if (!ok) return;
     await eliminar(form.id);
     onDeleted?.(form.id);
   }
@@ -170,8 +164,6 @@ export function FloraEditorMejorado({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <ConfirmModal />
-
       {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
       {/* ── Content ──────────────────────────────────────────────────────── */}

@@ -31,7 +31,6 @@ import {
   useRegisterMobileAside,
 } from "@/hooks/ui/useMobileAsidePanel";
 import { ComboSelector } from "@/ui/ComboSelector";
-import { useConfirm } from "@/ui/ConfirmModal";
 import {
   PersonajeLineaDeTiempo,
   PersonajeSidebarPanel,
@@ -548,20 +547,14 @@ export function EditorPersonaje({
 }) {
   const { form, setForm, status, save, remove, onFechaNacimientoChange } =
     usePersonajeForm(item, onSaved, onDeleted);
-  const { confirm, ConfirmModal } = useConfirm();
 
+  // Confirmación inline en el header compartido — ver EditorHeaderBar.
   const del = async () => {
-    const ok = await confirm({
-      message: `¿Eliminar a "${form.nombre}"?`,
-      danger: true,
-    });
-    if (!ok) return;
     await remove();
   };
 
   return (
     <>
-      <ConfirmModal />
       <FormularioPersonaje
         entities={entities}
         form={form}

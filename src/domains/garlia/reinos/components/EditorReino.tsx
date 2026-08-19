@@ -18,7 +18,6 @@ import {
 } from "@/hooks/ui/useMobileAsidePanel";
 
 import type { WikiEntity } from "@/ui/Markdown/commandItems";
-import { useConfirm } from "@/ui/ConfirmModal";
 import { type SaveStatus } from "@/domains/garlia/_shared/types";
 import { type Ciudad } from "@/domains/garlia/ciudades";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
@@ -139,7 +138,6 @@ export function EditorReino({
   const { ciudades: detalles, setCiudades: setDetalles } = useCiudadesDelReino(
     item.id,
   );
-  const { confirm, ConfirmModal } = useConfirm();
   const { onSnippetAction: _onSnippetAction } = useWikilink();
   const {
     personajes,
@@ -165,12 +163,8 @@ export function EditorReino({
     }
   };
 
+  // Confirmación inline en el header compartido — ver EditorHeaderBar.
   const del = async () => {
-    const ok = await confirm({
-      message: `¿Eliminar el reino "${form.nombre}"?`,
-      danger: true,
-    });
-    if (!ok) return;
     await reinosQueries.delete(form.id);
     void dexieDelete("reinos", form.id);
     onDeleted(form.id);
@@ -202,8 +196,6 @@ export function EditorReino({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
-      <ConfirmModal />
-
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 

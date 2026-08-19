@@ -26,7 +26,6 @@ import { Droplet, Flame, Gem, Layers, Mountain, Plus, Snowflake, Sparkle, Trash2
 import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
-import { useConfirm } from "@/ui/ConfirmModal";
 import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
@@ -85,7 +84,6 @@ export function MineralEditor({
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
   const { actualizar, eliminar } = useMinerales();
-  const { confirm, ConfirmModal } = useConfirm();
 
   const [form, setForm] = useState<Mineral>(mineralProp);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -129,12 +127,8 @@ export function MineralEditor({
     }
   }
 
+  // Confirmación inline en el header compartido — ver EditorHeaderBar.
   async function eliminarMineral() {
-    const ok = await confirm({
-      message: `¿Eliminar "${form.nombre}"?`,
-      danger: true,
-    });
-    if (!ok) return;
     await eliminar(form.id);
     onDeleted?.(form.id);
   }
@@ -154,8 +148,6 @@ export function MineralEditor({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <ConfirmModal />
-
       {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
