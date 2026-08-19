@@ -82,9 +82,9 @@ export function MineralEditor({
     }
   }
 
-  function cambiarComposicion(composicion: ComposicionEntrada[]) {
-    setForm((f) => ({ ...f, composicion }));
-    void guardar({ composicion });
+  function cambiarComposicion(componentes: ComposicionEntrada[]) {
+    setForm((f) => ({ ...f, componentes }));
+    void guardar({ componentes });
   }
 
   function onCompuestoCreado(nuevo: Compuesto) {
@@ -166,7 +166,7 @@ export function MineralEditor({
                 </p>
 
                 <SelectorComposicionMultiple
-                  composicion={form.composicion ?? []}
+                  composicion={form.componentes ?? []}
                   onChange={cambiarComposicion}
                   compuestos={compuestos}
                   elementos={elementos}

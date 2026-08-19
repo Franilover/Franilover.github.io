@@ -15,7 +15,7 @@ export interface Flora {
   /** @deprecated Legado: un solo compuesto. Se mantiene por compatibilidad. */
   compuesto_id: string | null;
   /** Composición material de la planta: partes hechas de compuestos distintos */
-  composicion: { compuesto_id: string; tag: string }[];
+  componentes: { compuesto_id: string; tag: string }[];
   notas: string;
   orden: number;
   created_at: string;
@@ -62,7 +62,7 @@ export interface PlantaProceso {
 export type FloraInput = Partial<
   Pick<
     Flora,
-    "nombre" | "imagen_url" | "descripcion" | "compuesto_id" | "composicion" | "notas" | "orden"
+    "nombre" | "imagen_url" | "descripcion" | "compuesto_id" | "componentes" | "notas" | "orden"
   >
 >;
 

@@ -51,7 +51,10 @@ export function useMinerales() {
     async (id: string, updates: MineralInput) => {
       setMinerales((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)));
       const { error } = await supabase.from("minerales").update(updates).eq("id", id);
-      if (error) void load();
+      if (error) {
+        console.error("[useMinerales] error actualizando mineral:", error);
+        void load();
+      }
     },
     [load],
   );

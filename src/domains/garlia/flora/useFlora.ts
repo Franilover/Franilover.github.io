@@ -51,7 +51,10 @@ export function useFlora() {
     async (id: string, updates: FloraInput) => {
       setFlora((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
       const { error } = await supabase.from("flora").update(updates).eq("id", id);
-      if (error) void load();
+      if (error) {
+        console.error("[useFlora] error actualizando flora:", error);
+        void load();
+      }
     },
     [load],
   );
