@@ -62,7 +62,6 @@ import {
   type ParticleMap,
   type ParticleType,
   PESO_POR_CAPA,
-  type PerfilAtomico,
   type ResultadoAfinidad,
   type ResultadoBalanceProceso,
   type ResultadoCancelacionCarga,
