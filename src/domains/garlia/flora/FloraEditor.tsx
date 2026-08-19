@@ -37,6 +37,7 @@ import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPag
 import { type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
+import { ComposicionQuimicaPanel } from "@/domains/garlia/_shared/ComposicionQuimicaPanel";
 import {
   SelectorComposicionMultiple,
   type ComposicionEntrada,
@@ -310,6 +311,7 @@ export function FloraEditorMejorado({
                         onUpdate={actualizarOrgano}
                         onDelete={() => eliminarOrgano(organo.id)}
                         compuestos={compuestos}
+                        elementos={elementos}
                       />
                     ))}
                   </div>
@@ -393,9 +395,10 @@ interface OrganoCardProps {
   onUpdate: (id: string, updates: Partial<PlantaOrgano>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
+  elementos: Elemento[];
 }
 
-function OrganoCard({ organo, onUpdate, onDelete, compuestos }: OrganoCardProps) {
+function OrganoCard({ organo, onUpdate, onDelete, compuestos, elementos }: OrganoCardProps) {
   const opcionActual = TIPOS_ORGANO.find((o) => o.value === organo.tipo_organo);
   const Icon = opcionActual?.icon ?? Leaf;
 
@@ -444,6 +447,15 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos }: OrganoCardProps)
             onChange={(e) => onUpdate(organo.id, { notas: e.target.value })}
           />
         </div>
+      </div>
+
+      <div className="mt-3">
+        <ComposicionQuimicaPanel
+          mezcla={organo.componentes ?? []}
+          compuestos={compuestos}
+          elementos={elementos}
+          titulo="Física derivada del órgano"
+        />
       </div>
     </div>
   );

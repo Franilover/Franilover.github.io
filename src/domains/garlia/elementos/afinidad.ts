@@ -797,6 +797,92 @@ export function calcularPeso(
   return { pesoTotal, porCapa, categoria };
 }
 
+// ─── Perfil atómico de una MEZCLA de Compuestos (Formaciones/Órganos) ──────
+// Formaciones (Mineral) y Órganos (Flora) NO son un Compuesto único: son
+// una mezcla de varios Compuestos + cantidad — mismo lenguaje que
+// ComponenteCompuesto pero un nivel más arriba (Compuesto en vez de
+// Elemento). A diferencia de SelectorComposicionMultiple (que usa {tag}
+// para partes distintas del ítem, sin proporción, y por eso NO se suman),
+// acá {cantidad} SÍ es una proporción real de mezcla — mismo criterio que
+// justifica sumar Elementos dentro de un Compuesto. Por eso tiene sentido
+// expandir cada Compuesto en sus Elementos componentes (multiplicados por
+// su propia cantidad × la cantidad del Compuesto en la mezcla) y correr el
+// mismo motor de calcularPerfilAtomico/calcularBalancePorCapa/reactividad/
+// peso ya usado para un Compuesto — es el mismo cálculo, un nivel más
+// anidado.
+export interface ComponenteCompuestoEnMezcla {
+  compuesto_id: string;
+  cantidad: number;
+}
+
+/**
+ * Expande una mezcla de Compuestos { compuesto_id, cantidad } en un
+ * Compuesto "virtual" cuyos componentes son Elementos — sumando las
+ * cantidades de elementos repetidos entre distintos Compuestos de la
+ * mezcla (ej. si dos Compuestos de la formación comparten un Elemento,
+ * sus cantidades se acumulan). Catalizadores y demás reglas de
+ * afinidad.ts siguen aplicando igual sobre el resultado, porque siguen
+ * siendo Elementos reales del catálogo.
+ */
+export function expandirMezclaDeCompuestos(
+  mezcla: ComponenteCompuestoEnMezcla[],
+  compuestos: Compuesto[],
+): Compuesto {
+  const acumulado = new Map<string, number>();
+
+  for (const { compuesto_id, cantidad } of mezcla) {
+    if (!cantidad) continue;
+    const compuesto = compuestos.find((c) => c.id === compuesto_id);
+    if (!compuesto) continue;
+    for (const componente of compuesto.componentes ?? []) {
+      const previo = acumulado.get(componente.elemento_id) ?? 0;
+      acumulado.set(componente.elemento_id, previo + componente.cantidad * cantidad);
+    }
+  }
+
+  return {
+    id: "__mezcla__",
+    nombre: "",
+    componentes: Array.from(acumulado.entries()).map(([elemento_id, cantidad]) => ({
+      elemento_id,
+      cantidad,
+    })),
+  };
+}
+
+/** Perfil atómico (nucleo/media/externa + capacidadExternaTotal) de una
+ *  mezcla de Compuestos — ver expandirMezclaDeCompuestos. */
+export function calcularPerfilAtomicoDeMezcla(
+  mezcla: ComponenteCompuestoEnMezcla[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+): PerfilAtomico {
+  const virtual = expandirMezclaDeCompuestos(mezcla, compuestos);
+  return calcularPerfilAtomico(virtual, elementos);
+}
+
+/** Reactividad de una mezcla de Compuestos — mismo criterio de déficit/
+ *  Estado Noble/catalizadores que calcularReactividad, aplicado al
+ *  Compuesto virtual expandido de la mezcla. */
+export function calcularReactividadDeMezcla(
+  mezcla: ComponenteCompuestoEnMezcla[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+): ResultadoReactividad {
+  const virtual = expandirMezclaDeCompuestos(mezcla, compuestos);
+  return calcularReactividad(virtual, elementos);
+}
+
+/** Peso Atómico (ponderado por capa) de una mezcla de Compuestos. */
+export function calcularPesoDeMezcla(
+  mezcla: ComponenteCompuestoEnMezcla[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+): ResultadoPeso {
+  const virtual = expandirMezclaDeCompuestos(mezcla, compuestos);
+  return calcularPeso(virtual, elementos);
+}
+
 // ─── Estequiometría exacta ──────────────────────────────────────────────────
 // Busca el múltiplo entero mínimo de la mezcla completa (multiplicar TODAS
 // las cantidades por el mismo factor k) tal que las 3 capas queden

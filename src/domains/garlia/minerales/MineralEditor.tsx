@@ -34,6 +34,7 @@ import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPag
 import { type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
+import { ComposicionQuimicaPanel } from "@/domains/garlia/_shared/ComposicionQuimicaPanel";
 import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
@@ -276,6 +277,7 @@ export function MineralEditor({
                           onUpdate={actualizarFormacion}
                           onDelete={() => eliminarFormacion(formacion.id)}
                           compuestos={compuestos}
+                          elementos={elementos}
                         />
                       ))}
                     </div>
@@ -364,11 +366,13 @@ function FormacionCard({
   onUpdate,
   onDelete,
   compuestos,
+  elementos,
 }: {
   formacion: MineralFormacion;
   onUpdate: (id: string, updates: Partial<MineralFormacion>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
+  elementos: Elemento[];
 }) {
   const opcionActual = TIPOS_FORMACION.find((o) => o.value === formacion.tipo_formacion);
   const Icon = opcionActual?.icon ?? Gem;
@@ -418,6 +422,15 @@ function FormacionCard({
             onChange={(e) => onUpdate(formacion.id, { notas: e.target.value })}
           />
         </div>
+      </div>
+
+      <div className="mt-3">
+        <ComposicionQuimicaPanel
+          mezcla={formacion.componentes ?? []}
+          compuestos={compuestos}
+          elementos={elementos}
+          titulo="Física derivada de la formación"
+        />
       </div>
     </div>
   );
