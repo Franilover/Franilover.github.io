@@ -77,7 +77,10 @@ export function usePlantaOrganosProcesos(plantaId: string) {
     async (id: string, updates: PlantaOrganoInput) => {
       setOrganos((prev) => prev.map((o) => (o.id === id ? { ...o, ...updates } : o)));
       const { error } = await supabase.from("planta_organos").update(updates).eq("id", id);
-      if (error) void load();
+      if (error) {
+        console.error("[usePlantaOrganosProcesos] error actualizando organo:", error);
+        void load();
+      }
     },
     [load],
   );
