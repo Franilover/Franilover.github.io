@@ -310,7 +310,7 @@ export function FloraEditorMejorado({
                 ) : organos.length === 0 ? (
                   <p className="text-xs text-primary/40 italic">Sin órganos. Crea uno para empezar.</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="divide-y divide-primary/10">
                     {organos.map((organo) => (
                       <OrganoCard
                         key={organo.id}
@@ -408,9 +408,9 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos }: OrganoCardProps)
   const Icon = opcionActual?.icon ?? Leaf;
 
   return (
-    <div className="border border-primary/10 rounded-lg bg-primary/[0.02] overflow-hidden">
-      {/* Header compacto: ícono + selector de tipo + eliminar */}
-      <div className="w-full px-3 py-2 flex items-center justify-between border-b border-primary/10 bg-primary/[0.015]">
+    <div className="group py-3 first:pt-0">
+      {/* Header: ícono + selector de tipo + eliminar (solo al hover) */}
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <Icon size={13} className="shrink-0 text-primary/40" />
           <SelectorTipo
@@ -422,17 +422,16 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos }: OrganoCardProps)
         </div>
         <button
           onClick={onDelete}
-          className="p-1 rounded hover:bg-red-500/10 text-red-500/50 hover:text-red-500 transition shrink-0"
+          className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition shrink-0 opacity-0 group-hover:opacity-100"
         >
           <Trash2 size={14} />
         </button>
       </div>
 
-      {/* Contenido: grid de 2 columnas cuando hay ancho — fórmula ocupa más
-          espacio (es lo principal), notas queda al lado. */}
-      <div className="p-3 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-3 text-xs items-start">
+      {/* Contenido: grid de 2 columnas cuando hay ancho, sin cajas anidadas */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
         <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1.5">
+          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1.5">
             Fórmula química
           </span>
           <SelectorFormulaOrgano
@@ -443,11 +442,11 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos }: OrganoCardProps)
         </div>
 
         <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1.5">
             Notas
           </span>
           <textarea
-            className="w-full h-full min-h-[4.5rem] bg-primary/[0.02] border border-primary/10 rounded px-2 py-1 text-primary/70 resize-none outline-none"
+            className="w-full h-full min-h-[3.5rem] bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
             placeholder="Notas del órgano…"
             value={organo.notas ?? ""}
             onChange={(e) => onUpdate(organo.id, { notas: e.target.value })}
@@ -504,7 +503,7 @@ function ListaProcesosReordenable({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="divide-y divide-primary/10">
       {ordenados.map((proceso) => {
         const arrastrando = dragId === proceso.id;
         const resaltarSoltar = overId === proceso.id && dragId !== proceso.id;
@@ -520,13 +519,9 @@ function ListaProcesosReordenable({
               e.preventDefault();
               handleDrop(proceso.id);
             }}
-            className={`transition-all ${resaltarSoltar ? "translate-y-0.5" : ""}`}
+            className="transition-opacity"
             style={{
-              outline: resaltarSoltar
-                ? "2px solid color-mix(in srgb, var(--primary) 40%, transparent)"
-                : undefined,
-              outlineOffset: 2,
-              borderRadius: 8,
+              boxShadow: resaltarSoltar ? "inset 0 2px 0 0 var(--primary)" : undefined,
               opacity: arrastrando ? 0.4 : 1,
             }}
           >
@@ -578,14 +573,14 @@ function ProcesoCard({
   dragHandleProps,
 }: ProcesoCardProps) {
   return (
-    <div className="border border-primary/10 rounded-lg bg-primary/[0.02] overflow-hidden">
-      {/* Header compacto: drag handle + selector de tipo real + eliminar */}
-      <div className="w-full px-2 py-2 flex items-center justify-between border-b border-primary/10 bg-primary/[0.015]">
+    <div className="group py-3">
+      {/* Header: drag handle + selector de tipo real + eliminar (hover) */}
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <span
             {...dragHandleProps}
             title="Arrastrar para reordenar"
-            className="shrink-0 p-1 rounded cursor-grab active:cursor-grabbing text-primary/25 hover:text-primary/50 transition"
+            className="shrink-0 p-1 -ml-1 rounded cursor-grab active:cursor-grabbing text-primary/20 hover:text-primary/50 transition"
           >
             <GripVertical size={13} />
           </span>
@@ -598,16 +593,16 @@ function ProcesoCard({
         </div>
         <button
           onClick={onDelete}
-          className="p-1 rounded hover:bg-red-500/10 text-red-500/50 hover:text-red-500 transition shrink-0"
+          className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition shrink-0 opacity-0 group-hover:opacity-100"
         >
           <Trash2 size={14} />
         </button>
       </div>
 
       {/* Contenido: consume/produce lado a lado, condiciones + descripción
-          también en columnas cuando el ancho lo permite. */}
-      <div className="p-3 space-y-3 text-xs">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          también en columnas cuando el ancho lo permite. Sin cajas anidadas. */}
+      <div className="space-y-3 text-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5 gap-y-3">
           <SelectorConsumeProduce
             label="Consume"
             items={(proceso.consume ?? []) as ItemProceso[]}
@@ -624,13 +619,13 @@ function ProcesoCard({
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-3 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-2 items-start">
           <div>
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1">
               Condiciones
             </span>
             <input
-              className="w-full bg-primary/[0.02] border border-primary/10 rounded px-2 py-1 text-primary/70 outline-none"
+              className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 outline-none transition-colors placeholder:text-primary/25"
               placeholder='Ej: "luz solar directa", "solo en primavera"…'
               value={proceso.condiciones ?? ""}
               onChange={(e) => onUpdate(proceso.id, { condiciones: e.target.value })}
@@ -638,11 +633,11 @@ function ProcesoCard({
           </div>
 
           <div>
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-1">
+            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1">
               Descripción
             </span>
             <textarea
-              className="w-full bg-primary/[0.02] border border-primary/10 rounded px-2 py-1 text-primary/70 resize-none outline-none"
+              className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
               placeholder="Descripción del proceso…"
               value={proceso.descripcion ?? ""}
               onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
