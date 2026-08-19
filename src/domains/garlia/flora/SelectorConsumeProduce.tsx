@@ -98,6 +98,7 @@ function FilaItemProceso({
   onQuitar: () => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
+  const [buscando, setBuscando] = useState(false);
 
   const catalogo = item.tipo === "elemento" ? elementos : compuestos;
   const elegido = useMemo(
@@ -152,13 +153,20 @@ function FilaItemProceso({
         {/* Buscador / valor elegido */}
         <div className="flex-1 min-w-0 relative">
           <input
-            value={elegido ? elegido.nombre : busqueda}
-            onFocus={() => setBusqueda("")}
+            value={buscando || !elegido ? busqueda : elegido.nombre}
+            onFocus={() => {
+              setBuscando(true);
+              setBusqueda("");
+            }}
+            onBlur={() => {
+              // Da tiempo a que el onMouseDown de una opción se dispare antes de cerrar
+              setTimeout(() => setBuscando(false), 120);
+            }}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder={`Buscar ${item.tipo}…`}
             className="w-full bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/30 placeholder:font-normal"
           />
-          {busqueda.trim() && (
+          {buscando && (
             <div
               className="absolute z-20 mt-1 left-0 right-0 max-h-40 overflow-y-auto rounded-md border shadow-lg"
               style={{
@@ -176,6 +184,7 @@ function FilaItemProceso({
                     onMouseDown={() => {
                       onChange({ id: c.id });
                       setBusqueda("");
+                      setBuscando(false);
                     }}
                     className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold text-primary/75 hover:bg-primary/6 hover:text-primary transition-colors truncate"
                   >
