@@ -438,6 +438,7 @@ function TodasLasBasesView({
                           : false
                       }
                       onAutoAbierto={() => setAutoAbrirSubsistemaId(null)}
+                      oris={key === "subsistemas" ? oris : undefined}
                     />
                   );
                 })}
@@ -474,6 +475,7 @@ function BasesItemCard({
   onSelectCriatura,
   autoAbrir,
   onAutoAbierto,
+  oris,
 }: {
   fila: FilaCatalogo;
   bloque: ClaveCatalogo;
@@ -495,6 +497,9 @@ function BasesItemCard({
    *  ancla apenas se monta. */
   autoAbrir?: boolean;
   onAutoAbierto?: () => void;
+  /** Catálogo de Oris — solo se usa cuando bloque === "subsistemas", para
+   *  que PanelEditorSubsistema pueda resolver "canaliza" a un Oris real. */
+  oris?: Oris[];
 }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const botonRef = useRef<HTMLButtonElement>(null);
@@ -552,6 +557,7 @@ function BasesItemCard({
               setAnchor(null);
             }}
             onSelectCriatura={onSelectCriatura}
+            oris={oris}
           />
         </PopoverFlotante>
       ) : (

@@ -22,22 +22,36 @@ import { createPortal } from "react-dom";
 import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 
+import type { Oris } from "@/domains/garlia/fisica/types";
+
 import { useCriaturasCatalogoMin } from "./useCriaturasCatalogoMin";
 import { useCriaturasPorIds } from "./useCriaturasPorIds";
+import { SelectorOris } from "./SelectorOris";
 import type { SubsistemaFila, SubsistemaMagia } from "./useSubsistemasMagia";
 
 // ─── Editor de tabla de filas (Canales / Filtros / Complementos) ───────────
+//
+// "canaliza" solía ser texto libre (cualquier cosa escrita a mano). Ahora es
+// una referencia real a un Oris del catálogo de Física (se guarda su `id`
+// en el mismo campo jsonb, que sigue siendo string — no hace falta migrar
+// el schema). Esto conecta de verdad Runas con Física: un Canal/Filtro ya
+// no solo *dice* qué Oris canaliza en un texto suelto, sino que apunta al
+// Oris real, y desde ahí se puede navegar a su fórmula/dominio.
 
 function EditorFilas({
   titulo,
   filas,
   onChange,
   conCanaliza = true,
+  oris,
 }: {
   titulo: string;
   filas: SubsistemaFila[];
   onChange: (filas: SubsistemaFila[]) => void;
   conCanaliza?: boolean;
+  /** Catálogo de Oris para resolver `canaliza` (ahora un oris_id) a su
+   *  nombre/fórmula real. Si no se pasa, cae de nuevo a texto libre. */
+  oris?: Oris[];
 }) {
   const actualizarFila = (idx: number, patch: Partial<SubsistemaFila>) => {
     onChange(filas.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
@@ -86,14 +100,23 @@ function EditorFilas({
                   value={f.descripcion ?? ""}
                   onChange={(e) => actualizarFila(idx, { descripcion: e.target.value })}
                 />
-                {conCanaliza && (
-                  <input
-                    className="min-w-0 bg-transparent text-xs text-accent/80 font-semibold outline-none placeholder:text-primary/25 placeholder:font-normal px-1 py-0.5 rounded hover:bg-primary/5 focus:bg-primary/8"
-                    placeholder="Canaliza (Oris)"
-                    value={f.canaliza ?? ""}
-                    onChange={(e) => actualizarFila(idx, { canaliza: e.target.value })}
-                  />
-                )}
+                {conCanaliza &&
+                  (oris ? (
+                    <SelectorOris
+                      oris={oris}
+                      orisId={f.canaliza || null}
+                      onChange={(orisId) => actualizarFila(idx, { canaliza: orisId ?? "" })}
+                    />
+                  ) : (
+                    // Fallback a texto libre si no hay catálogo de Oris cargado
+                    // (mismo comportamiento que antes de esta conexión).
+                    <input
+                      className="min-w-0 bg-transparent text-xs text-accent/80 font-semibold outline-none placeholder:text-primary/25 placeholder:font-normal px-1 py-0.5 rounded hover:bg-primary/5 focus:bg-primary/8"
+                      placeholder="Canaliza (Oris)"
+                      value={f.canaliza ?? ""}
+                      onChange={(e) => actualizarFila(idx, { canaliza: e.target.value })}
+                    />
+                  ))}
               </div>
               <button
                 type="button"
@@ -122,6 +145,7 @@ export function PanelEditorSubsistema({
   onSave,
   onDelete,
   onSelectCriatura,
+  oris,
 }: {
   subsistema: SubsistemaMagia;
   /** Vuelve a mostrar el ensayo de Energías en vez de este editor. */
@@ -131,6 +155,9 @@ export function PanelEditorSubsistema({
   /** Se dispara al clickear una criatura de la lista — el padre decide
    *  a dónde navegar (p. ej. abrir su editor). */
   onSelectCriatura?: (id: string) => void;
+  /** Catálogo de Oris (tabla "oris", Física) — pasado por FisicaPage, que
+   *  ya lo tiene cargado. Habilita el picker real en "canaliza". */
+  oris?: Oris[];
 }) {
   const [nombre, setNombre] = useState(subsistema.nombre);
   const [descripcion, setDescripcion] = useState(subsistema.descripcion ?? "");
@@ -263,8 +290,8 @@ export function PanelEditorSubsistema({
         />
       </div>
 
-      <EditorFilas titulo="Canales" filas={canales} onChange={setCanales} />
-      <EditorFilas titulo="Filtros" filas={filtros} onChange={setFiltros} />
+      <EditorFilas titulo="Canales" filas={canales} onChange={setCanales} oris={oris} />
+      <EditorFilas titulo="Filtros" filas={filtros} onChange={setFiltros} oris={oris} />
       <EditorFilas titulo="Complementos" filas={complementos} onChange={setComplementos} conCanaliza={false} />
 
       {/* Criaturas que usan este subsistema — editable desde acá: añadir

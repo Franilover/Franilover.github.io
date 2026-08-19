@@ -35,6 +35,8 @@ import { type Compuesto, type Elemento } from "@/domains/garlia/elementos/types"
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import { ComposicionQuimicaPanel } from "@/domains/garlia/_shared/ComposicionQuimicaPanel";
+import { BalanceProcesoPanel } from "@/domains/garlia/_shared/BalanceProcesoPanel";
+import { AfinidadEntreEntidadesPanel } from "@/domains/garlia/_shared/AfinidadEntreEntidadesPanel";
 import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
@@ -282,6 +284,14 @@ export function MineralEditor({
                       ))}
                     </div>
                   )}
+
+                  <AfinidadEntreEntidadesPanel
+                    entidadId={form.id}
+                    nombreEntidad={form.nombre}
+                    mezcla={formaciones.flatMap((f) => f.componentes ?? [])}
+                    compuestos={compuestos}
+                    elementos={elementos}
+                  />
                 </div>
               )}
 
@@ -487,6 +497,14 @@ function ProcesoMineralCard({
             compuestos={compuestos}
           />
         </div>
+
+        <BalanceProcesoPanel
+          consume={(proceso.consume ?? []) as ItemProceso[]}
+          produce={(proceso.produce ?? []) as ItemProceso[]}
+          compuestos={compuestos}
+          elementos={elementos}
+          onAutocompletar={(produce) => onUpdate(proceso.id, { produce })}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-2 items-start">
           <div>

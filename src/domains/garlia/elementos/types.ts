@@ -358,3 +358,29 @@ export interface ResultadoEstequiometria {
   /** Factor por el que se multiplicó la mezcla original para llegar al balance. */
   factor: number;
 }
+
+// ─── Balance de Procesos (MineralProceso / PlantaProceso) ──────────────────
+// Un Proceso (cristalización, oxidación, fotosíntesis…) tiene `consume` y
+// `produce`: listas mixtas de {tipo: 'elemento'|'compuesto', id, cantidad}.
+// A diferencia de un Compuesto (mezcla que debe cerrar sola en 0), acá lo
+// que debe cerrar es la ECUACIÓN completa: el total de partículas que
+// entran por `consume` debe igualar al total que sale por `produce`, capa
+// por capa — ninguna partícula se crea ni se destruye en la reacción,
+// igual que en química real (masa se conserva a ambos lados de la flecha).
+export interface BalanceCapaProceso {
+  layer: LayerName;
+  consumido: number;
+  producido: number;
+  /** producido − consumido. 0 = balanceado en esta capa. */
+  diferencia: number;
+}
+
+export interface ResultadoBalanceProceso {
+  /** true si las 3 capas están balanceadas (diferencia 0 en todas). */
+  balanceado: boolean;
+  capas: BalanceCapaProceso[];
+  /** Ids de elemento/compuesto referenciados en consume/produce que ya no
+   *  existen en el catálogo actual — el balance ignora estas entradas, así
+   *  que un resultado "balanceado" con huérfanos puede ser engañoso. */
+  huerfanos: { tipo: "elemento" | "compuesto"; id: string }[];
+}

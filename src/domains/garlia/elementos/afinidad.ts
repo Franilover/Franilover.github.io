@@ -52,6 +52,7 @@
 import {
   CAPACIDAD_CAPA_FIJA,
   capacidadExterna,
+  type BalanceCapaProceso,
   type ComponenteCompuesto,
   type Compuesto,
   type Elemento,
@@ -61,7 +62,9 @@ import {
   type ParticleMap,
   type ParticleType,
   PESO_POR_CAPA,
+  type PerfilAtomico,
   type ResultadoAfinidad,
+  type ResultadoBalanceProceso,
   type ResultadoCancelacionCarga,
   type ResultadoElectromagnetismo,
   type ResultadoEnlace,
@@ -919,4 +922,279 @@ export function calcularEstequiometriaExacta(
   }
 
   return { balanceado: false, componentes: [], factor: 0 };
+}
+
+/**
+ * Afinidad entre dos mezclas de Compuestos (ej. la mezcla completa de un
+ * Mineral —todas sus Formaciones juntas— contra la de una Flora —todos sus
+ * Órganos juntos—, o entre dos Minerales entre sí). Expande ambas mezclas
+ * a su Compuesto virtual (expandirMezclaDeCompuestos) y reusa el mismo
+ * calcularAfinidad de siempre — "se complementan" significa lo mismo acá
+ * que entre dos Compuestos sueltos: el superávit de una capa en una mezcla
+ * cubre el déficit de esa capa en la otra.
+ */
+export function calcularAfinidadDeMezclas(
+  mezclaA: ComponenteCompuestoEnMezcla[],
+  mezclaB: ComponenteCompuestoEnMezcla[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+  // Nombres reales para que el `motivo` generado por calcularAfinidad
+  // (ej. `"${a.nombre}" tiene partículas de sobra...`) hable de la
+  // entidad real en vez del Compuesto virtual sin nombre.
+  nombreA = "esta mezcla",
+  nombreB = "la otra mezcla",
+): ResultadoAfinidad {
+  const virtualA = { ...expandirMezclaDeCompuestos(mezclaA, compuestos), nombre: nombreA };
+  const virtualB = { ...expandirMezclaDeCompuestos(mezclaB, compuestos), nombre: nombreB };
+  return calcularAfinidad(virtualA, virtualB, elementos);
+}
+
+/**
+ * Ordena una lista de candidatos (cada uno con su propia mezcla de
+ * Compuestos) por afinidad descendente contra una mezcla de referencia —
+ * mismo criterio que ordenarPorAfinidad, pero a nivel mezcla en vez de
+ * Compuesto individual. Pensado para "¿con qué otro mineral/planta se
+ * complementa este?": cada candidato es la mezcla agregada de TODAS las
+ * Formaciones/Órganos de una entidad.
+ */
+export function ordenarPorAfinidadDeMezclas<T>(
+  mezclaReferencia: ComponenteCompuestoEnMezcla[],
+  candidatos: { item: T; mezcla: ComponenteCompuestoEnMezcla[]; nombre: string }[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+  nombreReferencia = "esta entidad",
+): { item: T; afinidad: ResultadoAfinidad }[] {
+  // Mismo orden de prioridad que ordenarPorAfinidad: complementa > estable
+  // > compite > saturado.
+  const orden: Record<string, number> = { complementa: 0, estable: 1, compite: 2, saturado: 3 };
+  return candidatos
+    .map(({ item, mezcla, nombre }) => ({
+      item,
+      afinidad: calcularAfinidadDeMezclas(
+        mezclaReferencia,
+        mezcla,
+        compuestos,
+        elementos,
+        nombreReferencia,
+        nombre,
+      ),
+    }))
+    .sort((a, b) => orden[a.afinidad.tipo] - orden[b.afinidad.tipo]);
+}
+
+// ─── Balance de Procesos (MineralProceso / PlantaProceso) ──────────────────
+// consume/produce son listas MIXTAS de {tipo: 'elemento'|'compuesto', id,
+// cantidad} — a diferencia de una mezcla de Compuestos (expandirMezclaDe-
+// Compuestos), acá cada entrada puede ser un Elemento suelto o un Compuesto
+// entero. Se expande todo a un solo perfil atómico por lado (sumando
+// partículas de cada elemento referenciado directamente, y de cada elemento
+// componente de cada compuesto referenciado) y se comparan consume vs
+// produce capa por capa: una reacción real no crea ni destruye partículas,
+// solo las reordena, así que ambos lados deben sumar lo mismo en cada capa.
+
+export interface EntradaProceso {
+  tipo: "elemento" | "compuesto";
+  id: string;
+  cantidad: number;
+}
+
+/** Expande una lista mixta de EntradaProceso en un único PerfilAtomico,
+ *  sumando partículas de elementos sueltos y de elementos componentes de
+ *  compuestos referenciados. Ids que no existen en ningún catálogo se
+ *  devuelven aparte en `huerfanos` para que el caller pueda avisar. */
+function expandirEntradasProceso(
+  entradas: EntradaProceso[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+): { perfil: PerfilAtomico; huerfanos: { tipo: "elemento" | "compuesto"; id: string }[] } {
+  const perfil: PerfilAtomico = { nucleo: {}, media: {}, externa: {}, capacidadExternaTotal: 0 };
+  const huerfanos: { tipo: "elemento" | "compuesto"; id: string }[] = [];
+
+  for (const entrada of entradas) {
+    if (!entrada.cantidad) continue;
+
+    if (entrada.tipo === "elemento") {
+      const elemento = elementos.find((e) => e.id === entrada.id);
+      if (!elemento) {
+        huerfanos.push({ tipo: "elemento", id: entrada.id });
+        continue;
+      }
+      const parcial = calcularPerfilAtomico(
+        { id: "__entrada__", nombre: "", componentes: [{ elemento_id: elemento.id, cantidad: entrada.cantidad }] },
+        elementos,
+      );
+      for (const layer of LAYERS) perfil[layer] = sumarParticleMap(perfil[layer], parcial[layer]);
+      perfil.capacidadExternaTotal += parcial.capacidadExternaTotal;
+    } else {
+      const compuesto = compuestos.find((c) => c.id === entrada.id);
+      if (!compuesto) {
+        huerfanos.push({ tipo: "compuesto", id: entrada.id });
+        continue;
+      }
+      const parcial = calcularPerfilAtomicoDeMezcla(
+        [{ compuesto_id: compuesto.id, cantidad: entrada.cantidad }],
+        compuestos,
+        elementos,
+      );
+      for (const layer of LAYERS) perfil[layer] = sumarParticleMap(perfil[layer], parcial[layer]);
+      perfil.capacidadExternaTotal += parcial.capacidadExternaTotal;
+    }
+  }
+
+  return { perfil, huerfanos };
+}
+
+/** Compara consume vs produce de un Proceso (MineralProceso/PlantaProceso)
+ *  capa por capa: producido debe igualar consumido para que la reacción
+ *  conserve partículas, igual que balancear 2H₂ + O₂ → 2H₂O. */
+export function calcularBalanceProceso(
+  consume: EntradaProceso[],
+  produce: EntradaProceso[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+): ResultadoBalanceProceso {
+  const lado = (entradas: EntradaProceso[]) =>
+    expandirEntradasProceso(entradas, compuestos, elementos);
+
+  const c = lado(consume ?? []);
+  const p = lado(produce ?? []);
+
+  const totalCapa = (perfil: PerfilAtomico, layer: LayerName) =>
+    Object.values(perfil[layer]).reduce((a, b) => a + (b ?? 0), 0);
+
+  const capas: BalanceCapaProceso[] = LAYERS.map((layer) => {
+    const consumido = totalCapa(c.perfil, layer);
+    const producido = totalCapa(p.perfil, layer);
+    return { layer, consumido, producido, diferencia: producido - consumido };
+  });
+
+  return {
+    balanceado: capas.every((cap) => cap.diferencia === 0),
+    capas,
+    huerfanos: [...c.huerfanos, ...p.huerfanos],
+  };
+}
+
+/**
+ * Autocompleta `produce` escalando sus cantidades (mismo factor entero
+ * para todas) para que iguale a `consume` capa por capa, cuando eso es
+ * posible con un factor entero razonable — mismo espíritu que
+ * calcularEstequiometriaExacta, pero balanceando dos lados en vez de
+ * llevar un solo compuesto a 0. Si `produce` está vacío o no alcanza
+ * ningún factor entero exacto, devuelve balanceado: false (no inventa
+ * entradas nuevas: solo re-escala las que el usuario ya puso).
+ */
+export function autocompletarBalanceProceso(
+  consume: EntradaProceso[],
+  produce: EntradaProceso[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+  maxFactor = 12,
+): { balanceado: boolean; produce: EntradaProceso[]; factor: number } {
+  if (!produce || produce.length === 0) {
+    return { balanceado: false, produce: [], factor: 0 };
+  }
+
+  for (let k = 1; k <= maxFactor; k++) {
+    const escalado = produce.map((e) => ({ ...e, cantidad: e.cantidad * k }));
+    const balance = calcularBalanceProceso(consume, escalado, compuestos, elementos);
+    if (balance.balanceado && balance.huerfanos.length === 0) {
+      return { balanceado: true, produce: escalado, factor: k };
+    }
+  }
+
+  return { balanceado: false, produce: [], factor: 0 };
+}
+
+// ─── Sugerencias D&D para Item, derivadas de su composición ────────────────
+// Item.composicion es { compuesto_id, tag }[] — partes distintas SIN
+// proporción (a diferencia de Formación/Órgano, que sí tienen `cantidad`;
+// ver el comentario de ComponenteCompuestoEnMezcla más arriba). Por eso acá
+// cada parte pesa 1 por igual al agregarlas: no hay una cantidad real que
+// ponderar, solo "esta parte también está hecha de este Compuesto".
+//
+// La idea (igual que generarDescripcionElemento, que arma texto desde la
+// estructura en vez de campos manuales) es leer qué partícula domina el
+// perfil agregado del ítem y, si domina algo asociado a un rol físico
+// reconocible, sugerir marcar es_arma/es_armadura — nunca marcarlo solo:
+// el diseño narrativo de un ítem es decisión humana, esto es una sugerencia
+// que el editor puede aceptar o ignorar.
+
+export interface SugerenciaReglaDnd {
+  campo: "es_arma" | "es_armadura";
+  motivo: string;
+  /** Sugerencia de dado_dano solo cuando campo === "es_arma" — un punto de
+   *  partida razonable, no una tirada balanceada por el sistema D&D (eso
+   *  sigue siendo criterio humano, ver PanelReglasDnd). */
+  dadoDanoSugerido?: string;
+}
+
+/** Perfil atómico agregado de todas las partes de un Item — mismo criterio
+ *  que expandirMezclaDeCompuestos pero con peso 1 por parte (sin cantidad). */
+export function calcularPerfilAtomicoDeItem(
+  composicion: { compuesto_id: string; tag: string }[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+): PerfilAtomico {
+  const mezcla: ComponenteCompuestoEnMezcla[] = (composicion ?? []).map((c) => ({
+    compuesto_id: c.compuesto_id,
+    cantidad: 1,
+  }));
+  return calcularPerfilAtomicoDeMezcla(mezcla, compuestos, elementos);
+}
+
+/**
+ * Sugiere reglas D&D (es_arma/es_armadura + dado_dano de partida) a partir
+ * de qué partícula domina el perfil agregado de un Item — Voluntad y
+ * Cinética hablan de ítems que ACTÚAN sobre algo (golpean, imponen fuerza:
+ * arma), mientras que Catálisis/Equilibrio hablan de ítems que ESTABILIZAN
+ * o protegen al portador (armadura). El resto de partículas (Masa,
+ * Potencial, Información, Percepción, Transición, Ciclo, Entropía) no
+ * mapean a un rol de combate claro, así que no sugieren nada — es mejor no
+ * sugerir que sugerir con baja confianza.
+ *
+ * No es la Ley de Cancelación de Carga ni una regla oficial: es la misma
+ * clase de heurística de diseño que (B) en la cabecera de este archivo,
+ * aplicada a Items en vez de a "qué compuesto pega con cuál".
+ */
+export function sugerirReglasDndDesdeComposicion(
+  composicion: { compuesto_id: string; tag: string }[],
+  compuestos: Compuesto[],
+  elementos: Elemento[],
+): SugerenciaReglaDnd | null {
+  if (!composicion || composicion.length === 0) return null;
+
+  const perfil = calcularPerfilAtomicoDeItem(composicion, compuestos, elementos);
+  const dominantes = calcularParticulaDominante(perfil);
+  if (dominantes.length === 0) return null;
+
+  // Empate entre varias partículas dominantes: solo actuamos si TODAS las
+  // dominantes caen del mismo lado (arma o armadura) — un empate mixto
+  // (ej. Voluntad y Catálisis empatadas) no da una señal clara.
+  const particulasArma = new Set(["Voluntad", "Cinética"]);
+  const particulasArmadura = new Set(["Catálisis", "Equilibrio"]);
+
+  const todasArma = dominantes.every((d) => particulasArma.has(d.particula));
+  const todasArmadura = dominantes.every((d) => particulasArmadura.has(d.particula));
+
+  if (todasArma) {
+    const nombres = dominantes.map((d) => d.particula).join("/");
+    // Dado de partida modesto (1d6) — señal de "probablemente un arma",
+    // el diseño fino del daño sigue siendo criterio humano.
+    return {
+      campo: "es_arma",
+      motivo: `Su composición está dominada por ${nombres}: partículas asociadas a ejercer fuerza/voluntad sobre algo, típico de un arma.`,
+      dadoDanoSugerido: "1d6",
+    };
+  }
+
+  if (todasArmadura) {
+    const nombres = dominantes.map((d) => d.particula).join("/");
+    return {
+      campo: "es_armadura",
+      motivo: `Su composición está dominada por ${nombres}: partículas asociadas a estabilizar/proteger, típico de una armadura.`,
+    };
+  }
+
+  return null;
 }

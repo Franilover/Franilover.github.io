@@ -42,6 +42,7 @@ import {
   SelectorComposicionMultiple,
   type ComposicionEntrada,
 } from "@/domains/garlia/_shared/SelectorComposicionMultiple";
+import { SugerenciaReglasDndPanel } from "@/domains/garlia/_shared/SugerenciaReglasDndPanel";
 
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
@@ -288,6 +289,15 @@ export function EditorItem({
                   loadingCompuestos={loadingCompuestos}
                   onCompuestoCreado={onCompuestoCreado}
                   onEditarCompuesto={setEditandoCompuestoId}
+                />
+
+                <SugerenciaReglasDndPanel
+                  composicion={form.composicion ?? []}
+                  compuestos={compuestos}
+                  elementos={elementos}
+                  yaEsArma={!!form.es_arma}
+                  yaEsArmadura={!!form.es_armadura}
+                  onAplicar={(cambios) => setForm((f: Item) => ({ ...f, ...cambios }))}
                 />
               </div>
 
