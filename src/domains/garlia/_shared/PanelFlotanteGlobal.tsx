@@ -251,6 +251,7 @@ export function PanelFlotanteGlobal() {
             <ItemEditor
               key={item!.id}
               item={item!}
+              onDeleted={() => cerrar()}
               onHeaderControlsChange={setHeaderControls}
             />
           ) : entidad.kind === "flora" ? (
