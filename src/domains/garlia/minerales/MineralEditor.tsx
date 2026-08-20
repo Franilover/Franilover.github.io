@@ -31,8 +31,9 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
-import { type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
+import { type Compuesto, type Elemento, type GrupoCompuesto } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import { BalanceProcesoPanel } from "@/domains/garlia/_shared/BalanceProcesoPanel";
@@ -63,6 +64,7 @@ export function MineralEditor({
 }) {
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
+  const { items: gruposCompuestos } = useGruposCompuestos();
   const { actualizar, eliminar } = useMinerales();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
     useEcosistemas();
@@ -284,6 +286,7 @@ export function MineralEditor({
                             onUpdate={actualizarFormacion}
                             onDelete={() => eliminarFormacion(formacion.id)}
                             compuestos={compuestos}
+                            gruposCompuestos={gruposCompuestos}
                           />
                         </div>
                       ))}
@@ -368,11 +371,13 @@ function FormacionCard({
   onUpdate,
   onDelete,
   compuestos,
+  gruposCompuestos,
 }: {
   formacion: MineralFormacion;
   onUpdate: (id: string, updates: Partial<MineralFormacion>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
+  gruposCompuestos?: GrupoCompuesto[];
 }) {
   return (
     <div className="group py-3">
@@ -399,6 +404,7 @@ function FormacionCard({
             compuestos={compuestos}
             componentes={(formacion.componentes ?? []) as ComponenteOrgano[]}
             onChange={(componentes) => onUpdate(formacion.id, { componentes })}
+            gruposCompuestos={gruposCompuestos}
           />
         </div>
 

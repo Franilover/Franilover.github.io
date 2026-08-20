@@ -15,7 +15,8 @@
 import { Plus, Trash2, Pencil } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-import type { Compuesto } from "@/domains/garlia/elementos/types";
+import type { Compuesto, GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import { SelectorGrupoCompuestos } from "@/domains/garlia/elementos/SelectorGrupoCompuestos";
 
 export interface ComponenteOrgano {
   compuesto_id: string;
@@ -28,6 +29,7 @@ export function SelectorFormulaOrgano({
   onChange,
   onAbrirCompuesto,
   ocultarBotonAgregar,
+  gruposCompuestos,
 }: {
   compuestos: Compuesto[];
   componentes: ComponenteOrgano[];
@@ -39,6 +41,11 @@ export function SelectorFormulaOrgano({
    *  propio botón (p.ej. en el header de la tarjeta) llamando a
    *  agregarComponenteOrgano() directamente. */
   ocultarBotonAgregar?: boolean;
+  /** Catálogo de Grupos de Compuestos — si se pasa, habilita el botón
+   *  "Usar grupo" que copia la fórmula de un grupo existente como punto de
+   *  partida (reemplaza la fórmula actual, sin acoplar tablas). Omitir el
+   *  prop oculta el botón. */
+  gruposCompuestos?: GrupoCompuesto[];
 }) {
   function agregar() {
     const elegidos = new Set(componentes.map((c) => c.compuesto_id));
@@ -76,16 +83,27 @@ export function SelectorFormulaOrgano({
         </div>
       )}
 
-      {!ocultarBotonAgregar && (
-        <button
-          type="button"
-          onClick={agregar}
-          disabled={compuestos.length === 0}
-          className="flex items-center justify-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Plus size={10} />
-          Agregar
-        </button>
+      {(!ocultarBotonAgregar || (gruposCompuestos && gruposCompuestos.length > 0)) && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {!ocultarBotonAgregar && (
+            <button
+              type="button"
+              onClick={agregar}
+              disabled={compuestos.length === 0}
+              className="flex items-center justify-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Plus size={10} />
+              Agregar
+            </button>
+          )}
+
+          {gruposCompuestos && (
+            <SelectorGrupoCompuestos
+              grupos={gruposCompuestos}
+              onElegir={(nuevos) => onChange(nuevos)}
+            />
+          )}
+        </div>
       )}
 
       {compuestos.length === 0 && (

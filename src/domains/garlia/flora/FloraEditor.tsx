@@ -26,7 +26,8 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
+import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { type Compuesto, type Elemento, type GrupoCompuesto } from "@/domains/garlia/elementos/types";
 import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
@@ -59,6 +60,7 @@ export function FloraEditorMejorado({
 }) {
   const { items: elementos, setItems: setElementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
+  const { items: gruposCompuestos } = useGruposCompuestos();
   const { actualizar, eliminar } = useFlora();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
     useEcosistemas();
@@ -315,6 +317,7 @@ export function FloraEditorMejorado({
                           compuestos={compuestos}
                           elementos={elementos}
                           onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
+                          gruposCompuestos={gruposCompuestos}
                         />
                       </div>
                     ))}
@@ -423,6 +426,7 @@ interface OrganoCardProps {
   compuestos: Compuesto[];
   elementos: Elemento[];
   onAbrirCompuesto?: (compuestoId: string) => void;
+  gruposCompuestos?: GrupoCompuesto[];
 }
 
 function OrganoCard({
@@ -432,6 +436,7 @@ function OrganoCard({
   compuestos,
   elementos,
   onAbrirCompuesto,
+  gruposCompuestos,
 }: OrganoCardProps) {
   function agregarComponente() {
     const componentes = (organo.componentes ?? []) as ComponenteOrgano[];
@@ -482,6 +487,7 @@ function OrganoCard({
             onChange={(componentes) => onUpdate(organo.id, { componentes })}
             onAbrirCompuesto={onAbrirCompuesto}
             ocultarBotonAgregar
+            gruposCompuestos={gruposCompuestos}
           />
         </div>
 
