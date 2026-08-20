@@ -12,7 +12,7 @@
  * patrón que patron_trazos (jsonb) en runas/types.ts.
  */
 
-import { Atom, Flame, Gem, Layers, Mountain, Sparkle, Wind } from "lucide-react";
+import { Gem, Link2, Scale, Wind, CircleOff } from "lucide-react";
 
 export type ParticleType =
   | "Masa"
@@ -81,33 +81,32 @@ export const LAYER_PARTICLES: Record<LayerName, ParticleType[]> = {
 
 export type ParticleMap = Partial<Record<ParticleType, number>>;
 
-export type ElementFamily =
-  | "Sensibles"
-  | "Nobles"
-  | "Base Terrosa"
-  | "Metal"
-  | "Mineral"
-  | "Gas/Fluido"
-  | "Energético";
+/**
+ * Familias derivadas directamente de la física del sistema (no de estética):
+ *   - Noble: capa externa saturada (§5.3) — eje aparte, prioritario.
+ *   - Rígido / Intermedio / Reactivo: según R = Catálisis/Transición en la
+ *     capa externa (§6.2) — R>1 rígido, R=1 intermedio, R<1 reactivo. Un
+ *     elemento con Catálisis>0 y Transición=0 cuenta como Rígido (rigidez
+ *     máxima, ver nota de §6.2).
+ *   - Inerte: Catálisis=0 y Transición=0 — sin medio de acoplamiento activo,
+ *     no enlaza por esta vía (caso límite no cubierto por la fórmula R).
+ */
+export type ElementFamily = "Noble" | "Rígido" | "Intermedio" | "Reactivo" | "Inerte";
 
 export const ELEMENT_FAMILIES: ElementFamily[] = [
-  "Sensibles",
-  "Nobles",
-  "Base Terrosa",
-  "Metal",
-  "Mineral",
-  "Gas/Fluido",
-  "Energético",
+  "Noble",
+  "Rígido",
+  "Intermedio",
+  "Reactivo",
+  "Inerte",
 ];
 
 export const FAMILY_ICON: Record<ElementFamily, React.ElementType> = {
-  Sensibles: Sparkle,
-  Nobles: Gem,
-  "Base Terrosa": Layers,
-  Metal: Atom,
-  Mineral: Mountain,
-  "Gas/Fluido": Wind,
-  Energético: Flame,
+  Noble: Gem,
+  Rígido: Link2,
+  Intermedio: Scale,
+  Reactivo: Wind,
+  Inerte: CircleOff,
 };
 
 /** Fila cruda tal cual vive en Supabase (tabla "elementos"). */

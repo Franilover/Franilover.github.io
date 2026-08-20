@@ -576,13 +576,11 @@ export function generarDescripcionElemento(elemento: Elemento): DescripcionEleme
   // Rol corto, por familia + si está completo.
   const completo = balanceExterna.balance === 0;
   const rolFamilia: Record<ElementFamily, string> = {
-    Sensibles: "sensible a estímulos externos",
-    Nobles: "estable e inerte",
-    "Base Terrosa": "base estructural, poco reactiva",
-    Metal: "conductor y estructural, se alea con facilidad",
-    Mineral: "denso y resistente, base de estructuras rígidas",
-    "Gas/Fluido": "liviano y disperso, reactivo ante impulsos",
-    Energético: "acumula o propaga energía activamente",
+    Noble: "capa externa saturada, estable e inerte",
+    Rígido: "Catálisis domina sobre Transición — enlace fuerte y duradero",
+    Intermedio: "Catálisis y Transición equilibradas — enlace de firmeza media",
+    Reactivo: "Transición domina sobre Catálisis — enlace débil, metaestable",
+    Inerte: "sin Catálisis ni Transición — no enlaza por esta vía",
   };
   const rol = elemento.es_noble
     ? "Noble — inerte y estable"

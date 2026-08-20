@@ -196,7 +196,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
             nombre: "Nuevo elemento",
             simbolo: "??",
             numero_atomico: siguienteNumero,
-            familia: "Sensibles",
+            familia: "Inerte",
             es_noble: false,
             nucleo: {},
             media: {},

@@ -52,7 +52,7 @@ const SECCIONES_DEFAULT: SeccionInfoTablaQuimica[] = [
     id: "estabilidad",
     titulo: "Estabilidad y familias",
     contenido:
-      "Capa externa completa → elemento Noble (inerte, raro, resistente a interferencia mágica). Incompleta → elemento Inestable, forma compuestos. Los Sensibles (Percepción/Transición) cambian fácil ante estímulos; los Reactivos (Voluntad/Catálisis) se combinan activamente.",
+      "Capa externa completa → elemento Noble (inerte, raro, resistente a interferencia mágica). Incompleta, la familia depende de la proporción Catálisis/Transición: Rígido (Catálisis domina, enlace fuerte), Intermedio (equilibrados), Reactivo (Transición domina, enlace débil/metaestable) o Inerte (sin Catálisis ni Transición, no enlaza por esta vía).",
   },
   {
     id: "manifestaciones",
