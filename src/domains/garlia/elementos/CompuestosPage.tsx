@@ -774,11 +774,11 @@ function CompuestoEditor({
 
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex flex-col gap-1.5">
-              <AnalisisReactivoPeso compuesto={local} elementos={elementos} />
+              <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
+              <AnalisisReactivoPeso compuesto={local} elementos={elementos} />
             </div>
           </div>
         </div>
