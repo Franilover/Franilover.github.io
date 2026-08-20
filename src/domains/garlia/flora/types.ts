@@ -26,7 +26,8 @@ export interface Flora {
 export interface PlantaOrgano {
   id: string;
   planta_id: string;
-  tipo_organo: "hoja" | "petalo" | "raiz" | "fruto" | "tallo" | "semilla" | "corteza" | "otro";
+  /** Nombre del órgano (texto libre: "hoja", "pétalo", "raíz", etc) */
+  nombre: string;
   /** Fórmula del órgano: mezcla de Compuestos + cantidad (mismo lenguaje que consume/produce de Procesos y Composición de Flora) */
   componentes: Array<{ compuesto_id: string; cantidad: number }> | null;
   /** ID opcional de compuesto base (para derivar fórmulas sin escribir todo) */
@@ -61,7 +62,7 @@ export type FloraInput = Partial<
 >;
 
 export type PlantaOrganoInput = Partial<
-  Pick<PlantaOrgano, "tipo_organo" | "componentes" | "compuesto_base_id" | "notas">
+  Pick<PlantaOrgano, "nombre" | "componentes" | "compuesto_base_id" | "notas">
 >;
 
 export type PlantaProcesoInput = Partial<

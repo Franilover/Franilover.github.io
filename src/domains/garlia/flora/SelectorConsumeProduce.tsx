@@ -52,16 +52,27 @@ export function SelectorConsumeProduce({
 
   return (
     <div className="flex flex-col">
-      <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 mb-1">
-        {label}
-      </span>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
+          {label}
+        </span>
+        <button
+          type="button"
+          onClick={agregar}
+          disabled={elementos.length === 0}
+          title={`Agregar a ${label}`}
+          className="shrink-0 w-4 h-4 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Plus size={11} />
+        </button>
+      </div>
 
       {items.length === 0 && (
-        <p className="text-micro text-primary/25 italic mb-1.5">Nada definido todavía.</p>
+        <p className="text-micro text-primary/25 italic">Nada definido todavía.</p>
       )}
 
       {items.length > 0 && (
-        <div className="divide-y divide-primary/10 mb-1.5">
+        <div className="divide-y divide-primary/10">
           {items.map((item, idx) => (
             <FilaItemProceso
               key={idx}
@@ -74,16 +85,6 @@ export function SelectorConsumeProduce({
           ))}
         </div>
       )}
-
-      <button
-        type="button"
-        onClick={agregar}
-        disabled={elementos.length === 0}
-        className="flex items-center justify-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        <Plus size={10} />
-        Agregar
-      </button>
     </div>
   );
 }
@@ -198,7 +199,7 @@ function FilaItemProceso({
           }}
           onKeyDown={onKeyDown}
           placeholder={`Buscar ${item.tipo}…`}
-          className="w-full bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none border-0 border-b border-primary/10 focus:border-primary/30 placeholder:text-primary/30 placeholder:font-normal transition-colors"
+          className="w-full bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors"
         />
         {buscando && (
           <div

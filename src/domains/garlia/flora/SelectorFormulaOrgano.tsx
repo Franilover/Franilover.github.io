@@ -157,7 +157,7 @@ function FilaComponenteOrgano({
           }}
           onKeyDown={onKeyDown}
           placeholder="Buscar compuesto…"
-          className="w-full bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none border-0 border-b border-primary/10 focus:border-primary/30 placeholder:text-primary/30 placeholder:font-normal transition-colors"
+          className="w-full bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors"
         />
         {buscando && (
           <div

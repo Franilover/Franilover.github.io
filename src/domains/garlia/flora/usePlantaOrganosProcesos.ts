@@ -59,10 +59,10 @@ export function usePlantaOrganosProcesos(plantaId: string) {
 
   // ── CRUD de órganos ────────────────────────────────────────────────────
   const crearOrgano = useCallback(
-    async (tipoOrgano: PlantaOrgano["tipo_organo"]) => {
+    async (nombre: string = "") => {
       const { data, error } = await supabase
         .from("planta_organos")
-        .insert([{ planta_id: plantaId, tipo_organo: tipoOrgano, componentes: null }])
+        .insert([{ planta_id: plantaId, nombre, componentes: null }])
         .select()
         .single();
 

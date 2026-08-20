@@ -14,13 +14,9 @@
  */
 
 import {
-  Droplet,
-  Flower2,
   GripVertical,
   Leaf,
   Plus,
-  Sprout,
-  TreeDeciduous,
   Trash2,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -45,22 +41,8 @@ import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/Selector
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
-import { SelectorTipo, type OpcionTipo } from "./SelectorTipo";
 import { SelectorFormulaOrgano, type ComponenteOrgano } from "./SelectorFormulaOrgano";
 import { SelectorConsumeProduce, type ItemProceso } from "./SelectorConsumeProduce";
-
-// ─── Catálogos de tipo fijos, con icono ────────────────────────────────────
-
-const TIPOS_ORGANO: OpcionTipo<PlantaOrgano["tipo_organo"]>[] = [
-  { value: "hoja", label: "Hoja", icon: Leaf },
-  { value: "petalo", label: "Pétalo", icon: Flower2 },
-  { value: "raiz", label: "Raíz", icon: Sprout },
-  { value: "fruto", label: "Fruto", icon: Droplet },
-  { value: "tallo", label: "Tallo", icon: TreeDeciduous },
-  { value: "semilla", label: "Semilla", icon: Sprout },
-  { value: "corteza", label: "Corteza", icon: TreeDeciduous },
-  { value: "otro", label: "Otro", icon: Leaf },
-];
 
 export function FloraEditorMejorado({
   flora: floraProp,
@@ -221,16 +203,12 @@ export function FloraEditorMejorado({
             {tabActiva === "organos" && (
               <div className="space-y-3">
                 <div className="flex items-center justify-end">
-                  <SelectorTipo
-                    variant="crear"
-                    triggerLabel={
-                      <span className="flex items-center gap-1.5">
-                        <Plus size={14} /> Nuevo órgano
-                      </span>
-                    }
-                    opciones={TIPOS_ORGANO}
-                    onSelect={(tipo) => void crearOrgano(tipo)}
-                  />
+                  <button
+                    onClick={() => void crearOrgano()}
+                    className="flex items-center gap-1.5 text-xs font-medium text-primary/60 hover:text-primary transition px-2 py-1 rounded hover:bg-primary/5"
+                  >
+                    <Plus size={14} /> Nuevo órgano
+                  </button>
                 </div>
 
                 {loadingOrganosProcesos ? (
@@ -317,20 +295,17 @@ interface OrganoCardProps {
 }
 
 function OrganoCard({ organo, onUpdate, onDelete, compuestos, elementos }: OrganoCardProps) {
-  const opcionActual = TIPOS_ORGANO.find((o) => o.value === organo.tipo_organo);
-  const Icon = opcionActual?.icon ?? Leaf;
-
   return (
     <div className="group py-3 first:pt-0">
-      {/* Header: ícono + selector de tipo + eliminar (solo al hover) */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Icon size={13} className="shrink-0 text-primary/40" />
-          <SelectorTipo
-            variant="chip"
-            valor={organo.tipo_organo}
-            opciones={TIPOS_ORGANO}
-            onSelect={(tipo) => onUpdate(organo.id, { tipo_organo: tipo })}
+      {/* Header: nombre del órgano (texto libre) + eliminar (solo al hover) */}
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Leaf size={13} className="shrink-0 text-primary/40" />
+          <input
+            className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
+            placeholder="Nombre del órgano (ej: Hoja)…"
+            value={organo.nombre ?? ""}
+            onChange={(e) => onUpdate(organo.id, { nombre: e.target.value })}
           />
         </div>
         <button
@@ -353,7 +328,7 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos, elementos }: Organ
 
         <div>
           <textarea
-            className="w-full h-full min-h-[3.5rem] bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+            className="w-full h-full min-h-[3.5rem] bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
             placeholder="Notas del órgano…"
             value={organo.notas ?? ""}
             onChange={(e) => onUpdate(organo.id, { notas: e.target.value })}
@@ -492,7 +467,7 @@ function ProcesoCard({
             <GripVertical size={13} />
           </span>
           <input
-            className="min-w-0 flex-1 bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
+            className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
             placeholder="Nombre del proceso (ej: Fotosíntesis)…"
             value={proceso.nombre ?? ""}
             onChange={(e) => onUpdate(proceso.id, { nombre: e.target.value })}
@@ -528,7 +503,7 @@ function ProcesoCard({
 
         <div>
           <textarea
-            className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+            className="w-full bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
             placeholder="Descripción del proceso (incluye condiciones ambientales, cuándo ocurre, etc)…"
             value={proceso.descripcion ?? ""}
             onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
