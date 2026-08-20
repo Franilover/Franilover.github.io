@@ -18,6 +18,9 @@ import {
   Combine,
   Download,
   Loader2,
+  Package,
+  Gem,
+  Sprout,
   Plus,
   Save,
   Search,
@@ -25,6 +28,7 @@ import {
   Wand2,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -44,6 +48,7 @@ import { ElementoPanelFlotante } from "./ElementosPage";
 import { AtomoVisual } from "./ElementoEditor";
 import { SelectorTagsCompuesto } from "./SelectorTagsCompuesto";
 import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
+import { useUsosCompuesto, type TipoUsoCompuesto, type UsoCompuesto } from "./useUsosCompuesto";
 
 import {
   autocompletarHastaEstable,
@@ -556,6 +561,93 @@ const ENLACE_COLOR: Record<TipoEnlace, string> = {
 };
 
 /** Detalle editable de un compuesto — mismo criterio que ElementoEditor. */
+const ICONO_USO: Record<TipoUsoCompuesto, React.ElementType> = {
+  item: Package,
+  mineral: Gem,
+  flora: Sprout,
+};
+
+const LABEL_USO: Record<TipoUsoCompuesto, string> = {
+  item: "Item",
+  mineral: "Mineral",
+  flora: "Flora",
+};
+
+/**
+ * Lista de quién usa este Compuesto en el resto del catálogo (Items,
+ * Minerales, Flora) — se muestra debajo de la fórmula de elementos en
+ * CompuestoEditor. Puramente informativo (sin navegación, ya que esas
+ * entidades viven fuera del dominio de Química), agrupado por tipo con un
+ * ícono distinto para cada uno.
+ */
+function UsosCompuestoBloque({
+  usos,
+  loading,
+}: {
+  usos: UsoCompuesto[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-1.5 text-micro text-primary/30 px-1 py-1">
+        <Loader2 className="animate-spin" size={11} />
+        Buscando dónde se usa…
+      </div>
+    );
+  }
+
+  if (usos.length === 0) {
+    return (
+      <p className="text-micro text-primary/25 px-1 py-1">
+        No se usa en ningún Item, Mineral o Flora todavía.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-micro font-black uppercase tracking-widest text-primary/40 px-1">
+        Usado en
+      </p>
+      <div className="flex flex-col gap-1">
+        {usos.map((uso, i) => {
+          const Icono = ICONO_USO[uso.tipo];
+          return (
+            <div
+              key={`${uso.tipo}-${uso.id}-${uso.detalle ?? ""}-${i}`}
+              className="flex items-center gap-1.5 px-1.5 py-1 rounded-md border border-primary/10 bg-primary/[0.02]"
+              title={`${LABEL_USO[uso.tipo]}${uso.detalle ? " · " + uso.detalle : ""}`}
+            >
+              {uso.imagen_url ? (
+                <Image
+                  src={uso.imagen_url}
+                  alt=""
+                  width={18}
+                  height={18}
+                  className="w-[18px] h-[18px] rounded object-cover shrink-0 border border-primary/10"
+                />
+              ) : (
+                <span className="w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 bg-primary/8 text-primary/40">
+                  <Icono size={11} />
+                </span>
+              )}
+              <span className="text-micro font-bold text-primary/40 uppercase tracking-wide shrink-0">
+                {LABEL_USO[uso.tipo]}
+              </span>
+              <span className="text-micro font-bold text-primary/80 truncate">{uso.nombre}</span>
+              {uso.detalle && (
+                <span className="text-micro text-primary/35 truncate ml-auto shrink-0">
+                  {uso.detalle}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CompuestoEditor({
   compuesto,
   elementos,
@@ -594,6 +686,8 @@ function CompuestoEditor({
   const { porCategoria: tagsPorCategoria, loading: tagsLoading } = useTagsCatalogo();
   const { tagIdsDe, toggleTag, loading: compuestoTagsLoading } = useCompuestoTags();
   const tagIdsAsignados = tagIdsDe(compuesto.id);
+  const { usosPorCompuesto, loading: usosLoading } = useUsosCompuesto();
+  const usos = usosPorCompuesto.get(compuesto.id) ?? [];
 
   async function persistElemento(id: string, cambios: Partial<Elemento>) {
     try {
@@ -770,6 +864,10 @@ function CompuestoEditor({
               }}
               onAbrirElemento={setEditandoElementoId}
             />
+
+            <div className="border-t border-primary/10 pt-2">
+              <UsosCompuestoBloque usos={usos} loading={usosLoading} />
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 min-w-0">
