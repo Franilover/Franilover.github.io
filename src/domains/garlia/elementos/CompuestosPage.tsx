@@ -170,7 +170,7 @@ function CompuestoCasilla({
       type="button"
       onClick={onClick}
       title={compuesto.nombre}
-      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-bold tracking-wide transition-colors truncate max-w-full ${
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-micro font-bold tracking-wide transition-colors truncate max-w-full ${
         seleccionado
           ? "text-primary border border-primary/40 ring-2 ring-primary/30"
           : "hover:bg-primary/10 text-primary/70 border border-primary/15"
@@ -179,7 +179,7 @@ function CompuestoCasilla({
       {estable && (
         <span
           title="Estructura atómica completa"
-          className="w-1.5 h-1.5 rounded-full bg-accent/70 shrink-0"
+          className="w-1 h-1 rounded-full bg-accent/70 shrink-0"
         />
       )}
       <span className="truncate">{compuesto.nombre}</span>
@@ -1340,12 +1340,12 @@ function MasonryGruposNaturaleza({
   );
   const anchoColumna = (anchoDisponible - GAP * (numColumnas - 1)) / numColumnas;
 
-  // Estimación de altura de una pill según su ancho de texto (aprox. 6.2px
-  // por carácter a este tamaño de fuente + padding del chip), para simular
-  // el flex-wrap real sin medir el DOM.
-  const PILL_ALTO = 34;
-  const PILL_GAP = 6;
-  const anchoPill = (nombre: string) => Math.min(Math.max(nombre.length * 7.5 + 44, 76), anchoColumna);
+  // Estimación de altura de una pill según su ancho de texto (aprox. 5px
+  // por carácter a text-micro + padding del chip), para simular el
+  // flex-wrap real sin medir el DOM.
+  const PILL_ALTO = 26;
+  const PILL_GAP = 4;
+  const anchoPill = (nombre: string) => Math.min(Math.max(nombre.length * 5 + 32, 60), anchoColumna);
 
   const altoGrupo = (grupo: { nombre: string; compuestos: Compuesto[] }) => {
     const tituloAlto = 20;
@@ -1396,7 +1396,7 @@ function MasonryGruposNaturaleza({
               <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
                 {grupo.nombre}
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1">
                 {grupo.compuestos.map((c) => (
                   <CompuestoCasilla
                     key={c.id}
