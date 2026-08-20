@@ -9,7 +9,7 @@
  * entidades que tengan el mismo grupo vinculado (es el catálogo compartido).
  */
 
-import { Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import React from "react";
 
 import type { Compuesto, GrupoCompuesto } from "@/domains/garlia/elementos/types";
@@ -25,6 +25,7 @@ export function TarjetaGrupoVinculado({
   onDelete,
   compuestos,
   onAbrirCompuesto,
+  onAbrirGrupo,
   gruposCompuestos,
   placeholderNombre = "Nombre…",
   placeholderNotas = "Notas…",
@@ -35,6 +36,10 @@ export function TarjetaGrupoVinculado({
   onDelete: () => void;
   compuestos: Compuesto[];
   onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Abre este grupo en el panel flotante (GrupoCompuestoPanelFlotante) —
+   *  vista completa fuera de la tarjeta inline, útil cuando el grupo está
+   *  vinculado a muchas entidades y se quiere editar desde un solo lugar. */
+  onAbrirGrupo?: (grupoId: string) => void;
   gruposCompuestos?: GrupoCompuesto[];
   placeholderNombre?: string;
   placeholderNotas?: string;
@@ -60,6 +65,16 @@ export function TarjetaGrupoVinculado({
           onChange={(e) => onUpdate(grupo.id, { nombre: e.target.value })}
         />
         <div className="flex items-center gap-1 shrink-0">
+          {onAbrirGrupo && (
+            <button
+              type="button"
+              onClick={() => onAbrirGrupo(grupo.id)}
+              title="Abrir en el editor flotante"
+              className="w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+            >
+              <ExternalLink size={12} />
+            </button>
+          )}
           <button
             type="button"
             onClick={agregarComponente}

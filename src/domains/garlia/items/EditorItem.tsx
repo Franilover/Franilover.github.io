@@ -38,6 +38,7 @@ import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
+import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 
@@ -79,6 +80,7 @@ export function EditorItem({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [showModalDnd, setShowModalDnd] = useState(false);
   const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
+  const [editandoGrupoId, setEditandoGrupoId] = useState<string | null>(null);
   const { onWikilink } = useWikilink();
 
   // Catálogo de criaturas para el selector "Criatura" (origen del ítem)
@@ -117,6 +119,17 @@ export function EditorItem({
 
   function onGrupoCompuestoActualizadoLocal(id: string, updates: any) {
     setGruposCompuestos((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+  }
+
+  // Persistencia directa del GrupoCompuesto en catálogo — usada por el
+  // panel flotante (GrupoCompuestoPanelFlotante), que no sabe a qué
+  // relación (estructura/habilidad) pertenece el grupo que edita.
+  async function persistirGrupoCompuesto(id: string, cambios: any) {
+    onGrupoCompuestoActualizadoLocal(id, cambios);
+    const { error } = await supabase.from("grupos_compuestos").update(cambios).eq("id", id);
+    if (error) {
+      console.error("[EditorItem] error guardando grupo de compuestos:", error);
+    }
   }
 
   useEffect(() => {
@@ -311,6 +324,7 @@ export function EditorItem({
                 }}
                 onDelete={(vinculoId) => void estructura.desvincular(vinculoId)}
                 onAbrirCompuesto={setEditandoCompuestoId}
+                onAbrirGrupo={setEditandoGrupoId}
                 placeholderNombre="Nombre de la parte (ej: Hoja)…"
                 placeholderNotas="Notas de esta parte…"
                 labelCrear="Crear parte nueva"
@@ -339,6 +353,7 @@ export function EditorItem({
                 }}
                 onDelete={(vinculoId) => void habilidades.desvincular(vinculoId)}
                 onAbrirCompuesto={setEditandoCompuestoId}
+                onAbrirGrupo={setEditandoGrupoId}
                 placeholderNombre="Nombre del poder (ej: Filo ardiente)…"
                 placeholderNotas="Notas de esta habilidad…"
                 labelCrear="Crear habilidad nueva"
@@ -382,6 +397,16 @@ export function EditorItem({
           onActualizar={(id, cambios) =>
             setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
           }
+        />
+      )}
+
+      {editandoGrupoId && (
+        <GrupoCompuestoPanelFlotante
+          grupo={gruposCompuestos.find((g) => g.id === editandoGrupoId)!}
+          compuestos={compuestos}
+          onCerrar={() => setEditandoGrupoId(null)}
+          onActualizar={persistirGrupoCompuesto}
+          onAbrirCompuesto={setEditandoCompuestoId}
         />
       )}
     </div>

@@ -31,6 +31,7 @@ export function SeccionGruposVinculados({
   onUpdate,
   onDelete,
   onAbrirCompuesto,
+  onAbrirGrupo,
   placeholderNombre,
   placeholderNotas,
   labelCrear,
@@ -52,6 +53,7 @@ export function SeccionGruposVinculados({
   onUpdate: (id: string, updates: Partial<GrupoCompuesto>) => void;
   onDelete: (vinculoId: string) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
+  onAbrirGrupo?: (grupoId: string) => void;
   placeholderNombre?: string;
   placeholderNotas?: string;
   labelCrear?: string;
@@ -106,6 +108,7 @@ export function SeccionGruposVinculados({
               onDelete={() => onDelete(item.vinculo_id)}
               compuestos={compuestos}
               onAbrirCompuesto={onAbrirCompuesto}
+              onAbrirGrupo={onAbrirGrupo}
               gruposCompuestos={gruposCompuestos}
               placeholderNombre={placeholderNombre}
               placeholderNotas={placeholderNotas}

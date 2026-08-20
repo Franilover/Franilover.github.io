@@ -183,7 +183,7 @@ export function GruposCompuestosPage({
  * el backdrop, Escape, o el botón X. Más liviano que esos dos (sin
  * EditorHeaderBar) porque acá el "editor" es solo nombre + fórmula + notas.
  */
-function GrupoCompuestoPanelFlotante({
+export function GrupoCompuestoPanelFlotante({
   grupo,
   compuestos,
   onCerrar,
