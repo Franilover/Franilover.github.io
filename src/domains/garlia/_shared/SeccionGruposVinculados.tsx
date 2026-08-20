@@ -99,7 +99,7 @@ export function SeccionGruposVinculados({
       ) : items.length === 0 ? (
         <p className="text-micro text-primary/25 italic py-2">Nada definido todavía.</p>
       ) : (
-        <div className="divide-y divide-primary/10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {items.map((item) => (
             <TarjetaGrupoVinculado
               key={item.vinculo_id}

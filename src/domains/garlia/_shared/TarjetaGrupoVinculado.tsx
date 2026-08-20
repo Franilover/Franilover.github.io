@@ -56,7 +56,7 @@ export function TarjetaGrupoVinculado({
   }
 
   return (
-    <div className="group py-3">
+    <div className="group py-3 px-3 rounded-lg border border-primary/10 bg-primary/[0.02]">
       <div className="flex items-center justify-between mb-2 gap-2">
         <input
           className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
@@ -94,7 +94,7 @@ export function TarjetaGrupoVinculado({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
         <div>
           <SelectorFormulaOrgano
             compuestos={compuestos}
