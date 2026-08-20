@@ -639,9 +639,9 @@ export function AtomoVisual({
             cy={cy}
             r={radios[layer]}
             fill="none"
-            style={{ stroke: "color-mix(in srgb, var(--primary) 12%, transparent)" }}
+            style={{ stroke: "color-mix(in srgb, var(--primary) 35%, transparent)" }}
             strokeDasharray="2 4"
-            strokeWidth={1}
+            strokeWidth={1.5}
           />
         ))}
 
