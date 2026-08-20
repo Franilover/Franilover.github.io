@@ -225,7 +225,7 @@ export function EditorItem({
         <div className="p-4">
           <div className="flex flex-col sm:flex-row gap-5">
             {/* Columna izquierda: imagen */}
-            <div className="w-full sm:w-96 sm:shrink-0">
+            <div className="w-full sm:w-72 sm:shrink-0">
               {/* Mobile: imagen con botón flotante */}
               <div
                 className="sm:hidden relative w-full rounded-xl overflow-hidden border border-primary/10 bg-primary/3"
