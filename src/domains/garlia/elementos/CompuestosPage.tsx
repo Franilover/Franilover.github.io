@@ -505,18 +505,9 @@ function AnalisisReactivoPeso({
         ? "Enlace débil y metaestable: se forma con facilidad, pero también se rompe o transforma con facilidad."
         : "Firmeza media: ni especialmente estable ni especialmente inestable frente a nuevas reacciones.";
 
-  const colorReactividad =
-    reactividad.nivel === "inerte"
-      ? "text-primary/40 bg-primary/5 border-primary/10"
-      : reactividad.nivel === "moderado"
-        ? "text-primary/60 bg-primary/5 border-primary/10"
-        : reactividad.nivel === "inestable"
-          ? "text-primary/80 bg-primary/10 border-primary/15"
-          : "text-primary bg-primary/10 border-primary/20";
-
   return (
     <div className="grid grid-cols-2 gap-1.5">
-      <div className={`flex flex-col gap-0.5 px-2 py-1.5 rounded-md border ${colorReactividad}`}>
+      <div className="flex flex-col gap-0.5 px-2 py-1.5">
         <span className="text-micro font-black uppercase tracking-wide">
           {REACTIVIDAD_LABEL[reactividad.nivel]}
         </span>
@@ -527,7 +518,7 @@ function AnalisisReactivoPeso({
           )}
         </span>
       </div>
-      <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/[0.02]">
+      <div className="flex flex-col gap-0.5 px-2 py-1.5">
         <span className="text-micro font-black uppercase tracking-wide text-primary/60">
           {peso.pesoTotal} · peso {peso.categoria}
         </span>
@@ -536,13 +527,13 @@ function AnalisisReactivoPeso({
           {peso.porCapa.externa}
         </span>
       </div>
-      <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/[0.02]">
+      <div className="flex flex-col gap-0.5 px-2 py-1.5">
         <span className="text-micro font-black uppercase tracking-wide text-primary/60">
           {cargaTitulo}
         </span>
         <span className="text-micro text-primary/40">{cargaDescripcion}</span>
       </div>
-      <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/[0.02]">
+      <div className="flex flex-col gap-0.5 px-2 py-1.5">
         <span className="text-micro font-black uppercase tracking-wide text-primary/60">
           {enlaceTitulo}
         </span>
@@ -745,10 +736,8 @@ function CompuestoEditor({
               loading={tagsLoading || compuestoTagsLoading}
             />
 
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30 mt-2">
-              Notas
-            </label>
-            <RichEditor
+            <div className="border-t border-primary/10 mt-2 pt-2">
+              <RichEditor
               minHeight="16rem"
               placeholder="Descripción del compuesto…"
               value={local.notas ?? ""}
@@ -756,14 +745,12 @@ function CompuestoEditor({
                 setLocal((p) => ({ ...p, notas: v }));
                 persist({ notas: v });
               }}
-            />
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5 min-w-0">
-            <div className="flex items-center justify-between">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Elementos que lo componen
-              </p>
+            <div className="flex items-center justify-end">
               <button
                 type="button"
                 onClick={handleAutoCompletar}
@@ -788,16 +775,10 @@ function CompuestoEditor({
 
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex flex-col gap-1.5">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Reactividad y peso
-              </p>
               <AnalisisReactivoPeso compuesto={local} elementos={elementos} />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Molécula
-              </p>
               <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
             </div>
           </div>
