@@ -170,10 +170,10 @@ function CompuestoCasilla({
       type="button"
       onClick={onClick}
       title={compuesto.nombre}
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-micro font-bold tracking-wide transition-colors truncate max-w-full ${
+      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-bold tracking-wide transition-colors truncate max-w-full ${
         seleccionado
-          ? "bg-primary/20 text-primary border border-primary/40 ring-2 ring-primary/30"
-          : "bg-primary/10 hover:bg-primary/20 text-primary/70 border border-primary/15"
+          ? "text-primary border border-primary/40 ring-2 ring-primary/30"
+          : "hover:bg-primary/10 text-primary/70 border border-primary/15"
       }`}
     >
       {estable && (
@@ -1343,9 +1343,9 @@ function MasonryGruposNaturaleza({
   // Estimación de altura de una pill según su ancho de texto (aprox. 6.2px
   // por carácter a este tamaño de fuente + padding del chip), para simular
   // el flex-wrap real sin medir el DOM.
-  const PILL_ALTO = 24;
-  const PILL_GAP = 4;
-  const anchoPill = (nombre: string) => Math.min(Math.max(nombre.length * 6.2 + 28, 60), anchoColumna);
+  const PILL_ALTO = 34;
+  const PILL_GAP = 6;
+  const anchoPill = (nombre: string) => Math.min(Math.max(nombre.length * 7.5 + 44, 76), anchoColumna);
 
   const altoGrupo = (grupo: { nombre: string; compuestos: Compuesto[] }) => {
     const tituloAlto = 20;
@@ -1396,7 +1396,7 @@ function MasonryGruposNaturaleza({
               <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
                 {grupo.nombre}
               </div>
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {grupo.compuestos.map((c) => (
                   <CompuestoCasilla
                     key={c.id}
