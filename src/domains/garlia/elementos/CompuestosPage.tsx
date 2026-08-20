@@ -53,7 +53,6 @@ import {
   calcularDeficitConCatalizadores,
   calcularElectromagnetismo,
   calcularEnlaceResultante,
-  calcularEstequiometriaExacta,
   calcularPerfilAtomico,
   calcularPeso,
   calcularReactividad,
@@ -189,15 +188,11 @@ function CompuestoCasilla({
 }
 
 /**
- * Selector de elementos a combinar — mismo espíritu que SelectorEntidad
- * (fichaComponents.tsx): barra de búsqueda arriba, siempre visible, con la
- * lista de resultados en vertical justo debajo (sin dropdown ni portal,
- * pensado para vivir fijo en una columna angosta). Cada fila trae su
- * propio botón sumar/quitar para elegir muy rápido sin reabrir nada; los
- * elementos ya elegidos muestran además el stepper +/- de cantidad y
- * quedan arriba de la lista, con separador. Los que más ayudan a cerrar
- * el déficit actual (sugerirElementosParaCompletar) se destacan con un
- * puntito, igual que antes.
+ * Selector de elementos a combinar — dos columnas: a la izquierda los
+ * elementos ya elegidos (con stepper +/- de cantidad), a la derecha el
+ * buscador y la lista de disponibles con botón + por fila para agregar
+ * rápido. Los que más ayudan a cerrar el déficit actual
+ * (sugerirElementosParaCompletar) se destacan con un puntito.
  */
 function SelectorElementosCompuesto({
   elementos,
@@ -259,184 +254,144 @@ function SelectorElementosCompuesto({
   }, [elementos, query, idsElegidos, idsSugeridos]);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      {/* Barra de búsqueda, siempre visible */}
-      <div className="shrink-0 flex items-center gap-2 px-2.5 h-8 rounded-md border border-primary/10 bg-primary/[0.03] focus-within:border-primary/30 transition-colors">
-        <Search size={12} className="text-primary/35 shrink-0" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar elemento…"
-          className="flex-1 bg-transparent outline-none text-micro text-primary/80 placeholder:text-primary/30"
-        />
-        {query && (
-          <button
-            type="button"
-            onClick={() => setQuery("")}
-            className="shrink-0 text-primary/30 hover:text-primary/60 transition-colors cursor-pointer"
-            title="Limpiar búsqueda"
-          >
-            <X size={11} />
-          </button>
-        )}
-      </div>
-
-      {/* Elegidos, con stepper de cantidad — siempre arriba de la lista de
-          disponibles, con separador. */}
-      {componentes.length > 0 && (
-        <div className="shrink-0 flex flex-col gap-0.5 pb-1 mb-0.5 border-b border-primary/10">
-          {componentes.map((c) => (
-            <div
-              key={c.elemento_id}
-              className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2 pr-1 py-1 border border-primary/10"
-            >
-              <span
-                className={`flex-1 min-w-0 truncate text-micro font-bold text-primary/80 ${
-                  onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
-                }`}
-                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
-                onClick={() => onAbrirElemento?.(c.elemento_id)}
-              >
-                {nombreElemento(elementos, c.elemento_id)}
-              </span>
-              <div className="shrink-0 flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCantidad(c.elemento_id, c.cantidad - 1)}
-                  className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
-                >
-                  −
-                </button>
-                <span className="w-4 text-center text-micro font-black text-primary tabular-nums">
-                  {c.cantidad}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setCantidad(c.elemento_id, c.cantidad + 1)}
-                  className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={() => quitarElemento(c.elemento_id)}
-                  title="Quitar"
-                  className="w-5 h-5 flex items-center justify-center rounded border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 transition-all cursor-pointer"
-                >
-                  <X size={10} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Disponibles: lista vertical siempre abierta, un botón + por fila
-          para agregar rápido sin reabrir ningún dropdown. Altura fija con
-          scroll propio — la columna vive en un grid items-start, así que
-          sin este límite crecería sin techo. */}
-      <div className="max-h-[22rem] overflow-y-auto flex flex-col gap-0.5 rounded-md border border-primary/10 bg-primary/[0.02] p-1">
-        {disponibles.length === 0 ? (
-          <p className="text-micro text-primary/25 text-center py-3">
-            {elementos.length === 0
-              ? "Todavía no hay elementos en la Tabla Química para combinar."
-              : query
-                ? "Sin resultados."
-                : "Ya agregaste todos los elementos disponibles."}
-          </p>
-        ) : (
-          disponibles.map((el) => {
-            const sugerido = idsSugeridos.has(el.id);
-            return (
+    <div className="grid grid-cols-2 gap-2">
+      {/* Columna izquierda: elementos ya elegidos, con stepper de cantidad. */}
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <p className="text-micro font-bold uppercase tracking-wide text-primary/30 px-0.5">
+          En el compuesto
+          {componentes.length > 0 && (
+            <span className="ml-1 text-primary/20">· {componentes.length}</span>
+          )}
+        </p>
+        <div className="min-h-[10rem] max-h-[22rem] overflow-y-auto flex flex-col gap-0.5 rounded-md border border-primary/10 bg-primary/[0.02] p-1">
+          {componentes.length === 0 ? (
+            <p className="text-micro text-primary/25 text-center py-3 px-2">
+              Todavía no agregaste ningún elemento.
+            </p>
+          ) : (
+            componentes.map((c) => (
               <div
-                key={el.id}
-                className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
-                  sugerido ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-primary/5"
-                }`}
+                key={c.elemento_id}
+                className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2 pr-1 py-1 border border-primary/10"
               >
-                {sugerido && <span className="w-1 h-1 rounded-full bg-primary/40 shrink-0" />}
-                <button
-                  type="button"
-                  onClick={() => (onAbrirElemento ? onAbrirElemento(el.id) : agregarElemento(el.id))}
-                  title={
-                    onAbrirElemento
-                      ? "Ver/editar este elemento"
-                      : sugerido
-                        ? `${el.nombre} — completa parte del déficit actual`
-                        : undefined
-                  }
-                  className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
+                <span
+                  className={`flex-1 min-w-0 truncate text-micro font-bold text-primary/80 ${
+                    onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
+                  }`}
+                  title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                  onClick={() => onAbrirElemento?.(c.elemento_id)}
                 >
-                  <span className="shrink-0 text-micro font-black text-primary/70 w-8">
-                    {el.simbolo || "??"}
+                  {nombreElemento(elementos, c.elemento_id)}
+                </span>
+                <div className="shrink-0 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCantidad(c.elemento_id, c.cantidad - 1)}
+                    className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
+                  >
+                    −
+                  </button>
+                  <span className="w-4 text-center text-micro font-black text-primary tabular-nums">
+                    {c.cantidad}
                   </span>
-                  <span className="flex-1 min-w-0 text-micro text-primary/80 truncate">
-                    {el.nombre}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => agregarElemento(el.id)}
-                  title="Agregar al compuesto"
-                  className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 group-hover:text-primary cursor-pointer"
-                >
-                  <Plus size={10} />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setCantidad(c.elemento_id, c.cantidad + 1)}
+                    className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => quitarElemento(c.elemento_id)}
+                    title="Quitar"
+                    className="w-5 h-5 flex items-center justify-center rounded border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 transition-all cursor-pointer"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
               </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Balance atómico del compuesto: suma de partículas por capa contra su
- * capacidad fija (2/4/6) — misma lógica que valencia química real. Muestra
- * dónde le sobra ("superávit", disponible para prestar) y dónde le falta
- * ("déficit", lo que necesita de otro compuesto para estabilizarse).
- */
-function BalanceAtomico({
-  compuesto,
-  elementos,
-}: {
-  compuesto: Compuesto;
-  elementos: Elemento[];
-}) {
-  const perfil = useMemo(
-    () => calcularPerfilAtomico(compuesto, elementos),
-    [compuesto, elementos],
-  );
-  const balance = useMemo(() => calcularBalancePorCapa(perfil), [perfil]);
-
-  return (
-    <div className="rounded-lg border border-primary/10 overflow-hidden">
-      {balance.map((b, i) => (
-        <div
-          key={b.layer}
-          className={`flex items-center gap-1.5 px-2 py-1 bg-primary/[0.02] ${
-            i > 0 ? "border-t border-primary/10" : ""
-          }`}
-        >
-          <span className="w-14 shrink-0 text-micro font-bold text-primary/60">
-            {LAYER_LABEL[b.layer as LayerName]}
-          </span>
-          <span className="flex-1 text-micro text-primary/40 tabular-nums">
-            {b.total} / {b.capacidad}
-          </span>
-          <span
-            className={`shrink-0 text-micro font-black uppercase tracking-wide px-1.5 py-0.5 rounded ${
-              b.balance === 0
-                ? "text-primary/30"
-                : "text-primary/70 bg-primary/10"
-            }`}
-          >
-            {b.balance === 0 ? "Completa" : b.balance > 0 ? `+${b.balance} sobra` : `${b.balance} falta`}
-          </span>
+            ))
+          )}
         </div>
-      ))}
+      </div>
+
+      {/* Columna derecha: buscador + lista de disponibles para agregar. */}
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <div className="shrink-0 flex items-center gap-2 px-2.5 h-8 rounded-md border border-primary/10 bg-primary/[0.03] focus-within:border-primary/30 transition-colors">
+          <Search size={12} className="text-primary/35 shrink-0" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar elemento…"
+            className="flex-1 bg-transparent outline-none text-micro text-primary/80 placeholder:text-primary/30"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="shrink-0 text-primary/30 hover:text-primary/60 transition-colors cursor-pointer"
+              title="Limpiar búsqueda"
+            >
+              <X size={11} />
+            </button>
+          )}
+        </div>
+
+        <div className="max-h-[22rem] overflow-y-auto flex flex-col gap-0.5 rounded-md border border-primary/10 bg-primary/[0.02] p-1">
+          {disponibles.length === 0 ? (
+            <p className="text-micro text-primary/25 text-center py-3">
+              {elementos.length === 0
+                ? "Todavía no hay elementos en la Tabla Química para combinar."
+                : query
+                  ? "Sin resultados."
+                  : "Ya agregaste todos los elementos disponibles."}
+            </p>
+          ) : (
+            disponibles.map((el) => {
+              const sugerido = idsSugeridos.has(el.id);
+              return (
+                <div
+                  key={el.id}
+                  className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
+                    sugerido ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-primary/5"
+                  }`}
+                >
+                  {sugerido && <span className="w-1 h-1 rounded-full bg-primary/40 shrink-0" />}
+                  <button
+                    type="button"
+                    onClick={() => (onAbrirElemento ? onAbrirElemento(el.id) : agregarElemento(el.id))}
+                    title={
+                      onAbrirElemento
+                        ? "Ver/editar este elemento"
+                        : sugerido
+                          ? `${el.nombre} — completa parte del déficit actual`
+                          : undefined
+                    }
+                    className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
+                  >
+                    <span className="shrink-0 text-micro font-black text-primary/70 w-8">
+                      {el.simbolo || "??"}
+                    </span>
+                    <span className="flex-1 min-w-0 text-micro text-primary/80 truncate">
+                      {el.nombre}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => agregarElemento(el.id)}
+                    title="Agregar al compuesto"
+                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 group-hover:text-primary cursor-pointer"
+                  >
+                    <Plus size={10} />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -524,57 +479,6 @@ function AnalisisReactivoPeso({
           {peso.porCapa.externa}
         </span>
       </div>
-    </div>
-  );
-}
-
-/**
- * Estequiometría exacta: busca el múltiplo entero mínimo de toda la mezcla
- * que deja las 3 capas en 0 sin sobras — como balancear 2H₂ + O₂ → 2H₂O.
- * Muestra el resultado solo si difiere de la mezcla actual (si ya está
- * balanceado tal cual, no hace falta mostrar nada extra).
- */
-function PanelEstequiometria({
-  compuesto,
-  elementos,
-}: {
-  compuesto: Compuesto;
-  elementos: Elemento[];
-}) {
-  const resultado = useMemo(
-    () => calcularEstequiometriaExacta(compuesto, elementos),
-    [compuesto, elementos],
-  );
-
-  if (!resultado.balanceado) {
-    return (
-      <p className="text-micro text-primary/25">
-        No hay una proporción entera (hasta ×12) que balancee las 3 capas exactamente en 0
-        con estos elementos.
-      </p>
-    );
-  }
-
-  const yaBalanceado = resultado.factor === 1;
-
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/5 text-primary/80">
-        <span className="text-micro font-bold leading-snug">
-          {yaBalanceado
-            ? "Esta mezcla ya está balanceada exacta (sin sobras)."
-            : `Multiplicando toda la mezcla ×${resultado.factor} se balancea exacto, sin sobras.`}
-        </span>
-      </div>
-      {!yaBalanceado && (
-        <div className="flex flex-col gap-0.5">
-          {resultado.componentes.map((c) => (
-            <span key={c.elemento_id} className="text-micro text-primary/50">
-              {nombreElemento(elementos, c.elemento_id)} × {c.cantidad}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -760,8 +664,8 @@ function CompuestoEditor({
         )}
 
         {/* Tres columnas: Elementos que lo componen (izquierda) · análisis
-            del compuesto — estequiometría, reactividad/peso, balance
-            (centro) · Notas con RichEditor (derecha). */}
+            del compuesto — reactividad/peso, molécula (centro) · Notas con
+            RichEditor (derecha). */}
         <div className="grid grid-cols-3 gap-3 items-start">
           <div className="flex flex-col gap-1.5 min-w-0">
             <div className="flex items-center justify-between">
@@ -793,23 +697,9 @@ function CompuestoEditor({
           <div className="flex flex-col gap-3 min-w-0">
             <div className="flex flex-col gap-1.5">
               <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Estequiometría exacta
-              </p>
-              <PanelEstequiometria compuesto={local} elementos={elementos} />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
                 Reactividad y peso
               </p>
               <AnalisisReactivoPeso compuesto={local} elementos={elementos} />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Balance atómico
-              </p>
-              <BalanceAtomico compuesto={local} elementos={elementos} />
             </div>
 
             <div className="flex flex-col gap-1.5">
