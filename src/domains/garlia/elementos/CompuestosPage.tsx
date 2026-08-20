@@ -188,11 +188,14 @@ function CompuestoCasilla({
 }
 
 /**
- * Selector de elementos a combinar — dos columnas: a la izquierda los
- * elementos ya elegidos (con stepper +/- de cantidad), a la derecha el
- * buscador y la lista de disponibles con botón + por fila para agregar
- * rápido. Los que más ayudan a cerrar el déficit actual
- * (sugerirElementosParaCompletar) se destacan con un puntito.
+ * Selector de elementos a combinar — una sola columna: barra de búsqueda
+ * arriba que, al enfocarse, despliega debajo (como dropdown flotante) la
+ * lista de elementos disponibles para agregar; al elegir uno o cerrar el
+ * dropdown (click afuera / Escape), abajo queda la lista fija de elementos
+ * ya en el compuesto, con su stepper +/- de cantidad y sin fondo de caja —
+ * solo separadores sutiles entre filas. Los que más ayudan a cerrar el
+ * déficit actual (sugerirElementosParaCompletar) se destacan con un
+ * puntito en el dropdown.
  */
 function SelectorElementosCompuesto({
   elementos,
@@ -208,6 +211,8 @@ function SelectorElementosCompuesto({
   onAbrirElemento?: (elementoId: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const contenedorRef = useRef<HTMLDivElement>(null);
   const idsElegidos = new Set(componentes.map((c) => c.elemento_id));
 
   const sugerencias = useMemo(
@@ -253,78 +258,41 @@ function SelectorElementosCompuesto({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elementos, query, idsElegidos, idsSugeridos]);
 
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {/* Columna izquierda: elementos ya elegidos, con stepper de cantidad. */}
-      <div className="flex flex-col gap-0.5 min-w-0">
-        <p className="text-micro font-bold uppercase tracking-wide text-primary/30 px-0.5">
-          En el compuesto
-          {componentes.length > 0 && (
-            <span className="ml-1 text-primary/20">· {componentes.length}</span>
-          )}
-        </p>
-        <div className="min-h-[10rem] max-h-[22rem] overflow-y-auto flex flex-col gap-0.5 rounded-md border border-primary/10 bg-primary/[0.02] p-1">
-          {componentes.length === 0 ? (
-            <p className="text-micro text-primary/25 text-center py-3 px-2">
-              Todavía no agregaste ningún elemento.
-            </p>
-          ) : (
-            componentes.map((c) => (
-              <div
-                key={c.elemento_id}
-                className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2 pr-1 py-1 border border-primary/10"
-              >
-                <span
-                  className={`flex-1 min-w-0 truncate text-micro font-bold text-primary/80 ${
-                    onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
-                  }`}
-                  title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
-                  onClick={() => onAbrirElemento?.(c.elemento_id)}
-                >
-                  {nombreElemento(elementos, c.elemento_id)}
-                </span>
-                <div className="shrink-0 flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setCantidad(c.elemento_id, c.cantidad - 1)}
-                    className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
-                  >
-                    −
-                  </button>
-                  <span className="w-4 text-center text-micro font-black text-primary tabular-nums">
-                    {c.cantidad}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCantidad(c.elemento_id, c.cantidad + 1)}
-                    className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
-                  >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => quitarElemento(c.elemento_id)}
-                    title="Quitar"
-                    className="w-5 h-5 flex items-center justify-center rounded border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 transition-all cursor-pointer"
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+  // Cerrar el dropdown al clickear afuera o al presionar Escape.
+  useEffect(() => {
+    if (!abierto) return;
+    function onPointerDown(e: PointerEvent) {
+      if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) {
+        setAbierto(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setAbierto(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [abierto]);
 
-      {/* Columna derecha: buscador + lista de disponibles para agregar. */}
-      <div className="flex flex-col gap-0.5 min-w-0">
+  return (
+    <div ref={contenedorRef} className="flex flex-col gap-1.5">
+      {/* Barra de búsqueda — al enfocarse despliega el dropdown de
+          disponibles debajo. */}
+      <div className="relative">
         <div className="shrink-0 flex items-center gap-2 px-2.5 h-8 rounded-md border border-primary/10 bg-primary/[0.03] focus-within:border-primary/30 transition-colors">
           <Search size={12} className="text-primary/35 shrink-0" />
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar elemento…"
+            onFocus={() => setAbierto(true)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setAbierto(true);
+            }}
+            placeholder="Buscar elemento para agregar…"
             className="flex-1 bg-transparent outline-none text-micro text-primary/80 placeholder:text-primary/30"
           />
           {query && (
@@ -339,58 +307,122 @@ function SelectorElementosCompuesto({
           )}
         </div>
 
-        <div className="max-h-[22rem] overflow-y-auto flex flex-col gap-0.5 rounded-md border border-primary/10 bg-primary/[0.02] p-1">
-          {disponibles.length === 0 ? (
-            <p className="text-micro text-primary/25 text-center py-3">
-              {elementos.length === 0
-                ? "Todavía no hay elementos en la Tabla Química para combinar."
-                : query
-                  ? "Sin resultados."
-                  : "Ya agregaste todos los elementos disponibles."}
-            </p>
-          ) : (
-            disponibles.map((el) => {
-              const sugerido = idsSugeridos.has(el.id);
-              return (
-                <div
-                  key={el.id}
-                  className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
-                    sugerido ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-primary/5"
-                  }`}
-                >
-                  {sugerido && <span className="w-1 h-1 rounded-full bg-primary/40 shrink-0" />}
-                  <button
-                    type="button"
-                    onClick={() => (onAbrirElemento ? onAbrirElemento(el.id) : agregarElemento(el.id))}
-                    title={
-                      onAbrirElemento
-                        ? "Ver/editar este elemento"
-                        : sugerido
+        {abierto && (
+          <div className="absolute z-20 top-full left-0 right-0 mt-1 max-h-[18rem] overflow-y-auto flex flex-col gap-0.5 rounded-md border border-primary/15 bg-bg-main shadow-lg p-1">
+            {disponibles.length === 0 ? (
+              <p className="text-micro text-primary/25 text-center py-3">
+                {elementos.length === 0
+                  ? "Todavía no hay elementos en la Tabla Química para combinar."
+                  : query
+                    ? "Sin resultados."
+                    : "Ya agregaste todos los elementos disponibles."}
+              </p>
+            ) : (
+              disponibles.map((el) => {
+                const sugerido = idsSugeridos.has(el.id);
+                return (
+                  <div
+                    key={el.id}
+                    className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
+                      sugerido ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-primary/5"
+                    }`}
+                  >
+                    {sugerido && <span className="w-1 h-1 rounded-full bg-primary/40 shrink-0" />}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        agregarElemento(el.id);
+                        setQuery("");
+                        setAbierto(false);
+                      }}
+                      title={
+                        sugerido
                           ? `${el.nombre} — completa parte del déficit actual`
-                          : undefined
-                    }
-                    className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
-                  >
-                    <span className="shrink-0 text-micro font-black text-primary/70 w-8">
-                      {el.simbolo || "??"}
-                    </span>
-                    <span className="flex-1 min-w-0 text-micro text-primary/80 truncate">
-                      {el.nombre}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => agregarElemento(el.id)}
-                    title="Agregar al compuesto"
-                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 group-hover:text-primary cursor-pointer"
-                  >
-                    <Plus size={10} />
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </div>
+                          : "Agregar al compuesto"
+                      }
+                      className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
+                    >
+                      <span className="shrink-0 text-micro font-black text-primary/70 w-8">
+                        {el.simbolo || "??"}
+                      </span>
+                      <span className="flex-1 min-w-0 text-micro text-primary/80 truncate">
+                        {el.nombre}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        agregarElemento(el.id);
+                        setQuery("");
+                        setAbierto(false);
+                      }}
+                      title="Agregar al compuesto"
+                      className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 group-hover:text-primary cursor-pointer"
+                    >
+                      <Plus size={10} />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Elementos ya en el compuesto — sin fondo de caja, solo
+          separadores sutiles entre filas. */}
+      <div className="flex flex-col">
+        {componentes.length === 0 ? (
+          <p className="text-micro text-primary/25 text-center py-3">
+            Todavía no agregaste ningún elemento.
+          </p>
+        ) : (
+          componentes.map((c, i) => (
+            <div
+              key={c.elemento_id}
+              className={`flex items-center gap-1.5 py-1.5 ${
+                i > 0 ? "border-t border-primary/10" : ""
+              }`}
+            >
+              <span
+                className={`flex-1 min-w-0 truncate text-micro font-bold text-primary/80 ${
+                  onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
+                }`}
+                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                onClick={() => onAbrirElemento?.(c.elemento_id)}
+              >
+                {nombreElemento(elementos, c.elemento_id)}
+              </span>
+              <div className="shrink-0 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCantidad(c.elemento_id, c.cantidad - 1)}
+                  className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
+                >
+                  −
+                </button>
+                <span className="w-4 text-center text-micro font-black text-primary tabular-nums">
+                  {c.cantidad}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCantidad(c.elemento_id, c.cantidad + 1)}
+                  className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={() => quitarElemento(c.elemento_id)}
+                  title="Quitar"
+                  className="w-5 h-5 flex items-center justify-center rounded border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 transition-all cursor-pointer"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
