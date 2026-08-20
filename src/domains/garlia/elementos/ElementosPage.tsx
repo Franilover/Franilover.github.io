@@ -20,7 +20,6 @@ import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 
-import { calcularParticulaDominante } from "./afinidad";
 import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
 import { ElementoEditor } from "./ElementoEditor";
@@ -34,7 +33,6 @@ import {
 } from "./useInfoTablaQuimica";
 import {
   ELEMENT_FAMILIES,
-  capacidadExterna,
   type Compuesto,
   type Elemento,
   type ElementFamily,
@@ -210,40 +208,19 @@ interface Props {
   onSeleccionarIdChange?: (id: string | null) => void;
 }
 
-// ─── Grupo (columna) tipo tabla periódica real ─────────────────────────────
-// En la tabla real, la columna (grupo) predice comportamiento: elementos
-// del mismo grupo se comportan parecido porque les falta/sobra la misma
-// cantidad de electrones de valencia. Acá usamos el balance de la capa
-// externa (falta/sobra) como equivalente directo — mismo espíritu que
-// balanceExterna en generarDescripcionElemento (afinidad.ts).
-function grupoDeElemento(elemento: Elemento): number {
-  const totalExterna = Object.values(elemento.externa ?? {}).reduce(
-    (a, b) => a + (b ?? 0),
-    0,
-  );
-  // balance: negativo = falta, positivo = sobra, 0 = completa (Noble).
-  // El techo depende del armónico del elemento (Ley de Expansión por
-  // Cierre de Noble), no es un valor fijo — ver capacidadExterna.
-  return totalExterna - capacidadExterna(elemento.numero_atomico);
-}
-
-/** Agrupa y ordena elementos por su "grupo" (déficit/superávit de capa externa),
- * de más incompleto a más sobrecargado, con los completos (Nobles) al medio —
- * mismo criterio visual que una tabla periódica real, donde los gases nobles
- * cierran la fila de la derecha. */
-function agruparComoTablaPeriodica(elementos: Elemento[]): { grupo: number; elementos: Elemento[] }[] {
-  const porGrupo = new Map<number, Elemento[]>();
+/** Agrupa y ordena elementos por familia (Noble, Rígido, Intermedio, Reactivo,
+ * Inerte) — mismo orden que ELEMENT_FAMILIES — con los elementos de cada
+ * familia ordenados por número atómico. */
+function agruparComoTablaPeriodica(elementos: Elemento[]): { familia: ElementFamily; elementos: Elemento[] }[] {
+  const porFamilia = new Map<ElementFamily, Elemento[]>();
   for (const el of elementos) {
-    const g = grupoDeElemento(el);
-    if (!porGrupo.has(g)) porGrupo.set(g, []);
-    porGrupo.get(g)!.push(el);
+    if (!porFamilia.has(el.familia)) porFamilia.set(el.familia, []);
+    porFamilia.get(el.familia)!.push(el);
   }
-  return Array.from(porGrupo.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([grupo, els]) => ({
-      grupo,
-      elementos: els.sort((x, y) => x.numero_atomico - y.numero_atomico),
-    }));
+  return ELEMENT_FAMILIES.filter((familia) => porFamilia.has(familia)).map((familia) => ({
+    familia,
+    elementos: porFamilia.get(familia)!.sort((x, y) => x.numero_atomico - y.numero_atomico),
+  }));
 }
 
 /**
@@ -266,14 +243,6 @@ function ElementoCasilla({
   enSeleccionMultiple?: boolean;
   onClick: (e: React.MouseEvent) => void;
 }) {
-  const dominantes = useMemo(() => calcularParticulaDominante(elemento), [elemento]);
-  const nombreDominante =
-    dominantes.length === 0
-      ? null
-      : dominantes.length === 1
-        ? dominantes[0].particula
-        : `${dominantes.length} empatadas`;
-
   return (
     <button
       type="button"
@@ -306,15 +275,6 @@ function ElementoCasilla({
       <span className="text-micro font-bold text-primary/80 truncate text-center leading-tight">
         {elemento.nombre}
       </span>
-
-      {nombreDominante && (
-        <span
-          title="Partícula dominante"
-          className="mt-0.5 self-center text-micro font-bold uppercase tracking-wide text-primary/60 bg-primary/5 rounded px-1 truncate max-w-full leading-tight"
-        >
-          {nombreDominante}
-        </span>
-      )}
     </button>
   );
 }
@@ -1037,20 +997,16 @@ export function ElementosPage({
           </div>
         ) : vista === "periodica" ? (
           <div className="flex flex-col gap-3">
-            {gruposPeriodicos.map(({ grupo, elementos: elsDelGrupo }) => (
-              <div key={grupo} className="flex flex-col gap-1">
+            {gruposPeriodicos.map(({ familia, elementos: elsDeFamilia }) => (
+              <div key={familia} className="flex flex-col gap-1">
                 <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-                  {grupo === 0
-                    ? "Capa completa (Nobles y estables)"
-                    : grupo < 0
-                      ? `Grupo ${grupo} · faltan ${-grupo} partícula(s) en capa externa`
-                      : `Grupo +${grupo} · sobran ${grupo} partícula(s) en capa externa`}
+                  {familia} · {elsDeFamilia.length} elemento{elsDeFamilia.length === 1 ? "" : "s"}
                 </p>
                 <div
                   className="grid gap-1"
                   style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
                 >
-                  {elsDelGrupo.map((el) => (
+                  {elsDeFamilia.map((el) => (
                     <ElementoCasilla
                       key={el.id}
                       elemento={el}
