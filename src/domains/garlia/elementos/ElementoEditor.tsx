@@ -82,11 +82,24 @@ export function ElementoEditor({
 
   // Estado Noble (sección 3.2): la capa externa debe estar 100% saturada
   // para que "es_noble" sea coherente con la regla de bloqueo de enlaces.
+  // Ya no es un toggle manual: se deriva 100% de las partículas — si la
+  // capa externa está saturada, el elemento ES Noble, sin excepción.
   const totalExterna = useMemo(() => layerTotal(local.externa), [local.externa]);
   const capacidadTotalExterna = useMemo(
     () => capacidadExterna(local.numero_atomico),
     [local.numero_atomico],
   );
+  const esNobleDerivado = capacidadTotalExterna > 0 && totalExterna === capacidadTotalExterna;
+
+  // Mantiene local.es_noble sincronizado con el derivado y lo persiste
+  // apenas cambia (ej. al completar o vaciar la capa externa), sin que el
+  // usuario tenga que tocar nada — reemplaza al toggle manual de antes.
+  useEffect(() => {
+    if (local.es_noble === esNobleDerivado) return;
+    setLocal((prev) => ({ ...prev, es_noble: esNobleDerivado }));
+    persist({ es_noble: esNobleDerivado });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esNobleDerivado]);
 
   async function persist(cambios: Partial<Elemento>) {
     setSaving(true);
@@ -256,37 +269,22 @@ export function ElementoEditor({
             <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
               <label
                 className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
-                title="Estado Noble (sección 3.2): capa externa 100% saturada. No puede iniciar ni aceptar enlaces nuevos, sin importar el balance de Voluntad/Percepción."
+                title="Estado Noble (sección 3.2): se calcula solo — capa externa 100% saturada. No puede iniciar ni aceptar enlaces nuevos, sin importar el balance de Voluntad/Percepción."
               >
                 Noble
               </label>
-              <div className="flex flex-col items-end gap-0.5 shrink-0">
-                <button
-                  type="button"
-                  title={
-                    capacidadTotalExterna > 0 && totalExterna !== capacidadTotalExterna
-                      ? `Capa externa ${totalExterna}/${capacidadTotalExterna} — no está saturada al 100%, marcar Noble aquí no coincidiría con la regla de cierre de capa.`
-                      : "Marca el elemento como Noble: bloquea enlaces nuevos en toda la app."
-                  }
-                  onClick={() => {
-                    const es_noble = !local.es_noble;
-                    setLocal((p) => ({ ...p, es_noble }));
-                    persist({ es_noble });
-                  }}
-                  className={`w-16 rounded-md px-2 py-1 text-micro font-bold outline-none transition-all cursor-pointer truncate ${
-                    local.es_noble
-                      ? "bg-primary text-btn-text"
-                      : "text-primary/50 hover:text-primary"
-                  }`}
-                >
-                  {local.es_noble ? "Sí" : "No"}
-                </button>
-                {local.es_noble && capacidadTotalExterna > 0 && totalExterna !== capacidadTotalExterna && (
-                  <span className="text-micro text-amber-500 leading-tight text-right">
-                    ⚠ {totalExterna}/{capacidadTotalExterna}
-                  </span>
-                )}
-              </div>
+              <span
+                title={
+                  esNobleDerivado
+                    ? "Capa externa saturada — bloquea enlaces nuevos en toda la app."
+                    : `Capa externa ${totalExterna}/${capacidadTotalExterna} — todavía no está saturada.`
+                }
+                className={`w-16 text-center rounded-md px-2 py-1 text-micro font-bold truncate ${
+                  esNobleDerivado ? "bg-primary text-btn-text" : "text-primary/40"
+                }`}
+              >
+                {esNobleDerivado ? "Sí" : "No"}
+              </span>
             </div>
 
             <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
