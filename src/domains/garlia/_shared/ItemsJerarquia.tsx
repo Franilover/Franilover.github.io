@@ -35,7 +35,7 @@
  * en las otras vistas jerárquicas.
  */
 
-import { Box, Eye, EyeOff, Leaf as LeafIcon, Gem as GemIcon, Sprout } from "lucide-react";
+import { Box, Eye, EyeOff, Leaf as LeafIcon, Gem as GemIcon, Plus, Sprout } from "lucide-react";
 import React, { useState } from "react";
 
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
@@ -162,47 +162,49 @@ function BloqueCategoria({
       : {};
 
   return (
-    <div className="mb-6">
-      <div
-        {...dropHandlers}
-        className={`flex items-center gap-2 mb-3 px-1 rounded-md transition-colors ${
-          dropActive ? "ring-2 ring-accent/60 bg-accent/5" : ""
-        }`}
-      >
-        <h2 className="text-micro font-black uppercase tracking-[0.25em] text-primary/50">
+    <div
+      {...dropHandlers}
+      className={`mb-6 w-full rounded-lg border overflow-hidden transition-colors ${
+        dropActive ? "border-accent/50 bg-accent/5" : "border-primary/10"
+      }`}
+    >
+      <div className="px-3 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <span className="text-micro text-primary/25 tabular-nums">{items.length}</span>
+        <h2
+          title={titulo}
+          className="min-w-0 truncate text-micro font-black uppercase tracking-[0.2em] text-primary/70 text-center justify-self-center max-w-full"
+        >
           {titulo}
         </h2>
-        <span className="text-micro text-primary/25 tabular-nums">{items.length}</span>
-        <div className="flex-1" />
-        {onCreate && (
-          <button
-            type="button"
-            onClick={onCreate}
-            disabled={creating}
-            className="text-micro font-bold uppercase tracking-wide text-primary/40 hover:text-primary transition-colors disabled:opacity-50"
-          >
-            + Añadir
-          </button>
-        )}
+        <div className="justify-self-end">
+          {onCreate && (
+            <button
+              type="button"
+              onClick={onCreate}
+              disabled={creating}
+              title="Añadir"
+              className="p-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50 shrink-0"
+            >
+              <Plus size={9} className="text-primary/60" />
+            </button>
+          )}
+        </div>
       </div>
 
       {loading && items.length === 0 ? (
         <div className="py-6 text-xs text-primary/30 text-center">Cargando…</div>
       ) : items.length === 0 ? (
         <div
-          {...dropHandlers}
-          className={`py-6 text-xs text-center rounded-lg border border-dashed transition-colors ${
-            dropActive
-              ? "border-accent/40 text-accent/60"
-              : "border-transparent text-primary/25"
+          className={`px-3 pb-3 pt-1 text-xs text-center ${
+            dropActive ? "text-accent/60" : "text-primary/25"
           }`}
         >
           {dragItem && onMoverItem ? "Soltá un item acá" : `Sin ${titulo.toLowerCase()} todavía`}
         </div>
       ) : (
         <div
-          className="grid gap-1.5"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(76px, 1fr))" }}
+          className="px-3 pb-3 grid gap-1"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))" }}
         >
           {items.map((item) => (
             <div key={item.id} {...(dragItem ? dragItem.dragHandlers(item.id) : {})}>
