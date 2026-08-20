@@ -209,13 +209,22 @@ export interface ComponenteGrupoCompuesto {
  * - "formacion": además aparece en el picker de Formaciones de Minerales —
  *   el propio Grupo ES la Formación (se vincula N:N a minerales vía
  *   mineral_formaciones).
+ * - "estructura": además aparece en el picker de Estructura de Items — el
+ *   propio Grupo ES la parte estructural (se vincula N:N a items vía
+ *   item_estructura). Mismo espíritu que "organo" pero para Items.
+ * - "habilidad": además aparece en el picker de Poderes/Habilidades de
+ *   Items — el propio Grupo ES la habilidad (se vincula N:N a items vía
+ *   item_habilidades). La fórmula de compuestos representa la
+ *   "composición mágica" que le da su efecto, sin campos extra.
  */
-export type TipoGrupoCompuesto = "generico" | "organo" | "formacion";
+export type TipoGrupoCompuesto = "generico" | "organo" | "formacion" | "estructura" | "habilidad";
 
 export const TIPOS_GRUPO_COMPUESTO: { value: TipoGrupoCompuesto; label: string }[] = [
   { value: "generico", label: "Genérico" },
   { value: "organo", label: "Órgano (Flora)" },
   { value: "formacion", label: "Formación (Minerales)" },
+  { value: "estructura", label: "Estructura (Ítems)" },
+  { value: "habilidad", label: "Habilidad (Ítems)" },
 ];
 
 /** Fila cruda tal cual vive en Supabase (tabla "grupos_compuestos"). */

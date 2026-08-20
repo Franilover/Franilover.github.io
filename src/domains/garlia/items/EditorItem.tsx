@@ -20,7 +20,7 @@
  */
 
 
-import { Bug, Dices, Package, X } from "lucide-react";
+import { Bug, Dices, Layers, Package, Sparkles, X } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
@@ -36,6 +36,7 @@ import { supabase } from "@/infra/supabase/supabase";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { type Compuesto } from "@/domains/garlia/elementos/types";
 import {
@@ -43,6 +44,8 @@ import {
   type ComposicionEntrada,
 } from "@/domains/garlia/_shared/SelectorComposicionMultiple";
 import { SugerenciaReglasDndPanel } from "@/domains/garlia/_shared/SugerenciaReglasDndPanel";
+import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
+import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
@@ -89,6 +92,38 @@ export function EditorItem({
   // Catálogo de elementos/compuestos — mismo patrón que Flora/Mineral
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos, loading: loadingCompuestos } = useCompuestos();
+
+  // Catálogo compartido de Grupos de Compuestos — Estructura y Habilidades
+  // de items son ambos GrupoCompuesto filtrados por tipo (mismo motor que
+  // Órganos de Flora / Formaciones de Minerales, ver useEntidadVinculosGrupo).
+  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
+  const catalogoEstructura = React.useMemo(
+    () => gruposCompuestos.filter((g) => g.tipo === "estructura"),
+    [gruposCompuestos],
+  );
+  const catalogoHabilidades = React.useMemo(
+    () => gruposCompuestos.filter((g) => g.tipo === "habilidad"),
+    [gruposCompuestos],
+  );
+
+  const estructura = useEntidadVinculosGrupo({
+    entidadId: item.id,
+    tablaPuente: "item_estructura",
+    columnaFk: "item_id",
+    catalogo: catalogoEstructura,
+    tipoNuevoGrupo: "estructura",
+  });
+  const habilidades = useEntidadVinculosGrupo({
+    entidadId: item.id,
+    tablaPuente: "item_habilidades",
+    columnaFk: "item_id",
+    catalogo: catalogoHabilidades,
+    tipoNuevoGrupo: "habilidad",
+  });
+
+  function onGrupoCompuestoActualizadoLocal(id: string, updates: any) {
+    setGruposCompuestos((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+  }
 
   useEffect(() => {
     setForm(item);
@@ -300,6 +335,62 @@ export function EditorItem({
                   onAplicar={(cambios) => setForm((f: Item) => ({ ...f, ...cambios }))}
                 />
               </div>
+
+              {/* Estructura — partes del ítem (mango, hoja, empuñadura…),
+                  cada una con su propia fórmula de compuestos. Mismo motor
+                  que Órganos de Flora: catálogo compartido de
+                  GrupoCompuesto con tipo="estructura". */}
+              <SeccionGruposVinculados
+                titulo="Estructura"
+                descripcion="Partes materiales del ítem, cada una con su propia fórmula de compuestos."
+                icono={Layers}
+                items={estructura.items}
+                catalogo={catalogoEstructura}
+                loading={estructura.loading}
+                compuestos={compuestos}
+                gruposCompuestos={gruposCompuestos}
+                onCrearNuevo={() => void estructura.crearYVincular()}
+                onUsarExistente={(id) => void estructura.vincularExistente(id)}
+                onUpdate={(id, updates) => {
+                  onGrupoCompuestoActualizadoLocal(id, updates);
+                  void estructura.actualizar(id, updates);
+                }}
+                onDelete={(vinculoId) => void estructura.desvincular(vinculoId)}
+                onAbrirCompuesto={setEditandoCompuestoId}
+                placeholderNombre="Nombre de la parte (ej: Hoja)…"
+                placeholderNotas="Notas de esta parte…"
+                labelCrear="Crear parte nueva"
+                labelExistente="Usar una existente"
+                labelBuscar="Buscar parte…"
+              />
+
+              {/* Poderes/Habilidades — la "composición mágica" que le da
+                  su efecto, mismo motor: GrupoCompuesto con
+                  tipo="habilidad", sin campos extra por decisión de
+                  diseño (solo nombre + fórmula + notas). */}
+              <SeccionGruposVinculados
+                titulo="Poderes / Habilidades"
+                descripcion="Composición mágica que le da su efecto a este ítem."
+                icono={Sparkles}
+                items={habilidades.items}
+                catalogo={catalogoHabilidades}
+                loading={habilidades.loading}
+                compuestos={compuestos}
+                gruposCompuestos={gruposCompuestos}
+                onCrearNuevo={() => void habilidades.crearYVincular()}
+                onUsarExistente={(id) => void habilidades.vincularExistente(id)}
+                onUpdate={(id, updates) => {
+                  onGrupoCompuestoActualizadoLocal(id, updates);
+                  void habilidades.actualizar(id, updates);
+                }}
+                onDelete={(vinculoId) => void habilidades.desvincular(vinculoId)}
+                onAbrirCompuesto={setEditandoCompuestoId}
+                placeholderNombre="Nombre del poder (ej: Filo ardiente)…"
+                placeholderNotas="Notas de esta habilidad…"
+                labelCrear="Crear habilidad nueva"
+                labelExistente="Usar una existente"
+                labelBuscar="Buscar habilidad…"
+              />
 
               <div className="space-y-1.5">
                 <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
