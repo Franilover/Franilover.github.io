@@ -197,9 +197,6 @@ export function ElementoEditor({
             + En qué compuestos se usa (derecha) — misma fila de 3 columnas. */}
         <div className="grid grid-cols-[1.4fr_minmax(9rem,0.7fr)_1fr] gap-3 items-start">
           <div className="flex flex-col gap-0.5">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Notas
-            </label>
             <RichEditor
               minHeight="10rem"
               placeholder="Descripción del elemento…"
@@ -316,12 +313,6 @@ export function ElementoEditor({
           </div>
 
           <div className="flex flex-col gap-0.5">
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Usado en compuestos
-              {compuestosQueLoUsan.length > 0 && (
-                <span className="ml-1 text-primary/20">· {compuestosQueLoUsan.length}</span>
-              )}
-            </label>
             <div className="min-h-[10rem] max-h-[10rem] overflow-y-auto p-1 flex flex-col gap-0.5">
               {compuestos === undefined ? (
                 <p className="text-micro text-primary/25 text-center py-3">
@@ -374,10 +365,7 @@ export function ElementoEditor({
               las partículas dominantes (mismo chip que antes vivía en Rol,
               ahora eliminado). */}
           <div className="flex flex-col gap-1.5 min-w-0">
-            <div className="flex items-center justify-between">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
-                Capas atómicas
-              </p>
+            <div className="flex items-center justify-end">
               <div className="flex items-center gap-1.5">
                 <span
                   title="Déficit acumulado sobre la capacidad total de las 3 capas"
@@ -395,15 +383,16 @@ export function ElementoEditor({
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-3 overflow-hidden">
+            <div className="grid grid-cols-3 gap-2">
               {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
                 <div
                   key={layer}
-                  className="flex flex-col gap-2 p-2"
+                  className="flex flex-col gap-2 p-2 rounded-lg border border-primary/10"
                 >
                   <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 text-center">
                     {LAYER_LABEL[layer]}
                   </span>
+                  <div className="border-t border-primary/10" />
                   <div className="flex flex-col items-stretch gap-1.5">
                     {LAYER_PARTICLES[layer].map((particle) => {
                       const value = local[layer]?.[particle] ?? 0;
