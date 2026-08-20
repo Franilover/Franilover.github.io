@@ -33,7 +33,6 @@ import {
   type SeccionInfoTablaQuimica,
 } from "./useInfoTablaQuimica";
 import {
-  formatLayer,
   ELEMENT_FAMILIES,
   capacidadExterna,
   type Compuesto,
@@ -282,10 +281,10 @@ function ElementoCasilla({
       title="Click: ver detalle · Shift+Click: agregar/quitar de la selección múltiple"
       className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
         enSeleccionMultiple
-          ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
+          ? "border-primary/50 ring-2 ring-primary/40"
           : seleccionado
-            ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
-            : "border-primary/10 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary/25"
+            ? "border-primary/50 ring-2 ring-primary/40"
+            : "border-primary/10 hover:bg-primary/5 hover:border-primary/25"
       }`}
     >
       <div className="flex items-start justify-between">
@@ -307,18 +306,6 @@ function ElementoCasilla({
       <span className="text-micro font-bold text-primary/80 truncate text-center leading-tight">
         {elemento.nombre}
       </span>
-
-      <div className="mt-0.5 pt-0.5 border-t border-primary/10 flex flex-col gap-0.5">
-        <span className="text-micro text-primary/40 truncate leading-tight">
-          <span className="text-primary/25">N</span> {formatLayer(elemento.nucleo)}
-        </span>
-        <span className="text-micro text-primary/40 truncate leading-tight">
-          <span className="text-primary/25">M</span> {formatLayer(elemento.media)}
-        </span>
-        <span className="text-micro text-primary/40 truncate leading-tight">
-          <span className="text-primary/25">E</span> {formatLayer(elemento.externa)}
-        </span>
-      </div>
 
       {nombreDominante && (
         <span
