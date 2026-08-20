@@ -193,53 +193,22 @@ export function ElementoEditor({
 
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
-        {/* En qué compuestos se usa (izquierda) + Selectores (centro,
-            apilados verticalmente) + Notas (derecha) — misma fila de 3
-            columnas, orden invertido: 3-1-2. */}
-        <div className="grid grid-cols-[1fr_minmax(9rem,0.7fr)_1.4fr] gap-3 items-start">
+        {/* Notas (izquierda) + Selectores (centro, apilados verticalmente)
+            + En qué compuestos se usa (derecha) — misma fila de 3 columnas. */}
+        <div className="grid grid-cols-[1.4fr_minmax(9rem,0.7fr)_1fr] gap-3 items-start">
           <div className="flex flex-col gap-0.5">
             <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Usado en compuestos
-              {compuestosQueLoUsan.length > 0 && (
-                <span className="ml-1 text-primary/20">· {compuestosQueLoUsan.length}</span>
-              )}
+              Notas
             </label>
-            <div className="min-h-[10rem] max-h-[10rem] overflow-y-auto rounded-md border border-primary/10 bg-primary/[0.02] p-1 flex flex-col gap-0.5">
-              {compuestos === undefined ? (
-                <p className="text-micro text-primary/25 text-center py-3">
-                  No disponible acá.
-                </p>
-              ) : compuestosQueLoUsan.length === 0 ? (
-                <p className="text-micro text-primary/25 text-center py-3">
-                  Este elemento todavía no se usa en ningún compuesto.
-                </p>
-              ) : (
-                compuestosQueLoUsan.map((c) => {
-                  const comp = (c.componentes ?? []).find((x) => x.elemento_id === elemento.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => onNavigateCompuesto?.(c.id)}
-                      disabled={!onNavigateCompuesto}
-                      title={onNavigateCompuesto ? "Abrir este compuesto" : undefined}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors hover:bg-primary/5 disabled:cursor-default disabled:hover:bg-transparent cursor-pointer"
-                    >
-                      <Beaker size={11} className="text-accent/60 shrink-0" />
-                      <span className="shrink-0 text-micro font-black text-primary/70">
-                        {c.simbolo || "??"}
-                      </span>
-                      <span className="flex-1 min-w-0 truncate text-micro text-primary/70">
-                        {c.nombre}
-                      </span>
-                      {comp && (
-                        <span className="shrink-0 text-micro text-primary/30">{comp.cantidad}×</span>
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
+            <RichEditor
+              minHeight="10rem"
+              placeholder="Descripción del elemento…"
+              value={local.notas ?? ""}
+              onChange={(v) => {
+                setLocal((p) => ({ ...p, notas: v }));
+                persist({ notas: v });
+              }}
+            />
           </div>
 
           {/* Columna de selectores: N° atómico, Familia, Noble, Catalizador
@@ -348,17 +317,47 @@ export function ElementoEditor({
 
           <div className="flex flex-col gap-0.5">
             <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Notas
+              Usado en compuestos
+              {compuestosQueLoUsan.length > 0 && (
+                <span className="ml-1 text-primary/20">· {compuestosQueLoUsan.length}</span>
+              )}
             </label>
-            <RichEditor
-              minHeight="10rem"
-              placeholder="Descripción del elemento…"
-              value={local.notas ?? ""}
-              onChange={(v) => {
-                setLocal((p) => ({ ...p, notas: v }));
-                persist({ notas: v });
-              }}
-            />
+            <div className="min-h-[10rem] max-h-[10rem] overflow-y-auto rounded-md border border-primary/10 bg-primary/[0.02] p-1 flex flex-col gap-0.5">
+              {compuestos === undefined ? (
+                <p className="text-micro text-primary/25 text-center py-3">
+                  No disponible acá.
+                </p>
+              ) : compuestosQueLoUsan.length === 0 ? (
+                <p className="text-micro text-primary/25 text-center py-3">
+                  Este elemento todavía no se usa en ningún compuesto.
+                </p>
+              ) : (
+                compuestosQueLoUsan.map((c) => {
+                  const comp = (c.componentes ?? []).find((x) => x.elemento_id === elemento.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => onNavigateCompuesto?.(c.id)}
+                      disabled={!onNavigateCompuesto}
+                      title={onNavigateCompuesto ? "Abrir este compuesto" : undefined}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors hover:bg-primary/5 disabled:cursor-default disabled:hover:bg-transparent cursor-pointer"
+                    >
+                      <Beaker size={11} className="text-accent/60 shrink-0" />
+                      <span className="shrink-0 text-micro font-black text-primary/70">
+                        {c.simbolo || "??"}
+                      </span>
+                      <span className="flex-1 min-w-0 truncate text-micro text-primary/70">
+                        {c.nombre}
+                      </span>
+                      {comp && (
+                        <span className="shrink-0 text-micro text-primary/30">{comp.cantidad}×</span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
 
