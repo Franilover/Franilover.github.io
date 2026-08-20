@@ -4,11 +4,10 @@
  * FloraEditor mejorado (v2 — interfaz de Órganos y Procesos)
  * ───────────────────────────────────────────────────────────────────────────
  * Tres secciones principales:
- * 1. Composición general (campo legado, mantener compatibilidad)
- * 2. Órganos individuales (hoja, pétalo, raíz, fruto, tallo…) — ahora con
- *    selector real de tipo (crear y cambiar) y editor visual de fórmula
- *    química (chips + stepper sobre la Tabla Química real, en vez de un
- *    textarea con JSON.stringify crudo).
+ * 1. Composición general: descripción + ecosistemas donde crece.
+ * 2. Órganos individuales (hoja, pétalo, raíz, fruto, tallo…) — selector
+ *    real de tipo (crear y cambiar) y editor visual de fórmula química
+ *    (chips + stepper sobre la Tabla Química real).
  * 3. Procesos del ciclo de vida (fotosíntesis, floración…) — selector real
  *    de tipo, editor visual de consume/produce (elemento o compuesto real
  *    + cantidad), y reorden por drag-and-drop persistido en `orden`.
@@ -33,17 +32,9 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
-import { ComposicionQuimicaPanel } from "@/domains/garlia/_shared/ComposicionQuimicaPanel";
-import { BalanceProcesoPanel } from "@/domains/garlia/_shared/BalanceProcesoPanel";
-import { AfinidadEntreEntidadesPanel } from "@/domains/garlia/_shared/AfinidadEntreEntidadesPanel";
-import {
-  SelectorComposicionMultiple,
-  type ComposicionEntrada,
-} from "@/domains/garlia/_shared/SelectorComposicionMultiple";
 import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
@@ -92,12 +83,11 @@ export function FloraEditorMejorado({
   onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const { items: elementos } = useElementos();
-  const { items: compuestos, setItems: setCompuestos, loading: loadingCompuestos } = useCompuestos();
+  const { items: compuestos } = useCompuestos();
   const { actualizar, eliminar } = useFlora();
 
   const [form, setForm] = useState<Flora>(floraProp);
   const [status, setStatus] = useState<SaveStatus>("idle");
-  const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
   const [ecosistemaAbierto, setEcosistemaAbierto] = useState<{
     id: string;
     anchor: HTMLElement;
@@ -135,15 +125,6 @@ export function FloraEditorMejorado({
     } catch {
       setStatus("error");
     }
-  }
-
-  function cambiarComposicion(componentes: ComposicionEntrada[]) {
-    setForm((f) => ({ ...f, componentes }));
-    void guardar({ componentes });
-  }
-
-  function onCompuestoCreado(nuevo: Compuesto) {
-    setCompuestos((prev) => [...prev, nuevo]);
   }
 
   // Confirmación inline en el header compartido — ver EditorHeaderBar.
@@ -238,25 +219,6 @@ export function FloraEditorMejorado({
                   />
                 </div>
 
-                <div>
-                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 block mb-2">
-                    Composición (Compuestos)
-                  </span>
-                  <p className="text-micro text-primary/30 mb-3">
-                    Compuestos de la Tabla Química que forman esta planta, por parte.
-                  </p>
-
-                  <SelectorComposicionMultiple
-                    composicion={form.componentes ?? []}
-                    onChange={cambiarComposicion}
-                    compuestos={compuestos}
-                    elementos={elementos}
-                    loadingCompuestos={loadingCompuestos}
-                    onCompuestoCreado={onCompuestoCreado}
-                    onEditarCompuesto={setEditandoCompuestoId}
-                  />
-                </div>
-
                 {/* Ecosistemas */}
                 <div className="pt-4 border-t border-primary/10">
                   <SelectorEcosistemasDeEntidad
@@ -264,20 +226,6 @@ export function FloraEditorMejorado({
                     campo="flora_ids"
                     label="Ecosistemas donde crece"
                     onSelectEcosistema={(id, anchor) => setEcosistemaAbierto({ id, anchor })}
-                  />
-                </div>
-
-                {/* Notas */}
-                <div className="pt-4 border-t border-primary/10">
-                  <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35 block mb-1.5">
-                    Notas
-                  </label>
-                  <textarea
-                    className="w-full min-h-[4.5rem] bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/70 outline-none placeholder:text-primary/30 resize-y"
-                    placeholder="Cualquier otra nota libre…"
-                    value={form.notas ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
-                    onBlur={() => guardar({ notas: form.notas })}
                   />
                 </div>
               </div>
@@ -318,14 +266,6 @@ export function FloraEditorMejorado({
                     ))}
                   </div>
                 )}
-
-                <AfinidadEntreEntidadesPanel
-                  entidadId={form.id}
-                  nombreEntidad={form.nombre}
-                  mezcla={organos.flatMap((o) => o.componentes ?? [])}
-                  compuestos={compuestos}
-                  elementos={elementos}
-                />
               </div>
             )}
 
@@ -368,18 +308,6 @@ export function FloraEditorMejorado({
       </div>
 
       {/* Popovers flotantes */}
-      {editandoCompuestoId && (
-        <CompuestoPanelFlotante
-          compuesto={compuestos.find((c) => c.id === editandoCompuestoId)!}
-          elementos={elementos}
-          todosLosCompuestos={compuestos}
-          onCerrar={() => setEditandoCompuestoId(null)}
-          onActualizar={(id, cambios) =>
-            setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
-          }
-        />
-      )}
-
       {ecosistemaAbierto && (
         <PopoverFlotante
           anchor={ecosistemaAbierto.anchor}
@@ -457,15 +385,6 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos, elementos }: Organ
             onChange={(e) => onUpdate(organo.id, { notas: e.target.value })}
           />
         </div>
-      </div>
-
-      <div className="mt-3">
-        <ComposicionQuimicaPanel
-          mezcla={organo.componentes ?? []}
-          compuestos={compuestos}
-          elementos={elementos}
-          titulo="Física derivada del órgano"
-        />
       </div>
     </div>
   );
@@ -632,14 +551,6 @@ function ProcesoCard({
             compuestos={compuestos}
           />
         </div>
-
-        <BalanceProcesoPanel
-          consume={(proceso.consume ?? []) as ItemProceso[]}
-          produce={(proceso.produce ?? []) as ItemProceso[]}
-          compuestos={compuestos}
-          elementos={elementos}
-          onAutocompletar={(produce) => onUpdate(proceso.id, { produce })}
-        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-2 items-start">
           <div>
