@@ -266,9 +266,17 @@ export function ElementoEditor({
               </select>
             </div>
 
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
+            <div
+              className={`flex items-center justify-between gap-2 rounded-lg border px-2 py-1.5 transition-colors ${
+                esNobleDerivado
+                  ? "bg-primary border-primary"
+                  : "border-primary/10"
+              }`}
+            >
               <label
-                className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
+                className={`text-micro font-black uppercase tracking-[0.2em] ${
+                  esNobleDerivado ? "text-btn-text/70" : "text-primary/30"
+                }`}
                 title="Estado Noble (sección 3.2): se calcula solo — capa externa 100% saturada. No puede iniciar ni aceptar enlaces nuevos, sin importar el balance de Voluntad/Percepción."
               >
                 Noble
@@ -279,18 +287,26 @@ export function ElementoEditor({
                     ? "Capa externa saturada — bloquea enlaces nuevos en toda la app."
                     : `Capa externa ${totalExterna}/${capacidadTotalExterna} — todavía no está saturada.`
                 }
-                className={`w-16 text-center rounded-md px-2 py-1 text-micro font-bold truncate ${
-                  esNobleDerivado ? "bg-primary text-btn-text" : "text-primary/40"
+                className={`text-micro font-bold ${
+                  esNobleDerivado ? "text-btn-text" : "text-primary/40"
                 }`}
               >
                 {esNobleDerivado ? "Sí" : "No"}
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
+            <div
+              className={`relative flex items-center justify-between gap-2 rounded-lg border px-2 py-1.5 transition-colors ${
+                local.es_catalizador
+                  ? "bg-primary border-primary"
+                  : "border-primary/10"
+              }`}
+            >
               <label
                 title="Reduce el déficit/energía de activación de un compuesto sin sumar sus partículas a las capas y sin consumirse — igual que un catalizador real."
-                className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
+                className={`text-micro font-black uppercase tracking-[0.2em] ${
+                  local.es_catalizador ? "text-btn-text/70" : "text-primary/30"
+                }`}
               >
                 Catalizador
               </label>
@@ -301,14 +317,16 @@ export function ElementoEditor({
                   setLocal((p) => ({ ...p, es_catalizador }));
                   persist({ es_catalizador });
                 }}
-                className={`w-16 shrink-0 rounded-md px-2 py-1 text-micro font-bold outline-none transition-all cursor-pointer truncate ${
-                  local.es_catalizador
-                    ? "bg-primary text-btn-text"
-                    : "text-primary/50 hover:text-primary"
+                className={`absolute inset-0 w-full h-full cursor-pointer`}
+                aria-label="Alternar catalizador"
+              />
+              <span
+                className={`text-micro font-bold pointer-events-none ${
+                  local.es_catalizador ? "text-btn-text" : "text-primary/50"
                 }`}
               >
                 {local.es_catalizador ? "Sí" : "No"}
-              </button>
+              </span>
             </div>
           </div>
 
