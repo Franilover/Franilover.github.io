@@ -22,10 +22,14 @@ export interface Flora {
   updated_at: string;
 }
 
-/** Órganos individuales de una planta, cada uno con fórmula química propia */
-export interface PlantaOrgano {
+/**
+ * Órgano: catálogo compartido (ya NO vive 1:1 dentro de una planta). Un
+ * mismo Órgano (ej. "Raíz fibrosa") puede vincularse a varias plantas vía
+ * PlantaOrgano — si se edita su fórmula acá, se actualiza en todas las
+ * plantas que lo usan.
+ */
+export interface Organo {
   id: string;
-  planta_id: string;
   /** Nombre del órgano (texto libre: "hoja", "pétalo", "raíz", etc) */
   nombre: string;
   /** Fórmula del órgano: mezcla de Compuestos + cantidad (mismo lenguaje que consume/produce de Procesos y Composición de Flora) */
@@ -35,6 +39,25 @@ export interface PlantaOrgano {
   notas: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Tabla puente N:N entre Flora y Organo (catálogo compartido). */
+export interface PlantaOrgano {
+  id: string;
+  planta_id: string;
+  organo_id: string;
+  created_at: string;
+}
+
+/**
+ * Vista combinada usada por la UI: el vínculo puente + los datos del
+ * Órgano ya resueltos, para no tener que hacer el join a mano en cada
+ * componente que solo necesita "los órganos de esta planta, con su
+ * fórmula". `vinculo_id` es el id de la fila puente (PlantaOrgano.id) —
+ * necesario para poder desvincular sin borrar el Organo del catálogo.
+ */
+export interface PlantaOrganoResuelto extends Organo {
+  vinculo_id: string;
 }
 
 /** Procesos del ciclo de vida de una planta (fotosíntesis, floración, etc) */
@@ -60,8 +83,8 @@ export type FloraInput = Partial<
   >
 >;
 
-export type PlantaOrganoInput = Partial<
-  Pick<PlantaOrgano, "nombre" | "componentes" | "compuesto_base_id" | "notas">
+export type OrganoInput = Partial<
+  Pick<Organo, "nombre" | "componentes" | "compuesto_base_id" | "notas">
 >;
 
 export type PlantaProcesoInput = Partial<

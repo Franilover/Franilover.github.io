@@ -22,8 +22,10 @@ import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 
 import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
+import { GruposCompuestosPage } from "./GruposCompuestosPage";
 import { ElementoEditor } from "./ElementoEditor";
 import { useCompuestos } from "./useCompuestos";
+import { useGruposCompuestos } from "./useGruposCompuestos";
 import {
   type EditorHeaderControls,
 } from "../_shared/useEditorHeaderControls";
@@ -37,6 +39,7 @@ import {
   type Compuesto,
   type Elemento,
   type ElementFamily,
+  type GrupoCompuesto,
 } from "./types";
 
 // ─── Descarga: todos los elementos de la Tabla Química en un solo JSON ─────
@@ -814,6 +817,42 @@ export function ElementosPage({
     }
   }
 
+  // ── Grupos de compuestos: catálogo de conjuntos reutilizables de
+  // Compuestos, apilado debajo de Compuestos y arriba de Reglas ───────────
+  const {
+    items: gruposCompuestos,
+    setItems: setGruposCompuestos,
+    loading: loadingGruposCompuestos,
+  } = useGruposCompuestos();
+  const [creatingGrupoCompuesto, setCreatingGrupoCompuesto] = useState(false);
+
+  async function handleCreateGrupoCompuesto() {
+    setCreatingGrupoCompuesto(true);
+    try {
+      const { data, error } = await supabase
+        .from("grupos_compuestos")
+        .insert([{ nombre: "Nuevo grupo", componentes: [] }])
+        .select()
+        .single();
+      if (error) throw error;
+      setGruposCompuestos((prev) => [...prev, data as GrupoCompuesto]);
+    } catch (e) {
+      console.error("[ElementosPage] error creando grupo de compuestos:", e);
+    } finally {
+      setCreatingGrupoCompuesto(false);
+    }
+  }
+
+  async function handleEliminarGrupoCompuesto(id: string) {
+    try {
+      const { error } = await supabase.from("grupos_compuestos").delete().eq("id", id);
+      if (error) throw error;
+      setGruposCompuestos((prev) => prev.filter((g) => g.id !== id));
+    } catch (e) {
+      console.error("[ElementosPage] error eliminando grupo de compuestos:", e);
+    }
+  }
+
   const activoId = seleccionadoId ?? seleccionarId ?? null;
   const activo = useMemo(
     () => elementos.find((e) => e.id === activoId) ?? null,
@@ -1100,6 +1139,22 @@ export function ElementosPage({
             setCompuestoAAbrir(null);
             setCompuestoRecienCreadoId(null);
           }}
+        />
+      </div>
+
+      {/* Grupos de compuestos */}
+      <div className="flex flex-col border-t border-primary/10">
+        <GruposCompuestosPage
+          grupos={gruposCompuestos}
+          compuestos={compuestos}
+          loading={loadingGruposCompuestos}
+          creating={creatingGrupoCompuesto}
+          onCreate={handleCreateGrupoCompuesto}
+          onActualizar={(id, cambios) =>
+            setGruposCompuestos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)))
+          }
+          onEliminar={handleEliminarGrupoCompuesto}
+          onAbrirCompuesto={(compuestoId) => setCompuestoAAbrir(compuestoId)}
         />
       </div>
 

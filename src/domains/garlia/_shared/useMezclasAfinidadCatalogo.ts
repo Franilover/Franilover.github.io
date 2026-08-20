@@ -33,10 +33,19 @@ export interface EntidadConMezcla {
   mezcla: ComponenteCompuestoEnMezcla[];
 }
 
-interface FilaFormacionOrgano {
+interface FilaFormacionMineral {
   mineral_id?: string;
-  planta_id?: string;
   componentes: { compuesto_id: string; cantidad: number }[] | null;
+}
+
+/**
+ * Fila de la tabla puente planta_organos, con el Organo del catálogo
+ * compartido ya resuelto (join vía organo_id) — la fórmula real vive en
+ * `organo.componentes`, la fila puente solo guarda el vínculo.
+ */
+interface FilaVinculoOrgano {
+  planta_id: string;
+  organo: { componentes: { compuesto_id: string; cantidad: number }[] | null } | null;
 }
 
 export function useMezclasAfinidadCatalogo() {
@@ -58,23 +67,23 @@ export function useMezclasAfinidadCatalogo() {
         supabase.from("minerales").select("id, nombre"),
         supabase.from("mineral_formaciones").select("mineral_id, componentes"),
         supabase.from("flora").select("id, nombre"),
-        supabase.from("planta_organos").select("planta_id, componentes"),
+        supabase.from("planta_organos").select("planta_id, organo:organos(componentes)"),
       ]);
 
       if (cancelado) return;
 
       const mezclaMineral = new Map<string, ComponenteCompuestoEnMezcla[]>();
-      for (const f of (formaciones ?? []) as FilaFormacionOrgano[]) {
+      for (const f of (formaciones ?? []) as FilaFormacionMineral[]) {
         if (!f.mineral_id || !f.componentes) continue;
         const acumulada = mezclaMineral.get(f.mineral_id) ?? [];
         mezclaMineral.set(f.mineral_id, [...acumulada, ...f.componentes]);
       }
 
       const mezclaFlora = new Map<string, ComponenteCompuestoEnMezcla[]>();
-      for (const o of (organos ?? []) as FilaFormacionOrgano[]) {
-        if (!o.planta_id || !o.componentes) continue;
-        const acumulada = mezclaFlora.get(o.planta_id) ?? [];
-        mezclaFlora.set(o.planta_id, [...acumulada, ...o.componentes]);
+      for (const v of (organos ?? []) as FilaVinculoOrgano[]) {
+        if (!v.planta_id || !v.organo?.componentes) continue;
+        const acumulada = mezclaFlora.get(v.planta_id) ?? [];
+        mezclaFlora.set(v.planta_id, [...acumulada, ...v.organo.componentes]);
       }
 
       const resultado: EntidadConMezcla[] = [

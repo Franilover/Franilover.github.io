@@ -16,8 +16,9 @@
  *   - Mineral: compuesto_id (legado) + componentes[].compuesto_id (legado)
  *              + mineral_formaciones.componentes[].compuesto_id
  *   - Flora:   compuesto_id (legado) + componentes[].compuesto_id (legado)
- *              + planta_organos.componentes[].compuesto_id
- *              + planta_organos.compuesto_base_id
+ *              + organos.componentes[].compuesto_id (catálogo compartido,
+ *                vinculado a la planta vía la tabla puente planta_organos)
+ *              + organos.compuesto_base_id
  *
  * Las Criaturas NO se incluyen: su perfil atómico (perfiles_atomicos_
  * criatura.componentes) referencia Elementos directamente, no Compuestos
@@ -75,23 +76,20 @@ interface FloraRow {
   componentes: { compuesto_id: string; tag: string }[] | null;
 }
 
+/**
+ * Fila de la tabla puente planta_organos, ya resuelta con el Organo del
+ * catálogo compartido (join vía organo_id) y la Flora vinculada (join vía
+ * planta_id) — el nombre y la fórmula reales viven en `organo`, no en la
+ * fila puente (que solo guarda el vínculo).
+ */
 interface PlantaOrganoRow {
   planta_id: string;
-  tipo_organo: string;
-  compuesto_base_id: string | null;
-  componentes: { compuesto_id: string; cantidad: number }[] | null;
+  organo: {
+    nombre: string;
+    compuesto_base_id: string | null;
+    componentes: { compuesto_id: string; cantidad: number }[] | null;
+  } | null;
 }
-
-const TIPO_ORGANO_LABEL: Record<string, string> = {
-  hoja: "Hoja",
-  petalo: "Pétalo",
-  raiz: "Raíz",
-  fruto: "Fruto",
-  tallo: "Tallo",
-  semilla: "Semilla",
-  corteza: "Corteza",
-  otro: "Órgano",
-};
 
 export function useUsosCompuesto() {
   const [items, setItems] = useState<ItemRow[]>([]);
@@ -126,7 +124,7 @@ export function useUsosCompuesto() {
           ),
         supabase
           .from("planta_organos")
-          .select("planta_id, tipo_organo, compuesto_base_id, componentes, flora(id, nombre, imagen_url)"),
+          .select("planta_id, flora(id, nombre, imagen_url), organo:organos(nombre, compuesto_base_id, componentes)"),
       ]);
 
       if (cancelado) return;
@@ -238,22 +236,22 @@ export function useUsosCompuesto() {
         });
       }
     }
-    for (const organo of plantaOrganos) {
-      if (!organo.planta) continue;
-      const etiqueta = TIPO_ORGANO_LABEL[organo.tipo_organo] ?? organo.tipo_organo;
-      agregar(organo.compuesto_base_id, {
+    for (const vinculo of plantaOrganos) {
+      if (!vinculo.planta || !vinculo.organo) continue;
+      const etiqueta = vinculo.organo.nombre || "Órgano";
+      agregar(vinculo.organo.compuesto_base_id, {
         tipo: "flora",
-        id: organo.planta.id,
-        nombre: organo.planta.nombre,
-        imagen_url: organo.planta.imagen_url,
+        id: vinculo.planta.id,
+        nombre: vinculo.planta.nombre,
+        imagen_url: vinculo.planta.imagen_url,
         detalle: etiqueta,
       });
-      for (const c of organo.componentes ?? []) {
+      for (const c of vinculo.organo.componentes ?? []) {
         agregar(c.compuesto_id, {
           tipo: "flora",
-          id: organo.planta.id,
-          nombre: organo.planta.nombre,
-          imagen_url: organo.planta.imagen_url,
+          id: vinculo.planta.id,
+          nombre: vinculo.planta.nombre,
+          imagen_url: vinculo.planta.imagen_url,
           detalle: etiqueta,
         });
       }

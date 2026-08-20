@@ -190,6 +190,32 @@ export const CONFIG_COMPUESTOS = {
   select: "id, nombre, simbolo, notas, componentes, created_at",
 };
 
+// ─── Grupos de Compuestos: conjuntos reutilizables de Compuestos ──────────
+// Un Grupo es simplemente "un conjunto reutilizable de compuestos con
+// cantidad" — mismo shape que la fórmula de un PlantaOrgano
+// ({compuesto_id, cantidad}[]), pensado para usarse directo como fórmula
+// desde Flora (Órganos) u otros módulos que necesiten una mezcla ya armada
+// sin tener que reconstruirla cada vez desde cero.
+export interface ComponenteGrupoCompuesto {
+  compuesto_id: string;
+  cantidad: number;
+}
+
+/** Fila cruda tal cual vive en Supabase (tabla "grupos_compuestos"). */
+export interface GrupoCompuesto {
+  id: string;
+  nombre: string;
+  notas: string | null;
+  componentes: ComponenteGrupoCompuesto[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export const CONFIG_GRUPOS_COMPUESTOS = {
+  tabla: "grupos_compuestos",
+  select: "id, nombre, notas, componentes, created_at, updated_at",
+};
+
 /** Compacta un ParticleMap en algo tipo "2M 1P" para tarjetas/resúmenes. */
 export function formatLayer(layer: ParticleMap | null | undefined): string {
   if (!layer) return "—";

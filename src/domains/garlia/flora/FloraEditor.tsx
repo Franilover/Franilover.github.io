@@ -38,13 +38,15 @@ import {
 
 import { useFlora } from "./useFlora";
 import { usePlantaOrganosProcesos } from "./usePlantaOrganosProcesos";
-import { type Flora, type PlantaOrgano, type PlantaProceso } from "./types";
+import { useOrganos } from "./useOrganos";
+import { type Flora, type PlantaOrganoResuelto, type PlantaProceso } from "./types";
 import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
 import { SelectorFormulaOrgano, type ComponenteOrgano } from "./SelectorFormulaOrgano";
 import { SelectorConsumeProduce, type ItemProceso } from "./SelectorConsumeProduce";
+import { SelectorOrganoPlanta } from "./SelectorOrganoPlanta";
 
 export function FloraEditorMejorado({
   flora: floraProp,
@@ -79,18 +81,25 @@ export function FloraEditorMejorado({
   const lastEntityClickTarget = useRef<HTMLElement | null>(null);
   const asideEcosistemasRef = useRef<HTMLElement | null>(null);
 
-  // Órganos y procesos
+  // Catálogo global de Órganos (compartido entre todas las plantas)
+  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
+
+  // Órganos vinculados a esta planta (resueltos contra el catálogo) y procesos
   const {
     organos,
     procesos,
     loading: loadingOrganosProcesos,
-    crearOrgano,
+    crearYVincularOrgano,
+    vincularOrganoExistente,
     actualizarOrgano,
-    eliminarOrgano,
+    desvincularOrgano,
     crearProceso,
     actualizarProceso,
     eliminarProceso,
-  } = usePlantaOrganosProcesos(floraProp.id);
+  } = usePlantaOrganosProcesos(floraProp.id, catalogoOrganos);
+
+  // Picker "Crear órgano / Usar uno existente" — abierto desde el botón +
+  const [selectorOrganoAbierto, setSelectorOrganoAbierto] = useState(false);
 
   // Ecosistemas donde crece esta planta — vínculo inverso: vive en
   // Ecosistema.flora_ids, no en Flora. Mismo patrón que SeccionEntidad en
@@ -206,13 +215,26 @@ export function FloraEditorMejorado({
               </button>
               </div>
               {tabActiva !== "composicion" && (
-                <button
-                  onClick={() => void (tabActiva === "organos" ? crearOrgano() : crearProceso())}
-                  title={tabActiva === "organos" ? "Nuevo órgano" : "Nuevo proceso"}
-                  className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                >
-                  <Plus size={16} />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() =>
+                      tabActiva === "organos" ? setSelectorOrganoAbierto(true) : void crearProceso()
+                    }
+                    title={tabActiva === "organos" ? "Agregar órgano" : "Nuevo proceso"}
+                    className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                  >
+                    <Plus size={16} />
+                  </button>
+                  {selectorOrganoAbierto && tabActiva === "organos" && (
+                    <SelectorOrganoPlanta
+                      catalogoOrganos={catalogoOrganos}
+                      organosYaVinculadosIds={new Set(organos.map((o) => o.id))}
+                      onCrearNuevo={() => void crearYVincularOrgano()}
+                      onUsarExistente={(organoId) => void vincularOrganoExistente(organoId)}
+                      onClose={() => setSelectorOrganoAbierto(false)}
+                    />
+                  )}
+                </div>
               )}
             </div>
 
@@ -277,11 +299,19 @@ export function FloraEditorMejorado({
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
                     {organos.map((organo) => (
-                      <div key={organo.id} className="border-b border-primary/10">
+                      <div key={organo.vinculo_id} className="border-b border-primary/10">
                         <OrganoCard
                           organo={organo}
-                          onUpdate={actualizarOrgano}
-                          onDelete={() => eliminarOrgano(organo.id)}
+                          onUpdate={(id, updates) => {
+                            // Optimista: refleja el cambio en el catálogo local ya
+                            // mismo (afecta a todas las plantas que usan este
+                            // Organo), y persiste en Supabase vía el hook.
+                            setCatalogoOrganos((prev) =>
+                              prev.map((o) => (o.id === id ? { ...o, ...updates } : o)),
+                            );
+                            void actualizarOrgano(id, updates);
+                          }}
+                          onDelete={() => void desvincularOrgano(organo.vinculo_id)}
                           compuestos={compuestos}
                           elementos={elementos}
                           onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
@@ -383,9 +413,12 @@ export function FloraEditorMejorado({
 }
 
 // ── Componente auxiliar: Tarjeta de órgano ─────────────────────────────────
+// organo.id es el id del Organo en el catálogo compartido (editar acá
+// afecta a todas las plantas que lo usan); onDelete desvincula esta
+// planta del Organo, sin borrarlo del catálogo.
 interface OrganoCardProps {
-  organo: PlantaOrgano;
-  onUpdate: (id: string, updates: Partial<PlantaOrgano>) => void;
+  organo: PlantaOrganoResuelto;
+  onUpdate: (id: string, updates: Partial<PlantaOrganoResuelto>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
   elementos: Elemento[];
@@ -432,6 +465,7 @@ function OrganoCard({
           </button>
           <button
             onClick={onDelete}
+            title="Quitar de esta planta (el órgano sigue en el catálogo para otras plantas)"
             className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition opacity-0 group-hover:opacity-100"
           >
             <Trash2 size={14} />
