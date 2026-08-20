@@ -27,6 +27,8 @@ import { type SaveStatus } from "@/ui/saveStatus";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
+import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage";
+import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import {
@@ -53,8 +55,8 @@ export function FloraEditorMejorado({
   onDeleted?: (id: string) => void;
   onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
-  const { items: elementos } = useElementos();
-  const { items: compuestos } = useCompuestos();
+  const { items: elementos, setItems: setElementos } = useElementos();
+  const { items: compuestos, setItems: setCompuestos } = useCompuestos();
   const { actualizar, eliminar } = useFlora();
 
   const [form, setForm] = useState<Flora>(floraProp);
@@ -63,6 +65,12 @@ export function FloraEditorMejorado({
     id: string;
     anchor: HTMLElement;
   } | null>(null);
+  // Panel flotante de Elemento o Compuesto, abierto al clickear un item
+  // elegido en Consume/Produce o en la Fórmula química de un Órgano.
+  // Un solo estado: abrir uno nuevo reemplaza el que estuviera abierto.
+  const [itemAbierto, setItemAbierto] = useState<
+    { tipo: "elemento" | "compuesto"; id: string } | null
+  >(null);
 
   // Órganos y procesos
   const {
@@ -225,6 +233,7 @@ export function FloraEditorMejorado({
                         onDelete={() => eliminarOrgano(organo.id)}
                         compuestos={compuestos}
                         elementos={elementos}
+                        onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
                       />
                     ))}
                   </div>
@@ -256,6 +265,7 @@ export function FloraEditorMejorado({
                     onReorder={reordenarProcesos}
                     compuestos={compuestos}
                     elementos={elementos}
+                    onAbrirItem={(item) => setItemAbierto({ tipo: item.tipo, id: item.id })}
                   />
                 )}
               </div>
@@ -281,6 +291,45 @@ export function FloraEditorMejorado({
           />
         </PopoverFlotante>
       )}
+
+      {/* Panel flotante de Elemento o Compuesto, abierto al clickear un item
+          elegido en Consume/Produce o en la Fórmula química de un Órgano. */}
+      {itemAbierto?.tipo === "elemento" &&
+        (() => {
+          const elemento = elementos.find((e) => e.id === itemAbierto.id);
+          if (!elemento) return null;
+          return (
+            <ElementoPanelFlotante
+              elemento={elemento}
+              todosLosElementos={elementos}
+              compuestos={compuestos}
+              onCerrar={() => setItemAbierto(null)}
+              onActualizar={(id, cambios) =>
+                setElementos((prev) => prev.map((e) => (e.id === id ? { ...e, ...cambios } : e)))
+              }
+              onNavigateCompuesto={(compuestoId) =>
+                setItemAbierto({ tipo: "compuesto", id: compuestoId })
+              }
+            />
+          );
+        })()}
+
+      {itemAbierto?.tipo === "compuesto" &&
+        (() => {
+          const compuesto = compuestos.find((c) => c.id === itemAbierto.id);
+          if (!compuesto) return null;
+          return (
+            <CompuestoPanelFlotante
+              compuesto={compuesto}
+              elementos={elementos}
+              todosLosCompuestos={compuestos}
+              onCerrar={() => setItemAbierto(null)}
+              onActualizar={(id, cambios) =>
+                setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
+              }
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -292,9 +341,17 @@ interface OrganoCardProps {
   onDelete: () => void;
   compuestos: Compuesto[];
   elementos: Elemento[];
+  onAbrirCompuesto?: (compuestoId: string) => void;
 }
 
-function OrganoCard({ organo, onUpdate, onDelete, compuestos, elementos }: OrganoCardProps) {
+function OrganoCard({
+  organo,
+  onUpdate,
+  onDelete,
+  compuestos,
+  elementos,
+  onAbrirCompuesto,
+}: OrganoCardProps) {
   return (
     <div className="group py-3 first:pt-0">
       {/* Header: nombre del órgano (texto libre) + eliminar (solo al hover) */}
@@ -323,6 +380,7 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos, elementos }: Organ
             compuestos={compuestos}
             componentes={(organo.componentes ?? []) as ComponenteOrgano[]}
             onChange={(componentes) => onUpdate(organo.id, { componentes })}
+            onAbrirCompuesto={onAbrirCompuesto}
           />
         </div>
 
@@ -350,6 +408,7 @@ function ListaProcesosReordenable({
   onReorder,
   compuestos,
   elementos,
+  onAbrirItem,
 }: {
   procesos: PlantaProceso[];
   onUpdate: (id: string, updates: Partial<PlantaProceso>) => void;
@@ -357,6 +416,7 @@ function ListaProcesosReordenable({
   onReorder: (orderedIds: string[]) => void;
   compuestos: Compuesto[];
   elementos: Elemento[];
+  onAbrirItem?: (item: ItemProceso) => void;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -413,6 +473,7 @@ function ListaProcesosReordenable({
               onDelete={() => onDelete(proceso.id)}
               compuestos={compuestos}
               elementos={elementos}
+              onAbrirItem={onAbrirItem}
               dragHandleProps={{
                 draggable: true,
                 onDragEnd: () => {
@@ -439,6 +500,7 @@ interface ProcesoCardProps {
   onDelete: () => void;
   compuestos: Compuesto[];
   elementos: Elemento[];
+  onAbrirItem?: (item: ItemProceso) => void;
   dragHandleProps: {
     draggable: boolean;
     onDragStart: (e: React.DragEvent) => void;
@@ -452,6 +514,7 @@ function ProcesoCard({
   onDelete,
   compuestos,
   elementos,
+  onAbrirItem,
   dragHandleProps,
 }: ProcesoCardProps) {
   return (
@@ -491,6 +554,7 @@ function ProcesoCard({
             onChange={(consume) => onUpdate(proceso.id, { consume })}
             elementos={elementos}
             compuestos={compuestos}
+            onAbrirItem={onAbrirItem}
           />
           <SelectorConsumeProduce
             label="Produce"
@@ -498,6 +562,7 @@ function ProcesoCard({
             onChange={(produce) => onUpdate(proceso.id, { produce })}
             elementos={elementos}
             compuestos={compuestos}
+            onAbrirItem={onAbrirItem}
           />
         </div>
 

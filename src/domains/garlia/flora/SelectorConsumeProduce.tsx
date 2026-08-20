@@ -12,7 +12,7 @@
  * botón "Agregar" con borde punteado).
  */
 
-import { Beaker, Atom, Plus, Trash2 } from "lucide-react";
+import { Beaker, Atom, Plus, Trash2, Pencil } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import type { Compuesto, Elemento } from "@/domains/garlia/elementos/types";
@@ -29,12 +29,17 @@ export function SelectorConsumeProduce({
   onChange,
   elementos,
   compuestos,
+  onAbrirItem,
 }: {
   label: string;
   items: ItemProceso[];
   onChange: (items: ItemProceso[]) => void;
   elementos: Elemento[];
   compuestos: Compuesto[];
+  /** Abre el panel flotante del Elemento o Compuesto elegido en una fila,
+   *  reemplazando el panel actualmente abierto (mismo patrón que el resto
+   *  del editor: CompuestoPanelFlotante / ElementoPanelFlotante). */
+  onAbrirItem?: (item: ItemProceso) => void;
 }) {
   function agregar() {
     const primero = elementos[0];
@@ -81,6 +86,7 @@ export function SelectorConsumeProduce({
               compuestos={compuestos}
               onChange={(cambios) => actualizar(idx, cambios)}
               onQuitar={() => quitar(idx)}
+              onAbrir={onAbrirItem ? () => onAbrirItem(item) : undefined}
             />
           ))}
         </div>
@@ -95,12 +101,14 @@ function FilaItemProceso({
   compuestos,
   onChange,
   onQuitar,
+  onAbrir,
 }: {
   item: ItemProceso;
   elementos: Elemento[];
   compuestos: Compuesto[];
   onChange: (cambios: Partial<ItemProceso>) => void;
   onQuitar: () => void;
+  onAbrir?: () => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
@@ -180,27 +188,49 @@ function FilaItemProceso({
         </button>
       </div>
 
-      {/* Buscador / valor elegido */}
+      {/* Valor elegido (clickeable → abre panel) o buscador */}
       <div className="flex-1 min-w-0 relative">
-        <input
-          value={buscando || !elegido ? busqueda : elegido.nombre}
-          onFocus={() => {
-            setBuscando(true);
-            setBusqueda("");
-            setActivo(0);
-          }}
-          onBlur={() => {
-            // Da tiempo a que el onMouseDown de una opción se dispare antes de cerrar
-            setTimeout(() => setBuscando(false), 120);
-          }}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            setActivo(0);
-          }}
-          onKeyDown={onKeyDown}
-          placeholder={`Buscar ${item.tipo}…`}
-          className="w-full bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors"
-        />
+        {elegido && !buscando ? (
+          <div className="flex items-center gap-1 group/item">
+            <button
+              type="button"
+              onClick={onAbrir}
+              disabled={!onAbrir}
+              title={onAbrir ? `Abrir ${elegido.nombre}` : undefined}
+              className="min-w-0 flex-1 text-left px-0 py-1 text-micro font-bold text-primary truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+            >
+              {elegido.nombre}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBuscando(true);
+                setBusqueda("");
+                setActivo(0);
+              }}
+              title="Reemplazar"
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-primary/25 hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover/item:opacity-100 cursor-pointer"
+            >
+              <Pencil size={10} />
+            </button>
+          </div>
+        ) : (
+          <input
+            autoFocus={buscando}
+            value={busqueda}
+            onBlur={() => {
+              // Da tiempo a que el onMouseDown de una opción se dispare antes de cerrar
+              setTimeout(() => setBuscando(false), 120);
+            }}
+            onChange={(e) => {
+              setBusqueda(e.target.value);
+              setActivo(0);
+            }}
+            onKeyDown={onKeyDown}
+            placeholder={`Buscar ${item.tipo}…`}
+            className="w-full bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors"
+          />
+        )}
         {buscando && (
           <div
             className="absolute z-20 mt-1 left-0 right-0 max-h-40 overflow-y-auto rounded-md border shadow-lg"
