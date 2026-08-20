@@ -109,6 +109,34 @@ export const FAMILY_ICON: Record<ElementFamily, React.ElementType> = {
   Inerte: CircleOff,
 };
 
+/**
+ * Colores por familia, inspirados en las categorías de la tabla periódica
+ * real (gases nobles = violeta, alcalinos = rojo/naranja muy reactivos,
+ * metales de transición = azul acero, metaloides = verde, no clasificados
+ * = gris) pero recalibrados en tonos apagados/oscuros para que encajen con
+ * el tema violeta-sepia oscuro de la app (--bg-main: #1c1720) en vez de
+ * verse como colores planos de Wikipedia sobre fondo blanco.
+ *
+ *   - Noble:      violeta lila  — como los gases nobles reales, y coincide
+ *                 con --accent del tema, reforzando que es la familia "eje".
+ *   - Rígido:     azul acero    — como los metales de transición reales.
+ *   - Intermedio: verde salvia  — como los metaloides reales (punto medio).
+ *   - Reactivo:   rojo ladrillo — como los metales alcalinos reales.
+ *   - Inerte:     gris piedra   — como los elementos sin clasificar.
+ *
+ * Cada familia trae: `text` (símbolo/ícono), `bg` (fondo sutil de casilla)
+ * y `border` (borde de casilla) — pensados para combinar sobre fondos
+ * oscuros usando opacidad baja, igual que el resto de la UI (bg-primary/5,
+ * border-primary/10, etc.).
+ */
+export const FAMILY_COLOR: Record<ElementFamily, { text: string; bg: string; border: string }> = {
+  Noble: { text: "#c9a3e0", bg: "rgba(170, 120, 190, 0.14)", border: "rgba(170, 120, 190, 0.38)" },
+  Rígido: { text: "#8fb3d9", bg: "rgba(90, 130, 180, 0.14)", border: "rgba(90, 130, 180, 0.38)" },
+  Intermedio: { text: "#9bc4a0", bg: "rgba(110, 160, 115, 0.14)", border: "rgba(110, 160, 115, 0.38)" },
+  Reactivo: { text: "#d99a7a", bg: "rgba(190, 110, 70, 0.14)", border: "rgba(190, 110, 70, 0.38)" },
+  Inerte: { text: "#a8a0ac", bg: "rgba(140, 130, 145, 0.12)", border: "rgba(140, 130, 145, 0.32)" },
+};
+
 /** Fila cruda tal cual vive en Supabase (tabla "elementos"). */
 export interface Elemento {
   id: string;

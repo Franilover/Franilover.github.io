@@ -33,6 +33,7 @@ import {
 } from "./useInfoTablaQuimica";
 import {
   ELEMENT_FAMILIES,
+  FAMILY_COLOR,
   type Compuesto,
   type Elemento,
   type ElementFamily,
@@ -247,14 +248,20 @@ function ElementoCasilla({
     <button
       type="button"
       onClick={onClick}
-      title="Click: ver detalle · Shift+Click: agregar/quitar de la selección múltiple"
+      title={`Click: ver detalle · Shift+Click: agregar/quitar de la selección múltiple · Familia: ${elemento.familia}`}
       className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
-        enSeleccionMultiple
+        enSeleccionMultiple || seleccionado
           ? "border-primary/50 ring-2 ring-primary/40"
-          : seleccionado
-            ? "border-primary/50 ring-2 ring-primary/40"
-            : "border-primary/10 hover:bg-primary/5 hover:border-primary/25"
+          : "hover:brightness-125"
       }`}
+      style={
+        enSeleccionMultiple || seleccionado
+          ? undefined
+          : {
+              backgroundColor: FAMILY_COLOR[elemento.familia].bg,
+              borderColor: FAMILY_COLOR[elemento.familia].border,
+            }
+      }
     >
       <div className="flex items-start justify-between">
         <span className="text-micro font-black text-primary/30 tabular-nums">
@@ -268,7 +275,10 @@ function ElementoCasilla({
         )}
       </div>
 
-      <span className="text-base font-black text-primary text-center leading-none py-0.5">
+      <span
+        className="text-base font-black text-center leading-none py-0.5"
+        style={{ color: FAMILY_COLOR[elemento.familia].text }}
+      >
         {elemento.simbolo || "??"}
       </span>
 
@@ -999,7 +1009,11 @@ export function ElementosPage({
           <div className="flex flex-col gap-3">
             {gruposPeriodicos.map(({ familia, elementos: elsDeFamilia }) => (
               <div key={familia} className="flex flex-col gap-1">
-                <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                <p className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: FAMILY_COLOR[familia].text }}
+                  />
                   {familia} · {elsDeFamilia.length} elemento{elsDeFamilia.length === 1 ? "" : "s"}
                 </p>
                 <div
