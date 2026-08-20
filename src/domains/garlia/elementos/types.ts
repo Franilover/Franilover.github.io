@@ -201,19 +201,39 @@ export interface ComponenteGrupoCompuesto {
   cantidad: number;
 }
 
+/**
+ * Tipo/tag de un Grupo de Compuestos — determina en qué buscadores aparece:
+ * - "generico": solo aparece como plantilla copiable (botón "Usar grupo").
+ * - "organo": además aparece en el picker de Órganos de Flora — el propio
+ *   Grupo ES el Órgano (se vincula N:N a plantas vía planta_organos).
+ * - "formacion": además aparece en el picker de Formaciones de Minerales —
+ *   el propio Grupo ES la Formación (se vincula N:N a minerales vía
+ *   mineral_formaciones).
+ */
+export type TipoGrupoCompuesto = "generico" | "organo" | "formacion";
+
+export const TIPOS_GRUPO_COMPUESTO: { value: TipoGrupoCompuesto; label: string }[] = [
+  { value: "generico", label: "Genérico" },
+  { value: "organo", label: "Órgano (Flora)" },
+  { value: "formacion", label: "Formación (Minerales)" },
+];
+
 /** Fila cruda tal cual vive en Supabase (tabla "grupos_compuestos"). */
 export interface GrupoCompuesto {
   id: string;
   nombre: string;
   notas: string | null;
   componentes: ComponenteGrupoCompuesto[];
+  /** Tag que determina en qué buscadores aparece este grupo — ver
+   *  TipoGrupoCompuesto. Default "generico" para grupos existentes. */
+  tipo: TipoGrupoCompuesto;
   created_at: string;
   updated_at?: string;
 }
 
 export const CONFIG_GRUPOS_COMPUESTOS = {
   tabla: "grupos_compuestos",
-  select: "id, nombre, notas, componentes, created_at, updated_at",
+  select: "id, nombre, notas, componentes, tipo, created_at, updated_at",
 };
 
 /** Compacta un ParticleMap en algo tipo "2M 1P" para tarjetas/resúmenes. */

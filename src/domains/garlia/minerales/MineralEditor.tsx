@@ -52,6 +52,7 @@ import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
 import { SelectorFormulaOrgano, type ComponenteOrgano } from "@/domains/garlia/flora/SelectorFormulaOrgano";
 import { SelectorConsumeProduce, type ItemProceso } from "@/domains/garlia/flora/SelectorConsumeProduce";
+import { SelectorFormacionMineral } from "./SelectorFormacionMineral";
 
 export function MineralEditor({
   mineral: mineralProp,
@@ -64,7 +65,7 @@ export function MineralEditor({
 }) {
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
-  const { items: gruposCompuestos } = useGruposCompuestos();
+  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
   const { actualizar, eliminar } = useMinerales();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
     useEcosistemas();
@@ -100,20 +101,29 @@ export function MineralEditor({
     });
   };
 
+  // Catálogo de Formaciones = Grupos de Compuestos con tipo="formacion"
+  // (catálogo global, compartido entre todos los minerales).
+  const catalogoFormaciones = useMemo(
+    () => gruposCompuestos.filter((g) => g.tipo === "formacion"),
+    [gruposCompuestos],
+  );
+
   // Formaciones y procesos
   const {
     formaciones,
     procesos,
     loading: loadingFormacionesProcesos,
     crearFormacion,
+    vincularFormacionExistente,
     actualizarFormacion,
     eliminarFormacion,
     crearProceso,
     actualizarProceso,
     eliminarProceso,
-  } = useMineralFormacionesProcesos(mineralProp.id, form);
+  } = useMineralFormacionesProcesos(mineralProp.id, catalogoFormaciones, form);
 
   const [tabActiva, setTabActiva] = useState<"info" | "formaciones" | "procesos">("info");
+  const [pickerFormacionAbierto, setPickerFormacionAbierto] = useState(false);
 
   useEffect(() => {
     setForm(mineralProp);
@@ -208,13 +218,28 @@ export function MineralEditor({
                   </button>
                 </div>
                 {tabActiva !== "info" && (
-                  <button
-                    onClick={() => void (tabActiva === "formaciones" ? crearFormacion() : crearProceso())}
-                    title={tabActiva === "formaciones" ? "Nueva formación" : "Nuevo proceso"}
-                    className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                  >
-                    <Plus size={16} />
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() =>
+                        tabActiva === "formaciones"
+                          ? setPickerFormacionAbierto((v) => !v)
+                          : void crearProceso()
+                      }
+                      title={tabActiva === "formaciones" ? "Nueva formación" : "Nuevo proceso"}
+                      className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                    >
+                      <Plus size={16} />
+                    </button>
+                    {tabActiva === "formaciones" && pickerFormacionAbierto && (
+                      <SelectorFormacionMineral
+                        catalogoFormaciones={catalogoFormaciones}
+                        formacionesYaVinculadasIds={new Set(formaciones.map((f) => f.id))}
+                        onCrearNueva={() => void crearFormacion()}
+                        onUsarExistente={(id) => void vincularFormacionExistente(id)}
+                        onClose={() => setPickerFormacionAbierto(false)}
+                      />
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -280,11 +305,19 @@ export function MineralEditor({
                   ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
                       {formaciones.map((formacion) => (
-                        <div key={formacion.id} className="border-b border-primary/10">
+                        <div key={formacion.vinculo_id} className="border-b border-primary/10">
                           <FormacionCard
                             formacion={formacion}
-                            onUpdate={actualizarFormacion}
-                            onDelete={() => eliminarFormacion(formacion.id)}
+                            onUpdate={(id, updates) => {
+                              // Optimista: refleja el cambio en el catálogo local ya
+                              // mismo (afecta a todos los minerales que usan este
+                              // Grupo), y persiste en Supabase vía el hook.
+                              setGruposCompuestos((prev) =>
+                                prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
+                              );
+                              void actualizarFormacion(id, updates);
+                            }}
+                            onDelete={() => void eliminarFormacion(formacion.vinculo_id)}
                             compuestos={compuestos}
                             gruposCompuestos={gruposCompuestos}
                           />

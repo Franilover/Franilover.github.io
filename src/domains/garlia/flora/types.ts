@@ -5,7 +5,15 @@
  * raíz, fruto, tallo) cada uno con su propia fórmula química (JSONB), y
  * procesos del ciclo de vida (fotosíntesis, floración, fructificación, etc)
  * que describen qué consume y qué produce en cada etapa.
+ *
+ * "Órgano" ya NO es una entidad propia: es un GrupoCompuesto con
+ * tipo="organo" (ver elementos/types.ts) — se reutiliza el mismo catálogo
+ * y editor que "Grupos de compuestos", solo filtrado por tag. Esto evita
+ * mantener dos tablas de fórmulas reutilizables ({compuesto_id,cantidad}[])
+ * en paralelo.
  */
+
+import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
 
 export interface Flora {
   id: string;
@@ -23,40 +31,28 @@ export interface Flora {
 }
 
 /**
- * Órgano: catálogo compartido (ya NO vive 1:1 dentro de una planta). Un
- * mismo Órgano (ej. "Raíz fibrosa") puede vincularse a varias plantas vía
- * PlantaOrgano — si se edita su fórmula acá, se actualiza en todas las
- * plantas que lo usan.
+ * Vínculo N:N entre Flora y GrupoCompuesto (con tipo="organo").
+ * Reemplaza a la vieja tabla puente `planta_organos` → `organos`: ahora el
+ * catálogo compartido de "órganos" ES el catálogo de Grupos de Compuestos
+ * filtrado por tipo="organo", así se evita mantener dos tablas de fórmulas
+ * reutilizables en paralelo.
  */
-export interface Organo {
-  id: string;
-  /** Nombre del órgano (texto libre: "hoja", "pétalo", "raíz", etc) */
-  nombre: string;
-  /** Fórmula del órgano: mezcla de Compuestos + cantidad (mismo lenguaje que consume/produce de Procesos y Composición de Flora) */
-  componentes: Array<{ compuesto_id: string; cantidad: number }> | null;
-  /** ID opcional de compuesto base (para derivar fórmulas sin escribir todo) */
-  compuesto_base_id: string | null;
-  notas: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/** Tabla puente N:N entre Flora y Organo (catálogo compartido). */
 export interface PlantaOrgano {
   id: string;
   planta_id: string;
-  organo_id: string;
+  /** FK a grupos_compuestos.id (antes: organo_id → organos.id). */
+  grupo_compuesto_id: string;
   created_at: string;
 }
 
 /**
  * Vista combinada usada por la UI: el vínculo puente + los datos del
- * Órgano ya resueltos, para no tener que hacer el join a mano en cada
- * componente que solo necesita "los órganos de esta planta, con su
+ * GrupoCompuesto ya resueltos, para no tener que hacer el join a mano en
+ * cada componente que solo necesita "los órganos de esta planta, con su
  * fórmula". `vinculo_id` es el id de la fila puente (PlantaOrgano.id) —
- * necesario para poder desvincular sin borrar el Organo del catálogo.
+ * necesario para poder desvincular sin borrar el grupo del catálogo.
  */
-export interface PlantaOrganoResuelto extends Organo {
+export interface PlantaOrganoResuelto extends GrupoCompuesto {
   vinculo_id: string;
 }
 
@@ -81,10 +77,6 @@ export type FloraInput = Partial<
     Flora,
     "nombre" | "imagen_url" | "descripcion" | "compuesto_id" | "componentes" | "notas" | "orden"
   >
->;
-
-export type OrganoInput = Partial<
-  Pick<Organo, "nombre" | "componentes" | "compuesto_base_id" | "notas">
 >;
 
 export type PlantaProcesoInput = Partial<

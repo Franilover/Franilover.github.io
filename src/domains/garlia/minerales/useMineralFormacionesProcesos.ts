@@ -3,9 +3,10 @@
 /**
  * useMineralFormacionesProcesos.ts
  * ───────────────────────────────────────────────────────────────────────────
- * Hook para CRUD de mineral_formaciones y mineral_procesos. Mismo molde que
+ * Hook para CRUD de Formaciones y Procesos de un mineral. Mismo molde que
  * usePlantaOrganosProcesos.ts (ver ese archivo para el razonamiento
- * completo), con dos diferencias deliberadas:
+ * completo sobre el patrón de vínculo N:N contra grupos_compuestos), con
+ * dos diferencias deliberadas:
  *
  * - Sin `orden`/reordenarProcesos: a diferencia del ciclo de vida de una
  *   planta, los procesos geológicos de un mineral no tienen una secuencia
@@ -14,38 +15,51 @@
  *
  * - migrarComponentesLegado: el campo plano `Mineral.componentes` (composición
  *   sin estructura, pre-Formaciones) se migra una sola vez a una Formación
- *   real (sin nombre) la primera vez que se cargan formaciones para un
- *   mineral que aún no tiene ninguna. Así no se pierde data ya cargada.
+ *   real (GrupoCompuesto tipo="formacion" + vínculo) la primera vez que se
+ *   cargan formaciones para un mineral que aún no tiene ninguna. Así no se
+ *   pierde data ya cargada.
+ *
+ * Formaciones: catálogo compartido — "grupos_compuestos" filtrado por
+ * tipo="formacion" (ver elementos/types.ts), vinculado N:N vía la tabla
+ * puente "mineral_formaciones" (ahora solo {id, mineral_id,
+ * grupo_compuesto_id, created_at} — el nombre/fórmula/notas viven en el
+ * GrupoCompuesto, no en esta tabla).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
+
+import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
 
 import type {
   Mineral,
   MineralFormacion,
-  MineralFormacionInput,
+  MineralFormacionVinculo,
   MineralProceso,
   MineralProcesoInput,
 } from "./types";
 
-export function useMineralFormacionesProcesos(mineralId: string, mineralLegado?: Mineral | null) {
-  const [formaciones, setFormaciones] = useState<MineralFormacion[]>([]);
+export function useMineralFormacionesProcesos(
+  mineralId: string,
+  catalogoFormaciones: GrupoCompuesto[],
+  mineralLegado?: Mineral | null,
+) {
+  const [vinculos, setVinculos] = useState<MineralFormacionVinculo[]>([]);
   const [procesos, setProcesos] = useState<MineralProceso[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ── Cargar formaciones y procesos ──────────────────────────────────────
+  // ── Cargar vínculos (mineral_formaciones) y procesos ───────────────────
   const load = useCallback(async () => {
     setLoading(true);
 
-    const { data: formacionData, error: formacionError } = await supabase
+    const { data: vinculoData, error: vinculoError } = await supabase
       .from("mineral_formaciones")
       .select("*")
       .eq("mineral_id", mineralId)
       .order("created_at", { ascending: true });
 
-    if (!formacionError && formacionData) {
-      setFormaciones(formacionData as MineralFormacion[]);
+    if (!vinculoError && vinculoData) {
+      setVinculos(vinculoData as MineralFormacionVinculo[]);
     }
 
     const { data: procesoData, error: procesoError } = await supabase
@@ -59,80 +73,132 @@ export function useMineralFormacionesProcesos(mineralId: string, mineralLegado?:
     }
 
     setLoading(false);
-    return { formacionesVacias: !formacionError && (formacionData?.length ?? 0) === 0 };
+    return { formacionesVacias: !vinculoError && (vinculoData?.length ?? 0) === 0 };
   }, [mineralId]);
 
   useEffect(() => {
     if (mineralId) void load();
   }, [mineralId, load]);
 
+  // ── Formaciones vinculadas a este mineral, ya resueltas contra el
+  // catálogo (huérfanos se ignoran silenciosamente, igual que en Flora) ──
+  const formaciones = useMemo<MineralFormacion[]>(() => {
+    const porId = new Map(catalogoFormaciones.map((g) => [g.id, g]));
+    return vinculos
+      .map((v) => {
+        const grupo = porId.get(v.grupo_compuesto_id);
+        if (!grupo) return null;
+        return { ...grupo, vinculo_id: v.id };
+      })
+      .filter((f): f is MineralFormacion => f !== null);
+  }, [vinculos, catalogoFormaciones]);
+
   // ── Migración one-shot del campo legado `componentes` ──────────────────
   // Se corre después de la primera carga: si el mineral tiene composición
-  // legado pero todavía no tiene ninguna Formación, la convierte en una
-  // Formación tipo "otro" para no perder la data ya cargada por el usuario.
+  // legado pero todavía no tiene ninguna Formación, la convierte en un
+  // GrupoCompuesto (tipo="formacion") + vínculo, para no perder la data ya
+  // cargada por el usuario.
   useEffect(() => {
     if (!mineralId || loading) return;
-    if (formaciones.length > 0) return;
+    if (vinculos.length > 0) return;
     const legado = mineralLegado?.componentes;
     if (!legado || legado.length === 0) return;
 
     void (async () => {
-      const { data, error } = await supabase
-        .from("mineral_formaciones")
+      const { data: nuevoGrupo, error: errorGrupo } = await supabase
+        .from("grupos_compuestos")
         .insert([
           {
-            mineral_id: mineralId,
             nombre: "",
             componentes: legado.map((c) => ({ compuesto_id: c.compuesto_id, cantidad: 1 })),
             notas: legado.some((c) => c.tag) ? legado.map((c) => c.tag).filter(Boolean).join(", ") : null,
+            tipo: "formacion",
           },
         ])
         .select()
         .single();
+      if (errorGrupo || !nuevoGrupo) return;
 
-      if (!error && data) {
-        setFormaciones((prev) => (prev.length > 0 ? prev : [data as MineralFormacion]));
-      }
+      const { data: vinculo, error: errorVinculo } = await supabase
+        .from("mineral_formaciones")
+        .insert([{ mineral_id: mineralId, grupo_compuesto_id: (nuevoGrupo as GrupoCompuesto).id }])
+        .select()
+        .single();
+      if (errorVinculo || !vinculo) return;
+
+      setVinculos((prev) => (prev.length > 0 ? prev : [vinculo as MineralFormacionVinculo]));
     })();
     // Solo debe dispararse una vez apenas se sabe que no hay formaciones —
-    // no en cada cambio de `formaciones` (evitaría re-disparar en loop).
+    // no en cada cambio de `vinculos` (evitaría re-disparar en loop).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineralId, loading]);
 
-  // ── CRUD de formaciones ─────────────────────────────────────────────────
+  // ── Crear un GrupoCompuesto nuevo (tipo="formacion") + vincularlo a este
+  // mineral ─────────────────────────────────────────────────────────────
   const crearFormacion = useCallback(
     async () => {
-      const { data, error } = await supabase
-        .from("mineral_formaciones")
-        .insert([{ mineral_id: mineralId, nombre: "", componentes: null }])
+      const { data: nuevoGrupo, error: errorGrupo } = await supabase
+        .from("grupos_compuestos")
+        .insert([{ nombre: "", componentes: [], tipo: "formacion" }])
         .select()
         .single();
+      if (errorGrupo || !nuevoGrupo) return null;
 
-      if (error || !data) return null;
-      setFormaciones((prev) => [...prev, data as MineralFormacion]);
-      return data as MineralFormacion;
+      const { data: vinculo, error: errorVinculo } = await supabase
+        .from("mineral_formaciones")
+        .insert([{ mineral_id: mineralId, grupo_compuesto_id: (nuevoGrupo as GrupoCompuesto).id }])
+        .select()
+        .single();
+      if (errorVinculo || !vinculo) return null;
+
+      setVinculos((prev) => [...prev, vinculo as MineralFormacionVinculo]);
+      return { ...(nuevoGrupo as GrupoCompuesto), vinculo_id: (vinculo as MineralFormacionVinculo).id };
     },
     [mineralId],
   );
 
-  const actualizarFormacion = useCallback(
-    async (id: string, updates: MineralFormacionInput) => {
-      setFormaciones((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
-      const { error } = await supabase.from("mineral_formaciones").update(updates).eq("id", id);
-      if (error) {
-        console.error("[useMineralFormacionesProcesos] error actualizando formacion:", error);
-        void load();
-      }
+  // ── Vincular un GrupoCompuesto ya existente (tipo="formacion") a este
+  // mineral ─────────────────────────────────────────────────────────────
+  const vincularFormacionExistente = useCallback(
+    async (grupoCompuestoId: string) => {
+      if (vinculos.some((v) => v.grupo_compuesto_id === grupoCompuestoId)) return null;
+
+      const { data: vinculo, error } = await supabase
+        .from("mineral_formaciones")
+        .insert([{ mineral_id: mineralId, grupo_compuesto_id: grupoCompuestoId }])
+        .select()
+        .single();
+      if (error || !vinculo) return null;
+
+      setVinculos((prev) => [...prev, vinculo as MineralFormacionVinculo]);
+      return vinculo as MineralFormacionVinculo;
     },
-    [load],
+    [mineralId, vinculos],
   );
 
-  const eliminarFormacion = useCallback(async (id: string) => {
-    setFormaciones((prev) => prev.filter((f) => f.id !== id));
-    await supabase.from("mineral_formaciones").delete().eq("id", id);
+  // ── Actualizar el GrupoCompuesto en el catálogo (afecta a todos los
+  // minerales que lo tengan vinculado) ────────────────────────────────────
+  const actualizarFormacion = useCallback(
+    async (grupoCompuestoId: string, updates: Partial<GrupoCompuesto>) => {
+      const { error } = await supabase
+        .from("grupos_compuestos")
+        .update(updates)
+        .eq("id", grupoCompuestoId);
+      if (error) {
+        console.error("[useMineralFormacionesProcesos] error actualizando formacion:", error);
+      }
+    },
+    [],
+  );
+
+  // ── Desvincular (borra solo la fila puente, el GrupoCompuesto sigue en
+  // el catálogo para otros minerales) ──────────────────────────────────────
+  const eliminarFormacion = useCallback(async (vinculoId: string) => {
+    setVinculos((prev) => prev.filter((v) => v.id !== vinculoId));
+    await supabase.from("mineral_formaciones").delete().eq("id", vinculoId);
   }, []);
 
-  // ── CRUD de procesos ────────────────────────────────────────────────────
+  // ── CRUD de procesos (sin cambios) ─────────────────────────────────────
   const crearProceso = useCallback(
     async () => {
       const { data, error } = await supabase
@@ -176,6 +242,7 @@ export function useMineralFormacionesProcesos(mineralId: string, mineralLegado?:
     loading,
     // Formaciones
     crearFormacion,
+    vincularFormacionExistente,
     actualizarFormacion,
     eliminarFormacion,
     // Procesos

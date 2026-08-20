@@ -14,11 +14,11 @@
  * compuesto puede estar referenciado en el catálogo):
  *   - Item:    compuesto_id (legado) + composicion[].compuesto_id
  *   - Mineral: compuesto_id (legado) + componentes[].compuesto_id (legado)
- *              + mineral_formaciones.componentes[].compuesto_id
+ *              + Formaciones (grupos_compuestos tipo="formacion",
+ *                vinculadas al mineral vía mineral_formaciones)
  *   - Flora:   compuesto_id (legado) + componentes[].compuesto_id (legado)
- *              + organos.componentes[].compuesto_id (catálogo compartido,
- *                vinculado a la planta vía la tabla puente planta_organos)
- *              + organos.compuesto_base_id
+ *              + Órganos (grupos_compuestos tipo="organo", vinculados a la
+ *                planta vía la tabla puente planta_organos)
  *
  * Las Criaturas NO se incluyen: su perfil atómico (perfiles_atomicos_
  * criatura.componentes) referencia Elementos directamente, no Compuestos
@@ -62,10 +62,23 @@ interface MineralRow {
   componentes: { compuesto_id: string; tag: string }[] | null;
 }
 
-interface MineralFormacionRow {
+/**
+ * Fila cruda de la tabla puente mineral_formaciones tal como la devuelve
+ * Supabase: la relación embebida (grupo_compuesto_id → grupos_compuestos,
+ * mineral_id → minerales) se tipa como array aunque en runtime cada
+ * vínculo tenga como mucho un registro de cada lado — se normaliza a
+ * objeto único al mapear.
+ */
+interface MineralFormacionRowCruda {
   mineral_id: string;
-  nombre_formacion: string;
-  componentes: { compuesto_id: string; cantidad: number }[] | null;
+  minerales: { id: string; nombre: string; imagen_url: string | null }[] | null;
+  grupo: { nombre: string; componentes: { compuesto_id: string; cantidad: number }[] | null }[] | null;
+}
+
+/** Fila ya normalizada (mineral/grupo como objeto único), la que usa el resto del hook. */
+interface MineralFormacionRow {
+  mineral: { id: string; nombre: string; imagen_url: string | null } | null;
+  grupo: { nombre: string; componentes: { compuesto_id: string; cantidad: number }[] | null } | null;
 }
 
 interface FloraRow {
@@ -78,16 +91,16 @@ interface FloraRow {
 
 /**
  * Fila cruda de la tabla puente planta_organos tal como la devuelve
- * Supabase: las relaciones embebidas (organo_id → organos, planta_id →
- * flora) se tipan como array aunque en runtime cada vínculo tenga como
- * mucho un registro de cada lado — se normaliza a objeto único al mapear.
+ * Supabase: las relaciones embebidas (grupo_compuesto_id →
+ * grupos_compuestos, planta_id → flora) se tipan como array aunque en
+ * runtime cada vínculo tenga como mucho un registro de cada lado — se
+ * normaliza a objeto único al mapear.
  */
 interface PlantaOrganoRowCruda {
   planta_id: string;
   flora: { id: string; nombre: string; imagen_url: string | null }[] | null;
   organo: {
     nombre: string;
-    compuesto_base_id: string | null;
     componentes: { compuesto_id: string; cantidad: number }[] | null;
   }[] | null;
 }
@@ -97,7 +110,6 @@ interface PlantaOrganoRow {
   planta_id: string;
   organo: {
     nombre: string;
-    compuesto_base_id: string | null;
     componentes: { compuesto_id: string; cantidad: number }[] | null;
   } | null;
 }
@@ -131,11 +143,13 @@ export function useUsosCompuesto() {
         supabase
           .from("mineral_formaciones")
           .select(
-            "mineral_id, nombre_formacion:nombre, componentes, minerales(id, nombre, imagen_url)",
+            "mineral_id, minerales(id, nombre, imagen_url), grupo:grupos_compuestos(nombre, componentes)",
           ),
         supabase
           .from("planta_organos")
-          .select("planta_id, flora(id, nombre, imagen_url), organo:organos(nombre, compuesto_base_id, componentes)"),
+          .select(
+            "planta_id, flora(id, nombre, imagen_url), organo:grupos_compuestos(nombre, componentes)",
+          ),
       ]);
 
       if (cancelado) return;
@@ -144,10 +158,11 @@ export function useUsosCompuesto() {
       setFlora((floraData as FloraRow[]) ?? []);
       setMineralFormaciones(
         ((formacionesData as unknown[]) ?? []).map((f) => {
-          const row = f as MineralFormacionRow & {
-            minerales: { id: string; nombre: string; imagen_url: string | null } | null;
+          const row = f as MineralFormacionRowCruda;
+          return {
+            mineral: row.minerales?.[0] ?? null,
+            grupo: row.grupo?.[0] ?? null,
           };
-          return { ...row, mineral: row.minerales };
         }),
       );
       setPlantaOrganos(
@@ -219,15 +234,16 @@ export function useUsosCompuesto() {
         });
       }
     }
-    for (const formacion of mineralFormaciones) {
-      if (!formacion.mineral) continue;
-      for (const c of formacion.componentes ?? []) {
+    for (const vinculo of mineralFormaciones) {
+      if (!vinculo.mineral || !vinculo.grupo) continue;
+      const etiqueta = vinculo.grupo.nombre || "Formación";
+      for (const c of vinculo.grupo.componentes ?? []) {
         agregar(c.compuesto_id, {
           tipo: "mineral",
-          id: formacion.mineral.id,
-          nombre: formacion.mineral.nombre,
-          imagen_url: formacion.mineral.imagen_url,
-          detalle: formacion.nombre_formacion || "Formación",
+          id: vinculo.mineral.id,
+          nombre: vinculo.mineral.nombre,
+          imagen_url: vinculo.mineral.imagen_url,
+          detalle: etiqueta,
         });
       }
     }
@@ -252,13 +268,6 @@ export function useUsosCompuesto() {
     for (const vinculo of plantaOrganos) {
       if (!vinculo.planta || !vinculo.organo) continue;
       const etiqueta = vinculo.organo.nombre || "Órgano";
-      agregar(vinculo.organo.compuesto_base_id, {
-        tipo: "flora",
-        id: vinculo.planta.id,
-        nombre: vinculo.planta.nombre,
-        imagen_url: vinculo.planta.imagen_url,
-        detalle: etiqueta,
-      });
       for (const c of vinculo.organo.componentes ?? []) {
         agregar(c.compuesto_id, {
           tipo: "flora",

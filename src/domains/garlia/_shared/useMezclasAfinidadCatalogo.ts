@@ -33,17 +33,17 @@ export interface EntidadConMezcla {
   mezcla: ComponenteCompuestoEnMezcla[];
 }
 
-interface FilaFormacionMineral {
-  mineral_id?: string;
-  componentes: { compuesto_id: string; cantidad: number }[] | null;
+interface FilaVinculoFormacion {
+  mineral_id: string;
+  grupo: { componentes: { compuesto_id: string; cantidad: number }[] | null }[] | null;
 }
 
 /**
- * Fila de la tabla puente planta_organos, con el Organo del catálogo
- * compartido ya resuelto (join vía organo_id) — la fórmula real vive en
- * `organo.componentes`, la fila puente solo guarda el vínculo.
- * Supabase tipa la relación embebida como array aunque en runtime sea un
- * único registro (FK organo_id → organos.id) — se toma el primero.
+ * Fila de la tabla puente planta_organos, con el GrupoCompuesto del
+ * catálogo compartido ya resuelto (join vía grupo_compuesto_id) — la
+ * fórmula real vive en `organo.componentes`, la fila puente solo guarda
+ * el vínculo. Supabase tipa la relación embebida como array aunque en
+ * runtime sea un único registro — se toma el primero.
  */
 interface FilaVinculoOrgano {
   planta_id: string;
@@ -67,18 +67,23 @@ export function useMezclasAfinidadCatalogo() {
         { data: organos },
       ] = await Promise.all([
         supabase.from("minerales").select("id, nombre"),
-        supabase.from("mineral_formaciones").select("mineral_id, componentes"),
+        supabase
+          .from("mineral_formaciones")
+          .select("mineral_id, grupo:grupos_compuestos(componentes)"),
         supabase.from("flora").select("id, nombre"),
-        supabase.from("planta_organos").select("planta_id, organo:organos(componentes)"),
+        supabase
+          .from("planta_organos")
+          .select("planta_id, organo:grupos_compuestos(componentes)"),
       ]);
 
       if (cancelado) return;
 
       const mezclaMineral = new Map<string, ComponenteCompuestoEnMezcla[]>();
-      for (const f of (formaciones ?? []) as FilaFormacionMineral[]) {
-        if (!f.mineral_id || !f.componentes) continue;
+      for (const f of (formaciones ?? []) as FilaVinculoFormacion[]) {
+        const componentes = f.grupo?.[0]?.componentes;
+        if (!f.mineral_id || !componentes) continue;
         const acumulada = mezclaMineral.get(f.mineral_id) ?? [];
-        mezclaMineral.set(f.mineral_id, [...acumulada, ...f.componentes]);
+        mezclaMineral.set(f.mineral_id, [...acumulada, ...componentes]);
       }
 
       const mezclaFlora = new Map<string, ComponenteCompuestoEnMezcla[]>();

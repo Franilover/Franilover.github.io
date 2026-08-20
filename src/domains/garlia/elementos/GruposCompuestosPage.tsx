@@ -15,12 +15,13 @@
  * directo, no una tabla química.
  */
 
-import { Boxes, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Boxes, Loader2, Plus, Sprout, Gem, Trash2, X } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { SelectorFormulaOrgano, type ComponenteOrgano } from "@/domains/garlia/flora/SelectorFormulaOrgano";
+import { SelectorTipoGrupoCompuesto } from "./SelectorTipoGrupoCompuesto";
 
 import type { Compuesto, GrupoCompuesto } from "./types";
 
@@ -33,6 +34,13 @@ interface Props {
   onActualizar: (id: string, cambios: Partial<GrupoCompuesto>) => void;
   onEliminar?: (id: string) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
+}
+
+/** Ícono según tipo — Boxes (genérico), Sprout (órgano), Gem (formación). */
+function IconoTipoGrupo({ tipo }: { tipo: GrupoCompuesto["tipo"] }) {
+  if (tipo === "organo") return <Sprout size={10} className="text-primary/40 shrink-0" />;
+  if (tipo === "formacion") return <Gem size={10} className="text-primary/40 shrink-0" />;
+  return <Boxes size={10} className="text-primary/40 shrink-0" />;
 }
 
 /**
@@ -60,7 +68,7 @@ function GrupoCompuestoPill({
           : "hover:bg-primary/10 text-primary/70 border border-primary/15"
       }`}
     >
-      <Boxes size={10} className="text-primary/40 shrink-0" />
+      <IconoTipoGrupo tipo={grupo.tipo} />
       <span className="truncate">{grupo.nombre || "(sin nombre)"}</span>
     </button>
   );
@@ -256,6 +264,10 @@ function GrupoCompuestoPanelFlotante({
             placeholder="Nombre del grupo (ej: Base floral)…"
             value={grupo.nombre ?? ""}
             onChange={(e) => onActualizar(grupo.id, { nombre: e.target.value })}
+          />
+          <SelectorTipoGrupoCompuesto
+            value={grupo.tipo ?? "generico"}
+            onChange={(tipo) => onActualizar(grupo.id, { tipo })}
           />
           {onEliminar && (
             <button

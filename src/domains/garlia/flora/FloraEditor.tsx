@@ -39,7 +39,6 @@ import {
 
 import { useFlora } from "./useFlora";
 import { usePlantaOrganosProcesos } from "./usePlantaOrganosProcesos";
-import { useOrganos } from "./useOrganos";
 import { type Flora, type PlantaOrganoResuelto, type PlantaProceso } from "./types";
 import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
@@ -60,7 +59,7 @@ export function FloraEditorMejorado({
 }) {
   const { items: elementos, setItems: setElementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
-  const { items: gruposCompuestos } = useGruposCompuestos();
+  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
   const { actualizar, eliminar } = useFlora();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
     useEcosistemas();
@@ -83,8 +82,12 @@ export function FloraEditorMejorado({
   const lastEntityClickTarget = useRef<HTMLElement | null>(null);
   const asideEcosistemasRef = useRef<HTMLElement | null>(null);
 
-  // Catálogo global de Órganos (compartido entre todas las plantas)
-  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
+  // Catálogo de Órganos = Grupos de Compuestos con tipo="organo" (catálogo
+  // global, compartido entre todas las plantas). Ya no es una tabla propia.
+  const catalogoOrganos = useMemo(
+    () => gruposCompuestos.filter((g) => g.tipo === "organo"),
+    [gruposCompuestos],
+  );
 
   // Órganos vinculados a esta planta (resueltos contra el catálogo) y procesos
   const {
@@ -307,9 +310,9 @@ export function FloraEditorMejorado({
                           onUpdate={(id, updates) => {
                             // Optimista: refleja el cambio en el catálogo local ya
                             // mismo (afecta a todas las plantas que usan este
-                            // Organo), y persiste en Supabase vía el hook.
-                            setCatalogoOrganos((prev) =>
-                              prev.map((o) => (o.id === id ? { ...o, ...updates } : o)),
+                            // Grupo), y persiste en Supabase vía el hook.
+                            setGruposCompuestos((prev) =>
+                              prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
                             );
                             void actualizarOrgano(id, updates);
                           }}
