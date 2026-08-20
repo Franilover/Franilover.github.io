@@ -13,7 +13,7 @@
  * creado (trigger tipo chip con el valor actual, editable en el lugar).
  */
 
-import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Plus as PlusIcon, type LucideIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -30,17 +30,23 @@ export function SelectorTipo<T extends string>({
   variant = "chip",
   triggerLabel,
   disabled,
+  title,
 }: {
   opciones: OpcionTipo<T>[];
   /** Valor actual (variant "chip") o null si es un trigger de creación. */
   valor?: T | null;
   onSelect: (value: T) => void;
   /** "chip": muestra el valor actual y permite cambiarlo (para editar).
-   *  "crear": botón con label fijo, para elegir tipo al crear un registro. */
-  variant?: "chip" | "crear";
+   *  "crear": botón con label fijo, para elegir tipo al crear un registro.
+   *  "crear-compacto": botón "+" icon-only (mismo look que el "+" de
+   *  Flora/Procesos), para elegir tipo al crear un registro sin ocupar
+   *  espacio con texto. */
+  variant?: "chip" | "crear" | "crear-compacto";
   /** Contenido del botón cuando variant="crear", ej. "+ Nuevo órgano". */
   triggerLabel?: React.ReactNode;
   disabled?: boolean;
+  /** Tooltip del botón cuando variant="crear-compacto". */
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -102,6 +108,17 @@ export function SelectorTipo<T extends string>({
         >
           {triggerLabel}
           <ChevronDown size={12} className={`transition ${open ? "rotate-180" : ""}`} />
+        </button>
+      ) : variant === "crear-compacto" ? (
+        <button
+          ref={triggerRef}
+          type="button"
+          disabled={disabled}
+          title={title}
+          onClick={() => setOpen((o) => !o)}
+          className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <PlusIcon size={16} />
         </button>
       ) : (
         <button
