@@ -14,7 +14,6 @@
  */
 
 import {
-  GripVertical,
   Leaf,
   Plus,
   Trash2,
@@ -91,7 +90,6 @@ export function FloraEditorMejorado({
     crearProceso,
     actualizarProceso,
     eliminarProceso,
-    reordenarProcesos,
   } = usePlantaOrganosProcesos(floraProp.id);
 
   // Ecosistemas donde crece esta planta — vínculo inverso: vive en
@@ -303,15 +301,20 @@ export function FloraEditorMejorado({
                 ) : procesos.length === 0 ? (
                   <p className="text-xs text-primary/40 italic">Sin procesos. Crea uno para empezar.</p>
                 ) : (
-                  <ListaProcesosReordenable
-                    procesos={procesos}
-                    onUpdate={actualizarProceso}
-                    onDelete={eliminarProceso}
-                    onReorder={reordenarProcesos}
-                    compuestos={compuestos}
-                    elementos={elementos}
-                    onAbrirItem={(item) => setItemAbierto({ tipo: item.tipo, id: item.id })}
-                  />
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
+                    {procesos.map((proceso) => (
+                      <div key={proceso.id} className="border-b border-primary/10">
+                        <ProcesoCard
+                          proceso={proceso}
+                          onUpdate={actualizarProceso}
+                          onDelete={() => eliminarProceso(proceso.id)}
+                          compuestos={compuestos}
+                          elementos={elementos}
+                          onAbrirItem={(item) => setItemAbierto({ tipo: item.tipo, id: item.id })}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -461,102 +464,6 @@ function OrganoCard({
   );
 }
 
-// ── Lista de procesos reordenable (drag-and-drop nativo) ───────────────────
-// Mismo mecanismo que el reorder de capítulos en EditorCapitulos.tsx:
-// HTML5 DnD nativo, sin dependencias nuevas. `dragId` es el proceso que se
-// está arrastrando; `overId` el que está debajo del cursor.
-function ListaProcesosReordenable({
-  procesos,
-  onUpdate,
-  onDelete,
-  onReorder,
-  compuestos,
-  elementos,
-  onAbrirItem,
-}: {
-  procesos: PlantaProceso[];
-  onUpdate: (id: string, updates: Partial<PlantaProceso>) => void;
-  onDelete: (id: string) => void;
-  onReorder: (orderedIds: string[]) => void;
-  compuestos: Compuesto[];
-  elementos: Elemento[];
-  onAbrirItem?: (item: ItemProceso) => void;
-}) {
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
-
-  const ordenados = [...procesos].sort((a, b) => a.orden - b.orden);
-
-  function handleDrop(targetId: string) {
-    if (!dragId || dragId === targetId) {
-      setDragId(null);
-      setOverId(null);
-      return;
-    }
-    const fromIdx = ordenados.findIndex((p) => p.id === dragId);
-    const toIdx = ordenados.findIndex((p) => p.id === targetId);
-    if (fromIdx === -1 || toIdx === -1) {
-      setDragId(null);
-      setOverId(null);
-      return;
-    }
-    const reordenados = [...ordenados];
-    const [moved] = reordenados.splice(fromIdx, 1);
-    reordenados.splice(toIdx, 0, moved);
-    onReorder(reordenados.map((p) => p.id));
-    setDragId(null);
-    setOverId(null);
-  }
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
-      {ordenados.map((proceso) => {
-        const arrastrando = dragId === proceso.id;
-        const resaltarSoltar = overId === proceso.id && dragId !== proceso.id;
-        return (
-          <div
-            key={proceso.id}
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (dragId && dragId !== proceso.id) setOverId(proceso.id);
-            }}
-            onDragLeave={() => setOverId((cur) => (cur === proceso.id ? null : cur))}
-            onDrop={(e) => {
-              e.preventDefault();
-              handleDrop(proceso.id);
-            }}
-            className="border-b border-primary/10 transition-opacity"
-            style={{
-              boxShadow: resaltarSoltar ? "inset 0 2px 0 0 var(--primary)" : undefined,
-              opacity: arrastrando ? 0.4 : 1,
-            }}
-          >
-            <ProcesoCard
-              proceso={proceso}
-              onUpdate={onUpdate}
-              onDelete={() => onDelete(proceso.id)}
-              compuestos={compuestos}
-              elementos={elementos}
-              onAbrirItem={onAbrirItem}
-              dragHandleProps={{
-                draggable: true,
-                onDragEnd: () => {
-                  setDragId(null);
-                  setOverId(null);
-                },
-                onDragStart: (e: React.DragEvent) => {
-                  setDragId(proceso.id);
-                  e.dataTransfer.effectAllowed = "move";
-                },
-              }}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Componente auxiliar: Tarjeta de proceso ────────────────────────────────
 interface ProcesoCardProps {
   proceso: PlantaProceso;
@@ -565,11 +472,6 @@ interface ProcesoCardProps {
   compuestos: Compuesto[];
   elementos: Elemento[];
   onAbrirItem?: (item: ItemProceso) => void;
-  dragHandleProps: {
-    draggable: boolean;
-    onDragStart: (e: React.DragEvent) => void;
-    onDragEnd: () => void;
-  };
 }
 
 function ProcesoCard({
@@ -579,27 +481,17 @@ function ProcesoCard({
   compuestos,
   elementos,
   onAbrirItem,
-  dragHandleProps,
 }: ProcesoCardProps) {
   return (
     <div className="group py-3">
-      {/* Header: drag handle + nombre del proceso (texto libre) + eliminar (hover) */}
+      {/* Header: nombre del proceso (texto libre) + eliminar (hover) */}
       <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span
-            {...dragHandleProps}
-            title="Arrastrar para reordenar"
-            className="shrink-0 p-1 -ml-1 rounded cursor-grab active:cursor-grabbing text-primary/20 hover:text-primary/50 transition"
-          >
-            <GripVertical size={13} />
-          </span>
-          <input
-            className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
-            placeholder="Nombre del proceso (ej: Fotosíntesis)…"
-            value={proceso.nombre ?? ""}
-            onChange={(e) => onUpdate(proceso.id, { nombre: e.target.value })}
-          />
-        </div>
+        <input
+          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
+          placeholder="Nombre del proceso (ej: Fotosíntesis)…"
+          value={proceso.nombre ?? ""}
+          onChange={(e) => onUpdate(proceso.id, { nombre: e.target.value })}
+        />
         <button
           onClick={onDelete}
           className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition shrink-0 opacity-0 group-hover:opacity-100"

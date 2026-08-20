@@ -4,16 +4,9 @@
  * usePlantaOrganosProcesos.ts
  * ───────────────────────────────────────────────────────────────────────────
  * Hook para CRUD de planta_organos y planta_procesos. Carga ambas tablas
- * filtradas por planta_id y proporciona métodos para crear, actualizar,
- * eliminar y reordenar registros.
- *
- * Cambios vs versión anterior:
- * - crearOrgano/crearProceso ahora reciben el tipo real elegido por el
- *   usuario (antes el caller siempre pasaba un valor fijo tipo "hoja").
- * - Nuevo reordenarProcesos: recibe la lista de ids en el nuevo orden y
- *   persiste el campo `orden` de cada proceso — mismo patrón que
- *   onReorderCaps en EditorCapitulos.tsx (update optimista + persistencia
- *   individual por fila).
+ * filtradas por planta_id y proporciona métodos para crear, actualizar y
+ * eliminar registros. Sin reorden: los procesos se muestran en grid de 2
+ * columnas, ordenados por fecha de creación (sin drag-and-drop).
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -44,7 +37,7 @@ export function usePlantaOrganosProcesos(plantaId: string) {
       .from("planta_procesos")
       .select("*")
       .eq("planta_id", plantaId)
-      .order("orden", { ascending: true });
+      .order("created_at", { ascending: true });
 
     if (!procesoError && procesoData) {
       setProcesos(procesoData as PlantaProceso[]);
@@ -93,15 +86,12 @@ export function usePlantaOrganosProcesos(plantaId: string) {
   // ── CRUD de procesos ───────────────────────────────────────────────────
   const crearProceso = useCallback(
     async (nombre: string = "") => {
-      const maxOrden = procesos.length > 0 ? Math.max(...procesos.map((p) => p.orden)) : -1;
-
       const { data, error } = await supabase
         .from("planta_procesos")
         .insert([
           {
             planta_id: plantaId,
             nombre,
-            orden: maxOrden + 1,
             consume: null,
             produce: null,
             descripcion: null,
@@ -111,10 +101,10 @@ export function usePlantaOrganosProcesos(plantaId: string) {
         .single();
 
       if (error || !data) return null;
-      setProcesos((prev) => [...prev, data as PlantaProceso].sort((a, b) => a.orden - b.orden));
+      setProcesos((prev) => [...prev, data as PlantaProceso]);
       return data as PlantaProceso;
     },
-    [plantaId, procesos],
+    [plantaId],
   );
 
   const actualizarProceso = useCallback(
@@ -133,34 +123,6 @@ export function usePlantaOrganosProcesos(plantaId: string) {
     await supabase.from("planta_procesos").delete().eq("id", id);
   }, []);
 
-  /**
-   * Reordena procesos: recibe la lista de ids en el nuevo orden deseado y
-   * persiste `orden` = índice en esa lista para cada fila. Update optimista
-   * primero (UI responde al instante), luego persistencia fila por fila —
-   * mismo espíritu que onReorderCaps en EditorCapitulos.tsx.
-   */
-  const reordenarProcesos = useCallback(
-    async (orderedIds: string[]) => {
-      setProcesos((prev) => {
-        const porId = new Map(prev.map((p) => [p.id, p]));
-        const reordenados = orderedIds
-          .map((id, idx) => {
-            const p = porId.get(id);
-            return p ? { ...p, orden: idx } : null;
-          })
-          .filter((p): p is PlantaProceso => p !== null);
-        return reordenados;
-      });
-
-      await Promise.all(
-        orderedIds.map((id, idx) =>
-          supabase.from("planta_procesos").update({ orden: idx }).eq("id", id),
-        ),
-      );
-    },
-    [],
-  );
-
   return {
     organos,
     procesos,
@@ -173,7 +135,6 @@ export function usePlantaOrganosProcesos(plantaId: string) {
     crearProceso,
     actualizarProceso,
     eliminarProceso,
-    reordenarProcesos,
     // Reload
     load,
   };
