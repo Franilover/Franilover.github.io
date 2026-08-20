@@ -277,17 +277,18 @@ export function FloraEditorMejorado({
                 ) : organos.length === 0 ? (
                   <p className="text-xs text-primary/40 italic">Sin órganos. Crea uno para empezar.</p>
                 ) : (
-                  <div className="divide-y divide-primary/10">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
                     {organos.map((organo) => (
-                      <OrganoCard
-                        key={organo.id}
-                        organo={organo}
-                        onUpdate={actualizarOrgano}
-                        onDelete={() => eliminarOrgano(organo.id)}
-                        compuestos={compuestos}
-                        elementos={elementos}
-                        onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
-                      />
+                      <div key={organo.id} className="border-b border-primary/10">
+                        <OrganoCard
+                          organo={organo}
+                          onUpdate={actualizarOrgano}
+                          onDelete={() => eliminarOrgano(organo.id)}
+                          compuestos={compuestos}
+                          elementos={elementos}
+                          onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
@@ -407,7 +408,7 @@ function OrganoCard({
   }
 
   return (
-    <div className="group py-3 first:pt-0">
+    <div className="group py-3">
       {/* Header: nombre del órgano (texto libre) + agregar compuesto + eliminar (hover) */}
       <div className="flex items-center justify-between mb-2 gap-2">
         <input
@@ -436,7 +437,7 @@ function OrganoCard({
       </div>
 
       {/* Contenido: grid de 2 columnas cuando hay ancho, sin cajas anidadas */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
         <div>
           <SelectorFormulaOrgano
             compuestos={compuestos}
@@ -508,7 +509,7 @@ function ListaProcesosReordenable({
   }
 
   return (
-    <div className="divide-y divide-primary/10">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
       {ordenados.map((proceso) => {
         const arrastrando = dragId === proceso.id;
         const resaltarSoltar = overId === proceso.id && dragId !== proceso.id;
@@ -524,7 +525,7 @@ function ListaProcesosReordenable({
               e.preventDefault();
               handleDrop(proceso.id);
             }}
-            className="transition-opacity"
+            className="border-b border-primary/10 transition-opacity"
             style={{
               boxShadow: resaltarSoltar ? "inset 0 2px 0 0 var(--primary)" : undefined,
               opacity: arrastrando ? 0.4 : 1,
@@ -609,7 +610,7 @@ function ProcesoCard({
 
       {/* Contenido: columna izquierda = Consume (arriba) + Produce (abajo),
           columna derecha = Descripción. Sin cajas anidadas. */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-3 text-xs items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-3 text-xs items-start">
         <div className="space-y-3">
           <SelectorConsumeProduce
             label="Consume"

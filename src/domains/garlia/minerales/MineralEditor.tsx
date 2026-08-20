@@ -276,15 +276,16 @@ export function MineralEditor({
                       Sin formaciones. Crea una para empezar.
                     </p>
                   ) : (
-                    <div className="divide-y divide-primary/10">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
                       {formaciones.map((formacion) => (
-                        <FormacionCard
-                          key={formacion.id}
-                          formacion={formacion}
-                          onUpdate={actualizarFormacion}
-                          onDelete={() => eliminarFormacion(formacion.id)}
-                          compuestos={compuestos}
-                        />
+                        <div key={formacion.id} className="border-b border-primary/10">
+                          <FormacionCard
+                            formacion={formacion}
+                            onUpdate={actualizarFormacion}
+                            onDelete={() => eliminarFormacion(formacion.id)}
+                            compuestos={compuestos}
+                          />
+                        </div>
                       ))}
                     </div>
                   )}
@@ -309,16 +310,17 @@ export function MineralEditor({
                       Sin procesos. Crea uno para empezar.
                     </p>
                   ) : (
-                    <div className="divide-y divide-primary/10">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
                       {procesos.map((proceso) => (
-                        <ProcesoMineralCard
-                          key={proceso.id}
-                          proceso={proceso}
-                          onUpdate={actualizarProceso}
-                          onDelete={() => eliminarProceso(proceso.id)}
-                          compuestos={compuestos}
-                          elementos={elementos}
-                        />
+                        <div key={proceso.id} className="border-b border-primary/10">
+                          <ProcesoMineralCard
+                            proceso={proceso}
+                            onUpdate={actualizarProceso}
+                            onDelete={() => eliminarProceso(proceso.id)}
+                            compuestos={compuestos}
+                            elementos={elementos}
+                          />
+                        </div>
                       ))}
                     </div>
                   )}
@@ -373,7 +375,7 @@ function FormacionCard({
   compuestos: Compuesto[];
 }) {
   return (
-    <div className="group py-3 first:pt-0">
+    <div className="group py-3">
       {/* Header: nombre de la formación (texto libre) + eliminar (hover) */}
       <div className="flex items-center justify-between mb-2 gap-2">
         <input
@@ -391,7 +393,7 @@ function FormacionCard({
       </div>
 
       {/* Contenido: grid de 2 columnas cuando hay ancho, sin cajas anidadas */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
         <div>
           <SelectorFormulaOrgano
             compuestos={compuestos}
@@ -428,7 +430,7 @@ function ProcesoMineralCard({
   elementos: Elemento[];
 }) {
   return (
-    <div className="group py-3 first:pt-0">
+    <div className="group py-3">
       {/* Header: nombre del proceso (texto libre) + eliminar (hover) */}
       <div className="flex items-center justify-between mb-2 gap-2">
         <input
@@ -447,7 +449,7 @@ function ProcesoMineralCard({
 
       {/* Contenido: columna izquierda = Consume (arriba) + Produce (abajo),
           columna derecha = Descripción. Sin cajas anidadas. */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-3 text-xs items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-3 text-xs items-start">
         <div className="space-y-3">
           <SelectorConsumeProduce
             label="Consume"
