@@ -246,52 +246,57 @@ function BloqueEcosistemaFloraMinerales({
   onOpenMineral: (id: string) => void;
 }) {
   return (
-    <div className="mb-6 break-inside-avoid">
-      {ecosistema.id === "__sin_ecosistema__" ? (
-        <div className="flex items-center gap-1.5 mb-2 px-1">
-          <Sprout size={11} className="text-primary/25 shrink-0" />
-          <h3 className="text-micro font-black uppercase tracking-[0.2em] text-primary/35">
+    <div className="mb-6 w-full rounded-lg border border-primary/10 overflow-hidden break-inside-avoid">
+      <div className="px-3 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <span className="text-micro text-primary/25 tabular-nums">
+          {flora.length + minerales.length}
+        </span>
+        {ecosistema.id === "__sin_ecosistema__" ? (
+          <h3
+            title={ecosistema.nombre}
+            className="min-w-0 truncate flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em] text-primary/50 justify-self-center max-w-full"
+          >
+            <Sprout size={11} className="text-primary/25 shrink-0" />
             {ecosistema.nombre}
           </h3>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onOpenEcosistema(ecosistema.id)}
-          className="flex items-center gap-1.5 mb-2 px-1 group"
-        >
-          <Sprout size={11} className="text-primary/35 shrink-0" />
-          <h3 className="text-micro font-black uppercase tracking-[0.2em] text-primary/50 group-hover:text-primary transition-colors">
+        ) : (
+          <button
+            type="button"
+            onClick={() => onOpenEcosistema(ecosistema.id)}
+            title={ecosistema.nombre}
+            className="min-w-0 truncate flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em] text-primary/70 hover:text-accent transition-colors justify-self-center max-w-full"
+          >
+            <Sprout size={11} className="text-primary/35 shrink-0" />
             {ecosistema.nombre}
-          </h3>
-        </button>
-      )}
+          </button>
+        )}
+        <span />
+      </div>
 
       {flora.length === 0 && minerales.length === 0 ? (
-        <p className="text-micro text-primary/25 italic px-1">Sin flora ni minerales</p>
+        <p className="px-3 pb-3 text-micro text-primary/25 italic">Sin flora ni minerales</p>
       ) : (
-        <div className="flex flex-wrap gap-1.5 px-1">
+        <div
+          className="px-3 pb-3 grid gap-1"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(52px, 1fr))" }}
+        >
           {flora.map((f) => (
-            <button
+            <EntityCard
               key={f.id}
-              type="button"
+              nombre={f.nombre}
+              imageUrl={f.imagen_url}
+              Icon={LeafIcon}
               onClick={() => onOpenFlora(f.id)}
-              className="flex items-center gap-1 px-2 py-1 rounded-full border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-micro font-semibold text-primary/70"
-            >
-              <LeafIcon size={9} className="text-primary/30 shrink-0" />
-              {f.nombre}
-            </button>
+            />
           ))}
           {minerales.map((m) => (
-            <button
+            <EntityCard
               key={m.id}
-              type="button"
+              nombre={m.nombre}
+              imageUrl={m.imagen_url}
+              Icon={GemIcon}
               onClick={() => onOpenMineral(m.id)}
-              className="flex items-center gap-1 px-2 py-1 rounded-full border border-primary/10 bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/20 transition-colors text-micro font-semibold text-primary/70"
-            >
-              <GemIcon size={9} className="text-primary/30 shrink-0" />
-              {m.nombre}
-            </button>
+            />
           ))}
         </div>
       )}
@@ -591,32 +596,58 @@ export function ItemsJerarquia({
       ) : (
         <>
           {flora && flora.length > 0 && (
-            <EntityCardGrid
-              title="Flora"
-              variant="grid"
-              loading={loadingFlora}
-              items={flora.map((f) => ({
-                id: f.id,
-                nombre: f.nombre,
-                imageUrl: f.imagen_url || undefined,
-              }))}
-              onItemClick={(id) => abrirPanel("flora", id)}
-              section="flora"
-            />
+            <div className="mb-6 w-full rounded-lg border border-primary/10 overflow-hidden">
+              <div className="px-3 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <span className="text-micro text-primary/25 tabular-nums">{flora.length}</span>
+                <h2 className="min-w-0 truncate text-micro font-black uppercase tracking-[0.2em] text-primary/70 text-center justify-self-center max-w-full">
+                  Flora
+                </h2>
+                <span />
+              </div>
+              <div className="px-3 pb-3">
+                <EntityCardGrid
+                  title="Flora"
+                  variant="grid"
+                  loading={loadingFlora}
+                  minCardWidth={52}
+                  hideHeader
+                  items={flora.map((f) => ({
+                    id: f.id,
+                    nombre: f.nombre,
+                    imageUrl: f.imagen_url || undefined,
+                  }))}
+                  onItemClick={(id) => abrirPanel("flora", id)}
+                  section="flora"
+                />
+              </div>
+            </div>
           )}
           {minerales && minerales.length > 0 && (
-            <EntityCardGrid
-              title="Minerales"
-              variant="grid"
-              loading={loadingMinerales}
-              items={minerales.map((m) => ({
-                id: m.id,
-                nombre: m.nombre,
-                imageUrl: m.imagen_url || undefined,
-              }))}
-              onItemClick={(id) => abrirPanel("mineral", id)}
-              section="minerales"
-            />
+            <div className="mb-6 w-full rounded-lg border border-primary/10 overflow-hidden">
+              <div className="px-3 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <span className="text-micro text-primary/25 tabular-nums">{minerales.length}</span>
+                <h2 className="min-w-0 truncate text-micro font-black uppercase tracking-[0.2em] text-primary/70 text-center justify-self-center max-w-full">
+                  Minerales
+                </h2>
+                <span />
+              </div>
+              <div className="px-3 pb-3">
+                <EntityCardGrid
+                  title="Minerales"
+                  variant="grid"
+                  loading={loadingMinerales}
+                  minCardWidth={52}
+                  hideHeader
+                  items={minerales.map((m) => ({
+                    id: m.id,
+                    nombre: m.nombre,
+                    imageUrl: m.imagen_url || undefined,
+                  }))}
+                  onItemClick={(id) => abrirPanel("mineral", id)}
+                  section="minerales"
+                />
+              </div>
+            </div>
           )}
         </>
       )}
