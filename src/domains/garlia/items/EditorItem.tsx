@@ -38,12 +38,6 @@ import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
-import { type Compuesto } from "@/domains/garlia/elementos/types";
-import {
-  SelectorComposicionMultiple,
-  type ComposicionEntrada,
-} from "@/domains/garlia/_shared/SelectorComposicionMultiple";
-import { SugerenciaReglasDndPanel } from "@/domains/garlia/_shared/SugerenciaReglasDndPanel";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 
@@ -91,7 +85,7 @@ export function EditorItem({
   const { criaturas: allCriaturas, loading: loadingCriaturas } = useCriaturasCatalogo();
   // Catálogo de elementos/compuestos — mismo patrón que Flora/Mineral
   const { items: elementos } = useElementos();
-  const { items: compuestos, setItems: setCompuestos, loading: loadingCompuestos } = useCompuestos();
+  const { items: compuestos, setItems: setCompuestos } = useCompuestos();
 
   // Catálogo compartido de Grupos de Compuestos — Estructura y Habilidades
   // de items son ambos GrupoCompuesto filtrados por tipo (mismo motor que
@@ -129,10 +123,6 @@ export function EditorItem({
     setForm(item);
     setStatus("idle");
   }, [item.id]);
-
-  function onCompuestoCreado(nuevo: Compuesto) {
-    setCompuestos((prev) => [...prev, nuevo]);
-  }
 
   const field =
     (k: keyof Item) =>
@@ -299,42 +289,6 @@ export function EditorItem({
                     : undefined
                 }
               />
-
-              {/* Composición material — puede tener varias partes hechas de
-                  compuestos distintos (ej: "Madera" en el mango, "Acero" en
-                  la hoja), cada una con su propia etiqueta */}
-              <div className="pt-2 border-t border-primary/10">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-                    Composición (Compuestos)
-                  </span>
-                </div>
-                <p className="text-micro text-primary/30 mb-1.5 -mt-1">
-                  Compuestos de la Tabla Química que forman este ítem, por parte
-                  (mango, hoja, empuñadura…).
-                </p>
-
-                <SelectorComposicionMultiple
-                  composicion={form.composicion ?? []}
-                  onChange={(composicion) =>
-                    setForm((f: Item) => ({ ...f, composicion }))
-                  }
-                  compuestos={compuestos}
-                  elementos={elementos}
-                  loadingCompuestos={loadingCompuestos}
-                  onCompuestoCreado={onCompuestoCreado}
-                  onEditarCompuesto={setEditandoCompuestoId}
-                />
-
-                <SugerenciaReglasDndPanel
-                  composicion={form.composicion ?? []}
-                  compuestos={compuestos}
-                  elementos={elementos}
-                  yaEsArma={!!form.es_arma}
-                  yaEsArmadura={!!form.es_armadura}
-                  onAplicar={(cambios) => setForm((f: Item) => ({ ...f, ...cambios }))}
-                />
-              </div>
 
               {/* Estructura — partes del ítem (mango, hoja, empuñadura…),
                   cada una con su propia fórmula de compuestos. Mismo motor
