@@ -209,10 +209,12 @@ export function ElementoEditor({
           </div>
 
           {/* Columna de selectores: N° atómico, Familia, Noble, Catalizador
-              — cada fila con el label a la izquierda y su control a la
-              derecha, en vez de label arriba/control abajo. */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
+              — cada fila con borde sutil propio (mismo estilo que las
+              columnas de capa atómica y las filas de Elementos que lo
+              componen en Compuestos), label a la izquierda y control a
+              la derecha, sin bordes individuales en los controles. */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
               <label
                 className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
                 title="El Número Atómico es solo la posición de orden en la Tabla Periódica (1 a 62) — no es la suma de partículas del elemento."
@@ -226,11 +228,11 @@ export function ElementoEditor({
                   setLocal((p) => ({ ...p, numero_atomico: Number(e.target.value) }))
                 }
                 onBlur={() => persist({ numero_atomico: local.numero_atomico })}
-                className="w-16 shrink-0 bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="w-16 shrink-0 bg-transparent rounded-md px-1 py-1 text-micro font-bold text-primary outline-none text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
 
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
               <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
                 Familia
               </label>
@@ -241,7 +243,7 @@ export function ElementoEditor({
                   setLocal((p) => ({ ...p, familia }));
                   persist({ familia });
                 }}
-                className="w-28 shrink-0 bg-primary/5 rounded-md px-2 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+                className="w-28 shrink-0 bg-transparent rounded-md px-1 py-1 text-micro font-bold text-primary outline-none text-right"
               >
                 {ELEMENT_FAMILIES.map((f) => (
                   <option key={f} value={f}>
@@ -251,7 +253,7 @@ export function ElementoEditor({
               </select>
             </div>
 
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
               <label
                 className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
                 title="Estado Noble (sección 3.2): capa externa 100% saturada. No puede iniciar ni aceptar enlaces nuevos, sin importar el balance de Voluntad/Percepción."
@@ -271,10 +273,10 @@ export function ElementoEditor({
                     setLocal((p) => ({ ...p, es_noble }));
                     persist({ es_noble });
                   }}
-                  className={`w-16 rounded-md px-2 py-1 text-micro font-bold outline-none border transition-all cursor-pointer truncate ${
+                  className={`w-16 rounded-md px-2 py-1 text-micro font-bold outline-none transition-all cursor-pointer truncate ${
                     local.es_noble
-                      ? "bg-primary text-btn-text border-primary"
-                      : "bg-primary/5 text-primary/50 border-primary/10 hover:border-primary/30"
+                      ? "bg-primary text-btn-text"
+                      : "text-primary/50 hover:text-primary"
                   }`}
                 >
                   {local.es_noble ? "Sí" : "No"}
@@ -287,7 +289,7 @@ export function ElementoEditor({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
               <label
                 title="Reduce el déficit/energía de activación de un compuesto sin sumar sus partículas a las capas y sin consumirse — igual que un catalizador real."
                 className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
@@ -301,10 +303,10 @@ export function ElementoEditor({
                   setLocal((p) => ({ ...p, es_catalizador }));
                   persist({ es_catalizador });
                 }}
-                className={`w-16 shrink-0 rounded-md px-2 py-1 text-micro font-bold outline-none border transition-all cursor-pointer truncate ${
+                className={`w-16 shrink-0 rounded-md px-2 py-1 text-micro font-bold outline-none transition-all cursor-pointer truncate ${
                   local.es_catalizador
-                    ? "bg-primary text-btn-text border-primary"
-                    : "bg-primary/5 text-primary/50 border-primary/10 hover:border-primary/30"
+                    ? "bg-primary text-btn-text"
+                    : "text-primary/50 hover:text-primary"
                 }`}
               >
                 {local.es_catalizador ? "Sí" : "No"}
