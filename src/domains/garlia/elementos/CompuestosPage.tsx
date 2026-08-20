@@ -695,10 +695,33 @@ function CompuestoEditor({
           </div>
         )}
 
-        {/* Tres columnas: Elementos que lo componen (izquierda) · análisis
-            del compuesto — reactividad/peso, molécula (centro) · Notas con
-            RichEditor (derecha). */}
+        {/* Tres columnas, orden invertido 3-1-2: Notas con RichEditor
+            (izquierda) · Elementos que lo componen (centro) · análisis
+            del compuesto — reactividad/peso, molécula (derecha). */}
         <div className="grid grid-cols-3 gap-3 items-start">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <SelectorTagsCompuesto
+              compuestoId={compuesto.id}
+              porCategoria={tagsPorCategoria}
+              tagIdsAsignados={tagIdsAsignados}
+              onToggle={(tagId) => toggleTag(compuesto.id, tagId)}
+              loading={tagsLoading || compuestoTagsLoading}
+            />
+
+            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30 mt-2">
+              Notas
+            </label>
+            <RichEditor
+              minHeight="16rem"
+              placeholder="Descripción del compuesto…"
+              value={local.notas ?? ""}
+              onChange={(v) => {
+                setLocal((p) => ({ ...p, notas: v }));
+                persist({ notas: v });
+              }}
+            />
+          </div>
+
           <div className="flex flex-col gap-1.5 min-w-0">
             <div className="flex items-center justify-between">
               <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/25">
@@ -740,29 +763,6 @@ function CompuestoEditor({
               </p>
               <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
             </div>
-          </div>
-
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <SelectorTagsCompuesto
-              compuestoId={compuesto.id}
-              porCategoria={tagsPorCategoria}
-              tagIdsAsignados={tagIdsAsignados}
-              onToggle={(tagId) => toggleTag(compuesto.id, tagId)}
-              loading={tagsLoading || compuestoTagsLoading}
-            />
-
-            <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30 mt-2">
-              Notas
-            </label>
-            <RichEditor
-              minHeight="16rem"
-              placeholder="Descripción del compuesto…"
-              value={local.notas ?? ""}
-              onChange={(v) => {
-                setLocal((p) => ({ ...p, notas: v }));
-                persist({ notas: v });
-              }}
-            />
           </div>
         </div>
       </div>
