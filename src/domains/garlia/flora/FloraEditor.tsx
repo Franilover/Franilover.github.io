@@ -14,7 +14,6 @@
  */
 
 import {
-  Beaker,
   Droplet,
   Flower2,
   GripVertical,
@@ -23,7 +22,6 @@ import {
   Sprout,
   TreeDeciduous,
   Trash2,
-  Wind,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
@@ -62,15 +60,6 @@ const TIPOS_ORGANO: OpcionTipo<PlantaOrgano["tipo_organo"]>[] = [
   { value: "semilla", label: "Semilla", icon: Sprout },
   { value: "corteza", label: "Corteza", icon: TreeDeciduous },
   { value: "otro", label: "Otro", icon: Leaf },
-];
-
-const TIPOS_PROCESO: OpcionTipo<PlantaProceso["tipo_proceso"]>[] = [
-  { value: "germinacion", label: "Germinación", icon: Sprout },
-  { value: "fotosintesis", label: "Fotosíntesis", icon: Wind },
-  { value: "floracion", label: "Floración", icon: Flower2 },
-  { value: "fructificacion", label: "Fructificación", icon: Droplet },
-  { value: "marchitamiento", label: "Marchitamiento", icon: Leaf },
-  { value: "otro", label: "Otro", icon: Beaker },
 ];
 
 export function FloraEditorMejorado({
@@ -274,16 +263,12 @@ export function FloraEditorMejorado({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-primary/50">PROCESOS DEL CICLO</span>
-                  <SelectorTipo
-                    variant="crear"
-                    triggerLabel={
-                      <span className="flex items-center gap-1.5">
-                        <Plus size={14} /> Nuevo proceso
-                      </span>
-                    }
-                    opciones={TIPOS_PROCESO}
-                    onSelect={(tipo) => void crearProceso(tipo)}
-                  />
+                  <button
+                    onClick={() => void crearProceso()}
+                    className="flex items-center gap-1.5 text-xs font-medium text-primary/60 hover:text-primary transition px-2 py-1 rounded hover:bg-primary/5"
+                  >
+                    <Plus size={14} /> Nuevo proceso
+                  </button>
                 </div>
 
                 {loadingOrganosProcesos ? (
@@ -507,9 +492,9 @@ function ProcesoCard({
 }: ProcesoCardProps) {
   return (
     <div className="group py-3">
-      {/* Header: drag handle + selector de tipo real + eliminar (hover) */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5 min-w-0">
+      {/* Header: drag handle + nombre del proceso (texto libre) + eliminar (hover) */}
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span
             {...dragHandleProps}
             title="Arrastrar para reordenar"
@@ -517,11 +502,11 @@ function ProcesoCard({
           >
             <GripVertical size={13} />
           </span>
-          <SelectorTipo
-            variant="chip"
-            valor={proceso.tipo_proceso}
-            opciones={TIPOS_PROCESO}
-            onSelect={(tipo) => onUpdate(proceso.id, { tipo_proceso: tipo })}
+          <input
+            className="min-w-0 flex-1 bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
+            placeholder="Nombre del proceso (ej: Fotosíntesis)…"
+            value={proceso.nombre_proceso ?? ""}
+            onChange={(e) => onUpdate(proceso.id, { nombre_proceso: e.target.value })}
           />
         </div>
         <button
@@ -532,10 +517,10 @@ function ProcesoCard({
         </button>
       </div>
 
-      {/* Contenido: consume/produce lado a lado, condiciones + descripción
-          también en columnas cuando el ancho lo permite. Sin cajas anidadas. */}
-      <div className="space-y-3 text-xs">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5 gap-y-3">
+      {/* Contenido: columna izquierda = Consume (arriba) + Produce (abajo),
+          columna derecha = Descripción. Sin cajas anidadas. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-3 text-xs items-start">
+        <div className="space-y-3">
           <SelectorConsumeProduce
             label="Consume"
             items={(proceso.consume ?? []) as ItemProceso[]}
@@ -552,31 +537,17 @@ function ProcesoCard({
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-2 items-start">
-          <div>
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1">
-              Condiciones
-            </span>
-            <input
-              className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 outline-none transition-colors placeholder:text-primary/25"
-              placeholder='Ej: "luz solar directa", "solo en primavera"…'
-              value={proceso.condiciones ?? ""}
-              onChange={(e) => onUpdate(proceso.id, { condiciones: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1">
-              Descripción
-            </span>
-            <textarea
-              className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-              placeholder="Descripción del proceso…"
-              value={proceso.descripcion ?? ""}
-              onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
-              rows={2}
-            />
-          </div>
+        <div>
+          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1">
+            Descripción
+          </span>
+          <textarea
+            className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+            placeholder="Descripción del proceso (incluye condiciones ambientales, cuándo ocurre, etc)…"
+            value={proceso.descripcion ?? ""}
+            onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
+            rows={5}
+          />
         </div>
       </div>
     </div>

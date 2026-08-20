@@ -40,20 +40,14 @@ export interface PlantaOrgano {
 export interface PlantaProceso {
   id: string;
   planta_id: string;
-  tipo_proceso:
-    | "fotosintesis"
-    | "floracion"
-    | "fructificacion"
-    | "germinacion"
-    | "marchitamiento"
-    | "otro";
+  /** Nombre del proceso (texto libre: "fotosíntesis", "floración", etc) */
+  nombre_proceso: string;
   orden: number; // Secuencia en el ciclo de vida
   /** Qué consume: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
   consume: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
   /** Qué produce: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
   produce: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
-  /** Condiciones ambientales (texto libre: "luz solar directa", "solo en primavera", etc) */
-  condiciones: string | null;
+  /** Descripción libre del proceso (incluye condiciones ambientales, etc) */
   descripcion: string | null;
   created_at: string;
   updated_at: string;
@@ -71,5 +65,5 @@ export type PlantaOrganoInput = Partial<
 >;
 
 export type PlantaProcesoInput = Partial<
-  Pick<PlantaProceso, "tipo_proceso" | "orden" | "consume" | "produce" | "condiciones" | "descripcion">
+  Pick<PlantaProceso, "nombre_proceso" | "orden" | "consume" | "produce" | "descripcion">
 >;

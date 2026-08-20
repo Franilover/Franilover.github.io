@@ -92,7 +92,7 @@ export function usePlantaOrganosProcesos(plantaId: string) {
 
   // ── CRUD de procesos ───────────────────────────────────────────────────
   const crearProceso = useCallback(
-    async (tipoProceso: PlantaProceso["tipo_proceso"]) => {
+    async (nombreProceso: string = "") => {
       const maxOrden = procesos.length > 0 ? Math.max(...procesos.map((p) => p.orden)) : -1;
 
       const { data, error } = await supabase
@@ -100,11 +100,10 @@ export function usePlantaOrganosProcesos(plantaId: string) {
         .insert([
           {
             planta_id: plantaId,
-            tipo_proceso: tipoProceso,
+            nombre_proceso: nombreProceso,
             orden: maxOrden + 1,
             consume: null,
             produce: null,
-            condiciones: null,
             descripcion: null,
           },
         ])
