@@ -22,7 +22,7 @@
  * Flora tal cual (son genéricos, sin nada específico de planta).
  */
 
-import { Droplet, Flame, Gem, Layers, Mountain, Plus, Snowflake, Sparkle, Trash2, Waves } from "lucide-react";
+import { Droplet, Flame, Gem, Layers, Mountain, Snowflake, Sparkle, Trash2, Waves } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -173,37 +173,51 @@ export function MineralEditor({
             {/* Columna derecha: tabs */}
             <div className="flex-1 min-w-0">
               {/* ── TABS ──────────────────────────────────────────────────── */}
-              <div className="flex gap-2 mb-4 border-b border-primary/10">
-                <button
-                  onClick={() => setTabActiva("info")}
-                  className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
-                    tabActiva === "info"
-                      ? "text-primary border-b-2 border-primary"
-                      : "text-primary/50 hover:text-primary/70"
-                  }`}
-                >
-                  Info
-                </button>
-                <button
-                  onClick={() => setTabActiva("formaciones")}
-                  className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
-                    tabActiva === "formaciones"
-                      ? "text-primary border-b-2 border-primary"
-                      : "text-primary/50 hover:text-primary/70"
-                  }`}
-                >
-                  Formaciones ({formaciones.length})
-                </button>
-                <button
-                  onClick={() => setTabActiva("procesos")}
-                  className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
-                    tabActiva === "procesos"
-                      ? "text-primary border-b-2 border-primary"
-                      : "text-primary/50 hover:text-primary/70"
-                  }`}
-                >
-                  Procesos ({procesos.length})
-                </button>
+              <div className="flex items-center justify-between gap-2 mb-4 border-b border-primary/10">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTabActiva("info")}
+                    className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
+                      tabActiva === "info"
+                        ? "text-primary border-b-2 border-primary"
+                        : "text-primary/50 hover:text-primary/70"
+                    }`}
+                  >
+                    Info
+                  </button>
+                  <button
+                    onClick={() => setTabActiva("formaciones")}
+                    className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
+                      tabActiva === "formaciones"
+                        ? "text-primary border-b-2 border-primary"
+                        : "text-primary/50 hover:text-primary/70"
+                    }`}
+                  >
+                    Formaciones ({formaciones.length})
+                  </button>
+                  <button
+                    onClick={() => setTabActiva("procesos")}
+                    className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
+                      tabActiva === "procesos"
+                        ? "text-primary border-b-2 border-primary"
+                        : "text-primary/50 hover:text-primary/70"
+                    }`}
+                  >
+                    Procesos ({procesos.length})
+                  </button>
+                </div>
+                {tabActiva !== "info" && (
+                  <SelectorTipo
+                    variant="crear-compacto"
+                    title={tabActiva === "formaciones" ? "Nueva formación" : "Nuevo proceso"}
+                    opciones={tabActiva === "formaciones" ? TIPOS_FORMACION : TIPOS_PROCESO_MINERAL}
+                    onSelect={(tipo) =>
+                      void (tabActiva === "formaciones"
+                        ? crearFormacion(tipo as MineralFormacion["tipo_formacion"])
+                        : crearProceso(tipo as MineralProceso["tipo_proceso"]))
+                    }
+                  />
+                )}
               </div>
 
               {/* ── TAB: Info ─────────────────────────────────────────────── */}
@@ -250,20 +264,6 @@ export function MineralEditor({
               {/* ── TAB: Formaciones ──────────────────────────────────────── */}
               {tabActiva === "formaciones" && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-primary/50">FORMACIONES</span>
-                    <SelectorTipo
-                      variant="crear"
-                      triggerLabel={
-                        <span className="flex items-center gap-1.5">
-                          <Plus size={14} /> Nueva formación
-                        </span>
-                      }
-                      opciones={TIPOS_FORMACION}
-                      onSelect={(tipo) => void crearFormacion(tipo)}
-                    />
-                  </div>
-
                   {loadingFormacionesProcesos ? (
                     <p className="text-xs text-primary/40">Cargando formaciones…</p>
                   ) : formaciones.length === 0 ? (
@@ -298,20 +298,6 @@ export function MineralEditor({
               {/* ── TAB: Procesos ────────────────────────────────────────── */}
               {tabActiva === "procesos" && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-primary/50">PROCESOS GEOLÓGICOS</span>
-                    <SelectorTipo
-                      variant="crear"
-                      triggerLabel={
-                        <span className="flex items-center gap-1.5">
-                          <Plus size={14} /> Nuevo proceso
-                        </span>
-                      }
-                      opciones={TIPOS_PROCESO_MINERAL}
-                      onSelect={(tipo) => void crearProceso(tipo)}
-                    />
-                  </div>
-
                   {loadingFormacionesProcesos ? (
                     <p className="text-xs text-primary/40">Cargando procesos…</p>
                   ) : procesos.length === 0 ? (
@@ -411,9 +397,6 @@ function FormacionCard({
       {/* Contenido: grid de 2 columnas cuando hay ancho, sin cajas anidadas */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
         <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1.5">
-            Fórmula química
-          </span>
           <SelectorFormulaOrgano
             compuestos={compuestos}
             componentes={(formacion.componentes ?? []) as ComponenteOrgano[]}
@@ -422,11 +405,8 @@ function FormacionCard({
         </div>
 
         <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1.5">
-            Notas
-          </span>
           <textarea
-            className="w-full h-full min-h-[3.5rem] bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+            className="w-full h-full min-h-[3.5rem] bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
             placeholder="Notas de la formación…"
             value={formacion.notas ?? ""}
             onChange={(e) => onUpdate(formacion.id, { notas: e.target.value })}
@@ -508,23 +488,17 @@ function ProcesoMineralCard({
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-2 items-start">
           <div>
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1">
-              Condiciones
-            </span>
             <input
-              className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 outline-none transition-colors placeholder:text-primary/25"
-              placeholder='Ej: "alta presión", "calor volcánico", "millones de años"…'
+              className="w-full bg-transparent px-0 py-1 text-primary/70 outline-none transition-colors placeholder:text-primary/25"
+              placeholder='Condiciones: "alta presión", "calor volcánico", "millones de años"…'
               value={proceso.condiciones ?? ""}
               onChange={(e) => onUpdate(proceso.id, { condiciones: e.target.value })}
             />
           </div>
 
           <div>
-            <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1">
-              Descripción
-            </span>
             <textarea
-              className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+              className="w-full bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
               placeholder="Descripción del proceso…"
               value={proceso.descripcion ?? ""}
               onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
