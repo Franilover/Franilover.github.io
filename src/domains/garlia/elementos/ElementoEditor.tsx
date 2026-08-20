@@ -322,7 +322,7 @@ export function ElementoEditor({
                 <span className="ml-1 text-primary/20">· {compuestosQueLoUsan.length}</span>
               )}
             </label>
-            <div className="min-h-[10rem] max-h-[10rem] overflow-y-auto rounded-md border border-primary/10 bg-primary/[0.02] p-1 flex flex-col gap-0.5">
+            <div className="min-h-[10rem] max-h-[10rem] overflow-y-auto p-1 flex flex-col gap-0.5">
               {compuestos === undefined ? (
                 <p className="text-micro text-primary/25 text-center py-3">
                   No disponible acá.
@@ -395,13 +395,11 @@ export function ElementoEditor({
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-3 rounded-lg border border-primary/10 overflow-hidden">
+            <div className="grid grid-cols-3 overflow-hidden">
               {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
                 <div
                   key={layer}
-                  className={`flex flex-col gap-2 p-2 ${
-                    i > 0 ? "border-l border-primary/10" : ""
-                  } bg-primary/[0.02]`}
+                  className="flex flex-col gap-2 p-2"
                 >
                   <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 text-center">
                     {LAYER_LABEL[layer]}
@@ -412,7 +410,7 @@ export function ElementoEditor({
                       return (
                         <div
                           key={particle}
-                          className="flex items-center justify-between gap-1.5 bg-primary/5 rounded-lg pl-2.5 pr-1 py-1.5 border border-primary/10 focus-within:border-primary/30"
+                          className="flex items-center justify-between gap-1.5 pl-2.5 pr-1 py-1.5"
                         >
                           <span className="text-xs font-bold text-primary/60 truncate">
                             {particle}
@@ -618,7 +616,7 @@ export function AtomoVisual({
 
   return (
     <div
-      className={`relative rounded-lg border border-primary/10 bg-primary/[0.02] flex items-center justify-center p-2 ${
+      className={`relative flex items-center justify-center p-2 ${
         className ?? "shrink-0 aspect-square h-full"
       }`}
       title="Representación del átomo: núcleo + capas orbitales con las partículas propias del mundo"
