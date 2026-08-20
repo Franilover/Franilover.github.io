@@ -369,9 +369,10 @@ function SelectorElementosCompuesto({
         )}
       </div>
 
-      {/* Elementos ya en el compuesto — sin fondo de caja, solo
-          separadores sutiles entre filas. */}
-      <div className="flex flex-col">
+      {/* Elementos ya en el compuesto — cada fila con un borde sutil
+          propio (mismo estilo que las columnas de capa atómica), sin
+          bordes individuales en los botones internos. */}
+      <div className="flex flex-col gap-1.5">
         {componentes.length === 0 ? (
           <p className="text-micro text-primary/25 text-center py-3">
             Todavía no agregaste ningún elemento.
@@ -380,9 +381,7 @@ function SelectorElementosCompuesto({
           componentes.map((c, i) => (
             <div
               key={c.elemento_id}
-              className={`flex items-center gap-1.5 py-1.5 ${
-                i > 0 ? "border-t border-primary/10" : ""
-              }`}
+              className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg border border-primary/10"
             >
               <span
                 className={`flex-1 min-w-0 truncate text-micro font-bold text-primary/80 ${
@@ -397,7 +396,7 @@ function SelectorElementosCompuesto({
                 <button
                   type="button"
                   onClick={() => setCantidad(c.elemento_id, c.cantidad - 1)}
-                  className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
+                  className="w-5 h-5 flex items-center justify-center rounded text-primary/50 hover:text-primary transition-all cursor-pointer"
                 >
                   −
                 </button>
@@ -407,7 +406,7 @@ function SelectorElementosCompuesto({
                 <button
                   type="button"
                   onClick={() => setCantidad(c.elemento_id, c.cantidad + 1)}
-                  className="w-5 h-5 flex items-center justify-center rounded border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 transition-all cursor-pointer"
+                  className="w-5 h-5 flex items-center justify-center rounded text-primary/50 hover:text-primary transition-all cursor-pointer"
                 >
                   +
                 </button>
@@ -415,7 +414,7 @@ function SelectorElementosCompuesto({
                   type="button"
                   onClick={() => quitarElemento(c.elemento_id)}
                   title="Quitar"
-                  className="w-5 h-5 flex items-center justify-center rounded border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 transition-all cursor-pointer"
+                  className="w-5 h-5 flex items-center justify-center rounded text-red-400/50 hover:text-red-400 transition-all cursor-pointer"
                 >
                   <X size={10} />
                 </button>
