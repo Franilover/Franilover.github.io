@@ -352,25 +352,43 @@ function OrganoCard({
   elementos,
   onAbrirCompuesto,
 }: OrganoCardProps) {
+  function agregarComponente() {
+    const componentes = (organo.componentes ?? []) as ComponenteOrgano[];
+    const elegidos = new Set(componentes.map((c) => c.compuesto_id));
+    const primero = compuestos.find((c) => !elegidos.has(c.id)) ?? compuestos[0];
+    if (!primero) return;
+    onUpdate(organo.id, {
+      componentes: [...componentes, { compuesto_id: primero.id, cantidad: 1 }],
+    });
+  }
+
   return (
     <div className="group py-3 first:pt-0">
-      {/* Header: nombre del órgano (texto libre) + eliminar (solo al hover) */}
+      {/* Header: nombre del órgano (texto libre) + agregar compuesto + eliminar (hover) */}
       <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <Leaf size={13} className="shrink-0 text-primary/40" />
-          <input
-            className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
-            placeholder="Nombre del órgano (ej: Hoja)…"
-            value={organo.nombre ?? ""}
-            onChange={(e) => onUpdate(organo.id, { nombre: e.target.value })}
-          />
+        <input
+          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
+          placeholder="Nombre del órgano (ej: Hoja)…"
+          value={organo.nombre ?? ""}
+          onChange={(e) => onUpdate(organo.id, { nombre: e.target.value })}
+        />
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={agregarComponente}
+            disabled={compuestos.length === 0}
+            title="Agregar compuesto"
+            className="w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Plus size={13} />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition opacity-0 group-hover:opacity-100"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
-        <button
-          onClick={onDelete}
-          className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition shrink-0 opacity-0 group-hover:opacity-100"
-        >
-          <Trash2 size={14} />
-        </button>
       </div>
 
       {/* Contenido: grid de 2 columnas cuando hay ancho, sin cajas anidadas */}
@@ -381,6 +399,7 @@ function OrganoCard({
             componentes={(organo.componentes ?? []) as ComponenteOrgano[]}
             onChange={(componentes) => onUpdate(organo.id, { componentes })}
             onAbrirCompuesto={onAbrirCompuesto}
+            ocultarBotonAgregar
           />
         </div>
 

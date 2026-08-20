@@ -27,6 +27,7 @@ export function SelectorFormulaOrgano({
   componentes,
   onChange,
   onAbrirCompuesto,
+  ocultarBotonAgregar,
 }: {
   compuestos: Compuesto[];
   componentes: ComponenteOrgano[];
@@ -34,6 +35,10 @@ export function SelectorFormulaOrgano({
   /** Abre el panel flotante del Compuesto elegido en una fila, reemplazando
    *  el panel actualmente abierto. */
   onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Oculta el botón "Agregar" interno — usar cuando el padre renderiza su
+   *  propio botón (p.ej. en el header de la tarjeta) llamando a
+   *  agregarComponenteOrgano() directamente. */
+  ocultarBotonAgregar?: boolean;
 }) {
   function agregar() {
     const elegidos = new Set(componentes.map((c) => c.compuesto_id));
@@ -71,15 +76,17 @@ export function SelectorFormulaOrgano({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={agregar}
-        disabled={compuestos.length === 0}
-        className="flex items-center justify-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        <Plus size={10} />
-        Agregar
-      </button>
+      {!ocultarBotonAgregar && (
+        <button
+          type="button"
+          onClick={agregar}
+          disabled={compuestos.length === 0}
+          className="flex items-center justify-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Plus size={10} />
+          Agregar
+        </button>
+      )}
 
       {compuestos.length === 0 && (
         <p className="text-micro text-primary/25">
