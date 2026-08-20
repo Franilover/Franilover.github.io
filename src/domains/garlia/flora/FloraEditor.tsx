@@ -197,9 +197,6 @@ export function FloraEditorMejorado({
             {tabActiva === "composicion" && (
               <div className="space-y-4">
                 <div>
-                  <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35 block mb-1.5">
-                    Descripción
-                  </label>
                   <RichEditor
                     minHeight="8rem"
                     placeholder="Qué es, dónde crece, usos, apariencia…"
@@ -223,8 +220,7 @@ export function FloraEditorMejorado({
             {/* ── TAB: Órganos ──────────────────────────────────────────── */}
             {tabActiva === "organos" && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-primary/50">ÓRGANOS</span>
+                <div className="flex items-center justify-end">
                   <SelectorTipo
                     variant="crear"
                     triggerLabel={
@@ -261,8 +257,7 @@ export function FloraEditorMejorado({
             {/* ── TAB: Procesos ────────────────────────────────────────── */}
             {tabActiva === "procesos" && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-primary/50">PROCESOS DEL CICLO</span>
+                <div className="flex items-center justify-end">
                   <button
                     onClick={() => void crearProceso()}
                     className="flex items-center gap-1.5 text-xs font-medium text-primary/60 hover:text-primary transition px-2 py-1 rounded hover:bg-primary/5"
@@ -349,9 +344,6 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos, elementos }: Organ
       {/* Contenido: grid de 2 columnas cuando hay ancho, sin cajas anidadas */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
         <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1.5">
-            Fórmula química
-          </span>
           <SelectorFormulaOrgano
             compuestos={compuestos}
             componentes={(organo.componentes ?? []) as ComponenteOrgano[]}
@@ -360,9 +352,6 @@ function OrganoCard({ organo, onUpdate, onDelete, compuestos, elementos }: Organ
         </div>
 
         <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1.5">
-            Notas
-          </span>
           <textarea
             className="w-full h-full min-h-[3.5rem] bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
             placeholder="Notas del órgano…"
@@ -505,8 +494,8 @@ function ProcesoCard({
           <input
             className="min-w-0 flex-1 bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
             placeholder="Nombre del proceso (ej: Fotosíntesis)…"
-            value={proceso.nombre_proceso ?? ""}
-            onChange={(e) => onUpdate(proceso.id, { nombre_proceso: e.target.value })}
+            value={proceso.nombre ?? ""}
+            onChange={(e) => onUpdate(proceso.id, { nombre: e.target.value })}
           />
         </div>
         <button
@@ -538,9 +527,6 @@ function ProcesoCard({
         </div>
 
         <div>
-          <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/35 block mb-1">
-            Descripción
-          </span>
           <textarea
             className="w-full bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
             placeholder="Descripción del proceso (incluye condiciones ambientales, cuándo ocurre, etc)…"

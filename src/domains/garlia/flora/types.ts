@@ -41,7 +41,7 @@ export interface PlantaProceso {
   id: string;
   planta_id: string;
   /** Nombre del proceso (texto libre: "fotosíntesis", "floración", etc) */
-  nombre_proceso: string;
+  nombre: string;
   orden: number; // Secuencia en el ciclo de vida
   /** Qué consume: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
   consume: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
@@ -65,5 +65,5 @@ export type PlantaOrganoInput = Partial<
 >;
 
 export type PlantaProcesoInput = Partial<
-  Pick<PlantaProceso, "nombre_proceso" | "orden" | "consume" | "produce" | "descripcion">
+  Pick<PlantaProceso, "nombre" | "orden" | "consume" | "produce" | "descripcion">
 >;
