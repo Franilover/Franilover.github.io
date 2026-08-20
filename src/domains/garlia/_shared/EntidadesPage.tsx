@@ -773,7 +773,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
           title="Flora"
           section="flora"
           variant="grid"
-          minCardWidth={52}
           loading={loadingFlora}
           creating={creatingFlora}
           items={flora.map((f) => ({
@@ -802,7 +801,6 @@ export function EntidadesPage({ section, selectedId }: Props) {
           title="Minerales"
           section="minerales"
           variant="grid"
-          minCardWidth={52}
           loading={loadingMinerales}
           creating={creatingMinerales}
           items={minerales.map((m) => ({
