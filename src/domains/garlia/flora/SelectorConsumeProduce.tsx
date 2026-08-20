@@ -113,6 +113,7 @@ function FilaItemProceso({
   const [busqueda, setBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [activo, setActivo] = useState(0);
+  const [tipoAbierto, setTipoAbierto] = useState(false);
 
   const catalogo = item.tipo === "elemento" ? elementos : compuestos;
   const elegido = useMemo(
@@ -160,32 +161,64 @@ function FilaItemProceso({
 
   return (
     <div className="flex items-center gap-2 py-1">
-      {/* Toggle elemento/compuesto */}
-      <div className="flex items-center gap-0.5 shrink-0">
+      {/* Toggle elemento/compuesto: un solo botón (icono = tipo actual) +
+          dropdown para elegir el otro */}
+      <div
+        className="relative shrink-0"
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setTipoAbierto(false);
+        }}
+      >
         <button
           type="button"
-          onClick={() => cambiarTipo("elemento")}
-          title="Elemento"
+          onClick={() => setTipoAbierto((v) => !v)}
+          title={item.tipo === "elemento" ? "Elemento" : "Compuesto"}
           className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
             item.tipo === "elemento"
               ? "bg-primary/15 text-primary"
-              : "text-primary/30 hover:text-primary/60 hover:bg-primary/5"
+              : "bg-accent/15 text-accent"
           }`}
         >
-          <Atom size={11} />
+          {item.tipo === "elemento" ? <Atom size={11} /> : <Beaker size={11} />}
         </button>
-        <button
-          type="button"
-          onClick={() => cambiarTipo("compuesto")}
-          title="Compuesto"
-          className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
-            item.tipo === "compuesto"
-              ? "bg-accent/15 text-accent"
-              : "text-primary/30 hover:text-primary/60 hover:bg-primary/5"
-          }`}
-        >
-          <Beaker size={11} />
-        </button>
+        {tipoAbierto && (
+          <div
+            className="absolute z-20 mt-1 left-0 rounded-md border shadow-lg overflow-hidden"
+            style={{
+              background: "var(--bg-main)",
+              borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                cambiarTipo("elemento");
+                setTipoAbierto(false);
+              }}
+              className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-micro font-bold whitespace-nowrap transition-colors ${
+                item.tipo === "elemento"
+                  ? "bg-primary/10 text-primary"
+                  : "text-primary/70 hover:bg-primary/6 hover:text-primary"
+              }`}
+            >
+              <Atom size={11} /> Elemento
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                cambiarTipo("compuesto");
+                setTipoAbierto(false);
+              }}
+              className={`w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-micro font-bold whitespace-nowrap transition-colors ${
+                item.tipo === "compuesto"
+                  ? "bg-accent/10 text-accent"
+                  : "text-primary/70 hover:bg-primary/6 hover:text-primary"
+              }`}
+            >
+              <Beaker size={11} /> Compuesto
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Valor elegido (clickeable → abre panel) o buscador */}
