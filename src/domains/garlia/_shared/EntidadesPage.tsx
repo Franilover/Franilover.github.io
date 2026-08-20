@@ -18,7 +18,7 @@
  * muestra sin lógica extra acá.
  */
 
-import { Eye, EyeOff, Gem, Leaf, Music, Plus, StickyNote } from "lucide-react";
+import { Gem, Leaf, Mountain, Music, Plus, Sprout, StickyNote } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { DescargarDatosDropdown } from "./DescargarDatosDropdown";
@@ -971,7 +971,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
               : "bg-primary/[0.04] border-primary/10 text-primary/40 hover:bg-primary/10"
           }`}
         >
-          {mostrarPersonajes ? <Eye size={12} /> : <EyeOff size={12} />}
+          {mostrarPersonajes ? <Mountain size={12} /> : <Sprout size={12} />}
         </button>
       )}
     </div>

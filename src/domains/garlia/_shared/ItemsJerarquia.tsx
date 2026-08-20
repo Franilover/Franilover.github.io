@@ -35,7 +35,7 @@
  * en las otras vistas jerárquicas.
  */
 
-import { Box, Eye, EyeOff, Leaf as LeafIcon, Gem as GemIcon, Plus, Sprout } from "lucide-react";
+import { Box, Leaf as LeafIcon, Gem as GemIcon, Mountain, Plus, Sprout } from "lucide-react";
 import React, { useState } from "react";
 
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
@@ -449,7 +449,7 @@ export function ItemsJerarquia({
                   : "bg-primary/[0.04] border-primary/10 text-primary/40 hover:bg-primary/10"
               }`}
             >
-              {porEcosistema ? <Eye size={12} /> : <EyeOff size={12} />}
+              {porEcosistema ? <Sprout size={12} /> : <Mountain size={12} />}
             </button>
           )}
           <BuscadorInline
