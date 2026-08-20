@@ -487,10 +487,23 @@ function AnalisisReactivoPeso({
   const transicion = perfil.externa.Transición ?? 0;
 
   const cargaNeta = voluntad - percepcion;
-  const cargaLabel = cargaNeta > 0 ? "Voluntad domina" : cargaNeta < 0 ? "Percepción domina" : "Cargas equilibradas";
+  const cargaTitulo =
+    cargaNeta > 0 ? "Predomina Voluntad" : cargaNeta < 0 ? "Predomina Percepción" : "Cargas equilibradas";
+  const cargaDescripcion =
+    cargaNeta > 0
+      ? "Más propenso a emitir: tiene Voluntad libre de sobra para donar y activar enlaces con otros compuestos."
+      : cargaNeta < 0
+        ? "Más propenso a recibir: tiene huecos de Percepción libres, a la espera de que otro compuesto le done Voluntad."
+        : "Ni dona ni recibe carga de más: su Voluntad y Percepción se cancelan entre sí en igual medida.";
 
-  const enlaceLabel =
-    catalisis > transicion ? "Rígido" : transicion > catalisis ? "Reactivo" : "Intermedio";
+  const enlaceTitulo =
+    catalisis > transicion ? "Predomina Catálisis" : transicion > catalisis ? "Predomina Transición" : "Enlace intermedio";
+  const enlaceDescripcion =
+    catalisis > transicion
+      ? "Enlace fuerte y duradero: una vez formado, cuesta romperlo o hacerlo reaccionar de nuevo."
+      : transicion > catalisis
+        ? "Enlace débil y metaestable: se forma con facilidad, pero también se rompe o transforma con facilidad."
+        : "Firmeza media: ni especialmente estable ni especialmente inestable frente a nuevas reacciones.";
 
   const colorReactividad =
     reactividad.nivel === "inerte"
@@ -525,19 +538,15 @@ function AnalisisReactivoPeso({
       </div>
       <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/[0.02]">
         <span className="text-micro font-black uppercase tracking-wide text-primary/60">
-          {cargaLabel}
+          {cargaTitulo}
         </span>
-        <span className="text-micro text-primary/40">
-          Voluntad {voluntad} · Percepción {percepcion}
-        </span>
+        <span className="text-micro text-primary/40">{cargaDescripcion}</span>
       </div>
       <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/[0.02]">
         <span className="text-micro font-black uppercase tracking-wide text-primary/60">
-          {enlaceLabel}
+          {enlaceTitulo}
         </span>
-        <span className="text-micro text-primary/40">
-          Catálisis {catalisis} · Transición {transicion}
-        </span>
+        <span className="text-micro text-primary/40">{enlaceDescripcion}</span>
       </div>
     </div>
   );
