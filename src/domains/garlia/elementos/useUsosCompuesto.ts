@@ -63,7 +63,7 @@ interface MineralRow {
 
 interface MineralFormacionRow {
   mineral_id: string;
-  tipo_formacion: string;
+  nombre_formacion: string;
   componentes: { compuesto_id: string; cantidad: number }[] | null;
 }
 
@@ -81,16 +81,6 @@ interface PlantaOrganoRow {
   compuesto_base_id: string | null;
   componentes: { compuesto_id: string; cantidad: number }[] | null;
 }
-
-const TIPO_FORMACION_LABEL: Record<string, string> = {
-  veta: "Veta",
-  inclusion: "Inclusión",
-  capa: "Capa",
-  nucleo: "Núcleo",
-  superficie: "Superficie",
-  cristal: "Cristal",
-  otro: "Formación",
-};
 
 const TIPO_ORGANO_LABEL: Record<string, string> = {
   hoja: "Hoja",
@@ -131,7 +121,9 @@ export function useUsosCompuesto() {
         supabase.from("flora").select("id, nombre, imagen_url, compuesto_id, componentes"),
         supabase
           .from("mineral_formaciones")
-          .select("mineral_id, tipo_formacion, componentes, minerales(id, nombre, imagen_url)"),
+          .select(
+            "mineral_id, nombre_formacion:nombre, componentes, minerales(id, nombre, imagen_url)",
+          ),
         supabase
           .from("planta_organos")
           .select("planta_id, tipo_organo, compuesto_base_id, componentes, flora(id, nombre, imagen_url)"),
@@ -224,7 +216,7 @@ export function useUsosCompuesto() {
           id: formacion.mineral.id,
           nombre: formacion.mineral.nombre,
           imagen_url: formacion.mineral.imagen_url,
-          detalle: TIPO_FORMACION_LABEL[formacion.tipo_formacion] ?? formacion.tipo_formacion,
+          detalle: formacion.nombre_formacion || "Formación",
         });
       }
     }

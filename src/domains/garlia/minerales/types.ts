@@ -35,14 +35,8 @@ export interface Mineral {
 export interface MineralFormacion {
   id: string;
   mineral_id: string;
-  tipo_formacion:
-    | "veta"
-    | "inclusion"
-    | "capa"
-    | "nucleo"
-    | "superficie"
-    | "cristal"
-    | "otro";
+  /** Nombre de la formación, texto libre (ej: "Veta", "Inclusión de cuarzo"…) */
+  nombre: string;
   /** Fórmula de la formación: mezcla de Compuestos + cantidad (mismo lenguaje que PlantaOrgano.componentes) */
   componentes: Array<{ compuesto_id: string; cantidad: number }> | null;
   notas: string | null;
@@ -54,20 +48,12 @@ export interface MineralFormacion {
 export interface MineralProceso {
   id: string;
   mineral_id: string;
-  tipo_proceso:
-    | "cristalizacion"
-    | "sedimentacion"
-    | "metamorfismo"
-    | "oxidacion"
-    | "erosion"
-    | "fusion"
-    | "otro";
+  /** Nombre del proceso, texto libre (ej: "Cristalización", "Oxidación"…) */
+  nombre: string;
   /** Qué consume: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
   consume: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
   /** Qué produce: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
   produce: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
-  /** Condiciones geológicas (texto libre: "alta presión", "calor volcánico", "millones de años") */
-  condiciones: string | null;
   descripcion: string | null;
   created_at: string;
   updated_at: string;
@@ -81,9 +67,9 @@ export type MineralInput = Partial<
 >;
 
 export type MineralFormacionInput = Partial<
-  Pick<MineralFormacion, "tipo_formacion" | "componentes" | "notas">
+  Pick<MineralFormacion, "nombre" | "componentes" | "notas">
 >;
 
 export type MineralProcesoInput = Partial<
-  Pick<MineralProceso, "tipo_proceso" | "consume" | "produce" | "condiciones" | "descripcion">
+  Pick<MineralProceso, "nombre" | "consume" | "produce" | "descripcion">
 >;

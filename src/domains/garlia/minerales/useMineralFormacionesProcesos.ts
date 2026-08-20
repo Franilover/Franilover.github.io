@@ -14,7 +14,7 @@
  *
  * - migrarComponentesLegado: el campo plano `Mineral.componentes` (composición
  *   sin estructura, pre-Formaciones) se migra una sola vez a una Formación
- *   real de tipo "otro" la primera vez que se cargan formaciones para un
+ *   real (sin nombre) la primera vez que se cargan formaciones para un
  *   mineral que aún no tiene ninguna. Así no se pierde data ya cargada.
  */
 
@@ -82,7 +82,7 @@ export function useMineralFormacionesProcesos(mineralId: string, mineralLegado?:
         .insert([
           {
             mineral_id: mineralId,
-            tipo_formacion: "otro",
+            nombre: "",
             componentes: legado.map((c) => ({ compuesto_id: c.compuesto_id, cantidad: 1 })),
             notas: legado.some((c) => c.tag) ? legado.map((c) => c.tag).filter(Boolean).join(", ") : null,
           },
@@ -101,10 +101,10 @@ export function useMineralFormacionesProcesos(mineralId: string, mineralLegado?:
 
   // ── CRUD de formaciones ─────────────────────────────────────────────────
   const crearFormacion = useCallback(
-    async (tipoFormacion: MineralFormacion["tipo_formacion"]) => {
+    async () => {
       const { data, error } = await supabase
         .from("mineral_formaciones")
-        .insert([{ mineral_id: mineralId, tipo_formacion: tipoFormacion, componentes: null }])
+        .insert([{ mineral_id: mineralId, nombre: "", componentes: null }])
         .select()
         .single();
 
@@ -134,16 +134,15 @@ export function useMineralFormacionesProcesos(mineralId: string, mineralLegado?:
 
   // ── CRUD de procesos ────────────────────────────────────────────────────
   const crearProceso = useCallback(
-    async (tipoProceso: MineralProceso["tipo_proceso"]) => {
+    async () => {
       const { data, error } = await supabase
         .from("mineral_procesos")
         .insert([
           {
             mineral_id: mineralId,
-            tipo_proceso: tipoProceso,
+            nombre: "",
             consume: null,
             produce: null,
-            condiciones: null,
             descripcion: null,
           },
         ])

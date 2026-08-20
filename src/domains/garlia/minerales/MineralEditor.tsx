@@ -3,29 +3,30 @@
 /**
  * MineralEditor.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Editor de una entidad Mineral: nombre, imagen, descripción rica, notas, y
- * — mismo molde que FloraEditor.tsx — Formaciones y Procesos:
+ * Editor de una entidad Mineral: nombre, imagen, descripción rica y
+ * ecosistemas — mismo molde visual que FloraEditor.tsx — más Formaciones y
+ * Procesos:
  *
- * - Formaciones: partes del mineral con fórmula propia (veta, inclusión,
- *   capa, núcleo, superficie, cristal…). Reemplaza la antigua composición
- *   plana de un solo nivel (`Mineral.componentes`), que se migra
- *   automáticamente a una Formación la primera vez que se abre este editor
- *   (ver useMineralFormacionesProcesos).
+ * - Formaciones: partes del mineral con fórmula propia, nombre libre (ej:
+ *   "Veta", "Inclusión de cuarzo"…). Reemplaza la antigua composición plana
+ *   de un solo nivel (`Mineral.componentes`), que se migra automáticamente
+ *   a una Formación la primera vez que se abre este editor (ver
+ *   useMineralFormacionesProcesos).
  *
- * - Procesos: eventos geológicos de formación/transformación
- *   (cristalización, oxidación, metamorfismo…) con consume/produce +
- *   condiciones — mismo shape que los Procesos de Flora, pero sin
- *   orden/secuencia: los procesos geológicos de un mineral no tienen un
- *   orden narrativo único.
+ * - Procesos: eventos geológicos de formación/transformación, nombre libre
+ *   (ej: "Cristalización", "Oxidación"…) con consume/produce — mismo shape
+ *   que los Procesos de Flora, pero sin orden/secuencia: los procesos
+ *   geológicos de un mineral no tienen un orden narrativo único.
  *
- * Reutiliza SelectorTipo, SelectorFormulaOrgano y SelectorConsumeProduce de
- * Flora tal cual (son genéricos, sin nada específico de planta).
+ * Reutiliza SelectorFormulaOrgano y SelectorConsumeProduce de Flora tal cual
+ * (son genéricos, sin nada específico de planta).
  */
 
-import { Droplet, Flame, Gem, Layers, Mountain, Snowflake, Sparkle, Trash2, Waves } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { Gem, Leaf, Plus, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
@@ -34,7 +35,6 @@ import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPag
 import { type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
-import { ComposicionQuimicaPanel } from "@/domains/garlia/_shared/ComposicionQuimicaPanel";
 import { BalanceProcesoPanel } from "@/domains/garlia/_shared/BalanceProcesoPanel";
 import { AfinidadEntreEntidadesPanel } from "@/domains/garlia/_shared/AfinidadEntreEntidadesPanel";
 import {
@@ -45,35 +45,12 @@ import {
 import { useMinerales } from "./useMinerales";
 import { useMineralFormacionesProcesos } from "./useMineralFormacionesProcesos";
 import { type Mineral, type MineralFormacion, type MineralProceso } from "./types";
-import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/SelectorEcosistemasDeEntidad";
+import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
-import { SelectorTipo, type OpcionTipo } from "@/domains/garlia/flora/SelectorTipo";
 import { SelectorFormulaOrgano, type ComponenteOrgano } from "@/domains/garlia/flora/SelectorFormulaOrgano";
 import { SelectorConsumeProduce, type ItemProceso } from "@/domains/garlia/flora/SelectorConsumeProduce";
-
-// ─── Catálogos de tipo fijos, con icono ────────────────────────────────────
-
-const TIPOS_FORMACION: OpcionTipo<MineralFormacion["tipo_formacion"]>[] = [
-  { value: "veta", label: "Veta", icon: Layers },
-  { value: "inclusion", label: "Inclusión", icon: Sparkle },
-  { value: "capa", label: "Capa", icon: Layers },
-  { value: "nucleo", label: "Núcleo", icon: Gem },
-  { value: "superficie", label: "Superficie", icon: Mountain },
-  { value: "cristal", label: "Cristal", icon: Sparkle },
-  { value: "otro", label: "Otro", icon: Gem },
-];
-
-const TIPOS_PROCESO_MINERAL: OpcionTipo<MineralProceso["tipo_proceso"]>[] = [
-  { value: "cristalizacion", label: "Cristalización", icon: Snowflake },
-  { value: "sedimentacion", label: "Sedimentación", icon: Layers },
-  { value: "metamorfismo", label: "Metamorfismo", icon: Mountain },
-  { value: "oxidacion", label: "Oxidación", icon: Droplet },
-  { value: "erosion", label: "Erosión", icon: Waves },
-  { value: "fusion", label: "Fusión", icon: Flame },
-  { value: "otro", label: "Otro", icon: Gem },
-];
 
 export function MineralEditor({
   mineral: mineralProp,
@@ -87,6 +64,8 @@ export function MineralEditor({
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
   const { actualizar, eliminar } = useMinerales();
+  const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
+    useEcosistemas();
 
   const [form, setForm] = useState<Mineral>(mineralProp);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -98,6 +77,26 @@ export function MineralEditor({
     id: string;
     anchor: HTMLElement;
   } | null>(null);
+  // Último elemento DOM clickeado dentro de la barra de Ecosistemas — usado
+  // como anchor del PopoverFlotante, ya que SeccionEntidad.onEntityClick
+  // solo entrega el id, no el evento/elemento. Mismo patrón que FloraEditor.
+  const lastEntityClickTarget = useRef<HTMLElement | null>(null);
+  const asideEcosistemasRef = useRef<HTMLElement | null>(null);
+
+  // Ecosistemas donde aparece este mineral — vínculo inverso: vive en
+  // Ecosistema.mineral_ids, no en Mineral. Mismo patrón que FloraEditor.
+  const ecosistemaIds = useMemo(
+    () => ecosistemas.filter((e) => (e.mineral_ids ?? []).includes(form.id)).map((e) => e.id),
+    [ecosistemas, form.id],
+  );
+  const handleToggleEcosistema = (ecosistemaId: string, add: boolean) => {
+    const eco = ecosistemas.find((e) => e.id === ecosistemaId);
+    if (!eco) return;
+    const actuales = eco.mineral_ids ?? [];
+    void actualizarEcosistema(ecosistemaId, {
+      mineral_ids: add ? [...actuales, form.id] : actuales.filter((id) => id !== form.id),
+    });
+  };
 
   // Formaciones y procesos
   const {
@@ -207,57 +206,63 @@ export function MineralEditor({
                   </button>
                 </div>
                 {tabActiva !== "info" && (
-                  <SelectorTipo
-                    variant="crear-compacto"
+                  <button
+                    onClick={() => void (tabActiva === "formaciones" ? crearFormacion() : crearProceso())}
                     title={tabActiva === "formaciones" ? "Nueva formación" : "Nuevo proceso"}
-                    opciones={tabActiva === "formaciones" ? TIPOS_FORMACION : TIPOS_PROCESO_MINERAL}
-                    onSelect={(tipo) =>
-                      void (tabActiva === "formaciones"
-                        ? crearFormacion(tipo as MineralFormacion["tipo_formacion"])
-                        : crearProceso(tipo as MineralProceso["tipo_proceso"]))
-                    }
-                  />
+                    className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                  >
+                    <Plus size={16} />
+                  </button>
                 )}
               </div>
 
               {/* ── TAB: Info ─────────────────────────────────────────────── */}
               {tabActiva === "info" && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35 block mb-1.5">
-                      Descripción
-                    </label>
+                <div className="flex gap-4 items-stretch">
+                  <div className="flex-1 min-w-0">
                     <RichEditor
-                      minHeight="10rem"
+                      minHeight="8rem"
                       placeholder="Qué es, dónde se encuentra, propiedades, apariencia…"
                       value={form.descripcion ?? ""}
                       onChange={(v) => setForm((f) => ({ ...f, descripcion: v }))}
                     />
                   </div>
 
-                  {/* Ecosistemas */}
-                  <div className="pt-4 border-t border-primary/10">
-                    <SelectorEcosistemasDeEntidad
-                      entidadId={form.id}
-                      campo="mineral_ids"
-                      label="Ecosistemas donde aparece"
-                      onSelectEcosistema={(id, anchor) => setEcosistemaAbierto({ id, anchor })}
+                  {/* Ecosistemas — barra vertical lateral, mismo patrón que
+                      SeccionEntidad en FloraEditor/EditorCriatura/PanelBioma.
+                      onEntityClick de SeccionEntidad solo entrega el id, no el
+                      elemento clickeado — se captura acá con onClickCapture
+                      para usarlo como anchor del PopoverFlotante. */}
+                  <aside
+                    ref={asideEcosistemasRef}
+                    className="shrink-0 w-44 flex flex-col border-l overflow-y-auto"
+                    style={{
+                      borderColor: "color-mix(in srgb, var(--primary) 7%, transparent)",
+                    }}
+                    onClickCapture={(e) => {
+                      lastEntityClickTarget.current = e.target as HTMLElement;
+                    }}
+                  >
+                    <SeccionEntidad
+                      allEntities={ecosistemas.map((e) => ({ id: e.id, nombre: e.nombre }))}
+                      emptyLabel="Sin ecosistemas"
+                      fallbackIcon={<Leaf size={14} strokeWidth={1} />}
+                      fill={false}
+                      icon={<Leaf size={9} />}
+                      label="Ecosistemas"
+                      loading={loadingEcosistemas}
+                      saving={false}
+                      selectedIds={ecosistemaIds}
+                      onEntityClick={(id) =>
+                        setEcosistemaAbierto({
+                          id,
+                          anchor:
+                            lastEntityClickTarget.current ?? asideEcosistemasRef.current ?? document.body,
+                        })
+                      }
+                      onToggle={handleToggleEcosistema}
                     />
-                  </div>
-
-                  {/* Notas */}
-                  <div className="pt-4 border-t border-primary/10">
-                    <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35 block mb-1.5">
-                      Notas
-                    </label>
-                    <textarea
-                      className="w-full min-h-[4.5rem] bg-transparent border-0 border-b border-primary/10 focus:border-primary/30 px-0 py-1.5 text-xs text-primary/70 outline-none placeholder:text-primary/30 resize-y transition-colors"
-                      placeholder="Cualquier otra nota libre…"
-                      value={form.notas ?? ""}
-                      onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
-                      onBlur={() => guardar({ notas: form.notas })}
-                    />
-                  </div>
+                  </aside>
                 </div>
               )}
 
@@ -279,7 +284,6 @@ export function MineralEditor({
                           onUpdate={actualizarFormacion}
                           onDelete={() => eliminarFormacion(formacion.id)}
                           compuestos={compuestos}
-                          elementos={elementos}
                         />
                       ))}
                     </div>
@@ -362,30 +366,22 @@ function FormacionCard({
   onUpdate,
   onDelete,
   compuestos,
-  elementos,
 }: {
   formacion: MineralFormacion;
   onUpdate: (id: string, updates: Partial<MineralFormacion>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
-  elementos: Elemento[];
 }) {
-  const opcionActual = TIPOS_FORMACION.find((o) => o.value === formacion.tipo_formacion);
-  const Icon = opcionActual?.icon ?? Gem;
-
   return (
     <div className="group py-3 first:pt-0">
-      {/* Header: ícono + selector de tipo + eliminar (solo al hover) */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Icon size={13} className="shrink-0 text-primary/40" />
-          <SelectorTipo
-            variant="chip"
-            valor={formacion.tipo_formacion}
-            opciones={TIPOS_FORMACION}
-            onSelect={(tipo) => onUpdate(formacion.id, { tipo_formacion: tipo })}
-          />
-        </div>
+      {/* Header: nombre de la formación (texto libre) + eliminar (hover) */}
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <input
+          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
+          placeholder="Nombre de la formación (ej: Veta, Inclusión de cuarzo)…"
+          value={formacion.nombre ?? ""}
+          onChange={(e) => onUpdate(formacion.id, { nombre: e.target.value })}
+        />
         <button
           onClick={onDelete}
           className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition shrink-0 opacity-0 group-hover:opacity-100"
@@ -413,15 +409,6 @@ function FormacionCard({
           />
         </div>
       </div>
-
-      <div className="mt-3">
-        <ComposicionQuimicaPanel
-          mezcla={formacion.componentes ?? []}
-          compuestos={compuestos}
-          elementos={elementos}
-          titulo="Física derivada de la formación"
-        />
-      </div>
     </div>
   );
 }
@@ -442,13 +429,13 @@ function ProcesoMineralCard({
 }) {
   return (
     <div className="group py-3 first:pt-0">
-      {/* Header: selector de tipo real + eliminar (hover) */}
-      <div className="flex items-center justify-between mb-2">
-        <SelectorTipo
-          variant="chip"
-          valor={proceso.tipo_proceso}
-          opciones={TIPOS_PROCESO_MINERAL}
-          onSelect={(tipo) => onUpdate(proceso.id, { tipo_proceso: tipo })}
+      {/* Header: nombre del proceso (texto libre) + eliminar (hover) */}
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <input
+          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
+          placeholder="Nombre del proceso (ej: Cristalización, Oxidación)…"
+          value={proceso.nombre ?? ""}
+          onChange={(e) => onUpdate(proceso.id, { nombre: e.target.value })}
         />
         <button
           onClick={onDelete}
@@ -458,10 +445,10 @@ function ProcesoMineralCard({
         </button>
       </div>
 
-      {/* Contenido: consume/produce lado a lado, condiciones + descripción
-          también en columnas cuando el ancho lo permite. Sin cajas anidadas. */}
-      <div className="space-y-3 text-xs">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5 gap-y-3">
+      {/* Contenido: columna izquierda = Consume (arriba) + Produce (abajo),
+          columna derecha = Descripción. Sin cajas anidadas. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-3 text-xs items-start">
+        <div className="space-y-3">
           <SelectorConsumeProduce
             label="Consume"
             items={(proceso.consume ?? []) as ItemProceso[]}
@@ -476,35 +463,23 @@ function ProcesoMineralCard({
             elementos={elementos}
             compuestos={compuestos}
           />
+          <BalanceProcesoPanel
+            consume={(proceso.consume ?? []) as ItemProceso[]}
+            produce={(proceso.produce ?? []) as ItemProceso[]}
+            compuestos={compuestos}
+            elementos={elementos}
+            onAutocompletar={(produce) => onUpdate(proceso.id, { produce })}
+          />
         </div>
 
-        <BalanceProcesoPanel
-          consume={(proceso.consume ?? []) as ItemProceso[]}
-          produce={(proceso.produce ?? []) as ItemProceso[]}
-          compuestos={compuestos}
-          elementos={elementos}
-          onAutocompletar={(produce) => onUpdate(proceso.id, { produce })}
-        />
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-2 items-start">
-          <div>
-            <input
-              className="w-full bg-transparent px-0 py-1 text-primary/70 outline-none transition-colors placeholder:text-primary/25"
-              placeholder='Condiciones: "alta presión", "calor volcánico", "millones de años"…'
-              value={proceso.condiciones ?? ""}
-              onChange={(e) => onUpdate(proceso.id, { condiciones: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <textarea
-              className="w-full bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-              placeholder="Descripción del proceso…"
-              value={proceso.descripcion ?? ""}
-              onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
-              rows={2}
-            />
-          </div>
+        <div>
+          <textarea
+            className="w-full bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+            placeholder="Descripción del proceso (incluye condiciones geológicas, cuándo ocurre, etc)…"
+            value={proceso.descripcion ?? ""}
+            onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
+            rows={5}
+          />
         </div>
       </div>
     </div>
