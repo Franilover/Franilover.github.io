@@ -77,11 +77,22 @@ interface FloraRow {
 }
 
 /**
- * Fila de la tabla puente planta_organos, ya resuelta con el Organo del
- * catálogo compartido (join vía organo_id) y la Flora vinculada (join vía
- * planta_id) — el nombre y la fórmula reales viven en `organo`, no en la
- * fila puente (que solo guarda el vínculo).
+ * Fila cruda de la tabla puente planta_organos tal como la devuelve
+ * Supabase: las relaciones embebidas (organo_id → organos, planta_id →
+ * flora) se tipan como array aunque en runtime cada vínculo tenga como
+ * mucho un registro de cada lado — se normaliza a objeto único al mapear.
  */
+interface PlantaOrganoRowCruda {
+  planta_id: string;
+  flora: { id: string; nombre: string; imagen_url: string | null }[] | null;
+  organo: {
+    nombre: string;
+    compuesto_base_id: string | null;
+    componentes: { compuesto_id: string; cantidad: number }[] | null;
+  }[] | null;
+}
+
+/** Fila ya normalizada (organo/planta como objeto único), la que usa el resto del hook. */
 interface PlantaOrganoRow {
   planta_id: string;
   organo: {
@@ -141,10 +152,12 @@ export function useUsosCompuesto() {
       );
       setPlantaOrganos(
         ((organosData as unknown[]) ?? []).map((o) => {
-          const row = o as PlantaOrganoRow & {
-            flora: { id: string; nombre: string; imagen_url: string | null } | null;
+          const row = o as PlantaOrganoRowCruda;
+          return {
+            planta_id: row.planta_id,
+            organo: row.organo?.[0] ?? null,
+            planta: row.flora?.[0] ?? null,
           };
-          return { ...row, planta: row.flora };
         }),
       );
       setLoading(false);

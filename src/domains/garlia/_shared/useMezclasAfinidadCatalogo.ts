@@ -42,10 +42,12 @@ interface FilaFormacionMineral {
  * Fila de la tabla puente planta_organos, con el Organo del catálogo
  * compartido ya resuelto (join vía organo_id) — la fórmula real vive en
  * `organo.componentes`, la fila puente solo guarda el vínculo.
+ * Supabase tipa la relación embebida como array aunque en runtime sea un
+ * único registro (FK organo_id → organos.id) — se toma el primero.
  */
 interface FilaVinculoOrgano {
   planta_id: string;
-  organo: { componentes: { compuesto_id: string; cantidad: number }[] | null } | null;
+  organo: { componentes: { compuesto_id: string; cantidad: number }[] | null }[] | null;
 }
 
 export function useMezclasAfinidadCatalogo() {
@@ -81,9 +83,10 @@ export function useMezclasAfinidadCatalogo() {
 
       const mezclaFlora = new Map<string, ComponenteCompuestoEnMezcla[]>();
       for (const v of (organos ?? []) as FilaVinculoOrgano[]) {
-        if (!v.planta_id || !v.organo?.componentes) continue;
+        const componentes = v.organo?.[0]?.componentes;
+        if (!v.planta_id || !componentes) continue;
         const acumulada = mezclaFlora.get(v.planta_id) ?? [];
-        mezclaFlora.set(v.planta_id, [...acumulada, ...v.organo.componentes]);
+        mezclaFlora.set(v.planta_id, [...acumulada, ...componentes]);
       }
 
       const resultado: EntidadConMezcla[] = [
