@@ -19,9 +19,10 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
+import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
@@ -39,7 +40,7 @@ import {
 import { useFlora } from "./useFlora";
 import { usePlantaOrganosProcesos } from "./usePlantaOrganosProcesos";
 import { type Flora, type PlantaOrgano, type PlantaProceso } from "./types";
-import { SelectorEcosistemasDeEntidad } from "@/domains/garlia/biologia/SelectorEcosistemasDeEntidad";
+import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
@@ -58,6 +59,8 @@ export function FloraEditorMejorado({
   const { items: elementos, setItems: setElementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
   const { actualizar, eliminar } = useFlora();
+  const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
+    useEcosistemas();
 
   const [form, setForm] = useState<Flora>(floraProp);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -71,6 +74,11 @@ export function FloraEditorMejorado({
   const [itemAbierto, setItemAbierto] = useState<
     { tipo: "elemento" | "compuesto"; id: string } | null
   >(null);
+  // Último elemento DOM clickeado dentro de la barra de Ecosistemas — usado
+  // como anchor del PopoverFlotante, ya que SeccionEntidad.onEntityClick
+  // solo entrega el id, no el evento/elemento.
+  const lastEntityClickTarget = useRef<HTMLElement | null>(null);
+  const asideEcosistemasRef = useRef<HTMLElement | null>(null);
 
   // Órganos y procesos
   const {
@@ -85,6 +93,22 @@ export function FloraEditorMejorado({
     eliminarProceso,
     reordenarProcesos,
   } = usePlantaOrganosProcesos(floraProp.id);
+
+  // Ecosistemas donde crece esta planta — vínculo inverso: vive en
+  // Ecosistema.flora_ids, no en Flora. Mismo patrón que SeccionEntidad en
+  // EditorCriatura/PanelBioma.
+  const ecosistemaIds = useMemo(
+    () => ecosistemas.filter((e) => (e.flora_ids ?? []).includes(form.id)).map((e) => e.id),
+    [ecosistemas, form.id],
+  );
+  const handleToggleEcosistema = (ecosistemaId: string, add: boolean) => {
+    const eco = ecosistemas.find((e) => e.id === ecosistemaId);
+    if (!eco) return;
+    const actuales = eco.flora_ids ?? [];
+    void actualizarEcosistema(ecosistemaId, {
+      flora_ids: add ? [...actuales, form.id] : actuales.filter((id) => id !== form.id),
+    });
+  };
 
   const [tabActiva, setTabActiva] = useState<"composicion" | "organos" | "procesos">(
     "composicion",
@@ -150,7 +174,8 @@ export function FloraEditorMejorado({
             {/* Columna derecha: tabs */}
             <div className="flex-1 min-w-0">
               {/* ── TABS ──────────────────────────────────────────────────── */}
-              <div className="flex gap-2 mb-4 border-b border-primary/10">
+              <div className="flex items-center justify-between gap-2 mb-4 border-b border-primary/10">
+              <div className="flex gap-2">
               <button
                 onClick={() => setTabActiva("composicion")}
                 className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
@@ -181,12 +206,22 @@ export function FloraEditorMejorado({
               >
                 Procesos ({procesos.length})
               </button>
+              </div>
+              {tabActiva !== "composicion" && (
+                <button
+                  onClick={() => void (tabActiva === "organos" ? crearOrgano() : crearProceso())}
+                  title={tabActiva === "organos" ? "Nuevo órgano" : "Nuevo proceso"}
+                  className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                >
+                  <Plus size={16} />
+                </button>
+              )}
             </div>
 
             {/* ── TAB: Composición ──────────────────────────────────────── */}
             {tabActiva === "composicion" && (
-              <div className="space-y-4">
-                <div>
+              <div className="flex gap-4 items-stretch">
+                <div className="flex-1 min-w-0">
                   <RichEditor
                     minHeight="8rem"
                     placeholder="Qué es, dónde crece, usos, apariencia…"
@@ -195,30 +230,48 @@ export function FloraEditorMejorado({
                   />
                 </div>
 
-                {/* Ecosistemas */}
-                <div className="pt-4 border-t border-primary/10">
-                  <SelectorEcosistemasDeEntidad
-                    entidadId={form.id}
-                    campo="flora_ids"
-                    label="Ecosistemas donde crece"
-                    onSelectEcosistema={(id, anchor) => setEcosistemaAbierto({ id, anchor })}
+                {/* Ecosistemas — barra vertical lateral, mismo patrón que
+                    SeccionEntidad en EditorCriatura/PanelBioma.
+                    onEntityClick de SeccionEntidad solo entrega el id, no el
+                    elemento clickeado — se captura acá con onClickCapture
+                    para usarlo como anchor del PopoverFlotante (centrado, así
+                    que no depende de la posición exacta del anchor). */}
+                <aside
+                  ref={asideEcosistemasRef}
+                  className="shrink-0 w-44 flex flex-col border-l overflow-y-auto"
+                  style={{
+                    borderColor: "color-mix(in srgb, var(--primary) 7%, transparent)",
+                  }}
+                  onClickCapture={(e) => {
+                    lastEntityClickTarget.current = e.target as HTMLElement;
+                  }}
+                >
+                  <SeccionEntidad
+                    allEntities={ecosistemas.map((e) => ({ id: e.id, nombre: e.nombre }))}
+                    emptyLabel="Sin ecosistemas"
+                    fallbackIcon={<Leaf size={14} strokeWidth={1} />}
+                    fill={false}
+                    icon={<Leaf size={9} />}
+                    label="Ecosistemas"
+                    loading={loadingEcosistemas}
+                    saving={false}
+                    selectedIds={ecosistemaIds}
+                    onEntityClick={(id) =>
+                      setEcosistemaAbierto({
+                        id,
+                        anchor:
+                          lastEntityClickTarget.current ?? asideEcosistemasRef.current ?? document.body,
+                      })
+                    }
+                    onToggle={handleToggleEcosistema}
                   />
-                </div>
+                </aside>
               </div>
             )}
 
             {/* ── TAB: Órganos ──────────────────────────────────────────── */}
             {tabActiva === "organos" && (
               <div className="space-y-3">
-                <div className="flex items-center justify-end">
-                  <button
-                    onClick={() => void crearOrgano()}
-                    className="flex items-center gap-1.5 text-xs font-medium text-primary/60 hover:text-primary transition px-2 py-1 rounded hover:bg-primary/5"
-                  >
-                    <Plus size={14} /> Nuevo órgano
-                  </button>
-                </div>
-
                 {loadingOrganosProcesos ? (
                   <p className="text-xs text-primary/40">Cargando órganos…</p>
                 ) : organos.length === 0 ? (
@@ -244,15 +297,6 @@ export function FloraEditorMejorado({
             {/* ── TAB: Procesos ────────────────────────────────────────── */}
             {tabActiva === "procesos" && (
               <div className="space-y-3">
-                <div className="flex items-center justify-end">
-                  <button
-                    onClick={() => void crearProceso()}
-                    className="flex items-center gap-1.5 text-xs font-medium text-primary/60 hover:text-primary transition px-2 py-1 rounded hover:bg-primary/5"
-                  >
-                    <Plus size={14} /> Nuevo proceso
-                  </button>
-                </div>
-
                 {loadingOrganosProcesos ? (
                   <p className="text-xs text-primary/40">Cargando procesos…</p>
                 ) : procesos.length === 0 ? (
