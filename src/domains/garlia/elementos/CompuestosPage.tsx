@@ -479,6 +479,18 @@ function AnalisisReactivoPeso({
     [compuesto, elementos],
   );
   const peso = useMemo(() => calcularPeso(compuesto, elementos), [compuesto, elementos]);
+  const perfil = useMemo(() => calcularPerfilAtomico(compuesto, elementos), [compuesto, elementos]);
+
+  const voluntad = perfil.externa.Voluntad ?? 0;
+  const percepcion = perfil.externa.Percepción ?? 0;
+  const catalisis = perfil.externa.Catálisis ?? 0;
+  const transicion = perfil.externa.Transición ?? 0;
+
+  const cargaNeta = voluntad - percepcion;
+  const cargaLabel = cargaNeta > 0 ? "Voluntad domina" : cargaNeta < 0 ? "Percepción domina" : "Cargas equilibradas";
+
+  const enlaceLabel =
+    catalisis > transicion ? "Rígido" : transicion > catalisis ? "Reactivo" : "Intermedio";
 
   const colorReactividad =
     reactividad.nivel === "inerte"
@@ -509,6 +521,22 @@ function AnalisisReactivoPeso({
         <span className="text-micro text-primary/40">
           Núcleo×3 {peso.porCapa.nucleo} · Media×2 {peso.porCapa.media} · Externa×1{" "}
           {peso.porCapa.externa}
+        </span>
+      </div>
+      <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/[0.02]">
+        <span className="text-micro font-black uppercase tracking-wide text-primary/60">
+          {cargaLabel}
+        </span>
+        <span className="text-micro text-primary/40">
+          Voluntad {voluntad} · Percepción {percepcion}
+        </span>
+      </div>
+      <div className="flex flex-col gap-0.5 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/[0.02]">
+        <span className="text-micro font-black uppercase tracking-wide text-primary/60">
+          {enlaceLabel}
+        </span>
+        <span className="text-micro text-primary/40">
+          Catálisis {catalisis} · Transición {transicion}
         </span>
       </div>
     </div>
