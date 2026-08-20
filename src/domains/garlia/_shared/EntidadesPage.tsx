@@ -54,14 +54,12 @@ import { GeografiaJerarquica, type GrupoPersonajeSubtipo } from "@/domains/garli
 import { GrupoFiltroBarra, GrupoFiltroDropdown, type GrupoFiltroSubtipo } from "@/domains/garlia/_shared/GrupoFiltroDropdown";
 import { CriaturasJerarquica } from "@/domains/garlia/_shared/CriaturasJerarquica";
 import { ItemsJerarquia } from "@/domains/garlia/_shared/ItemsJerarquia";
-import {
-  AgrupacionPersonajesDropdown,
-  type AgrupacionPersonajes,
-} from "@/domains/garlia/_shared/AgrupacionPersonajesDropdown";
+import { AgrupacionPersonajesDropdown } from "@/domains/garlia/_shared/AgrupacionPersonajesDropdown";
 import { BuscadorInline } from "@/domains/garlia/_shared/BuscadorInline";
 import { TABLA_TO_SECTION } from "@/domains/garlia/_shared/useExternalCommandBridge";
 import { useMundoNavigation, type SectionKey } from "@/domains/garlia/_shared/useMundoNavigationStore";
 import { usePanelFlotante } from "@/domains/garlia/_shared/usePanelFlotanteStore";
+import { useEntidadesUi } from "@/domains/garlia/_shared/useEntidadesUiStore";
 
 interface Personaje {
   id: string;
@@ -339,23 +337,35 @@ export function EntidadesPage({ section, selectedId }: Props) {
   // dropdown que la controla vive pegado al buscador de esa vista; al
   // cambiarla, los dropdowns de filtro por grupo debajo cambian a los
   // correspondientes (Reinos vs Criaturas) — ver más abajo.
-  const [agrupacionPersonajes, setAgrupacionPersonajes] = useState<AgrupacionPersonajes>("reino");
+  // Persistido en Zustand (useEntidadesUiStore) para que, si estás en
+  // GeografiaJerarquica / CriaturasJerarquica / ItemsJerarquia y recargás
+  // la página, se mantenga la misma vista en vez de volver a "reino".
+  const agrupacionPersonajes = useEntidadesUi((s) => s.agrupacionPersonajes);
+  const setAgrupacionPersonajes = useEntidadesUi((s) => s.setAgrupacionPersonajes);
   // Toggle "mostrar personajes" — al apagarlo, ambas vistas jerárquicas
   // ocultan la grilla de personajes y solo muestran la estructura de
   // arriba (Reino/Ciudad o Ecosistema/Criatura), para una vista más limpia.
-  const [mostrarPersonajes, setMostrarPersonajes] = useState(true);
+  const mostrarPersonajes = useEntidadesUi((s) => s.mostrarPersonajes);
+  const setMostrarPersonajes = useEntidadesUi((s) => s.setMostrarPersonajes);
 
-  const [grupoPersonajeSeleccionadoId, setGrupoPersonajeSeleccionadoId] = useState<string | null>(null);
-  const [grupoCriaturaSeleccionadoId, setGrupoCriaturaSeleccionadoId] = useState<string | null>(null);
-  const [grupoItemSeleccionadoId, setGrupoItemSeleccionadoId] = useState<string | null>(null);
-  const [grupoReinoSeleccionadoId, setGrupoReinoSeleccionadoId] = useState<string | null>(null);
+  const grupoPersonajeSeleccionadoId = useEntidadesUi((s) => s.grupoPersonajeSeleccionadoId);
+  const setGrupoPersonajeSeleccionadoId = useEntidadesUi((s) => s.setGrupoPersonajeSeleccionadoId);
+  const grupoCriaturaSeleccionadoId = useEntidadesUi((s) => s.grupoCriaturaSeleccionadoId);
+  const setGrupoCriaturaSeleccionadoId = useEntidadesUi((s) => s.setGrupoCriaturaSeleccionadoId);
+  const grupoItemSeleccionadoId = useEntidadesUi((s) => s.grupoItemSeleccionadoId);
+  const setGrupoItemSeleccionadoId = useEntidadesUi((s) => s.setGrupoItemSeleccionadoId);
+  const grupoReinoSeleccionadoId = useEntidadesUi((s) => s.grupoReinoSeleccionadoId);
+  const setGrupoReinoSeleccionadoId = useEntidadesUi((s) => s.setGrupoReinoSeleccionadoId);
 
   // Búsqueda por nombre — una por sección, todas filtran sobre el nombre
   // de la entidad (case/acento-insensible), combinándose (AND) con el
   // filtro de grupo activo de cada vista.
-  const [busquedaCriatura, setBusquedaCriatura] = useState<string>("");
-  const [busquedaReino, setBusquedaReino] = useState<string>("");
-  const [busquedaItem, setBusquedaItem] = useState<string>("");
+  const busquedaCriatura = useEntidadesUi((s) => s.busquedaCriatura);
+  const setBusquedaCriatura = useEntidadesUi((s) => s.setBusquedaCriatura);
+  const busquedaReino = useEntidadesUi((s) => s.busquedaReino);
+  const setBusquedaReino = useEntidadesUi((s) => s.setBusquedaReino);
+  const busquedaItem = useEntidadesUi((s) => s.busquedaItem);
+  const setBusquedaItem = useEntidadesUi((s) => s.setBusquedaItem);
 
   // ── Canciones ─────────────────────────────────────────────────────────
   const { canciones, setCanciones, loading: loadingCanciones } = useCanciones();
