@@ -454,16 +454,6 @@ function OrganoCard({
   onAbrirCompuesto,
   gruposCompuestos,
 }: OrganoCardProps) {
-  function agregarComponente() {
-    const componentes = (organo.componentes ?? []) as ComponenteOrgano[];
-    const elegidos = new Set(componentes.map((c) => c.compuesto_id));
-    const primero = compuestos.find((c) => !elegidos.has(c.id)) ?? compuestos[0];
-    if (!primero) return;
-    onUpdate(organo.id, {
-      componentes: [...componentes, { compuesto_id: primero.id, cantidad: 1 }],
-    });
-  }
-
   return (
     <div className="group py-3">
       {/* Header: nombre del órgano (texto libre) + agregar compuesto + eliminar (hover) */}
@@ -476,15 +466,6 @@ function OrganoCard({
         />
         <div className="flex items-center gap-1 shrink-0">
           <button
-            type="button"
-            onClick={agregarComponente}
-            disabled={compuestos.length === 0}
-            title="Agregar compuesto"
-            className="w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Plus size={13} />
-          </button>
-          <button
             onClick={onDelete}
             title="Quitar de esta planta (el órgano sigue en el catálogo para otras plantas)"
             className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition opacity-0 group-hover:opacity-100"
@@ -495,7 +476,7 @@ function OrganoCard({
       </div>
 
       {/* Contenido: grid de 2 columnas cuando hay ancho, sin cajas anidadas */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2 text-xs items-start">
         <div>
           <SelectorFormulaOrgano
             compuestos={compuestos}
