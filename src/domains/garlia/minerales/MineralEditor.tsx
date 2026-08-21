@@ -494,43 +494,19 @@ function ProcesoMineralCard({
 
   return (
     <div className="group py-3">
-      {/* Header: solo eliminar — el proceso ya no tiene nombre propio, se
-          identifica por la reacción que vincula. */}
-      <div className="flex items-center justify-end mb-2 gap-2">
-        <button
-          onClick={onDelete}
-          title="Eliminar evento"
-          className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition shrink-0 opacity-0 group-hover:opacity-100"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-3 text-xs items-start">
-        <SeccionReaccionVinculada
-          reaccion={vinculo.reaccion}
-          catalogo={reacciones}
-          compuestos={compuestos}
-          elementos={elementos}
-          onCrearNuevo={() => void vinculo.crearYVincular()}
-          onUsarExistente={(id) => void vinculo.vincularExistente(id)}
-          onUpdate={(id, updates) => {
-            onUpdateReaccion(id, updates);
-            void vinculo.actualizar(updates);
-          }}
-          onQuitar={() => void vinculo.desvincular()}
-        />
-
-        <div>
-          <textarea
-            className="w-full bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-            placeholder="Descripción del evento geológico (condiciones, cuándo ocurre, etc)…"
-            value={proceso.descripcion ?? ""}
-            onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
-            rows={5}
-          />
-        </div>
-      </div>
+      <SeccionReaccionVinculada
+        reaccion={vinculo.reaccion}
+        catalogo={reacciones}
+        compuestos={compuestos}
+        elementos={elementos}
+        onCrearNuevo={() => void vinculo.crearYVincular()}
+        onUsarExistente={(id) => void vinculo.vincularExistente(id)}
+        onUpdate={(id, updates) => {
+          onUpdateReaccion(id, updates);
+          void vinculo.actualizar(updates);
+        }}
+        onQuitar={onDelete}
+      />
     </div>
   );
 }

@@ -350,9 +350,9 @@ export function EditorItem({
                 labelBuscar="Buscar parte…"
               />
 
-              {/* Poderes/Habilidades — ahora son Reacciones del catálogo
-                  global de Química (consume/produce), vinculadas N:N igual
-                  que Procesos de Flora/Minerales. Editar una Reacción acá
+              {/* Poder/Habilidad — ahora es 1 sola Reacción del catálogo
+                  global de Química (consume/produce), vinculada 1:1 igual
+                  que Procesos de Flora/Minerales. Editar la Reacción acá
                   afecta a todo lo que la use. */}
               <SeccionReaccionVinculada
                 titulo="Poder / Habilidad"
