@@ -22,10 +22,9 @@
  *     disponible para otras plantas / para volver a vincularlo.
  *
  * Procesos: ahora son solo una etapa del ciclo de vida (descripcion) que
- * vincula N:N Reacciones del catálogo global de Química — el CRUD de cada
- * vínculo Proceso↔Reaccion vive en useEntidadVinculosReaccion, uno por
- * proceso (se instancia desde el componente que renderiza cada
- * PlantaProceso, no acá, porque la cantidad de procesos es dinámica).
+ * vincula 1:1 una Reacción del catálogo global de Química vía reaccion_id
+ * — el CRUD de ese vínculo vive en useEntidadVinculoReaccion, instanciado
+ * desde el componente que renderiza cada PlantaProceso.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -162,13 +161,13 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
   }, []);
 
   // ── CRUD de procesos: ahora solo una etapa (descripcion) — el
-  // consume/produce vive en las Reacciones vinculadas N:N (ver
-  // useEntidadVinculosReaccion, instanciado por proceso desde la UI). ──────
+  // consume/produce vive en la Reacción vinculada 1:1 (ver
+  // useEntidadVinculoReaccion, instanciado por proceso desde la UI). ──────
   const crearProceso = useCallback(
     async () => {
       const { data, error } = await supabase
         .from("planta_procesos")
-        .insert([{ planta_id: plantaId, descripcion: null }])
+        .insert([{ planta_id: plantaId, descripcion: null, reaccion_id: null }])
         .select()
         .single();
 

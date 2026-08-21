@@ -37,8 +37,8 @@ import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
 } from "@/domains/garlia/_shared/useEditorHeaderControls";
-import { SeccionReaccionesVinculadas } from "@/domains/garlia/_shared/SeccionReaccionesVinculadas";
-import { useEntidadVinculosReaccion } from "@/domains/garlia/_shared/useEntidadVinculosReaccion";
+import { SeccionReaccionVinculada } from "@/domains/garlia/_shared/SeccionReaccionVinculada";
+import { useEntidadVinculoReaccion } from "@/domains/garlia/_shared/useEntidadVinculoReaccion";
 
 import { useFlora } from "./useFlora";
 import { usePlantaOrganosProcesos } from "./usePlantaOrganosProcesos";
@@ -522,10 +522,10 @@ function OrganoCard({
 
 // ── Componente auxiliar: Tarjeta de proceso ────────────────────────────────
 // Ahora un proceso es solo una etapa del ciclo de vida (descripcion) que
-// vincula N:N Reacciones del catálogo global de Química — cada Reacción
-// vinculada trae su propio nombre/consume/produce/balance (ver
-// TarjetaReaccionVinculada). El vínculo N:N se instancia acá vía
-// useEntidadVinculosReaccion, uno por proceso.
+// vincula 1:1 una Reacción del catálogo global de Química vía reaccion_id —
+// la Reacción vinculada trae su propio nombre/consume/produce/balance (ver
+// TarjetaReaccionVinculada). El vínculo se instancia acá vía
+// useEntidadVinculoReaccion.
 interface ProcesoCardProps {
   proceso: PlantaProceso;
   onUpdate: (id: string, updates: Partial<PlantaProceso>) => void;
@@ -547,17 +547,18 @@ function ProcesoCard({
   onUpdateReaccion,
   onAbrirItem,
 }: ProcesoCardProps) {
-  const reaccionesVinculadas = useEntidadVinculosReaccion({
+  const vinculo = useEntidadVinculoReaccion({
+    tabla: "planta_procesos",
     entidadId: proceso.id,
-    tablaPuente: "planta_proceso_reacciones",
-    columnaFk: "planta_proceso_id",
+    reaccionIdActual: proceso.reaccion_id,
     catalogo: reacciones,
+    onReaccionIdCambiado: (reaccionId) => onUpdate(proceso.id, { reaccion_id: reaccionId }),
   });
 
   return (
     <div className="group py-3">
       {/* Header: solo eliminar — el proceso ya no tiene nombre propio, se
-          identifica por las reacciones que vincula. */}
+          identifica por la reacción que vincula. */}
       <div className="flex items-center justify-end mb-2 gap-2">
         <button
           onClick={onDelete}
@@ -569,19 +570,18 @@ function ProcesoCard({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-3 text-xs items-start">
-        <SeccionReaccionesVinculadas
-          items={reaccionesVinculadas.items}
+        <SeccionReaccionVinculada
+          reaccion={vinculo.reaccion}
           catalogo={reacciones}
-          loading={reaccionesVinculadas.loading}
           compuestos={compuestos}
           elementos={elementos}
-          onCrearNuevo={() => void reaccionesVinculadas.crearYVincular()}
-          onUsarExistente={(id) => void reaccionesVinculadas.vincularExistente(id)}
+          onCrearNuevo={() => void vinculo.crearYVincular()}
+          onUsarExistente={(id) => void vinculo.vincularExistente(id)}
           onUpdate={(id, updates) => {
             onUpdateReaccion(id, updates);
-            void reaccionesVinculadas.actualizar(id, updates);
+            void vinculo.actualizar(updates);
           }}
-          onDelete={(vinculoId) => void reaccionesVinculadas.desvincular(vinculoId)}
+          onQuitar={() => void vinculo.desvincular()}
           onAbrirItem={onAbrirItem}
         />
 

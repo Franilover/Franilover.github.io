@@ -199,13 +199,13 @@ export function useMineralFormacionesProcesos(
   }, []);
 
   // ── CRUD de procesos: ahora solo un evento geológico (descripcion) — el
-  // consume/produce vive en las Reacciones vinculadas N:N (ver
-  // useEntidadVinculosReaccion, instanciado por proceso desde la UI). ──────
+  // consume/produce vive en la Reacción vinculada 1:1 (ver
+  // useEntidadVinculoReaccion, instanciado por proceso desde la UI). ──────
   const crearProceso = useCallback(
     async () => {
       const { data, error } = await supabase
         .from("mineral_procesos")
-        .insert([{ mineral_id: mineralId, descripcion: null }])
+        .insert([{ mineral_id: mineralId, descripcion: null, reaccion_id: null }])
         .select()
         .single();
 

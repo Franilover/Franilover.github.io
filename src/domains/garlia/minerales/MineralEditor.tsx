@@ -38,8 +38,8 @@ import { type Compuesto, type Elemento, type GrupoCompuesto, type Reaccion } fro
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import { AfinidadEntreEntidadesPanel } from "@/domains/garlia/_shared/AfinidadEntreEntidadesPanel";
-import { SeccionReaccionesVinculadas } from "@/domains/garlia/_shared/SeccionReaccionesVinculadas";
-import { useEntidadVinculosReaccion } from "@/domains/garlia/_shared/useEntidadVinculosReaccion";
+import { SeccionReaccionVinculada } from "@/domains/garlia/_shared/SeccionReaccionVinculada";
+import { useEntidadVinculoReaccion } from "@/domains/garlia/_shared/useEntidadVinculoReaccion";
 import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
@@ -464,8 +464,9 @@ function FormacionCard({
 
 // ── Componente auxiliar: Tarjeta de proceso geológico ──────────────────────
 // Ahora un proceso es solo un evento geológico (descripcion) que vincula
-// N:N Reacciones del catálogo global de Química — cada Reacción vinculada
-// trae su propio nombre/consume/produce/balance (ver TarjetaReaccionVinculada).
+// 1:1 una Reacción del catálogo global de Química vía reaccion_id — la
+// Reacción vinculada trae su propio nombre/consume/produce/balance (ver
+// TarjetaReaccionVinculada).
 function ProcesoMineralCard({
   proceso,
   onUpdate,
@@ -483,17 +484,18 @@ function ProcesoMineralCard({
   reacciones: Reaccion[];
   onUpdateReaccion: (id: string, updates: Partial<Reaccion>) => void;
 }) {
-  const reaccionesVinculadas = useEntidadVinculosReaccion({
+  const vinculo = useEntidadVinculoReaccion({
+    tabla: "mineral_procesos",
     entidadId: proceso.id,
-    tablaPuente: "mineral_proceso_reacciones",
-    columnaFk: "mineral_proceso_id",
+    reaccionIdActual: proceso.reaccion_id,
     catalogo: reacciones,
+    onReaccionIdCambiado: (reaccionId) => onUpdate(proceso.id, { reaccion_id: reaccionId }),
   });
 
   return (
     <div className="group py-3">
       {/* Header: solo eliminar — el proceso ya no tiene nombre propio, se
-          identifica por las reacciones que vincula. */}
+          identifica por la reacción que vincula. */}
       <div className="flex items-center justify-end mb-2 gap-2">
         <button
           onClick={onDelete}
@@ -505,19 +507,18 @@ function ProcesoMineralCard({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-3 text-xs items-start">
-        <SeccionReaccionesVinculadas
-          items={reaccionesVinculadas.items}
+        <SeccionReaccionVinculada
+          reaccion={vinculo.reaccion}
           catalogo={reacciones}
-          loading={reaccionesVinculadas.loading}
           compuestos={compuestos}
           elementos={elementos}
-          onCrearNuevo={() => void reaccionesVinculadas.crearYVincular()}
-          onUsarExistente={(id) => void reaccionesVinculadas.vincularExistente(id)}
+          onCrearNuevo={() => void vinculo.crearYVincular()}
+          onUsarExistente={(id) => void vinculo.vincularExistente(id)}
           onUpdate={(id, updates) => {
             onUpdateReaccion(id, updates);
-            void reaccionesVinculadas.actualizar(id, updates);
+            void vinculo.actualizar(updates);
           }}
-          onDelete={(vinculoId) => void reaccionesVinculadas.desvincular(vinculoId)}
+          onQuitar={() => void vinculo.desvincular()}
         />
 
         <div>

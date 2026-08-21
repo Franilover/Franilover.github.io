@@ -42,9 +42,9 @@ import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPag
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { ReaccionPanelFlotante } from "@/domains/garlia/elementos/ReaccionesPage";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
-import { useEntidadVinculosReaccion } from "@/domains/garlia/_shared/useEntidadVinculosReaccion";
+import { useItemHabilidadReaccion } from "@/domains/garlia/_shared/useItemHabilidadReaccion";
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
-import { SeccionReaccionesVinculadas } from "@/domains/garlia/_shared/SeccionReaccionesVinculadas";
+import { SeccionReaccionVinculada } from "@/domains/garlia/_shared/SeccionReaccionVinculada";
 
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
@@ -111,15 +111,13 @@ export function EditorItem({
     tipoNuevoGrupo: "estructura",
   });
 
-  // Habilidades del item = Reacciones del catálogo global de Química
-  // vinculadas N:N (tabla puente item_habilidades, ahora con reaccion_id en
-  // vez de grupo_compuesto_id). Editar la Reacción acá afecta a todo lo que
+  // Habilidad del item = 1 sola Reacción del catálogo global de Química,
+  // vinculada 1:1 vía la tabla puente item_habilidades (item_id, reaccion_id
+  // — una sola fila por item). Editar la Reacción acá afecta a todo lo que
   // la use — Procesos de Flora/Minerales incluidos.
   const { items: reacciones, setItems: setReacciones } = useReacciones();
-  const habilidades = useEntidadVinculosReaccion({
-    entidadId: item.id,
-    tablaPuente: "item_habilidades",
-    columnaFk: "item_id",
+  const habilidad = useItemHabilidadReaccion({
+    itemId: item.id,
     catalogo: reacciones,
   });
 
@@ -356,22 +354,21 @@ export function EditorItem({
                   global de Química (consume/produce), vinculadas N:N igual
                   que Procesos de Flora/Minerales. Editar una Reacción acá
                   afecta a todo lo que la use. */}
-              <SeccionReaccionesVinculadas
-                titulo="Poderes / Habilidades"
+              <SeccionReaccionVinculada
+                titulo="Poder / Habilidad"
                 descripcion="Reacción química que le da su efecto a este ítem."
                 icono={Sparkles}
-                items={habilidades.items}
+                reaccion={habilidad.reaccion}
                 catalogo={reacciones}
-                loading={habilidades.loading}
                 compuestos={compuestos}
                 elementos={elementos}
-                onCrearNuevo={() => void habilidades.crearYVincular()}
-                onUsarExistente={(id) => void habilidades.vincularExistente(id)}
+                onCrearNuevo={() => void habilidad.crearYVincular()}
+                onUsarExistente={(id) => void habilidad.vincularExistente(id)}
                 onUpdate={(id, updates) => {
                   onReaccionActualizadaLocal(id, updates);
-                  void habilidades.actualizar(id, updates);
+                  void habilidad.actualizar(updates);
                 }}
-                onDelete={(vinculoId) => void habilidades.desvincular(vinculoId)}
+                onQuitar={() => void habilidad.desvincular()}
                 onAbrirItem={(it) => setEditandoCompuestoId(it.tipo === "compuesto" ? it.id : null)}
                 onAbrirReaccion={setEditandoReaccionId}
                 labelCrear="Crear habilidad nueva"

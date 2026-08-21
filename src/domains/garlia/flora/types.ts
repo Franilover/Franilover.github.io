@@ -59,32 +59,19 @@ export interface PlantaOrganoResuelto extends GrupoCompuesto {
 /**
  * Etapa del ciclo de vida de una planta (ej. "Floración", "Fructificación").
  * Ya NO tiene consume/produce propios ni nombre — es un contenedor que
- * vincula N:N Reacciones del catálogo global de Química (tabla puente
- * `planta_proceso_reacciones`). Cada Reacción vinculada trae su propio
- * nombre, consume/produce y balance — ver useReacciones /
- * useEntidadVinculosReaccion. Esto reemplaza el viejo modelo donde
- * PlantaProceso tenía su propio consume/produce inline sin catálogo
- * compartido.
+ * vincula 1:1 una Reacción del catálogo global de Química vía reaccion_id.
+ * La Reacción vinculada trae su propio nombre, consume/produce y balance —
+ * ver useReacciones / useEntidadVinculoReaccion.
  */
 export interface PlantaProceso {
   id: string;
   planta_id: string;
+  /** Reacción vinculada del catálogo global — 1:1, null si aún no se eligió. */
+  reaccion_id: string | null;
   /** Descripción libre de la etapa (condiciones ambientales, contexto, etc) */
   descripcion: string | null;
   created_at: string;
   updated_at: string;
-}
-
-/**
- * Vínculo N:N entre PlantaProceso y Reaccion (tabla puente
- * `planta_proceso_reacciones`). Ver ReaccionVinculadaResuelta en
- * useEntidadVinculosReaccion para la vista ya resuelta contra el catálogo.
- */
-export interface PlantaProcesoReaccion {
-  id: string;
-  planta_proceso_id: string;
-  reaccion_id: string;
-  created_at: string;
 }
 
 export type FloraInput = Partial<
@@ -94,4 +81,4 @@ export type FloraInput = Partial<
   >
 >;
 
-export type PlantaProcesoInput = Partial<Pick<PlantaProceso, "descripcion">>;
+export type PlantaProcesoInput = Partial<Pick<PlantaProceso, "reaccion_id" | "descripcion">>;

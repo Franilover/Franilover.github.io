@@ -18,7 +18,13 @@ import React from "react";
 import type { Compuesto, Elemento, Reaccion } from "@/domains/garlia/elementos/types";
 import { SelectorConsumeProduce, type ItemProceso } from "@/domains/garlia/flora/SelectorConsumeProduce";
 import { BalanceProcesoPanel } from "@/domains/garlia/_shared/BalanceProcesoPanel";
-import type { ReaccionVinculadaResuelta } from "@/domains/garlia/_shared/useEntidadVinculosReaccion";
+
+/** Reaccion + un id de "vínculo" (hoy siempre = reaccion.id, ya que el
+ *  modelo es 1:1 sin tabla puente) — se mantiene el shape para no acoplar
+ *  esta tarjeta a los detalles de cómo cada consumidor guarda el vínculo. */
+export interface ReaccionVinculadaResuelta extends Reaccion {
+  vinculo_id: string;
+}
 
 export function TarjetaReaccionVinculada({
   reaccion,
