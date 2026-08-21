@@ -485,6 +485,14 @@ function OrganoCard({
             onAbrirCompuesto={onAbrirCompuesto}
             ocultarBotonAgregar
             gruposCompuestos={gruposCompuestos}
+            onUsarGrupo={(grupoElegido) => {
+              // Solo copiamos el nombre del grupo si todavía no hay uno
+              // propio puesto — no pisamos un nombre que el usuario ya
+              // escribió.
+              if ((organo.nombre ?? "").trim() === "") {
+                onUpdate(organo.id, { nombre: grupoElegido.nombre });
+              }
+            }}
           />
         </div>
 

@@ -446,6 +446,14 @@ function FormacionCard({
             componentes={(formacion.componentes ?? []) as ComponenteOrgano[]}
             onChange={(componentes) => onUpdate(formacion.id, { componentes })}
             gruposCompuestos={gruposCompuestos}
+            onUsarGrupo={(grupoElegido) => {
+              // Solo copiamos el nombre del grupo si todavía no hay uno
+              // propio puesto — no pisamos un nombre que el usuario ya
+              // escribió.
+              if ((formacion.nombre ?? "").trim() === "") {
+                onUpdate(formacion.id, { nombre: grupoElegido.nombre });
+              }
+            }}
           />
         </div>
 

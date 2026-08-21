@@ -46,6 +46,11 @@ export function SelectorFormulaOrgano({
    *  partida (reemplaza la fórmula actual, sin acoplar tablas). Omitir el
    *  prop oculta el botón. */
   gruposCompuestos?: GrupoCompuesto[];
+  /** Se llama con el GrupoCompuesto completo elegido en "Usar grupo",
+   *  además del reemplazo de componentes vía onChange — permite que el
+   *  padre copie también el nombre u otros datos del grupo (p.ej. el
+   *  nombre del órgano/formación/parte). */
+  onUsarGrupo?: (grupo: GrupoCompuesto) => void;
 }) {
   function agregar() {
     const elegidos = new Set(componentes.map((c) => c.compuesto_id));
@@ -100,7 +105,10 @@ export function SelectorFormulaOrgano({
           {gruposCompuestos && (
             <SelectorGrupoCompuestos
               grupos={gruposCompuestos}
-              onElegir={(nuevos) => onChange(nuevos)}
+              onElegir={(nuevos, grupoElegido) => {
+                onChange(nuevos);
+                onUsarGrupo?.(grupoElegido);
+              }}
             />
           )}
         </div>
