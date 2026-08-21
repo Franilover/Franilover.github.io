@@ -81,23 +81,34 @@ export function TarjetaReaccionVinculada({
       </div>
 
       <div className="pb-2.5 flex flex-col gap-3">
-        <SelectorConsumeProduce
-          label="Consume"
-          items={(reaccion.consume ?? []) as ItemProceso[]}
-          onChange={(consume) => onUpdate(reaccion.id, { consume })}
-          elementos={elementos}
-          compuestos={compuestos}
-          onAbrirItem={onAbrirItem}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-3">
+            <SelectorConsumeProduce
+              label="Consume"
+              items={(reaccion.consume ?? []) as ItemProceso[]}
+              onChange={(consume) => onUpdate(reaccion.id, { consume })}
+              elementos={elementos}
+              compuestos={compuestos}
+              onAbrirItem={onAbrirItem}
+            />
 
-        <SelectorConsumeProduce
-          label="Produce"
-          items={(reaccion.produce ?? []) as ItemProceso[]}
-          onChange={(produce) => onUpdate(reaccion.id, { produce })}
-          elementos={elementos}
-          compuestos={compuestos}
-          onAbrirItem={onAbrirItem}
-        />
+            <SelectorConsumeProduce
+              label="Produce"
+              items={(reaccion.produce ?? []) as ItemProceso[]}
+              onChange={(produce) => onUpdate(reaccion.id, { produce })}
+              elementos={elementos}
+              compuestos={compuestos}
+              onAbrirItem={onAbrirItem}
+            />
+          </div>
+
+          <textarea
+            className="w-full h-full min-h-[3.5rem] bg-transparent px-0 py-1 text-xs text-primary/70 resize-none outline-none placeholder:text-primary/25"
+            placeholder="Descripción / condiciones de esta reacción…"
+            value={reaccion.descripcion ?? ""}
+            onChange={(e) => onUpdate(reaccion.id, { descripcion: e.target.value })}
+          />
+        </div>
 
         <BalanceProcesoPanel
           consume={(reaccion.consume ?? []) as ItemProceso[]}
@@ -105,13 +116,6 @@ export function TarjetaReaccionVinculada({
           compuestos={compuestos}
           elementos={elementos}
           onAutocompletar={(produce) => onUpdate(reaccion.id, { produce })}
-        />
-
-        <textarea
-          className="w-full min-h-[3.5rem] bg-transparent px-0 py-1 text-xs text-primary/70 resize-none outline-none placeholder:text-primary/25"
-          placeholder="Descripción / condiciones de esta reacción…"
-          value={reaccion.descripcion ?? ""}
-          onChange={(e) => onUpdate(reaccion.id, { descripcion: e.target.value })}
         />
       </div>
     </div>
