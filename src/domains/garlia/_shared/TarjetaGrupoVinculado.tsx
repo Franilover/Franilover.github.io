@@ -59,8 +59,13 @@ export function TarjetaGrupoVinculado({
     });
   }
 
-  function usarGrupo(nuevos: { compuesto_id: string; cantidad: number }[]) {
-    onUpdate(grupo.id, { componentes: nuevos });
+  function usarGrupo(nuevos: { compuesto_id: string; cantidad: number }[], grupoElegido: GrupoCompuesto) {
+    onUpdate(grupo.id, {
+      componentes: nuevos,
+      // Solo copiamos el nombre del grupo si todavía no hay uno propio
+      // puesto — no queremos pisar un nombre que el usuario ya escribió.
+      ...((grupo.nombre ?? "").trim() === "" ? { nombre: grupoElegido.nombre } : {}),
+    });
   }
 
   return (
@@ -132,8 +137,8 @@ export function TarjetaGrupoVinculado({
                     </button>
                     <SelectorGrupoCompuestos
                       grupos={gruposCompuestos}
-                      onElegir={(nuevos) => {
-                        usarGrupo(nuevos);
+                      onElegir={(nuevos, grupoElegido) => {
+                        usarGrupo(nuevos, grupoElegido);
                         setUsarGrupoAbierto(false);
                       }}
                       ocultarBoton

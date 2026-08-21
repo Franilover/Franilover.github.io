@@ -28,9 +28,13 @@ export function SelectorGrupoCompuestos({
 }: {
   grupos: GrupoCompuesto[];
   /** Se llama con los componentes del grupo elegido, ya copiados
-   *  ({compuesto_id, cantidad}[]) — el consumidor decide si reemplaza o
-   *  fusiona con la fórmula actual. */
-  onElegir: (componentes: { compuesto_id: string; cantidad: number }[]) => void;
+   *  ({compuesto_id, cantidad}[]), y el grupo completo elegido (para que el
+   *  consumidor pueda copiar también su nombre u otros datos si quiere) —
+   *  el consumidor decide si reemplaza o fusiona con la fórmula actual. */
+  onElegir: (
+    componentes: { compuesto_id: string; cantidad: number }[],
+    grupo: GrupoCompuesto,
+  ) => void;
   /** Texto del botón — por defecto "Usar grupo". */
   label?: string;
   /** Oculta el botón propio — usar cuando el padre controla la apertura
@@ -60,7 +64,10 @@ export function SelectorGrupoCompuestos({
   }, [grupos, busqueda]);
 
   function elegir(g: GrupoCompuesto) {
-    onElegir((g.componentes ?? []).map((c) => ({ compuesto_id: c.compuesto_id, cantidad: c.cantidad })));
+    onElegir(
+      (g.componentes ?? []).map((c) => ({ compuesto_id: c.compuesto_id, cantidad: c.cantidad })),
+      g,
+    );
     setAbierto(false);
     setBusqueda("");
   }
