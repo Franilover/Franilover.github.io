@@ -30,6 +30,7 @@ export function SelectorFormulaOrgano({
   onAbrirCompuesto,
   ocultarBotonAgregar,
   gruposCompuestos,
+  onUsarGrupo,
 }: {
   compuestos: Compuesto[];
   componentes: ComponenteOrgano[];
