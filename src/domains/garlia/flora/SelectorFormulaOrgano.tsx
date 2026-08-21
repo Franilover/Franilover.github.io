@@ -107,8 +107,17 @@ export function SelectorFormulaOrgano({
             <SelectorGrupoCompuestos
               grupos={gruposCompuestos}
               onElegir={(nuevos, grupoElegido) => {
-                onChange(nuevos);
-                onUsarGrupo?.(grupoElegido);
+                if (onUsarGrupo) {
+                  // El padre maneja esto como un cambio de vínculo (reemplaza
+                  // a qué GrupoCompuesto apunta la entidad) — no mutamos acá
+                  // el grupo actualmente vinculado.
+                  onUsarGrupo(grupoElegido);
+                } else {
+                  // Sin onUsarGrupo: comportamiento original, copia la
+                  // fórmula del grupo elegido como punto de partida editable
+                  // (reemplaza solo los componentes locales).
+                  onChange(nuevos);
+                }
               }}
             />
           )}

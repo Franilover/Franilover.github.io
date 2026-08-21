@@ -106,6 +106,18 @@ export function SeccionGruposVinculados({
               grupo={item}
               onUpdate={onUpdate}
               onDelete={() => onDelete(item.vinculo_id)}
+              onCambiarGrupo={(grupoCompuestoId) => {
+                // "Usar grupo" cambia a qué GrupoCompuesto apunta este
+                // vínculo (reemplaza el vínculo), en vez de mutar el grupo
+                // actualmente vinculado — así el título se actualiza al
+                // del grupo elegido.
+                if (grupoCompuestoId === item.id) return;
+                const yaVinculado = items.some(
+                  (i) => i.id === grupoCompuestoId && i.vinculo_id !== item.vinculo_id,
+                );
+                onDelete(item.vinculo_id);
+                if (!yaVinculado) onUsarExistente(grupoCompuestoId);
+              }}
               compuestos={compuestos}
               onAbrirCompuesto={onAbrirCompuesto}
               onAbrirGrupo={onAbrirGrupo}

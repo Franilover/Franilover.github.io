@@ -320,6 +320,21 @@ export function MineralEditor({
                               void actualizarFormacion(id, updates);
                             }}
                             onDelete={() => void eliminarFormacion(formacion.vinculo_id)}
+                            onCambiarGrupo={(grupoCompuestoId) => {
+                              // "Usar grupo" cambia a qué GrupoCompuesto
+                              // apunta esta formación (reemplaza el vínculo),
+                              // en vez de mutar el grupo actualmente
+                              // vinculado — así el título se actualiza al
+                              // del grupo elegido.
+                              if (grupoCompuestoId === formacion.id) return;
+                              const yaVinculado = formaciones.some(
+                                (f) =>
+                                  f.id === grupoCompuestoId &&
+                                  f.vinculo_id !== formacion.vinculo_id,
+                              );
+                              void eliminarFormacion(formacion.vinculo_id);
+                              if (!yaVinculado) void vincularFormacionExistente(grupoCompuestoId);
+                            }}
                             compuestos={compuestos}
                             gruposCompuestos={gruposCompuestos}
                           />
@@ -411,12 +426,17 @@ function FormacionCard({
   formacion,
   onUpdate,
   onDelete,
+  onCambiarGrupo,
   compuestos,
   gruposCompuestos,
 }: {
   formacion: MineralFormacion;
   onUpdate: (id: string, updates: Partial<MineralFormacion>) => void;
   onDelete: () => void;
+  /** "Usar grupo": cambia a qué GrupoCompuesto apunta esta formación
+   *  (reemplaza el vínculo mineral↔grupo), en vez de mutar el contenido
+   *  del grupo actualmente vinculado. */
+  onCambiarGrupo: (grupoCompuestoId: string) => void;
   compuestos: Compuesto[];
   gruposCompuestos?: GrupoCompuesto[];
 }) {
@@ -446,14 +466,7 @@ function FormacionCard({
             componentes={(formacion.componentes ?? []) as ComponenteOrgano[]}
             onChange={(componentes) => onUpdate(formacion.id, { componentes })}
             gruposCompuestos={gruposCompuestos}
-            onUsarGrupo={(grupoElegido) => {
-              // Solo copiamos el nombre del grupo si todavía no hay uno
-              // propio puesto — no pisamos un nombre que el usuario ya
-              // escribió.
-              if ((formacion.nombre ?? "").trim() === "") {
-                onUpdate(formacion.id, { nombre: grupoElegido.nombre });
-              }
-            }}
+            onUsarGrupo={(grupoElegido) => onCambiarGrupo(grupoElegido.id)}
           />
         </div>
 

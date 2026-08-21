@@ -24,6 +24,7 @@ export function TarjetaGrupoVinculado({
   grupo,
   onUpdate,
   onDelete,
+  onCambiarGrupo,
   compuestos,
   onAbrirCompuesto,
   onAbrirGrupo,
@@ -35,6 +36,11 @@ export function TarjetaGrupoVinculado({
   grupo: GrupoVinculadoResuelto;
   onUpdate: (id: string, updates: Partial<GrupoCompuesto>) => void;
   onDelete: () => void;
+  /** "Usar grupo": cambia a qué GrupoCompuesto apunta este vínculo
+   *  (reemplaza el vínculo entidad↔grupo), en vez de mutar el contenido
+   *  del grupo actualmente vinculado — así el título se actualiza al del
+   *  grupo elegido y no se pisa el catálogo compartido. */
+  onCambiarGrupo: (grupoCompuestoId: string) => void;
   compuestos: Compuesto[];
   onAbrirCompuesto?: (compuestoId: string) => void;
   /** Abre este grupo en el panel flotante (GrupoCompuestoPanelFlotante) —
@@ -56,15 +62,6 @@ export function TarjetaGrupoVinculado({
     if (!primero) return;
     onUpdate(grupo.id, {
       componentes: [...componentes, { compuesto_id: primero.id, cantidad: 1 }],
-    });
-  }
-
-  function usarGrupo(nuevos: { compuesto_id: string; cantidad: number }[], grupoElegido: GrupoCompuesto) {
-    onUpdate(grupo.id, {
-      componentes: nuevos,
-      // Solo copiamos el nombre del grupo si todavía no hay uno propio
-      // puesto — no queremos pisar un nombre que el usuario ya escribió.
-      ...((grupo.nombre ?? "").trim() === "" ? { nombre: grupoElegido.nombre } : {}),
     });
   }
 
@@ -137,8 +134,8 @@ export function TarjetaGrupoVinculado({
                     </button>
                     <SelectorGrupoCompuestos
                       grupos={gruposCompuestos}
-                      onElegir={(nuevos, grupoElegido) => {
-                        usarGrupo(nuevos, grupoElegido);
+                      onElegir={(_nuevos, grupoElegido) => {
+                        onCambiarGrupo(grupoElegido.id);
                         setUsarGrupoAbierto(false);
                       }}
                       ocultarBoton

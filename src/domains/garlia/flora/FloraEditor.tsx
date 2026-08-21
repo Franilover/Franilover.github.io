@@ -321,6 +321,19 @@ export function FloraEditorMejorado({
                             void actualizarOrgano(id, updates);
                           }}
                           onDelete={() => void desvincularOrgano(organo.vinculo_id)}
+                          onCambiarGrupo={(grupoCompuestoId) => {
+                            // "Usar grupo" cambia a qué GrupoCompuesto apunta
+                            // esta parte de la planta (reemplaza el vínculo),
+                            // en vez de mutar el grupo actualmente vinculado
+                            // — así el título se actualiza al del grupo
+                            // elegido y no se pisa el catálogo compartido.
+                            if (grupoCompuestoId === organo.id) return; // ya es este mismo grupo
+                            const yaVinculado = organos.some(
+                              (o) => o.id === grupoCompuestoId && o.vinculo_id !== organo.vinculo_id,
+                            );
+                            void desvincularOrgano(organo.vinculo_id);
+                            if (!yaVinculado) void vincularOrganoExistente(grupoCompuestoId);
+                          }}
                           compuestos={compuestos}
                           elementos={elementos}
                           onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
@@ -439,6 +452,11 @@ interface OrganoCardProps {
   organo: PlantaOrganoResuelto;
   onUpdate: (id: string, updates: Partial<PlantaOrganoResuelto>) => void;
   onDelete: () => void;
+  /** "Usar grupo": cambia a qué GrupoCompuesto apunta esta parte de la
+   *  planta (reemplaza el vínculo planta↔grupo), en vez de mutar el
+   *  contenido del grupo actualmente vinculado. Así el título se actualiza
+   *  al nombre del grupo elegido, y no se pisa el catálogo compartido. */
+  onCambiarGrupo: (grupoCompuestoId: string) => void;
   compuestos: Compuesto[];
   elementos: Elemento[];
   onAbrirCompuesto?: (compuestoId: string) => void;
@@ -449,6 +467,7 @@ function OrganoCard({
   organo,
   onUpdate,
   onDelete,
+  onCambiarGrupo,
   compuestos,
   elementos,
   onAbrirCompuesto,
@@ -485,14 +504,7 @@ function OrganoCard({
             onAbrirCompuesto={onAbrirCompuesto}
             ocultarBotonAgregar
             gruposCompuestos={gruposCompuestos}
-            onUsarGrupo={(grupoElegido) => {
-              // Solo copiamos el nombre del grupo si todavía no hay uno
-              // propio puesto — no pisamos un nombre que el usuario ya
-              // escribió.
-              if ((organo.nombre ?? "").trim() === "") {
-                onUpdate(organo.id, { nombre: grupoElegido.nombre });
-              }
-            }}
+            onUsarGrupo={(grupoElegido) => onCambiarGrupo(grupoElegido.id)}
           />
         </div>
 
