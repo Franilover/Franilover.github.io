@@ -16,9 +16,13 @@
 import { Plus, Search, X, type LucideIcon } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
+/** Shape mínimo que necesita el selector — GrupoCompuesto y Reaccion cumplen ambos. */
+interface CatalogoConNombre {
+  id: string;
+  nombre: string;
+}
 
-export function SelectorGrupoVinculado({
+export function SelectorGrupoVinculado<T extends CatalogoConNombre>({
   catalogo,
   yaVinculadosIds,
   onCrearNuevo,
@@ -30,12 +34,13 @@ export function SelectorGrupoVinculado({
   labelBuscar = "Buscar…",
   labelVacio = "No hay otros en el catálogo todavía",
 }: {
-  /** Catálogo de GrupoCompuesto ya filtrado por tipo (todas las entidades). */
-  catalogo: GrupoCompuesto[];
-  /** Ids de GrupoCompuesto ya vinculados a esta entidad — se excluyen de "usar existente". */
+  /** Catálogo ya filtrado por tipo/relevancia (todas las entidades). Acepta
+   *  GrupoCompuesto o Reaccion — cualquier cosa con {id, nombre}. */
+  catalogo: T[];
+  /** Ids ya vinculados a esta entidad — se excluyen de "usar existente". */
   yaVinculadosIds: Set<string>;
   onCrearNuevo: () => void;
-  onUsarExistente: (grupoCompuestoId: string) => void;
+  onUsarExistente: (id: string) => void;
   onClose: () => void;
   icono: LucideIcon;
   labelCrear?: string;

@@ -212,10 +212,12 @@ export interface ComponenteGrupoCompuesto {
  * - "estructura": además aparece en el picker de Estructura de Items — el
  *   propio Grupo ES la parte estructural (se vincula N:N a items vía
  *   item_estructura). Mismo espíritu que "organo" pero para Items.
- * - "habilidad": además aparece en el picker de Poderes/Habilidades de
- *   Items — el propio Grupo ES la habilidad (se vincula N:N a items vía
- *   item_habilidades). La fórmula de compuestos representa la
- *   "composición mágica" que le da su efecto, sin campos extra.
+ * - "habilidad": @deprecated LEGADO. Antes el propio Grupo ERA la
+ *   habilidad de un Item (vía item_habilidades). Ese rol lo cumple ahora el
+ *   catálogo de Reacciones (ver elementos/types.ts → Reaccion,
+ *   item_habilidades apunta a reaccion_id). Se mantiene en el union type
+ *   solo por si quedan filas viejas con este tag en la base — ya NO
+ *   aparece como opción en TIPOS_GRUPO_COMPUESTO ni en ningún picker activo.
  */
 export type TipoGrupoCompuesto = "generico" | "organo" | "formacion" | "estructura" | "habilidad";
 
@@ -224,7 +226,6 @@ export const TIPOS_GRUPO_COMPUESTO: { value: TipoGrupoCompuesto; label: string }
   { value: "organo", label: "Órgano (Flora)" },
   { value: "formacion", label: "Formación (Minerales)" },
   { value: "estructura", label: "Estructura (Ítems)" },
-  { value: "habilidad", label: "Habilidad (Ítems)" },
 ];
 
 /** Fila cruda tal cual vive en Supabase (tabla "grupos_compuestos"). */
@@ -243,6 +244,35 @@ export interface GrupoCompuesto {
 export const CONFIG_GRUPOS_COMPUESTOS = {
   tabla: "grupos_compuestos",
   select: "id, nombre, notas, componentes, tipo, created_at, updated_at",
+};
+
+// ─── Reacciones: recetas reutilizables de consume/produce ──────────────────
+// Catálogo global (Química, debajo de Grupos de Compuestos) de reacciones
+// con nombre + consume[] + produce[] + descripción — mismo shape que
+// PlantaProceso/MineralProceso, pero como entidad compartida propia en vez
+// de vivir 1:1 dentro de una planta/mineral. Pensada para vincularse en
+// vivo desde Procesos (Flora/Minerales) y Habilidades (Items): editar la
+// Reacción en el catálogo actualiza todos los lugares que la usan.
+export interface EntradaReaccion {
+  tipo: "elemento" | "compuesto";
+  id: string;
+  cantidad: number;
+}
+
+/** Fila cruda tal cual vive en Supabase (tabla "reacciones"). */
+export interface Reaccion {
+  id: string;
+  nombre: string;
+  consume: EntradaReaccion[];
+  produce: EntradaReaccion[];
+  descripcion: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export const CONFIG_REACCIONES = {
+  tabla: "reacciones",
+  select: "id, nombre, consume, produce, descripcion, created_at, updated_at",
 };
 
 /** Compacta un ParticleMap en algo tipo "2M 1P" para tarjetas/resúmenes. */

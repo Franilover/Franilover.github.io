@@ -32,12 +32,14 @@ import { type SaveStatus } from "@/ui/saveStatus";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
-import { type Compuesto, type Elemento, type GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import { type Compuesto, type Elemento, type GrupoCompuesto, type Reaccion } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
-import { BalanceProcesoPanel } from "@/domains/garlia/_shared/BalanceProcesoPanel";
 import { AfinidadEntreEntidadesPanel } from "@/domains/garlia/_shared/AfinidadEntreEntidadesPanel";
+import { SeccionReaccionesVinculadas } from "@/domains/garlia/_shared/SeccionReaccionesVinculadas";
+import { useEntidadVinculosReaccion } from "@/domains/garlia/_shared/useEntidadVinculosReaccion";
 import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
@@ -51,7 +53,6 @@ import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPo
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
 import { SelectorFormulaOrgano, type ComponenteOrgano } from "@/domains/garlia/flora/SelectorFormulaOrgano";
-import { SelectorConsumeProduce, type ItemProceso } from "@/domains/garlia/flora/SelectorConsumeProduce";
 import { SelectorFormacionMineral } from "./SelectorFormacionMineral";
 
 export function MineralEditor({
@@ -66,6 +67,7 @@ export function MineralEditor({
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
   const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
+  const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useMinerales();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
     useEcosistemas();
@@ -355,6 +357,12 @@ export function MineralEditor({
                             onDelete={() => eliminarProceso(proceso.id)}
                             compuestos={compuestos}
                             elementos={elementos}
+                            reacciones={reacciones}
+                            onUpdateReaccion={(id, updates) => {
+                              setReacciones((prev) =>
+                                prev.map((r) => (r.id === id ? { ...r, ...updates } : r)),
+                              );
+                            }}
                           />
                         </div>
                       ))}
@@ -455,68 +463,70 @@ function FormacionCard({
 }
 
 // ── Componente auxiliar: Tarjeta de proceso geológico ──────────────────────
+// Ahora un proceso es solo un evento geológico (descripcion) que vincula
+// N:N Reacciones del catálogo global de Química — cada Reacción vinculada
+// trae su propio nombre/consume/produce/balance (ver TarjetaReaccionVinculada).
 function ProcesoMineralCard({
   proceso,
   onUpdate,
   onDelete,
   compuestos,
   elementos,
+  reacciones,
+  onUpdateReaccion,
 }: {
   proceso: MineralProceso;
   onUpdate: (id: string, updates: Partial<MineralProceso>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
   elementos: Elemento[];
+  reacciones: Reaccion[];
+  onUpdateReaccion: (id: string, updates: Partial<Reaccion>) => void;
 }) {
+  const reaccionesVinculadas = useEntidadVinculosReaccion({
+    entidadId: proceso.id,
+    tablaPuente: "mineral_proceso_reacciones",
+    columnaFk: "mineral_proceso_id",
+    catalogo: reacciones,
+  });
+
   return (
     <div className="group py-3">
-      {/* Header: nombre del proceso (texto libre) + eliminar (hover) */}
+      {/* Header: solo eliminar — el proceso ya no tiene nombre propio, se
+          identifica por las reacciones que vincula. */}
       <div className="flex items-center justify-between mb-2 gap-2">
-        <input
-          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
-          placeholder="Nombre del proceso (ej: Cristalización, Oxidación)…"
-          value={proceso.nombre ?? ""}
-          onChange={(e) => onUpdate(proceso.id, { nombre: e.target.value })}
-        />
+        <span className="text-micro font-black uppercase tracking-widest text-primary/30">
+          Evento geológico
+        </span>
         <button
           onClick={onDelete}
+          title="Eliminar evento"
           className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition shrink-0 opacity-0 group-hover:opacity-100"
         >
           <Trash2 size={14} />
         </button>
       </div>
 
-      {/* Contenido: columna izquierda = Consume (arriba) + Produce (abajo),
-          columna derecha = Descripción. Sin cajas anidadas. */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-3 text-xs items-start">
-        <div className="space-y-3">
-          <SelectorConsumeProduce
-            label="Consume"
-            items={(proceso.consume ?? []) as ItemProceso[]}
-            onChange={(consume) => onUpdate(proceso.id, { consume })}
-            elementos={elementos}
-            compuestos={compuestos}
-          />
-          <SelectorConsumeProduce
-            label="Produce"
-            items={(proceso.produce ?? []) as ItemProceso[]}
-            onChange={(produce) => onUpdate(proceso.id, { produce })}
-            elementos={elementos}
-            compuestos={compuestos}
-          />
-          <BalanceProcesoPanel
-            consume={(proceso.consume ?? []) as ItemProceso[]}
-            produce={(proceso.produce ?? []) as ItemProceso[]}
-            compuestos={compuestos}
-            elementos={elementos}
-            onAutocompletar={(produce) => onUpdate(proceso.id, { produce })}
-          />
-        </div>
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-3 text-xs items-start">
+        <SeccionReaccionesVinculadas
+          items={reaccionesVinculadas.items}
+          catalogo={reacciones}
+          loading={reaccionesVinculadas.loading}
+          compuestos={compuestos}
+          elementos={elementos}
+          onCrearNuevo={() => void reaccionesVinculadas.crearYVincular()}
+          onUsarExistente={(id) => void reaccionesVinculadas.vincularExistente(id)}
+          onUpdate={(id, updates) => {
+            onUpdateReaccion(id, updates);
+            void reaccionesVinculadas.actualizar(id, updates);
+          }}
+          onDelete={(vinculoId) => void reaccionesVinculadas.desvincular(vinculoId)}
+        />
 
         <div>
           <textarea
             className="w-full bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-            placeholder="Descripción del proceso (incluye condiciones geológicas, cuándo ocurre, etc)…"
+            placeholder="Descripción del evento geológico (condiciones, cuándo ocurre, etc)…"
             value={proceso.descripcion ?? ""}
             onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
             rows={5}

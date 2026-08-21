@@ -21,7 +21,11 @@
  *     puente), sin borrar el GrupoCompuesto del catálogo — así sigue
  *     disponible para otras plantas / para volver a vincularlo.
  *
- * Procesos: sin cambios de modelo, siguen 1:1 con planta_id.
+ * Procesos: ahora son solo una etapa del ciclo de vida (descripcion) que
+ * vincula N:N Reacciones del catálogo global de Química — el CRUD de cada
+ * vínculo Proceso↔Reaccion vive en useEntidadVinculosReaccion, uno por
+ * proceso (se instancia desde el componente que renderiza cada
+ * PlantaProceso, no acá, porque la cantidad de procesos es dinámica).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -157,20 +161,14 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
     await supabase.from("planta_organos").delete().eq("id", vinculoId);
   }, []);
 
-  // ── CRUD de procesos (sin cambios) ─────────────────────────────────────
+  // ── CRUD de procesos: ahora solo una etapa (descripcion) — el
+  // consume/produce vive en las Reacciones vinculadas N:N (ver
+  // useEntidadVinculosReaccion, instanciado por proceso desde la UI). ──────
   const crearProceso = useCallback(
-    async (nombre: string = "") => {
+    async () => {
       const { data, error } = await supabase
         .from("planta_procesos")
-        .insert([
-          {
-            planta_id: plantaId,
-            nombre,
-            consume: null,
-            produce: null,
-            descripcion: null,
-          },
-        ])
+        .insert([{ planta_id: plantaId, descripcion: null }])
         .select()
         .single();
 

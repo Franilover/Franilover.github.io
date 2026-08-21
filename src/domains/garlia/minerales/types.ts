@@ -62,19 +62,28 @@ export interface MineralFormacion extends GrupoCompuesto {
   vinculo_id: string;
 }
 
-/** Procesos geológicos de formación/transformación de un mineral */
+/**
+ * Evento geológico de formación/transformación de un mineral (ej.
+ * "Cristalización", "Oxidación"). Ya NO tiene consume/produce propios ni
+ * nombre — es un contenedor que vincula N:N Reacciones del catálogo global
+ * de Química (tabla puente `mineral_proceso_reacciones`), mismo patrón que
+ * PlantaProceso en Flora. Cada Reacción vinculada trae su propio nombre,
+ * consume/produce y balance.
+ */
 export interface MineralProceso {
   id: string;
   mineral_id: string;
-  /** Nombre del proceso, texto libre (ej: "Cristalización", "Oxidación"…) */
-  nombre: string;
-  /** Qué consume: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
-  consume: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
-  /** Qué produce: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
-  produce: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
   descripcion: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Vínculo N:N entre MineralProceso y Reaccion (tabla puente `mineral_proceso_reacciones`). */
+export interface MineralProcesoReaccion {
+  id: string;
+  mineral_proceso_id: string;
+  reaccion_id: string;
+  created_at: string;
 }
 
 export type MineralInput = Partial<
@@ -84,6 +93,4 @@ export type MineralInput = Partial<
   >
 >;
 
-export type MineralProcesoInput = Partial<
-  Pick<MineralProceso, "nombre" | "consume" | "produce" | "descripcion">
->;
+export type MineralProcesoInput = Partial<Pick<MineralProceso, "descripcion">>;

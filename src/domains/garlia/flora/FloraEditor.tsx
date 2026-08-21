@@ -27,7 +27,8 @@ import { type SaveStatus } from "@/ui/saveStatus";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
-import { type Compuesto, type Elemento, type GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
+import { type Compuesto, type Elemento, type GrupoCompuesto, type Reaccion } from "@/domains/garlia/elementos/types";
 import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
@@ -36,6 +37,8 @@ import {
   usePublishHeaderControls,
   type OnHeaderControlsChange,
 } from "@/domains/garlia/_shared/useEditorHeaderControls";
+import { SeccionReaccionesVinculadas } from "@/domains/garlia/_shared/SeccionReaccionesVinculadas";
+import { useEntidadVinculosReaccion } from "@/domains/garlia/_shared/useEntidadVinculosReaccion";
 
 import { useFlora } from "./useFlora";
 import { usePlantaOrganosProcesos } from "./usePlantaOrganosProcesos";
@@ -45,7 +48,7 @@ import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPo
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
 import { SelectorFormulaOrgano, type ComponenteOrgano } from "./SelectorFormulaOrgano";
-import { SelectorConsumeProduce, type ItemProceso } from "./SelectorConsumeProduce";
+import { type ItemProceso } from "./SelectorConsumeProduce";
 import { SelectorOrganoPlanta } from "./SelectorOrganoPlanta";
 
 export function FloraEditorMejorado({
@@ -60,6 +63,7 @@ export function FloraEditorMejorado({
   const { items: elementos, setItems: setElementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
   const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
+  const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useFlora();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
     useEcosistemas();
@@ -346,6 +350,15 @@ export function FloraEditorMejorado({
                           onDelete={() => eliminarProceso(proceso.id)}
                           compuestos={compuestos}
                           elementos={elementos}
+                          reacciones={reacciones}
+                          onUpdateReaccion={(id, updates) => {
+                            // Optimista: refleja el cambio en el catálogo local ya
+                            // mismo (afecta a todos los procesos/habilidades que
+                            // usan esta Reacción), y persiste vía el hook.
+                            setReacciones((prev) =>
+                              prev.map((r) => (r.id === id ? { ...r, ...updates } : r)),
+                            );
+                          }}
                           onAbrirItem={(item) => setItemAbierto({ tipo: item.tipo, id: item.id })}
                         />
                       </div>
@@ -508,12 +521,19 @@ function OrganoCard({
 }
 
 // ── Componente auxiliar: Tarjeta de proceso ────────────────────────────────
+// Ahora un proceso es solo una etapa del ciclo de vida (descripcion) que
+// vincula N:N Reacciones del catálogo global de Química — cada Reacción
+// vinculada trae su propio nombre/consume/produce/balance (ver
+// TarjetaReaccionVinculada). El vínculo N:N se instancia acá vía
+// useEntidadVinculosReaccion, uno por proceso.
 interface ProcesoCardProps {
   proceso: PlantaProceso;
   onUpdate: (id: string, updates: Partial<PlantaProceso>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
   elementos: Elemento[];
+  reacciones: Reaccion[];
+  onUpdateReaccion: (id: string, updates: Partial<Reaccion>) => void;
   onAbrirItem?: (item: ItemProceso) => void;
 }
 
@@ -523,52 +543,58 @@ function ProcesoCard({
   onDelete,
   compuestos,
   elementos,
+  reacciones,
+  onUpdateReaccion,
   onAbrirItem,
 }: ProcesoCardProps) {
+  const reaccionesVinculadas = useEntidadVinculosReaccion({
+    entidadId: proceso.id,
+    tablaPuente: "planta_proceso_reacciones",
+    columnaFk: "planta_proceso_id",
+    catalogo: reacciones,
+  });
+
   return (
     <div className="group py-3">
-      {/* Header: nombre del proceso (texto libre) + eliminar (hover) */}
+      {/* Header: solo eliminar — el proceso ya no tiene nombre propio, se
+          identifica por las reacciones que vincula. */}
       <div className="flex items-center justify-between mb-2 gap-2">
-        <input
-          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
-          placeholder="Nombre del proceso (ej: Fotosíntesis)…"
-          value={proceso.nombre ?? ""}
-          onChange={(e) => onUpdate(proceso.id, { nombre: e.target.value })}
-        />
+        <span className="text-micro font-black uppercase tracking-widest text-primary/30">
+          Etapa
+        </span>
         <button
           onClick={onDelete}
+          title="Eliminar etapa"
           className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition shrink-0 opacity-0 group-hover:opacity-100"
         >
           <Trash2 size={14} />
         </button>
       </div>
 
-      {/* Contenido: columna izquierda = Consume (arriba) + Produce (abajo),
-          columna derecha = Descripción. Sin cajas anidadas. */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.4fr] gap-x-5 gap-y-3 text-xs items-start">
-        <div className="space-y-3">
-          <SelectorConsumeProduce
-            label="Consume"
-            items={(proceso.consume ?? []) as ItemProceso[]}
-            onChange={(consume) => onUpdate(proceso.id, { consume })}
-            elementos={elementos}
-            compuestos={compuestos}
-            onAbrirItem={onAbrirItem}
-          />
-          <SelectorConsumeProduce
-            label="Produce"
-            items={(proceso.produce ?? []) as ItemProceso[]}
-            onChange={(produce) => onUpdate(proceso.id, { produce })}
-            elementos={elementos}
-            compuestos={compuestos}
-            onAbrirItem={onAbrirItem}
-          />
-        </div>
+      <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-3 text-xs items-start">
+        <SeccionReaccionesVinculadas
+          items={reaccionesVinculadas.items}
+          catalogo={reacciones}
+          loading={reaccionesVinculadas.loading}
+          compuestos={compuestos}
+          elementos={elementos}
+          onCrearNuevo={() => void reaccionesVinculadas.crearYVincular()}
+          onUsarExistente={(id) => void reaccionesVinculadas.vincularExistente(id)}
+          onUpdate={(id, updates) => {
+            onUpdateReaccion(id, updates);
+            void reaccionesVinculadas.actualizar(id, updates);
+          }}
+          onDelete={(vinculoId) => void reaccionesVinculadas.desvincular(vinculoId)}
+          onAbrirItem={onAbrirItem}
+        />
 
         <div>
+          <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1">
+            Descripción
+          </p>
           <textarea
             className="w-full bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-            placeholder="Descripción del proceso (incluye condiciones ambientales, cuándo ocurre, etc)…"
+            placeholder="Descripción de la etapa (condiciones ambientales, cuándo ocurre, etc)…"
             value={proceso.descripcion ?? ""}
             onChange={(e) => onUpdate(proceso.id, { descripcion: e.target.value })}
             rows={5}

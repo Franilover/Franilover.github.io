@@ -56,20 +56,35 @@ export interface PlantaOrganoResuelto extends GrupoCompuesto {
   vinculo_id: string;
 }
 
-/** Procesos del ciclo de vida de una planta (fotosíntesis, floración, etc) */
+/**
+ * Etapa del ciclo de vida de una planta (ej. "Floración", "Fructificación").
+ * Ya NO tiene consume/produce propios ni nombre — es un contenedor que
+ * vincula N:N Reacciones del catálogo global de Química (tabla puente
+ * `planta_proceso_reacciones`). Cada Reacción vinculada trae su propio
+ * nombre, consume/produce y balance — ver useReacciones /
+ * useEntidadVinculosReaccion. Esto reemplaza el viejo modelo donde
+ * PlantaProceso tenía su propio consume/produce inline sin catálogo
+ * compartido.
+ */
 export interface PlantaProceso {
   id: string;
   planta_id: string;
-  /** Nombre del proceso (texto libre: "fotosíntesis", "floración", etc) */
-  nombre: string;
-  /** Qué consume: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
-  consume: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
-  /** Qué produce: array de {tipo: 'elemento'|'compuesto', id, cantidad} */
-  produce: Array<{ tipo: "elemento" | "compuesto"; id: string; cantidad: number }> | null;
-  /** Descripción libre del proceso (incluye condiciones ambientales, etc) */
+  /** Descripción libre de la etapa (condiciones ambientales, contexto, etc) */
   descripcion: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Vínculo N:N entre PlantaProceso y Reaccion (tabla puente
+ * `planta_proceso_reacciones`). Ver ReaccionVinculadaResuelta en
+ * useEntidadVinculosReaccion para la vista ya resuelta contra el catálogo.
+ */
+export interface PlantaProcesoReaccion {
+  id: string;
+  planta_proceso_id: string;
+  reaccion_id: string;
+  created_at: string;
 }
 
 export type FloraInput = Partial<
@@ -79,6 +94,4 @@ export type FloraInput = Partial<
   >
 >;
 
-export type PlantaProcesoInput = Partial<
-  Pick<PlantaProceso, "nombre" | "consume" | "produce" | "descripcion">
->;
+export type PlantaProcesoInput = Partial<Pick<PlantaProceso, "descripcion">>;

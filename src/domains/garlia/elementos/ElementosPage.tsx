@@ -23,9 +23,11 @@ import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
 import { GruposCompuestosPage } from "./GruposCompuestosPage";
+import { ReaccionesPage } from "./ReaccionesPage";
 import { ElementoEditor } from "./ElementoEditor";
 import { useCompuestos } from "./useCompuestos";
 import { useGruposCompuestos } from "./useGruposCompuestos";
+import { useReacciones } from "./useReacciones";
 import {
   type EditorHeaderControls,
 } from "../_shared/useEditorHeaderControls";
@@ -40,6 +42,7 @@ import {
   type Elemento,
   type ElementFamily,
   type GrupoCompuesto,
+  type Reaccion,
 } from "./types";
 
 // ─── Descarga: todos los elementos de la Tabla Química en un solo JSON ─────
@@ -853,6 +856,42 @@ export function ElementosPage({
     }
   }
 
+  // ── Reacciones: catálogo de recetas reutilizables de consume/produce,
+  // apilado debajo de Grupos de Compuestos ────────────────────────────────
+  const {
+    items: reacciones,
+    setItems: setReacciones,
+    loading: loadingReacciones,
+  } = useReacciones();
+  const [creatingReaccion, setCreatingReaccion] = useState(false);
+
+  async function handleCreateReaccion() {
+    setCreatingReaccion(true);
+    try {
+      const { data, error } = await supabase
+        .from("reacciones")
+        .insert([{ nombre: "Nueva reacción", consume: [], produce: [] }])
+        .select()
+        .single();
+      if (error) throw error;
+      setReacciones((prev) => [...prev, data as Reaccion]);
+    } catch (e) {
+      console.error("[ElementosPage] error creando reacción:", e);
+    } finally {
+      setCreatingReaccion(false);
+    }
+  }
+
+  async function handleEliminarReaccion(id: string) {
+    try {
+      const { error } = await supabase.from("reacciones").delete().eq("id", id);
+      if (error) throw error;
+      setReacciones((prev) => prev.filter((r) => r.id !== id));
+    } catch (e) {
+      console.error("[ElementosPage] error eliminando reacción:", e);
+    }
+  }
+
   const activoId = seleccionadoId ?? seleccionarId ?? null;
   const activo = useMemo(
     () => elementos.find((e) => e.id === activoId) ?? null,
@@ -1155,6 +1194,27 @@ export function ElementosPage({
           }
           onEliminar={handleEliminarGrupoCompuesto}
           onAbrirCompuesto={(compuestoId) => setCompuestoAAbrir(compuestoId)}
+        />
+      </div>
+
+      {/* Reacciones */}
+      <div className="flex flex-col border-t border-primary/10">
+        <ReaccionesPage
+          reacciones={reacciones}
+          compuestos={compuestos}
+          elementos={elementos}
+          loading={loadingReacciones}
+          creating={creatingReaccion}
+          onCreate={handleCreateReaccion}
+          onActualizar={(id, cambios) =>
+            setReacciones((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)))
+          }
+          onEliminar={handleEliminarReaccion}
+          onAbrirItem={(item) =>
+            item.tipo === "compuesto"
+              ? setCompuestoAAbrir(item.id)
+              : setSeleccionadoId(item.id)
+          }
         />
       </div>
 

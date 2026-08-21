@@ -37,10 +37,14 @@ import { supabase } from "@/infra/supabase/supabase";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
+import { ReaccionPanelFlotante } from "@/domains/garlia/elementos/ReaccionesPage";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
+import { useEntidadVinculosReaccion } from "@/domains/garlia/_shared/useEntidadVinculosReaccion";
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
+import { SeccionReaccionesVinculadas } from "@/domains/garlia/_shared/SeccionReaccionesVinculadas";
 
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
@@ -81,6 +85,7 @@ export function EditorItem({
   const [showModalDnd, setShowModalDnd] = useState(false);
   const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
   const [editandoGrupoId, setEditandoGrupoId] = useState<string | null>(null);
+  const [editandoReaccionId, setEditandoReaccionId] = useState<string | null>(null);
   const { onWikilink } = useWikilink();
 
   // Catálogo de criaturas para el selector "Criatura" (origen del ítem)
@@ -89,16 +94,12 @@ export function EditorItem({
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
 
-  // Catálogo compartido de Grupos de Compuestos — Estructura y Habilidades
-  // de items son ambos GrupoCompuesto filtrados por tipo (mismo motor que
-  // Órganos de Flora / Formaciones de Minerales, ver useEntidadVinculosGrupo).
+  // Catálogo compartido de Grupos de Compuestos — Estructura del item es
+  // GrupoCompuesto filtrado por tipo="estructura" (mismo motor que Órganos
+  // de Flora / Formaciones de Minerales, ver useEntidadVinculosGrupo).
   const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
   const catalogoEstructura = React.useMemo(
     () => gruposCompuestos.filter((g) => g.tipo === "estructura"),
-    [gruposCompuestos],
-  );
-  const catalogoHabilidades = React.useMemo(
-    () => gruposCompuestos.filter((g) => g.tipo === "habilidad"),
     [gruposCompuestos],
   );
 
@@ -109,12 +110,17 @@ export function EditorItem({
     catalogo: catalogoEstructura,
     tipoNuevoGrupo: "estructura",
   });
-  const habilidades = useEntidadVinculosGrupo({
+
+  // Habilidades del item = Reacciones del catálogo global de Química
+  // vinculadas N:N (tabla puente item_habilidades, ahora con reaccion_id en
+  // vez de grupo_compuesto_id). Editar la Reacción acá afecta a todo lo que
+  // la use — Procesos de Flora/Minerales incluidos.
+  const { items: reacciones, setItems: setReacciones } = useReacciones();
+  const habilidades = useEntidadVinculosReaccion({
     entidadId: item.id,
     tablaPuente: "item_habilidades",
     columnaFk: "item_id",
-    catalogo: catalogoHabilidades,
-    tipoNuevoGrupo: "habilidad",
+    catalogo: reacciones,
   });
 
   function onGrupoCompuestoActualizadoLocal(id: string, updates: any) {
@@ -129,6 +135,20 @@ export function EditorItem({
     const { error } = await supabase.from("grupos_compuestos").update(cambios).eq("id", id);
     if (error) {
       console.error("[EditorItem] error guardando grupo de compuestos:", error);
+    }
+  }
+
+  function onReaccionActualizadaLocal(id: string, updates: any) {
+    setReacciones((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+  }
+
+  // Persistencia directa de la Reacción en catálogo — usada por el panel
+  // flotante (ReaccionPanelFlotante), que no sabe que se abrió desde acá.
+  async function persistirReaccion(id: string, cambios: any) {
+    onReaccionActualizadaLocal(id, cambios);
+    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
+    if (error) {
+      console.error("[EditorItem] error guardando reacción:", error);
     }
   }
 
@@ -332,30 +352,28 @@ export function EditorItem({
                 labelBuscar="Buscar parte…"
               />
 
-              {/* Poderes/Habilidades — la "composición mágica" que le da
-                  su efecto, mismo motor: GrupoCompuesto con
-                  tipo="habilidad", sin campos extra por decisión de
-                  diseño (solo nombre + fórmula + notas). */}
-              <SeccionGruposVinculados
+              {/* Poderes/Habilidades — ahora son Reacciones del catálogo
+                  global de Química (consume/produce), vinculadas N:N igual
+                  que Procesos de Flora/Minerales. Editar una Reacción acá
+                  afecta a todo lo que la use. */}
+              <SeccionReaccionesVinculadas
                 titulo="Poderes / Habilidades"
-                descripcion="Composición mágica que le da su efecto a este ítem."
+                descripcion="Reacción química que le da su efecto a este ítem."
                 icono={Sparkles}
                 items={habilidades.items}
-                catalogo={catalogoHabilidades}
+                catalogo={reacciones}
                 loading={habilidades.loading}
                 compuestos={compuestos}
-                gruposCompuestos={gruposCompuestos}
+                elementos={elementos}
                 onCrearNuevo={() => void habilidades.crearYVincular()}
                 onUsarExistente={(id) => void habilidades.vincularExistente(id)}
                 onUpdate={(id, updates) => {
-                  onGrupoCompuestoActualizadoLocal(id, updates);
+                  onReaccionActualizadaLocal(id, updates);
                   void habilidades.actualizar(id, updates);
                 }}
                 onDelete={(vinculoId) => void habilidades.desvincular(vinculoId)}
-                onAbrirCompuesto={setEditandoCompuestoId}
-                onAbrirGrupo={setEditandoGrupoId}
-                placeholderNombre="Nombre del poder (ej: Filo ardiente)…"
-                placeholderNotas="Notas de esta habilidad…"
+                onAbrirItem={(it) => setEditandoCompuestoId(it.tipo === "compuesto" ? it.id : null)}
+                onAbrirReaccion={setEditandoReaccionId}
                 labelCrear="Crear habilidad nueva"
                 labelExistente="Usar una existente"
                 labelBuscar="Buscar habilidad…"
@@ -407,6 +425,17 @@ export function EditorItem({
           onCerrar={() => setEditandoGrupoId(null)}
           onActualizar={persistirGrupoCompuesto}
           onAbrirCompuesto={setEditandoCompuestoId}
+        />
+      )}
+
+      {editandoReaccionId && (
+        <ReaccionPanelFlotante
+          reaccion={reacciones.find((r) => r.id === editandoReaccionId)!}
+          compuestos={compuestos}
+          elementos={elementos}
+          onCerrar={() => setEditandoReaccionId(null)}
+          onActualizar={persistirReaccion}
+          onAbrirItem={(it) => setEditandoCompuestoId(it.tipo === "compuesto" ? it.id : null)}
         />
       )}
     </div>
