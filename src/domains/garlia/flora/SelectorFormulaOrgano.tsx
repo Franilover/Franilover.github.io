@@ -12,7 +12,7 @@
  * Reemplaza la versión anterior que apuntaba a Elementos por nombre.
  */
 
-import { Plus, Trash2, Pencil } from "lucide-react";
+import { Plus, Trash2, Pencil, MoreVertical } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import type { Compuesto, GrupoCompuesto } from "@/domains/garlia/elementos/types";
@@ -131,6 +131,7 @@ function FilaComponenteOrgano({
   const [busqueda, setBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [activo, setActivo] = useState(0);
+  const [menuAbierto, setMenuAbierto] = useState(false);
 
   const elegido = useMemo(
     () => compuestos.find((c) => c.id === componente.compuesto_id) ?? null,
@@ -242,35 +243,67 @@ function FilaComponenteOrgano({
         )}
       </div>
 
-      {/* Stepper cantidad */}
-      <div className="shrink-0 flex items-center gap-1.5 text-primary/50">
-        <button
-          type="button"
-          onClick={() => onChange({ cantidad: Math.max(1, componente.cantidad - 1) })}
-          className="w-5 h-5 flex items-center justify-center rounded hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-        >
-          −
-        </button>
-        <span className="w-4 text-center text-micro font-black text-primary tabular-nums">
-          {componente.cantidad}
-        </span>
-        <button
-          type="button"
-          onClick={() => onChange({ cantidad: componente.cantidad + 1 })}
-          className="w-5 h-5 flex items-center justify-center rounded hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-        >
-          +
-        </button>
-      </div>
+      {/* Cantidad (solo lectura acá; se edita desde el menú de 3 puntos) */}
+      <span className="shrink-0 w-4 text-center text-micro font-black text-primary tabular-nums">
+        {componente.cantidad}
+      </span>
 
-      <button
-        type="button"
-        onClick={onQuitar}
-        title="Quitar"
-        className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-red-400/40 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+      {/* Menú de 3 puntos: stepper +/- y Quitar */}
+      <div
+        className="relative shrink-0"
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setMenuAbierto(false);
+        }}
       >
-        <Trash2 size={11} />
-      </button>
+        <button
+          type="button"
+          onClick={() => setMenuAbierto((v) => !v)}
+          title="Más opciones"
+          className="w-5 h-5 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+        >
+          <MoreVertical size={12} />
+        </button>
+
+        {menuAbierto && (
+          <div
+            className="absolute z-20 mt-1 right-0 rounded-md border shadow-lg overflow-hidden"
+            style={{
+              background: "var(--bg-main)",
+              borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+            }}
+          >
+            <div className="flex items-center justify-center gap-2 px-3 py-2 whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => onChange({ cantidad: Math.max(1, componente.cantidad - 1) })}
+                className="w-5 h-5 flex items-center justify-center rounded text-primary/60 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+              >
+                −
+              </button>
+              <span className="w-4 text-center text-micro font-black text-primary tabular-nums">
+                {componente.cantidad}
+              </span>
+              <button
+                type="button"
+                onClick={() => onChange({ cantidad: componente.cantidad + 1 })}
+                className="w-5 h-5 flex items-center justify-center rounded text-primary/60 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+              >
+                +
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuAbierto(false);
+                onQuitar();
+              }}
+              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-micro font-bold whitespace-nowrap text-red-400/70 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
+            >
+              <Trash2 size={11} /> Quitar
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

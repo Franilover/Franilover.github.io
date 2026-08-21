@@ -9,14 +9,15 @@
  * entidades que tengan el mismo grupo vinculado (es el catálogo compartido).
  */
 
-import { ExternalLink, Plus, Trash2 } from "lucide-react";
-import React from "react";
+import { ExternalLink, Plus, Trash2, Layers } from "lucide-react";
+import React, { useState } from "react";
 
 import type { Compuesto, GrupoCompuesto } from "@/domains/garlia/elementos/types";
 import {
   SelectorFormulaOrgano,
   type ComponenteOrgano,
 } from "@/domains/garlia/flora/SelectorFormulaOrgano";
+import { SelectorGrupoCompuestos } from "@/domains/garlia/elementos/SelectorGrupoCompuestos";
 import type { GrupoVinculadoResuelto } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 export function TarjetaGrupoVinculado({
@@ -45,6 +46,9 @@ export function TarjetaGrupoVinculado({
   placeholderNotas?: string;
   tituloEliminar?: string;
 }) {
+  const [menuAgregarAbierto, setMenuAgregarAbierto] = useState(false);
+  const [usarGrupoAbierto, setUsarGrupoAbierto] = useState(false);
+
   function agregarComponente() {
     const componentes = (grupo.componentes ?? []) as ComponenteOrgano[];
     const elegidos = new Set(componentes.map((c) => c.compuesto_id));
@@ -53,6 +57,10 @@ export function TarjetaGrupoVinculado({
     onUpdate(grupo.id, {
       componentes: [...componentes, { compuesto_id: primero.id, cantidad: 1 }],
     });
+  }
+
+  function usarGrupo(nuevos: { compuesto_id: string; cantidad: number }[]) {
+    onUpdate(grupo.id, { componentes: nuevos });
   }
 
   return (
@@ -75,15 +83,68 @@ export function TarjetaGrupoVinculado({
               <ExternalLink size={12} />
             </button>
           )}
-          <button
-            type="button"
-            onClick={agregarComponente}
-            disabled={compuestos.length === 0}
-            title="Agregar compuesto"
-            className="w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          <div
+            className="relative shrink-0"
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setMenuAgregarAbierto(false);
+            }}
           >
-            <Plus size={13} />
-          </button>
+            <button
+              type="button"
+              onClick={() => setMenuAgregarAbierto((v) => !v)}
+              disabled={compuestos.length === 0}
+              title="Agregar compuesto"
+              className="w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Plus size={13} />
+            </button>
+
+            {menuAgregarAbierto && (
+              <div
+                className="absolute z-20 mt-1 right-0 rounded-md border shadow-lg overflow-hidden min-w-[9rem]"
+                style={{
+                  background: "var(--bg-main)",
+                  borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    agregarComponente();
+                    setMenuAgregarAbierto(false);
+                  }}
+                  disabled={compuestos.length === 0}
+                  className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-micro font-bold whitespace-nowrap text-primary/70 hover:bg-primary/6 hover:text-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus size={11} /> Agregar
+                </button>
+                {gruposCompuestos && gruposCompuestos.length > 0 && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuAgregarAbierto(false);
+                        setUsarGrupoAbierto(true);
+                      }}
+                      className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-micro font-bold whitespace-nowrap text-primary/70 hover:bg-primary/6 hover:text-primary transition-colors cursor-pointer"
+                    >
+                      <Layers size={11} /> Usar grupo
+                    </button>
+                    <SelectorGrupoCompuestos
+                      grupos={gruposCompuestos}
+                      onElegir={(nuevos) => {
+                        usarGrupo(nuevos);
+                        setUsarGrupoAbierto(false);
+                      }}
+                      ocultarBoton
+                      abiertoControlado={usarGrupoAbierto}
+                      onAbiertoChange={setUsarGrupoAbierto}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <button
             onClick={onDelete}
             title={tituloEliminar}
@@ -94,7 +155,7 @@ export function TarjetaGrupoVinculado({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-[1.4fr_1fr] gap-x-5 gap-y-2 text-xs items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2 text-xs items-start">
         <div>
           <SelectorFormulaOrgano
             compuestos={compuestos}
@@ -102,7 +163,6 @@ export function TarjetaGrupoVinculado({
             onChange={(componentes) => onUpdate(grupo.id, { componentes })}
             onAbrirCompuesto={onAbrirCompuesto}
             ocultarBotonAgregar
-            gruposCompuestos={gruposCompuestos}
           />
         </div>
 

@@ -21,6 +21,10 @@ export function SelectorGrupoCompuestos({
   grupos,
   onElegir,
   label = "Usar grupo",
+  ocultarBoton = false,
+  abiertoControlado,
+  onAbiertoChange,
+  variant = "dashed",
 }: {
   grupos: GrupoCompuesto[];
   /** Se llama con los componentes del grupo elegido, ya copiados
@@ -29,8 +33,23 @@ export function SelectorGrupoCompuestos({
   onElegir: (componentes: { compuesto_id: string; cantidad: number }[]) => void;
   /** Texto del botón — por defecto "Usar grupo". */
   label?: string;
+  /** Oculta el botón propio — usar cuando el padre controla la apertura
+   *  externamente (p.ej. desde un ítem de un dropdown) vía abiertoControlado. */
+  ocultarBoton?: boolean;
+  /** Controla la apertura del popover desde afuera (junto con onAbiertoChange).
+   *  Si se omite, el componente maneja su propio estado interno. */
+  abiertoControlado?: boolean;
+  onAbiertoChange?: (abierto: boolean) => void;
+  /** "dashed" (por defecto): botón con borde punteado, estilo independiente.
+   *  "menuitem": se muestra como un ítem de lista dentro de otro menú. */
+  variant?: "dashed" | "menuitem";
 }) {
-  const [abierto, setAbierto] = useState(false);
+  const [abiertoInterno, setAbiertoInterno] = useState(false);
+  const abierto = abiertoControlado ?? abiertoInterno;
+  const setAbierto = (v: boolean) => {
+    if (onAbiertoChange) onAbiertoChange(v);
+    else setAbiertoInterno(v);
+  };
   const [busqueda, setBusqueda] = useState("");
   const contenedorRef = useRef<HTMLDivElement>(null);
 
@@ -49,16 +68,22 @@ export function SelectorGrupoCompuestos({
   if (grupos.length === 0) return null;
 
   return (
-    <div className="relative inline-block" ref={contenedorRef}>
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        title="Copiar la fórmula de un Grupo de Compuestos existente"
-        className="flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
-      >
-        <Layers size={10} />
-        {label}
-      </button>
+    <div className={ocultarBoton ? "relative" : "relative inline-block"} ref={contenedorRef}>
+      {!ocultarBoton && (
+        <button
+          type="button"
+          onClick={() => setAbierto(!abierto)}
+          title="Copiar la fórmula de un Grupo de Compuestos existente"
+          className={
+            variant === "menuitem"
+              ? "w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-micro font-bold whitespace-nowrap text-primary/70 hover:bg-primary/6 hover:text-primary transition-colors cursor-pointer"
+              : "flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
+          }
+        >
+          <Layers size={variant === "menuitem" ? 11 : 10} />
+          {label}
+        </button>
+      )}
 
       {abierto && (
         <>
