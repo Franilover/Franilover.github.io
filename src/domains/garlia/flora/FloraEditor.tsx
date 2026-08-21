@@ -558,10 +558,7 @@ function ProcesoCard({
     <div className="group py-3">
       {/* Header: solo eliminar — el proceso ya no tiene nombre propio, se
           identifica por las reacciones que vincula. */}
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <span className="text-micro font-black uppercase tracking-widest text-primary/30">
-          Etapa
-        </span>
+      <div className="flex items-center justify-end mb-2 gap-2">
         <button
           onClick={onDelete}
           title="Eliminar etapa"

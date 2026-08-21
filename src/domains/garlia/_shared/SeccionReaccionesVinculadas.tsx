@@ -60,11 +60,8 @@ export function SeccionReaccionesVinculadas({
   const Icono = icono;
 
   return (
-    <div className="pt-2 border-t border-primary/10">
-      <div className="flex items-center justify-between mb-1.5 relative">
-        <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40">
-          {titulo} {items.length > 0 && `(${items.length})`}
-        </span>
+    <div className="pt-1">
+      <div className="flex items-center justify-end mb-1.5 relative">
         <button
           type="button"
           onClick={() => setSelectorAbierto((v) => !v)}
@@ -95,7 +92,7 @@ export function SeccionReaccionesVinculadas({
       ) : items.length === 0 ? (
         <p className="text-micro text-primary/25 italic py-2">Nada vinculado todavía.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3 divide-y divide-primary/10">
           {items.map((item) => (
             <TarjetaReaccionVinculada
               key={item.vinculo_id}
