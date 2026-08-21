@@ -15,14 +15,28 @@
  * NO toca EditorCriatura.tsx — solo referencia criaturas por id.
  */
 
-import { Download, Loader2, Upload, X } from "lucide-react";
-import React, { useRef, useState } from "react";
+import { Dna, Download, FlaskConical, Loader2, Sprout, Upload, X } from "lucide-react";
+import React, { useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
+import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
+import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
+import type { GrupoCompuesto, Reaccion } from "@/domains/garlia/elementos/types";
 
 import { CladisticaPage } from "./CladisticaPage";
 import { useClados } from "./useBiologia";
 import type { Clado } from "./types";
+
+type TabBiologia = "cladistica" | "organos" | "procesos";
+
+const TABS_BIOLOGIA: { key: TabBiologia; label: string; icono: React.ElementType }[] = [
+  { key: "cladistica", label: "Cladística", icono: Dna },
+  { key: "organos", label: "Órganos", icono: Sprout },
+  { key: "procesos", label: "Procesos", icono: FlaskConical },
+];
 
 interface Props {
   /** El padre decide qué hacer al clickear una criatura (ej. abrir su editor). */
@@ -122,6 +136,35 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   // saca esa responsabilidad.
   const { clados, setClados } = useClados();
 
+  const [tab, setTab] = useState<TabBiologia>("cladistica");
+
+  // ── Órganos y Procesos: catálogos globales, mismo motor que Física ────
+  // Órganos = GrupoCompuesto tipo="organo" (mismo catálogo que usa Flora
+  // para vincular por planta). Procesos = todo el catálogo de Reaccion
+  // (mismo que usan Procesos de Flora/Minerales y Habilidades de Items).
+  // Self-contained, igual que el resto de Biología: trae sus propios datos
+  // acá sin tocar CladisticaPage ni depender de una planta puntual.
+  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
+  const catalogoOrganos = useMemo(
+    () => gruposCompuestos.filter((g) => g.tipo === "organo"),
+    [gruposCompuestos],
+  );
+  const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
+  const { items: compuestosCatalogo } = useCompuestos();
+  const { items: elementosCatalogo } = useElementos();
+
+  async function actualizarOrgano(id: string, cambios: Partial<GrupoCompuesto>) {
+    setGruposCompuestos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
+    const { error } = await supabase.from("grupos_compuestos").update(cambios).eq("id", id);
+    if (error) console.error("[BiologiaPage] error guardando órgano:", error);
+  }
+
+  async function actualizarProceso(id: string, cambios: Partial<Reaccion>) {
+    setReaccionesCatalogo((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
+    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
+    if (error) console.error("[BiologiaPage] error guardando proceso:", error);
+  }
+
   const inputArchivoRef = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
   const [mensajeImportacion, setMensajeImportacion] = useState<string | null>(null);
@@ -184,6 +227,30 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
 
   return (
     <div>
+      {/* Tabs: Cladística (default, comportamiento sin cambios) / Órganos /
+          Procesos — mismo lenguaje visual simple, sin depender de un
+          sistema de tabs genérico compartido para no acoplar Biología a
+          otro módulo. */}
+      <div className="flex items-center gap-1 px-2 mb-2 border-b border-primary/10">
+        {TABS_BIOLOGIA.map(({ key, label, icono: Icono }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 -mb-px border-b-2 text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
+              tab === key
+                ? "border-primary text-primary"
+                : "border-transparent text-primary/40 hover:text-primary/70"
+            }`}
+          >
+            <Icono size={12} />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "cladistica" && (
+      <>
       <div className="flex items-center justify-end gap-1 px-2 mb-1">
         <input
           ref={inputArchivoRef}
@@ -226,6 +293,34 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
       )}
 
       <CladisticaPage onSelectCriatura={onSelectCriatura} />
+      </>
+      )}
+
+      {tab === "organos" && (
+        <div className="p-2.5">
+          <GridCatalogoGrupo
+            modo="grupo"
+            titulo="Órganos"
+            icono="organo"
+            items={catalogoOrganos}
+            compuestos={compuestosCatalogo}
+            onActualizar={actualizarOrgano}
+          />
+        </div>
+      )}
+
+      {tab === "procesos" && (
+        <div className="p-2.5">
+          <GridCatalogoGrupo
+            modo="reaccion"
+            titulo="Procesos"
+            items={reaccionesCatalogo}
+            compuestos={compuestosCatalogo}
+            elementos={elementosCatalogo}
+            onActualizar={actualizarProceso}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -47,8 +47,15 @@ import {
   type Particula,
   type ParticulaBase,
 } from "./types";
+import type { GrupoCompuesto, Reaccion } from "@/domains/garlia/elementos/types";
 import { PanelEditorSubsistema } from "@/domains/garlia/runas/BloqueSubsistemasMagia";
 import type { SubsistemaMagia } from "@/domains/garlia/runas/useSubsistemasMagia";
+
+import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
+import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 
 /** Adapta un SubsistemaMagia al shape FilaCatalogo — vive acá (no en
  *  types.ts de física) para no acoplar ese módulo al dominio "runas". */
@@ -356,6 +363,34 @@ function TodasLasBasesView({
   creandoSubsistema?: boolean;
 }) {
   const catalogos = catalogosBases(particulaBase, particulas, iums, oris, subsistemas);
+
+  // ── Formaciones y Habilidades: catálogos globales, debajo de Subsistemas ──
+  // Formaciones = GrupoCompuesto tipo="formacion" (mismo catálogo que
+  // Minerales e Items). Habilidades = todo el catálogo de Reaccion (mismo
+  // que usan Procesos de Flora/Minerales y Habilidades de Items). Self-
+  // contained, mismo espíritu que el resto de Física: trae sus propios
+  // datos acá en vez de subirlos como props hasta RunasPage.
+  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
+  const catalogoFormaciones = useMemo(
+    () => gruposCompuestos.filter((g) => g.tipo === "formacion"),
+    [gruposCompuestos],
+  );
+  const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
+  const { items: compuestosCatalogo } = useCompuestos();
+  const { items: elementosCatalogo } = useElementos();
+
+  async function actualizarFormacion(id: string, cambios: Partial<GrupoCompuesto>) {
+    setGruposCompuestos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
+    const { error } = await supabase.from("grupos_compuestos").update(cambios).eq("id", id);
+    if (error) console.error("[FisicaPage] error guardando formación:", error);
+  }
+
+  async function actualizarHabilidad(id: string, cambios: Partial<Reaccion>) {
+    setReaccionesCatalogo((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
+    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
+    if (error) console.error("[FisicaPage] error guardando habilidad:", error);
+  }
+
   const [nombreNuevoSubsistema, setNombreNuevoSubsistema] = useState("");
   const [creandoAbierto, setCreandoAbierto] = useState(false);
   // Cuando se crea un subsistema nuevo, abrimos su popover automáticamente
@@ -454,6 +489,33 @@ function TodasLasBasesView({
             )}
           </div>
         ))}
+
+        {/* Formaciones y Habilidades — catálogos globales, mismo patrón que
+            los bloques de arriba pero usando el editor flotante completo
+            (GrupoCompuestoPanelFlotante / ReaccionPanelFlotante) en vez del
+            popover liviano de BasesItemCard, ya que acá el contenido
+            (fórmula de compuestos, consume/produce) es más rico. */}
+        <div className="flex flex-col gap-2 pt-2 border-t border-primary/10">
+          <GridCatalogoGrupo
+            modo="grupo"
+            titulo="Formaciones"
+            icono="formacion"
+            items={catalogoFormaciones}
+            compuestos={compuestosCatalogo}
+            onActualizar={actualizarFormacion}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2 pt-2 border-t border-primary/10">
+          <GridCatalogoGrupo
+            modo="reaccion"
+            titulo="Habilidades"
+            items={reaccionesCatalogo}
+            compuestos={compuestosCatalogo}
+            elementos={elementosCatalogo}
+            onActualizar={actualizarHabilidad}
+          />
+        </div>
       </div>
     </div>
   );

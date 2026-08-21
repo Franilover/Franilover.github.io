@@ -94,12 +94,16 @@ export function EditorItem({
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
 
-  // Catálogo compartido de Grupos de Compuestos — Estructura del item es
-  // GrupoCompuesto filtrado por tipo="estructura" (mismo motor que Órganos
-  // de Flora / Formaciones de Minerales, ver useEntidadVinculosGrupo).
+  // Catálogo compartido de Grupos de Compuestos — Estructura del item ahora
+  // usa el MISMO catálogo que Formaciones de Minerales (tipo="formacion"),
+  // no un catálogo propio. Rediseño unificado: un item y un mineral pueden
+  // compartir la misma Formación (ej. "Cristal de Cuarzo" como parte de una
+  // espada y como formación mineral), y editarla en cualquiera de los dos
+  // lugares actualiza a ambos. La tabla puente sigue siendo item_estructura
+  // (solo cambió qué catálogo se le ofrece al usuario para elegir/crear).
   const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
   const catalogoEstructura = React.useMemo(
-    () => gruposCompuestos.filter((g) => g.tipo === "estructura"),
+    () => gruposCompuestos.filter((g) => g.tipo === "formacion"),
     [gruposCompuestos],
   );
 
@@ -108,7 +112,7 @@ export function EditorItem({
     tablaPuente: "item_estructura",
     columnaFk: "item_id",
     catalogo: catalogoEstructura,
-    tipoNuevoGrupo: "estructura",
+    tipoNuevoGrupo: "formacion",
   });
 
   // Habilidades del item = N Reacciones del catálogo global de Química,
@@ -321,13 +325,14 @@ export function EditorItem({
                 }
               />
 
-              {/* Estructura — partes del ítem (mango, hoja, empuñadura…),
-                  cada una con su propia fórmula de compuestos. Mismo motor
-                  que Órganos de Flora: catálogo compartido de
-                  GrupoCompuesto con tipo="estructura". */}
+              {/* Formaciones — partes materiales del ítem (mango, hoja,
+                  empuñadura…), cada una con su propia fórmula de
+                  compuestos. Rediseño unificado: mismo catálogo global de
+                  GrupoCompuesto tipo="formacion" que usan los Minerales —
+                  ya no un catálogo propio "estructura". */}
               <SeccionGruposVinculados
-                titulo="Estructura"
-                descripcion="Partes materiales del ítem, cada una con su propia fórmula de compuestos."
+                titulo="Formaciones"
+                descripcion="Partes materiales del ítem, cada una con su propia fórmula de compuestos — mismo catálogo que las Formaciones de Minerales."
                 icono={Layers}
                 items={estructura.items}
                 catalogo={catalogoEstructura}
@@ -343,11 +348,11 @@ export function EditorItem({
                 onDelete={(vinculoId) => void estructura.desvincular(vinculoId)}
                 onAbrirCompuesto={setEditandoCompuestoId}
                 onAbrirGrupo={setEditandoGrupoId}
-                placeholderNombre="Nombre de la parte (ej: Hoja)…"
-                placeholderNotas="Notas de esta parte…"
-                labelCrear="Crear parte nueva"
+                placeholderNombre="Nombre de la formación (ej: Cuarzo)…"
+                placeholderNotas="Notas de esta formación…"
+                labelCrear="Crear formación nueva"
                 labelExistente="Usar una existente"
-                labelBuscar="Buscar parte…"
+                labelBuscar="Buscar formación…"
               />
 
               {/* Poder/Habilidad — ahora son N Reacciones del catálogo
