@@ -42,9 +42,9 @@ import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPag
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { ReaccionPanelFlotante } from "@/domains/garlia/elementos/ReaccionesPage";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
-import { useItemHabilidadReaccion } from "@/domains/garlia/_shared/useItemHabilidadReaccion";
+import { useItemHabilidadesReaccion } from "@/domains/garlia/_shared/useItemHabilidadesReaccion";
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
-import { SeccionReaccionVinculada } from "@/domains/garlia/_shared/SeccionReaccionVinculada";
+import { SeccionReaccionesVinculadas } from "@/domains/garlia/_shared/SeccionReaccionesVinculadas";
 
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
@@ -111,12 +111,12 @@ export function EditorItem({
     tipoNuevoGrupo: "estructura",
   });
 
-  // Habilidad del item = 1 sola Reacción del catálogo global de Química,
-  // vinculada 1:1 vía la tabla puente item_habilidades (item_id, reaccion_id
-  // — una sola fila por item). Editar la Reacción acá afecta a todo lo que
-  // la use — Procesos de Flora/Minerales incluidos.
+  // Habilidades del item = N Reacciones del catálogo global de Química,
+  // vinculadas N:N vía la tabla puente item_habilidades (item_id,
+  // reaccion_id — múltiples filas por item). Editar una Reacción acá afecta
+  // a todo lo que la use — Procesos de Flora/Minerales incluidos.
   const { items: reacciones, setItems: setReacciones } = useReacciones();
-  const habilidad = useItemHabilidadReaccion({
+  const habilidades = useItemHabilidadesReaccion({
     itemId: item.id,
     catalogo: reacciones,
   });
@@ -350,25 +350,27 @@ export function EditorItem({
                 labelBuscar="Buscar parte…"
               />
 
-              {/* Poder/Habilidad — ahora es 1 sola Reacción del catálogo
-                  global de Química (consume/produce), vinculada 1:1 igual
-                  que Procesos de Flora/Minerales. Editar la Reacción acá
-                  afecta a todo lo que la use. */}
-              <SeccionReaccionVinculada
+              {/* Poder/Habilidad — ahora son N Reacciones del catálogo
+                  global de Química (consume/produce), vinculadas N:N igual
+                  que Estructura. Se muestran en grid de 2 columnas (2
+                  habilidades por fila). Editar una Reacción acá afecta a
+                  todo lo que la use. */}
+              <SeccionReaccionesVinculadas
                 titulo="Poder / Habilidad"
-                descripcion="Reacción química que le da su efecto a este ítem."
+                descripcion="Reacciones químicas que le dan su efecto a este ítem."
                 icono={Sparkles}
-                reaccion={habilidad.reaccion}
+                items={habilidades.items}
                 catalogo={reacciones}
+                loading={habilidades.loading}
                 compuestos={compuestos}
                 elementos={elementos}
-                onCrearNuevo={() => void habilidad.crearYVincular()}
-                onUsarExistente={(id) => void habilidad.vincularExistente(id)}
+                onCrearNuevo={() => void habilidades.crearYVincular()}
+                onUsarExistente={(id) => void habilidades.vincularExistente(id)}
                 onUpdate={(id, updates) => {
                   onReaccionActualizadaLocal(id, updates);
-                  void habilidad.actualizar(updates);
+                  void habilidades.actualizar(id, updates);
                 }}
-                onQuitar={() => void habilidad.desvincular()}
+                onDelete={(vinculoId) => void habilidades.desvincular(vinculoId)}
                 onAbrirItem={(it) => setEditandoCompuestoId(it.tipo === "compuesto" ? it.id : null)}
                 onAbrirReaccion={setEditandoReaccionId}
                 labelCrear="Crear habilidad nueva"
