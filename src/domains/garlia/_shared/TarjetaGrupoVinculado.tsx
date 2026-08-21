@@ -64,7 +64,7 @@ export function TarjetaGrupoVinculado({
   }
 
   return (
-    <div className="group py-3 px-3 rounded-lg border border-primary/10 bg-primary/[0.02]">
+    <div className="group py-3 px-3 rounded-lg border border-primary/10">
       <div className="flex items-center justify-between mb-2 gap-2">
         <input
           className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
