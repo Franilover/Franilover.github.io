@@ -28,7 +28,7 @@ import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
-import { type Compuesto, type Elemento, type GrupoCompuesto, type Reaccion } from "@/domains/garlia/elementos/types";
+import { type Compuesto, type Elemento, type Reaccion } from "@/domains/garlia/elementos/types";
 import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
@@ -318,23 +318,9 @@ export function FloraEditorMejorado({
                             void actualizarOrgano(id, updates);
                           }}
                           onDelete={() => void desvincularOrgano(organo.vinculo_id)}
-                          onCambiarGrupo={(grupoCompuestoId) => {
-                            // "Usar grupo" cambia a qué Órgano apunta
-                            // esta parte de la planta (reemplaza el vínculo),
-                            // en vez de mutar el grupo actualmente vinculado
-                            // — así el título se actualiza al del grupo
-                            // elegido y no se pisa el catálogo compartido.
-                            if (grupoCompuestoId === organo.id) return; // ya es este mismo grupo
-                            const yaVinculado = organos.some(
-                              (o) => o.id === grupoCompuestoId && o.vinculo_id !== organo.vinculo_id,
-                            );
-                            void desvincularOrgano(organo.vinculo_id);
-                            if (!yaVinculado) void vincularOrganoExistente(grupoCompuestoId);
-                          }}
                           compuestos={compuestos}
                           elementos={elementos}
                           onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
-                          gruposCompuestos={catalogoOrganos}
                         />
                       </div>
                     ))}
@@ -449,26 +435,18 @@ interface OrganoCardProps {
   organo: PlantaOrganoResuelto;
   onUpdate: (id: string, updates: Partial<PlantaOrganoResuelto>) => void;
   onDelete: () => void;
-  /** "Usar grupo": cambia a qué GrupoCompuesto apunta esta parte de la
-   *  planta (reemplaza el vínculo planta↔grupo), en vez de mutar el
-   *  contenido del grupo actualmente vinculado. Así el título se actualiza
-   *  al nombre del grupo elegido, y no se pisa el catálogo compartido. */
-  onCambiarGrupo: (grupoCompuestoId: string) => void;
   compuestos: Compuesto[];
   elementos: Elemento[];
   onAbrirCompuesto?: (compuestoId: string) => void;
-  gruposCompuestos?: GrupoCompuesto[];
 }
 
 function OrganoCard({
   organo,
   onUpdate,
   onDelete,
-  onCambiarGrupo,
   compuestos,
   elementos,
   onAbrirCompuesto,
-  gruposCompuestos,
 }: OrganoCardProps) {
   return (
     <div className="group py-3">
@@ -500,8 +478,6 @@ function OrganoCard({
             onChange={(componentes) => onUpdate(organo.id, { componentes })}
             onAbrirCompuesto={onAbrirCompuesto}
             ocultarBotonAgregar
-            gruposCompuestos={gruposCompuestos}
-            onUsarGrupo={(grupoElegido) => onCambiarGrupo(grupoElegido.id)}
           />
         </div>
 

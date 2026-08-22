@@ -4,9 +4,9 @@
  * SeccionGruposVinculados.tsx
  * ───────────────────────────────────────────────────────────────────────────
  * Bloque completo "título + botón agregar + lista" para una relación N:N con
- * el catálogo de GrupoCompuesto (ver useEntidadVinculosGrupo). Pensado para
- * insertarse directo en un editor (ej. EditorItem) sin repetir el fontanería
- * de abrir/cerrar el popover y armar cada tarjeta.
+ * un catálogo propio (Órganos, Formaciones — ver useEntidadVinculosGrupo).
+ * Pensado para insertarse directo en un editor (ej. EditorItem) sin repetir
+ * el fontanería de abrir/cerrar el popover y armar cada tarjeta.
  */
 
 import { Plus, type LucideIcon } from "lucide-react";
@@ -25,7 +25,6 @@ export function SeccionGruposVinculados({
   catalogo,
   loading,
   compuestos,
-  gruposCompuestos,
   onCrearNuevo,
   onUsarExistente,
   onUpdate,
@@ -42,12 +41,10 @@ export function SeccionGruposVinculados({
   descripcion?: string;
   icono: LucideIcon;
   items: GrupoVinculadoResuelto[];
-  /** Catálogo completo (ya filtrado por tipo) para el picker "usar existente". */
+  /** Catálogo completo del propio módulo (Órganos, Formaciones…) para el picker "usar existente". */
   catalogo: GrupoCompuesto[];
   loading?: boolean;
   compuestos: Compuesto[];
-  /** Catálogo genérico para el botón "Usar grupo" dentro de cada fórmula (opcional). */
-  gruposCompuestos?: GrupoCompuesto[];
   onCrearNuevo: () => void;
   onUsarExistente: (grupoCompuestoId: string) => void;
   onUpdate: (id: string, updates: Partial<GrupoCompuesto>) => void;
@@ -106,22 +103,9 @@ export function SeccionGruposVinculados({
               grupo={item}
               onUpdate={onUpdate}
               onDelete={() => onDelete(item.vinculo_id)}
-              onCambiarGrupo={(grupoCompuestoId) => {
-                // "Usar grupo" cambia a qué GrupoCompuesto apunta este
-                // vínculo (reemplaza el vínculo), en vez de mutar el grupo
-                // actualmente vinculado — así el título se actualiza al
-                // del grupo elegido.
-                if (grupoCompuestoId === item.id) return;
-                const yaVinculado = items.some(
-                  (i) => i.id === grupoCompuestoId && i.vinculo_id !== item.vinculo_id,
-                );
-                onDelete(item.vinculo_id);
-                if (!yaVinculado) onUsarExistente(grupoCompuestoId);
-              }}
               compuestos={compuestos}
               onAbrirCompuesto={onAbrirCompuesto}
               onAbrirGrupo={onAbrirGrupo}
-              gruposCompuestos={gruposCompuestos}
               placeholderNombre={placeholderNombre}
               placeholderNotas={placeholderNotas}
             />

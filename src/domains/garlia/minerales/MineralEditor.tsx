@@ -34,7 +34,7 @@ import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
-import { type Compuesto, type Elemento, type GrupoCompuesto, type Reaccion } from "@/domains/garlia/elementos/types";
+import { type Compuesto, type Elemento, type Reaccion } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import { AfinidadEntreEntidadesPanel } from "@/domains/garlia/_shared/AfinidadEntreEntidadesPanel";
@@ -317,23 +317,7 @@ export function MineralEditor({
                               void actualizarFormacion(id, updates);
                             }}
                             onDelete={() => void eliminarFormacion(formacion.vinculo_id)}
-                            onCambiarGrupo={(grupoCompuestoId) => {
-                              // "Usar grupo" cambia a qué Formación apunta
-                              // esta parte del mineral (reemplaza el
-                              // vínculo), en vez de mutar la formación
-                              // actualmente vinculada — así el título se
-                              // actualiza al de la formación elegida.
-                              if (grupoCompuestoId === formacion.id) return;
-                              const yaVinculado = formaciones.some(
-                                (f) =>
-                                  f.id === grupoCompuestoId &&
-                                  f.vinculo_id !== formacion.vinculo_id,
-                              );
-                              void eliminarFormacion(formacion.vinculo_id);
-                              if (!yaVinculado) void vincularFormacionExistente(grupoCompuestoId);
-                            }}
                             compuestos={compuestos}
-                            gruposCompuestos={catalogoFormaciones}
                           />
                         </div>
                       ))}
@@ -423,19 +407,12 @@ function FormacionCard({
   formacion,
   onUpdate,
   onDelete,
-  onCambiarGrupo,
   compuestos,
-  gruposCompuestos,
 }: {
   formacion: MineralFormacion;
   onUpdate: (id: string, updates: Partial<MineralFormacion>) => void;
   onDelete: () => void;
-  /** "Usar grupo": cambia a qué GrupoCompuesto apunta esta formación
-   *  (reemplaza el vínculo mineral↔grupo), en vez de mutar el contenido
-   *  del grupo actualmente vinculado. */
-  onCambiarGrupo: (grupoCompuestoId: string) => void;
   compuestos: Compuesto[];
-  gruposCompuestos?: GrupoCompuesto[];
 }) {
   return (
     <div className="group py-3">
@@ -462,8 +439,6 @@ function FormacionCard({
             compuestos={compuestos}
             componentes={(formacion.componentes ?? []) as ComponenteOrgano[]}
             onChange={(componentes) => onUpdate(formacion.id, { componentes })}
-            gruposCompuestos={gruposCompuestos}
-            onUsarGrupo={(grupoElegido) => onCambiarGrupo(grupoElegido.id)}
           />
         </div>
 

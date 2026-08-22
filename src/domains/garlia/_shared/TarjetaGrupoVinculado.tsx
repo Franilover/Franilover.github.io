@@ -9,7 +9,7 @@
  * entidades que tengan el mismo grupo vinculado (es el catálogo compartido).
  */
 
-import { ExternalLink, Plus, Trash2, Layers } from "lucide-react";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 
 import type { Compuesto, GrupoCompuesto } from "@/domains/garlia/elementos/types";
@@ -17,18 +17,15 @@ import {
   SelectorFormulaOrgano,
   type ComponenteOrgano,
 } from "@/domains/garlia/flora/SelectorFormulaOrgano";
-import { SelectorGrupoCompuestos } from "@/domains/garlia/elementos/SelectorGrupoCompuestos";
 import type { GrupoVinculadoResuelto } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 export function TarjetaGrupoVinculado({
   grupo,
   onUpdate,
   onDelete,
-  onCambiarGrupo,
   compuestos,
   onAbrirCompuesto,
   onAbrirGrupo,
-  gruposCompuestos,
   placeholderNombre = "Nombre…",
   placeholderNotas = "Notas…",
   tituloEliminar = "Quitar de este ítem (sigue en el catálogo para otros ítems)",
@@ -36,24 +33,17 @@ export function TarjetaGrupoVinculado({
   grupo: GrupoVinculadoResuelto;
   onUpdate: (id: string, updates: Partial<GrupoCompuesto>) => void;
   onDelete: () => void;
-  /** "Usar grupo": cambia a qué GrupoCompuesto apunta este vínculo
-   *  (reemplaza el vínculo entidad↔grupo), en vez de mutar el contenido
-   *  del grupo actualmente vinculado — así el título se actualiza al del
-   *  grupo elegido y no se pisa el catálogo compartido. */
-  onCambiarGrupo: (grupoCompuestoId: string) => void;
   compuestos: Compuesto[];
   onAbrirCompuesto?: (compuestoId: string) => void;
   /** Abre este grupo en el panel flotante (GrupoCompuestoPanelFlotante) —
    *  vista completa fuera de la tarjeta inline, útil cuando el grupo está
    *  vinculado a muchas entidades y se quiere editar desde un solo lugar. */
   onAbrirGrupo?: (grupoId: string) => void;
-  gruposCompuestos?: GrupoCompuesto[];
   placeholderNombre?: string;
   placeholderNotas?: string;
   tituloEliminar?: string;
 }) {
   const [menuAgregarAbierto, setMenuAgregarAbierto] = useState(false);
-  const [usarGrupoAbierto, setUsarGrupoAbierto] = useState(false);
 
   function agregarComponente() {
     const componentes = (grupo.componentes ?? []) as ComponenteOrgano[];
@@ -120,30 +110,6 @@ export function TarjetaGrupoVinculado({
                 >
                   <Plus size={11} /> Agregar
                 </button>
-                {gruposCompuestos && gruposCompuestos.length > 0 && (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenuAgregarAbierto(false);
-                        setUsarGrupoAbierto(true);
-                      }}
-                      className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-micro font-bold whitespace-nowrap text-primary/70 hover:bg-primary/6 hover:text-primary transition-colors cursor-pointer"
-                    >
-                      <Layers size={11} /> Usar grupo
-                    </button>
-                    <SelectorGrupoCompuestos
-                      grupos={gruposCompuestos}
-                      onElegir={(_nuevos, grupoElegido) => {
-                        onCambiarGrupo(grupoElegido.id);
-                        setUsarGrupoAbierto(false);
-                      }}
-                      ocultarBoton
-                      abiertoControlado={usarGrupoAbierto}
-                      onAbiertoChange={setUsarGrupoAbierto}
-                    />
-                  </div>
-                )}
               </div>
             )}
           </div>

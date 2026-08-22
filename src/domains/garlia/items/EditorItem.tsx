@@ -333,7 +333,6 @@ export function EditorItem({
                 catalogo={catalogoEstructura}
                 loading={estructura.loading}
                 compuestos={compuestos}
-                gruposCompuestos={catalogoEstructura}
                 onCrearNuevo={() => void estructura.crearYVincular()}
                 onUsarExistente={(id) => void estructura.vincularExistente(id)}
                 onUpdate={(id, updates) => {
