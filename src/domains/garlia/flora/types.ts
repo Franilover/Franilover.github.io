@@ -70,8 +70,9 @@ export interface PlantaProceso {
   reaccion_id: string | null;
   /** Descripción libre de la etapa (condiciones ambientales, contexto, etc) */
   descripcion: string | null;
+  /** Orden de la etapa en el ciclo de vida — persiste el drag-and-drop. */
+  orden: number;
   created_at: string;
-  updated_at: string;
 }
 
 export type FloraInput = Partial<
@@ -81,4 +82,4 @@ export type FloraInput = Partial<
   >
 >;
 
-export type PlantaProcesoInput = Partial<Pick<PlantaProceso, "reaccion_id" | "descripcion">>;
+export type PlantaProcesoInput = Partial<Pick<PlantaProceso, "reaccion_id" | "descripcion" | "orden">>;

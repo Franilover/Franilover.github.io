@@ -463,7 +463,7 @@ function ProcesoCard({
   onAbrirItem,
 }: ProcesoCardProps) {
   const vinculo = useEntidadVinculoReaccion({
-    tabla: "planta_procesos",
+    tabla: "planta_reacciones",
     entidadId: proceso.id,
     reaccionIdActual: proceso.reaccion_id,
     catalogo: reacciones,

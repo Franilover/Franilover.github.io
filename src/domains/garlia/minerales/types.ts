@@ -77,7 +77,6 @@ export interface MineralProceso {
   reaccion_id: string | null;
   descripcion: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 export type MineralInput = Partial<

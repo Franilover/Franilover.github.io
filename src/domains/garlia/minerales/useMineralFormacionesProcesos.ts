@@ -64,7 +64,7 @@ export function useMineralFormacionesProcesos(
     }
 
     const { data: procesoData, error: procesoError } = await supabase
-      .from("mineral_procesos")
+      .from("mineral_reacciones")
       .select("*")
       .eq("mineral_id", mineralId)
       .order("created_at", { ascending: true });
@@ -198,11 +198,13 @@ export function useMineralFormacionesProcesos(
 
   // ── CRUD de procesos: ahora solo un evento geológico (descripcion) — el
   // consume/produce vive en la Reacción vinculada 1:1 (ver
-  // useEntidadVinculoReaccion, instanciado por proceso desde la UI). ──────
+  // useEntidadVinculoReaccion, instanciado por proceso desde la UI). Tabla
+  // real "mineral_reacciones" (no "mineral_procesos"), sin columna `orden`
+  // — los eventos geológicos no tienen secuencia narrativa única. ────────
   const crearProceso = useCallback(
     async () => {
       const { data, error } = await supabase
-        .from("mineral_procesos")
+        .from("mineral_reacciones")
         .insert([{ mineral_id: mineralId, descripcion: null, reaccion_id: null }])
         .select()
         .single();
@@ -217,7 +219,7 @@ export function useMineralFormacionesProcesos(
   const actualizarProceso = useCallback(
     async (id: string, updates: MineralProcesoInput) => {
       setProcesos((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
-      const { error } = await supabase.from("mineral_procesos").update(updates).eq("id", id);
+      const { error } = await supabase.from("mineral_reacciones").update(updates).eq("id", id);
       if (error) void load();
     },
     [load],
@@ -225,7 +227,7 @@ export function useMineralFormacionesProcesos(
 
   const eliminarProceso = useCallback(async (id: string) => {
     setProcesos((prev) => prev.filter((p) => p.id !== id));
-    await supabase.from("mineral_procesos").delete().eq("id", id);
+    await supabase.from("mineral_reacciones").delete().eq("id", id);
   }, []);
 
   return {

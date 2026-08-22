@@ -60,10 +60,10 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
     }
 
     const { data: procesoData, error: procesoError } = await supabase
-      .from("planta_procesos")
+      .from("planta_reacciones")
       .select("*")
       .eq("planta_id", plantaId)
-      .order("created_at", { ascending: true });
+      .order("orden", { ascending: true });
 
     if (!procesoError && procesoData) {
       setProcesos(procesoData as PlantaProceso[]);
@@ -162,12 +162,16 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
 
   // ── CRUD de procesos: ahora solo una etapa (descripcion) — el
   // consume/produce vive en la Reacción vinculada 1:1 (ver
-  // useEntidadVinculoReaccion, instanciado por proceso desde la UI). ──────
+  // useEntidadVinculoReaccion, instanciado por proceso desde la UI).
+  // Tabla real "planta_reacciones" (no "planta_procesos") — tiene columna
+  // `orden` propia para el drag-and-drop del ciclo de vida. ──────────────
   const crearProceso = useCallback(
     async () => {
+      const siguienteOrden =
+        procesos.length > 0 ? Math.max(...procesos.map((p) => p.orden ?? 0)) + 1 : 0;
       const { data, error } = await supabase
-        .from("planta_procesos")
-        .insert([{ planta_id: plantaId, descripcion: null, reaccion_id: null }])
+        .from("planta_reacciones")
+        .insert([{ planta_id: plantaId, descripcion: null, reaccion_id: null, orden: siguienteOrden }])
         .select()
         .single();
 
@@ -175,7 +179,7 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
       setProcesos((prev) => [...prev, data as PlantaProceso]);
       return data as PlantaProceso;
     },
-    [plantaId],
+    [plantaId, procesos],
   );
 
   const actualizarProceso = useCallback(
@@ -183,7 +187,7 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
       setProcesos((prev) =>
         prev.map((p) => (p.id === id ? { ...p, ...updates } : p)),
       );
-      const { error } = await supabase.from("planta_procesos").update(updates).eq("id", id);
+      const { error } = await supabase.from("planta_reacciones").update(updates).eq("id", id);
       if (error) void load();
     },
     [load],
@@ -191,7 +195,7 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
 
   const eliminarProceso = useCallback(async (id: string) => {
     setProcesos((prev) => prev.filter((p) => p.id !== id));
-    await supabase.from("planta_procesos").delete().eq("id", id);
+    await supabase.from("planta_reacciones").delete().eq("id", id);
   }, []);
 
   return {

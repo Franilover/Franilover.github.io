@@ -434,7 +434,7 @@ function ProcesoMineralCard({
   onUpdateReaccion: (id: string, updates: Partial<Reaccion>) => void;
 }) {
   const vinculo = useEntidadVinculoReaccion({
-    tabla: "mineral_procesos",
+    tabla: "mineral_reacciones",
     entidadId: proceso.id,
     reaccionIdActual: proceso.reaccion_id,
     catalogo: reacciones,

@@ -14,7 +14,7 @@
  *
  * Uso:
  *   const vinculo = useEntidadVinculoReaccion({
- *     tabla: "planta_procesos",
+ *     tabla: "planta_reacciones",
  *     entidadId: proceso.id,
  *     reaccionIdActual: proceso.reaccion_id,
  *     catalogo: reacciones,
@@ -34,7 +34,7 @@ export function useEntidadVinculoReaccion({
   catalogo,
   onReaccionIdCambiado,
 }: {
-  /** Tabla de la entidad dueña del vínculo, ej. "planta_procesos". */
+  /** Tabla de la entidad dueña del vínculo, ej. "planta_reacciones". */
   tabla: string;
   entidadId: string;
   reaccionIdActual: string | null;
