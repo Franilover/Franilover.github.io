@@ -54,7 +54,7 @@ import type { SubsistemaMagia } from "@/domains/garlia/runas/useSubsistemasMagia
 import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
+import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 
 /** Adapta un SubsistemaMagia al shape FilaCatalogo — vive acá (no en
@@ -370,7 +370,7 @@ function TodasLasBasesView({
   // usan Procesos de Flora/Minerales y Habilidades de Items). Self-
   // contained, mismo espíritu que el resto de Física: trae sus propios
   // datos acá en vez de subirlos como props hasta RunasPage.
-  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useEstructurasEnsambladas();
+  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useFormaciones();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
   const { items: compuestosCatalogo } = useCompuestos();
   const { items: elementosCatalogo } = useElementos();
