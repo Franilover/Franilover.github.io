@@ -333,7 +333,10 @@ export function EditorItem({
                 catalogo={catalogoEstructura}
                 loading={estructura.loading}
                 compuestos={compuestos}
-                onCrearNuevo={() => void estructura.crearYVincular()}
+                onCrearNuevo={async () => {
+                  const nuevo = await estructura.crearYVincular();
+                  if (nuevo) setEditandoGrupoId(nuevo.id);
+                }}
                 onUsarExistente={(id) => void estructura.vincularExistente(id)}
                 onUpdate={(id, updates) => {
                   onGrupoCompuestoActualizadoLocal(id, updates);

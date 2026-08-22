@@ -1,15 +1,22 @@
 "use client";
 
 /**
- * TarjetaGrupoVinculado.tsx
+ * TarjetaFormacionOrgano.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Generaliza OrganoCard (flora/FloraEditor.tsx) para cualquier
- * GrupoCompuesto vinculado N:N a una entidad — nombre libre, fórmula de
- * compuestos (SelectorFormulaOrgano) y notas. Editar acá afecta a todas las
- * entidades que tengan el mismo grupo vinculado (es el catálogo compartido).
+ * Tarjeta de edición para un Órgano o Formación ya vinculado a una entidad
+ * (planta, mineral, o item) — nombre libre, fórmula de compuestos
+ * (SelectorFormulaOrgano) y notas. Editar acá afecta a todas las entidades
+ * que tengan el mismo Órgano/Formación vinculado (catálogo propio
+ * compartido — tablas "organos"/"formaciones").
+ *
+ * Un solo componente para los 3 consumidores (antes triplicado: FormacionCard
+ * en MineralEditor.tsx, OrganoCard en FloraEditor.tsx, TarjetaGrupoVinculado en
+ * _shared/) — incluye Formaciones de Minerales, Formaciones de Items, y
+ * Órganos de Flora. El nombre distingue el vocabulario del placeholder
+ * (Órgano vs Formación) pero el comportamiento es idéntico.
  */
 
-import { ExternalLink, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 
 import type { Compuesto, GrupoCompuesto } from "@/domains/garlia/elementos/types";
@@ -17,10 +24,15 @@ import {
   SelectorFormulaOrgano,
   type ComponenteOrgano,
 } from "@/domains/garlia/flora/SelectorFormulaOrgano";
-import type { GrupoVinculadoResuelto } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
-export function TarjetaGrupoVinculado({
-  grupo,
+/** Shape mínimo: el vínculo puente resuelto contra el catálogo — mismo para
+ *  PlantaOrganoResuelto, MineralFormacion, y GrupoVinculadoResuelto. */
+export interface VinculadoConFormula extends GrupoCompuesto {
+  vinculo_id: string;
+}
+
+export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
+  item,
   onUpdate,
   onDelete,
   compuestos,
@@ -28,17 +40,18 @@ export function TarjetaGrupoVinculado({
   onAbrirGrupo,
   placeholderNombre = "Nombre…",
   placeholderNotas = "Notas…",
-  tituloEliminar = "Quitar de este ítem (sigue en el catálogo para otros ítems)",
+  tituloEliminar = "Quitar de aquí (sigue en el catálogo para otras entidades)",
 }: {
-  grupo: GrupoVinculadoResuelto;
+  item: T;
   onUpdate: (id: string, updates: Partial<GrupoCompuesto>) => void;
   onDelete: () => void;
   compuestos: Compuesto[];
   onAbrirCompuesto?: (compuestoId: string) => void;
-  /** Abre este grupo en el panel flotante (GrupoCompuestoPanelFlotante) —
-   *  vista completa fuera de la tarjeta inline, útil cuando el grupo está
-   *  vinculado a muchas entidades y se quiere editar desde un solo lugar. */
-  onAbrirGrupo?: (grupoId: string) => void;
+  /** Abre este Órgano/Formación en el panel flotante
+   *  (GrupoCompuestoPanelFlotante) — vista completa fuera de la tarjeta
+   *  inline, útil cuando está vinculado a muchas entidades y se quiere
+   *  editar desde un solo lugar. */
+  onAbrirGrupo?: (id: string) => void;
   placeholderNombre?: string;
   placeholderNotas?: string;
   tituloEliminar?: string;
@@ -46,11 +59,11 @@ export function TarjetaGrupoVinculado({
   const [menuAgregarAbierto, setMenuAgregarAbierto] = useState(false);
 
   function agregarComponente() {
-    const componentes = (grupo.componentes ?? []) as ComponenteOrgano[];
+    const componentes = (item.componentes ?? []) as ComponenteOrgano[];
     const elegidos = new Set(componentes.map((c) => c.compuesto_id));
     const primero = compuestos.find((c) => !elegidos.has(c.id)) ?? compuestos[0];
     if (!primero) return;
-    onUpdate(grupo.id, {
+    onUpdate(item.id, {
       componentes: [...componentes, { compuesto_id: primero.id, cantidad: 1 }],
     });
   }
@@ -58,23 +71,24 @@ export function TarjetaGrupoVinculado({
   return (
     <div className="group py-3 px-3 rounded-lg border border-primary/10">
       <div className="flex items-center justify-between mb-2 gap-2">
-        <input
-          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
-          placeholder={placeholderNombre}
-          value={grupo.nombre ?? ""}
-          onChange={(e) => onUpdate(grupo.id, { nombre: e.target.value })}
-        />
+        {onAbrirGrupo ? (
+          <button
+            type="button"
+            onClick={() => onAbrirGrupo(item.id)}
+            title="Abrir en el editor flotante"
+            className="min-w-0 flex-1 text-left bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 truncate transition-colors hover:text-accent hover:underline cursor-pointer"
+          >
+            {item.nombre || placeholderNombre}
+          </button>
+        ) : (
+          <input
+            className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
+            placeholder={placeholderNombre}
+            value={item.nombre ?? ""}
+            onChange={(e) => onUpdate(item.id, { nombre: e.target.value })}
+          />
+        )}
         <div className="flex items-center gap-1 shrink-0">
-          {onAbrirGrupo && (
-            <button
-              type="button"
-              onClick={() => onAbrirGrupo(grupo.id)}
-              title="Abrir en el editor flotante"
-              className="w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-            >
-              <ExternalLink size={12} />
-            </button>
-          )}
           <div
             className="relative shrink-0"
             onBlur={(e) => {
@@ -127,8 +141,8 @@ export function TarjetaGrupoVinculado({
         <div>
           <SelectorFormulaOrgano
             compuestos={compuestos}
-            componentes={(grupo.componentes ?? []) as ComponenteOrgano[]}
-            onChange={(componentes) => onUpdate(grupo.id, { componentes })}
+            componentes={(item.componentes ?? []) as ComponenteOrgano[]}
+            onChange={(componentes) => onUpdate(item.id, { componentes })}
             onAbrirCompuesto={onAbrirCompuesto}
             ocultarBotonAgregar
           />
@@ -138,8 +152,8 @@ export function TarjetaGrupoVinculado({
           <textarea
             className="w-full h-full min-h-[3.5rem] bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
             placeholder={placeholderNotas}
-            value={grupo.notas ?? ""}
-            onChange={(e) => onUpdate(grupo.id, { notas: e.target.value })}
+            value={item.notas ?? ""}
+            onChange={(e) => onUpdate(item.id, { notas: e.target.value })}
           />
         </div>
       </div>

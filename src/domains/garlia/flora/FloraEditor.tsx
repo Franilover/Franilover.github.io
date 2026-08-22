@@ -16,7 +16,6 @@
 import {
   Leaf,
   Plus,
-  Trash2,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
@@ -31,6 +30,7 @@ import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { type Compuesto, type Elemento, type Reaccion } from "@/domains/garlia/elementos/types";
 import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
+import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import {
@@ -38,18 +38,17 @@ import {
   type OnHeaderControlsChange,
 } from "@/domains/garlia/_shared/useEditorHeaderControls";
 import { SeccionReaccionVinculada } from "@/domains/garlia/_shared/SeccionReaccionVinculada";
+import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 import { useEntidadVinculoReaccion } from "@/domains/garlia/_shared/useEntidadVinculoReaccion";
 
 import { useFlora } from "./useFlora";
 import { usePlantaOrganosProcesos } from "./usePlantaOrganosProcesos";
-import { type Flora, type PlantaOrganoResuelto, type PlantaProceso } from "./types";
+import { type Flora, type PlantaProceso } from "./types";
 import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
-import { SelectorFormulaOrgano, type ComponenteOrgano } from "./SelectorFormulaOrgano";
 import { type ItemProceso } from "./SelectorConsumeProduce";
-import { SelectorOrganoPlanta } from "./SelectorOrganoPlanta";
 
 export function FloraEditorMejorado({
   flora: floraProp,
@@ -78,7 +77,7 @@ export function FloraEditorMejorado({
   // elegido en Consume/Produce o en la Fórmula química de un Órgano.
   // Un solo estado: abrir uno nuevo reemplaza el que estuviera abierto.
   const [itemAbierto, setItemAbierto] = useState<
-    { tipo: "elemento" | "compuesto"; id: string } | null
+    { tipo: "elemento" | "compuesto" | "organo"; id: string } | null
   >(null);
   // Último elemento DOM clickeado dentro de la barra de Ecosistemas — usado
   // como anchor del PopoverFlotante, ya que SeccionEntidad.onEntityClick
@@ -103,9 +102,6 @@ export function FloraEditorMejorado({
     actualizarProceso,
     eliminarProceso,
   } = usePlantaOrganosProcesos(floraProp.id, catalogoOrganos);
-
-  // Picker "Crear órgano / Usar uno existente" — abierto desde el botón +
-  const [selectorOrganoAbierto, setSelectorOrganoAbierto] = useState(false);
 
   // Ecosistemas donde crece esta planta — vínculo inverso: vive en
   // Ecosistema.flora_ids, no en Flora. Mismo patrón que SeccionEntidad en
@@ -220,27 +216,14 @@ export function FloraEditorMejorado({
                 Procesos ({procesos.length})
               </button>
               </div>
-              {tabActiva !== "composicion" && (
-                <div className="relative">
-                  <button
-                    onClick={() =>
-                      tabActiva === "organos" ? setSelectorOrganoAbierto(true) : void crearProceso()
-                    }
-                    title={tabActiva === "organos" ? "Agregar órgano" : "Nuevo proceso"}
-                    className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                  >
-                    <Plus size={16} />
-                  </button>
-                  {selectorOrganoAbierto && tabActiva === "organos" && (
-                    <SelectorOrganoPlanta
-                      catalogoOrganos={catalogoOrganos}
-                      organosYaVinculadosIds={new Set(organos.map((o) => o.id))}
-                      onCrearNuevo={() => void crearYVincularOrgano()}
-                      onUsarExistente={(organoId) => void vincularOrganoExistente(organoId)}
-                      onClose={() => setSelectorOrganoAbierto(false)}
-                    />
-                  )}
-                </div>
+              {tabActiva === "procesos" && (
+                <button
+                  onClick={() => void crearProceso()}
+                  title="Nuevo proceso"
+                  className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                >
+                  <Plus size={16} />
+                </button>
               )}
             </div>
 
@@ -297,36 +280,37 @@ export function FloraEditorMejorado({
 
             {/* ── TAB: Órganos ──────────────────────────────────────────── */}
             {tabActiva === "organos" && (
-              <div className="space-y-3">
-                {loadingOrganosProcesos ? (
-                  <p className="text-xs text-primary/40">Cargando órganos…</p>
-                ) : organos.length === 0 ? (
-                  <p className="text-xs text-primary/40 italic">Sin órganos. Crea uno para empezar.</p>
-                ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
-                    {organos.map((organo) => (
-                      <div key={organo.vinculo_id} className="border-b border-primary/10">
-                        <OrganoCard
-                          organo={organo}
-                          onUpdate={(id, updates) => {
-                            // Optimista: refleja el cambio en el catálogo local ya
-                            // mismo (afecta a todas las plantas que usan este
-                            // Órgano), y persiste en Supabase vía el hook.
-                            setCatalogoOrganos((prev) =>
-                              prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
-                            );
-                            void actualizarOrgano(id, updates);
-                          }}
-                          onDelete={() => void desvincularOrgano(organo.vinculo_id)}
-                          compuestos={compuestos}
-                          elementos={elementos}
-                          onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <SeccionGruposVinculados
+                titulo="Órganos"
+                icono={Leaf}
+                items={organos}
+                catalogo={catalogoOrganos}
+                loading={loadingOrganosProcesos}
+                compuestos={compuestos}
+                onCrearNuevo={async () => {
+                  const nuevo = await crearYVincularOrgano();
+                  if (nuevo) setItemAbierto({ tipo: "organo", id: nuevo.id });
+                  return nuevo;
+                }}
+                onUsarExistente={(id) => void vincularOrganoExistente(id)}
+                onUpdate={(id, updates) => {
+                  // Optimista: refleja el cambio en el catálogo local ya
+                  // mismo (afecta a todas las plantas que usan este
+                  // Órgano), y persiste en Supabase vía el hook.
+                  setCatalogoOrganos((prev) =>
+                    prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
+                  );
+                  void actualizarOrgano(id, updates);
+                }}
+                onDelete={(vinculoId) => void desvincularOrgano(vinculoId)}
+                onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
+                onAbrirGrupo={(id) => setItemAbierto({ tipo: "organo", id })}
+                placeholderNombre="Nombre del órgano (ej: Hoja)…"
+                placeholderNotas="Notas del órgano…"
+                labelCrear="Crear órgano"
+                labelExistente="Usar uno existente"
+                labelBuscar="Buscar órgano…"
+              />
             )}
 
             {/* ── TAB: Procesos ────────────────────────────────────────── */}
@@ -423,73 +407,30 @@ export function FloraEditorMejorado({
             />
           );
         })()}
-    </div>
-  );
-}
 
-// ── Componente auxiliar: Tarjeta de órgano ─────────────────────────────────
-// organo.id es el id del Organo en el catálogo compartido (editar acá
-// afecta a todas las plantas que lo usan); onDelete desvincula esta
-// planta del Organo, sin borrarlo del catálogo.
-interface OrganoCardProps {
-  organo: PlantaOrganoResuelto;
-  onUpdate: (id: string, updates: Partial<PlantaOrganoResuelto>) => void;
-  onDelete: () => void;
-  compuestos: Compuesto[];
-  elementos: Elemento[];
-  onAbrirCompuesto?: (compuestoId: string) => void;
-}
-
-function OrganoCard({
-  organo,
-  onUpdate,
-  onDelete,
-  compuestos,
-  elementos,
-  onAbrirCompuesto,
-}: OrganoCardProps) {
-  return (
-    <div className="group py-3">
-      {/* Header: nombre del órgano (texto libre) + agregar compuesto + eliminar (hover) */}
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <input
-          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
-          placeholder="Nombre del órgano (ej: Hoja)…"
-          value={organo.nombre ?? ""}
-          onChange={(e) => onUpdate(organo.id, { nombre: e.target.value })}
-        />
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={onDelete}
-            title="Quitar de esta planta (el órgano sigue en el catálogo para otras plantas)"
-            className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition opacity-0 group-hover:opacity-100"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* Contenido: grid de 2 columnas cuando hay ancho, sin cajas anidadas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2 text-xs items-start">
-        <div>
-          <SelectorFormulaOrgano
-            compuestos={compuestos}
-            componentes={(organo.componentes ?? []) as ComponenteOrgano[]}
-            onChange={(componentes) => onUpdate(organo.id, { componentes })}
-            onAbrirCompuesto={onAbrirCompuesto}
-            ocultarBotonAgregar
-          />
-        </div>
-
-        <div>
-          <textarea
-            className="w-full h-full min-h-[3.5rem] bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-            placeholder="Notas del órgano…"
-            value={organo.notas ?? ""}
-            onChange={(e) => onUpdate(organo.id, { notas: e.target.value })}
-          />
-        </div>
-      </div>
+      {/* Click en el nombre de un Órgano en la tarjeta abre este panel —
+          vista completa fuera de la tarjeta inline, útil cuando el
+          Órgano está vinculado a muchas plantas y se quiere editar desde
+          un solo lugar. */}
+      {itemAbierto?.tipo === "organo" &&
+        (() => {
+          const organo = catalogoOrganos.find((o) => o.id === itemAbierto.id);
+          if (!organo) return null;
+          return (
+            <GrupoCompuestoPanelFlotante
+              grupo={organo}
+              compuestos={compuestos}
+              onCerrar={() => setItemAbierto(null)}
+              onActualizar={(id, cambios) => {
+                setCatalogoOrganos((prev) =>
+                  prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)),
+                );
+                void actualizarOrgano(id, cambios);
+              }}
+              onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
+            />
+          );
+        })()}
     </div>
   );
 }
