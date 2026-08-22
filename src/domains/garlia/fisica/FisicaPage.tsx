@@ -54,7 +54,7 @@ import type { SubsistemaMagia } from "@/domains/garlia/runas/useSubsistemasMagia
 import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
+import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 
 /** Adapta un SubsistemaMagia al shape FilaCatalogo — vive acá (no en
@@ -365,26 +365,25 @@ function TodasLasBasesView({
   const catalogos = catalogosBases(particulaBase, particulas, iums, oris, subsistemas);
 
   // ── Formaciones y Habilidades: catálogos propios, debajo de Subsistemas ──
-  // Formaciones = tabla real "estructuras_ensambladas" (mismo catálogo que
-  // Minerales, Items y Órganos de Flora/Criaturas). Habilidades = tabla
-  // real "reacciones" (mismo catálogo que usan Procesos de Flora/Minerales
-  // y Habilidades de Items). Self-contained, mismo espíritu que el resto de
-  // Física: trae sus propios datos acá en vez de subirlos como props hasta
-  // RunasPage.
-  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useEstructurasEnsambladas();
+  // Formaciones = tabla "formaciones" (mismo catálogo que Minerales e
+  // Items). Habilidades = tabla "procesos_reacciones" (mismo catálogo que
+  // usan Procesos de Flora/Minerales y Habilidades de Items). Self-
+  // contained, mismo espíritu que el resto de Física: trae sus propios
+  // datos acá en vez de subirlos como props hasta RunasPage.
+  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useFormaciones();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
   const { items: compuestosCatalogo } = useCompuestos();
   const { items: elementosCatalogo } = useElementos();
 
   async function actualizarFormacion(id: string, cambios: Partial<GrupoCompuesto>) {
     setCatalogoFormaciones((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
-    const { error } = await supabase.from("estructuras_ensambladas").update(cambios).eq("id", id);
+    const { error } = await supabase.from("formaciones").update(cambios).eq("id", id);
     if (error) console.error("[FisicaPage] error guardando formación:", error);
   }
 
   async function actualizarHabilidad(id: string, cambios: Partial<Reaccion>) {
     setReaccionesCatalogo((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
-    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
+    const { error } = await supabase.from("procesos_reacciones").update(cambios).eq("id", id);
     if (error) console.error("[FisicaPage] error guardando habilidad:", error);
   }
 
@@ -967,7 +966,13 @@ function ConceptoEditor({
         )}
       </div>
 
-      <div className={embedded ? "" : "flex-1 min-h-0 p-2.5 overflow-y-auto"}>
+      <div
+        className={
+          embedded
+            ? "max-h-[40vh] overflow-y-auto"
+            : "flex-1 min-h-0 overflow-y-auto p-2.5"
+        }
+      >
         <div className="text-sm">
           <RichEditor
             minHeight={embedded ? "6rem" : "16rem"}
