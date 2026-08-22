@@ -25,6 +25,7 @@ import {
   Dices,
   Globe,
   Image as ImageIcon,
+  Layers,
   MapPin,
   Package,
   Shield,
@@ -71,12 +72,18 @@ import {
 } from "@/domains/garlia/_shared/useEditorHeaderControls";
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { useCriaturaAsideCatalogs } from "@/domains/garlia/criaturas/useCriaturaAsideCatalogs";
+import { useCriaturaOrganos } from "@/domains/garlia/criaturas/useCriaturaOrganos";
 import { useMembresiaSubsistemaCriatura } from "@/domains/garlia/criaturas/useMembresiaSubsistemaCriatura";
 import { usePersonajesDeCriatura } from "@/domains/garlia/criaturas/usePersonajesDeCriatura";
 import { useMembresiaGruposCriatura } from "@/domains/garlia/grupos/useMembresiaGruposCriatura";
 import { PanelPerfilCriatura } from "@/domains/garlia/biologia/PerfilAtomicoCriaturaPanel";
+import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
+import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
+import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
 import { usePerfilesAtomicosCriatura } from "@/domains/garlia/biologia/useBiologia";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
+import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
 import { useOris } from "@/domains/garlia/fisica/useFisica";
 import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete } from "@/lib/utils/dexieHelpers";
@@ -114,7 +121,7 @@ export function EditorCriatura({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [showModalDnd, setShowModalDnd] = useState(false);
   const [panelActivo, setPanelActivo] = useState<
-    "clasificacion" | "ilustraciones" | "perfilAtomico" | null
+    "clasificacion" | "ilustraciones" | "perfilAtomico" | "organos" | null
   >(null);
   const { onWikilink } = useWikilink();
 
@@ -155,6 +162,24 @@ export function EditorCriatura({
     () => (orisPerfil ?? []).map((o) => ({ id: o.id, nombre: o.nombre })),
     [orisPerfil],
   );
+
+  // ── Órganos (composición macro, ensamblaje de compuestos) ────────────────
+  // Catálogo real "estructuras_ensambladas" — compartido con Formaciones de
+  // Minerales/Items y Órganos de Flora. Distinto del Perfil atómico de
+  // arriba, que es composición directa por elemento (nivel micro).
+  const [editandoGrupoId, setEditandoGrupoId] = useState<string | null>(null);
+  const { items: compuestosOrganos, setItems: setCompuestosOrganos } = useCompuestos();
+  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useEstructurasEnsambladas();
+  const organosCriatura = useCriaturaOrganos(form.id, catalogoOrganos);
+
+  function onOrganoActualizadoLocal(id: string, updates: Partial<GrupoCompuesto>) {
+    setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+  }
+
+  async function persistirOrgano(id: string, cambios: Partial<GrupoCompuesto>) {
+    onOrganoActualizadoLocal(id, cambios);
+    await organosCriatura.actualizarOrgano(id, cambios);
+  }
 
   // ── Catálogos del aside ────────────────────────────────────────────────────
   const { allPersonajes, allReinos, allCiudades } = useCriaturaAsideCatalogs();
@@ -282,9 +307,9 @@ export function EditorCriatura({
     setSavingCrafted(false);
   };
 
-  // Los tres toggles de panel (Clasificación/Ilustraciones/Perfil atómico)
-  // + el dado D&D son específicos de Criatura, así que viajan juntos como
-  // "extra" dentro de los controles de header.
+  // Los cuatro toggles de panel (Clasificación/Ilustraciones/Perfil
+  // atómico/Órganos) + el dado D&D son específicos de Criatura, así que
+  // viajan juntos como "extra" dentro de los controles de header.
   const extraBotonesHeader = (
     <>
       <button
@@ -333,6 +358,22 @@ export function EditorCriatura({
       >
         <Atom size={11} />
         <span className="hidden md:inline">Perfil atómico</span>
+      </button>
+
+      <button
+        className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
+          panelActivo === "organos"
+            ? "border-primary/40 text-primary bg-primary/8"
+            : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+        }`}
+        title="Órganos"
+        type="button"
+        onClick={() =>
+          setPanelActivo((p) => (p === "organos" ? null : "organos"))
+        }
+      >
+        <Layers size={11} />
+        <span className="hidden md:inline">Órganos</span>
       </button>
 
       <button
@@ -442,7 +483,9 @@ export function EditorCriatura({
                       ? "Clasificación"
                       : panelActivo === "ilustraciones"
                         ? "Ilustraciones"
-                        : "Perfil atómico"}
+                        : panelActivo === "organos"
+                          ? "Órganos"
+                          : "Perfil atómico"}
                   </p>
                   <button
                     className="text-primary/25 hover:text-primary transition-colors"
@@ -524,6 +567,28 @@ export function EditorCriatura({
                       />
                     </div>
                   </div>
+                ) : panelActivo === "organos" ? (
+                  <SeccionGruposVinculados
+                    titulo="Órganos"
+                    descripcion="Ensamblaje de compuestos de la criatura — mismo catálogo que Formaciones de Minerales/Items y Órganos de Flora."
+                    icono={Layers}
+                    items={organosCriatura.organos}
+                    catalogo={catalogoOrganos}
+                    loading={organosCriatura.loading}
+                    compuestos={compuestosOrganos}
+                    onCrearNuevo={async () => {
+                      const nuevo = await organosCriatura.crearYVincularOrgano();
+                      if (nuevo) setEditandoGrupoId(nuevo.id);
+                      return nuevo;
+                    }}
+                    onUsarExistente={(id) => void organosCriatura.vincularOrganoExistente(id)}
+                    onUpdate={(id, updates) => {
+                      onOrganoActualizadoLocal(id, updates);
+                      void organosCriatura.actualizarOrgano(id, updates);
+                    }}
+                    onDelete={(vinculoId) => void organosCriatura.desvincularOrgano(vinculoId)}
+                    onAbrirGrupo={(id) => setEditandoGrupoId(id)}
+                  />
                 ) : (
                   <div className="max-h-[70vh] overflow-y-auto pr-0.5">
                     {loadingElementosPerfil ||
@@ -827,6 +892,15 @@ export function EditorCriatura({
           }
           onChangeStatsDnd={(v) => setForm((f) => ({ ...f, stats_dnd: v }))}
           onClose={() => setShowModalDnd(false)}
+        />
+      )}
+
+      {editandoGrupoId && (
+        <GrupoCompuestoPanelFlotante
+          grupo={catalogoOrganos.find((g) => g.id === editandoGrupoId)!}
+          compuestos={compuestosOrganos}
+          onCerrar={() => setEditandoGrupoId(null)}
+          onActualizar={persistirOrgano}
         />
       )}
     </div>

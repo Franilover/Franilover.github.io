@@ -31,7 +31,7 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
+import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
@@ -66,7 +66,7 @@ export function MineralEditor({
 }) {
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
-  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useFormaciones();
+  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useEstructurasEnsambladas();
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useMinerales();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
@@ -106,9 +106,10 @@ export function MineralEditor({
     });
   };
 
-  // Catálogo de Formaciones: tabla propia "formaciones" (catálogo global,
-  // compartido entre todos los minerales, y también con Estructura de
-  // Items), separada de Grupos de Compuestos desde el rediseño de Física.
+  // Catálogo de Formaciones: tabla real "estructuras_ensambladas" (catálogo
+  // global, compartido entre todos los minerales, y también con Estructura
+  // de Items y Órganos de Flora/Criaturas), separada de Grupos de
+  // Compuestos.
 
   // Formaciones y procesos
   const {

@@ -36,7 +36,7 @@ import { supabase } from "@/infra/supabase/supabase";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
+import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
@@ -95,16 +95,16 @@ export function EditorItem({
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
 
   // Catálogo propio de Formaciones — Estructura del item usa el MISMO
-  // catálogo (tabla "formaciones") que Formaciones de Minerales. Rediseño
-  // unificado: un item y un mineral pueden compartir la misma Formación
-  // (ej. "Cristal de Cuarzo" como parte de una espada y como formación
-  // mineral), y editarla en cualquiera de los dos lugares actualiza a
-  // ambos. La tabla puente sigue siendo item_estructura.
-  const { items: catalogoEstructura, setItems: setCatalogoEstructura } = useFormaciones();
+  // catálogo (tabla real "estructuras_ensambladas") que Formaciones de
+  // Minerales y Órganos de Flora/Criaturas. Un item y un mineral pueden
+  // compartir la misma Formación (ej. "Cristal de Cuarzo" como parte de una
+  // espada y como formación mineral), y editarla en cualquiera de los dos
+  // lugares actualiza a ambos. La tabla puente sigue siendo item_estructura.
+  const { items: catalogoEstructura, setItems: setCatalogoEstructura } = useEstructurasEnsambladas();
 
   const estructura = useEntidadVinculosGrupo({
     entidadId: item.id,
-    tablaCatalogo: "formaciones",
+    tablaCatalogo: "estructuras_ensambladas",
     tablaPuente: "item_estructura",
     columnaFk: "item_id",
     catalogo: catalogoEstructura,
@@ -129,7 +129,7 @@ export function EditorItem({
   // relación (estructura/habilidad) pertenece el grupo que edita.
   async function persistirGrupoCompuesto(id: string, cambios: any) {
     onGrupoCompuestoActualizadoLocal(id, cambios);
-    const { error } = await supabase.from("formaciones").update(cambios).eq("id", id);
+    const { error } = await supabase.from("estructuras_ensambladas").update(cambios).eq("id", id);
     if (error) {
       console.error("[EditorItem] error guardando formación:", error);
     }
@@ -144,7 +144,7 @@ export function EditorItem({
   // desde acá.
   async function persistirReaccion(id: string, cambios: any) {
     onReaccionActualizadaLocal(id, cambios);
-    const { error } = await supabase.from("procesos_reacciones").update(cambios).eq("id", id);
+    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
     if (error) {
       console.error("[EditorItem] error guardando reacción:", error);
     }
@@ -323,8 +323,8 @@ export function EditorItem({
 
               {/* Formaciones — partes materiales del ítem (mango, hoja,
                   empuñadura…), cada una con su propia fórmula de
-                  compuestos. Catálogo propio "formaciones", el mismo que
-                  usan los Minerales. */}
+                  compuestos. Catálogo real "estructuras_ensambladas", el
+                  mismo que usan Minerales y Criaturas. */}
               <SeccionGruposVinculados
                 titulo="Formaciones"
                 descripcion="Partes materiales del ítem, cada una con su propia fórmula de compuestos — mismo catálogo que las Formaciones de Minerales."
@@ -336,6 +336,7 @@ export function EditorItem({
                 onCrearNuevo={async () => {
                   const nuevo = await estructura.crearYVincular();
                   if (nuevo) setEditandoGrupoId(nuevo.id);
+                  return nuevo;
                 }}
                 onUsarExistente={(id) => void estructura.vincularExistente(id)}
                 onUpdate={(id, updates) => {

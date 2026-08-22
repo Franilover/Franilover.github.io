@@ -15,13 +15,13 @@
  *
  * - migrarComponentesLegado: el campo plano `Mineral.componentes` (composición
  *   sin estructura, pre-Formaciones) se migra una sola vez a una Formación
- *   real (tabla "formaciones" + vínculo) la primera vez que se cargan
- *   formaciones para un mineral que aún no tiene ninguna. Así no se pierde
- *   data ya cargada.
+ *   real (tabla "estructuras_ensambladas" + vínculo) la primera vez que se
+ *   cargan formaciones para un mineral que aún no tiene ninguna. Así no se
+ *   pierde data ya cargada.
  *
- * Formaciones: catálogo propio — tabla "formaciones" (separada de
- * "grupos_compuestos" desde el rediseño de Física, compartida con
- * Estructura de Items), vinculado N:N vía la tabla puente
+ * Formaciones: catálogo propio — tabla real "estructuras_ensambladas"
+ * (separada de "grupos_compuestos", compartida con Órganos de Flora/
+ * Criaturas y Estructura de Items), vinculado N:N vía la tabla puente
  * "mineral_formaciones" (solo {id, mineral_id, grupo_compuesto_id,
  * created_at} — el nombre/fórmula/notas viven en la Formación, no en esta
  * tabla).
@@ -97,7 +97,7 @@ export function useMineralFormacionesProcesos(
   // ── Migración one-shot del campo legado `componentes` ──────────────────
   // Se corre después de la primera carga: si el mineral tiene composición
   // legado pero todavía no tiene ninguna Formación, la convierte en una
-  // Formación (tabla "formaciones") + vínculo, para no perder la data ya
+  // Formación (tabla "estructuras_ensambladas") + vínculo, para no perder la data ya
   // cargada por el usuario.
   useEffect(() => {
     if (!mineralId || loading) return;
@@ -107,7 +107,7 @@ export function useMineralFormacionesProcesos(
 
     void (async () => {
       const { data: nuevoGrupo, error: errorGrupo } = await supabase
-        .from("formaciones")
+        .from("estructuras_ensambladas")
         .insert([
           {
             nombre: "",
@@ -137,7 +137,7 @@ export function useMineralFormacionesProcesos(
   const crearFormacion = useCallback(
     async () => {
       const { data: nuevoGrupo, error: errorGrupo } = await supabase
-        .from("formaciones")
+        .from("estructuras_ensambladas")
         .insert([{ nombre: "", componentes: [] }])
         .select()
         .single();
@@ -179,7 +179,7 @@ export function useMineralFormacionesProcesos(
   const actualizarFormacion = useCallback(
     async (grupoCompuestoId: string, updates: Partial<GrupoCompuesto>) => {
       const { error } = await supabase
-        .from("formaciones")
+        .from("estructuras_ensambladas")
         .update(updates)
         .eq("id", grupoCompuestoId);
       if (error) {

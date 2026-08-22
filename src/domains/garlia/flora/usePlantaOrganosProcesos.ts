@@ -5,11 +5,12 @@
  * ───────────────────────────────────────────────────────────────────────────
  * Hook para CRUD de Órganos y Procesos de una planta.
  *
- * Órganos: catálogo propio — tabla "organos" (separada de
- * "grupos_compuestos" desde el rediseño de Biología). Este hook resuelve
- * los vínculos de `plantaId` (tabla puente "planta_organos", FK
- * `grupo_compuesto_id` → organos.id) contra el catálogo de Órganos
- * (recibido como parámetro, ya cargado por useOrganos en el componente
+ * Órganos: catálogo propio — tabla real "estructuras_ensambladas"
+ * (separada de "grupos_compuestos", compartida con Formaciones de
+ * Minerales/Items y Órganos de Criaturas). Este hook resuelve los vínculos
+ * de `plantaId` (tabla puente "planta_organos", FK `grupo_compuesto_id` →
+ * estructuras_ensambladas.id) contra el catálogo de Órganos (recibido como
+ * parámetro, ya cargado por useEstructurasEnsambladas en el componente
  * padre) y expone:
  *   - crearYVincularOrgano: crea un Organo nuevo y lo vincula a esta planta
  *     ("Crear órgano" en el picker).
@@ -22,10 +23,9 @@
  *     para otras plantas / para volver a vincularlo.
  *
  * Procesos: ahora son solo una etapa del ciclo de vida (descripcion) que
- * vincula 1:1 un Proceso/Reacción de la tabla "procesos_reacciones"
- * (separada de "reacciones") vía reaccion_id — el CRUD de ese vínculo vive
- * en useEntidadVinculoReaccion, instanciado desde el componente que
- * renderiza cada PlantaProceso.
+ * vincula 1:1 un Proceso/Reacción de la tabla real "reacciones" vía
+ * reaccion_id — el CRUD de ese vínculo vive en useEntidadVinculoReaccion,
+ * instanciado desde el componente que renderiza cada PlantaProceso.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -95,7 +95,7 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
   const crearYVincularOrgano = useCallback(
     async (nombre: string = "") => {
       const { data: nuevoGrupo, error: errorGrupo } = await supabase
-        .from("organos")
+        .from("estructuras_ensambladas")
         .insert([{ nombre, componentes: [] }])
         .select()
         .single();
@@ -143,7 +143,7 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
   const actualizarOrgano = useCallback(
     async (grupoCompuestoId: string, updates: Partial<GrupoCompuesto>) => {
       const { error } = await supabase
-        .from("organos")
+        .from("estructuras_ensambladas")
         .update(updates)
         .eq("id", grupoCompuestoId);
       if (error) {

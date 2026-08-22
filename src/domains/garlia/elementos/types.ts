@@ -196,11 +196,11 @@ export const CONFIG_COMPUESTOS = {
 // ({compuesto_id, cantidad}[]), usado como plantilla genérica copiable
 // desde cualquier módulo (botón "Usar grupo").
 //
-// Desde el rediseño que separó Órganos/Formaciones en tablas propias
-// ("organos", "formaciones"), "grupos_compuestos" ya NO tiene tipos
+// Desde el rediseño que unificó Órganos/Formaciones en una sola tabla
+// ("estructuras_ensambladas"), "grupos_compuestos" ya NO tiene tipos
 // especiales — solo existen grupos "genéricos". Los tipos legado
-// "organo"/"formacion"/"estructura"/"habilidad" fueron migrados a sus
-// tablas propias y ya no aparecen acá.
+// "organo"/"formacion"/"estructura"/"habilidad" fueron migrados a su
+// tabla propia y ya no aparecen acá.
 export interface ComponenteGrupoCompuesto {
   compuesto_id: string;
   cantidad: number;
@@ -222,36 +222,29 @@ export const CONFIG_GRUPOS_COMPUESTOS = {
   select: "id, nombre, notas, componentes, created_at, updated_at",
 };
 
-// ─── Órganos: catálogo propio de Biología/Flora ────────────────────────────
-// Antes vivían como GrupoCompuesto tipo="organo"; desde el rediseño tienen
-// tabla propia "organos", mismo shape que GrupoCompuesto. Se vinculan N:N a
-// plantas vía planta_organos (grupo_compuesto_id → organos.id) y se
-// muestran como catálogo completo en la tab Órganos de Biología.
-export type Organo = GrupoCompuesto;
+// ─── Estructuras ensambladas: catálogo unificado de Órganos/Formaciones ───
+// Antes vivían como GrupoCompuesto tipo="organo"/"formacion"/"estructura";
+// luego pasaron por tablas separadas ("organos", "formaciones") en un
+// rediseño intermedio. Hoy viven todas en una sola tabla real
+// "estructuras_ensambladas", mismo shape que GrupoCompuesto. Se vinculan
+// N:N a plantas (planta_organos), minerales (mineral_formaciones), items
+// (item_estructura) y criaturas (criatura_organos), todas vía
+// grupo_compuesto_id → estructuras_ensambladas.id. "Organo" y "Formacion"
+// quedan como alias de conveniencia para no reescribir cada sitio de uso —
+// son el mismo tipo.
+export type EstructuraEnsamblada = GrupoCompuesto;
+export type Organo = EstructuraEnsamblada;
+export type Formacion = EstructuraEnsamblada;
 
-export const CONFIG_ORGANOS = {
-  tabla: "organos",
-  select: "id, nombre, notas, componentes, created_at, updated_at",
-};
-
-// ─── Formaciones: catálogo propio de Física/Minerales/Items ────────────────
-// Antes vivían como GrupoCompuesto tipo="formacion" (Minerales) o
-// tipo="estructura" (Items, unificado después con Formaciones); desde el
-// rediseño tienen tabla propia "formaciones", mismo shape que
-// GrupoCompuesto. Se vinculan N:N a minerales (mineral_formaciones) e items
-// (item_estructura) vía grupo_compuesto_id → formaciones.id, y se muestran
-// como catálogo completo debajo de Subsistemas en Física.
-export type Formacion = GrupoCompuesto;
-
-export const CONFIG_FORMACIONES = {
-  tabla: "formaciones",
+export const CONFIG_ESTRUCTURAS_ENSAMBLADAS = {
+  tabla: "estructuras_ensambladas",
   select: "id, nombre, notas, componentes, created_at, updated_at",
 };
 
 // ─── Procesos/Reacciones: recetas reutilizables de consume/produce ────────
-// Catálogo propio (tabla "procesos_reacciones", separada de
-// "grupos_compuestos" desde el rediseño) con nombre + consume[] + produce[]
-// + descripción — mismo shape que PlantaProceso/MineralProceso. Procesos
+// Catálogo propio (tabla real "reacciones", separada de
+// "grupos_compuestos") con nombre + consume[] + produce[] + descripción +
+// activador — mismo shape que PlantaProceso/MineralProceso. Procesos
 // (Biología/Flora/Minerales) y Habilidades (Items) son a propósito EL MISMO
 // catálogo — editar una Reacción acá actualiza todos los lugares que la
 // usan, sea planta, mineral o item.
@@ -261,20 +254,21 @@ export interface EntradaReaccion {
   cantidad: number;
 }
 
-/** Fila cruda tal cual vive en Supabase (tabla "procesos_reacciones"). */
+/** Fila cruda tal cual vive en Supabase (tabla "reacciones"). */
 export interface Reaccion {
   id: string;
   nombre: string;
   consume: EntradaReaccion[];
   produce: EntradaReaccion[];
   descripcion: string | null;
+  activador?: string | null;
   created_at: string;
   updated_at?: string;
 }
 
 export const CONFIG_REACCIONES = {
-  tabla: "procesos_reacciones",
-  select: "id, nombre, consume, produce, descripcion, created_at, updated_at",
+  tabla: "reacciones",
+  select: "id, nombre, consume, produce, descripcion, activador, created_at, updated_at",
 };
 
 /** Compacta un ParticleMap en algo tipo "2M 1P" para tarjetas/resúmenes. */

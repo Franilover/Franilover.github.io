@@ -4,15 +4,15 @@
  * TarjetaFormacionOrgano.tsx
  * ───────────────────────────────────────────────────────────────────────────
  * Tarjeta de edición para un Órgano o Formación ya vinculado a una entidad
- * (planta, mineral, o item) — nombre libre, fórmula de compuestos
+ * (planta, mineral, item, o criatura) — nombre libre, fórmula de compuestos
  * (SelectorFormulaOrgano) y notas. Editar acá afecta a todas las entidades
  * que tengan el mismo Órgano/Formación vinculado (catálogo propio
- * compartido — tablas "organos"/"formaciones").
+ * compartido — tabla real "estructuras_ensambladas").
  *
- * Un solo componente para los 3 consumidores (antes triplicado: FormacionCard
+ * Un solo componente para los consumidores (antes triplicado: FormacionCard
  * en MineralEditor.tsx, OrganoCard en FloraEditor.tsx, TarjetaGrupoVinculado en
- * _shared/) — incluye Formaciones de Minerales, Formaciones de Items, y
- * Órganos de Flora. El nombre distingue el vocabulario del placeholder
+ * _shared/) — incluye Formaciones de Minerales, Formaciones de Items,
+ * Órganos de Flora, y Órganos de Criaturas. El nombre distingue el vocabulario del placeholder
  * (Órgano vs Formación) pero el comportamiento es idéntico.
  */
 

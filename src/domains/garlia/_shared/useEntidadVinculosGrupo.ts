@@ -5,23 +5,24 @@
  * ───────────────────────────────────────────────────────────────────────────
  * Generaliza usePlantaOrganosProcesos (flora/) para cualquier entidad que
  * necesite vincular N:N un catálogo propio tipo "GrupoCompuesto" — mismo
- * patrón que usan Formaciones de Minerales/Items (tabla "formaciones").
+ * patrón que usan Formaciones de Minerales/Items (tabla real
+ * "estructuras_ensambladas").
  *
- * Desde el rediseño que separó Órganos/Formaciones/Procesos/Habilidades en
- * tablas propias, ya no hay un `tipo` que discrimine dentro de
- * "grupos_compuestos" — cada catálogo (ej. "formaciones") es su propia
- * tabla, pasada acá vía `tablaCatalogo`. La entidad vinculada sigue siendo
- * una fila puente {entidad_id, grupo_compuesto_id} distinta por relación —
- * editar la fórmula en el catálogo actualiza todas las entidades que la
- * tengan vinculada.
+ * Órganos/Formaciones/Procesos/Habilidades viven en tablas propias — ya no
+ * hay un `tipo` que discrimine dentro de "grupos_compuestos" — cada
+ * catálogo (ej. "estructuras_ensambladas") es su propia tabla, pasada acá
+ * vía `tablaCatalogo`. La entidad vinculada sigue siendo una fila puente
+ * {entidad_id, grupo_compuesto_id} distinta por relación — editar la
+ * fórmula en el catálogo actualiza todas las entidades que la tengan
+ * vinculada.
  *
  * Uso:
  *   const formaciones = useEntidadVinculosGrupo({
  *     entidadId: item.id,
- *     tablaCatalogo: "formaciones",
+ *     tablaCatalogo: "estructuras_ensambladas",
  *     tablaPuente: "item_estructura",
  *     columnaFk: "item_id",
- *     catalogo: catalogoFormaciones, // useFormaciones().items
+ *     catalogo: catalogoFormaciones, // useEstructurasEnsambladas().items
  *   });
  */
 
@@ -52,7 +53,7 @@ export function useEntidadVinculosGrupo({
 }: {
   /** Id de la entidad padre (item, planta, mineral…). */
   entidadId: string;
-  /** Nombre de la tabla de catálogo propia, ej. "formaciones" u "organos". */
+  /** Nombre de la tabla de catálogo propia, ej. "estructuras_ensambladas". */
   tablaCatalogo: string;
   /** Nombre de la tabla puente en Supabase, ej. "item_estructura". */
   tablaPuente: string;
