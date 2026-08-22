@@ -1,0 +1,40 @@
+Antes de descomprimir este tar, borrá manualmente este archivo (ya no se usa,
+el selector de tipo de Grupo de Compuestos se eliminó del rediseño):
+
+  rm src/domains/garlia/elementos/SelectorTipoGrupoCompuesto.tsx
+
+Después descomprimí el tar parado en la raíz de domains/garlia/:
+
+  tar -xzf garlia_rediseno_biologia_fisica_tablas_separadas.tar.gz -C src/domains/garlia/
+
+Archivos que trae este tar (16, todos pisan o crean):
+  _shared/GridCatalogoGrupo.tsx           (nuevo)
+  _shared/useEntidadVinculosGrupo.ts      (reemplaza)
+  _shared/useEntidadVinculoReaccion.ts    (reemplaza)
+  _shared/useItemHabilidadesReaccion.ts   (reemplaza)
+  _shared/useItemHabilidadReaccion.ts     (reemplaza, legado sin uso)
+  biologia/BiologiaPage.tsx               (reemplaza)
+  elementos/GruposCompuestosPage.tsx      (reemplaza)
+  elementos/types.ts                      (reemplaza)
+  elementos/useFormaciones.ts             (nuevo)
+  elementos/useOrganos.ts                 (nuevo)
+  fisica/FisicaPage.tsx                   (reemplaza)
+  flora/FloraEditor.tsx                   (reemplaza)
+  flora/usePlantaOrganosProcesos.ts       (reemplaza)
+  items/EditorItem.tsx                    (reemplaza)
+  minerales/MineralEditor.tsx             (reemplaza)
+  minerales/useMineralFormacionesProcesos.ts (reemplaza)
+
+La migración de base de datos (separar organos/formaciones/procesos_reacciones
+de grupos_compuestos/reacciones) YA ESTÁ APLICADA en Supabase — no hace falta
+correr nada en la base, solo actualizar el código.
+
+Resumen de lo que cambió:
+1. Biología: sin tabs. Columna izquierda = Cladística. Columna derecha =
+   Órganos arriba, Procesos abajo.
+2. 4 tablas nuevas en Supabase: organos, formaciones, procesos_reacciones
+   (Procesos y Habilidades siguen unificadas en esta última, a propósito).
+   grupos_compuestos quedó solo con el registro genérico real; reacciones
+   quedó deprecada (los datos ya están migrados a procesos_reacciones).
+3. Después de aplicar este tar, correr build/tsc para confirmar que no
+   quedó ninguna referencia rota a los tipos/tablas viejas.

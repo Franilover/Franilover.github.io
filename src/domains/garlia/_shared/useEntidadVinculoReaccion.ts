@@ -4,8 +4,11 @@
  * useEntidadVinculoReaccion.ts
  * ───────────────────────────────────────────────────────────────────────────
  * Vínculo 1:1 entre una entidad (PlantaProceso, MineralProceso, o el propio
- * Item vía item_habilidades) y una Reacción del catálogo global de Química,
- * vía columna `reaccion_id` directa — sin tabla puente.
+ * Item vía item_habilidades) y un Proceso/Reacción de la tabla
+ * "procesos_reacciones" (catálogo separado de "grupos_compuestos" desde el
+ * rediseño de Biología/Física — Procesos y Habilidades siguen siendo EL
+ * MISMO catálogo entre sí, solo aislado del resto de Química), vía columna
+ * `reaccion_id` directa — sin tabla puente.
  *
  * La Reacción vinculada ES la reacción real del catálogo — no hay copia.
  * Editarla acá (o desde Química) actualiza todo lo que la use.
@@ -61,10 +64,10 @@ export function useEntidadVinculoReaccion({
     [tabla, entidadId, onReaccionIdCambiado],
   );
 
-  // ── Crear una Reacción nueva en el catálogo global + vincularla ────────
+  // ── Crear un Proceso/Reacción nuevo en el catálogo + vincularlo ────────
   const crearYVincular = useCallback(async () => {
     const { data: nuevaReaccion, error } = await supabase
-      .from("reacciones")
+      .from("procesos_reacciones")
       .insert([{ nombre: "", consume: [], produce: [], descripcion: null }])
       .select()
       .single();
@@ -86,7 +89,7 @@ export function useEntidadVinculoReaccion({
   // que la tenga vinculada) ────────────────────────────────────────────────
   const actualizar = useCallback(async (updates: Partial<Reaccion>) => {
     if (!reaccionIdActual) return;
-    const { error } = await supabase.from("reacciones").update(updates).eq("id", reaccionIdActual);
+    const { error } = await supabase.from("procesos_reacciones").update(updates).eq("id", reaccionIdActual);
     if (error) {
       console.error("[useEntidadVinculoReaccion] error actualizando reacción:", error);
     }

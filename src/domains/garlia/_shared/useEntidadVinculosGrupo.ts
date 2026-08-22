@@ -4,29 +4,31 @@
  * useEntidadVinculosGrupo.ts
  * ───────────────────────────────────────────────────────────────────────────
  * Generaliza usePlantaOrganosProcesos (flora/) para cualquier entidad que
- * necesite vincular N:N su catálogo compartido de GrupoCompuesto — mismo
- * patrón que Órganos de Flora o Formaciones de Minerales, ahora reutilizable
- * para Estructura y Habilidades de Items sin duplicar el CRUD dos veces.
+ * necesite vincular N:N un catálogo propio tipo "GrupoCompuesto" — mismo
+ * patrón que usan Formaciones de Minerales/Items (tabla "formaciones").
  *
- * Un GrupoCompuesto con cierto `tipo` (ej. "estructura", "habilidad") ES la
- * entidad vinculada — no hay tabla propia por concepto, solo una tabla
- * puente {entidad_id, grupo_compuesto_id} distinta por relación. Editar la
- * fórmula del GrupoCompuesto en el catálogo actualiza todas las entidades
- * que lo tengan vinculado.
+ * Desde el rediseño que separó Órganos/Formaciones/Procesos/Habilidades en
+ * tablas propias, ya no hay un `tipo` que discrimine dentro de
+ * "grupos_compuestos" — cada catálogo (ej. "formaciones") es su propia
+ * tabla, pasada acá vía `tablaCatalogo`. La entidad vinculada sigue siendo
+ * una fila puente {entidad_id, grupo_compuesto_id} distinta por relación —
+ * editar la fórmula en el catálogo actualiza todas las entidades que la
+ * tengan vinculada.
  *
  * Uso:
- *   const estructura = useEntidadVinculosGrupo({
+ *   const formaciones = useEntidadVinculosGrupo({
  *     entidadId: item.id,
+ *     tablaCatalogo: "formaciones",
  *     tablaPuente: "item_estructura",
  *     columnaFk: "item_id",
- *     catalogo: catalogoEstructura, // gruposCompuestos.filter(g => g.tipo === "estructura")
+ *     catalogo: catalogoFormaciones, // useFormaciones().items
  *   });
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 
-import type { GrupoCompuesto, TipoGrupoCompuesto } from "@/domains/garlia/elementos/types";
+import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
 
 /** Fila cruda de una tabla puente {id, [columnaFk]: string, grupo_compuesto_id, created_at}. */
 interface VinculoGrupo {
@@ -43,21 +45,21 @@ export interface GrupoVinculadoResuelto extends GrupoCompuesto {
 
 export function useEntidadVinculosGrupo({
   entidadId,
+  tablaCatalogo,
   tablaPuente,
   columnaFk,
   catalogo,
-  tipoNuevoGrupo,
 }: {
   /** Id de la entidad padre (item, planta, mineral…). */
   entidadId: string;
+  /** Nombre de la tabla de catálogo propia, ej. "formaciones" u "organos". */
+  tablaCatalogo: string;
   /** Nombre de la tabla puente en Supabase, ej. "item_estructura". */
   tablaPuente: string;
   /** Columna FK de la tabla puente que apunta a la entidad padre, ej. "item_id". */
   columnaFk: string;
-  /** Catálogo de GrupoCompuesto ya filtrado por tipo (cargado por el padre vía useGruposCompuestos). */
+  /** Catálogo ya cargado por el padre (ej. useFormaciones().items). */
   catalogo: GrupoCompuesto[];
-  /** Tipo a asignar al crear un GrupoCompuesto nuevo desde acá. */
-  tipoNuevoGrupo: TipoGrupoCompuesto;
 }) {
   const [vinculos, setVinculos] = useState<VinculoGrupo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,12 +94,12 @@ export function useEntidadVinculosGrupo({
       .filter((g): g is GrupoVinculadoResuelto => g !== null);
   }, [vinculos, catalogo]);
 
-  // ── Crear un GrupoCompuesto nuevo (con tipoNuevoGrupo) + vincularlo ────
+  // ── Crear un registro nuevo en tablaCatalogo + vincularlo ──────────────
   const crearYVincular = useCallback(
     async (nombre: string = "") => {
       const { data: nuevoGrupo, error: errorGrupo } = await supabase
-        .from("grupos_compuestos")
-        .insert([{ nombre, componentes: [], tipo: tipoNuevoGrupo }])
+        .from(tablaCatalogo)
+        .insert([{ nombre, componentes: [] }])
         .select()
         .single();
       if (errorGrupo || !nuevoGrupo) return null;
@@ -116,7 +118,7 @@ export function useEntidadVinculosGrupo({
       setVinculos((prev) => [...prev, vinculo as VinculoGrupo]);
       return { ...(nuevoGrupo as GrupoCompuesto), vinculo_id: (vinculo as VinculoGrupo).id };
     },
-    [tablaPuente, columnaFk, entidadId, tipoNuevoGrupo],
+    [tablaCatalogo, tablaPuente, columnaFk, entidadId],
   );
 
   // ── Vincular un GrupoCompuesto ya existente del catálogo ───────────────
@@ -137,19 +139,19 @@ export function useEntidadVinculosGrupo({
     [tablaPuente, columnaFk, entidadId, vinculos],
   );
 
-  // ── Actualizar el GrupoCompuesto en el catálogo (afecta a todas las
+  // ── Actualizar el registro en tablaCatalogo (afecta a todas las
   // entidades que lo tengan vinculado) ────────────────────────────────────
   const actualizar = useCallback(
     async (grupoCompuestoId: string, updates: Partial<GrupoCompuesto>) => {
       const { error } = await supabase
-        .from("grupos_compuestos")
+        .from(tablaCatalogo)
         .update(updates)
         .eq("id", grupoCompuestoId);
       if (error) {
         console.error("[useEntidadVinculosGrupo] error actualizando grupo:", error);
       }
     },
-    [],
+    [tablaCatalogo],
   );
 
   // ── Desvincular (borra solo la fila puente, el GrupoCompuesto sigue en

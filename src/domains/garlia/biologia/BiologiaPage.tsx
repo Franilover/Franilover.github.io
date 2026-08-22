@@ -15,28 +15,20 @@
  * NO toca EditorCriatura.tsx — solo referencia criaturas por id.
  */
 
-import { Dna, Download, FlaskConical, Loader2, Sprout, Upload, X } from "lucide-react";
+import { Download, Loader2, Upload, X } from "lucide-react";
 import React, { useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import type { GrupoCompuesto, Reaccion } from "@/domains/garlia/elementos/types";
 
 import { CladisticaPage } from "./CladisticaPage";
 import { useClados } from "./useBiologia";
 import type { Clado } from "./types";
-
-type TabBiologia = "cladistica" | "organos" | "procesos";
-
-const TABS_BIOLOGIA: { key: TabBiologia; label: string; icono: React.ElementType }[] = [
-  { key: "cladistica", label: "Cladística", icono: Dna },
-  { key: "organos", label: "Órganos", icono: Sprout },
-  { key: "procesos", label: "Procesos", icono: FlaskConical },
-];
 
 interface Props {
   /** El padre decide qué hacer al clickear una criatura (ej. abrir su editor). */
@@ -136,32 +128,26 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   // saca esa responsabilidad.
   const { clados, setClados } = useClados();
 
-  const [tab, setTab] = useState<TabBiologia>("cladistica");
-
-  // ── Órganos y Procesos: catálogos globales, mismo motor que Física ────
-  // Órganos = GrupoCompuesto tipo="organo" (mismo catálogo que usa Flora
-  // para vincular por planta). Procesos = todo el catálogo de Reaccion
-  // (mismo que usan Procesos de Flora/Minerales y Habilidades de Items).
-  // Self-contained, igual que el resto de Biología: trae sus propios datos
-  // acá sin tocar CladisticaPage ni depender de una planta puntual.
-  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
-  const catalogoOrganos = useMemo(
-    () => gruposCompuestos.filter((g) => g.tipo === "organo"),
-    [gruposCompuestos],
-  );
+  // ── Órganos y Procesos: catálogos propios, mismo motor que Física ─────
+  // Órganos = tabla "organos" (mismo catálogo que usa Flora para vincular
+  // por planta). Procesos = tabla "procesos_reacciones" (mismo catálogo
+  // que usan Procesos de Flora/Minerales y Habilidades de Items). Self-
+  // contained, igual que el resto de Biología: trae sus propios datos acá
+  // sin tocar CladisticaPage ni depender de una planta puntual.
+  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
   const { items: compuestosCatalogo } = useCompuestos();
   const { items: elementosCatalogo } = useElementos();
 
   async function actualizarOrgano(id: string, cambios: Partial<GrupoCompuesto>) {
-    setGruposCompuestos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
-    const { error } = await supabase.from("grupos_compuestos").update(cambios).eq("id", id);
+    setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
+    const { error } = await supabase.from("organos").update(cambios).eq("id", id);
     if (error) console.error("[BiologiaPage] error guardando órgano:", error);
   }
 
   async function actualizarProceso(id: string, cambios: Partial<Reaccion>) {
     setReaccionesCatalogo((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
-    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
+    const { error } = await supabase.from("procesos_reacciones").update(cambios).eq("id", id);
     if (error) console.error("[BiologiaPage] error guardando proceso:", error);
   }
 
@@ -226,77 +212,58 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   }
 
   return (
-    <div>
-      {/* Tabs: Cladística (default, comportamiento sin cambios) / Órganos /
-          Procesos — mismo lenguaje visual simple, sin depender de un
-          sistema de tabs genérico compartido para no acoplar Biología a
-          otro módulo. */}
-      <div className="flex items-center gap-1 px-2 mb-2 border-b border-primary/10">
-        {TABS_BIOLOGIA.map(({ key, label, icono: Icono }) => (
+    <div className="flex flex-col sm:flex-row gap-3 min-h-0">
+      {/* Columna izquierda: Cladística — comportamiento sin cambios, solo
+          ahora vive fija al lado de Órganos/Procesos en vez de ocupar todo
+          el ancho detrás de un tab. */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-end gap-1 px-2 mb-1">
+          <input
+            ref={inputArchivoRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={handleArchivoSeleccionado}
+            className="hidden"
+          />
           <button
-            key={key}
             type="button"
-            onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 -mb-px border-b-2 text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
-              tab === key
-                ? "border-primary text-primary"
-                : "border-transparent text-primary/40 hover:text-primary/70"
-            }`}
+            disabled={importando}
+            onClick={() => inputArchivoRef.current?.click()}
+            title='Subir un JSON con clados: crea los nuevos y actualiza los existentes (mismo nombre), mismo formato que "Descargar datos"'
+            className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
-            <Icono size={12} />
-            {label}
+            {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
           </button>
-        ))}
-      </div>
-
-      {tab === "cladistica" && (
-      <>
-      <div className="flex items-center justify-end gap-1 px-2 mb-1">
-        <input
-          ref={inputArchivoRef}
-          type="file"
-          accept="application/json,.json"
-          onChange={handleArchivoSeleccionado}
-          className="hidden"
-        />
-        <button
-          type="button"
-          disabled={importando}
-          onClick={() => inputArchivoRef.current?.click()}
-          title='Subir un JSON con clados: crea los nuevos y actualiza los existentes (mismo nombre), mismo formato que "Descargar datos"'
-          className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-        >
-          {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
-        </button>
-        <button
-          type="button"
-          onClick={() => descargarDatosBiologia({ clados })}
-          title="Descargar el cladograma de Biología (clados) como JSON"
-          className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <Download size={14} />
-        </button>
-      </div>
-
-      {mensajeImportacion && (
-        <div className="flex items-center justify-between gap-2 px-2 mb-1 text-micro text-primary/60">
-          <span className="min-w-0">{mensajeImportacion}</span>
           <button
             type="button"
-            onClick={() => setMensajeImportacion(null)}
-            className="shrink-0 text-primary/30 hover:text-primary/60 cursor-pointer"
-            title="Cerrar"
+            onClick={() => descargarDatosBiologia({ clados })}
+            title="Descargar el cladograma de Biología (clados) como JSON"
+            className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
           >
-            <X size={10} />
+            <Download size={14} />
           </button>
         </div>
-      )}
 
-      <CladisticaPage onSelectCriatura={onSelectCriatura} />
-      </>
-      )}
+        {mensajeImportacion && (
+          <div className="flex items-center justify-between gap-2 px-2 mb-1 text-micro text-primary/60">
+            <span className="min-w-0">{mensajeImportacion}</span>
+            <button
+              type="button"
+              onClick={() => setMensajeImportacion(null)}
+              className="shrink-0 text-primary/30 hover:text-primary/60 cursor-pointer"
+              title="Cerrar"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        )}
 
-      {tab === "organos" && (
+        <CladisticaPage onSelectCriatura={onSelectCriatura} />
+      </div>
+
+      {/* Columna derecha: Órganos arriba, Procesos abajo — apilados, cada
+          uno con su propio separador de sección, sin tabs. */}
+      <div className="flex-1 min-w-0 flex flex-col gap-4 border-l border-primary/10 pl-3">
         <div className="p-2.5">
           <GridCatalogoGrupo
             modo="grupo"
@@ -307,10 +274,8 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
             onActualizar={actualizarOrgano}
           />
         </div>
-      )}
 
-      {tab === "procesos" && (
-        <div className="p-2.5">
+        <div className="p-2.5 border-t border-primary/10 pt-4">
           <GridCatalogoGrupo
             modo="reaccion"
             titulo="Procesos"
@@ -320,7 +285,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
             onActualizar={actualizarProceso}
           />
         </div>
-      )}
+      </div>
     </div>
   );
 }

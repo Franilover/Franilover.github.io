@@ -3,13 +3,14 @@
 /**
  * useItemHabilidadesReaccion.ts (plural — N:N)
  * ───────────────────────────────────────────────────────────────────────────
- * Vínculo N:N entre un Item y varias Reacciones del catálogo global de
- * Química, vía la tabla puente `item_habilidades` (item_id, reaccion_id) —
- * ahora un item puede tener múltiples filas (múltiples habilidades), igual
- * que Estructura vía useEntidadVinculosGrupo. Misma interfaz de salida que
- * useEntidadVinculosGrupo (items/loading/crearYVincular/vincularExistente/
- * actualizar/desvincular) para poder reutilizar SeccionReaccionesVinculadas
- * sin duplicar lógica.
+ * Vínculo N:N entre un Item y varias Habilidades (tabla "procesos_reacciones"
+ * — catálogo separado de "grupos_compuestos", compartido con Procesos de
+ * Flora/Minerales) vía la tabla puente `item_habilidades` (item_id,
+ * reaccion_id) — un item puede tener múltiples filas (múltiples
+ * habilidades), igual que Formaciones vía useEntidadVinculosGrupo. Misma
+ * interfaz de salida que useEntidadVinculosGrupo (items/loading/
+ * crearYVincular/vincularExistente/actualizar/desvincular) para poder
+ * reutilizar SeccionReaccionesVinculadas sin duplicar lógica.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -71,10 +72,10 @@ export function useItemHabilidadesReaccion({
       .filter((r): r is ReaccionVinculadaHabilidad => r !== null);
   }, [vinculos, catalogo]);
 
-  // ── Crear una Reacción nueva en el catálogo global + vincularla ────────
+  // ── Crear una Habilidad nueva en el catálogo + vincularla ──────────────
   const crearYVincular = useCallback(async () => {
     const { data: nuevaReaccion, error: errorReaccion } = await supabase
-      .from("reacciones")
+      .from("procesos_reacciones")
       .insert([{ nombre: "", consume: [], produce: [], descripcion: null }])
       .select()
       .single();
@@ -116,7 +117,7 @@ export function useItemHabilidadesReaccion({
   // ── Actualizar la Reacción vinculada en el catálogo (afecta a todo lo
   // que la use) ────────────────────────────────────────────────────────────
   const actualizar = useCallback(async (reaccionId: string, updates: Partial<Reaccion>) => {
-    const { error } = await supabase.from("reacciones").update(updates).eq("id", reaccionId);
+    const { error } = await supabase.from("procesos_reacciones").update(updates).eq("id", reaccionId);
     if (error) {
       console.error("[useItemHabilidadesReaccion] error actualizando reacción:", error);
     }

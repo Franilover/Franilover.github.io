@@ -193,73 +193,75 @@ export const CONFIG_COMPUESTOS = {
 // ─── Grupos de Compuestos: conjuntos reutilizables de Compuestos ──────────
 // Un Grupo es simplemente "un conjunto reutilizable de compuestos con
 // cantidad" — mismo shape que la fórmula de un PlantaOrgano
-// ({compuesto_id, cantidad}[]), pensado para usarse directo como fórmula
-// desde Flora (Órganos) u otros módulos que necesiten una mezcla ya armada
-// sin tener que reconstruirla cada vez desde cero.
+// ({compuesto_id, cantidad}[]), usado como plantilla genérica copiable
+// desde cualquier módulo (botón "Usar grupo").
+//
+// Desde el rediseño que separó Órganos/Formaciones en tablas propias
+// ("organos", "formaciones"), "grupos_compuestos" ya NO tiene tipos
+// especiales — solo existen grupos "genéricos". Los tipos legado
+// "organo"/"formacion"/"estructura"/"habilidad" fueron migrados a sus
+// tablas propias y ya no aparecen acá.
 export interface ComponenteGrupoCompuesto {
   compuesto_id: string;
   cantidad: number;
 }
 
-/**
- * Tipo/tag de un Grupo de Compuestos — determina en qué buscadores aparece:
- * - "generico": solo aparece como plantilla copiable (botón "Usar grupo").
- * - "organo": además aparece en el picker de Órganos de Flora — el propio
- *   Grupo ES el Órgano (se vincula N:N a plantas vía planta_organos).
- * - "formacion": además aparece en el picker de Formaciones de Minerales —
- *   el propio Grupo ES la Formación (se vincula N:N a minerales vía
- *   mineral_formaciones).
- * - "estructura": además aparece en el picker de Estructura de Items — el
- *   propio Grupo ES la parte estructural (se vincula N:N a items vía
- *   item_estructura). Mismo espíritu que "organo" pero para Items.
- * - "habilidad": @deprecated LEGADO. Antes el propio Grupo ERA la
- *   habilidad de un Item (vía item_habilidades). Ese rol lo cumple ahora el
- *   catálogo de Reacciones (ver elementos/types.ts → Reaccion,
- *   item_habilidades apunta a reaccion_id). Se mantiene en el union type
- *   solo por si quedan filas viejas con este tag en la base — ya NO
- *   aparece como opción en TIPOS_GRUPO_COMPUESTO ni en ningún picker activo.
- */
-export type TipoGrupoCompuesto = "generico" | "organo" | "formacion" | "estructura" | "habilidad";
-
-export const TIPOS_GRUPO_COMPUESTO: { value: TipoGrupoCompuesto; label: string }[] = [
-  { value: "generico", label: "Genérico" },
-  { value: "organo", label: "Órgano (Flora)" },
-  { value: "formacion", label: "Formación (Minerales)" },
-  { value: "estructura", label: "Estructura (Ítems)" },
-];
-
-/** Fila cruda tal cual vive en Supabase (tabla "grupos_compuestos"). */
+/** Fila cruda tal cual vive en Supabase (tabla "grupos_compuestos") — solo
+ *  grupos genéricos desde el rediseño; sin campo `tipo`. */
 export interface GrupoCompuesto {
   id: string;
   nombre: string;
   notas: string | null;
   componentes: ComponenteGrupoCompuesto[];
-  /** Tag que determina en qué buscadores aparece este grupo — ver
-   *  TipoGrupoCompuesto. Default "generico" para grupos existentes. */
-  tipo: TipoGrupoCompuesto;
   created_at: string;
   updated_at?: string;
 }
 
 export const CONFIG_GRUPOS_COMPUESTOS = {
   tabla: "grupos_compuestos",
-  select: "id, nombre, notas, componentes, tipo, created_at, updated_at",
+  select: "id, nombre, notas, componentes, created_at, updated_at",
 };
 
-// ─── Reacciones: recetas reutilizables de consume/produce ──────────────────
-// Catálogo global (Química, debajo de Grupos de Compuestos) de reacciones
-// con nombre + consume[] + produce[] + descripción — mismo shape que
-// PlantaProceso/MineralProceso, pero como entidad compartida propia en vez
-// de vivir 1:1 dentro de una planta/mineral. Pensada para vincularse en
-// vivo desde Procesos (Flora/Minerales) y Habilidades (Items): editar la
-// Reacción en el catálogo actualiza todos los lugares que la usan.
+// ─── Órganos: catálogo propio de Biología/Flora ────────────────────────────
+// Antes vivían como GrupoCompuesto tipo="organo"; desde el rediseño tienen
+// tabla propia "organos", mismo shape que GrupoCompuesto. Se vinculan N:N a
+// plantas vía planta_organos (grupo_compuesto_id → organos.id) y se
+// muestran como catálogo completo en la tab Órganos de Biología.
+export type Organo = GrupoCompuesto;
+
+export const CONFIG_ORGANOS = {
+  tabla: "organos",
+  select: "id, nombre, notas, componentes, created_at, updated_at",
+};
+
+// ─── Formaciones: catálogo propio de Física/Minerales/Items ────────────────
+// Antes vivían como GrupoCompuesto tipo="formacion" (Minerales) o
+// tipo="estructura" (Items, unificado después con Formaciones); desde el
+// rediseño tienen tabla propia "formaciones", mismo shape que
+// GrupoCompuesto. Se vinculan N:N a minerales (mineral_formaciones) e items
+// (item_estructura) vía grupo_compuesto_id → formaciones.id, y se muestran
+// como catálogo completo debajo de Subsistemas en Física.
+export type Formacion = GrupoCompuesto;
+
+export const CONFIG_FORMACIONES = {
+  tabla: "formaciones",
+  select: "id, nombre, notas, componentes, created_at, updated_at",
+};
+
+// ─── Procesos/Reacciones: recetas reutilizables de consume/produce ────────
+// Catálogo propio (tabla "procesos_reacciones", separada de
+// "grupos_compuestos" desde el rediseño) con nombre + consume[] + produce[]
+// + descripción — mismo shape que PlantaProceso/MineralProceso. Procesos
+// (Biología/Flora/Minerales) y Habilidades (Items) son a propósito EL MISMO
+// catálogo — editar una Reacción acá actualiza todos los lugares que la
+// usan, sea planta, mineral o item.
 export interface EntradaReaccion {
   tipo: "elemento" | "compuesto";
   id: string;
   cantidad: number;
 }
 
-/** Fila cruda tal cual vive en Supabase (tabla "reacciones"). */
+/** Fila cruda tal cual vive en Supabase (tabla "procesos_reacciones"). */
 export interface Reaccion {
   id: string;
   nombre: string;
@@ -271,7 +273,7 @@ export interface Reaccion {
 }
 
 export const CONFIG_REACCIONES = {
-  tabla: "reacciones",
+  tabla: "procesos_reacciones",
   select: "id, nombre, consume, produce, descripcion, created_at, updated_at",
 };
 

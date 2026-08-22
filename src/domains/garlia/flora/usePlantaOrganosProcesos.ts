@@ -5,26 +5,27 @@
  * ───────────────────────────────────────────────────────────────────────────
  * Hook para CRUD de Órganos y Procesos de una planta.
  *
- * Órganos: catálogo compartido — ya NO es la tabla propia "organos", sino
- * "grupos_compuestos" filtrado por tipo="organo" (ver elementos/types.ts).
- * Este hook resuelve los vínculos de `plantaId` (tabla puente
- * "planta_organos", ahora con FK `grupo_compuesto_id`) contra el catálogo
- * de Grupos de Compuestos (recibido como parámetro, ya cargado por
- * useGruposCompuestos en el componente padre) y expone:
- *   - crearYVincularOrgano: crea un GrupoCompuesto nuevo (tipo="organo") y
- *     lo vincula a esta planta ("Crear órgano" en el picker).
- *   - vincularOrganoExistente: vincula un GrupoCompuesto ya existente del
- *     catálogo ("Usar uno existente" en el picker) — no duplica nada.
- *   - actualizarOrgano: edita la fórmula/nombre/notas del GrupoCompuesto en
- *     el catálogo — el cambio se refleja en todas las plantas que lo usan.
- *   - desvincularOrgano: quita el vínculo planta↔grupo (borra la fila
- *     puente), sin borrar el GrupoCompuesto del catálogo — así sigue
- *     disponible para otras plantas / para volver a vincularlo.
+ * Órganos: catálogo propio — tabla "organos" (separada de
+ * "grupos_compuestos" desde el rediseño de Biología). Este hook resuelve
+ * los vínculos de `plantaId` (tabla puente "planta_organos", FK
+ * `grupo_compuesto_id` → organos.id) contra el catálogo de Órganos
+ * (recibido como parámetro, ya cargado por useOrganos en el componente
+ * padre) y expone:
+ *   - crearYVincularOrgano: crea un Organo nuevo y lo vincula a esta planta
+ *     ("Crear órgano" en el picker).
+ *   - vincularOrganoExistente: vincula un Organo ya existente del catálogo
+ *     ("Usar uno existente" en el picker) — no duplica nada.
+ *   - actualizarOrgano: edita la fórmula/nombre/notas del Organo en el
+ *     catálogo — el cambio se refleja en todas las plantas que lo usan.
+ *   - desvincularOrgano: quita el vínculo planta↔órgano (borra la fila
+ *     puente), sin borrar el Organo del catálogo — así sigue disponible
+ *     para otras plantas / para volver a vincularlo.
  *
  * Procesos: ahora son solo una etapa del ciclo de vida (descripcion) que
- * vincula 1:1 una Reacción del catálogo global de Química vía reaccion_id
- * — el CRUD de ese vínculo vive en useEntidadVinculoReaccion, instanciado
- * desde el componente que renderiza cada PlantaProceso.
+ * vincula 1:1 un Proceso/Reacción de la tabla "procesos_reacciones"
+ * (separada de "reacciones") vía reaccion_id — el CRUD de ese vínculo vive
+ * en useEntidadVinculoReaccion, instanciado desde el componente que
+ * renderiza cada PlantaProceso.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -90,13 +91,12 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
       .filter((o): o is PlantaOrganoResuelto => o !== null);
   }, [vinculos, catalogoOrganos]);
 
-  // ── Crear un GrupoCompuesto nuevo (tipo="organo") + vincularlo a esta
-  // planta ──────────────────────────────────────────────────────────────
+  // ── Crear un Organo nuevo + vincularlo a esta planta ───────────────────
   const crearYVincularOrgano = useCallback(
     async (nombre: string = "") => {
       const { data: nuevoGrupo, error: errorGrupo } = await supabase
-        .from("grupos_compuestos")
-        .insert([{ nombre, componentes: [], tipo: "organo" }])
+        .from("organos")
+        .insert([{ nombre, componentes: [] }])
         .select()
         .single();
       if (errorGrupo || !nuevoGrupo) return null;
@@ -138,12 +138,12 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
     [plantaId, vinculos],
   );
 
-  // ── Actualizar el GrupoCompuesto en el catálogo (afecta a todas las
-  // plantas que lo tengan vinculado) ──────────────────────────────────────
+  // ── Actualizar el Organo en el catálogo (afecta a todas las plantas que
+  // lo tengan vinculado) ──────────────────────────────────────────────────
   const actualizarOrgano = useCallback(
     async (grupoCompuestoId: string, updates: Partial<GrupoCompuesto>) => {
       const { error } = await supabase
-        .from("grupos_compuestos")
+        .from("organos")
         .update(updates)
         .eq("id", grupoCompuestoId);
       if (error) {

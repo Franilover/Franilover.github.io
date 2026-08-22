@@ -26,7 +26,7 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { type Compuesto, type Elemento, type GrupoCompuesto, type Reaccion } from "@/domains/garlia/elementos/types";
 import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage";
@@ -62,7 +62,7 @@ export function FloraEditorMejorado({
 }) {
   const { items: elementos, setItems: setElementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
-  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
+  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useFlora();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
@@ -86,12 +86,9 @@ export function FloraEditorMejorado({
   const lastEntityClickTarget = useRef<HTMLElement | null>(null);
   const asideEcosistemasRef = useRef<HTMLElement | null>(null);
 
-  // Catálogo de Órganos = Grupos de Compuestos con tipo="organo" (catálogo
-  // global, compartido entre todas las plantas). Ya no es una tabla propia.
-  const catalogoOrganos = useMemo(
-    () => gruposCompuestos.filter((g) => g.tipo === "organo"),
-    [gruposCompuestos],
-  );
+  // Catálogo de Órganos: tabla propia "organos" (catálogo global,
+  // compartido entre todas las plantas), separada de Grupos de Compuestos
+  // desde el rediseño de Biología.
 
   // Órganos vinculados a esta planta (resueltos contra el catálogo) y procesos
   const {
@@ -314,15 +311,15 @@ export function FloraEditorMejorado({
                           onUpdate={(id, updates) => {
                             // Optimista: refleja el cambio en el catálogo local ya
                             // mismo (afecta a todas las plantas que usan este
-                            // Grupo), y persiste en Supabase vía el hook.
-                            setGruposCompuestos((prev) =>
+                            // Órgano), y persiste en Supabase vía el hook.
+                            setCatalogoOrganos((prev) =>
                               prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
                             );
                             void actualizarOrgano(id, updates);
                           }}
                           onDelete={() => void desvincularOrgano(organo.vinculo_id)}
                           onCambiarGrupo={(grupoCompuestoId) => {
-                            // "Usar grupo" cambia a qué GrupoCompuesto apunta
+                            // "Usar grupo" cambia a qué Órgano apunta
                             // esta parte de la planta (reemplaza el vínculo),
                             // en vez de mutar el grupo actualmente vinculado
                             // — así el título se actualiza al del grupo
@@ -337,7 +334,7 @@ export function FloraEditorMejorado({
                           compuestos={compuestos}
                           elementos={elementos}
                           onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
-                          gruposCompuestos={gruposCompuestos}
+                          gruposCompuestos={catalogoOrganos}
                         />
                       </div>
                     ))}

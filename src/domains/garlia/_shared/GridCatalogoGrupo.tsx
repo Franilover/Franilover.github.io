@@ -3,10 +3,11 @@
 /**
  * GridCatalogoGrupo.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Grid de tarjetas clickeables sobre un catálogo global (GrupoCompuesto de
- * cierto tipo, o Reaccion), cada una abriendo su editor flotante completo —
- * GrupoCompuestoPanelFlotante o ReaccionPanelFlotante, los mismos "editores
- * propios" que ya usa Química (GruposCompuestosPage/ReaccionesPage) e Items.
+ * Grid de tarjetas clickeables sobre un catálogo global (Organo, Formacion,
+ * o Reaccion/Proceso — todos comparten el shape GrupoCompuesto/Reaccion),
+ * cada una abriendo su editor flotante completo — GrupoCompuestoPanelFlotante
+ * o ReaccionPanelFlotante, los mismos "editores propios" que ya usa Química
+ * (GruposCompuestosPage/ReaccionesPage) e Items.
  *
  * Nace del rediseño de Biología (tabs Órganos/Procesos) y Física (grids de
  * Formaciones/Habilidades debajo de Subsistemas): en vez de triplicar el

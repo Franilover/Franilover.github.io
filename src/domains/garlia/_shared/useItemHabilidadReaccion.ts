@@ -85,7 +85,7 @@ export function useItemHabilidadReaccion({
 
   const crearYVincular = useCallback(async () => {
     const { data: nuevaReaccion, error } = await supabase
-      .from("reacciones")
+      .from("procesos_reacciones")
       .insert([{ nombre: "", consume: [], produce: [], descripcion: null }])
       .select()
       .single();
@@ -105,7 +105,7 @@ export function useItemHabilidadReaccion({
   const actualizar = useCallback(
     async (updates: Partial<Reaccion>) => {
       if (!reaccionId) return;
-      const { error } = await supabase.from("reacciones").update(updates).eq("id", reaccionId);
+      const { error } = await supabase.from("procesos_reacciones").update(updates).eq("id", reaccionId);
       if (error) {
         console.error("[useItemHabilidadReaccion] error actualizando reacción:", error);
       }

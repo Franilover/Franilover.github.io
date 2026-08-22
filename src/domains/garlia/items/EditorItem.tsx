@@ -36,7 +36,7 @@ import { supabase } from "@/infra/supabase/supabase";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
@@ -94,25 +94,20 @@ export function EditorItem({
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
 
-  // Catálogo compartido de Grupos de Compuestos — Estructura del item ahora
-  // usa el MISMO catálogo que Formaciones de Minerales (tipo="formacion"),
-  // no un catálogo propio. Rediseño unificado: un item y un mineral pueden
-  // compartir la misma Formación (ej. "Cristal de Cuarzo" como parte de una
-  // espada y como formación mineral), y editarla en cualquiera de los dos
-  // lugares actualiza a ambos. La tabla puente sigue siendo item_estructura
-  // (solo cambió qué catálogo se le ofrece al usuario para elegir/crear).
-  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
-  const catalogoEstructura = React.useMemo(
-    () => gruposCompuestos.filter((g) => g.tipo === "formacion"),
-    [gruposCompuestos],
-  );
+  // Catálogo propio de Formaciones — Estructura del item usa el MISMO
+  // catálogo (tabla "formaciones") que Formaciones de Minerales. Rediseño
+  // unificado: un item y un mineral pueden compartir la misma Formación
+  // (ej. "Cristal de Cuarzo" como parte de una espada y como formación
+  // mineral), y editarla en cualquiera de los dos lugares actualiza a
+  // ambos. La tabla puente sigue siendo item_estructura.
+  const { items: catalogoEstructura, setItems: setCatalogoEstructura } = useFormaciones();
 
   const estructura = useEntidadVinculosGrupo({
     entidadId: item.id,
+    tablaCatalogo: "formaciones",
     tablaPuente: "item_estructura",
     columnaFk: "item_id",
     catalogo: catalogoEstructura,
-    tipoNuevoGrupo: "formacion",
   });
 
   // Habilidades del item = N Reacciones del catálogo global de Química,
@@ -126,17 +121,17 @@ export function EditorItem({
   });
 
   function onGrupoCompuestoActualizadoLocal(id: string, updates: any) {
-    setGruposCompuestos((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+    setCatalogoEstructura((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
   }
 
-  // Persistencia directa del GrupoCompuesto en catálogo — usada por el
+  // Persistencia directa de la Formación en catálogo — usada por el
   // panel flotante (GrupoCompuestoPanelFlotante), que no sabe a qué
   // relación (estructura/habilidad) pertenece el grupo que edita.
   async function persistirGrupoCompuesto(id: string, cambios: any) {
     onGrupoCompuestoActualizadoLocal(id, cambios);
-    const { error } = await supabase.from("grupos_compuestos").update(cambios).eq("id", id);
+    const { error } = await supabase.from("formaciones").update(cambios).eq("id", id);
     if (error) {
-      console.error("[EditorItem] error guardando grupo de compuestos:", error);
+      console.error("[EditorItem] error guardando formación:", error);
     }
   }
 
@@ -144,11 +139,12 @@ export function EditorItem({
     setReacciones((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
   }
 
-  // Persistencia directa de la Reacción en catálogo — usada por el panel
-  // flotante (ReaccionPanelFlotante), que no sabe que se abrió desde acá.
+  // Persistencia directa de la Reacción/Habilidad en catálogo — usada por
+  // el panel flotante (ReaccionPanelFlotante), que no sabe que se abrió
+  // desde acá.
   async function persistirReaccion(id: string, cambios: any) {
     onReaccionActualizadaLocal(id, cambios);
-    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
+    const { error } = await supabase.from("procesos_reacciones").update(cambios).eq("id", id);
     if (error) {
       console.error("[EditorItem] error guardando reacción:", error);
     }
@@ -327,9 +323,8 @@ export function EditorItem({
 
               {/* Formaciones — partes materiales del ítem (mango, hoja,
                   empuñadura…), cada una con su propia fórmula de
-                  compuestos. Rediseño unificado: mismo catálogo global de
-                  GrupoCompuesto tipo="formacion" que usan los Minerales —
-                  ya no un catálogo propio "estructura". */}
+                  compuestos. Catálogo propio "formaciones", el mismo que
+                  usan los Minerales. */}
               <SeccionGruposVinculados
                 titulo="Formaciones"
                 descripcion="Partes materiales del ítem, cada una con su propia fórmula de compuestos — mismo catálogo que las Formaciones de Minerales."
@@ -338,7 +333,7 @@ export function EditorItem({
                 catalogo={catalogoEstructura}
                 loading={estructura.loading}
                 compuestos={compuestos}
-                gruposCompuestos={gruposCompuestos}
+                gruposCompuestos={catalogoEstructura}
                 onCrearNuevo={() => void estructura.crearYVincular()}
                 onUsarExistente={(id) => void estructura.vincularExistente(id)}
                 onUpdate={(id, updates) => {
@@ -424,7 +419,7 @@ export function EditorItem({
 
       {editandoGrupoId && (
         <GrupoCompuestoPanelFlotante
-          grupo={gruposCompuestos.find((g) => g.id === editandoGrupoId)!}
+          grupo={catalogoEstructura.find((g) => g.id === editandoGrupoId)!}
           compuestos={compuestos}
           onCerrar={() => setEditandoGrupoId(null)}
           onActualizar={persistirGrupoCompuesto}

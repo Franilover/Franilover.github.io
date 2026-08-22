@@ -31,7 +31,7 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useGruposCompuestos } from "@/domains/garlia/elementos/useGruposCompuestos";
+import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { type Compuesto, type Elemento, type GrupoCompuesto, type Reaccion } from "@/domains/garlia/elementos/types";
@@ -66,7 +66,7 @@ export function MineralEditor({
 }) {
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
-  const { items: gruposCompuestos, setItems: setGruposCompuestos } = useGruposCompuestos();
+  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useFormaciones();
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useMinerales();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
@@ -103,12 +103,9 @@ export function MineralEditor({
     });
   };
 
-  // Catálogo de Formaciones = Grupos de Compuestos con tipo="formacion"
-  // (catálogo global, compartido entre todos los minerales).
-  const catalogoFormaciones = useMemo(
-    () => gruposCompuestos.filter((g) => g.tipo === "formacion"),
-    [gruposCompuestos],
-  );
+  // Catálogo de Formaciones: tabla propia "formaciones" (catálogo global,
+  // compartido entre todos los minerales, y también con Estructura de
+  // Items), separada de Grupos de Compuestos desde el rediseño de Física.
 
   // Formaciones y procesos
   const {
@@ -312,20 +309,20 @@ export function MineralEditor({
                             formacion={formacion}
                             onUpdate={(id, updates) => {
                               // Optimista: refleja el cambio en el catálogo local ya
-                              // mismo (afecta a todos los minerales que usan este
-                              // Grupo), y persiste en Supabase vía el hook.
-                              setGruposCompuestos((prev) =>
+                              // mismo (afecta a todos los minerales que usan esta
+                              // Formación), y persiste en Supabase vía el hook.
+                              setCatalogoFormaciones((prev) =>
                                 prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
                               );
                               void actualizarFormacion(id, updates);
                             }}
                             onDelete={() => void eliminarFormacion(formacion.vinculo_id)}
                             onCambiarGrupo={(grupoCompuestoId) => {
-                              // "Usar grupo" cambia a qué GrupoCompuesto
-                              // apunta esta formación (reemplaza el vínculo),
-                              // en vez de mutar el grupo actualmente
-                              // vinculado — así el título se actualiza al
-                              // del grupo elegido.
+                              // "Usar grupo" cambia a qué Formación apunta
+                              // esta parte del mineral (reemplaza el
+                              // vínculo), en vez de mutar la formación
+                              // actualmente vinculada — así el título se
+                              // actualiza al de la formación elegida.
                               if (grupoCompuestoId === formacion.id) return;
                               const yaVinculado = formaciones.some(
                                 (f) =>
@@ -336,7 +333,7 @@ export function MineralEditor({
                               if (!yaVinculado) void vincularFormacionExistente(grupoCompuestoId);
                             }}
                             compuestos={compuestos}
-                            gruposCompuestos={gruposCompuestos}
+                            gruposCompuestos={catalogoFormaciones}
                           />
                         </div>
                       ))}
