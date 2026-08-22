@@ -3,170 +3,24 @@
 /**
  * GruposCompuestosPage.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Sub-sección "Grupos de compuestos" dentro de Química: catálogo de
- * conjuntos reutilizables de Compuestos (ej. "Base floral" = Fluxio×2 +
- * Cristalio×1). Se usan como fórmula ya armada desde Flora (Órganos) u
- * otros módulos, en vez de tener que reconstruir la mezcla cada vez.
- *
- * Mismo patrón visual simple que la tarjeta de Órgano en FloraEditor: lista
- * vertical con nombre editable + fórmula (chips + stepper, reutilizando
- * SelectorFormulaOrgano ya que comparte el shape {compuesto_id, cantidad})
- * + notas. Sin grid periódico ni laboratorio — es un catálogo chico y
- * directo, no una tabla química.
+ * Ya NO existe la sub-sección de página "Grupos de compuestos" (la tabla
+ * "grupos_compuestos" fue eliminada de Supabase — reemplazada por
+ * "estructuras_ensambladas" y "reacciones", ver elementos/types.ts). Este
+ * archivo solo sobrevive por GrupoCompuestoPanelFlotante: el modal genérico
+ * de edición de fórmula (chips + stepper vía SelectorFormulaOrgano) que
+ * reutilizan MineralEditor, EditorItem, EditorCriatura, FloraEditor y
+ * GridCatalogoGrupo para editar una EstructuraEnsamblada o Reaccion ya
+ * vinculada — recibe todo por props (grupo, onActualizar, onEliminar), no
+ * toca ninguna tabla directamente, así que sigue siendo válido tal cual.
  */
 
-import { Boxes, Loader2, Plus, Trash2, X } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import { Boxes, Plus, Trash2, X } from "lucide-react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
-import { supabase } from "@/infra/supabase/supabase";
 import { SelectorFormulaOrgano, type ComponenteOrgano } from "@/domains/garlia/flora/SelectorFormulaOrgano";
 
 import type { Compuesto, GrupoCompuesto } from "./types";
-
-interface Props {
-  grupos: GrupoCompuesto[];
-  compuestos: Compuesto[];
-  loading?: boolean;
-  creating?: boolean;
-  onCreate?: () => void;
-  onActualizar: (id: string, cambios: Partial<GrupoCompuesto>) => void;
-  onEliminar?: (id: string) => void;
-  onAbrirCompuesto?: (compuestoId: string) => void;
-}
-
-/**
- * Pill compacta de grupo: solo el nombre, mismo lenguaje visual que
- * CompuestoCasilla en CompuestosPage — la ficha completa (fórmula + notas)
- * vive en el panel flotante, no acá.
- */
-function GrupoCompuestoPill({
-  grupo,
-  seleccionado,
-  onClick,
-}: {
-  grupo: GrupoCompuesto;
-  seleccionado?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={grupo.nombre || "(sin nombre)"}
-      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-micro font-bold tracking-wide transition-colors truncate max-w-full ${
-        seleccionado
-          ? "text-primary border border-primary/40 ring-2 ring-primary/30"
-          : "hover:bg-primary/10 text-primary/70 border border-primary/15"
-      }`}
-    >
-      <Boxes size={10} className="text-primary/40 shrink-0" />
-      <span className="truncate">{grupo.nombre || "(sin nombre)"}</span>
-    </button>
-  );
-}
-
-export function GruposCompuestosPage({
-  grupos,
-  compuestos,
-  loading,
-  creating,
-  onCreate,
-  onActualizar,
-  onEliminar,
-  onAbrirCompuesto,
-}: Props) {
-  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
-
-  // Persiste en Supabase y recién después actualiza el estado local del
-  // padre — mismo patrón que persist() en CompuestoPanelFlotante y
-  // actualizarOrgano() en usePlantaOrganosProcesos. onActualizar (la prop)
-  // solo sincroniza el estado en memoria; el guardado real vive acá.
-  async function guardar(id: string, cambios: Partial<GrupoCompuesto>) {
-    onActualizar(id, cambios); // optimista: refleja el cambio ya mismo
-    const { error } = await supabase.from("grupos_compuestos").update(cambios).eq("id", id);
-    if (error) {
-      console.error("[GruposCompuestosPage] error guardando grupo de compuestos:", error);
-    }
-  }
-
-  const activo = useMemo(
-    () => grupos.find((g) => g.id === seleccionadoId) ?? null,
-    [grupos, seleccionadoId],
-  );
-
-  // Si se crea un grupo nuevo, abrirlo automáticamente (mismo espíritu que
-  // seleccionarId en ElementosPage/CompuestosPage) — acá alcanza con mirar
-  // si apareció un id que todavía no conocíamos, sin prop extra.
-  const idsConocidosRef = React.useRef(new Set(grupos.map((g) => g.id)));
-  useEffect(() => {
-    const nuevo = grupos.find((g) => !idsConocidosRef.current.has(g.id));
-    idsConocidosRef.current = new Set(grupos.map((g) => g.id));
-    if (nuevo) setSeleccionadoId(nuevo.id);
-  }, [grupos]);
-
-  return (
-    <div className="p-3 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div className="text-primary/40">
-          <p className="text-micro font-black uppercase tracking-widest">Grupos de compuestos</p>
-        </div>
-        {onCreate && (
-          <button
-            type="button"
-            disabled={creating || compuestos.length === 0}
-            onClick={onCreate}
-            title={
-              compuestos.length === 0
-                ? "Primero cargá compuestos en la Tabla Química"
-                : "Nuevo grupo de compuestos"
-            }
-            className="flex items-center justify-center p-1.5 rounded-md bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {creating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
-          </button>
-        )}
-      </div>
-
-      {loading && grupos.length === 0 ? (
-        <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
-      ) : grupos.length === 0 ? (
-        <div className="py-6 text-micro text-primary/25 text-center">
-          Todavía no hay grupos de compuestos creados.
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-1">
-          {grupos.map((grupo) => (
-            <GrupoCompuestoPill
-              key={grupo.id}
-              grupo={grupo}
-              seleccionado={grupo.id === seleccionadoId}
-              onClick={() => setSeleccionadoId((actual) => (actual === grupo.id ? null : grupo.id))}
-            />
-          ))}
-        </div>
-      )}
-
-      {activo && (
-        <GrupoCompuestoPanelFlotante
-          grupo={activo}
-          compuestos={compuestos}
-          onCerrar={() => setSeleccionadoId(null)}
-          onActualizar={guardar}
-          onEliminar={
-            onEliminar
-              ? (id) => {
-                  onEliminar(id);
-                  setSeleccionadoId(null);
-                }
-              : undefined
-          }
-          onAbrirCompuesto={onAbrirCompuesto}
-        />
-      )}
-    </div>
-  );
-}
 
 /**
  * Panel flotante centrado del detalle de un Grupo de Compuestos — mismo

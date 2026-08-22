@@ -196,18 +196,20 @@ export const CONFIG_COMPUESTOS = {
 // ({compuesto_id, cantidad}[]), usado como plantilla genérica copiable
 // desde cualquier módulo (botón "Usar grupo").
 //
-// Desde el rediseño que unificó Órganos/Formaciones en una sola tabla
-// ("estructuras_ensambladas"), "grupos_compuestos" ya NO tiene tipos
-// especiales — solo existen grupos "genéricos". Los tipos legado
-// "organo"/"formacion"/"estructura"/"habilidad" fueron migrados a su
-// tabla propia y ya no aparecen acá.
+// La tabla "grupos_compuestos" fue eliminada de Supabase — el catálogo
+// genérico que vivía ahí se disolvió en tablas propias por dominio
+// ("estructuras_ensambladas", "reacciones"). GrupoCompuesto sigue acá solo
+// como SHAPE base (compuestos + cantidad), no como tabla real: los alias
+// EstructuraEnsamblada y Reaccion lo reutilizan más abajo, y también lo usa
+// GrupoCompuestoPanelFlotante como tipo genérico de edición de fórmula.
 export interface ComponenteGrupoCompuesto {
   compuesto_id: string;
   cantidad: number;
 }
 
-/** Fila cruda tal cual vive en Supabase (tabla "grupos_compuestos") — solo
- *  grupos genéricos desde el rediseño; sin campo `tipo`. */
+/** Shape genérico de "fórmula reutilizable de Compuestos" — YA NO es una
+ *  fila real de Supabase (no existe tabla "grupos_compuestos"); sirve solo
+ *  como base estructural compartida. */
 export interface GrupoCompuesto {
   id: string;
   nombre: string;
@@ -216,11 +218,6 @@ export interface GrupoCompuesto {
   created_at: string;
   updated_at?: string;
 }
-
-export const CONFIG_GRUPOS_COMPUESTOS = {
-  tabla: "grupos_compuestos",
-  select: "id, nombre, notas, componentes, created_at, updated_at",
-};
 
 // ─── Estructuras ensambladas: catálogo unificado de Órganos/Formaciones ───
 // Antes vivían como GrupoCompuesto tipo="organo"/"formacion"/"estructura";
