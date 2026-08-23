@@ -198,10 +198,10 @@ export const CONFIG_COMPUESTOS = {
 //
 // La tabla "grupos_compuestos" fue eliminada de Supabase — el catálogo
 // genérico que vivía ahí se disolvió en tablas propias por dominio
-// ("estructuras_ensambladas", "reacciones"). GrupoCompuesto sigue acá solo
-// como SHAPE base (compuestos + cantidad), no como tabla real: los alias
-// EstructuraEnsamblada y Reaccion lo reutilizan más abajo, y también lo usa
-// GrupoCompuestoPanelFlotante como tipo genérico de edición de fórmula.
+// ("organos", "formaciones", "reacciones"). GrupoCompuesto sigue acá solo
+// como SHAPE base (compuestos + cantidad), no como tabla real: lo sigue
+// usando GrupoCompuestoPanelFlotante/Reaccion como tipo genérico de
+// edición de fórmula donde aplica.
 export interface ComponenteGrupoCompuesto {
   compuesto_id: string;
   cantidad: number;
