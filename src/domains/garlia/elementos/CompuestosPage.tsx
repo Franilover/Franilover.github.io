@@ -1114,40 +1114,35 @@ export function CompuestoPanelFlotante({
           </button>
         </div>
 
-        {(granosDeCompuesto.loading ||
-          celulasDeCompuesto.loading ||
-          granosDeCompuesto.items.length > 0 ||
-          celulasDeCompuesto.items.length > 0) && (
-          <div className="shrink-0 px-3 pt-2">
-            <BreadcrumbJerarquia
-              niveles={[
-                {
-                  label: "Grano",
-                  icono: <Gem size={10} />,
-                  activo: false,
-                  items: granosDeCompuesto.items.map((g) => ({
-                    id: g.grano_id,
-                    nombre: g.grano.nombre,
-                  })),
-                  loading: granosDeCompuesto.loading,
-                  onNavegar: (granoId) => setGranoOCelulaAbierto({ tipo: "grano", id: granoId }),
-                },
-                {
-                  label: "Célula",
-                  icono: <Beaker size={10} />,
-                  activo: false,
-                  items: celulasDeCompuesto.items.map((c) => ({
-                    id: c.celula_id,
-                    nombre: c.celula.nombre,
-                  })),
-                  loading: celulasDeCompuesto.loading,
-                  onNavegar: (celulaId) => setGranoOCelulaAbierto({ tipo: "celula", id: celulaId }),
-                },
-                { label: "Compuesto", icono: <Package size={10} />, activo: true },
-              ]}
-            />
-          </div>
-        )}
+        <div className="shrink-0 px-3 pt-2">
+          <BreadcrumbJerarquia
+            niveles={[
+              {
+                label: "Grano",
+                icono: <Gem size={10} />,
+                activo: false,
+                items: granosDeCompuesto.items.map((g) => ({
+                  id: g.grano_id,
+                  nombre: g.grano.nombre,
+                })),
+                loading: granosDeCompuesto.loading,
+                onNavegar: (granoId) => setGranoOCelulaAbierto({ tipo: "grano", id: granoId }),
+              },
+              {
+                label: "Célula",
+                icono: <Beaker size={10} />,
+                activo: false,
+                items: celulasDeCompuesto.items.map((c) => ({
+                  id: c.celula_id,
+                  nombre: c.celula.nombre,
+                })),
+                loading: celulasDeCompuesto.loading,
+                onNavegar: (celulaId) => setGranoOCelulaAbierto({ tipo: "celula", id: celulaId }),
+              },
+              { label: "Compuesto", icono: <Package size={10} />, activo: true },
+            ]}
+          />
+        </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
           <CompuestoEditor
