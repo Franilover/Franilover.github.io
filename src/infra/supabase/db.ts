@@ -241,6 +241,110 @@ export interface GaleriaItem {
   creado_en: string;
 }
 
+// ─── Órganos/Formaciones y su jerarquía de composición (v33) ──────────────
+// Ver domains/garlia/elementos/types.ts para el detalle completo de cada
+// campo — acá solo se declara el shape mínimo que Dexie necesita cachear.
+export interface OrganoDexie {
+  id: string;
+  nombre: string;
+  funcion?: string | null;
+  notas?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface FormacionDexie {
+  id: string;
+  nombre: string;
+  funcion?: string | null;
+  notas?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CelulaDexie {
+  id: string;
+  nombre: string;
+  compuesto_id?: string | null;
+  estructura?: unknown;
+  funcion?: string | null;
+  notas?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TejidoDexie {
+  id: string;
+  nombre: string;
+  celula_id?: string | null;
+  estructura?: unknown;
+  funcion?: string | null;
+  notas?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GranoDexie {
+  id: string;
+  nombre: string;
+  compuesto_id?: string | null;
+  estructura?: unknown;
+  funcion?: string | null;
+  notas?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface VetaDexie {
+  id: string;
+  nombre: string;
+  grano_id?: string | null;
+  estructura?: unknown;
+  funcion?: string | null;
+  notas?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Fila puente organo_tejidos: vincula un Tejido a un Órgano. */
+export interface OrganoTejidoDexie {
+  id: string;
+  organo_id: string;
+  tejido_id: string;
+  proporcion?: string | null;
+  created_at?: string;
+}
+
+/** Fila puente formacion_vetas: vincula una Veta a una Formación. */
+export interface FormacionVetaDexie {
+  id: string;
+  formacion_id: string;
+  veta_id: string;
+  proporcion?: string | null;
+  created_at?: string;
+}
+
+export interface ReaccionDexie {
+  id: string;
+  nombre: string;
+  consume?: unknown;
+  produce?: unknown;
+  descripcion?: string | null;
+  activador?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Tablas puente {entidad_id, grupo_compuesto_id} hacia Órgano/Formación —
+ *  mismo shape genérico que usa useEntidadVinculosGrupo.ts en las 4 tablas
+ *  reales (planta_organos, criatura_organos, mineral_formaciones,
+ *  item_estructura); el nombre de columna es histórico, ver ese archivo. */
+export interface EntidadGrupoVinculoDexie {
+  id: string;
+  grupo_compuesto_id: string;
+  [key: string]: any;
+}
+
 export interface OfflineOperation {
   id?: number;
   table: string;
@@ -700,6 +804,22 @@ class AgendaFraniDB extends Dexie {
   ecosistemas!: Table<EcosistemaLocal, string>;
   cadenas_alimenticias!: Table<CadenaAlimenticiaLocal, string>;
   perfiles_atomicos_criatura!: Table<PerfilAtomicoCriaturaLocal, string>;
+
+  // Órganos/Formaciones y su jerarquía de composición (Célula/Tejido,
+  // Grano/Veta) + Reacciones — ver bloque v33 más abajo.
+  organos!: Table<OrganoDexie, string>;
+  formaciones!: Table<FormacionDexie, string>;
+  celulas!: Table<CelulaDexie, string>;
+  tejidos!: Table<TejidoDexie, string>;
+  granos!: Table<GranoDexie, string>;
+  vetas!: Table<VetaDexie, string>;
+  organo_tejidos!: Table<OrganoTejidoDexie, string>;
+  formacion_vetas!: Table<FormacionVetaDexie, string>;
+  reacciones!: Table<ReaccionDexie, string>;
+  planta_organos!: Table<EntidadGrupoVinculoDexie, string>;
+  criatura_organos!: Table<EntidadGrupoVinculoDexie, string>;
+  mineral_formaciones!: Table<EntidadGrupoVinculoDexie, string>;
+  item_estructura!: Table<EntidadGrupoVinculoDexie, string>;
 
   constructor() {
     super("AgendaFranilover");
@@ -1493,6 +1613,32 @@ class AgendaFraniDB extends Dexie {
       ecosistemas: "id, nombre, bioma_id, orden",
       cadenas_alimenticias: "id, nombre, ecosistema_id, orden",
       perfiles_atomicos_criatura: "id, criatura_id",
+    });
+
+    // ─── v33: cache offline de Órganos/Formaciones y su jerarquía de
+    // composición (Célula/Tejido, Grano/Veta) + Reacciones — mismo motivo
+    // que v32: hasta ahora pegaban directo a Supabase sin cache local, así
+    // que useOrganos/useFormaciones/useCelulas/useTejidos/useGranos/
+    // useVetas/useReacciones se reiniciaban en blanco al recargar sin
+    // conexión. Incluye también las tablas puente organo_tejidos y
+    // formacion_vetas (fórmula de cada Órgano/Formación puntual) y las
+    // tablas puente hacia las entidades finales (planta_organos,
+    // criatura_organos, mineral_formaciones, item_estructura) — mismo
+    // patrón {entidad_id, grupo_compuesto_id} que usa useEntidadVinculosGrupo.
+    this.version(33).stores({
+      organos: "id, nombre, created_at",
+      formaciones: "id, nombre, created_at",
+      celulas: "id, nombre, compuesto_id, created_at",
+      tejidos: "id, nombre, celula_id, created_at",
+      granos: "id, nombre, compuesto_id, created_at",
+      vetas: "id, nombre, grano_id, created_at",
+      organo_tejidos: "id, organo_id, tejido_id",
+      formacion_vetas: "id, formacion_id, veta_id",
+      reacciones: "id, nombre, created_at",
+      planta_organos: "id, planta_id, grupo_compuesto_id",
+      criatura_organos: "id, criatura_id, grupo_compuesto_id",
+      mineral_formaciones: "id, mineral_id, grupo_compuesto_id",
+      item_estructura: "id, item_id, grupo_compuesto_id",
     });
   }
 }

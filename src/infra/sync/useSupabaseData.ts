@@ -88,6 +88,21 @@ const DEXIE_TABLES = new Set([
   "ecosistemas",
   "cadenas_alimenticias",
   "perfiles_atomicos_criatura",
+  // ─── Órganos/Formaciones y su jerarquía de composición (Célula/Tejido,
+  // Grano/Veta) + Reacciones — ver v33 en infra/supabase/db.ts ────────────
+  "organos",
+  "formaciones",
+  "celulas",
+  "tejidos",
+  "granos",
+  "vetas",
+  "organo_tejidos",
+  "formacion_vetas",
+  "reacciones",
+  "planta_organos",
+  "criatura_organos",
+  "mineral_formaciones",
+  "item_estructura",
 ]);
 
 const OFFLINE_WRITABLE = new Set([
@@ -131,6 +146,21 @@ const OFFLINE_WRITABLE = new Set([
   "ecosistemas",
   "cadenas_alimenticias",
   "perfiles_atomicos_criatura",
+  // ─── Órganos/Formaciones y su jerarquía de composición (Célula/Tejido,
+  // Grano/Veta) + Reacciones — ver v33 en infra/supabase/db.ts ────────────
+  "organos",
+  "formaciones",
+  "celulas",
+  "tejidos",
+  "granos",
+  "vetas",
+  "organo_tejidos",
+  "formacion_vetas",
+  "reacciones",
+  "planta_organos",
+  "criatura_organos",
+  "mineral_formaciones",
+  "item_estructura",
 ]);
 
 // Tablas con ID numérico autogenerado por la DB — no se pueden crear offline
