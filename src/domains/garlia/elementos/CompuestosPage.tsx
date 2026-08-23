@@ -1016,11 +1016,21 @@ export function CompuestoPanelFlotante({
   // Levantado desde CompuestoEditor para que el breadcrumb de acá (header)
   // y el bloque "Compone" del cuerpo compartan el mismo sub-panel — clic en
   // cualquiera de los dos abre el mismo PanelEditorGrano/PanelEditorCelula.
-  // CompuestoPanelFlotante no se remonta al navegar entre compuestos (el
-  // caller no le pasa key={compuesto.id}), así que hay que resetear a mano
-  // cuando cambia compuesto.id — si no, este estado queda apuntando al
-  // Grano/Célula del compuesto ANTERIOR y la segunda navegación no abre
-  // nada nuevo (el sub-panel ya está "abierto" según este estado viejo).
+  // Además de controlar qué sub-panel abrir, este estado se usa más abajo
+  // para OCULTAR (no desmontar) este panel de Compuesto mientras el
+  // sub-panel está abierto: PanelEditorGrano/PanelEditorCelula usan el
+  // mismo z-[9999] fijo (createPortal a document.body, igual que este
+  // panel y el resto de la cadena Grano⇄Veta⇄Formación /
+  // Célula⇄Tejido⇄Órgano), así que sin esto quedaban dos portales al mismo
+  // nivel apilados por orden de montaje en vez de por jerarquía real —
+  // tapando paneles al abrir un tercer nivel desde ahí. Ocultar en vez de
+  // desmontar preserva el estado del editor de Compuesto (nombre sin
+  // guardar, etc.) para cuando el usuario vuelve.
+  //
+  // CompuestoPanelFlotante tampoco se remonta al navegar entre compuestos
+  // (el caller no le pasa key={compuesto.id}), así que hay que resetear
+  // este estado a mano cuando cambia compuesto.id — si no, queda
+  // apuntando al Grano/Célula del compuesto ANTERIOR (ver useEffect abajo).
   const [granoOCelulaAbierto, setGranoOCelulaAbierto] = useState<
     { tipo: "grano" | "celula"; id: string } | null
   >(null);
@@ -1047,7 +1057,9 @@ export function CompuestoPanelFlotante({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6"
+      className={`fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 ${
+        granoOCelulaAbierto ? "invisible pointer-events-none" : ""
+      }`}
       style={{
         background: "color-mix(in srgb, var(--primary) 35%, transparent)",
         backdropFilter: "blur(8px)",
