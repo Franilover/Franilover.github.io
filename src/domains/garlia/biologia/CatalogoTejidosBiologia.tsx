@@ -109,7 +109,20 @@ export function CatalogoTejidosBiologia({
               return res;
             }}
             onCompuestoCreado={onCompuestoCreado}
-            onAbrirCompuesto={onAbrirCompuesto}
+            onAbrirCompuesto={
+              onAbrirCompuesto
+                ? (compuestoId) => {
+                    // Cierra este panel de Célula antes de subir el id: si
+                    // no, CompuestoPanelFlotante (montado por el padre,
+                    // portal aparte) queda apilado ENCIMA de este — mismo
+                    // z-[9999] fijo en ambos, así que un tercer nivel
+                    // abierto desde el Compuesto podía terminar tapado por
+                    // este panel de Célula que seguía vivo de fondo.
+                    setCelulaSeleccionadaId(null);
+                    onAbrirCompuesto(compuestoId);
+                  }
+                : undefined
+            }
             onAbrirTejido={(tejidoId) => {
               setCelulaSeleccionadaId(null);
               setTejidoSeleccionadoId(tejidoId);
@@ -171,7 +184,18 @@ export function CatalogoTejidosBiologia({
               setCelulaSeleccionadaId(celulaId);
             }}
             onCompuestoCreado={onCompuestoCreado}
-            onAbrirCompuesto={onAbrirCompuesto}
+            onAbrirCompuesto={
+              onAbrirCompuesto
+                ? (compuestoId) => {
+                    // Mismo motivo que en PanelEditorCelula arriba: cerrar
+                    // este panel de Tejido antes de subir el id evita que
+                    // quede apilado bajo/con CompuestoPanelFlotante (mismo
+                    // z-[9999] fijo, portal aparte montado por el padre).
+                    setTejidoSeleccionadoId(null);
+                    onAbrirCompuesto(compuestoId);
+                  }
+                : undefined
+            }
             onAbrirOrgano={
               onAbrirOrgano
                 ? (organoId) => {

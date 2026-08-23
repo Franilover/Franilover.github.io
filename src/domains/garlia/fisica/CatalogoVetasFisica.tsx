@@ -111,7 +111,21 @@ export function CatalogoVetasFisica({
               return res;
             }}
             onCompuestoCreado={onCompuestoCreado}
-            onAbrirCompuesto={onAbrirCompuesto}
+            onAbrirCompuesto={
+              onAbrirCompuesto
+                ? (compuestoId) => {
+                    // Cierra este panel de Grano antes de subir el id: si
+                    // no, CompuestoPanelFlotante (montado por FisicaPage,
+                    // portal aparte) queda apilado ENCIMA de este —  mismo
+                    // z-[9999] fijo en ambos, así que un tercer nivel
+                    // abierto desde el Compuesto (p.ej. otra Célula) podía
+                    // terminar tapado por este panel de Grano que seguía
+                    // vivo de fondo.
+                    setGranoSeleccionadoId(null);
+                    onAbrirCompuesto(compuestoId);
+                  }
+                : undefined
+            }
             onAbrirVeta={(vetaId) => {
               setGranoSeleccionadoId(null);
               setVetaSeleccionadaId(vetaId);

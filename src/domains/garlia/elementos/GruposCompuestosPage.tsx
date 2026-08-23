@@ -319,7 +319,20 @@ export function GrupoCompuestoPanelFlotante({
                 onCerrar();
                 onAbrirOrganoExterno?.(organoId);
               }}
-              onAbrirCompuesto={onAbrirCompuesto}
+              onAbrirCompuesto={
+                onAbrirCompuesto
+                  ? (compuestoId) => {
+                      // Igual que con onAbrirOrgano arriba: sin cerrar
+                      // este panel de Tejido (y el propio Órgano/Formación
+                      // que lo contiene), CompuestoPanelFlotante quedaba
+                      // apilado con el mismo z-[9999] fijo — un tercer
+                      // nivel abierto desde ahí podía tapar o ser tapado.
+                      setTejidoOVetaAbiertoId(null);
+                      onCerrar();
+                      onAbrirCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
             />
           );
         })()
@@ -366,7 +379,19 @@ export function GrupoCompuestoPanelFlotante({
               onCerrar={() => setCelulaOGranoAbiertoId(null)}
               onActualizar={celulasCatalogo.actualizar}
               onEliminar={celulasCatalogo.eliminar}
-              onAbrirCompuesto={onAbrirCompuesto}
+              onAbrirCompuesto={
+                onAbrirCompuesto
+                  ? (compuestoId) => {
+                      // Mismo motivo que onAbrirOrgano/onAbrirFormacion en
+                      // los paneles de arriba: cerrar Célula + el propio
+                      // Órgano antes de subir el id evita quedar apilado
+                      // con CompuestoPanelFlotante (mismo z-[9999] fijo).
+                      setCelulaOGranoAbiertoId(null);
+                      onCerrar();
+                      onAbrirCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
               onAbrirTejido={(tejidoId) => {
                 setCelulaOGranoAbiertoId(null);
                 setTejidoOVetaAbiertoId(tejidoId);
@@ -386,7 +411,18 @@ export function GrupoCompuestoPanelFlotante({
               onCerrar={() => setCelulaOGranoAbiertoId(null)}
               onActualizar={granosCatalogo.actualizar}
               onEliminar={granosCatalogo.eliminar}
-              onAbrirCompuesto={onAbrirCompuesto}
+              onAbrirCompuesto={
+                onAbrirCompuesto
+                  ? (compuestoId) => {
+                      // Mismo motivo que arriba: cerrar Grano + la propia
+                      // Formación antes de subir el id evita quedar
+                      // apilado con CompuestoPanelFlotante.
+                      setCelulaOGranoAbiertoId(null);
+                      onCerrar();
+                      onAbrirCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
               onAbrirVeta={(vetaId) => {
                 setCelulaOGranoAbiertoId(null);
                 setTejidoOVetaAbiertoId(vetaId);
