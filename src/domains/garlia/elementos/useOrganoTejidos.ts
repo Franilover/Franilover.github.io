@@ -256,7 +256,7 @@ export function useOrganoTejidos(organoId: string | null) {
   // ── Filas resueltas de la fórmula, listas para la UI ────────────────────
   const items = useMemo<TejidoDeOrgano[]>(() => {
     return vinculos
-      .map((v) => {
+      .map((v): TejidoDeOrgano | null => {
         const tejido = tejidos[v.tejido_id];
         if (!tejido) return null;
         const celulaId = celulaPorTejido[v.tejido_id] ?? null;
