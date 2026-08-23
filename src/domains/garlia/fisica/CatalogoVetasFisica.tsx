@@ -165,7 +165,16 @@ function GridSimple<T extends { id: string; nombre: string }>({
   onSeleccionar: (id: string) => void;
   labelVacio: string;
 }) {
-  if (loading) return <p className="text-micro text-primary/25 italic py-2">Cargando…</p>;
+  // Solo mostramos "Cargando…" si todavía no hay NADA que pintar — con
+  // items ya presentes (llegados de Dexie o de un fetch anterior), un
+  // `loading=true` de revalidación en segundo plano no debe tapar la
+  // grid: eso es lo que causaba el parpadeo/"Cargando…" en cada cambio
+  // de tab o remount, aunque los datos ya estuvieran en caché local
+  // (useSupabaseData vuelve a poner loading=true en cada montaje porque
+  // leer Dexie es async, así que el primer render nunca lo sabe todavía).
+  if (loading && items.length === 0) {
+    return <p className="text-micro text-primary/25 italic py-2">Cargando…</p>;
+  }
 
   if (items.length === 0) {
     return (

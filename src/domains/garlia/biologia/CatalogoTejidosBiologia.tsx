@@ -163,7 +163,11 @@ function GridSimple<T extends { id: string; nombre: string }>({
   onSeleccionar: (id: string) => void;
   labelVacio: string;
 }) {
-  if (loading) return <p className="text-micro text-primary/25 italic py-2">Cargando…</p>;
+  // Mismo fix que CatalogoVetasFisica.tsx: no tapar la grid con "Cargando…"
+  // si ya hay items (Dexie o fetch previo) — solo cuando no hay nada todavía.
+  if (loading && items.length === 0) {
+    return <p className="text-micro text-primary/25 italic py-2">Cargando…</p>;
+  }
 
   if (items.length === 0) {
     return (
