@@ -107,7 +107,7 @@ export function GrupoCompuestoPanelFlotante({
       }}
     >
       <div
-        className="w-full max-w-xl max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        className="w-full max-w-3xl max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col"
         style={{
           background: "var(--bg-main)",
           border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
@@ -157,54 +157,61 @@ export function GrupoCompuestoPanelFlotante({
           </button>
         </div>
 
-        {/* Contenido: función + fórmula + notas */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
-          <div>
-            <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
-              Función
-            </p>
-            <input
-              className="w-full bg-transparent px-0 py-1 text-xs text-primary/80 outline-none placeholder:text-primary/25"
-              placeholder="Para qué sirve…"
-              value={grupo.funcion ?? ""}
-              onChange={(e) => onActualizar(grupo.id, { funcion: e.target.value })}
-            />
-          </div>
+        {/* Contenido: dos columnas — izquierda composición (fórmula),
+           derecha texto (función + notas). Header ya tiene el título. */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+            {/* Columna izquierda: composición / vínculos */}
+            <div className="md:w-1/2 min-w-0">
+              <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
+                Fórmula
+              </p>
+              {formula.loading ? (
+                <p className="text-micro text-primary/25 italic">Cargando…</p>
+              ) : (
+                <SelectorFormulaTejidos
+                  items={formula.items}
+                  onVincularExistente={(id) => void formula.vincularExistente(id)}
+                  onCrearYVincular={(nombre) => void formula.crearYVincular(nombre)}
+                  catalogoDisponible={catalogo.items}
+                  loadingCatalogo={catalogo.loading}
+                  labelCatalogo={tipo === "organo" ? "Tejido" : "Veta"}
+                  onActualizarProporcion={(vinculoId, proporcion) =>
+                    void formula.actualizarProporcion(vinculoId, proporcion)
+                  }
+                  onQuitar={(vinculoId) => void formula.quitarCompuesto(vinculoId)}
+                  onAbrirCelula={(celulaOGranoId) => setCelulaOGranoAbiertoId(celulaOGranoId)}
+                  onAbrirTejido={(tejidoOVetaId) => setTejidoOVetaAbiertoId(tejidoOVetaId)}
+                />
+              )}
+            </div>
 
-          <div>
-            <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
-              Fórmula
-            </p>
-            {formula.loading ? (
-              <p className="text-micro text-primary/25 italic">Cargando…</p>
-            ) : (
-              <SelectorFormulaTejidos
-                items={formula.items}
-                onVincularExistente={(id) => void formula.vincularExistente(id)}
-                onCrearYVincular={(nombre) => void formula.crearYVincular(nombre)}
-                catalogoDisponible={catalogo.items}
-                loadingCatalogo={catalogo.loading}
-                labelCatalogo={tipo === "organo" ? "Tejido" : "Veta"}
-                onActualizarProporcion={(vinculoId, proporcion) =>
-                  void formula.actualizarProporcion(vinculoId, proporcion)
-                }
-                onQuitar={(vinculoId) => void formula.quitarCompuesto(vinculoId)}
-                onAbrirCelula={(celulaOGranoId) => setCelulaOGranoAbiertoId(celulaOGranoId)}
-                onAbrirTejido={(tejidoOVetaId) => setTejidoOVetaAbiertoId(tejidoOVetaId)}
-              />
-            )}
-          </div>
+            {/* Columna derecha: bloques de texto — función + notas */}
+            <div className="md:w-1/2 min-w-0 flex flex-col gap-4">
+              <div>
+                <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
+                  Función
+                </p>
+                <input
+                  className="w-full bg-transparent px-0 py-1 text-xs text-primary/80 outline-none placeholder:text-primary/25"
+                  placeholder="Para qué sirve…"
+                  value={grupo.funcion ?? ""}
+                  onChange={(e) => onActualizar(grupo.id, { funcion: e.target.value })}
+                />
+              </div>
 
-          <div>
-            <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
-              Notas
-            </p>
-            <textarea
-              className="w-full min-h-[6rem] bg-transparent px-0 py-1 text-xs text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-              placeholder="Notas…"
-              value={grupo.notas ?? ""}
-              onChange={(e) => onActualizar(grupo.id, { notas: e.target.value })}
-            />
+              <div>
+                <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
+                  Notas
+                </p>
+                <textarea
+                  className="w-full min-h-[6rem] bg-transparent px-0 py-1 text-xs text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+                  placeholder="Notas…"
+                  value={grupo.notas ?? ""}
+                  onChange={(e) => onActualizar(grupo.id, { notas: e.target.value })}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

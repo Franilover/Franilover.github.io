@@ -289,41 +289,52 @@ export function PanelEditorCelula({
         </button>
       </div>
 
-      <div className="p-3 flex flex-col gap-3 max-h-[70vh] overflow-y-auto">
+      <div className="p-3 max-h-[70vh] overflow-y-auto">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
 
-        <input
-          className="w-full bg-transparent px-0 py-0.5 text-micro font-bold text-primary/60 outline-none placeholder:text-primary/25"
-          placeholder="Función…"
-          value={item.funcion ?? ""}
-          onChange={(e) => onActualizar(item.id, { funcion: e.target.value })}
-        />
+        <div className="flex flex-col md:flex-row gap-3 md:gap-5 mt-1">
+          {/* Columna izquierda: composición / vínculos */}
+          <div className="md:w-1/2 min-w-0">
+            <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
+              Compuestos · de qué está hecha la célula
+            </p>
+            <ListaVinculosMN<CompuestoDeCelula>
+              items={vinculosCompuesto.items}
+              loading={vinculosCompuesto.loading}
+              catalogo={compuestos}
+              loadingCatalogo={loadingCompuestos}
+              getNombre={(v) => v.compuesto.nombre}
+              getCatalogoId={(v) => v.compuesto_id}
+              rolPlaceholder="Rol (ej. membrana, citoplasma)…"
+              onAgregar={(compuestoId) => void vinculosCompuesto.vincularExistente(compuestoId)}
+              onActualizarRol={vinculosCompuesto.actualizarRol}
+              onQuitar={vinculosCompuesto.quitar}
+              onAbrirCompuesto={onAbrirCompuesto}
+            />
+          </div>
 
-        <div>
-          <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-            Compuestos · de qué está hecha la célula
-          </p>
-          <ListaVinculosMN<CompuestoDeCelula>
-            items={vinculosCompuesto.items}
-            loading={vinculosCompuesto.loading}
-            catalogo={compuestos}
-            loadingCatalogo={loadingCompuestos}
-            getNombre={(v) => v.compuesto.nombre}
-            getCatalogoId={(v) => v.compuesto_id}
-            rolPlaceholder="Rol (ej. membrana, citoplasma)…"
-            onAgregar={(compuestoId) => void vinculosCompuesto.vincularExistente(compuestoId)}
-            onActualizarRol={vinculosCompuesto.actualizarRol}
-            onQuitar={vinculosCompuesto.quitar}
-            onAbrirCompuesto={onAbrirCompuesto}
-          />
+          {/* Columna derecha: bloques de texto — función + notas */}
+          <div className="md:w-1/2 min-w-0 flex flex-col gap-3">
+            <div>
+              <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
+                Función
+              </p>
+              <input
+                className="w-full bg-transparent px-0 py-0.5 text-micro font-bold text-primary/60 outline-none placeholder:text-primary/25"
+                placeholder="Función…"
+                value={item.funcion ?? ""}
+                onChange={(e) => onActualizar(item.id, { funcion: e.target.value })}
+              />
+            </div>
+
+            <NotasField
+              value={item.notas ?? ""}
+              onChange={(notas) => onActualizar(item.id, { notas })}
+            />
+
+            <NotaReutilizable />
+          </div>
         </div>
-
-        <NotasField
-          value={item.notas ?? ""}
-          onChange={(notas) => onActualizar(item.id, { notas })}
-        />
-
-        <NotaReutilizable />
       </div>
     </PanelFlotanteBase>
   );
@@ -414,62 +425,75 @@ export function PanelEditorTejido({
         </button>
       </div>
 
-      <div className="p-3 flex flex-col gap-3 max-h-[70vh] overflow-y-auto">
+      <div className="p-3 max-h-[70vh] overflow-y-auto">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
 
-        <input
-          className="w-full bg-transparent px-0 py-0.5 text-micro font-bold text-primary/60 outline-none placeholder:text-primary/25"
-          placeholder="Función…"
-          value={item.funcion ?? ""}
-          onChange={(e) => onActualizar(item.id, { funcion: e.target.value })}
-        />
+        <div className="flex flex-col md:flex-row gap-3 md:gap-5 mt-1">
+          {/* Columna izquierda: composición / vínculos */}
+          <div className="md:w-1/2 min-w-0 flex flex-col gap-3">
+            <div>
+              <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
+                Células · qué tipos celulares lo pueblan
+              </p>
+              <ListaVinculosMN<CelulaDeTejido>
+                items={vinculosCelula.items}
+                loading={vinculosCelula.loading}
+                catalogo={celulas}
+                loadingCatalogo={loadingCelulas}
+                getNombre={(v) => v.celula.nombre}
+                getCatalogoId={(v) => v.celula_id}
+                rolPlaceholder="Rol (ej. célula principal)…"
+                iconoCatalogo={<Beaker size={11} className="text-accent/60 shrink-0" />}
+                onAgregar={(celulaId) => void vinculosCelula.vincularExistente(celulaId)}
+                onActualizarRol={vinculosCelula.actualizarRol}
+                onQuitar={vinculosCelula.quitar}
+                onAbrirItem={onAbrirCelula}
+              />
+            </div>
 
-        <div>
-          <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-            Células · qué tipos celulares lo pueblan
-          </p>
-          <ListaVinculosMN<CelulaDeTejido>
-            items={vinculosCelula.items}
-            loading={vinculosCelula.loading}
-            catalogo={celulas}
-            loadingCatalogo={loadingCelulas}
-            getNombre={(v) => v.celula.nombre}
-            getCatalogoId={(v) => v.celula_id}
-            rolPlaceholder="Rol (ej. célula principal)…"
-            iconoCatalogo={<Beaker size={11} className="text-accent/60 shrink-0" />}
-            onAgregar={(celulaId) => void vinculosCelula.vincularExistente(celulaId)}
-            onActualizarRol={vinculosCelula.actualizarRol}
-            onQuitar={vinculosCelula.quitar}
-            onAbrirItem={onAbrirCelula}
-          />
+            <div>
+              <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
+                Compuestos de matriz · material directo, sin pasar por una célula
+              </p>
+              <ListaVinculosMN<CompuestoDeTejido>
+                items={vinculosCompuesto.items}
+                loading={vinculosCompuesto.loading}
+                catalogo={compuestos}
+                loadingCatalogo={loadingCompuestos}
+                getNombre={(v) => v.compuesto.nombre}
+                getCatalogoId={(v) => v.compuesto_id}
+                rolPlaceholder="Rol (ej. matriz extracelular)…"
+                onAgregar={(compuestoId) => void vinculosCompuesto.vincularExistente(compuestoId)}
+                onActualizarRol={vinculosCompuesto.actualizarRol}
+                onQuitar={vinculosCompuesto.quitar}
+                onAbrirCompuesto={onAbrirCompuesto}
+                onCompuestoCreado={onCompuestoCreado}
+              />
+            </div>
+          </div>
+
+          {/* Columna derecha: bloques de texto — función + notas */}
+          <div className="md:w-1/2 min-w-0 flex flex-col gap-3">
+            <div>
+              <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
+                Función
+              </p>
+              <input
+                className="w-full bg-transparent px-0 py-0.5 text-micro font-bold text-primary/60 outline-none placeholder:text-primary/25"
+                placeholder="Función…"
+                value={item.funcion ?? ""}
+                onChange={(e) => onActualizar(item.id, { funcion: e.target.value })}
+              />
+            </div>
+
+            <NotasField
+              value={item.notas ?? ""}
+              onChange={(notas) => onActualizar(item.id, { notas })}
+            />
+
+            <NotaReutilizable />
+          </div>
         </div>
-
-        <div>
-          <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-            Compuestos de matriz · material directo, sin pasar por una célula
-          </p>
-          <ListaVinculosMN<CompuestoDeTejido>
-            items={vinculosCompuesto.items}
-            loading={vinculosCompuesto.loading}
-            catalogo={compuestos}
-            loadingCatalogo={loadingCompuestos}
-            getNombre={(v) => v.compuesto.nombre}
-            getCatalogoId={(v) => v.compuesto_id}
-            rolPlaceholder="Rol (ej. matriz extracelular)…"
-            onAgregar={(compuestoId) => void vinculosCompuesto.vincularExistente(compuestoId)}
-            onActualizarRol={vinculosCompuesto.actualizarRol}
-            onQuitar={vinculosCompuesto.quitar}
-            onAbrirCompuesto={onAbrirCompuesto}
-            onCompuestoCreado={onCompuestoCreado}
-          />
-        </div>
-
-        <NotasField
-          value={item.notas ?? ""}
-          onChange={(notas) => onActualizar(item.id, { notas })}
-        />
-
-        <NotaReutilizable />
       </div>
     </PanelFlotanteBase>
   );
@@ -677,7 +701,7 @@ function PanelFlotanteBase({
       onClick={onCerrar}
     >
       <div
-        className="w-full max-w-md flex flex-col rounded-xl border shadow-2xl overflow-hidden"
+        className="w-full max-w-2xl flex flex-col rounded-xl border shadow-2xl overflow-hidden"
         style={{
           background: "var(--bg-main)",
           borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
