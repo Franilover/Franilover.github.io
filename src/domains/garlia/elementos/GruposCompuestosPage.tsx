@@ -21,6 +21,7 @@ import { createPortal } from "react-dom";
 import { SelectorFormulaTejidos } from "@/domains/garlia/_shared/SelectorFormulaTejidos";
 import { useOrganoTejidos } from "@/domains/garlia/elementos/useOrganoTejidos";
 import { useFormacionVetas } from "@/domains/garlia/elementos/useFormacionVetas";
+import { useCatalogoTejidos } from "@/domains/garlia/elementos/useCatalogoTejidos";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 import type { Compuesto } from "./types";
@@ -52,6 +53,7 @@ export function GrupoCompuestoPanelFlotante({
   const tejidos = useOrganoTejidos(tipo === "organo" ? grupo.id : null);
   const vetas = useFormacionVetas(tipo === "formacion" ? grupo.id : null);
   const formula = tipo === "organo" ? tejidos : vetas;
+  const catalogo = useCatalogoTejidos(tipo);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -170,6 +172,10 @@ export function GrupoCompuestoPanelFlotante({
                 compuestos={compuestos}
                 items={formula.items}
                 onAgregar={(compuestoId) => void formula.agregarCompuesto(compuestoId)}
+                onVincularExistente={(id) => void formula.vincularExistente(id)}
+                catalogoDisponible={catalogo.items}
+                loadingCatalogo={catalogo.loading}
+                labelCatalogo={tipo === "organo" ? "Tejido" : "Veta"}
                 onActualizarCompuesto={(catalogoId, compuestoId) =>
                   void formula.actualizarCompuesto(catalogoId, compuestoId)
                 }

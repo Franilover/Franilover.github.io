@@ -27,6 +27,7 @@ import React from "react";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 import { useOrganoTejidos } from "@/domains/garlia/elementos/useOrganoTejidos";
 import { useFormacionVetas } from "@/domains/garlia/elementos/useFormacionVetas";
+import { useCatalogoTejidos } from "@/domains/garlia/elementos/useCatalogoTejidos";
 import { SelectorFormulaTejidos } from "@/domains/garlia/_shared/SelectorFormulaTejidos";
 import type { Compuesto } from "@/domains/garlia/elementos/types";
 
@@ -70,6 +71,10 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
   const vetas = useFormacionVetas(tipo === "formacion" ? item.id : null);
 
   const formula = tipo === "organo" ? tejidos : vetas;
+
+  // Catálogo completo de Tejidos/Vetas ya existentes, para el picker
+  // "usar existente" — se carga una sola vez por tipo, no por entidad.
+  const catalogo = useCatalogoTejidos(tipo);
 
   return (
     <div className="group py-3 px-3 rounded-lg border border-primary/10">
@@ -123,6 +128,10 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
               compuestos={compuestos}
               items={formula.items}
               onAgregar={(compuestoId) => void formula.agregarCompuesto(compuestoId)}
+              onVincularExistente={(id) => void formula.vincularExistente(id)}
+              catalogoDisponible={catalogo.items}
+              loadingCatalogo={catalogo.loading}
+              labelCatalogo={tipo === "organo" ? "Tejido" : "Veta"}
               onActualizarCompuesto={(catalogoId, compuestoId) =>
                 void formula.actualizarCompuesto(catalogoId, compuestoId)
               }

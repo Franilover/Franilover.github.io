@@ -27,6 +27,9 @@ export interface VetaDeFormacion {
   vinculo_id: string;
   formacion_id: string;
   veta_id: string;
+  /** Alias de veta_id — mismo campo que espera FilaFormulaTejido para
+   *  no reofrecer esta Veta en el picker de "usar existente". */
+  tejido_o_veta_id: string;
   grano_id: string | null;
   /** Alias de grano_id — id de catálogo donde vive compuesto_id (shape
    *  compartido con TejidoDeOrgano, ver FilaFormulaTejido). */
@@ -118,6 +121,7 @@ export function useFormacionVetas(formacionId: string | null) {
           vinculo_id: v.id,
           formacion_id: v.formacion_id,
           veta_id: v.veta_id,
+          tejido_o_veta_id: v.veta_id,
           grano_id: veta.grano_id,
           catalogo_id: veta.grano_id,
           proporcion: v.proporcion,
@@ -163,6 +167,48 @@ export function useFormacionVetas(formacionId: string | null) {
     [formacionId],
   );
 
+  // ── Vincular una Veta YA EXISTENTE (de cualquier otra Formación) sin
+  // crear Grano/Veta nuevos — reutilización real, contraparte de agregarCompuesto.
+  const vincularExistente = useCallback(
+    async (vetaId: string) => {
+      if (!formacionId) return null;
+
+      const { data: vinculo, error: errorVinculo } = await supabase
+        .from("formacion_vetas")
+        .insert([{ formacion_id: formacionId, veta_id: vetaId }])
+        .select()
+        .single();
+      if (errorVinculo || !vinculo) return null;
+
+      if (!vetas[vetaId]) {
+        const { data: vetaData } = await supabase
+          .from(CONFIG_VETAS.tabla)
+          .select(CONFIG_VETAS.select)
+          .eq("id", vetaId)
+          .single();
+        if (vetaData) {
+          const veta = vetaData as unknown as Veta;
+          setVetas((prev) => ({ ...prev, [veta.id]: veta }));
+          if (veta.grano_id && !granos[veta.grano_id]) {
+            const { data: granoData } = await supabase
+              .from(CONFIG_GRANOS.tabla)
+              .select(CONFIG_GRANOS.select)
+              .eq("id", veta.grano_id)
+              .single();
+            if (granoData) {
+              const grano = granoData as unknown as Grano;
+              setGranos((prev) => ({ ...prev, [grano.id]: grano }));
+            }
+          }
+        }
+      }
+
+      setVinculos((prev) => [...prev, vinculo as FormacionVeta]);
+      return vinculo as FormacionVeta;
+    },
+    [formacionId, vetas, granos],
+  );
+
   const actualizarCompuesto = useCallback(async (granoId: string, compuestoId: string) => {
     setGranos((prev) =>
       prev[granoId] ? { ...prev, [granoId]: { ...prev[granoId], compuesto_id: compuestoId } } : prev,
@@ -192,6 +238,7 @@ export function useFormacionVetas(formacionId: string | null) {
     items,
     loading,
     agregarCompuesto,
+    vincularExistente,
     actualizarCompuesto,
     actualizarProporcion,
     quitarCompuesto,

@@ -19,10 +19,11 @@
  * cantidad propia, son una fila de catálogo reutilizable.
  */
 
-import { Plus, Trash2, Pencil, MoreVertical } from "lucide-react";
+import { Plus, Trash2, Pencil, MoreVertical, Search, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import type { Compuesto } from "@/domains/garlia/elementos/types";
+import type { EntradaCatalogoTejido } from "@/domains/garlia/elementos/useCatalogoTejidos";
 
 /** Shape mínimo de una fila de fórmula ya resuelta — cumplen TejidoDeOrgano y VetaDeFormacion.
  *  `catalogo_id` es el id de la Célula (Órgano) o Grano (Formación) — el
@@ -30,6 +31,10 @@ import type { Compuesto } from "@/domains/garlia/elementos/types";
  *  (la fila puente organo_tejidos/formacion_vetas). */
 export interface FilaFormulaTejido {
   vinculo_id: string;
+  /** Id del propio Tejido/Veta (tejido_id/veta_id) — distinto de catalogo_id
+   *  (Célula/Grano). Usado para no reofrecer un Tejido ya vinculado en el
+   *  picker de "usar existente". Opcional por compatibilidad retro. */
+  tejido_o_veta_id?: string;
   catalogo_id: string | null;
   compuesto_id: string | null;
   proporcion: string | null;
@@ -39,15 +44,25 @@ export function SelectorFormulaTejidos({
   compuestos,
   items,
   onAgregar,
+  onVincularExistente,
+  catalogoDisponible,
+  loadingCatalogo,
   onActualizarCompuesto,
   onActualizarProporcion,
   onQuitar,
   onAbrirCompuesto,
   ocultarBotonAgregar,
+  labelCatalogo = "Tejido",
 }: {
   compuestos: Compuesto[];
   items: FilaFormulaTejido[];
   onAgregar: (compuestoId: string) => void;
+  /** Vincula un Tejido/Veta YA EXISTENTE (de otra entidad) sin crear uno nuevo.
+   *  Si se omite, no se muestra el botón "Usar existente". */
+  onVincularExistente?: (tejidoOVetaId: string) => void;
+  /** Catálogo completo de Tejidos/Vetas ya creados — ver useCatalogoTejidos. */
+  catalogoDisponible?: EntradaCatalogoTejido[];
+  loadingCatalogo?: boolean;
   onActualizarCompuesto: (celulaOGranoId: string, compuestoId: string) => void;
   onActualizarProporcion: (vinculoId: string, proporcion: string) => void;
   onQuitar: (vinculoId: string) => void;
@@ -55,13 +70,28 @@ export function SelectorFormulaTejidos({
   onAbrirCompuesto?: (compuestoId: string) => void;
   /** Oculta el botón "Agregar" interno — usar cuando el padre renderiza su propio botón. */
   ocultarBotonAgregar?: boolean;
+  /** Vocabulario del picker de "usar existente": "Tejido" u "Veta". */
+  labelCatalogo?: string;
 }) {
+  const [pickerAbierto, setPickerAbierto] = useState(false);
+
   function agregar() {
     const elegidos = new Set(items.map((c) => c.compuesto_id));
     const primero = compuestos.find((c) => !elegidos.has(c.id)) ?? compuestos[0];
     if (!primero) return;
     onAgregar(primero.id);
   }
+
+  // Ya vinculados a esta fórmula: no tiene sentido ofrecerlos de nuevo en el picker.
+  const yaVinculadosIds = useMemo(
+    () => new Set(items.map((i) => i.tejido_o_veta_id).filter((id): id is string => !!id)),
+    [items],
+  );
+
+  const disponiblesParaPicker = useMemo(
+    () => (catalogoDisponible ?? []).filter((c) => !yaVinculadosIds.has(c.id)),
+    [catalogoDisponible, yaVinculadosIds],
+  );
 
   return (
     <div className="flex flex-col">
@@ -102,6 +132,19 @@ export function SelectorFormulaTejidos({
             <Plus size={10} />
             Agregar
           </button>
+
+          {onVincularExistente && (
+            <button
+              type="button"
+              onClick={() => setPickerAbierto(true)}
+              disabled={!!loadingCatalogo || disponiblesParaPicker.length === 0}
+              title={`Reutilizar un ${labelCatalogo} ya creado en otra parte`}
+              className="flex items-center justify-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Search size={10} />
+              Usar existente
+            </button>
+          )}
         </div>
       )}
 
@@ -110,6 +153,105 @@ export function SelectorFormulaTejidos({
           Todavía no hay compuestos en la Tabla Química para asignar.
         </p>
       )}
+
+      {pickerAbierto && onVincularExistente && (
+        <PickerTejidoExistente
+          labelCatalogo={labelCatalogo}
+          disponibles={disponiblesParaPicker}
+          onElegir={(id) => {
+            onVincularExistente(id);
+            setPickerAbierto(false);
+          }}
+          onClose={() => setPickerAbierto(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Picker de "Usar existente" a nivel Tejido/Veta — mismo lenguaje visual
+ * que PickerUsarExistente (SeccionGruposVinculados.tsx), un nivel más
+ * abajo: en vez de elegir un Órgano/Formación completo, elige el Tejido/
+ * Veta intermedio y lo vincula sin duplicar Célula/Tejido.
+ */
+function PickerTejidoExistente({
+  labelCatalogo,
+  disponibles,
+  onElegir,
+  onClose,
+}: {
+  labelCatalogo: string;
+  disponibles: EntradaCatalogoTejido[];
+  onElegir: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+
+  const filtrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return disponibles;
+    return disponibles.filter((d) => d.nombre.toLowerCase().includes(q));
+  }, [disponibles, busqueda]);
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, black 45%, transparent)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md max-h-[70vh] flex flex-col rounded-xl border shadow-2xl overflow-hidden"
+        style={{
+          background: "var(--bg-main)",
+          borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-primary/10">
+          <Search size={13} className="text-primary/30 shrink-0" />
+          <input
+            autoFocus
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder={`Buscar ${labelCatalogo.toLowerCase()}…`}
+            className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-sm text-primary outline-none placeholder:text-primary/30"
+          />
+          <span className="text-micro text-primary/30 shrink-0">{disponibles.length}</span>
+          <button
+            type="button"
+            onClick={onClose}
+            title="Cerrar"
+            className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+          >
+            <X size={13} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto p-2">
+          {filtrados.length === 0 ? (
+            <p className="text-micro text-primary/25 italic text-center py-6">Sin resultados</p>
+          ) : (
+            <div className="flex flex-col divide-y divide-primary/10">
+              {filtrados.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => onElegir(d.id)}
+                  className="w-full text-left px-2 py-2 hover:bg-primary/5 transition-colors cursor-pointer rounded"
+                >
+                  <p className="text-micro font-bold text-primary truncate">
+                    {d.nombre || "Sin nombre"}
+                  </p>
+                  {d.funcion && (
+                    <p className="text-micro text-primary/40 truncate mt-0.5">{d.funcion}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

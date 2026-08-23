@@ -38,6 +38,9 @@ export interface TejidoDeOrgano {
   vinculo_id: string;
   organo_id: string;
   tejido_id: string;
+  /** Alias de tejido_id — mismo campo que espera FilaFormulaTejido para
+   *  no reofrecer este Tejido en el picker de "usar existente". */
+  tejido_o_veta_id: string;
   celula_id: string | null;
   /** Alias de celula_id — id de catálogo donde vive compuesto_id (shape
    *  compartido con VetaDeFormacion, ver FilaFormulaTejido). */
@@ -130,6 +133,7 @@ export function useOrganoTejidos(organoId: string | null) {
           vinculo_id: v.id,
           organo_id: v.organo_id,
           tejido_id: v.tejido_id,
+          tejido_o_veta_id: v.tejido_id,
           celula_id: tejido.celula_id,
           catalogo_id: tejido.celula_id,
           proporcion: v.proporcion,
@@ -176,6 +180,50 @@ export function useOrganoTejidos(organoId: string | null) {
     [organoId],
   );
 
+  // ── Vincular un Tejido YA EXISTENTE (de cualquier otro Órgano) sin crear
+  // Célula/Tejido nuevos — reutilización real, contraparte de agregarCompuesto.
+  const vincularExistente = useCallback(
+    async (tejidoId: string) => {
+      if (!organoId) return null;
+
+      const { data: vinculo, error: errorVinculo } = await supabase
+        .from("organo_tejidos")
+        .insert([{ organo_id: organoId, tejido_id: tejidoId }])
+        .select()
+        .single();
+      if (errorVinculo || !vinculo) return null;
+
+      // Si el Tejido (y su Célula) no están en el estado local todavía
+      // (viene de otro Órgano), los traemos para que la fila se resuelva sin recargar todo.
+      if (!tejidos[tejidoId]) {
+        const { data: tejidoData } = await supabase
+          .from(CONFIG_TEJIDOS.tabla)
+          .select(CONFIG_TEJIDOS.select)
+          .eq("id", tejidoId)
+          .single();
+        if (tejidoData) {
+          const tejido = tejidoData as unknown as Tejido;
+          setTejidos((prev) => ({ ...prev, [tejido.id]: tejido }));
+          if (tejido.celula_id && !celulas[tejido.celula_id]) {
+            const { data: celulaData } = await supabase
+              .from(CONFIG_CELULAS.tabla)
+              .select(CONFIG_CELULAS.select)
+              .eq("id", tejido.celula_id)
+              .single();
+            if (celulaData) {
+              const celula = celulaData as unknown as Celula;
+              setCelulas((prev) => ({ ...prev, [celula.id]: celula }));
+            }
+          }
+        }
+      }
+
+      setVinculos((prev) => [...prev, vinculo as OrganoTejido]);
+      return vinculo as OrganoTejido;
+    },
+    [organoId, tejidos, celulas],
+  );
+
   // ── Reemplazar el compuesto de una fila (edita la Célula existente) ────
   const actualizarCompuesto = useCallback(
     async (celulaId: string, compuestoId: string) => {
@@ -212,6 +260,7 @@ export function useOrganoTejidos(organoId: string | null) {
     items,
     loading,
     agregarCompuesto,
+    vincularExistente,
     actualizarCompuesto,
     actualizarProporcion,
     quitarCompuesto,
