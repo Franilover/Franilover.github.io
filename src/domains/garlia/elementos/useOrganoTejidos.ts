@@ -261,6 +261,38 @@ export function useOrganoTejidos(organoId: string | null) {
     [organoId],
   );
 
+  // ── Crear un Tejido nuevo en el catálogo global (con nombre, sin Célula
+  // todavía) y vincularlo de una — flujo "Agregar" unificado con reutilizar,
+  // contraparte de vincularExistente cuando el Tejido buscado no existe. ──
+  const crearYVincular = useCallback(
+    async (nombre: string) => {
+      if (!organoId) return null;
+
+      const { data: nuevoTejido, error: errorTejido } = await supabase
+        .from(CONFIG_TEJIDOS.tabla)
+        .insert([{ nombre, celula_id: null, estructura: [] }])
+        .select()
+        .single();
+      if (errorTejido || !nuevoTejido) return null;
+
+      const tejido = nuevoTejido as Tejido;
+      setTejidos((prev) => ({ ...prev, [tejido.id]: tejido }));
+      void guardarEnDexie([], [tejido], []);
+
+      const { data: vinculo, error: errorVinculo } = await supabase
+        .from("organo_tejidos")
+        .insert([{ organo_id: organoId, tejido_id: tejido.id }])
+        .select()
+        .single();
+      if (errorVinculo || !vinculo) return null;
+
+      setVinculos((prev) => [...prev, vinculo as OrganoTejido]);
+      void guardarEnDexie([vinculo as OrganoTejido], [], []);
+      return vinculo as OrganoTejido;
+    },
+    [organoId],
+  );
+
   // ── Vincular un Tejido YA EXISTENTE (de cualquier otro Órgano) sin crear
   // Célula/Tejido nuevos — reutilización real, contraparte de agregarCompuesto.
   const vincularExistente = useCallback(
@@ -372,6 +404,7 @@ export function useOrganoTejidos(organoId: string | null) {
     loading,
     agregarCompuesto,
     vincularExistente,
+    crearYVincular,
     actualizarCompuesto,
     actualizarNombre,
     actualizarProporcion,

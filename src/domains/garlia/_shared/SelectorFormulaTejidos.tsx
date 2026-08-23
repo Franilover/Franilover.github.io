@@ -47,8 +47,8 @@ export interface FilaFormulaTejido {
 export function SelectorFormulaTejidos({
   compuestos,
   items,
-  onAgregar,
   onVincularExistente,
+  onCrearYVincular,
   catalogoDisponible,
   loadingCatalogo,
   onActualizarCompuesto,
@@ -62,10 +62,12 @@ export function SelectorFormulaTejidos({
 }: {
   compuestos: Compuesto[];
   items: FilaFormulaTejido[];
-  onAgregar: (compuestoId: string) => void;
-  /** Vincula un Tejido/Veta YA EXISTENTE (de otra entidad) sin crear uno nuevo.
-   *  Si se omite, no se muestra el botón "Usar existente". */
+  /** Vincula un Tejido/Veta YA EXISTENTE (de otra entidad) sin crear uno nuevo. */
   onVincularExistente?: (tejidoOVetaId: string) => void;
+  /** Crea un Tejido/Veta nuevo en el catálogo global (con este nombre) y lo
+   *  vincula de una — usado desde el picker cuando la búsqueda no matchea
+   *  nada existente. Mismo catálogo que edita Biología > Tejidos/Vetas. */
+  onCrearYVincular?: (nombre: string) => void;
   /** Catálogo completo de Tejidos/Vetas ya creados — ver useCatalogoTejidos. */
   catalogoDisponible?: EntradaCatalogoTejido[];
   loadingCatalogo?: boolean;
@@ -79,23 +81,16 @@ export function SelectorFormulaTejidos({
   onAbrirCompuesto?: (compuestoId: string) => void;
   /** Oculta el botón "Agregar" interno — usar cuando el padre renderiza su propio botón. */
   ocultarBotonAgregar?: boolean;
-  /** Modo solo lectura: no agregar, no usar existente, no editar compuesto/
-   *  proporción, no quitar — cada fila solo muestra nombre + proporción,
-   *  con el nombre clickeable a onAbrirCompuesto si se provee. Usar en
-   *  tarjetas embebidas donde la fórmula se edita desde el editor propio
-   *  del Órgano/Formación, no inline. */
+  /** Modo solo lectura: no agregar, no editar compuesto/proporción/nombre,
+   *  no quitar — cada fila solo muestra nombre + proporción, con el nombre
+   *  clickeable a onAbrirCompuesto si se provee. Usar en tarjetas embebidas
+   *  donde la fórmula se edita desde el editor propio del Órgano/Formación,
+   *  no inline. */
   soloLectura?: boolean;
-  /** Vocabulario del picker de "usar existente": "Tejido" u "Veta". */
+  /** Vocabulario del picker: "Tejido" u "Veta". */
   labelCatalogo?: string;
 }) {
   const [pickerAbierto, setPickerAbierto] = useState(false);
-
-  function agregar() {
-    const elegidos = new Set(items.map((c) => c.compuesto_id));
-    const primero = compuestos.find((c) => !elegidos.has(c.id)) ?? compuestos[0];
-    if (!primero) return;
-    onAgregar(primero.id);
-  }
 
   // Ya vinculados a esta fórmula: no tiene sentido ofrecerlos de nuevo en el picker.
   const yaVinculadosIds = useMemo(
@@ -166,47 +161,41 @@ export function SelectorFormulaTejidos({
         </div>
       )}
 
-      {!ocultarBotonAgregar && (
+      {!ocultarBotonAgregar && (onVincularExistente || onCrearYVincular) && (
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             type="button"
-            onClick={agregar}
-            disabled={compuestos.length === 0}
+            onClick={() => setPickerAbierto(true)}
+            disabled={!!loadingCatalogo}
+            title={`Elegir un ${labelCatalogo} existente o crear uno nuevo`}
             className="flex items-center justify-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus size={10} />
             Agregar
           </button>
-
-          {onVincularExistente && (
-            <button
-              type="button"
-              onClick={() => setPickerAbierto(true)}
-              disabled={!!loadingCatalogo || disponiblesParaPicker.length === 0}
-              title={`Reutilizar un ${labelCatalogo} ya creado en otra parte`}
-              className="flex items-center justify-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide border border-dashed border-primary/20 text-primary/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Search size={10} />
-              Usar existente
-            </button>
-          )}
         </div>
       )}
 
-      {compuestos.length === 0 && (
-        <p className="text-micro text-primary/25">
-          Todavía no hay compuestos en la Tabla Química para asignar.
-        </p>
-      )}
-
-      {pickerAbierto && onVincularExistente && (
+      {(pickerAbierto && (onVincularExistente || onCrearYVincular)) && (
         <PickerTejidoExistente
           labelCatalogo={labelCatalogo}
           disponibles={disponiblesParaPicker}
-          onElegir={(id) => {
-            onVincularExistente(id);
-            setPickerAbierto(false);
-          }}
+          onElegir={
+            onVincularExistente
+              ? (id) => {
+                  onVincularExistente(id);
+                  setPickerAbierto(false);
+                }
+              : undefined
+          }
+          onCrear={
+            onCrearYVincular
+              ? (nombre) => {
+                  onCrearYVincular(nombre);
+                  setPickerAbierto(false);
+                }
+              : undefined
+          }
           onClose={() => setPickerAbierto(false)}
         />
       )}
@@ -215,20 +204,22 @@ export function SelectorFormulaTejidos({
 }
 
 /**
- * Picker de "Usar existente" a nivel Tejido/Veta — mismo lenguaje visual
- * que PickerUsarExistente (SeccionGruposVinculados.tsx), un nivel más
- * abajo: en vez de elegir un Órgano/Formación completo, elige el Tejido/
- * Veta intermedio y lo vincula sin duplicar Célula/Tejido.
+ * Picker unificado: buscar un Tejido/Veta ya existente en TODO el catálogo
+ * global (mismo catálogo que edita Biología > Tejidos/Vetas, ver
+ * CatalogoTejidosBiologia.tsx) y vincularlo, o crear uno nuevo con el texto
+ * buscado si no existe — sin salir del editor del Órgano/Formación.
  */
 function PickerTejidoExistente({
   labelCatalogo,
   disponibles,
   onElegir,
+  onCrear,
   onClose,
 }: {
   labelCatalogo: string;
   disponibles: EntradaCatalogoTejido[];
-  onElegir: (id: string) => void;
+  onElegir?: (id: string) => void;
+  onCrear?: (nombre: string) => void;
   onClose: () => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
@@ -238,6 +229,13 @@ function PickerTejidoExistente({
     if (!q) return disponibles;
     return disponibles.filter((d) => d.nombre.toLowerCase().includes(q));
   }, [disponibles, busqueda]);
+
+  const busquedaLimpia = busqueda.trim();
+  // No ofrecer "Crear X" si ya existe una entrada con ese nombre exacto.
+  const coincideExacto = filtrados.some(
+    (d) => d.nombre.toLowerCase() === busquedaLimpia.toLowerCase(),
+  );
+  const puedeCrear = !!onCrear && busquedaLimpia.length > 0 && !coincideExacto;
 
   return (
     <div
@@ -259,7 +257,7 @@ function PickerTejidoExistente({
             autoFocus
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder={`Buscar ${labelCatalogo.toLowerCase()}…`}
+            placeholder={`Buscar o crear ${labelCatalogo.toLowerCase()}…`}
             className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-sm text-primary outline-none placeholder:text-primary/30"
           />
           <span className="text-micro text-primary/30 shrink-0">{disponibles.length}</span>
@@ -274,26 +272,43 @@ function PickerTejidoExistente({
         </div>
 
         <div className="overflow-y-auto p-2">
-          {filtrados.length === 0 ? (
-            <p className="text-micro text-primary/25 italic text-center py-6">Sin resultados</p>
+          {puedeCrear && (
+            <button
+              type="button"
+              onClick={() => onCrear?.(busquedaLimpia)}
+              className="w-full flex items-center gap-2 text-left px-2 py-2 mb-1 rounded-md border border-dashed border-accent/30 bg-accent/5 hover:bg-accent/10 transition-colors cursor-pointer"
+            >
+              <Plus size={12} className="text-accent shrink-0" />
+              <span className="text-micro font-bold text-accent truncate">
+                Crear &quot;{busquedaLimpia}&quot;
+              </span>
+            </button>
+          )}
+
+          {filtrados.length === 0 && !puedeCrear ? (
+            <p className="text-micro text-primary/25 italic text-center py-6">
+              {onElegir ? "Sin resultados" : "Escribí un nombre para crear uno nuevo"}
+            </p>
           ) : (
-            <div className="flex flex-col divide-y divide-primary/10">
-              {filtrados.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => onElegir(d.id)}
-                  className="w-full text-left px-2 py-2 hover:bg-primary/5 transition-colors cursor-pointer rounded"
-                >
-                  <p className="text-micro font-bold text-primary truncate">
-                    {d.nombre || "Sin nombre"}
-                  </p>
-                  {d.funcion && (
-                    <p className="text-micro text-primary/40 truncate mt-0.5">{d.funcion}</p>
-                  )}
-                </button>
-              ))}
-            </div>
+            onElegir && (
+              <div className="flex flex-col divide-y divide-primary/10">
+                {filtrados.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => onElegir(d.id)}
+                    className="w-full text-left px-2 py-2 hover:bg-primary/5 transition-colors cursor-pointer rounded"
+                  >
+                    <p className="text-micro font-bold text-primary truncate">
+                      {d.nombre || "Sin nombre"}
+                    </p>
+                    {d.funcion && (
+                      <p className="text-micro text-primary/40 truncate mt-0.5">{d.funcion}</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )
           )}
         </div>
       </div>

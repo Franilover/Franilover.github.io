@@ -242,6 +242,38 @@ export function useFormacionVetas(formacionId: string | null) {
     [formacionId],
   );
 
+  // ── Crear una Veta nueva en el catálogo global (con nombre, sin Grano
+  // todavía) y vincularla de una — flujo "Agregar" unificado con reutilizar,
+  // contraparte de vincularExistente cuando la Veta buscada no existe. ──
+  const crearYVincular = useCallback(
+    async (nombre: string) => {
+      if (!formacionId) return null;
+
+      const { data: nuevaVeta, error: errorVeta } = await supabase
+        .from(CONFIG_VETAS.tabla)
+        .insert([{ nombre, grano_id: null, estructura: [] }])
+        .select()
+        .single();
+      if (errorVeta || !nuevaVeta) return null;
+
+      const veta = nuevaVeta as Veta;
+      setVetas((prev) => ({ ...prev, [veta.id]: veta }));
+      void guardarEnDexie([], [veta], []);
+
+      const { data: vinculo, error: errorVinculo } = await supabase
+        .from("formacion_vetas")
+        .insert([{ formacion_id: formacionId, veta_id: veta.id }])
+        .select()
+        .single();
+      if (errorVinculo || !vinculo) return null;
+
+      setVinculos((prev) => [...prev, vinculo as FormacionVeta]);
+      void guardarEnDexie([vinculo as FormacionVeta], [], []);
+      return vinculo as FormacionVeta;
+    },
+    [formacionId],
+  );
+
   // ── Vincular una Veta YA EXISTENTE (de cualquier otra Formación) sin
   // crear Grano/Veta nuevos — reutilización real, contraparte de agregarCompuesto.
   const vincularExistente = useCallback(
@@ -344,6 +376,7 @@ export function useFormacionVetas(formacionId: string | null) {
     loading,
     agregarCompuesto,
     vincularExistente,
+    crearYVincular,
     actualizarCompuesto,
     actualizarNombre,
     actualizarProporcion,

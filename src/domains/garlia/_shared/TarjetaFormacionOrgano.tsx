@@ -125,7 +125,6 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
             <SelectorFormulaTejidos
               compuestos={compuestos}
               items={formula.items}
-              onAgregar={() => {}}
               onActualizarCompuesto={() => {}}
               onActualizarProporcion={() => {}}
               onQuitar={() => {}}

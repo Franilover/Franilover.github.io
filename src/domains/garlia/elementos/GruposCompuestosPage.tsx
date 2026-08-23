@@ -14,7 +14,7 @@
  * composición internamente según `tipo`.
  */
 
-import { Boxes, Plus, Trash2, X } from "lucide-react";
+import { Boxes, Trash2, X } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
@@ -147,32 +147,17 @@ export function GrupoCompuestoPanelFlotante({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-micro font-black uppercase tracking-widest text-primary/40">
-                Fórmula
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  const elegidos = new Set(formula.items.map((f) => f.compuesto_id));
-                  const primero = compuestos.find((c) => !elegidos.has(c.id)) ?? compuestos[0];
-                  if (primero) void formula.agregarCompuesto(primero.id);
-                }}
-                disabled={compuestos.length === 0}
-                title="Agregar compuesto"
-                className="w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Plus size={13} />
-              </button>
-            </div>
+            <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
+              Fórmula
+            </p>
             {formula.loading ? (
               <p className="text-micro text-primary/25 italic">Cargando…</p>
             ) : (
               <SelectorFormulaTejidos
                 compuestos={compuestos}
                 items={formula.items}
-                onAgregar={(compuestoId) => void formula.agregarCompuesto(compuestoId)}
                 onVincularExistente={(id) => void formula.vincularExistente(id)}
+                onCrearYVincular={(nombre) => void formula.crearYVincular(nombre)}
                 catalogoDisponible={catalogo.items}
                 loadingCatalogo={catalogo.loading}
                 labelCatalogo={tipo === "organo" ? "Tejido" : "Veta"}
@@ -187,7 +172,6 @@ export function GrupoCompuestoPanelFlotante({
                 }
                 onQuitar={(vinculoId) => void formula.quitarCompuesto(vinculoId)}
                 onAbrirCompuesto={onAbrirCompuesto}
-                ocultarBotonAgregar
               />
             )}
           </div>
