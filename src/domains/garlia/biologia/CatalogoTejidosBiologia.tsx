@@ -25,7 +25,7 @@
  * abre panel flotante centrado).
  */
 
-import { Beaker, Layers, Plus, Trash2, X, Search } from "lucide-react";
+import { Beaker, Boxes, Layers, Plus, Trash2, X, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -35,13 +35,20 @@ import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
 import { useCelulaCompuestos, type CompuestoDeCelula } from "@/domains/garlia/elementos/useCelulaCompuestos";
 import { useTejidoCelulas, type CelulaDeTejido } from "@/domains/garlia/elementos/useTejidoCelulas";
 import { useTejidoCompuestos, type CompuestoDeTejido } from "@/domains/garlia/elementos/useTejidoCompuestos";
+import { useTejidosDeUnaCelula } from "@/domains/garlia/elementos/useTejidosDeUnaCelula";
+import { useOrganosDeUnTejido } from "@/domains/garlia/elementos/useOrganosDeUnTejido";
 import type { Celula, Compuesto, Tejido } from "@/domains/garlia/elementos/types";
+import { BreadcrumbJerarquia } from "./BreadcrumbJerarquia";
 
 interface Props {
   compuestos: Compuesto[];
   loadingCompuestos?: boolean;
   onCompuestoCreado?: (c: Compuesto) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Navegar a un Órgano desde el breadcrumb de un Tejido — el padre
+   *  (BiologiaPage/GruposCompuestosPage) decide cómo abrir su editor,
+   *  ya que el Órgano vive fuera de este catálogo (ver GrupoCompuestoPanelFlotante). */
+  onAbrirOrgano?: (organoId: string) => void;
 }
 
 export function CatalogoTejidosBiologia({
@@ -49,6 +56,7 @@ export function CatalogoTejidosBiologia({
   loadingCompuestos,
   onCompuestoCreado,
   onAbrirCompuesto,
+  onAbrirOrgano,
 }: Props) {
   const celulas = useCelulas();
   const tejidos = useTejidos();
@@ -101,6 +109,10 @@ export function CatalogoTejidosBiologia({
             }}
             onCompuestoCreado={onCompuestoCreado}
             onAbrirCompuesto={onAbrirCompuesto}
+            onAbrirTejido={(tejidoId) => {
+              setCelulaSeleccionadaId(null);
+              setTejidoSeleccionadoId(tejidoId);
+            }}
           />
         )}
       </div>
@@ -151,6 +163,14 @@ export function CatalogoTejidosBiologia({
             }}
             onCompuestoCreado={onCompuestoCreado}
             onAbrirCompuesto={onAbrirCompuesto}
+            onAbrirOrgano={
+              onAbrirOrgano
+                ? (organoId) => {
+                    setTejidoSeleccionadoId(null);
+                    onAbrirOrgano(organoId);
+                  }
+                : undefined
+            }
           />
         )}
       </div>
@@ -228,6 +248,7 @@ export function PanelEditorCelula({
   onEliminar,
   onCompuestoCreado,
   onAbrirCompuesto,
+  onAbrirTejido,
 }: {
   item: Celula;
   compuestos: Compuesto[];
@@ -237,12 +258,15 @@ export function PanelEditorCelula({
   onEliminar: (id: string) => Promise<{ ok: boolean; error: unknown }>;
   onCompuestoCreado?: (c: Compuesto) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Cierra este panel y abre el del Tejido elegido — navegación hacia arriba. */
+  onAbrirTejido?: (tejidoId: string) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [eliminando, setEliminando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
   const vinculosCompuesto = useCelulaCompuestos(item.id);
+  const tejidosQueUsanEstaCelula = useTejidosDeUnaCelula(item.id);
 
   async function handleEliminar() {
     const ok = await confirm({
@@ -273,6 +297,25 @@ export function PanelEditorCelula({
         eliminando={eliminando}
         onCerrar={onCerrar}
       />
+
+      <div className="shrink-0 px-3 pt-2">
+        <BreadcrumbJerarquia
+          niveles={[
+            { label: "Célula", icono: <Beaker size={10} />, activo: true },
+            {
+              label: "Tejido",
+              icono: <Layers size={10} />,
+              activo: false,
+              items: tejidosQueUsanEstaCelula.items.map((v) => ({
+                id: v.tejido_id,
+                nombre: v.tejido.nombre,
+              })),
+              loading: tejidosQueUsanEstaCelula.loading,
+              onNavegar: onAbrirTejido,
+            },
+          ]}
+        />
+      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
@@ -341,6 +384,7 @@ export function PanelEditorTejido({
   onActualizar,
   onEliminar,
   onAbrirCelula,
+  onAbrirOrgano,
   onCompuestoCreado,
   onAbrirCompuesto,
 }: {
@@ -354,6 +398,8 @@ export function PanelEditorTejido({
   onEliminar: (id: string) => Promise<{ ok: boolean; error: unknown }>;
   /** Cierra este panel y abre el de la Célula elegida — navegación cruzada. */
   onAbrirCelula?: (celulaId: string) => void;
+  /** Cierra este panel y abre el del Órgano elegido — navegación hacia arriba. */
+  onAbrirOrgano?: (organoId: string) => void;
   onCompuestoCreado?: (c: Compuesto) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
 }) {
@@ -363,6 +409,7 @@ export function PanelEditorTejido({
 
   const vinculosCelula = useTejidoCelulas(item.id);
   const vinculosCompuesto = useTejidoCompuestos(item.id);
+  const organosQueUsanEsteTejido = useOrganosDeUnTejido(item.id);
 
   async function handleEliminar() {
     const ok = await confirm({
@@ -393,6 +440,36 @@ export function PanelEditorTejido({
         eliminando={eliminando}
         onCerrar={onCerrar}
       />
+
+      <div className="shrink-0 px-3 pt-2">
+        <BreadcrumbJerarquia
+          niveles={[
+            {
+              label: "Célula",
+              icono: <Beaker size={10} />,
+              activo: false,
+              items: vinculosCelula.items.map((v) => ({
+                id: v.celula_id,
+                nombre: v.celula.nombre,
+              })),
+              loading: vinculosCelula.loading,
+              onNavegar: onAbrirCelula,
+            },
+            { label: "Tejido", icono: <Layers size={10} />, activo: true },
+            {
+              label: "Órgano",
+              icono: <Boxes size={10} />,
+              activo: false,
+              items: organosQueUsanEsteTejido.items.map((v) => ({
+                id: v.organo_id,
+                nombre: v.organo.nombre,
+              })),
+              loading: organosQueUsanEsteTejido.loading,
+              onNavegar: onAbrirOrgano,
+            },
+          ]}
+        />
+      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}

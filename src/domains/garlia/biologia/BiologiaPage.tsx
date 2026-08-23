@@ -147,6 +147,10 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   // composición de una Célula abre acá su editor completo — mismo patrón
   // que FloraEditor.tsx (setItemAbierto({ tipo: "compuesto", id })).
   const [compuestoAbiertoId, setCompuestoAbiertoId] = useState<string | null>(null);
+  // Navegación controlada desde el breadcrumb "Tejido → Órgano" de
+  // CatalogoTejidosBiologia — al elegir un Órgano, este id le llega a
+  // GridCatalogoGrupo (abrirIdExterno) para abrir su editor flotante.
+  const [organoAAbrirId, setOrganoAAbrirId] = useState<string | null>(null);
 
   async function actualizarOrgano(id: string, cambios: Partial<Organo>) {
     setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
@@ -278,6 +282,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
             compuestos={compuestosCatalogo}
             loadingCompuestos={loadingCompuestos}
             onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+            onAbrirOrgano={(id) => setOrganoAAbrirId(id)}
           />
         </div>
 
@@ -290,6 +295,8 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
             compuestos={compuestosCatalogo}
             onActualizar={actualizarOrgano}
             onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+            abrirIdExterno={organoAAbrirId}
+            onAbrirIdExternoConsumido={() => setOrganoAAbrirId(null)}
           />
         </div>
 

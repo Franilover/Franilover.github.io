@@ -22,7 +22,7 @@
  */
 
 import { Boxes, Gem, Sprout, FlaskConical } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { ReaccionPanelFlotante } from "@/domains/garlia/elementos/ReaccionesPage";
@@ -41,6 +41,15 @@ type Props =
       /** Ícono de tarjeta Y qué cadena de composición resolver en el panel
        *  flotante (organo→tejidos/células, formacion→vetas/granos). */
       icono?: "organo" | "formacion" | "generico";
+      /**
+       * Id de un item de este catálogo a abrir de forma controlada desde
+       * afuera — usado para navegar hasta acá desde el breadcrumb
+       * "Tejido → Órgano" de un PanelEditorTejido que no vive dentro de
+       * este grid. Cuando cambia, reemplaza la selección interna.
+       */
+      abrirIdExterno?: string | null;
+      /** Se llama tras consumir abrirIdExterno, para que el padre limpie su estado. */
+      onAbrirIdExternoConsumido?: () => void;
     }
   | {
       modo: "reaccion";
@@ -66,6 +75,16 @@ function IconoGrupo({ tipo }: { tipo?: "organo" | "formacion" | "generico" }) {
  */
 export function GridCatalogoGrupo(props: Props) {
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+
+  // Navegación controlada desde afuera (breadcrumb Tejido → Órgano): al
+  // recibir un id nuevo, lo abre acá igual que un click de tarjeta, y avisa
+  // al padre para que limpie su estado y no reabra en loop.
+  useEffect(() => {
+    if (props.modo !== "grupo" || !props.abrirIdExterno) return;
+    setSeleccionadoId(props.abrirIdExterno);
+    props.onAbrirIdExternoConsumido?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.modo === "grupo" ? props.abrirIdExterno : null]);
 
   const activo =
     props.modo === "grupo"
@@ -124,6 +143,11 @@ export function GridCatalogoGrupo(props: Props) {
               : undefined
           }
           onAbrirCompuesto={props.onAbrirCompuesto}
+          onAbrirOrganoExterno={
+            props.icono !== "formacion"
+              ? (organoId) => setSeleccionadoId(organoId)
+              : undefined
+          }
         />
       )}
 

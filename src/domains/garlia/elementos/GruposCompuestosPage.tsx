@@ -14,7 +14,7 @@
  * composición internamente según `tipo`.
  */
 
-import { Boxes, Trash2, X } from "lucide-react";
+import { Boxes, Layers, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -27,6 +27,7 @@ import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
 import { useGranos } from "@/domains/garlia/elementos/useGranos";
 import { useVetas } from "@/domains/garlia/elementos/useVetas";
 import { PanelEditorTejido, PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { BreadcrumbJerarquia } from "@/domains/garlia/biologia/BreadcrumbJerarquia";
 import { PanelEditorVeta, PanelEditorGrano, SelectorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
@@ -46,6 +47,7 @@ export function GrupoCompuestoPanelFlotante({
   onActualizar,
   onEliminar,
   onAbrirCompuesto,
+  onAbrirOrganoExterno,
 }: {
   grupo: EntradaCatalogoGrupo;
   /** "organo" resuelve la fórmula vía Tejidos/Células; "formacion" vía Vetas/Granos. */
@@ -55,6 +57,14 @@ export function GrupoCompuestoPanelFlotante({
   onActualizar: (id: string, cambios: Partial<EntradaCatalogoGrupo>) => void;
   onEliminar?: (id: string) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
+  /**
+   * Navegar a OTRO Órgano desde el breadcrumb "Tejido → Órgano" dentro del
+   * PanelEditorTejido anidado — ese Tejido puede pertenecer a un Órgano
+   * distinto al que este panel muestra. Cierra este modal y delega en el
+   * padre (BiologiaPage) abrir el editor del Órgano elegido, mismo patrón
+   * que onAbrirCompuesto.
+   */
+  onAbrirOrganoExterno?: (organoId: string) => void;
 }) {
   const tejidos = useOrganoTejidos(tipo === "organo" ? grupo.id : null);
   const vetas = useFormacionVetas(tipo === "formacion" ? grupo.id : null);
@@ -157,6 +167,24 @@ export function GrupoCompuestoPanelFlotante({
           </button>
         </div>
 
+        {tipo === "organo" && (
+          <div className="shrink-0 px-3 pt-2">
+            <BreadcrumbJerarquia
+              niveles={[
+                {
+                  label: "Tejido",
+                  icono: <Layers size={10} />,
+                  activo: false,
+                  items: formula.items.map((f) => ({ id: f.tejido_id, nombre: f.nombre })),
+                  loading: formula.loading,
+                  onNavegar: (tejidoId) => setTejidoOVetaAbiertoId(tejidoId),
+                },
+                { label: "Órgano", icono: <Boxes size={10} />, activo: true },
+              ]}
+            />
+          </div>
+        )}
+
         {/* Contenido: dos columnas — izquierda composición (fórmula),
            derecha texto (función + notas). Header ya tiene el título. */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
@@ -232,6 +260,14 @@ export function GrupoCompuestoPanelFlotante({
               onActualizar={tejidosCatalogo.actualizar}
               onEliminar={tejidosCatalogo.eliminar}
               onAbrirCelula={(celulaId) => setCelulaOGranoAbiertoId(celulaId)}
+              onAbrirOrgano={(organoId) => {
+                // El Tejido puede ser usado por OTRO Órgano distinto al que
+                // este panel ya tiene abierto — cerramos todo este modal y
+                // dejamos que el padre (BiologiaPage) abra el Órgano elegido.
+                setTejidoOVetaAbiertoId(null);
+                onCerrar();
+                onAbrirOrganoExterno?.(organoId);
+              }}
               onAbrirCompuesto={onAbrirCompuesto}
             />
           );
@@ -271,6 +307,10 @@ export function GrupoCompuestoPanelFlotante({
               onActualizar={celulasCatalogo.actualizar}
               onEliminar={celulasCatalogo.eliminar}
               onAbrirCompuesto={onAbrirCompuesto}
+              onAbrirTejido={(tejidoId) => {
+                setCelulaOGranoAbiertoId(null);
+                setTejidoOVetaAbiertoId(tejidoId);
+              }}
             />
           );
         })()
