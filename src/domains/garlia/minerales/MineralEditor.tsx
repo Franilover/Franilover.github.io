@@ -297,15 +297,6 @@ export function MineralEditor({
                       return nueva;
                     }}
                     onUsarExistente={(id) => void vincularFormacionExistente(id)}
-                    onUpdate={(id, updates) => {
-                      // Optimista: refleja el cambio en el catálogo local ya
-                      // mismo (afecta a todos los minerales que usan esta
-                      // Formación), y persiste en Supabase vía el hook.
-                      setCatalogoFormaciones((prev) =>
-                        prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
-                      );
-                      void actualizarFormacion(id, updates);
-                    }}
                     onDelete={(vinculoId) => void eliminarFormacion(vinculoId)}
                     onAbrirGrupo={setEditandoFormacionId}
                     placeholderNombre="Nombre de la formación (ej: Veta, Inclusión de cuarzo)…"

@@ -294,15 +294,6 @@ export function FloraEditorMejorado({
                   return nuevo;
                 }}
                 onUsarExistente={(id) => void vincularOrganoExistente(id)}
-                onUpdate={(id, updates) => {
-                  // Optimista: refleja el cambio en el catálogo local ya
-                  // mismo (afecta a todas las plantas que usan este
-                  // Órgano), y persiste en Supabase vía el hook.
-                  setCatalogoOrganos((prev) =>
-                    prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
-                  );
-                  void actualizarOrgano(id, updates);
-                }}
                 onDelete={(vinculoId) => void desvincularOrgano(vinculoId)}
                 onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
                 onAbrirGrupo={(id) => setItemAbierto({ tipo: "organo", id })}

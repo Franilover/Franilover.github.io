@@ -584,10 +584,6 @@ export function EditorCriatura({
                       return nuevo;
                     }}
                     onUsarExistente={(id) => void organosCriatura.vincularOrganoExistente(id)}
-                    onUpdate={(id, updates) => {
-                      onOrganoActualizadoLocal(id, updates);
-                      void organosCriatura.actualizarOrgano(id, updates);
-                    }}
                     onDelete={(vinculoId) => void organosCriatura.desvincularOrgano(vinculoId)}
                     onAbrirGrupo={(id) => setEditandoGrupoId(id)}
                   />

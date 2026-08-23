@@ -16,8 +16,7 @@
  *     NO tiene vinculados, como tarjetas reales (mismo componente
  *     TarjetaFormacionOrgano, con su fórmula visible) en vez de una lista
  *     de texto — clickear una tarjeta la vincula. Las tarjetas de "Usar"
- *     son de solo selección: no editan ni agregan compuestos desde ahí (el
- *     onUpdate/onDelete de esa vista son no-op y no hay onAbrirGrupo); para
+ *     son de solo selección (no hay onAbrirGrupo en esa vista); para
  *     editar el contenido hay que abrir su panel flotante una vez vinculada.
  */
 
@@ -41,7 +40,6 @@ export function SeccionGruposVinculados({
   compuestos,
   onCrearNuevo,
   onUsarExistente,
-  onUpdate,
   onDelete,
   onAbrirCompuesto,
   onAbrirGrupo,
@@ -68,7 +66,6 @@ export function SeccionGruposVinculados({
    *  abrir el panel flotante con el id devuelto (ver EditorItem.tsx). */
   onCrearNuevo: () => void | Promise<{ id: string } | null>;
   onUsarExistente: (grupoCompuestoId: string) => void;
-  onUpdate: (id: string, updates: Partial<EntradaCatalogoGrupo>) => void;
   onDelete: (vinculoId: string) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
   onAbrirGrupo?: (grupoId: string) => void;
@@ -163,7 +160,6 @@ export function SeccionGruposVinculados({
               key={item.vinculo_id}
               item={item}
               tipo={tipo}
-              onUpdate={onUpdate}
               onDelete={() => onDelete(item.vinculo_id)}
               compuestos={compuestos}
               onAbrirCompuesto={onAbrirCompuesto}
@@ -195,8 +191,8 @@ export function SeccionGruposVinculados({
 
 /**
  * Picker de "Usar existente" — muestra cada opción como la misma tarjeta
- * real (fórmula/notas visibles), pero de solo selección: onUpdate/onDelete
- * están deshabilitados (no-op) y no hay onAbrirGrupo — clickear la tarjeta
+ * real (fórmula/notas visibles); la tarjeta ya es de solo lectura por
+ * defecto (sin onDelete ni onAbrirGrupo) — clickear el botón exterior
  * vincula. Editar el contenido requiere abrir el panel flotante desde la
  * tarjeta ya vinculada, fuera de este picker.
  */
@@ -278,8 +274,6 @@ function PickerUsarExistente({
                     <TarjetaFormacionOrgano
                       item={{ ...g, vinculo_id: g.id } as GrupoVinculadoResuelto}
                       tipo={tipo}
-                      onUpdate={() => {}}
-                      onDelete={() => {}}
                       compuestos={compuestos}
                     />
                   </div>

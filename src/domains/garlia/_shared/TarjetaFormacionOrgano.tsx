@@ -3,17 +3,21 @@
 /**
  * TarjetaFormacionOrgano.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Tarjeta de edición para un Órgano o Formación ya vinculado a una entidad
- * (planta, mineral, item, o criatura) — nombre libre, función, notas, y la
- * fórmula de compuestos que lo compone.
+ * Tarjeta de SOLO LECTURA para un Órgano o Formación ya vinculado a una
+ * entidad (planta, mineral, item, o criatura) — nombre, función, fórmula y
+ * notas se muestran pero no se editan acá. Toda edición (agregar/usar
+ * existente/quitar de la fórmula, cambiar nombre/función/notas) vive en su
+ * editor propio: GrupoCompuestoPanelFlotante, que se abre clickeando el
+ * nombre (onAbrirGrupo). Esto evita duplicar el mismo estado editable en
+ * dos lugares a la vez (la tarjeta inline y el panel flotante).
  *
  * La fórmula ya NO es una columna `componentes` inline del propio
  * Organo/Formacion (esa columna no existe en Supabase) — vive 2 niveles
  * más abajo: Organo→organo_tejidos→Tejido→Célula→Compuesto, o su espejo
  * Formacion→formacion_vetas→Veta→Grano→Compuesto. Esta tarjeta resuelve
  * esa cadena con useOrganoTejidos/useFormacionVetas según `tipo`, y
- * delega la lista de la fórmula a SelectorFormulaTejidos (reemplaza al
- * viejo SelectorFormulaOrgano, que editaba un array plano).
+ * delega la lista de la fórmula a SelectorFormulaTejidos en modo
+ * `soloLectura` (solo nombre + proporción, sin controles de edición).
  *
  * Un solo componente para los consumidores (Formaciones de Minerales,
  * Formaciones de Items, Órganos de Flora, Órganos de Criaturas) — el
@@ -27,7 +31,6 @@ import React from "react";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 import { useOrganoTejidos } from "@/domains/garlia/elementos/useOrganoTejidos";
 import { useFormacionVetas } from "@/domains/garlia/elementos/useFormacionVetas";
-import { useCatalogoTejidos } from "@/domains/garlia/elementos/useCatalogoTejidos";
 import { SelectorFormulaTejidos } from "@/domains/garlia/_shared/SelectorFormulaTejidos";
 import type { Compuesto } from "@/domains/garlia/elementos/types";
 
@@ -41,25 +44,27 @@ export interface VinculadoConFormula extends EntradaCatalogoGrupo {
 export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
   item,
   tipo = "organo",
-  onUpdate,
   onDelete,
   compuestos,
   onAbrirCompuesto,
   onAbrirGrupo,
-  placeholderNombre = "Nombre…",
-  placeholderNotas = "Notas…",
+  placeholderNombre = "Sin nombre",
+  placeholderNotas = "Sin notas.",
   tituloEliminar = "Quitar de aquí (sigue en el catálogo para otras entidades)",
 }: {
   item: T;
   /** "organo" resuelve la fórmula vía Tejidos/Células; "formacion" vía Vetas/Granos. */
   tipo?: "organo" | "formacion";
-  onUpdate: (id: string, updates: Partial<EntradaCatalogoGrupo>) => void;
-  onDelete: () => void;
+  /** Desvincula el Órgano/Formación de esta entidad (no lo borra del
+   *  catálogo). Si se omite, no se muestra el botón. Editar el contenido
+   *  (nombre, función, fórmula, notas) es responsabilidad del editor
+   *  propio — ver onAbrirGrupo. */
+  onDelete?: () => void;
   compuestos: Compuesto[];
   onAbrirCompuesto?: (compuestoId: string) => void;
-  /** Abre este Órgano/Formación en el panel flotante — vista completa
-   *  fuera de la tarjeta inline, útil cuando está vinculado a muchas
-   *  entidades y se quiere editar desde un solo lugar. */
+  /** Abre este Órgano/Formación en su editor propio (panel flotante) —
+   *  único lugar donde se edita nombre/función/fórmula/notas. Si se omite,
+   *  el nombre se muestra como texto plano (no clickeable). */
   onAbrirGrupo?: (id: string) => void;
   placeholderNombre?: string;
   placeholderNotas?: string;
@@ -72,10 +77,6 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
 
   const formula = tipo === "organo" ? tejidos : vetas;
 
-  // Catálogo completo de Tejidos/Vetas ya existentes, para el picker
-  // "usar existente" — se carga una sola vez por tipo, no por entidad.
-  const catalogo = useCatalogoTejidos(tipo);
-
   return (
     <div className="group py-3 px-3 rounded-lg border border-primary/10">
       <div className="flex items-center justify-between mb-2 gap-2">
@@ -83,38 +84,35 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
           <button
             type="button"
             onClick={() => onAbrirGrupo(item.id)}
-            title="Abrir en el editor flotante"
+            title="Abrir en el editor"
             className="min-w-0 flex-1 text-left bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 truncate transition-colors hover:text-accent hover:underline cursor-pointer"
           >
             {item.nombre || placeholderNombre}
           </button>
         ) : (
-          <input
-            className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
-            placeholder={placeholderNombre}
-            value={item.nombre ?? ""}
-            onChange={(e) => onUpdate(item.id, { nombre: e.target.value })}
-          />
+          <p className="min-w-0 flex-1 truncate px-0 py-1 text-sm font-semibold text-primary/80">
+            {item.nombre || placeholderNombre}
+          </p>
         )}
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={onDelete}
-            title={tituloEliminar}
-            className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition opacity-0 group-hover:opacity-100"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+        {onDelete && (
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={onDelete}
+              title={tituloEliminar}
+              className="p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition opacity-0 group-hover:opacity-100"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="mb-2">
-        <input
-          className="w-full bg-transparent px-0 py-0.5 text-micro font-bold text-primary/60 outline-none transition-colors placeholder:text-primary/25 placeholder:font-normal"
-          placeholder="Función…"
-          value={item.funcion ?? ""}
-          onChange={(e) => onUpdate(item.id, { funcion: e.target.value })}
-        />
-      </div>
+      {item.funcion && (
+        <div className="mb-2">
+          <p className="px-0 py-0.5 text-micro font-bold text-primary/60">{item.funcion}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2 text-xs items-start">
         <div>
@@ -127,19 +125,12 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
             <SelectorFormulaTejidos
               compuestos={compuestos}
               items={formula.items}
-              onAgregar={(compuestoId) => void formula.agregarCompuesto(compuestoId)}
-              onVincularExistente={(id) => void formula.vincularExistente(id)}
-              catalogoDisponible={catalogo.items}
-              loadingCatalogo={catalogo.loading}
-              labelCatalogo={tipo === "organo" ? "Tejido" : "Veta"}
-              onActualizarCompuesto={(catalogoId, compuestoId) =>
-                void formula.actualizarCompuesto(catalogoId, compuestoId)
-              }
-              onActualizarProporcion={(vinculoId, proporcion) =>
-                void formula.actualizarProporcion(vinculoId, proporcion)
-              }
-              onQuitar={(vinculoId) => void formula.quitarCompuesto(vinculoId)}
+              onAgregar={() => {}}
+              onActualizarCompuesto={() => {}}
+              onActualizarProporcion={() => {}}
+              onQuitar={() => {}}
               onAbrirCompuesto={onAbrirCompuesto}
+              soloLectura
             />
           )}
         </div>
@@ -148,12 +139,9 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
           <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
             Notas
           </p>
-          <textarea
-            className="w-full h-full min-h-[3.5rem] bg-transparent px-0 py-1 text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-            placeholder={placeholderNotas}
-            value={item.notas ?? ""}
-            onChange={(e) => onUpdate(item.id, { notas: e.target.value })}
-          />
+          <p className="w-full h-full min-h-[3.5rem] px-0 py-1 text-primary/70 whitespace-pre-wrap">
+            {item.notas || placeholderNotas}
+          </p>
         </div>
       </div>
     </div>

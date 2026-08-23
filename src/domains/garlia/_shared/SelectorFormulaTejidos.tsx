@@ -52,6 +52,7 @@ export function SelectorFormulaTejidos({
   onQuitar,
   onAbrirCompuesto,
   ocultarBotonAgregar,
+  soloLectura,
   labelCatalogo = "Tejido",
 }: {
   compuestos: Compuesto[];
@@ -70,6 +71,12 @@ export function SelectorFormulaTejidos({
   onAbrirCompuesto?: (compuestoId: string) => void;
   /** Oculta el botón "Agregar" interno — usar cuando el padre renderiza su propio botón. */
   ocultarBotonAgregar?: boolean;
+  /** Modo solo lectura: no agregar, no usar existente, no editar compuesto/
+   *  proporción, no quitar — cada fila solo muestra nombre + proporción,
+   *  con el nombre clickeable a onAbrirCompuesto si se provee. Usar en
+   *  tarjetas embebidas donde la fórmula se edita desde el editor propio
+   *  del Órgano/Formación, no inline. */
+  soloLectura?: boolean;
   /** Vocabulario del picker de "usar existente": "Tejido" u "Veta". */
   labelCatalogo?: string;
 }) {
@@ -92,6 +99,31 @@ export function SelectorFormulaTejidos({
     () => (catalogoDisponible ?? []).filter((c) => !yaVinculadosIds.has(c.id)),
     [catalogoDisponible, yaVinculadosIds],
   );
+
+  if (soloLectura) {
+    return (
+      <div className="flex flex-col">
+        {items.length === 0 ? (
+          <p className="text-micro text-primary/25 italic">Nada definido todavía.</p>
+        ) : (
+          <div className="divide-y divide-primary/10">
+            {items.map((item) => (
+              <FilaFormulaTejidoSoloLectura
+                key={item.vinculo_id}
+                item={item}
+                compuestos={compuestos}
+                onAbrir={
+                  onAbrirCompuesto && item.compuesto_id
+                    ? () => onAbrirCompuesto(item.compuesto_id as string)
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">
@@ -252,6 +284,45 @@ function PickerTejidoExistente({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Fila de fórmula en modo solo lectura — usada en tarjetas embebidas
+ * (Planta/Criatura/Mineral/Item) donde la fórmula ya no se edita inline;
+ * solo muestra nombre (clickeable a onAbrir si se provee) + proporción.
+ */
+function FilaFormulaTejidoSoloLectura({
+  item,
+  compuestos,
+  onAbrir,
+}: {
+  item: FilaFormulaTejido;
+  compuestos: Compuesto[];
+  onAbrir?: () => void;
+}) {
+  const elegido = useMemo(
+    () => compuestos.find((c) => c.id === item.compuesto_id) ?? null,
+    [compuestos, item.compuesto_id],
+  );
+
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <button
+        type="button"
+        onClick={onAbrir}
+        disabled={!onAbrir}
+        title={onAbrir ? `Abrir ${elegido?.nombre ?? ""}` : undefined}
+        className="min-w-0 flex-1 text-left px-0 py-1 text-micro font-bold text-primary truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+      >
+        {elegido?.nombre || "Sin compuesto"}
+      </button>
+      {item.proporcion && (
+        <span className="shrink-0 text-micro font-black text-primary/50 tabular-nums">
+          {item.proporcion}
+        </span>
+      )}
     </div>
   );
 }

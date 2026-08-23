@@ -340,10 +340,6 @@ export function EditorItem({
                   return nuevo;
                 }}
                 onUsarExistente={(id) => void estructura.vincularExistente(id)}
-                onUpdate={(id, updates) => {
-                  onGrupoCompuestoActualizadoLocal(id, updates);
-                  void estructura.actualizar(id, updates);
-                }}
                 onDelete={(vinculoId) => void estructura.desvincular(vinculoId)}
                 onAbrirCompuesto={setEditandoCompuestoId}
                 onAbrirGrupo={setEditandoGrupoId}
