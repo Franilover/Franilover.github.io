@@ -584,7 +584,6 @@ export function EditorCriatura({
                     items={organosCriatura.organos}
                     catalogo={catalogoOrganos}
                     loading={organosCriatura.loading}
-                    compuestos={compuestosOrganos}
                     onCrearNuevo={async () => {
                       const nuevo = await organosCriatura.crearYVincularOrgano();
                       if (nuevo) setEditandoGrupoId(nuevo.id);
