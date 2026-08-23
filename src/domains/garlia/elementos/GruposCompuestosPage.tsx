@@ -14,7 +14,7 @@
  * composición internamente según `tipo`.
  */
 
-import { Boxes, Layers, Trash2, X } from "lucide-react";
+import { Boxes, Beaker, Layers, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -29,6 +29,7 @@ import { useVetas } from "@/domains/garlia/elementos/useVetas";
 import { PanelEditorTejido, PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { BreadcrumbJerarquia } from "@/domains/garlia/biologia/BreadcrumbJerarquia";
 import { PanelEditorVeta, PanelEditorGrano, SelectorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
+import { useCelulasDeUnOrgano } from "@/domains/garlia/elementos/useCelulasDeUnOrgano";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 import type { Compuesto } from "./types";
@@ -69,6 +70,10 @@ export function GrupoCompuestoPanelFlotante({
   const tejidos = useOrganoTejidos(tipo === "organo" ? grupo.id : null);
   const vetas = useFormacionVetas(tipo === "formacion" ? grupo.id : null);
   const formula = tipo === "organo" ? tejidos : vetas;
+  // Unión transitiva de TODAS las Células de TODOS los Tejidos de este
+  // Órgano (a diferencia de `tejidos.items`, que solo trae la primera
+  // Célula por fila) — usada en el nivel "Célula" del breadcrumb.
+  const celulasDelOrgano = useCelulasDeUnOrgano(tipo === "organo" ? grupo.id : null);
   const catalogo = useCatalogoTejidos(tipo);
 
   // ── Editor completo del Tejido/Veta propio de una fila de la fórmula —
@@ -171,6 +176,14 @@ export function GrupoCompuestoPanelFlotante({
           <div className="shrink-0 px-3 pt-2">
             <BreadcrumbJerarquia
               niveles={[
+                {
+                  label: "Célula",
+                  icono: <Beaker size={10} />,
+                  activo: false,
+                  items: celulasDelOrgano.items.map((c) => ({ id: c.id, nombre: c.nombre })),
+                  loading: celulasDelOrgano.loading,
+                  onNavegar: (celulaId) => setCelulaOGranoAbiertoId(celulaId),
+                },
                 {
                   label: "Tejido",
                   icono: <Layers size={10} />,

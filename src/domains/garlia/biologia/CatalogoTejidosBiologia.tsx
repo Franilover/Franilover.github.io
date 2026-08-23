@@ -37,6 +37,7 @@ import { useTejidoCelulas, type CelulaDeTejido } from "@/domains/garlia/elemento
 import { useTejidoCompuestos, type CompuestoDeTejido } from "@/domains/garlia/elementos/useTejidoCompuestos";
 import { useTejidosDeUnaCelula } from "@/domains/garlia/elementos/useTejidosDeUnaCelula";
 import { useOrganosDeUnTejido } from "@/domains/garlia/elementos/useOrganosDeUnTejido";
+import { useOrganosDeUnaCelula } from "@/domains/garlia/elementos/useOrganosDeUnaCelula";
 import type { Celula, Compuesto, Tejido } from "@/domains/garlia/elementos/types";
 import { BreadcrumbJerarquia } from "./BreadcrumbJerarquia";
 
@@ -113,6 +114,14 @@ export function CatalogoTejidosBiologia({
               setCelulaSeleccionadaId(null);
               setTejidoSeleccionadoId(tejidoId);
             }}
+            onAbrirOrgano={
+              onAbrirOrgano
+                ? (organoId) => {
+                    setCelulaSeleccionadaId(null);
+                    onAbrirOrgano(organoId);
+                  }
+                : undefined
+            }
           />
         )}
       </div>
@@ -249,6 +258,7 @@ export function PanelEditorCelula({
   onCompuestoCreado,
   onAbrirCompuesto,
   onAbrirTejido,
+  onAbrirOrgano,
 }: {
   item: Celula;
   compuestos: Compuesto[];
@@ -260,6 +270,9 @@ export function PanelEditorCelula({
   onAbrirCompuesto?: (compuestoId: string) => void;
   /** Cierra este panel y abre el del Tejido elegido — navegación hacia arriba. */
   onAbrirTejido?: (tejidoId: string) => void;
+  /** Cierra este panel y abre el del Órgano elegido — navegación transitiva
+   *  (Célula → Tejido → Órgano, unión de todos los Órganos alcanzables). */
+  onAbrirOrgano?: (organoId: string) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [eliminando, setEliminando] = useState(false);
@@ -267,6 +280,7 @@ export function PanelEditorCelula({
 
   const vinculosCompuesto = useCelulaCompuestos(item.id);
   const tejidosQueUsanEstaCelula = useTejidosDeUnaCelula(item.id);
+  const organosQueUsanEstaCelula = useOrganosDeUnaCelula(item.id);
 
   async function handleEliminar() {
     const ok = await confirm({
@@ -312,6 +326,17 @@ export function PanelEditorCelula({
               })),
               loading: tejidosQueUsanEstaCelula.loading,
               onNavegar: onAbrirTejido,
+            },
+            {
+              label: "Órgano",
+              icono: <Boxes size={10} />,
+              activo: false,
+              items: organosQueUsanEstaCelula.items.map((o) => ({
+                id: o.id,
+                nombre: o.nombre,
+              })),
+              loading: organosQueUsanEstaCelula.loading,
+              onNavegar: onAbrirOrgano,
             },
           ]}
         />
