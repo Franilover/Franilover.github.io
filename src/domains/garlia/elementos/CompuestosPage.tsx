@@ -1016,9 +1016,17 @@ export function CompuestoPanelFlotante({
   // Levantado desde CompuestoEditor para que el breadcrumb de acá (header)
   // y el bloque "Compone" del cuerpo compartan el mismo sub-panel — clic en
   // cualquiera de los dos abre el mismo PanelEditorGrano/PanelEditorCelula.
+  // CompuestoPanelFlotante no se remonta al navegar entre compuestos (el
+  // caller no le pasa key={compuesto.id}), así que hay que resetear a mano
+  // cuando cambia compuesto.id — si no, este estado queda apuntando al
+  // Grano/Célula del compuesto ANTERIOR y la segunda navegación no abre
+  // nada nuevo (el sub-panel ya está "abierto" según este estado viejo).
   const [granoOCelulaAbierto, setGranoOCelulaAbierto] = useState<
     { tipo: "grano" | "celula"; id: string } | null
   >(null);
+  useEffect(() => {
+    setGranoOCelulaAbierto(null);
+  }, [compuesto.id]);
   const granosDeCompuesto = useGranosDeUnCompuesto(compuesto.id);
   const celulasDeCompuesto = useCelulasDeUnCompuesto(compuesto.id);
 
