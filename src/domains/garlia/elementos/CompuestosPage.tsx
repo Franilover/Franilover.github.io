@@ -55,6 +55,7 @@ import { useGranosDeUnCompuesto } from "./useGranosDeUnCompuesto";
 import { useCelulasDeUnCompuesto } from "./useCelulasDeUnCompuesto";
 import { PanelEditorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { BreadcrumbJerarquia } from "@/domains/garlia/biologia/BreadcrumbJerarquia";
 
 import {
   autocompletarHastaEstable,
@@ -654,127 +655,6 @@ function UsosCompuestoBloque({
   );
 }
 
-/**
- * SeUsaEnGranoOCelulaBloque
- * ───────────────────────────────────────────────────────────────────────────
- * Rama navegable "quién me usa" desde un Compuesto, en paralelo a
- * UsosCompuestoBloque (que es informativa, sin click): acá el Compuesto es
- * la puerta de entrada real a DOS árboles distintos que conviven en el
- * mismo catálogo —
- *   Física/Minerales:  Compuesto ← grano.compuesto_id (1:1 directo)
- *   Biología:          Compuesto ← celula_compuestos (M:N)
- * — y ambos se muestran a la vez, no como niveles de un único breadcrumb
- * lineal (a diferencia de Grano⇄Veta⇄Formación o Célula⇄Tejido⇄Órgano, acá
- * un mismo Compuesto puede tener Granos Y Células simultáneamente).
- *
- * Cada fila es clickeable y abre el editor completo de ese Grano/Célula
- * (PanelEditorGrano/PanelEditorCelula, mismos componentes reutilizados que
- * ya usa CatalogoVetasFisica/CatalogoTejidosBiologia) apilado encima de
- * este panel — mismo patrón que ElementoPanelFlotante anidado en
- * CompuestoEditor. No requiere que los ~9 lugares donde vive
- * CompuestoPanelFlotante le pasen callbacks nuevos: administra su propio
- * sub-panel internamente.
- */
-function SeUsaEnGranoOCelulaBloque({
-  compuestoId,
-  onAbrirGrano,
-  onAbrirCelula,
-}: {
-  compuestoId: string;
-  onAbrirGrano: (granoId: string) => void;
-  onAbrirCelula: (celulaId: string) => void;
-}) {
-  const granosDeCompuesto = useGranosDeUnCompuesto(compuestoId);
-  const celulasDeCompuesto = useCelulasDeUnCompuesto(compuestoId);
-
-  const sinNada =
-    !granosDeCompuesto.loading &&
-    !celulasDeCompuesto.loading &&
-    granosDeCompuesto.items.length === 0 &&
-    celulasDeCompuesto.items.length === 0;
-
-  if (sinNada) {
-    return (
-      <p className="text-micro text-primary/25 px-1 py-1">
-        No se usa en ningún Grano ni Célula todavía.
-      </p>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <p className="text-micro font-black uppercase tracking-widest text-primary/40 px-1">
-        Compone
-      </p>
-
-      {(granosDeCompuesto.loading || granosDeCompuesto.items.length > 0) && (
-        <div className="flex flex-col gap-1">
-          {granosDeCompuesto.loading ? (
-            <div className="flex items-center gap-1.5 text-micro text-primary/30 px-1">
-              <Loader2 className="animate-spin" size={11} />
-              Buscando granos…
-            </div>
-          ) : (
-            granosDeCompuesto.items.map((g) => (
-              <button
-                key={g.vinculo_id}
-                type="button"
-                onClick={() => onAbrirGrano(g.grano_id)}
-                className="flex items-center gap-1.5 px-1.5 py-1 rounded-md border border-primary/10 bg-primary/[0.02] hover:border-primary/25 hover:bg-primary/5 transition-all text-left cursor-pointer"
-              >
-                <span className="w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 bg-primary/8 text-primary/40">
-                  <Gem size={11} />
-                </span>
-                <span className="text-micro font-bold text-primary/40 uppercase tracking-wide shrink-0">
-                  Grano
-                </span>
-                <span className="text-micro font-bold text-primary/80 truncate">
-                  {g.grano.nombre || "(sin nombre)"}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      )}
-
-      {(celulasDeCompuesto.loading || celulasDeCompuesto.items.length > 0) && (
-        <div className="flex flex-col gap-1">
-          {celulasDeCompuesto.loading ? (
-            <div className="flex items-center gap-1.5 text-micro text-primary/30 px-1">
-              <Loader2 className="animate-spin" size={11} />
-              Buscando células…
-            </div>
-          ) : (
-            celulasDeCompuesto.items.map((c) => (
-              <button
-                key={c.vinculo_id}
-                type="button"
-                onClick={() => onAbrirCelula(c.celula_id)}
-                className="flex items-center gap-1.5 px-1.5 py-1 rounded-md border border-primary/10 bg-primary/[0.02] hover:border-primary/25 hover:bg-primary/5 transition-all text-left cursor-pointer"
-              >
-                <span className="w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 bg-primary/8 text-primary/40">
-                  <Beaker size={11} />
-                </span>
-                <span className="text-micro font-bold text-primary/40 uppercase tracking-wide shrink-0">
-                  Célula
-                </span>
-                <span className="text-micro font-bold text-primary/80 truncate">
-                  {c.celula.nombre || "(sin nombre)"}
-                </span>
-                {c.rol && (
-                  <span className="text-micro text-primary/35 truncate ml-auto shrink-0">
-                    {c.rol}
-                  </span>
-                )}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function CompuestoEditor({
   compuesto,
   elementos,
@@ -785,6 +665,8 @@ function CompuestoEditor({
   onHeaderControlsChange,
   onActualizarElemento,
   onNavigateCompuesto,
+  granoOCelulaAbierto: granoOCelulaAbiertoProp,
+  onGranoOCelulaAbiertoChange,
 }: {
   compuesto: Compuesto;
   elementos: Elemento[];
@@ -804,17 +686,30 @@ function CompuestoEditor({
    *  (clic en "Usado en compuestos" dentro del panel de Elemento embebido).
    *  Opcional: si no se pasa, esa lista queda como referencia sin navegar. */
   onNavigateCompuesto?: (compuestoId: string) => void;
+  /** Controlado opcionalmente desde CompuestoPanelFlotante, que necesita el
+   *  mismo estado para que el breadcrumb del header (Grano/Célula ⇄
+   *  Compuesto) navegue al mismo sub-panel que abre "Compone" en el
+   *  cuerpo. Si no se pasa, el editor usa su propio estado interno
+   *  (uso standalone, sin breadcrumb en header). */
+  granoOCelulaAbierto?: { tipo: "grano" | "celula"; id: string } | null;
+  onGranoOCelulaAbiertoChange?: (v: { tipo: "grano" | "celula"; id: string } | null) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
   const [local, setLocal] = useState(compuesto);
   const [editandoElementoId, setEditandoElementoId] = useState<string | null>(null);
   // Sub-panel anidado del Grano/Célula elegido desde SeUsaEnGranoOCelulaBloque
-  // — mismo patrón que editandoElementoId, pero apunta a una de dos
-  // entidades distintas según qué rama se clickeó (ver tipo abajo).
-  const [granoOCelulaAbierto, setGranoOCelulaAbierto] = useState<
+  // o desde el breadcrumb del header — mismo patrón que editandoElementoId,
+  // pero apunta a una de dos entidades distintas según qué rama se
+  // clickeó. Controlable desde afuera (ver props) para que
+  // CompuestoPanelFlotante pueda disparar la misma navegación desde su
+  // breadcrumb de header.
+  const [granoOCelulaAbiertoLocal, setGranoOCelulaAbiertoLocal] = useState<
     { tipo: "grano" | "celula"; id: string } | null
   >(null);
+  const granoOCelulaAbierto =
+    granoOCelulaAbiertoProp !== undefined ? granoOCelulaAbiertoProp : granoOCelulaAbiertoLocal;
+  const setGranoOCelulaAbierto = onGranoOCelulaAbiertoChange ?? setGranoOCelulaAbiertoLocal;
 
   const { porCategoria: tagsPorCategoria, loading: tagsLoading } = useTagsCatalogo();
   const { tagIdsDe, toggleTag, loading: compuestoTagsLoading } = useCompuestoTags();
@@ -1008,14 +903,6 @@ function CompuestoEditor({
             <div className="border-t border-primary/10 pt-2">
               <UsosCompuestoBloque usos={usos} loading={usosLoading} />
             </div>
-
-            <div className="border-t border-primary/10 pt-2">
-              <SeUsaEnGranoOCelulaBloque
-                compuestoId={compuesto.id}
-                onAbrirGrano={(granoId) => setGranoOCelulaAbierto({ tipo: "grano", id: granoId })}
-                onAbrirCelula={(celulaId) => setGranoOCelulaAbierto({ tipo: "celula", id: celulaId })}
-              />
-            </div>
           </div>
 
           <div className="flex flex-col gap-3 min-w-0">
@@ -1126,6 +1013,14 @@ export function CompuestoPanelFlotante({
   onNavigateCompuesto?: (compuestoId: string) => void;
 }) {
   const [headerControls, setHeaderControls] = useState<EditorHeaderControls | null>(null);
+  // Levantado desde CompuestoEditor para que el breadcrumb de acá (header)
+  // y el bloque "Compone" del cuerpo compartan el mismo sub-panel — clic en
+  // cualquiera de los dos abre el mismo PanelEditorGrano/PanelEditorCelula.
+  const [granoOCelulaAbierto, setGranoOCelulaAbierto] = useState<
+    { tipo: "grano" | "celula"; id: string } | null
+  >(null);
+  const granosDeCompuesto = useGranosDeUnCompuesto(compuesto.id);
+  const celulasDeCompuesto = useCelulasDeUnCompuesto(compuesto.id);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1219,6 +1114,41 @@ export function CompuestoPanelFlotante({
           </button>
         </div>
 
+        {(granosDeCompuesto.loading ||
+          celulasDeCompuesto.loading ||
+          granosDeCompuesto.items.length > 0 ||
+          celulasDeCompuesto.items.length > 0) && (
+          <div className="shrink-0 px-3 pt-2">
+            <BreadcrumbJerarquia
+              niveles={[
+                {
+                  label: "Grano",
+                  icono: <Gem size={10} />,
+                  activo: false,
+                  items: granosDeCompuesto.items.map((g) => ({
+                    id: g.grano_id,
+                    nombre: g.grano.nombre,
+                  })),
+                  loading: granosDeCompuesto.loading,
+                  onNavegar: (granoId) => setGranoOCelulaAbierto({ tipo: "grano", id: granoId }),
+                },
+                {
+                  label: "Célula",
+                  icono: <Beaker size={10} />,
+                  activo: false,
+                  items: celulasDeCompuesto.items.map((c) => ({
+                    id: c.celula_id,
+                    nombre: c.celula.nombre,
+                  })),
+                  loading: celulasDeCompuesto.loading,
+                  onNavegar: (celulaId) => setGranoOCelulaAbierto({ tipo: "celula", id: celulaId }),
+                },
+                { label: "Compuesto", icono: <Package size={10} />, activo: true },
+              ]}
+            />
+          </div>
+        )}
+
         <div className="flex-1 min-h-0 overflow-y-auto">
           <CompuestoEditor
             key={compuesto.id}
@@ -1236,6 +1166,8 @@ export function CompuestoPanelFlotante({
             }
             onHeaderControlsChange={setHeaderControls}
             onNavigateCompuesto={onNavigateCompuesto}
+            granoOCelulaAbierto={granoOCelulaAbierto}
+            onGranoOCelulaAbiertoChange={setGranoOCelulaAbierto}
           />
         </div>
       </div>
