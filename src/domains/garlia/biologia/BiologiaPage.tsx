@@ -24,6 +24,7 @@ import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
+import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import type { Organo, Reaccion } from "@/domains/garlia/elementos/types";
 
 import { CladisticaPage } from "./CladisticaPage";
@@ -139,8 +140,13 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   // ni depender de una planta puntual.
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
-  const { items: compuestosCatalogo, loading: loadingCompuestos } = useCompuestos();
+  const { items: compuestosCatalogo, setItems: setCompuestosCatalogo, loading: loadingCompuestos } = useCompuestos();
   const { items: elementosCatalogo } = useElementos();
+
+  // Click en un Compuesto de matriz (Tejido) o en un Compuesto de la
+  // composición de una Célula abre acá su editor completo — mismo patrón
+  // que FloraEditor.tsx (setItemAbierto({ tipo: "compuesto", id })).
+  const [compuestoAbiertoId, setCompuestoAbiertoId] = useState<string | null>(null);
 
   async function actualizarOrgano(id: string, cambios: Partial<Organo>) {
     setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
@@ -271,6 +277,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
           <CatalogoTejidosBiologia
             compuestos={compuestosCatalogo}
             loadingCompuestos={loadingCompuestos}
+            onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
           />
         </div>
 
@@ -282,6 +289,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
             items={catalogoOrganos}
             compuestos={compuestosCatalogo}
             onActualizar={actualizarOrgano}
+            onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
           />
         </div>
 
@@ -296,6 +304,25 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
           />
         </div>
       </div>
+
+      {compuestoAbiertoId &&
+        (() => {
+          const compuesto = compuestosCatalogo.find((c) => c.id === compuestoAbiertoId);
+          if (!compuesto) return null;
+          return (
+            <CompuestoPanelFlotante
+              compuesto={compuesto}
+              elementos={elementosCatalogo}
+              todosLosCompuestos={compuestosCatalogo}
+              onCerrar={() => setCompuestoAbiertoId(null)}
+              onActualizar={(id, cambios) =>
+                setCompuestosCatalogo((prev) =>
+                  prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+                )
+              }
+            />
+          );
+        })()}
     </div>
   );
 }
