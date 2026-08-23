@@ -27,6 +27,7 @@ import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import type { Organo, Reaccion } from "@/domains/garlia/elementos/types";
 
 import { CladisticaPage } from "./CladisticaPage";
+import { CatalogoTejidosBiologia } from "./CatalogoTejidosBiologia";
 import { useClados } from "./useBiologia";
 import type { Clado } from "./types";
 
@@ -138,7 +139,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   // ni depender de una planta puntual.
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
-  const { items: compuestosCatalogo } = useCompuestos();
+  const { items: compuestosCatalogo, loading: loadingCompuestos } = useCompuestos();
   const { items: elementosCatalogo } = useElementos();
 
   async function actualizarOrgano(id: string, cambios: Partial<Organo>) {
@@ -267,6 +268,13 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
           uno con su propio separador de sección, sin tabs. */}
       <div className="flex-1 min-w-0 flex flex-col gap-4 border-l border-primary/10 pl-3">
         <div className="p-2.5">
+          <CatalogoTejidosBiologia
+            compuestos={compuestosCatalogo}
+            loadingCompuestos={loadingCompuestos}
+          />
+        </div>
+
+        <div className="p-2.5 border-t border-primary/10 pt-4">
           <GridCatalogoGrupo
             modo="grupo"
             titulo="Órganos"
