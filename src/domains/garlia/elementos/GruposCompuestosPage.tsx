@@ -26,7 +26,7 @@ import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
 import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
 import { useGranos } from "@/domains/garlia/elementos/useGranos";
 import { useVetas } from "@/domains/garlia/elementos/useVetas";
-import { PanelEditorTejido, PanelEditorCelula, SelectorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { PanelEditorTejido, PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { PanelEditorVeta, PanelEditorGrano, SelectorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
@@ -220,10 +220,12 @@ export function GrupoCompuestoPanelFlotante({
               item={tejidoActivo}
               celulas={celulasCatalogo.items}
               loadingCelulas={celulasCatalogo.loading}
+              compuestos={compuestos}
               onCerrar={() => setTejidoOVetaAbiertoId(null)}
               onActualizar={tejidosCatalogo.actualizar}
               onEliminar={tejidosCatalogo.eliminar}
               onAbrirCelula={(celulaId) => setCelulaOGranoAbiertoId(celulaId)}
+              onAbrirCompuesto={onAbrirCompuesto}
             />
           );
         })()

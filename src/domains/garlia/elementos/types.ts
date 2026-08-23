@@ -266,17 +266,26 @@ export const CONFIG_FORMACIONES = {
 
 // ─── Células / Tejidos: composición de un Órgano (flora, criaturas) ───────
 // Un Órgano no tiene fórmula propia — se arma de Tejidos (organo_tejidos,
-// con `proporcion` libre en texto), y cada Tejido se arma de Células
-// (tejidos.celula_id, 1:1 por ahora), y cada Célula referencia un único
-// Compuesto real (celulas.compuesto_id). Cadena completa:
-//   Organo → organo_tejidos → Tejido → Celula → Compuesto
-// Mismo espíritu que el viejo `componentes` plano, pero con 2 niveles
-// intermedios con nombre/función propios (una Célula o Tejido puede
-// reutilizarse entre Órganos distintos).
+// con `proporcion` libre en texto). Migración (ago-2026): la relación
+// Tejido→Célula y Célula→Compuesto dejó de ser 1:1 (columnas
+// tejidos.celula_id / celulas.compuesto_id, hoy legacy y sin uso) y pasó a
+// M:N vía tres tablas puente nuevas, replicando el patrón de organo_tejidos:
+//   - tejido_celulas    (tejido_id, celula_id, rol, proporcion)
+//   - tejido_compuestos (tejido_id, compuesto_id, rol, proporcion) — matriz
+//     extracelular u otro material del tejido que no pasa por una célula.
+//   - celula_compuestos (celula_id, compuesto_id, rol, proporcion) — de qué
+//     materiales está hecha la célula misma (membrana, citoplasma, etc.).
+// Cadena completa:
+//   Organo → organo_tejidos → Tejido ─┬─ tejido_celulas ─→ Celula → celula_compuestos → Compuesto
+//                                     └─ tejido_compuestos ────────────────────────────→ Compuesto
+// Una misma Célula o Tejido puede reutilizarse entre Órganos distintos, y
+// ahora también un Tejido puede tener varias Células y varios Compuestos
+// de matriz a la vez (antes solo podía apuntar a una única Célula).
 export interface Celula {
   id: string;
   nombre: string;
-  compuesto_id: string | null;
+  /** @deprecated Legacy 1:1, sin uso desde la migración a celula_compuestos (M:N). Queda null. */
+  compuesto_id?: string | null;
   estructura: unknown;
   funcion: string | null;
   notas: string | null;
@@ -287,7 +296,8 @@ export interface Celula {
 export interface Tejido {
   id: string;
   nombre: string;
-  celula_id: string | null;
+  /** @deprecated Legacy 1:1, sin uso desde la migración a tejido_celulas (M:N). Queda null. */
+  celula_id?: string | null;
   estructura: unknown;
   funcion: string | null;
   notas: string | null;
@@ -304,14 +314,59 @@ export interface OrganoTejido {
   created_at: string;
 }
 
+/** Fila puente tejido_celulas: vincula una Célula a un Tejido (M:N), con rol libre (ej. "célula principal"). */
+export interface TejidoCelula {
+  id: string;
+  tejido_id: string;
+  celula_id: string;
+  rol: string | null;
+  proporcion: string | null;
+  created_at: string;
+}
+
+/** Fila puente tejido_compuestos: material de matriz de un Tejido que no pasa por ninguna Célula. */
+export interface TejidoCompuesto {
+  id: string;
+  tejido_id: string;
+  compuesto_id: string;
+  rol: string | null;
+  proporcion: string | null;
+  created_at: string;
+}
+
+/** Fila puente celula_compuestos: de qué Compuestos está hecha una Célula (membrana, citoplasma, etc.). */
+export interface CelulaCompuesto {
+  id: string;
+  celula_id: string;
+  compuesto_id: string;
+  rol: string | null;
+  proporcion: string | null;
+  created_at: string;
+}
+
 export const CONFIG_CELULAS = {
   tabla: "celulas",
-  select: "id, nombre, compuesto_id, estructura, funcion, notas, created_at, updated_at",
+  select: "id, nombre, estructura, funcion, notas, created_at, updated_at",
 };
 
 export const CONFIG_TEJIDOS = {
   tabla: "tejidos",
-  select: "id, nombre, celula_id, estructura, funcion, notas, created_at, updated_at",
+  select: "id, nombre, estructura, funcion, notas, created_at, updated_at",
+};
+
+export const CONFIG_TEJIDO_CELULAS = {
+  tabla: "tejido_celulas",
+  select: "id, tejido_id, celula_id, rol, proporcion, created_at",
+};
+
+export const CONFIG_TEJIDO_COMPUESTOS = {
+  tabla: "tejido_compuestos",
+  select: "id, tejido_id, compuesto_id, rol, proporcion, created_at",
+};
+
+export const CONFIG_CELULA_COMPUESTOS = {
+  tabla: "celula_compuestos",
+  select: "id, celula_id, compuesto_id, rol, proporcion, created_at",
 };
 
 // ─── Granos / Vetas: composición de una Formación (minerales) ────────────

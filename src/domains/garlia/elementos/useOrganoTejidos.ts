@@ -3,22 +3,27 @@
 /**
  * useOrganoTejidos.ts
  * ───────────────────────────────────────────────────────────────────────────
- * Resuelve la composición de UN Órgano: la cadena real en Supabase es
- *   Organo → organo_tejidos (proporcion) → Tejido → Celula → Compuesto
- * Reemplaza al viejo `Organo.componentes` plano ({compuesto_id, cantidad}[]),
- * que ya no existe como columna — cada nivel intermedio (Tejido, Célula)
- * es su propia fila reutilizable, con nombre/función propios.
+ * Resuelve la composición de UN Órgano: la cadena real en Supabase
+ * (migración ago-2026) es
+ *   Organo → organo_tejidos (proporcion) → Tejido ─┬─ tejido_celulas (M:N) → Celula → celula_compuestos (M:N) → Compuesto
+ *                                                   └─ tejido_compuestos (M:N) ──────────────────────────────→ Compuesto
+ * Antes Tejido→Célula y Célula→Compuesto eran 1:1 (columnas celula_id /
+ * compuesto_id, hoy legacy y sin uso); ahora un mismo Tejido puede tener
+ * varias Células y varios Compuestos de matriz a la vez.
  *
- * Simplificación deliberada de la UI: en vez de exponer Tejido y Célula
- * como dos catálogos separados para elegir/reutilizar, este hook ofrece un
- * flujo de UNA sola acción por fila de la fórmula — "agregar compuesto" —
- * que por debajo crea una Célula nueva (compuesto_id) + un Tejido nuevo
- * (celula_id) + el vínculo organo_tejidos, los tres en cadena. Esto
- * modela cada fila de la fórmula como "un tejido hecho de este compuesto",
- * sin forzar al usuario a pensar en 3 tablas para agregar un ingrediente.
- * Reutilizar un Tejido/Célula ya existente entre Órganos sigue siendo
- * posible más adelante (quedan como catálogos propios en Supabase), pero
- * no es parte de este flujo simplificado.
+ * `agregarCompuesto` sigue ofreciendo el flujo simplificado de UNA acción
+ * por fila ("agregar compuesto a la fórmula del Órgano"): crea una Célula
+ * nueva, la vincula al Compuesto vía celula_compuestos, crea un Tejido
+ * nuevo, lo vincula a esa Célula vía tejido_celulas, y crea el vínculo
+ * organo_tejidos — cuatro pasos en cadena en vez de tres, pero el mismo
+ * resultado desde la UI: "un tejido hecho de este compuesto". Reutilizar
+ * un Tejido/Célula ya existente entre Órganos sigue siendo posible (quedan
+ * como catálogos propios en Supabase), pero no es parte de este flujo.
+ *
+ * `items.compuesto_id` y `catalogo_nombre` ahora resuelven contra la
+ * PRIMERA Célula vinculada del Tejido (si el tejido tiene varias, esta
+ * vista simplificada solo muestra la primera — para ver/editar todas usar
+ * useTejidoCelulas.ts directamente sobre ese tejido_id).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,10 +32,14 @@ import { db } from "@/infra/supabase/db";
 
 import {
   CONFIG_CELULAS,
+  CONFIG_CELULA_COMPUESTOS,
   CONFIG_TEJIDOS,
+  CONFIG_TEJIDO_CELULAS,
   type Celula,
+  type CelulaCompuesto,
   type OrganoTejido,
   type Tejido,
+  type TejidoCelula,
 } from "@/domains/garlia/elementos/types";
 
 // ── Cache-first: leer/escribir Dexie para organo_tejidos/tejidos/celulas ──
@@ -69,6 +78,11 @@ async function leerCelulasDeDexie(ids: string[]): Promise<Record<string, Celula>
   } catch {}
   return out;
 }
+
+// tejido_celulas y celula_compuestos todavía no están registradas en
+// infra/supabase/db.ts (Dexie) — no hay caché offline-first para estos dos
+// niveles todavía, se leen siempre en vivo de Supabase (ver load() abajo).
+// TODO: agregar ambas tablas a db.ts, mismo patrón que organo_tejidos.
 
 async function guardarEnDexie(
   vinculos: OrganoTejido[],
@@ -114,6 +128,11 @@ export function useOrganoTejidos(organoId: string | null) {
   const [vinculos, setVinculos] = useState<OrganoTejido[]>([]);
   const [tejidos, setTejidos] = useState<Record<string, Tejido>>({});
   const [celulas, setCelulas] = useState<Record<string, Celula>>({});
+  // tejido_id → celula_id de la PRIMERA célula vinculada (ver nota de
+  // cabecera: esta vista simplificada solo resuelve una por tejido).
+  const [celulaPorTejido, setCelulaPorTejido] = useState<Record<string, string>>({});
+  // celula_id → compuesto_id del PRIMER compuesto vinculado a esa célula.
+  const [compuestoPorCelula, setCompuestoPorCelula] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -121,22 +140,21 @@ export function useOrganoTejidos(organoId: string | null) {
       setVinculos([]);
       setTejidos({});
       setCelulas({});
+      setCelulaPorTejido({});
+      setCompuestoPorCelula({});
       setLoading(false);
       return;
     }
 
-    // ── Paso 1: pintar de inmediato con lo que ya haya en Dexie ──────────
+    // ── Paso 1: pintar de inmediato con lo que ya haya en Dexie (solo
+    // vínculos + tejidos — tejido_celulas/celula_compuestos no tienen
+    // caché local todavía, ver TODO arriba) ──────────────────────────────
     const vinculosLocales = await leerVinculosDeDexie(organoId);
     if (vinculosLocales.length > 0) {
       setVinculos(vinculosLocales);
       const tejidoIdsLocales = vinculosLocales.map((v) => v.tejido_id);
       const tejidosLocales = await leerTejidosDeDexie(tejidoIdsLocales);
       setTejidos(tejidosLocales);
-      const celulaIdsLocales = Object.values(tejidosLocales)
-        .map((t) => t.celula_id)
-        .filter((id): id is string => !!id);
-      const celulasLocales = await leerCelulasDeDexie(celulaIdsLocales);
-      setCelulas(celulasLocales);
       setLoading(false); // ya hay algo para mostrar — dejar de bloquear la UI
     } else {
       setLoading(true);
@@ -161,6 +179,8 @@ export function useOrganoTejidos(organoId: string | null) {
     if (tejidoIds.length === 0) {
       setTejidos({});
       setCelulas({});
+      setCelulaPorTejido({});
+      setCompuestoPorCelula({});
       setLoading(false);
       void guardarEnDexie(vinculoData as OrganoTejido[], [], []);
       return;
@@ -175,12 +195,24 @@ export function useOrganoTejidos(organoId: string | null) {
     for (const t of (tejidoData ?? []) as unknown as Tejido[]) tejidosPorId[t.id] = t;
     setTejidos(tejidosPorId);
 
-    const celulaIds = Object.values(tejidosPorId)
-      .map((t) => t.celula_id)
-      .filter((id): id is string => !!id);
+    // Resolver Célula(s) por Tejido vía tejido_celulas (M:N) — nos
+    // quedamos con la primera por tejido para esta vista simplificada.
+    const { data: tcData } = await supabase
+      .from(CONFIG_TEJIDO_CELULAS.tabla)
+      .select(CONFIG_TEJIDO_CELULAS.select)
+      .in("tejido_id", tejidoIds)
+      .order("created_at", { ascending: true });
 
+    const celulaPorTejidoNuevo: Record<string, string> = {};
+    for (const tc of (tcData ?? []) as unknown as TejidoCelula[]) {
+      if (!celulaPorTejidoNuevo[tc.tejido_id]) celulaPorTejidoNuevo[tc.tejido_id] = tc.celula_id;
+    }
+    setCelulaPorTejido(celulaPorTejidoNuevo);
+
+    const celulaIds = Object.values(celulaPorTejidoNuevo);
     if (celulaIds.length === 0) {
       setCelulas({});
+      setCompuestoPorCelula({});
       setLoading(false);
       void guardarEnDexie(vinculoData as OrganoTejido[], Object.values(tejidosPorId), []);
       return;
@@ -194,6 +226,20 @@ export function useOrganoTejidos(organoId: string | null) {
     const celulasPorId: Record<string, Celula> = {};
     for (const c of (celulaData ?? []) as unknown as Celula[]) celulasPorId[c.id] = c;
     setCelulas(celulasPorId);
+
+    // Resolver Compuesto por Célula vía celula_compuestos (M:N) — de nuevo
+    // nos quedamos con el primero por célula para esta vista simplificada.
+    const { data: ccData } = await supabase
+      .from(CONFIG_CELULA_COMPUESTOS.tabla)
+      .select(CONFIG_CELULA_COMPUESTOS.select)
+      .in("celula_id", celulaIds)
+      .order("created_at", { ascending: true });
+
+    const compuestoPorCelulaNuevo: Record<string, string> = {};
+    for (const cc of (ccData ?? []) as unknown as CelulaCompuesto[]) {
+      if (!compuestoPorCelulaNuevo[cc.celula_id]) compuestoPorCelulaNuevo[cc.celula_id] = cc.compuesto_id;
+    }
+    setCompuestoPorCelula(compuestoPorCelulaNuevo);
 
     setLoading(false);
     void guardarEnDexie(
@@ -213,53 +259,71 @@ export function useOrganoTejidos(organoId: string | null) {
       .map((v) => {
         const tejido = tejidos[v.tejido_id];
         if (!tejido) return null;
-        const celula = tejido.celula_id ? celulas[tejido.celula_id] : undefined;
+        const celulaId = celulaPorTejido[v.tejido_id] ?? null;
+        const celula = celulaId ? celulas[celulaId] : undefined;
+        const compuestoId = celulaId ? (compuestoPorCelula[celulaId] ?? null) : null;
         return {
           vinculo_id: v.id,
           organo_id: v.organo_id,
           tejido_id: v.tejido_id,
           tejido_o_veta_id: v.tejido_id,
-          celula_id: tejido.celula_id,
-          catalogo_id: tejido.celula_id,
+          celula_id: celulaId,
+          catalogo_id: celulaId,
           catalogo_nombre: celula?.nombre ?? null,
           proporcion: v.proporcion,
           nombre: tejido.nombre,
           funcion: tejido.funcion,
           notas: tejido.notas,
-          compuesto_id: celula?.compuesto_id ?? null,
+          compuesto_id: compuestoId,
         };
       })
       .filter((t): t is TejidoDeOrgano => t !== null);
-  }, [vinculos, tejidos, celulas]);
+  }, [vinculos, tejidos, celulas, celulaPorTejido, compuestoPorCelula]);
 
-  // ── Agregar un compuesto a la fórmula: crea Célula + Tejido + vínculo ───
+  // ── Agregar un compuesto a la fórmula: crea Célula + celula_compuestos +
+  // Tejido + tejido_celulas + vínculo organo_tejidos (cadena de 5 pasos,
+  // ver nota de cabecera) ──────────────────────────────────────────────
   const agregarCompuesto = useCallback(
     async (compuestoId: string) => {
       if (!organoId) return null;
 
       const { data: nuevaCelula, error: errorCelula } = await supabase
         .from(CONFIG_CELULAS.tabla)
-        .insert([{ nombre: "", compuesto_id: compuestoId, estructura: [] }])
+        .insert([{ nombre: "", estructura: [] }])
         .select()
         .single();
       if (errorCelula || !nuevaCelula) return null;
+      const celulaId = (nuevaCelula as Celula).id;
+
+      const { error: errorCC } = await supabase
+        .from(CONFIG_CELULA_COMPUESTOS.tabla)
+        .insert([{ celula_id: celulaId, compuesto_id: compuestoId }]);
+      if (errorCC) return null;
 
       const { data: nuevoTejido, error: errorTejido } = await supabase
         .from(CONFIG_TEJIDOS.tabla)
-        .insert([{ nombre: "", celula_id: (nuevaCelula as Celula).id, estructura: [] }])
+        .insert([{ nombre: "", estructura: [] }])
         .select()
         .single();
       if (errorTejido || !nuevoTejido) return null;
+      const tejidoId = (nuevoTejido as Tejido).id;
+
+      const { error: errorTC } = await supabase
+        .from(CONFIG_TEJIDO_CELULAS.tabla)
+        .insert([{ tejido_id: tejidoId, celula_id: celulaId }]);
+      if (errorTC) return null;
 
       const { data: vinculo, error: errorVinculo } = await supabase
         .from("organo_tejidos")
-        .insert([{ organo_id: organoId, tejido_id: (nuevoTejido as Tejido).id }])
+        .insert([{ organo_id: organoId, tejido_id: tejidoId }])
         .select()
         .single();
       if (errorVinculo || !vinculo) return null;
 
-      setTejidos((prev) => ({ ...prev, [(nuevoTejido as Tejido).id]: nuevoTejido as Tejido }));
-      setCelulas((prev) => ({ ...prev, [(nuevaCelula as Celula).id]: nuevaCelula as Celula }));
+      setTejidos((prev) => ({ ...prev, [tejidoId]: nuevoTejido as Tejido }));
+      setCelulas((prev) => ({ ...prev, [celulaId]: nuevaCelula as Celula }));
+      setCelulaPorTejido((prev) => ({ ...prev, [tejidoId]: celulaId }));
+      setCompuestoPorCelula((prev) => ({ ...prev, [celulaId]: compuestoId }));
       setVinculos((prev) => [...prev, vinculo as OrganoTejido]);
       void guardarEnDexie([vinculo as OrganoTejido], [nuevoTejido as Tejido], [nuevaCelula as Celula]);
       return vinculo as OrganoTejido;
@@ -276,7 +340,7 @@ export function useOrganoTejidos(organoId: string | null) {
 
       const { data: nuevoTejido, error: errorTejido } = await supabase
         .from(CONFIG_TEJIDOS.tabla)
-        .insert([{ nombre, celula_id: null, estructura: [] }])
+        .insert([{ nombre, estructura: [] }])
         .select()
         .single();
       if (errorTejido || !nuevoTejido) return null;
@@ -324,16 +388,31 @@ export function useOrganoTejidos(organoId: string | null) {
           const tejido = tejidoData as unknown as Tejido;
           setTejidos((prev) => ({ ...prev, [tejido.id]: tejido }));
           void guardarEnDexie([], [tejido], []);
-          if (tejido.celula_id && !celulas[tejido.celula_id]) {
-            const { data: celulaData } = await supabase
-              .from(CONFIG_CELULAS.tabla)
-              .select(CONFIG_CELULAS.select)
-              .eq("id", tejido.celula_id)
-              .single();
-            if (celulaData) {
-              const celula = celulaData as unknown as Celula;
-              setCelulas((prev) => ({ ...prev, [celula.id]: celula }));
-              void guardarEnDexie([], [], [celula]);
+
+          // Célula ya no vive en tejido.celula_id (legacy) — se resuelve
+          // vía tejido_celulas (M:N), tomando la primera vinculada.
+          const { data: tcData } = await supabase
+            .from(CONFIG_TEJIDO_CELULAS.tabla)
+            .select(CONFIG_TEJIDO_CELULAS.select)
+            .eq("tejido_id", tejidoId)
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          const celulaId = (tcData as unknown as TejidoCelula | null)?.celula_id ?? null;
+
+          if (celulaId) {
+            setCelulaPorTejido((prev) => ({ ...prev, [tejidoId]: celulaId }));
+            if (!celulas[celulaId]) {
+              const { data: celulaData } = await supabase
+                .from(CONFIG_CELULAS.tabla)
+                .select(CONFIG_CELULAS.select)
+                .eq("id", celulaId)
+                .single();
+              if (celulaData) {
+                const celula = celulaData as unknown as Celula;
+                setCelulas((prev) => ({ ...prev, [celula.id]: celula }));
+                void guardarEnDexie([], [], [celula]);
+              }
             }
           }
         }
@@ -346,19 +425,27 @@ export function useOrganoTejidos(organoId: string | null) {
     [organoId, tejidos, celulas],
   );
 
-  // ── Reemplazar el compuesto de una fila (edita la Célula existente) ────
+  // ── Reemplazar el compuesto de una fila: ya no es un update de columna
+  // (celula.compuesto_id, legacy) sino un vínculo en celula_compuestos.
+  // Simplificación: para esta vista de una fila = un compuesto, borramos
+  // cualquier vínculo previo de esa Célula y creamos el nuevo (si la
+  // Célula necesita varios Compuestos a la vez, usar useCelulaCompuestos
+  // directamente en vez de este atajo). ──────────────────────────────────
   const actualizarCompuesto = useCallback(
     async (celulaId: string, compuestoId: string) => {
-      setCelulas((prev) => {
-        if (!prev[celulaId]) return prev;
-        const actualizada = { ...prev[celulaId], compuesto_id: compuestoId };
-        void guardarEnDexie([], [], [actualizada]);
-        return { ...prev, [celulaId]: actualizada };
-      });
+      setCompuestoPorCelula((prev) => ({ ...prev, [celulaId]: compuestoId }));
+
+      const { error: errorDelete } = await supabase
+        .from(CONFIG_CELULA_COMPUESTOS.tabla)
+        .delete()
+        .eq("celula_id", celulaId);
+      if (errorDelete) {
+        console.error("[useOrganoTejidos] error limpiando vínculos previos:", errorDelete);
+        return;
+      }
       const { error } = await supabase
-        .from(CONFIG_CELULAS.tabla)
-        .update({ compuesto_id: compuestoId })
-        .eq("id", celulaId);
+        .from(CONFIG_CELULA_COMPUESTOS.tabla)
+        .insert([{ celula_id: celulaId, compuesto_id: compuestoId }]);
       if (error) console.error("[useOrganoTejidos] error actualizando célula:", error);
     },
     [],

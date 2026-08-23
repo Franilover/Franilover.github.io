@@ -10,23 +10,30 @@
  * catálogo de solo composición — separado de "Usar existente" (que vive
  * dentro de la fórmula de un Órgano puntual, ver SelectorFormulaTejidos.tsx).
  *
- * Ojo con la cadena real (ver elementos/types.ts): Célula → compuesto_id
- * (apunta directo a un Compuesto), pero Tejido → celula_id (apunta a una
- * Célula, NO a un Compuesto directo). Por eso son dos paneles distintos,
- * no uno genérico: el de Célula usa SelectorCompuesto, el de Tejido usa
- * SelectorCelula (nuevo, definido acá mismo).
+ * Migración ago-2026 (ver elementos/types.ts): Célula→Compuesto y
+ * Tejido→Célula dejaron de ser 1:1 (compuesto_id/celula_id, legacy) y
+ * pasaron a M:N vía tablas puente:
+ *   - celula_compuestos (useCelulaCompuestos)  → de qué está hecha la Célula
+ *   - tejido_celulas    (useTejidoCelulas)     → qué Células pueblan el Tejido
+ *   - tejido_compuestos (useTejidoCompuestos)  → matriz extracelular directa
+ * Por eso los dos paneles ya no usan un selector único (SelectorCompuesto/
+ * SelectorCelula single-pick): cada uno lista sus vínculos con
+ * ListaVinculosMN (agregar por búsqueda, quitar por fila) — mismo espíritu
+ * que useOrganoTejidos, aplicado un nivel más abajo en la cadena.
  *
  * Mismo lenguaje visual que GridCatalogoGrupo (grid de 3 columnas, click
  * abre panel flotante centrado).
  */
 
-import { Beaker, Layers, Plus, Trash2, X, Search, Check } from "lucide-react";
+import { Beaker, Layers, Plus, Trash2, X, Search } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import { useConfirm } from "@/ui/ConfirmModal";
-import { SelectorCompuesto } from "@/domains/garlia/_shared/SelectorCompuesto";
 import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
 import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
+import { useCelulaCompuestos, type CompuestoDeCelula } from "@/domains/garlia/elementos/useCelulaCompuestos";
+import { useTejidoCelulas, type CelulaDeTejido } from "@/domains/garlia/elementos/useTejidoCelulas";
+import { useTejidoCompuestos, type CompuestoDeTejido } from "@/domains/garlia/elementos/useTejidoCompuestos";
 import type { Celula, Compuesto, Tejido } from "@/domains/garlia/elementos/types";
 
 interface Props {
@@ -128,6 +135,8 @@ export function CatalogoTejidosBiologia({
             item={tejidoActivo}
             celulas={celulas.items}
             loadingCelulas={celulas.loading}
+            compuestos={compuestos}
+            loadingCompuestos={loadingCompuestos}
             onCerrar={() => setTejidoSeleccionadoId(null)}
             onActualizar={tejidos.actualizar}
             onEliminar={async (id) => {
@@ -139,6 +148,8 @@ export function CatalogoTejidosBiologia({
               setTejidoSeleccionadoId(null);
               setCelulaSeleccionadaId(celulaId);
             }}
+            onCompuestoCreado={onCompuestoCreado}
+            onAbrirCompuesto={onAbrirCompuesto}
           />
         )}
       </div>
@@ -200,7 +211,8 @@ function GridSimple<T extends { id: string; nombre: string }>({
   );
 }
 
-// ─── Panel Célula: nombre, función, notas, Compuesto (compuesto_id) ────────
+// ─── Panel Célula: nombre, función, notas, Compuestos (M:N vía
+// celula_compuestos) ────────────────────────────────────────────────────
 // Exportado: reutilizado directo desde SelectorFormulaTejidos (fila "hecho
 // de" de un Tejido en la fórmula de un Órgano) — clickear ahí debe abrir
 // ESTE panel (Célula), no el del Compuesto directo, ver cadena real en el
@@ -229,6 +241,8 @@ export function PanelEditorCelula({
   const [eliminando, setEliminando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
+  const vinculosCompuesto = useCelulaCompuestos(item.id);
+
   async function handleEliminar() {
     const ok = await confirm({
       title: "Eliminar célula",
@@ -241,7 +255,7 @@ export function PanelEditorCelula({
     setEliminando(false);
     if (!res.ok) {
       setErrorEliminar(
-        "No se pudo eliminar — probablemente algún Tejido todavía la usa. Cambiale el compuesto desde ahí o quitala primero.",
+        "No se pudo eliminar — probablemente algún Tejido todavía la usa. Quitala de ahí primero.",
       );
     }
   }
@@ -275,7 +289,7 @@ export function PanelEditorCelula({
         </button>
       </div>
 
-      <div className="p-3 flex flex-col gap-3">
+      <div className="p-3 flex flex-col gap-3 max-h-[70vh] overflow-y-auto">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
 
         <input
@@ -287,15 +301,20 @@ export function PanelEditorCelula({
 
         <div>
           <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-            Compuesto
+            Compuestos · de qué está hecha la célula
           </p>
-          <SelectorCompuesto
-            compuestos={compuestos}
-            loadingCompuestos={loadingCompuestos}
-            compuestoId={item.compuesto_id}
-            onChange={(compuestoId) => onActualizar(item.id, { compuesto_id: compuestoId })}
-            onCompuestoCreado={onCompuestoCreado}
-            onEditarCompuesto={onAbrirCompuesto}
+          <ListaVinculosMN<CompuestoDeCelula>
+            items={vinculosCompuesto.items}
+            loading={vinculosCompuesto.loading}
+            catalogo={compuestos}
+            loadingCatalogo={loadingCompuestos}
+            getNombre={(v) => v.compuesto.nombre}
+            getCatalogoId={(v) => v.compuesto_id}
+            rolPlaceholder="Rol (ej. membrana, citoplasma)…"
+            onAgregar={(compuestoId) => void vinculosCompuesto.vincularExistente(compuestoId)}
+            onActualizarRol={vinculosCompuesto.actualizarRol}
+            onQuitar={vinculosCompuesto.quitar}
+            onAbrirCompuesto={onAbrirCompuesto}
           />
         </div>
 
@@ -310,7 +329,8 @@ export function PanelEditorCelula({
   );
 }
 
-// ─── Panel Tejido: nombre, función, notas, Célula (celula_id) ──────────────
+// ─── Panel Tejido: nombre, función, notas, Células + Compuestos de matriz
+// (M:N vía tejido_celulas / tejido_compuestos) ──────────────────────────
 // Exportado: reutilizado directo desde SelectorFormulaTejidos/GruposCompuestosPage
 // (editor de la fórmula de un Órgano) para abrir el mismo editor completo al
 // clickear el nombre de una fila — un solo editor de Tejido en toda la app.
@@ -319,23 +339,34 @@ export function PanelEditorTejido({
   item,
   celulas,
   loadingCelulas,
+  compuestos,
+  loadingCompuestos,
   onCerrar,
   onActualizar,
   onEliminar,
   onAbrirCelula,
+  onCompuestoCreado,
+  onAbrirCompuesto,
 }: {
   item: Tejido;
   celulas: Celula[];
   loadingCelulas?: boolean;
+  compuestos: Compuesto[];
+  loadingCompuestos?: boolean;
   onCerrar: () => void;
   onActualizar: (id: string, cambios: Partial<Tejido>) => void;
   onEliminar: (id: string) => Promise<{ ok: boolean; error: unknown }>;
   /** Cierra este panel y abre el de la Célula elegida — navegación cruzada. */
   onAbrirCelula?: (celulaId: string) => void;
+  onCompuestoCreado?: (c: Compuesto) => void;
+  onAbrirCompuesto?: (compuestoId: string) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [eliminando, setEliminando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
+
+  const vinculosCelula = useTejidoCelulas(item.id);
+  const vinculosCompuesto = useTejidoCompuestos(item.id);
 
   async function handleEliminar() {
     const ok = await confirm({
@@ -383,7 +414,7 @@ export function PanelEditorTejido({
         </button>
       </div>
 
-      <div className="p-3 flex flex-col gap-3">
+      <div className="p-3 flex flex-col gap-3 max-h-[70vh] overflow-y-auto">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
 
         <input
@@ -395,14 +426,41 @@ export function PanelEditorTejido({
 
         <div>
           <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-            Célula
+            Células · qué tipos celulares lo pueblan
           </p>
-          <SelectorCelula
-            celulas={celulas}
-            loadingCelulas={loadingCelulas}
-            celulaId={item.celula_id}
-            onChange={(celulaId) => onActualizar(item.id, { celula_id: celulaId })}
-            onAbrirCelula={onAbrirCelula}
+          <ListaVinculosMN<CelulaDeTejido>
+            items={vinculosCelula.items}
+            loading={vinculosCelula.loading}
+            catalogo={celulas}
+            loadingCatalogo={loadingCelulas}
+            getNombre={(v) => v.celula.nombre}
+            getCatalogoId={(v) => v.celula_id}
+            rolPlaceholder="Rol (ej. célula principal)…"
+            iconoCatalogo={<Beaker size={11} className="text-accent/60 shrink-0" />}
+            onAgregar={(celulaId) => void vinculosCelula.vincularExistente(celulaId)}
+            onActualizarRol={vinculosCelula.actualizarRol}
+            onQuitar={vinculosCelula.quitar}
+            onAbrirItem={onAbrirCelula}
+          />
+        </div>
+
+        <div>
+          <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
+            Compuestos de matriz · material directo, sin pasar por una célula
+          </p>
+          <ListaVinculosMN<CompuestoDeTejido>
+            items={vinculosCompuesto.items}
+            loading={vinculosCompuesto.loading}
+            catalogo={compuestos}
+            loadingCatalogo={loadingCompuestos}
+            getNombre={(v) => v.compuesto.nombre}
+            getCatalogoId={(v) => v.compuesto_id}
+            rolPlaceholder="Rol (ej. matriz extracelular)…"
+            onAgregar={(compuestoId) => void vinculosCompuesto.vincularExistente(compuestoId)}
+            onActualizarRol={vinculosCompuesto.actualizarRol}
+            onQuitar={vinculosCompuesto.quitar}
+            onAbrirCompuesto={onAbrirCompuesto}
+            onCompuestoCreado={onCompuestoCreado}
           />
         </div>
 
@@ -417,90 +475,143 @@ export function PanelEditorTejido({
   );
 }
 
-// ─── SelectorCelula: mismo lenguaje visual que SelectorCompuesto, pero
-// eligiendo una Célula del catálogo (para Tejido.celula_id) — no crea
-// Células nuevas desde acá (para eso está el botón "Nueva" de la grid).
-// Exportado junto con PanelEditorTejido — ver nota arriba. ────────────────
+// ─── ListaVinculosMN: lista genérica de vínculos M:N con rol libre —
+// reemplaza a los viejos SelectorCompuesto/SelectorCelula (single-pick) en
+// este archivo. Cada fila: nombre del item vinculado (clickeable si se
+// provee onAbrirItem/onAbrirCompuesto) + input de rol + botón quitar.
+// Debajo, un buscador para agregar un vínculo nuevo del catálogo — no crea
+// entradas nuevas de Célula/Compuesto desde acá, solo vincula existentes,
+// igual que useOrganoTejidos con "usar existente". ──────────────────────
 
-export function SelectorCelula({
-  celulas,
-  loadingCelulas,
-  celulaId,
-  onChange,
-  onAbrirCelula,
+interface VinculoConNombre {
+  vinculo_id: string;
+  rol: string | null;
+}
+
+function ListaVinculosMN<T extends VinculoConNombre>({
+  items,
+  loading,
+  catalogo,
+  loadingCatalogo,
+  getNombre,
+  getCatalogoId,
+  rolPlaceholder,
+  iconoCatalogo,
+  onAgregar,
+  onActualizarRol,
+  onQuitar,
+  onAbrirItem,
+  onAbrirCompuesto,
 }: {
-  celulas: Celula[];
-  loadingCelulas?: boolean;
-  celulaId: string | null;
-  onChange: (celulaId: string | null) => void;
-  onAbrirCelula?: (celulaId: string) => void;
+  items: T[];
+  loading: boolean;
+  catalogo: { id: string; nombre: string }[];
+  loadingCatalogo?: boolean;
+  getNombre: (v: T) => string;
+  getCatalogoId: (v: T) => string;
+  rolPlaceholder: string;
+  iconoCatalogo?: React.ReactNode;
+  onAgregar: (catalogoId: string) => void;
+  onActualizarRol: (vinculoId: string, rol: string) => void;
+  onQuitar: (vinculoId: string) => void;
+  /** Navegación cruzada genérica (ej. abrir la Célula vinculada). */
+  onAbrirItem?: (catalogoId: string) => void;
+  /** Navegación cruzada específica para Compuesto (nombre distinto por claridad). */
+  onAbrirCompuesto?: (compuestoId: string) => void;
+  onCompuestoCreado?: (c: Compuesto) => void;
+}) {
+  const [buscando, setBuscando] = useState(false);
+
+  const yaVinculadosIds = useMemo(() => new Set(items.map(getCatalogoId)), [items, getCatalogoId]);
+  const disponibles = useMemo(
+    () => catalogo.filter((c) => !yaVinculadosIds.has(c.id)),
+    [catalogo, yaVinculadosIds],
+  );
+
+  const abrir = onAbrirItem ?? onAbrirCompuesto;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {loading ? (
+        <p className="text-micro text-primary/25 italic py-1">Cargando…</p>
+      ) : items.length === 0 ? (
+        <p className="text-micro text-primary/25 italic py-1">Sin vínculos todavía</p>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {items.map((v) => (
+            <div
+              key={v.vinculo_id}
+              className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2.5 pr-1.5 py-1.5 border border-primary/10"
+            >
+              {iconoCatalogo}
+              <button
+                type="button"
+                onClick={() => abrir?.(getCatalogoId(v))}
+                disabled={!abrir}
+                className="shrink-0 max-w-[45%] truncate text-left text-micro font-bold text-primary/80 disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+              >
+                {getNombre(v) || "Sin nombre"}
+              </button>
+              <input
+                value={v.rol ?? ""}
+                onChange={(e) => onActualizarRol(v.vinculo_id, e.target.value)}
+                placeholder={rolPlaceholder}
+                className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-micro text-primary/60 outline-none placeholder:text-primary/25"
+              />
+              <button
+                type="button"
+                onClick={() => onQuitar(v.vinculo_id)}
+                title="Quitar"
+                className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {buscando ? (
+        <PickerCatalogoExistente
+          disponibles={disponibles}
+          loading={loadingCatalogo}
+          onElegir={(id) => {
+            onAgregar(id);
+            setBuscando(false);
+          }}
+          onClose={() => setBuscando(false)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setBuscando(true)}
+          className="flex items-center gap-1 self-start text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors cursor-pointer"
+        >
+          <Plus size={10} /> Agregar
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PickerCatalogoExistente({
+  disponibles,
+  loading,
+  onElegir,
+  onClose,
+}: {
+  disponibles: { id: string; nombre: string }[];
+  loading?: boolean;
+  onElegir: (id: string) => void;
+  onClose: () => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
-  const [abierto, setAbierto] = useState(false);
-  const [activo, setActivo] = useState(0);
 
-  const elegida = useMemo(() => celulas.find((c) => c.id === celulaId) ?? null, [celulas, celulaId]);
-
-  const filtradas = useMemo(() => {
+  const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (!q) return celulas;
-    return celulas.filter((c) => c.nombre.toLowerCase().includes(q));
-  }, [celulas, busqueda]);
-
-  function elegir(c: Celula) {
-    onChange(c.id);
-    setAbierto(false);
-    setBusqueda("");
-  }
-
-  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (filtradas.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActivo((i) => (i + 1) % filtradas.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActivo((i) => (i - 1 + filtradas.length) % filtradas.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const c = filtradas[activo];
-      if (c) elegir(c);
-    } else if (e.key === "Escape") {
-      setAbierto(false);
-    }
-  }
-
-  if (elegida && !abierto) {
-    return (
-      <div className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2.5 pr-1.5 py-1.5 border border-primary/10">
-        <Beaker size={12} className="text-accent/60 shrink-0" />
-        <button
-          type="button"
-          onClick={() => onAbrirCelula?.(elegida.id)}
-          disabled={!onAbrirCelula}
-          className="flex-1 min-w-0 truncate text-left text-micro font-bold text-primary/80 disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
-        >
-          {elegida.nombre || "Sin nombre"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setAbierto(true)}
-          title="Cambiar"
-          className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-        >
-          <Search size={11} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          title="Quitar"
-          className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-        >
-          <X size={11} />
-        </button>
-      </div>
-    );
-  }
+    if (!q) return disponibles;
+    return disponibles.filter((d) => d.nombre.toLowerCase().includes(q));
+  }, [disponibles, busqueda]);
 
   return (
     <div className="relative">
@@ -509,25 +620,19 @@ export function SelectorCelula({
         <input
           autoFocus
           value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value);
-            setActivo(0);
-          }}
-          onKeyDown={onKeyDown}
-          onBlur={() => setTimeout(() => setAbierto(false), 120)}
-          placeholder={loadingCelulas ? "Cargando…" : "Buscar célula…"}
+          onChange={(e) => setBusqueda(e.target.value)}
+          onBlur={() => setTimeout(onClose, 120)}
+          placeholder={loading ? "Cargando…" : "Buscar para vincular…"}
           className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal"
         />
-        {elegida && (
-          <button
-            type="button"
-            onMouseDown={() => setAbierto(false)}
-            title="Cancelar"
-            className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-primary/30 hover:text-primary transition-colors cursor-pointer"
-          >
-            <X size={10} />
-          </button>
-        )}
+        <button
+          type="button"
+          onMouseDown={onClose}
+          title="Cancelar"
+          className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-primary/30 hover:text-primary transition-colors cursor-pointer"
+        >
+          <X size={10} />
+        </button>
       </div>
 
       <div
@@ -537,21 +642,17 @@ export function SelectorCelula({
           borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
         }}
       >
-        {filtradas.length === 0 ? (
+        {filtrados.length === 0 ? (
           <p className="text-micro text-primary/25 italic text-center py-2">Sin resultados</p>
         ) : (
-          filtradas.slice(0, 30).map((c, i) => (
+          filtrados.slice(0, 30).map((d) => (
             <button
-              key={c.id}
+              key={d.id}
               type="button"
-              onMouseEnter={() => setActivo(i)}
-              onMouseDown={() => elegir(c)}
-              className={`w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold transition-colors truncate ${
-                i === activo ? "bg-primary/10 text-primary" : "text-primary/75 hover:bg-primary/6 hover:text-primary"
-              }`}
+              onMouseDown={() => onElegir(d.id)}
+              className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold text-primary/75 hover:bg-primary/6 hover:text-primary transition-colors truncate"
             >
-              {c.id === celulaId && <Check size={10} className="text-accent shrink-0" />}
-              {c.nombre || "Sin nombre"}
+              {d.nombre || "Sin nombre"}
             </button>
           ))
         )}

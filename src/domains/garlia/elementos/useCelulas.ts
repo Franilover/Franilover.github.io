@@ -14,6 +14,10 @@
  * necesitaba tener acá porque ElementosPage.tsx ya lo hacía inline para
  * Compuestos. Acá lo encapsulamos para no repetir esa lógica en
  * BiologiaPage.tsx.
+ *
+ * Migración ago-2026: la Célula ya NO trae su Compuesto vía columna propia
+ * (compuesto_id, legacy) — la composición material se gestiona aparte con
+ * useCelulaCompuestos.ts (tabla puente celula_compuestos, M:N).
  */
 
 import { useCallback, useMemo, useState } from "react";
@@ -32,13 +36,14 @@ export function useCelulas() {
 
   const [creando, setCreando] = useState(false);
 
-  // ── Crear una Célula suelta (sin compuesto_id todavía) ──────────────────
+  // ── Crear una Célula suelta (composición se agrega después vía
+  // useCelulaCompuestos, M:N — ya no hay compuesto_id que setear acá) ─────
   const crear = useCallback(async () => {
     setCreando(true);
     try {
       const { data: nueva, error } = await supabase
         .from(CONFIG_CELULAS.tabla)
-        .insert([{ nombre: "Nueva célula", compuesto_id: null, estructura: [] }])
+        .insert([{ nombre: "Nueva célula", estructura: [] }])
         .select()
         .single();
       if (error || !nueva) return null;

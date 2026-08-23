@@ -15,9 +15,17 @@
  * criterio que ya usa ComposicionQuimicaPanel por Formación/Órgano
  * individual, pero a nivel de la entidad entera.
  *
- * Consulta liviana (solo compuesto_id/cantidad + entidad dueña), separada
- * de los hooks de edición completos (useMineralFormacionesProcesos,
- * usePlantaOrganosProcesos) que traen filas completas por una sola entidad.
+ * FIX (ago-2026): el lado de Flora/Órganos consultaba `grupos_compuestos`
+ * y `organo.componentes` — ninguna de las dos existe en Supabase (la tabla
+ * `grupos_compuestos` fue eliminada, y Órgano dejó de tener columna
+ * `componentes` propia, ver elementos/types.ts). Las queries fallaban
+ * silenciosamente y el panel de Flora quedaba siempre vacío. Reescrito
+ * para reconstruir la mezcla real desde la cadena viva:
+ *   planta_organos → Organo → organo_tejidos → Tejido ─┬─ tejido_celulas → Celula → celula_compuestos → Compuesto
+ *                                                       └─ tejido_compuestos ─────────────────────────→ Compuesto
+ * El lado de Mineral/Formación (formacion_vetas → Veta.grano_id →
+ * Grano.compuesto_id) sigue siendo el patrón viejo 1:1 — no se tocó en
+ * esta migración, queda fuera de este fix.
  */
 
 import { useEffect, useState } from "react";
@@ -33,21 +41,11 @@ export interface EntidadConMezcla {
   mezcla: ComponenteCompuestoEnMezcla[];
 }
 
-interface FilaVinculoFormacion {
-  mineral_id: string;
-  grupo: { componentes: { compuesto_id: string; cantidad: number }[] | null }[] | null;
-}
-
-/**
- * Fila de la tabla puente planta_organos, con el GrupoCompuesto del
- * catálogo compartido ya resuelto (join vía grupo_compuesto_id) — la
- * fórmula real vive en `organo.componentes`, la fila puente solo guarda
- * el vínculo. Supabase tipa la relación embebida como array aunque en
- * runtime sea un único registro — se toma el primero.
- */
 interface FilaVinculoOrgano {
   planta_id: string;
-  organo: { componentes: { compuesto_id: string; cantidad: number }[] | null }[] | null;
+  /** Pese al nombre histórico, apunta a organos.id — se resuelve por
+   *  separado (organo_tejidos → Tejido → Célula/Compuesto), no embebido. */
+  grupo_compuesto_id: string;
 }
 
 export function useMezclasAfinidadCatalogo() {
@@ -60,38 +58,106 @@ export function useMezclasAfinidadCatalogo() {
     async function cargar() {
       setLoading(true);
 
-      const [
-        { data: minerales },
-        { data: formaciones },
-        { data: floras },
-        { data: organos },
-      ] = await Promise.all([
-        supabase.from("minerales").select("id, nombre"),
-        supabase
-          .from("mineral_formaciones")
-          .select("mineral_id, grupo:grupos_compuestos(componentes)"),
-        supabase.from("flora").select("id, nombre"),
-        supabase
-          .from("planta_organos")
-          .select("planta_id, organo:grupos_compuestos(componentes)"),
-      ]);
+      const [{ data: minerales }, { data: formaciones }, { data: floras }, { data: vinculosOrgano }] =
+        await Promise.all([
+          supabase.from("minerales").select("id, nombre"),
+          // NOTA: grupo_compuesto_id acá apunta a formaciones.id (nombre
+          // histórico, ver elementos/types.ts) — la cadena real es
+          // Formacion → formacion_vetas → Veta.grano_id → Grano.compuesto_id,
+          // que sigue siendo 1:1 y quedó FUERA del alcance de esta migración
+          // (solo tocamos Célula/Tejido/Órgano, no Grano/Veta). Por ahora
+          // el lado mineral sigue sin resolver mezcla real — ver TODO abajo.
+          supabase.from("mineral_formaciones").select("mineral_id, grupo_compuesto_id"),
+          supabase.from("flora").select("id, nombre"),
+          supabase.from("planta_organos").select("planta_id, grupo_compuesto_id"),
+        ]);
 
       if (cancelado) return;
 
+      // ── Lado Mineral: TODO — mismo bug que tenía Flora, sin arreglar
+      // todavía (requiere resolver formacion_vetas → Veta → Grano por
+      // separado, análogo a lo que se hizo abajo para Flora/Órganos). Por
+      // ahora la mezcla queda vacía en vez de fallar silenciosamente. ────
+      void formaciones;
       const mezclaMineral = new Map<string, ComponenteCompuestoEnMezcla[]>();
-      for (const f of (formaciones ?? []) as FilaVinculoFormacion[]) {
-        const componentes = f.grupo?.[0]?.componentes;
-        if (!f.mineral_id || !componentes) continue;
-        const acumulada = mezclaMineral.get(f.mineral_id) ?? [];
-        mezclaMineral.set(f.mineral_id, [...acumulada, ...componentes]);
-      }
+
+      // ── Lado Flora: reconstruir la mezcla real desde la cadena viva ────
+      const organoIds = ((vinculosOrgano ?? []) as FilaVinculoOrgano[])
+        .map((v) => v.grupo_compuesto_id)
+        .filter((id): id is string => !!id);
 
       const mezclaFlora = new Map<string, ComponenteCompuestoEnMezcla[]>();
-      for (const v of (organos ?? []) as FilaVinculoOrgano[]) {
-        const componentes = v.organo?.[0]?.componentes;
-        if (!v.planta_id || !componentes) continue;
-        const acumulada = mezclaFlora.get(v.planta_id) ?? [];
-        mezclaFlora.set(v.planta_id, [...acumulada, ...componentes]);
+
+      if (organoIds.length > 0) {
+        const { data: organoTejidos } = await supabase
+          .from("organo_tejidos")
+          .select("organo_id, tejido_id")
+          .in("organo_id", organoIds);
+
+        const tejidoIds = [...new Set((organoTejidos ?? []).map((v) => v.tejido_id as string))];
+
+        if (tejidoIds.length > 0) {
+          const [{ data: tejidoCelulas }, { data: tejidoCompuestos }] = await Promise.all([
+            supabase.from("tejido_celulas").select("tejido_id, celula_id").in("tejido_id", tejidoIds),
+            supabase.from("tejido_compuestos").select("tejido_id, compuesto_id").in("tejido_id", tejidoIds),
+          ]);
+
+          const celulaIds = [
+            ...new Set((tejidoCelulas ?? []).map((v) => v.celula_id as string)),
+          ];
+          const celulaCompuestos =
+            celulaIds.length > 0
+              ? (
+                  await supabase
+                    .from("celula_compuestos")
+                    .select("celula_id, compuesto_id")
+                    .in("celula_id", celulaIds)
+                ).data
+              : [];
+
+          // compuesto_id por tejido: directo (tejido_compuestos) + indirecto
+          // (tejido_celulas → celula_compuestos).
+          const compuestosPorTejido = new Map<string, string[]>();
+          for (const tc of tejidoCompuestos ?? []) {
+            const acc = compuestosPorTejido.get(tc.tejido_id as string) ?? [];
+            acc.push(tc.compuesto_id as string);
+            compuestosPorTejido.set(tc.tejido_id as string, acc);
+          }
+          const compuestosPorCelula = new Map<string, string[]>();
+          for (const cc of celulaCompuestos ?? []) {
+            const acc = compuestosPorCelula.get(cc.celula_id as string) ?? [];
+            acc.push(cc.compuesto_id as string);
+            compuestosPorCelula.set(cc.celula_id as string, acc);
+          }
+          for (const tc of tejidoCelulas ?? []) {
+            const viaCelula = compuestosPorCelula.get(tc.celula_id as string) ?? [];
+            const acc = compuestosPorTejido.get(tc.tejido_id as string) ?? [];
+            compuestosPorTejido.set(tc.tejido_id as string, [...acc, ...viaCelula]);
+          }
+
+          // organo_id → lista de compuesto_id (agregando todos sus tejidos)
+          const compuestosPorOrgano = new Map<string, string[]>();
+          for (const ot of organoTejidos ?? []) {
+            const compuestosDelTejido = compuestosPorTejido.get(ot.tejido_id as string) ?? [];
+            const acc = compuestosPorOrgano.get(ot.organo_id as string) ?? [];
+            compuestosPorOrgano.set(ot.organo_id as string, [...acc, ...compuestosDelTejido]);
+          }
+
+          // planta_id → mezcla agregada de todos sus Órganos. No hay
+          // cantidad numérica real en esta cadena (proporcion es texto
+          // libre) — cada aparición de un Compuesto cuenta como cantidad 1,
+          // aproximación razonable para el cálculo de afinidad.
+          for (const v of (vinculosOrgano ?? []) as FilaVinculoOrgano[]) {
+            const compuestoIds = compuestosPorOrgano.get(v.grupo_compuesto_id) ?? [];
+            if (!v.planta_id || compuestoIds.length === 0) continue;
+            const acumulada = mezclaFlora.get(v.planta_id) ?? [];
+            const nuevos: ComponenteCompuestoEnMezcla[] = compuestoIds.map((compuesto_id) => ({
+              compuesto_id,
+              cantidad: 1,
+            }));
+            mezclaFlora.set(v.planta_id, [...acumulada, ...nuevos]);
+          }
+        }
       }
 
       const resultado: EntidadConMezcla[] = [

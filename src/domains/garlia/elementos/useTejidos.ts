@@ -6,6 +6,10 @@
  * Espejo de useCelulas.ts, un nivel arriba: catálogo GLOBAL de Tejidos
  * (tabla real "tejidos") con CRUD completo, independiente de cualquier
  * Órgano. Ver useCelulas.ts para el razonamiento completo.
+ *
+ * Migración ago-2026: el Tejido ya NO trae su Célula vía columna propia
+ * (celula_id, legacy) — ver useTejidoCelulas.ts (M:N, varias Células por
+ * Tejido) y useTejidoCompuestos.ts (matriz que no pasa por ninguna Célula).
  */
 
 import { useCallback, useMemo, useState } from "react";
@@ -24,13 +28,14 @@ export function useTejidos() {
 
   const [creando, setCreando] = useState(false);
 
-  // ── Crear un Tejido suelto (sin celula_id todavía) ───────────────────────
+  // ── Crear un Tejido suelto (Células y Compuestos de matriz se agregan
+  // después vía useTejidoCelulas / useTejidoCompuestos, M:N) ──────────────
   const crear = useCallback(async () => {
     setCreando(true);
     try {
       const { data: nuevo, error } = await supabase
         .from(CONFIG_TEJIDOS.tabla)
-        .insert([{ nombre: "Nuevo tejido", celula_id: null, estructura: [] }])
+        .insert([{ nombre: "Nuevo tejido", estructura: [] }])
         .select()
         .single();
       if (error || !nuevo) return null;

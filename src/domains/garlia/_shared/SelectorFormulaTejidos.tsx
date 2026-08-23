@@ -12,6 +12,16 @@
  * agregar/actualizar/proporcion/quitar — funciona igual con
  * useOrganoTejidos o useFormacionVetas.
  *
+ * Migración ago-2026 (solo Tejido/Célula, Veta/Grano no cambió): Tejido→
+ * Célula y Célula→Compuesto pasaron de 1:1 a M:N (tablas puente
+ * tejido_celulas/celula_compuestos, ver elementos/types.ts). Este
+ * componente NO necesitó cambios: sigue mostrando "1 fila = 1 célula
+ * (catalogo_id/catalogo_nombre)", que es la PRIMERA célula vinculada al
+ * tejido — useOrganoTejidos.ts resuelve esa simplificación por debajo. Si
+ * un Tejido necesita mostrar/editar varias Células o Compuestos de matriz
+ * a la vez, no es este componente: usar useTejidoCelulas/
+ * useTejidoCompuestos directamente (ver CatalogoTejidosBiologia.tsx).
+ *
  * Mismo lenguaje visual que el viejo SelectorFormulaOrgano (buscador +
  * fila con nombre/proporción/menú), pero "cantidad" pasa a ser
  * "proporción" en texto libre (columna `proporcion` de organo_tejidos/
@@ -355,7 +365,7 @@ function FilaFormulaTejidoSoloLectura({
           title={onAbrirCelula ? `Abrir ${item.catalogo_nombre ?? ""}` : undefined}
           className="min-w-0 text-left px-0 text-[10px] text-primary/40 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
         >
-          hecho de: {item.catalogo_nombre || "sin célula"}
+          hecho de: {item.catalogo_nombre || "sin composición asignada"}
         </button>
       </div>
       {item.proporcion && (
@@ -461,7 +471,7 @@ function FilaFormulaTejidoRow({
           title={onAbrirCelula ? `Abrir ${item.catalogo_nombre || ""}` : undefined}
           className="min-w-0 flex-1 text-left px-0 text-[10px] font-bold text-primary/70 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
         >
-          {item.catalogo_nombre || "sin célula"}
+          {item.catalogo_nombre || "sin composición asignada"}
         </button>
       </div>
     </div>
