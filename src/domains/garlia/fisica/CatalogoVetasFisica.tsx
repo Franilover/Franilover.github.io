@@ -23,7 +23,8 @@
  */
 
 import { Gem, Layers, Plus, Trash2, X, Search, Check } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useConfirm } from "@/ui/ConfirmModal";
 import { SelectorCompuesto } from "@/domains/garlia/_shared/SelectorCompuesto";
@@ -256,33 +257,17 @@ export function PanelEditorGrano({
   return (
     <PanelFlotanteBase onCerrar={onCerrar}>
       <ConfirmModal />
-      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-primary/10">
-        <input
-          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none placeholder:text-primary/25"
-          placeholder="Nombre…"
-          value={item.nombre ?? ""}
-          onChange={(e) => onActualizar(item.id, { nombre: e.target.value })}
-        />
-        <button
-          type="button"
-          onClick={handleEliminar}
-          disabled={eliminando}
-          title="Eliminar"
-          className="shrink-0 p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition disabled:opacity-40"
-        >
-          <Trash2 size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={onCerrar}
-          title="Cerrar"
-          className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-        >
-          <X size={13} />
-        </button>
-      </div>
+      <PanelFlotanteHeader
+        icono={<Gem className="text-primary/50" size={12} />}
+        nombre={item.nombre ?? ""}
+        placeholder="Nombre…"
+        onChangeNombre={(nombre) => onActualizar(item.id, { nombre })}
+        onEliminar={handleEliminar}
+        eliminando={eliminando}
+        onCerrar={onCerrar}
+      />
 
-      <div className="p-3 flex flex-col gap-3">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
 
         <input
@@ -364,33 +349,17 @@ export function PanelEditorVeta({
   return (
     <PanelFlotanteBase onCerrar={onCerrar}>
       <ConfirmModal />
-      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-primary/10">
-        <input
-          className="min-w-0 flex-1 bg-transparent px-0 py-1 text-sm font-semibold text-primary/80 outline-none placeholder:text-primary/25"
-          placeholder="Nombre…"
-          value={item.nombre ?? ""}
-          onChange={(e) => onActualizar(item.id, { nombre: e.target.value })}
-        />
-        <button
-          type="button"
-          onClick={handleEliminar}
-          disabled={eliminando}
-          title="Eliminar"
-          className="shrink-0 p-1 rounded hover:bg-red-500/10 text-red-500/40 hover:text-red-500 transition disabled:opacity-40"
-        >
-          <Trash2 size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={onCerrar}
-          title="Cerrar"
-          className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-        >
-          <X size={13} />
-        </button>
-      </div>
+      <PanelFlotanteHeader
+        icono={<Layers className="text-primary/50" size={12} />}
+        nombre={item.nombre ?? ""}
+        placeholder="Nombre…"
+        onChangeNombre={(nombre) => onActualizar(item.id, { nombre })}
+        onEliminar={handleEliminar}
+        eliminando={eliminando}
+        onCerrar={onCerrar}
+      />
 
-      <div className="p-3 flex flex-col gap-3">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
 
         <input
@@ -576,22 +545,113 @@ function PanelFlotanteBase({
   children: React.ReactNode;
   onCerrar: () => void;
 }) {
-  return (
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCerrar();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onCerrar]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center p-4"
-      style={{ background: "color-mix(in srgb, black 45%, transparent)" }}
-      onClick={onCerrar}
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6"
+      style={{
+        background: "color-mix(in srgb, var(--primary) 35%, transparent)",
+        backdropFilter: "blur(8px)",
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCerrar();
+      }}
     >
       <div
-        className="w-full max-w-md flex flex-col rounded-xl border shadow-2xl overflow-hidden"
+        className="w-full h-full max-w-6xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
         style={{
           background: "var(--bg-main)",
-          borderColor: "color-mix(in srgb, var(--primary) 14%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+          animation: "popIn 160ms cubic-bezier(0.34, 1.56, 0.64, 1)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {children}
       </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Header estándar del panel flotante grande — mismo look que
+ * ElementoPanelFlotante/CompuestoPanelFlotante: cuadro con ícono a la
+ * izquierda, input de nombre grande, botón eliminar y botón cerrar a la
+ * derecha. A diferencia de Elemento/Compuesto (que publican headerControls
+ * con botón "Guardar" explícito), acá se mantiene el autosave on-change ya
+ * existente en Grano/Veta — solo se iguala la cáscara visual.
+ */
+function PanelFlotanteHeader({
+  icono,
+  nombre,
+  placeholder,
+  onChangeNombre,
+  onEliminar,
+  eliminando,
+  onCerrar,
+}: {
+  icono: React.ReactNode;
+  nombre: string;
+  placeholder: string;
+  onChangeNombre: (nombre: string) => void;
+  onEliminar: () => void;
+  eliminando?: boolean;
+  onCerrar: () => void;
+}) {
+  return (
+    <div
+      className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-b"
+      style={{
+        borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+        background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+      }}
+    >
+      <div
+        className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
+        style={{
+          background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+          borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
+        }}
+      >
+        {icono}
+      </div>
+      <input
+        className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
+        placeholder={placeholder}
+        value={nombre}
+        onChange={(e) => onChangeNombre(e.target.value)}
+      />
+      <button
+        type="button"
+        onClick={onEliminar}
+        disabled={eliminando}
+        title="Eliminar"
+        className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all disabled:opacity-40 cursor-pointer"
+      >
+        <Trash2 size={10} />
+      </button>
+      <button
+        type="button"
+        onClick={onCerrar}
+        title="Cerrar (Esc)"
+        className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/8 transition-colors cursor-pointer"
+      >
+        <X size={16} />
+      </button>
     </div>
   );
 }
