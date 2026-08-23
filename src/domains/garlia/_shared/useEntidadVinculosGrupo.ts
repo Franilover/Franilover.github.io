@@ -35,10 +35,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 
-import type { Formacion, Organo } from "@/domains/garlia/elementos/types";
+import type { EntidadCatalogoGrupoBase } from "@/domains/garlia/elementos/types";
 
-/** Shape mínimo compartido por Organo y Formacion. */
-export type EntradaCatalogoGrupo = Organo | Formacion;
+/** Shape mínimo compartido por Organo y Formacion — tipado contra la base
+ *  común (EntidadCatalogoGrupoBase) en vez de una unión (Organo | Formacion),
+ *  que TypeScript no deja `extends`-ear de forma confiable (perdía `id` en
+ *  GrupoVinculadoResuelto — ver build error). Sigue aceptando indistintamente
+ *  filas de Organo o de Formacion en runtime, porque ambas son
+ *  estructuralmente esa misma base. */
+export type EntradaCatalogoGrupo = EntidadCatalogoGrupoBase;
 
 /** Fila cruda de una tabla puente {id, [columnaFk]: string, grupo_compuesto_id, created_at}. */
 interface VinculoGrupo {

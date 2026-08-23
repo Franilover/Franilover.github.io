@@ -234,7 +234,14 @@ export interface GrupoCompuesto {
 // `grupo_compuesto_id` por compatibilidad histórica, aunque hoy apunte a
 // organos.id o formaciones.id según el caso (no a una tabla
 // "grupos_compuestos", que ya no existe).
-export interface Organo {
+//
+// Organo y Formacion son estructuralmente idénticos — ambos extienden esta
+// base en vez de repetir los campos, así el código compartido (ver
+// useEntidadVinculosGrupo.ts, SeccionGruposVinculados.tsx) puede tipar
+// contra la base sin recurrir a un tipo unión (`Organo | Formacion`), que
+// TypeScript no deja `extends`-ear de forma confiable y termina "perdiendo"
+// campos como `id` en el tipo resultante.
+export interface EntidadCatalogoGrupoBase {
   id: string;
   nombre: string;
   funcion: string | null;
@@ -243,14 +250,9 @@ export interface Organo {
   updated_at?: string;
 }
 
-export interface Formacion {
-  id: string;
-  nombre: string;
-  funcion: string | null;
-  notas: string | null;
-  created_at: string;
-  updated_at?: string;
-}
+export interface Organo extends EntidadCatalogoGrupoBase {}
+
+export interface Formacion extends EntidadCatalogoGrupoBase {}
 
 export const CONFIG_ORGANOS = {
   tabla: "organos",
