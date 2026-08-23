@@ -79,6 +79,7 @@ import { useMembresiaGruposCriatura } from "@/domains/garlia/grupos/useMembresia
 import { PanelPerfilCriatura } from "@/domains/garlia/biologia/PerfilAtomicoCriaturaPanel";
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
+import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
 import { PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
@@ -180,6 +181,10 @@ export function EditorCriatura({
   // nota en MineralEditor.tsx/EditorItem.tsx (su espejo Grano).
   const [editandoCelulaId, setEditandoCelulaId] = useState<string | null>(null);
   const celulasCatalogo = useCelulas();
+
+  // Click en un Compuesto (desde el panel de Órgano o desde el de Célula)
+  // abre acá su editor completo — mismo patrón que FloraEditor.tsx.
+  const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
 
   function onOrganoActualizadoLocal(id: string, updates: Partial<Organo>) {
     setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
@@ -906,6 +911,7 @@ export function EditorCriatura({
           compuestos={compuestosOrganos}
           onCerrar={() => setEditandoGrupoId(null)}
           onActualizar={persistirOrgano}
+          onAbrirCompuesto={setEditandoCompuestoId}
         />
       )}
 
@@ -923,6 +929,28 @@ export function EditorCriatura({
               onCerrar={() => setEditandoCelulaId(null)}
               onActualizar={celulasCatalogo.actualizar}
               onEliminar={celulasCatalogo.eliminar}
+              onAbrirCompuesto={setEditandoCompuestoId}
+            />
+          );
+        })()}
+
+      {/* Click en un Compuesto (desde el panel de Órgano o de Célula) — el
+          editor completo del propio Compuesto, un nivel más adentro. */}
+      {editandoCompuestoId &&
+        (() => {
+          const compuesto = compuestosOrganos.find((c) => c.id === editandoCompuestoId);
+          if (!compuesto) return null;
+          return (
+            <CompuestoPanelFlotante
+              compuesto={compuesto}
+              elementos={elementosPerfil}
+              todosLosCompuestos={compuestosOrganos}
+              onCerrar={() => setEditandoCompuestoId(null)}
+              onActualizar={(id, cambios) =>
+                setCompuestosOrganos((prev) =>
+                  prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+                )
+              }
             />
           );
         })()}

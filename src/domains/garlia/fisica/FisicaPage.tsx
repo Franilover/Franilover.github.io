@@ -56,6 +56,7 @@ import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
+import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { CatalogoVetasFisica } from "./CatalogoVetasFisica";
 
 /** Adapta un SubsistemaMagia al shape FilaCatalogo — vive acá (no en
@@ -375,8 +376,12 @@ function TodasLasBasesView({
   // subirlos como props hasta RunasPage.
   const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useFormaciones();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
-  const { items: compuestosCatalogo } = useCompuestos();
+  const { items: compuestosCatalogo, setItems: setCompuestosCatalogo } = useCompuestos();
   const { items: elementosCatalogo } = useElementos();
+
+  // Click en un Compuesto (desde Granos/Vetas, Formaciones o Habilidades)
+  // abre acá su editor completo — mismo patrón que BiologiaPage/FloraEditor.
+  const [compuestoAbiertoId, setCompuestoAbiertoId] = useState<string | null>(null);
 
   async function actualizarFormacion(id: string, cambios: Partial<Formacion>) {
     setCatalogoFormaciones((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
@@ -496,6 +501,7 @@ function TodasLasBasesView({
         <div className="flex flex-col gap-2 pt-2 border-t border-primary/10">
           <CatalogoVetasFisica
             compuestos={compuestosCatalogo}
+            onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
           />
         </div>
 
@@ -512,6 +518,7 @@ function TodasLasBasesView({
             items={catalogoFormaciones}
             compuestos={compuestosCatalogo}
             onActualizar={actualizarFormacion}
+            onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
           />
         </div>
 
@@ -523,9 +530,31 @@ function TodasLasBasesView({
             compuestos={compuestosCatalogo}
             elementos={elementosCatalogo}
             onActualizar={actualizarHabilidad}
+            onAbrirItem={(item) => {
+              if (item.tipo === "compuesto") setCompuestoAbiertoId(item.id);
+            }}
           />
         </div>
       </div>
+
+      {compuestoAbiertoId &&
+        (() => {
+          const compuesto = compuestosCatalogo.find((c) => c.id === compuestoAbiertoId);
+          if (!compuesto) return null;
+          return (
+            <CompuestoPanelFlotante
+              compuesto={compuesto}
+              elementos={elementosCatalogo}
+              todosLosCompuestos={compuestosCatalogo}
+              onCerrar={() => setCompuestoAbiertoId(null)}
+              onActualizar={(id, cambios) =>
+                setCompuestosCatalogo((prev) =>
+                  prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+                )
+              }
+            />
+          );
+        })()}
     </div>
   );
 }
