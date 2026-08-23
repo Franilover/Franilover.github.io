@@ -24,9 +24,12 @@
 import { Plus, Search, X, type LucideIcon } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-import type { Compuesto, GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import type { Compuesto } from "@/domains/garlia/elementos/types";
 import { TarjetaFormacionOrgano } from "@/domains/garlia/_shared/TarjetaFormacionOrgano";
-import type { GrupoVinculadoResuelto } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
+import type {
+  EntradaCatalogoGrupo,
+  GrupoVinculadoResuelto,
+} from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 export function SeccionGruposVinculados({
   titulo,
@@ -52,14 +55,14 @@ export function SeccionGruposVinculados({
   icono: LucideIcon;
   items: GrupoVinculadoResuelto[];
   /** Catálogo completo del propio módulo (Órganos, Formaciones…) para el picker "usar existente". */
-  catalogo: GrupoCompuesto[];
+  catalogo: EntradaCatalogoGrupo[];
   loading?: boolean;
   compuestos: Compuesto[];
   /** Crea un registro vacío + lo vincula — el llamador es responsable de
    *  abrir el panel flotante con el id devuelto (ver EditorItem.tsx). */
   onCrearNuevo: () => void | Promise<{ id: string } | null>;
   onUsarExistente: (grupoCompuestoId: string) => void;
-  onUpdate: (id: string, updates: Partial<GrupoCompuesto>) => void;
+  onUpdate: (id: string, updates: Partial<EntradaCatalogoGrupo>) => void;
   onDelete: (vinculoId: string) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
   onAbrirGrupo?: (grupoId: string) => void;
@@ -198,7 +201,7 @@ function PickerUsarExistente({
   onClose,
 }: {
   titulo: string;
-  disponibles: GrupoCompuesto[];
+  disponibles: EntradaCatalogoGrupo[];
   compuestos: Compuesto[];
   labelBuscar: string;
   onElegir: (id: string) => void;

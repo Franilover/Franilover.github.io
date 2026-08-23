@@ -219,23 +219,141 @@ export interface GrupoCompuesto {
   updated_at?: string;
 }
 
-// ─── Estructuras ensambladas: catálogo unificado de Órganos/Formaciones ───
-// Antes vivían como GrupoCompuesto tipo="organo"/"formacion"/"estructura";
-// luego pasaron por tablas separadas ("organos", "formaciones") en un
-// rediseño intermedio. Hoy viven todas en una sola tabla real
-// "estructuras_ensambladas", mismo shape que GrupoCompuesto. Se vinculan
-// N:N a plantas (planta_organos), minerales (mineral_formaciones), items
-// (item_estructura) y criaturas (criatura_organos), todas vía
-// grupo_compuesto_id → estructuras_ensambladas.id. "Organo" y "Formacion"
-// quedan como alias de conveniencia para no reescribir cada sitio de uso —
-// son el mismo tipo.
-export type EstructuraEnsamblada = GrupoCompuesto;
-export type Organo = EstructuraEnsamblada;
-export type Formacion = EstructuraEnsamblada;
+// ─── Órganos / Formaciones: catálogo propio, SEPARADO ──────────────────────
+// Pasaron por 3 etapas: GrupoCompuesto tipo="organo"/"formacion" → tabla
+// unificada "estructuras_ensambladas" → hoy, dos tablas reales separadas
+// "organos" y "formaciones", cada una con su propia jerarquía de
+// composición debajo (ver Célula/Tejido y Grano/Veta más abajo). Ya NO
+// tienen columna `componentes`: un Órgano/Formación es solo catálogo
+// (nombre, función, notas) — la fórmula de compuestos vive varios niveles
+// más abajo, resuelta vía la tabla puente organo_tejidos/formacion_vetas.
+//
+// Se vinculan N:N a plantas (planta_organos), minerales
+// (mineral_formaciones), items (item_estructura) y criaturas
+// (criatura_organos) — todas esas tablas puente siguen usando la columna
+// `grupo_compuesto_id` por compatibilidad histórica, aunque hoy apunte a
+// organos.id o formaciones.id según el caso (no a una tabla
+// "grupos_compuestos", que ya no existe).
+export interface Organo {
+  id: string;
+  nombre: string;
+  funcion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at?: string;
+}
 
-export const CONFIG_ESTRUCTURAS_ENSAMBLADAS = {
-  tabla: "estructuras_ensambladas",
-  select: "id, nombre, notas, componentes, created_at, updated_at",
+export interface Formacion {
+  id: string;
+  nombre: string;
+  funcion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export const CONFIG_ORGANOS = {
+  tabla: "organos",
+  select: "id, nombre, funcion, notas, created_at, updated_at",
+};
+
+export const CONFIG_FORMACIONES = {
+  tabla: "formaciones",
+  select: "id, nombre, funcion, notas, created_at, updated_at",
+};
+
+// ─── Células / Tejidos: composición de un Órgano (flora, criaturas) ───────
+// Un Órgano no tiene fórmula propia — se arma de Tejidos (organo_tejidos,
+// con `proporcion` libre en texto), y cada Tejido se arma de Células
+// (tejidos.celula_id, 1:1 por ahora), y cada Célula referencia un único
+// Compuesto real (celulas.compuesto_id). Cadena completa:
+//   Organo → organo_tejidos → Tejido → Celula → Compuesto
+// Mismo espíritu que el viejo `componentes` plano, pero con 2 niveles
+// intermedios con nombre/función propios (una Célula o Tejido puede
+// reutilizarse entre Órganos distintos).
+export interface Celula {
+  id: string;
+  nombre: string;
+  compuesto_id: string | null;
+  estructura: unknown;
+  funcion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Tejido {
+  id: string;
+  nombre: string;
+  celula_id: string | null;
+  estructura: unknown;
+  funcion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** Fila puente organo_tejidos: vincula un Tejido a un Órgano con una proporción libre. */
+export interface OrganoTejido {
+  id: string;
+  organo_id: string;
+  tejido_id: string;
+  proporcion: string | null;
+  created_at: string;
+}
+
+export const CONFIG_CELULAS = {
+  tabla: "celulas",
+  select: "id, nombre, compuesto_id, estructura, funcion, notas, created_at, updated_at",
+};
+
+export const CONFIG_TEJIDOS = {
+  tabla: "tejidos",
+  select: "id, nombre, celula_id, estructura, funcion, notas, created_at, updated_at",
+};
+
+// ─── Granos / Vetas: composición de una Formación (minerales) ────────────
+// Espejo inerte de Célula/Tejido: Formacion → formacion_vetas → Veta →
+// Grano → Compuesto.
+export interface Grano {
+  id: string;
+  nombre: string;
+  compuesto_id: string | null;
+  estructura: unknown;
+  funcion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Veta {
+  id: string;
+  nombre: string;
+  grano_id: string | null;
+  estructura: unknown;
+  funcion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** Fila puente formacion_vetas: vincula una Veta a una Formación con una proporción libre. */
+export interface FormacionVeta {
+  id: string;
+  formacion_id: string;
+  veta_id: string;
+  proporcion: string | null;
+  created_at: string;
+}
+
+export const CONFIG_GRANOS = {
+  tabla: "granos",
+  select: "id, nombre, compuesto_id, estructura, funcion, notas, created_at, updated_at",
+};
+
+export const CONFIG_VETAS = {
+  tabla: "vetas",
+  select: "id, nombre, grano_id, estructura, funcion, notas, created_at, updated_at",
 };
 
 // ─── Procesos/Reacciones: recetas reutilizables de consume/produce ────────

@@ -4,32 +4,41 @@
  * useEntidadVinculosGrupo.ts
  * ───────────────────────────────────────────────────────────────────────────
  * Generaliza usePlantaOrganosProcesos (flora/) para cualquier entidad que
- * necesite vincular N:N un catálogo propio tipo "GrupoCompuesto" — mismo
- * patrón que usan Formaciones de Minerales/Items (tabla real
- * "estructuras_ensambladas").
+ * necesite vincular N:N un catálogo propio de Órganos o Formaciones — mismo
+ * patrón que usan Formaciones de Minerales/Items (tabla real "formaciones")
+ * y Órganos de Flora/Criaturas (tabla real "organos").
  *
- * Órganos/Formaciones/Procesos/Habilidades viven en tablas propias — ya no
- * hay un `tipo` que discrimine dentro de "grupos_compuestos" — cada
- * catálogo (ej. "estructuras_ensambladas") es su propia tabla, pasada acá
- * vía `tablaCatalogo`. La entidad vinculada sigue siendo una fila puente
- * {entidad_id, grupo_compuesto_id} distinta por relación — editar la
- * fórmula en el catálogo actualiza todas las entidades que la tengan
- * vinculada.
+ * Cada catálogo (Órganos u Formaciones) es su propia tabla real, pasada
+ * acá vía `tablaCatalogo`. La entidad vinculada sigue siendo una fila
+ * puente {entidad_id, grupo_compuesto_id} distinta por relación — el
+ * nombre de columna `grupo_compuesto_id` es histórico (de cuando existía
+ * una tabla "grupos_compuestos" unificada) pero hoy apunta a organos.id o
+ * formaciones.id según el caso. Editar el registro en el catálogo
+ * actualiza todas las entidades que lo tengan vinculado.
+ *
+ * A diferencia de la versión vieja (cuando el catálogo era GrupoCompuesto
+ * con `componentes` inline), un Órgano/Formación ya NO tiene fórmula
+ * propia — crearYVincular solo crea el registro vacío (nombre/función);
+ * la composición (Tejidos/Granos) se arma después, por separado, vía
+ * useOrganoTejidos/useFormacionVetas sobre el id ya creado.
  *
  * Uso:
  *   const formaciones = useEntidadVinculosGrupo({
  *     entidadId: item.id,
- *     tablaCatalogo: "estructuras_ensambladas",
+ *     tablaCatalogo: "formaciones",
  *     tablaPuente: "item_estructura",
  *     columnaFk: "item_id",
- *     catalogo: catalogoFormaciones, // useEstructurasEnsambladas().items
+ *     catalogo: catalogoFormaciones, // useFormaciones().items
  *   });
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 
-import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import type { Formacion, Organo } from "@/domains/garlia/elementos/types";
+
+/** Shape mínimo compartido por Organo y Formacion. */
+export type EntradaCatalogoGrupo = Organo | Formacion;
 
 /** Fila cruda de una tabla puente {id, [columnaFk]: string, grupo_compuesto_id, created_at}. */
 interface VinculoGrupo {
@@ -39,7 +48,7 @@ interface VinculoGrupo {
   [key: string]: unknown;
 }
 
-export interface GrupoVinculadoResuelto extends GrupoCompuesto {
+export interface GrupoVinculadoResuelto extends EntradaCatalogoGrupo {
   /** Id de la fila puente — necesario para desvincular sin borrar el grupo del catálogo. */
   vinculo_id: string;
 }
@@ -53,14 +62,14 @@ export function useEntidadVinculosGrupo({
 }: {
   /** Id de la entidad padre (item, planta, mineral…). */
   entidadId: string;
-  /** Nombre de la tabla de catálogo propia, ej. "estructuras_ensambladas". */
+  /** Nombre de la tabla de catálogo propia, ej. "formaciones" u "organos". */
   tablaCatalogo: string;
   /** Nombre de la tabla puente en Supabase, ej. "item_estructura". */
   tablaPuente: string;
   /** Columna FK de la tabla puente que apunta a la entidad padre, ej. "item_id". */
   columnaFk: string;
   /** Catálogo ya cargado por el padre (ej. useFormaciones().items). */
-  catalogo: GrupoCompuesto[];
+  catalogo: EntradaCatalogoGrupo[];
 }) {
   const [vinculos, setVinculos] = useState<VinculoGrupo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,18 +105,21 @@ export function useEntidadVinculosGrupo({
   }, [vinculos, catalogo]);
 
   // ── Crear un registro nuevo en tablaCatalogo + vincularlo ──────────────
+  // Ya no lleva `componentes` — un Organo/Formacion nuevo nace vacío
+  // (solo nombre) y su composición se carga después, por separado, vía
+  // useOrganoTejidos/useFormacionVetas sobre el id devuelto acá.
   const crearYVincular = useCallback(
     async (nombre: string = "") => {
       const { data: nuevoGrupo, error: errorGrupo } = await supabase
         .from(tablaCatalogo)
-        .insert([{ nombre, componentes: [] }])
+        .insert([{ nombre, funcion: null }])
         .select()
         .single();
       if (errorGrupo || !nuevoGrupo) return null;
 
       const { data: vinculo, error: errorVinculo } = await supabase
         .from(tablaPuente)
-        .insert([{ [columnaFk]: entidadId, grupo_compuesto_id: (nuevoGrupo as GrupoCompuesto).id }])
+        .insert([{ [columnaFk]: entidadId, grupo_compuesto_id: (nuevoGrupo as EntradaCatalogoGrupo).id }])
         .select()
         .single();
       if (errorVinculo || !vinculo) {
@@ -117,12 +129,12 @@ export function useEntidadVinculosGrupo({
       }
 
       setVinculos((prev) => [...prev, vinculo as VinculoGrupo]);
-      return { ...(nuevoGrupo as GrupoCompuesto), vinculo_id: (vinculo as VinculoGrupo).id };
+      return { ...(nuevoGrupo as EntradaCatalogoGrupo), vinculo_id: (vinculo as VinculoGrupo).id };
     },
     [tablaCatalogo, tablaPuente, columnaFk, entidadId],
   );
 
-  // ── Vincular un GrupoCompuesto ya existente del catálogo ───────────────
+  // ── Vincular un registro ya existente del catálogo ─────────────────────
   const vincularExistente = useCallback(
     async (grupoCompuestoId: string) => {
       if (vinculos.some((v) => v.grupo_compuesto_id === grupoCompuestoId)) return null;
@@ -143,7 +155,7 @@ export function useEntidadVinculosGrupo({
   // ── Actualizar el registro en tablaCatalogo (afecta a todas las
   // entidades que lo tengan vinculado) ────────────────────────────────────
   const actualizar = useCallback(
-    async (grupoCompuestoId: string, updates: Partial<GrupoCompuesto>) => {
+    async (grupoCompuestoId: string, updates: Partial<EntradaCatalogoGrupo>) => {
       const { error } = await supabase
         .from(tablaCatalogo)
         .update(updates)
@@ -155,7 +167,7 @@ export function useEntidadVinculosGrupo({
     [tablaCatalogo],
   );
 
-  // ── Desvincular (borra solo la fila puente, el GrupoCompuesto sigue en
+  // ── Desvincular (borra solo la fila puente, el registro sigue en
   // el catálogo para otras entidades) ─────────────────────────────────────
   const desvincular = useCallback(
     async (vinculoId: string) => {

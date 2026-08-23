@@ -13,7 +13,7 @@
  * en paralelo.
  */
 
-import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import type { Organo } from "@/domains/garlia/elementos/types";
 
 export interface Flora {
   id: string;
@@ -31,28 +31,29 @@ export interface Flora {
 }
 
 /**
- * Vínculo N:N entre Flora y GrupoCompuesto (con tipo="organo").
- * Reemplaza a la vieja tabla puente `planta_organos` → `organos`: ahora el
- * catálogo compartido de "órganos" ES el catálogo de Grupos de Compuestos
- * filtrado por tipo="organo", así se evita mantener dos tablas de fórmulas
- * reutilizables en paralelo.
+ * Vínculo N:N entre Flora y Organo. Tabla puente real `planta_organos` →
+ * `organos.id`. La columna `grupo_compuesto_id` es el nombre histórico
+ * (de cuando existía una tabla unificada "grupos_compuestos") pero hoy
+ * apunta a organos.id.
  */
 export interface PlantaOrgano {
   id: string;
   planta_id: string;
-  /** FK a grupos_compuestos.id (antes: organo_id → organos.id). */
+  /** FK a organos.id (nombre de columna histórico). */
   grupo_compuesto_id: string;
   created_at: string;
 }
 
 /**
  * Vista combinada usada por la UI: el vínculo puente + los datos del
- * GrupoCompuesto ya resueltos, para no tener que hacer el join a mano en
- * cada componente que solo necesita "los órganos de esta planta, con su
- * fórmula". `vinculo_id` es el id de la fila puente (PlantaOrgano.id) —
- * necesario para poder desvincular sin borrar el grupo del catálogo.
+ * Organo ya resueltos, para no tener que hacer el join a mano en cada
+ * componente que solo necesita "los órganos de esta planta". La fórmula
+ * de compuestos (Tejidos/Células) se resuelve aparte, vía
+ * useOrganoTejidos, sobre el id de este Organo. `vinculo_id` es el id de
+ * la fila puente (PlantaOrgano.id) — necesario para poder desvincular
+ * sin borrar el Organo del catálogo.
  */
-export interface PlantaOrganoResuelto extends GrupoCompuesto {
+export interface PlantaOrganoResuelto extends Organo {
   vinculo_id: string;
 }
 

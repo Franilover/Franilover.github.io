@@ -4,46 +4,55 @@
  * GruposCompuestosPage.tsx
  * ───────────────────────────────────────────────────────────────────────────
  * Ya NO existe la sub-sección de página "Grupos de compuestos" (la tabla
- * "grupos_compuestos" fue eliminada de Supabase — reemplazada por
- * "estructuras_ensambladas" y "reacciones", ver elementos/types.ts). Este
- * archivo solo sobrevive por GrupoCompuestoPanelFlotante: el modal genérico
- * de edición de fórmula (chips + stepper vía SelectorFormulaOrgano) que
- * reutilizan MineralEditor, EditorItem, EditorCriatura, FloraEditor y
- * GridCatalogoGrupo para editar una EstructuraEnsamblada o Reaccion ya
- * vinculada — recibe todo por props (grupo, onActualizar, onEliminar), no
- * toca ninguna tabla directamente, así que sigue siendo válido tal cual.
+ * "grupos_compuestos" fue eliminada de Supabase hace tiempo). Este archivo
+ * solo sobrevive por GrupoCompuestoPanelFlotante: el modal genérico de
+ * edición de un Órgano o Formación ya vinculado — nombre, función, fórmula
+ * (vía SelectorFormulaTejidos + useOrganoTejidos/useFormacionVetas) y
+ * notas — que reutilizan MineralEditor, EditorItem, EditorCriatura,
+ * FloraEditor, BiologiaPage y GridCatalogoGrupo. Recibe el registro por
+ * props (grupo, onActualizar, onEliminar) y resuelve su propia
+ * composición internamente según `tipo`.
  */
 
 import { Boxes, Plus, Trash2, X } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
-import { SelectorFormulaOrgano, type ComponenteOrgano } from "@/domains/garlia/flora/SelectorFormulaOrgano";
+import { SelectorFormulaTejidos } from "@/domains/garlia/_shared/SelectorFormulaTejidos";
+import { useOrganoTejidos } from "@/domains/garlia/elementos/useOrganoTejidos";
+import { useFormacionVetas } from "@/domains/garlia/elementos/useFormacionVetas";
+import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
-import type { Compuesto, GrupoCompuesto } from "./types";
+import type { Compuesto } from "./types";
 
 /**
- * Panel flotante centrado del detalle de un Grupo de Compuestos — mismo
+ * Panel flotante centrado del detalle de un Órgano/Formación — mismo
  * comportamiento visual que ElementoPanelFlotante/CompuestoPanelFlotante en
  * ElementosPage.tsx: modal centrado con backdrop blur, cierra con click en
- * el backdrop, Escape, o el botón X. Más liviano que esos dos (sin
- * EditorHeaderBar) porque acá el "editor" es solo nombre + fórmula + notas.
+ * el backdrop, Escape, o el botón X.
  */
 export function GrupoCompuestoPanelFlotante({
   grupo,
+  tipo = "organo",
   compuestos,
   onCerrar,
   onActualizar,
   onEliminar,
   onAbrirCompuesto,
 }: {
-  grupo: GrupoCompuesto;
+  grupo: EntradaCatalogoGrupo;
+  /** "organo" resuelve la fórmula vía Tejidos/Células; "formacion" vía Vetas/Granos. */
+  tipo?: "organo" | "formacion";
   compuestos: Compuesto[];
   onCerrar: () => void;
-  onActualizar: (id: string, cambios: Partial<GrupoCompuesto>) => void;
+  onActualizar: (id: string, cambios: Partial<EntradaCatalogoGrupo>) => void;
   onEliminar?: (id: string) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
 }) {
+  const tejidos = useOrganoTejidos(tipo === "organo" ? grupo.id : null);
+  const vetas = useFormacionVetas(tipo === "formacion" ? grupo.id : null);
+  const formula = tipo === "organo" ? tejidos : vetas;
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCerrar();
@@ -56,16 +65,6 @@ export function GrupoCompuestoPanelFlotante({
       document.body.style.overflow = prevOverflow;
     };
   }, [onCerrar]);
-
-  function agregarComponente() {
-    const componentes = grupo.componentes ?? [];
-    const elegidos = new Set(componentes.map((c) => c.compuesto_id));
-    const primero = compuestos.find((c) => !elegidos.has(c.id)) ?? compuestos[0];
-    if (!primero) return;
-    onActualizar(grupo.id, {
-      componentes: [...componentes, { compuesto_id: primero.id, cantidad: 1 }],
-    });
-  }
 
   if (typeof document === "undefined") return null;
 
@@ -107,7 +106,7 @@ export function GrupoCompuestoPanelFlotante({
           </div>
           <input
             className="flex-1 min-w-0 bg-transparent text-sm font-black text-primary outline-none placeholder:text-primary/25"
-            placeholder="Nombre del grupo (ej: Base floral)…"
+            placeholder="Nombre (ej: Hoja, Veta de cuarzo)…"
             value={grupo.nombre ?? ""}
             onChange={(e) => onActualizar(grupo.id, { nombre: e.target.value })}
           />
@@ -115,7 +114,7 @@ export function GrupoCompuestoPanelFlotante({
             <button
               type="button"
               onClick={() => onEliminar(grupo.id)}
-              title="Eliminar grupo"
+              title="Eliminar"
               className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-micro font-black uppercase tracking-widest border border-red-500/15 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all cursor-pointer"
             >
               <Trash2 size={10} />
@@ -131,8 +130,20 @@ export function GrupoCompuestoPanelFlotante({
           </button>
         </div>
 
-        {/* Contenido: fórmula + notas */}
+        {/* Contenido: función + fórmula + notas */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
+          <div>
+            <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
+              Función
+            </p>
+            <input
+              className="w-full bg-transparent px-0 py-1 text-xs text-primary/80 outline-none placeholder:text-primary/25"
+              placeholder="Para qué sirve…"
+              value={grupo.funcion ?? ""}
+              onChange={(e) => onActualizar(grupo.id, { funcion: e.target.value })}
+            />
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-micro font-black uppercase tracking-widest text-primary/40">
@@ -140,7 +151,11 @@ export function GrupoCompuestoPanelFlotante({
               </p>
               <button
                 type="button"
-                onClick={agregarComponente}
+                onClick={() => {
+                  const elegidos = new Set(formula.items.map((f) => f.compuesto_id));
+                  const primero = compuestos.find((c) => !elegidos.has(c.id)) ?? compuestos[0];
+                  if (primero) void formula.agregarCompuesto(primero.id);
+                }}
                 disabled={compuestos.length === 0}
                 title="Agregar compuesto"
                 className="w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
@@ -148,13 +163,24 @@ export function GrupoCompuestoPanelFlotante({
                 <Plus size={13} />
               </button>
             </div>
-            <SelectorFormulaOrgano
-              compuestos={compuestos}
-              componentes={(grupo.componentes ?? []) as ComponenteOrgano[]}
-              onChange={(componentes) => onActualizar(grupo.id, { componentes })}
-              onAbrirCompuesto={onAbrirCompuesto}
-              ocultarBotonAgregar
-            />
+            {formula.loading ? (
+              <p className="text-micro text-primary/25 italic">Cargando…</p>
+            ) : (
+              <SelectorFormulaTejidos
+                compuestos={compuestos}
+                items={formula.items}
+                onAgregar={(compuestoId) => void formula.agregarCompuesto(compuestoId)}
+                onActualizarCompuesto={(catalogoId, compuestoId) =>
+                  void formula.actualizarCompuesto(catalogoId, compuestoId)
+                }
+                onActualizarProporcion={(vinculoId, proporcion) =>
+                  void formula.actualizarProporcion(vinculoId, proporcion)
+                }
+                onQuitar={(vinculoId) => void formula.quitarCompuesto(vinculoId)}
+                onAbrirCompuesto={onAbrirCompuesto}
+                ocultarBotonAgregar
+              />
+            )}
           </div>
 
           <div>
@@ -163,7 +189,7 @@ export function GrupoCompuestoPanelFlotante({
             </p>
             <textarea
               className="w-full min-h-[6rem] bg-transparent px-0 py-1 text-xs text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-              placeholder="Notas del grupo…"
+              placeholder="Notas…"
               value={grupo.notas ?? ""}
               onChange={(e) => onActualizar(grupo.id, { notas: e.target.value })}
             />

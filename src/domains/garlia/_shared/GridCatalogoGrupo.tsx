@@ -26,18 +26,20 @@ import React, { useState } from "react";
 
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { ReaccionPanelFlotante } from "@/domains/garlia/elementos/ReaccionesPage";
-import type { Compuesto, Elemento, GrupoCompuesto, Reaccion } from "@/domains/garlia/elementos/types";
+import type { Compuesto, Elemento, Reaccion } from "@/domains/garlia/elementos/types";
+import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 type Props =
   | {
       modo: "grupo";
       titulo: string;
-      items: GrupoCompuesto[];
+      items: EntradaCatalogoGrupo[];
       compuestos: Compuesto[];
-      onActualizar: (id: string, cambios: Partial<GrupoCompuesto>) => void;
+      onActualizar: (id: string, cambios: Partial<EntradaCatalogoGrupo>) => void;
       onEliminar?: (id: string) => void;
       onAbrirCompuesto?: (compuestoId: string) => void;
-      /** Ícono de tarjeta — por defecto según el tipo de GrupoCompuesto más común en items. */
+      /** Ícono de tarjeta Y qué cadena de composición resolver en el panel
+       *  flotante (organo→tejidos/células, formacion→vetas/granos). */
       icono?: "organo" | "formacion" | "generico";
     }
   | {
@@ -108,7 +110,8 @@ export function GridCatalogoGrupo(props: Props) {
 
       {activo && props.modo === "grupo" && (
         <GrupoCompuestoPanelFlotante
-          grupo={activo as GrupoCompuesto}
+          grupo={activo as EntradaCatalogoGrupo}
+          tipo={props.icono === "formacion" ? "formacion" : "organo"}
           compuestos={props.compuestos}
           onCerrar={() => setSeleccionadoId(null)}
           onActualizar={props.onActualizar}
