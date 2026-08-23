@@ -314,8 +314,11 @@ function PanelEditorGrano({
 }
 
 // ─── Panel Veta: nombre, función, notas, Grano (grano_id) ──────────────────
+// Exportado: reutilizado directo desde SelectorFormulaTejidos/GruposCompuestosPage
+// (editor de la fórmula de una Formación) para abrir el mismo editor completo
+// al clickear el nombre de una fila — un solo editor de Veta en toda la app.
 
-function PanelEditorVeta({
+export function PanelEditorVeta({
   item,
   granos,
   loadingGranos,
@@ -419,9 +422,10 @@ function PanelEditorVeta({
 
 // ─── SelectorGrano: mismo lenguaje visual que SelectorCompuesto, pero
 // eligiendo un Grano del catálogo (para Veta.grano_id) — no crea Granos
-// nuevos desde acá (para eso está el botón "Nuevo" de la grid). ────────────
+// nuevos desde acá (para eso está el botón "Nuevo" de la grid).
+// Exportado junto con PanelEditorVeta — ver nota arriba. ───────────────────
 
-function SelectorGrano({
+export function SelectorGrano({
   granos,
   loadingGranos,
   granoId,

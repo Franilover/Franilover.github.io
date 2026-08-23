@@ -15,13 +15,19 @@
  */
 
 import { Boxes, Trash2, X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { SelectorFormulaTejidos } from "@/domains/garlia/_shared/SelectorFormulaTejidos";
 import { useOrganoTejidos } from "@/domains/garlia/elementos/useOrganoTejidos";
 import { useFormacionVetas } from "@/domains/garlia/elementos/useFormacionVetas";
 import { useCatalogoTejidos } from "@/domains/garlia/elementos/useCatalogoTejidos";
+import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
+import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
+import { useGranos } from "@/domains/garlia/elementos/useGranos";
+import { useVetas } from "@/domains/garlia/elementos/useVetas";
+import { PanelEditorTejido, SelectorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { PanelEditorVeta, SelectorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 import type { Compuesto } from "./types";
@@ -54,6 +60,18 @@ export function GrupoCompuestoPanelFlotante({
   const vetas = useFormacionVetas(tipo === "formacion" ? grupo.id : null);
   const formula = tipo === "organo" ? tejidos : vetas;
   const catalogo = useCatalogoTejidos(tipo);
+
+  // ── Editor completo del Tejido/Veta propio de una fila de la fórmula —
+  // mismo panel que Biología > Catálogo de Tejidos / Física > Catálogo de
+  // Vetas (ver CatalogoTejidosBiologia.tsx / CatalogoVetasFisica.tsx),
+  // reutilizado acá para no duplicar el editor. Solo se instancian los
+  // catálogos globales (useCelulas/useTejidos o useGranos/useVetas) cuando
+  // el panel está realmente abierto. ────────────────────────────────────
+  const [tejidoOVetaAbiertoId, setTejidoOVetaAbiertoId] = useState<string | null>(null);
+  const celulasCatalogo = useCelulas();
+  const tejidosCatalogo = useTejidos();
+  const granosCatalogo = useGranos();
+  const vetasCatalogo = useVetas();
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -164,14 +182,12 @@ export function GrupoCompuestoPanelFlotante({
                 onActualizarCompuesto={(catalogoId, compuestoId) =>
                   void formula.actualizarCompuesto(catalogoId, compuestoId)
                 }
-                onActualizarNombre={(tejidoOVetaId, nombre) =>
-                  void formula.actualizarNombre(tejidoOVetaId, nombre)
-                }
                 onActualizarProporcion={(vinculoId, proporcion) =>
                   void formula.actualizarProporcion(vinculoId, proporcion)
                 }
                 onQuitar={(vinculoId) => void formula.quitarCompuesto(vinculoId)}
                 onAbrirCompuesto={onAbrirCompuesto}
+                onAbrirTejido={(tejidoOVetaId) => setTejidoOVetaAbiertoId(tejidoOVetaId)}
               />
             )}
           </div>
@@ -189,6 +205,43 @@ export function GrupoCompuestoPanelFlotante({
           </div>
         </div>
       </div>
+
+      {/* Editor completo del Tejido/Veta de una fila — encima de este panel
+         (mismo z-index base, PanelFlotanteBase se encarga de superponerse). */}
+      {tejidoOVetaAbiertoId && tipo === "organo" && (
+        (() => {
+          const tejidoActivo = tejidosCatalogo.items.find((t) => t.id === tejidoOVetaAbiertoId);
+          if (!tejidoActivo) return null;
+          return (
+            <PanelEditorTejido
+              item={tejidoActivo}
+              celulas={celulasCatalogo.items}
+              loadingCelulas={celulasCatalogo.loading}
+              onCerrar={() => setTejidoOVetaAbiertoId(null)}
+              onActualizar={tejidosCatalogo.actualizar}
+              onEliminar={tejidosCatalogo.eliminar}
+              onAbrirCelula={undefined}
+            />
+          );
+        })()
+      )}
+      {tejidoOVetaAbiertoId && tipo === "formacion" && (
+        (() => {
+          const vetaActiva = vetasCatalogo.items.find((v) => v.id === tejidoOVetaAbiertoId);
+          if (!vetaActiva) return null;
+          return (
+            <PanelEditorVeta
+              item={vetaActiva}
+              granos={granosCatalogo.items}
+              loadingGranos={granosCatalogo.loading}
+              onCerrar={() => setTejidoOVetaAbiertoId(null)}
+              onActualizar={vetasCatalogo.actualizar}
+              onEliminar={vetasCatalogo.eliminar}
+              onAbrirGrano={undefined}
+            />
+          );
+        })()
+      )}
     </div>,
     document.body,
   );

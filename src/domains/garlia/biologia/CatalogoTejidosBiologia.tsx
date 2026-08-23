@@ -307,8 +307,11 @@ function PanelEditorCelula({
 }
 
 // ─── Panel Tejido: nombre, función, notas, Célula (celula_id) ──────────────
+// Exportado: reutilizado directo desde SelectorFormulaTejidos/GruposCompuestosPage
+// (editor de la fórmula de un Órgano) para abrir el mismo editor completo al
+// clickear el nombre de una fila — un solo editor de Tejido en toda la app.
 
-function PanelEditorTejido({
+export function PanelEditorTejido({
   item,
   celulas,
   loadingCelulas,
@@ -412,9 +415,10 @@ function PanelEditorTejido({
 
 // ─── SelectorCelula: mismo lenguaje visual que SelectorCompuesto, pero
 // eligiendo una Célula del catálogo (para Tejido.celula_id) — no crea
-// Células nuevas desde acá (para eso está el botón "Nueva" de la grid). ────
+// Células nuevas desde acá (para eso está el botón "Nueva" de la grid).
+// Exportado junto con PanelEditorTejido — ver nota arriba. ────────────────
 
-function SelectorCelula({
+export function SelectorCelula({
   celulas,
   loadingCelulas,
   celulaId,

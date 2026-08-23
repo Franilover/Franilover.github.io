@@ -20,7 +20,7 @@
  */
 
 import { Plus, Trash2, Pencil, MoreVertical, Search, X } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import type { Compuesto } from "@/domains/garlia/elementos/types";
 import type { EntradaCatalogoTejido } from "@/domains/garlia/elementos/useCatalogoTejidos";
@@ -52,10 +52,10 @@ export function SelectorFormulaTejidos({
   catalogoDisponible,
   loadingCatalogo,
   onActualizarCompuesto,
-  onActualizarNombre,
   onActualizarProporcion,
   onQuitar,
   onAbrirCompuesto,
+  onAbrirTejido,
   ocultarBotonAgregar,
   soloLectura,
   labelCatalogo = "Tejido",
@@ -72,18 +72,19 @@ export function SelectorFormulaTejidos({
   catalogoDisponible?: EntradaCatalogoTejido[];
   loadingCatalogo?: boolean;
   onActualizarCompuesto: (celulaOGranoId: string, compuestoId: string) => void;
-  /** Renombra el Tejido/Veta propio de la fila (distinto del Compuesto que
-   *  lo compone). Si se omite, el nombre se muestra pero no es editable. */
-  onActualizarNombre?: (tejidoOVetaId: string, nombre: string) => void;
   onActualizarProporcion: (vinculoId: string, proporcion: string) => void;
   onQuitar: (vinculoId: string) => void;
   /** Abre el panel flotante del Compuesto elegido en una fila. */
   onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Abre el editor completo del Tejido/Veta propio de la fila (mismo panel
+   *  que Biología/Física > Catálogo de Tejidos/Vetas) — clickeando el
+   *  nombre. Si se omite, el nombre se muestra pero no es clickeable. */
+  onAbrirTejido?: (tejidoOVetaId: string) => void;
   /** Oculta el botón "Agregar" interno — usar cuando el padre renderiza su propio botón. */
   ocultarBotonAgregar?: boolean;
-  /** Modo solo lectura: no agregar, no editar compuesto/proporción/nombre,
-   *  no quitar — cada fila solo muestra nombre + proporción, con el nombre
-   *  clickeable a onAbrirCompuesto si se provee. Usar en tarjetas embebidas
+  /** Modo solo lectura: no agregar, no editar compuesto/proporción, no
+   *  quitar — cada fila solo muestra nombre + proporción, con el nombre
+   *  clickeable a onAbrirTejido si se provee. Usar en tarjetas embebidas
    *  donde la fórmula se edita desde el editor propio del Órgano/Formación,
    *  no inline. */
   soloLectura?: boolean;
@@ -115,7 +116,12 @@ export function SelectorFormulaTejidos({
                 key={item.vinculo_id}
                 item={item}
                 compuestos={compuestos}
-                onAbrir={
+                onAbrirTejido={
+                  onAbrirTejido && item.tejido_o_veta_id
+                    ? () => onAbrirTejido(item.tejido_o_veta_id as string)
+                    : undefined
+                }
+                onAbrirCompuesto={
                   onAbrirCompuesto && item.compuesto_id
                     ? () => onAbrirCompuesto(item.compuesto_id as string)
                     : undefined
@@ -144,14 +150,14 @@ export function SelectorFormulaTejidos({
               onCambiarCompuesto={(compuestoId) => {
                 if (item.catalogo_id) onActualizarCompuesto(item.catalogo_id, compuestoId);
               }}
-              onCambiarNombre={
-                onActualizarNombre && item.tejido_o_veta_id
-                  ? (nombre) => onActualizarNombre(item.tejido_o_veta_id as string, nombre)
-                  : undefined
-              }
               onCambiarProporcion={(proporcion) => onActualizarProporcion(item.vinculo_id, proporcion)}
               onQuitar={() => onQuitar(item.vinculo_id)}
-              onAbrir={
+              onAbrirTejido={
+                onAbrirTejido && item.tejido_o_veta_id
+                  ? () => onAbrirTejido(item.tejido_o_veta_id as string)
+                  : undefined
+              }
+              onAbrirCompuesto={
                 onAbrirCompuesto && item.compuesto_id
                   ? () => onAbrirCompuesto(item.compuesto_id as string)
                   : undefined
@@ -319,16 +325,18 @@ function PickerTejidoExistente({
 /**
  * Fila de fórmula en modo solo lectura — usada en tarjetas embebidas
  * (Planta/Criatura/Mineral/Item) donde la fórmula ya no se edita inline;
- * solo muestra nombre (clickeable a onAbrir si se provee) + proporción.
+ * solo muestra nombre (clickeable a onAbrirTejido si se provee) + proporción.
  */
 function FilaFormulaTejidoSoloLectura({
   item,
   compuestos,
-  onAbrir,
+  onAbrirTejido,
+  onAbrirCompuesto,
 }: {
   item: FilaFormulaTejido;
   compuestos: Compuesto[];
-  onAbrir?: () => void;
+  onAbrirTejido?: () => void;
+  onAbrirCompuesto?: () => void;
 }) {
   const elegido = useMemo(
     () => compuestos.find((c) => c.id === item.compuesto_id) ?? null,
@@ -338,14 +346,20 @@ function FilaFormulaTejidoSoloLectura({
   return (
     <div className="flex items-center gap-2 py-1">
       <div className="min-w-0 flex-1 flex flex-col">
-        <span className="truncate text-micro font-bold text-primary">
-          {item.nombre || "Sin nombre"}
-        </span>
         <button
           type="button"
-          onClick={onAbrir}
-          disabled={!onAbrir}
-          title={onAbrir ? `Abrir ${elegido?.nombre ?? ""}` : undefined}
+          onClick={onAbrirTejido}
+          disabled={!onAbrirTejido}
+          title={onAbrirTejido ? `Abrir ${item.nombre || ""}` : undefined}
+          className="min-w-0 text-left truncate text-micro font-bold text-primary transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+        >
+          {item.nombre || "Sin nombre"}
+        </button>
+        <button
+          type="button"
+          onClick={onAbrirCompuesto}
+          disabled={!onAbrirCompuesto}
+          title={onAbrirCompuesto ? `Abrir ${elegido?.nombre ?? ""}` : undefined}
           className="min-w-0 text-left px-0 text-[10px] text-primary/40 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
         >
           hecho de: {elegido?.nombre || "sin compuesto"}
@@ -364,29 +378,24 @@ function FilaFormulaTejidoRow({
   item,
   compuestos,
   onCambiarCompuesto,
-  onCambiarNombre,
   onCambiarProporcion,
   onQuitar,
-  onAbrir,
+  onAbrirTejido,
+  onAbrirCompuesto,
 }: {
   item: FilaFormulaTejido;
   compuestos: Compuesto[];
   onCambiarCompuesto: (compuestoId: string) => void;
-  onCambiarNombre?: (nombre: string) => void;
   onCambiarProporcion: (proporcion: string) => void;
   onQuitar: () => void;
-  onAbrir?: () => void;
+  onAbrirTejido?: () => void;
+  onAbrirCompuesto?: () => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [activo, setActivo] = useState(0);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [proporcionLocal, setProporcionLocal] = useState(item.proporcion ?? "");
-  const [nombreLocal, setNombreLocal] = useState(item.nombre ?? "");
-
-  useEffect(() => {
-    setNombreLocal(item.nombre ?? "");
-  }, [item.nombre]);
 
   const elegido = useMemo(
     () => compuestos.find((c) => c.id === item.compuesto_id) ?? null,
@@ -426,18 +435,17 @@ function FilaFormulaTejidoRow({
 
   return (
     <div className="flex flex-col gap-0.5 py-1">
-      {/* Fila principal: nombre propio del Tejido/Veta (editable) + proporción + menú */}
+      {/* Fila principal: nombre propio del Tejido/Veta (link → abre editor completo) + proporción + menú */}
       <div className="flex items-center gap-2">
-        <input
-          value={nombreLocal}
-          onChange={(e) => setNombreLocal(e.target.value)}
-          onBlur={() => {
-            if (onCambiarNombre && nombreLocal !== (item.nombre ?? "")) onCambiarNombre(nombreLocal);
-          }}
-          disabled={!onCambiarNombre}
-          placeholder="Nombre…"
-          className="flex-1 min-w-0 bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors disabled:cursor-default"
-        />
+        <button
+          type="button"
+          onClick={onAbrirTejido}
+          disabled={!onAbrirTejido}
+          title={onAbrirTejido ? `Abrir ${item.nombre || ""}` : undefined}
+          className="flex-1 min-w-0 text-left px-0 py-1 text-micro font-bold text-primary truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+        >
+          {item.nombre || "Sin nombre"}
+        </button>
 
         {/* Proporción: texto libre (ej. "60%", "mayoritario", "trazas") */}
         <input
@@ -497,9 +505,9 @@ function FilaFormulaTejidoRow({
             <div className="flex items-center gap-1 group/item">
               <button
                 type="button"
-                onClick={onAbrir}
-                disabled={!onAbrir}
-                title={onAbrir ? `Abrir ${elegido.nombre}` : undefined}
+                onClick={onAbrirCompuesto}
+                disabled={!onAbrirCompuesto}
+                title={onAbrirCompuesto ? `Abrir ${elegido.nombre}` : undefined}
                 className="min-w-0 flex-1 text-left px-0 text-[10px] font-bold text-primary/70 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
               >
                 {elegido.nombre}
