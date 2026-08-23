@@ -382,6 +382,11 @@ function TodasLasBasesView({
   // Click en un Compuesto (desde Granos/Vetas, Formaciones o Habilidades)
   // abre acá su editor completo — mismo patrón que BiologiaPage/FloraEditor.
   const [compuestoAbiertoId, setCompuestoAbiertoId] = useState<string | null>(null);
+  // Navegación controlada desde el breadcrumb "Veta → Formación" / "Grano →
+  // Formación" de CatalogoVetasFisica — al elegir una Formación, este id le
+  // llega a GridCatalogoGrupo (abrirIdExterno) para abrir su editor
+  // flotante, mismo patrón que organoAAbrirId en BiologiaPage.
+  const [formacionAAbrirId, setFormacionAAbrirId] = useState<string | null>(null);
 
   async function actualizarFormacion(id: string, cambios: Partial<Formacion>) {
     setCatalogoFormaciones((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
@@ -502,6 +507,7 @@ function TodasLasBasesView({
           <CatalogoVetasFisica
             compuestos={compuestosCatalogo}
             onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+            onAbrirFormacion={(id) => setFormacionAAbrirId(id)}
           />
         </div>
 
@@ -519,6 +525,8 @@ function TodasLasBasesView({
             compuestos={compuestosCatalogo}
             onActualizar={actualizarFormacion}
             onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+            abrirIdExterno={formacionAAbrirId}
+            onAbrirIdExternoConsumido={() => setFormacionAAbrirId(null)}
           />
         </div>
 

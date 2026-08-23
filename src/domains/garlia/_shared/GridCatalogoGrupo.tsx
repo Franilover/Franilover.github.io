@@ -148,6 +148,11 @@ export function GridCatalogoGrupo(props: Props) {
               ? (organoId) => setSeleccionadoId(organoId)
               : undefined
           }
+          onAbrirFormacionExterna={
+            props.icono === "formacion"
+              ? (formacionId) => setSeleccionadoId(formacionId)
+              : undefined
+          }
         />
       )}
 

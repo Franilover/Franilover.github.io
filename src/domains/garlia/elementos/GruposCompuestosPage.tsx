@@ -14,7 +14,7 @@
  * composición internamente según `tipo`.
  */
 
-import { Boxes, Beaker, Layers, Trash2, X } from "lucide-react";
+import { Boxes, Beaker, Layers, Gem, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -66,6 +66,15 @@ export function GrupoCompuestoPanelFlotante({
    * que onAbrirCompuesto.
    */
   onAbrirOrganoExterno?: (organoId: string) => void;
+  /**
+   * Navegar a OTRA Formación desde el breadcrumb "Veta → Formación" /
+   * "Grano → Formación" dentro del PanelEditorVeta/PanelEditorGrano
+   * anidado — esa Veta/Grano puede pertenecer a una Formación distinta a
+   * la que este panel muestra. Cierra este modal y delega en el padre
+   * (FisicaPage) abrir el editor de la Formación elegida, mismo patrón
+   * que onAbrirOrganoExterno.
+   */
+  onAbrirFormacionExterna?: (formacionId: string) => void;
 }) {
   const tejidos = useOrganoTejidos(tipo === "organo" ? grupo.id : null);
   const vetas = useFormacionVetas(tipo === "formacion" ? grupo.id : null);
@@ -198,6 +207,34 @@ export function GrupoCompuestoPanelFlotante({
           </div>
         )}
 
+        {tipo === "formacion" && (
+          <div className="shrink-0 px-3 pt-2">
+            <BreadcrumbJerarquia
+              niveles={[
+                {
+                  label: "Grano",
+                  icono: <Gem size={10} />,
+                  activo: false,
+                  items: vetas.items
+                    .map((v) => (v.grano_id ? { id: v.grano_id, nombre: v.catalogo_nombre ?? "" } : null))
+                    .filter((g): g is { id: string; nombre: string } => g !== null),
+                  loading: vetas.loading,
+                  onNavegar: (granoId) => setCelulaOGranoAbiertoId(granoId),
+                },
+                {
+                  label: "Veta",
+                  icono: <Layers size={10} />,
+                  activo: false,
+                  items: vetas.items.map((v) => ({ id: v.veta_id, nombre: v.nombre })),
+                  loading: vetas.loading,
+                  onNavegar: (vetaId) => setTejidoOVetaAbiertoId(vetaId),
+                },
+                { label: "Formación", icono: <Boxes size={10} />, activo: true },
+              ]}
+            />
+          </div>
+        )}
+
         {/* Contenido: dos columnas — izquierda composición (fórmula),
            derecha texto (función + notas). Header ya tiene el título. */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
@@ -299,6 +336,15 @@ export function GrupoCompuestoPanelFlotante({
               onActualizar={vetasCatalogo.actualizar}
               onEliminar={vetasCatalogo.eliminar}
               onAbrirGrano={(granoId) => setCelulaOGranoAbiertoId(granoId)}
+              onAbrirFormacion={(formacionId) => {
+                // La Veta puede ser usada por OTRA Formación distinta a la
+                // que este panel ya tiene abierto — cerramos todo este
+                // modal y dejamos que el padre (FisicaPage) abra la
+                // Formación elegida.
+                setTejidoOVetaAbiertoId(null);
+                onCerrar();
+                onAbrirFormacionExterna?.(formacionId);
+              }}
             />
           );
         })()
@@ -340,6 +386,19 @@ export function GrupoCompuestoPanelFlotante({
               onActualizar={granosCatalogo.actualizar}
               onEliminar={granosCatalogo.eliminar}
               onAbrirCompuesto={onAbrirCompuesto}
+              onAbrirVeta={(vetaId) => {
+                setCelulaOGranoAbiertoId(null);
+                setTejidoOVetaAbiertoId(vetaId);
+              }}
+              onAbrirFormacion={(formacionId) => {
+                // El Grano puede ser alcanzado por Vetas de OTRA Formación
+                // distinta a la que este panel ya tiene abierto — cerramos
+                // todo este modal y dejamos que el padre (FisicaPage) abra
+                // la Formación elegida.
+                setCelulaOGranoAbiertoId(null);
+                onCerrar();
+                onAbrirFormacionExterna?.(formacionId);
+              }}
             />
           );
         })()

@@ -18,11 +18,18 @@
  * no uno genérico: el de Grano usa SelectorCompuesto, el de Veta usa
  * SelectorGrano (nuevo, definido acá mismo).
  *
+ * Breadcrumb Grano ⇄ Veta ⇄ Formación (espejo de BreadcrumbJerarquia de
+ * Biología, componente genérico reutilizado tal cual — ver biologia/
+ * BreadcrumbJerarquia.tsx): a diferencia de Grano→Veta (1:1 directo vía
+ * grano_id, resuelto con useVetasDeUnGrano), Veta→Formación es M:N vía
+ * `formacion_vetas` (useFormacionesDeUnaVeta), y Grano→Formación es
+ * transitivo, atravesando ambos tramos (useFormacionesDeUnGrano).
+ *
  * Mismo lenguaje visual que GridCatalogoGrupo (grid de 3 columnas, click
  * abre panel flotante centrado).
  */
 
-import { Gem, Layers, Plus, Trash2, X, Search, Check } from "lucide-react";
+import { Gem, Layers, Boxes, Plus, Trash2, X, Search, Check } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -30,13 +37,21 @@ import { useConfirm } from "@/ui/ConfirmModal";
 import { SelectorCompuesto } from "@/domains/garlia/_shared/SelectorCompuesto";
 import { useGranos } from "@/domains/garlia/elementos/useGranos";
 import { useVetas } from "@/domains/garlia/elementos/useVetas";
+import { useVetasDeUnGrano } from "@/domains/garlia/elementos/useVetasDeUnGrano";
+import { useFormacionesDeUnaVeta } from "@/domains/garlia/elementos/useFormacionesDeUnaVeta";
+import { useFormacionesDeUnGrano } from "@/domains/garlia/elementos/useFormacionesDeUnGrano";
 import type { Grano, Compuesto, Veta } from "@/domains/garlia/elementos/types";
+import { BreadcrumbJerarquia } from "../biologia/BreadcrumbJerarquia";
 
 interface Props {
   compuestos: Compuesto[];
   loadingCompuestos?: boolean;
   onCompuestoCreado?: (c: Compuesto) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Navegar a una Formación desde el breadcrumb de un Grano o una Veta —
+   *  el padre (FisicaPage) decide cómo abrir su editor, ya que la
+   *  Formación vive fuera de este catálogo (ver GridCatalogoGrupo). */
+  onAbrirFormacion?: (formacionId: string) => void;
 }
 
 export function CatalogoVetasFisica({
@@ -44,6 +59,7 @@ export function CatalogoVetasFisica({
   loadingCompuestos,
   onCompuestoCreado,
   onAbrirCompuesto,
+  onAbrirFormacion,
 }: Props) {
   const granos = useGranos();
   const vetas = useVetas();
@@ -96,6 +112,18 @@ export function CatalogoVetasFisica({
             }}
             onCompuestoCreado={onCompuestoCreado}
             onAbrirCompuesto={onAbrirCompuesto}
+            onAbrirVeta={(vetaId) => {
+              setGranoSeleccionadoId(null);
+              setVetaSeleccionadaId(vetaId);
+            }}
+            onAbrirFormacion={
+              onAbrirFormacion
+                ? (formacionId) => {
+                    setGranoSeleccionadoId(null);
+                    onAbrirFormacion(formacionId);
+                  }
+                : undefined
+            }
           />
         )}
       </div>
@@ -142,6 +170,14 @@ export function CatalogoVetasFisica({
               setVetaSeleccionadaId(null);
               setGranoSeleccionadoId(granoId);
             }}
+            onAbrirFormacion={
+              onAbrirFormacion
+                ? (formacionId) => {
+                    setVetaSeleccionadaId(null);
+                    onAbrirFormacion(formacionId);
+                  }
+                : undefined
+            }
           />
         )}
       </div>
@@ -223,6 +259,8 @@ export function PanelEditorGrano({
   onEliminar,
   onCompuestoCreado,
   onAbrirCompuesto,
+  onAbrirVeta,
+  onAbrirFormacion,
 }: {
   item: Grano;
   compuestos: Compuesto[];
@@ -232,10 +270,19 @@ export function PanelEditorGrano({
   onEliminar: (id: string) => Promise<{ ok: boolean; error: unknown }>;
   onCompuestoCreado?: (c: Compuesto) => void;
   onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Cierra este panel y abre el de la Veta elegida — navegación hacia arriba. */
+  onAbrirVeta?: (vetaId: string) => void;
+  /** Cierra este panel y abre el de la Formación elegida — navegación
+   *  transitiva (Grano → Veta → Formación, unión de todas las Formaciones
+   *  alcanzables). */
+  onAbrirFormacion?: (formacionId: string) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [eliminando, setEliminando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
+
+  const vetasQueUsanEsteGrano = useVetasDeUnGrano(item.id);
+  const formacionesQueUsanEsteGrano = useFormacionesDeUnGrano(item.id);
 
   async function handleEliminar() {
     const ok = await confirm({
@@ -266,6 +313,36 @@ export function PanelEditorGrano({
         eliminando={eliminando}
         onCerrar={onCerrar}
       />
+
+      <div className="shrink-0 px-3 pt-2">
+        <BreadcrumbJerarquia
+          niveles={[
+            { label: "Grano", icono: <Gem size={10} />, activo: true },
+            {
+              label: "Veta",
+              icono: <Layers size={10} />,
+              activo: false,
+              items: vetasQueUsanEsteGrano.items.map((v) => ({
+                id: v.veta_id,
+                nombre: v.veta.nombre,
+              })),
+              loading: vetasQueUsanEsteGrano.loading,
+              onNavegar: onAbrirVeta,
+            },
+            {
+              label: "Formación",
+              icono: <Boxes size={10} />,
+              activo: false,
+              items: formacionesQueUsanEsteGrano.items.map((f) => ({
+                id: f.id,
+                nombre: f.nombre,
+              })),
+              loading: formacionesQueUsanEsteGrano.loading,
+              onNavegar: onAbrirFormacion,
+            },
+          ]}
+        />
+      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
@@ -315,6 +392,7 @@ export function PanelEditorVeta({
   onActualizar,
   onEliminar,
   onAbrirGrano,
+  onAbrirFormacion,
 }: {
   item: Veta;
   granos: Grano[];
@@ -324,10 +402,14 @@ export function PanelEditorVeta({
   onEliminar: (id: string) => Promise<{ ok: boolean; error: unknown }>;
   /** Cierra este panel y abre el del Grano elegido — navegación cruzada. */
   onAbrirGrano?: (granoId: string) => void;
+  /** Cierra este panel y abre el de la Formación elegida — navegación hacia arriba. */
+  onAbrirFormacion?: (formacionId: string) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [eliminando, setEliminando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
+
+  const formacionesQueUsanEstaVeta = useFormacionesDeUnaVeta(item.id);
 
   async function handleEliminar() {
     const ok = await confirm({
@@ -358,6 +440,37 @@ export function PanelEditorVeta({
         eliminando={eliminando}
         onCerrar={onCerrar}
       />
+
+      <div className="shrink-0 px-3 pt-2">
+        <BreadcrumbJerarquia
+          niveles={[
+            {
+              label: "Grano",
+              icono: <Gem size={10} />,
+              activo: false,
+              items: item.grano_id
+                ? granos
+                    .filter((g) => g.id === item.grano_id)
+                    .map((g) => ({ id: g.id, nombre: g.nombre }))
+                : [],
+              loading: loadingGranos,
+              onNavegar: onAbrirGrano,
+            },
+            { label: "Veta", icono: <Layers size={10} />, activo: true },
+            {
+              label: "Formación",
+              icono: <Boxes size={10} />,
+              activo: false,
+              items: formacionesQueUsanEstaVeta.items.map((v) => ({
+                id: v.formacion_id,
+                nombre: v.formacion.nombre,
+              })),
+              loading: formacionesQueUsanEstaVeta.loading,
+              onNavegar: onAbrirFormacion,
+            },
+          ]}
+        />
+      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3">
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
