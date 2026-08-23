@@ -49,6 +49,7 @@ export function GrupoCompuestoPanelFlotante({
   onEliminar,
   onAbrirCompuesto,
   onAbrirOrganoExterno,
+  onAbrirFormacionExterna,
 }: {
   grupo: EntradaCatalogoGrupo;
   /** "organo" resuelve la fórmula vía Tejidos/Células; "formacion" vía Vetas/Granos. */
