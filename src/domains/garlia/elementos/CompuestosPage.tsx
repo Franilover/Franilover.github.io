@@ -49,6 +49,12 @@ import { AtomoVisual } from "./ElementoEditor";
 import { SelectorTagsCompuesto } from "./SelectorTagsCompuesto";
 import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
 import { useUsosCompuesto, type TipoUsoCompuesto, type UsoCompuesto } from "./useUsosCompuesto";
+import { useGranos } from "./useGranos";
+import { useCelulas } from "./useCelulas";
+import { useGranosDeUnCompuesto } from "./useGranosDeUnCompuesto";
+import { useCelulasDeUnCompuesto } from "./useCelulasDeUnCompuesto";
+import { PanelEditorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
+import { PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 
 import {
   autocompletarHastaEstable,
@@ -648,6 +654,127 @@ function UsosCompuestoBloque({
   );
 }
 
+/**
+ * SeUsaEnGranoOCelulaBloque
+ * ───────────────────────────────────────────────────────────────────────────
+ * Rama navegable "quién me usa" desde un Compuesto, en paralelo a
+ * UsosCompuestoBloque (que es informativa, sin click): acá el Compuesto es
+ * la puerta de entrada real a DOS árboles distintos que conviven en el
+ * mismo catálogo —
+ *   Física/Minerales:  Compuesto ← grano.compuesto_id (1:1 directo)
+ *   Biología:          Compuesto ← celula_compuestos (M:N)
+ * — y ambos se muestran a la vez, no como niveles de un único breadcrumb
+ * lineal (a diferencia de Grano⇄Veta⇄Formación o Célula⇄Tejido⇄Órgano, acá
+ * un mismo Compuesto puede tener Granos Y Células simultáneamente).
+ *
+ * Cada fila es clickeable y abre el editor completo de ese Grano/Célula
+ * (PanelEditorGrano/PanelEditorCelula, mismos componentes reutilizados que
+ * ya usa CatalogoVetasFisica/CatalogoTejidosBiologia) apilado encima de
+ * este panel — mismo patrón que ElementoPanelFlotante anidado en
+ * CompuestoEditor. No requiere que los ~9 lugares donde vive
+ * CompuestoPanelFlotante le pasen callbacks nuevos: administra su propio
+ * sub-panel internamente.
+ */
+function SeUsaEnGranoOCelulaBloque({
+  compuestoId,
+  onAbrirGrano,
+  onAbrirCelula,
+}: {
+  compuestoId: string;
+  onAbrirGrano: (granoId: string) => void;
+  onAbrirCelula: (celulaId: string) => void;
+}) {
+  const granosDeCompuesto = useGranosDeUnCompuesto(compuestoId);
+  const celulasDeCompuesto = useCelulasDeUnCompuesto(compuestoId);
+
+  const sinNada =
+    !granosDeCompuesto.loading &&
+    !celulasDeCompuesto.loading &&
+    granosDeCompuesto.items.length === 0 &&
+    celulasDeCompuesto.items.length === 0;
+
+  if (sinNada) {
+    return (
+      <p className="text-micro text-primary/25 px-1 py-1">
+        No se usa en ningún Grano ni Célula todavía.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-micro font-black uppercase tracking-widest text-primary/40 px-1">
+        Compone
+      </p>
+
+      {(granosDeCompuesto.loading || granosDeCompuesto.items.length > 0) && (
+        <div className="flex flex-col gap-1">
+          {granosDeCompuesto.loading ? (
+            <div className="flex items-center gap-1.5 text-micro text-primary/30 px-1">
+              <Loader2 className="animate-spin" size={11} />
+              Buscando granos…
+            </div>
+          ) : (
+            granosDeCompuesto.items.map((g) => (
+              <button
+                key={g.vinculo_id}
+                type="button"
+                onClick={() => onAbrirGrano(g.grano_id)}
+                className="flex items-center gap-1.5 px-1.5 py-1 rounded-md border border-primary/10 bg-primary/[0.02] hover:border-primary/25 hover:bg-primary/5 transition-all text-left cursor-pointer"
+              >
+                <span className="w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 bg-primary/8 text-primary/40">
+                  <Gem size={11} />
+                </span>
+                <span className="text-micro font-bold text-primary/40 uppercase tracking-wide shrink-0">
+                  Grano
+                </span>
+                <span className="text-micro font-bold text-primary/80 truncate">
+                  {g.grano.nombre || "(sin nombre)"}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      {(celulasDeCompuesto.loading || celulasDeCompuesto.items.length > 0) && (
+        <div className="flex flex-col gap-1">
+          {celulasDeCompuesto.loading ? (
+            <div className="flex items-center gap-1.5 text-micro text-primary/30 px-1">
+              <Loader2 className="animate-spin" size={11} />
+              Buscando células…
+            </div>
+          ) : (
+            celulasDeCompuesto.items.map((c) => (
+              <button
+                key={c.vinculo_id}
+                type="button"
+                onClick={() => onAbrirCelula(c.celula_id)}
+                className="flex items-center gap-1.5 px-1.5 py-1 rounded-md border border-primary/10 bg-primary/[0.02] hover:border-primary/25 hover:bg-primary/5 transition-all text-left cursor-pointer"
+              >
+                <span className="w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 bg-primary/8 text-primary/40">
+                  <Beaker size={11} />
+                </span>
+                <span className="text-micro font-bold text-primary/40 uppercase tracking-wide shrink-0">
+                  Célula
+                </span>
+                <span className="text-micro font-bold text-primary/80 truncate">
+                  {c.celula.nombre || "(sin nombre)"}
+                </span>
+                {c.rol && (
+                  <span className="text-micro text-primary/35 truncate ml-auto shrink-0">
+                    {c.rol}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompuestoEditor({
   compuesto,
   elementos,
@@ -682,12 +809,25 @@ function CompuestoEditor({
   const [saving, setSaving] = useState(false);
   const [local, setLocal] = useState(compuesto);
   const [editandoElementoId, setEditandoElementoId] = useState<string | null>(null);
+  // Sub-panel anidado del Grano/Célula elegido desde SeUsaEnGranoOCelulaBloque
+  // — mismo patrón que editandoElementoId, pero apunta a una de dos
+  // entidades distintas según qué rama se clickeó (ver tipo abajo).
+  const [granoOCelulaAbierto, setGranoOCelulaAbierto] = useState<
+    { tipo: "grano" | "celula"; id: string } | null
+  >(null);
 
   const { porCategoria: tagsPorCategoria, loading: tagsLoading } = useTagsCatalogo();
   const { tagIdsDe, toggleTag, loading: compuestoTagsLoading } = useCompuestoTags();
   const tagIdsAsignados = tagIdsDe(compuesto.id);
   const { usosPorCompuesto, loading: usosLoading } = useUsosCompuesto();
   const usos = usosPorCompuesto.get(compuesto.id) ?? [];
+  // Catálogos globales de Grano/Célula — solo para tener sus handlers
+  // actualizar/eliminar disponibles cuando se abre el sub-panel de arriba;
+  // useSupabaseData cachea vía Dexie, así que instanciarlos acá no repite
+  // fetch si ya se cargaron en Física/Biología. Mismo criterio que
+  // CatalogoVetasFisica/CatalogoTejidosBiologia.
+  const granosCatalogo = useGranos();
+  const celulasCatalogo = useCelulas();
 
   async function persistElemento(id: string, cambios: Partial<Elemento>) {
     try {
@@ -868,6 +1008,14 @@ function CompuestoEditor({
             <div className="border-t border-primary/10 pt-2">
               <UsosCompuestoBloque usos={usos} loading={usosLoading} />
             </div>
+
+            <div className="border-t border-primary/10 pt-2">
+              <SeUsaEnGranoOCelulaBloque
+                compuestoId={compuesto.id}
+                onAbrirGrano={(granoId) => setGranoOCelulaAbierto({ tipo: "grano", id: granoId })}
+                onAbrirCelula={(celulaId) => setGranoOCelulaAbierto({ tipo: "celula", id: celulaId })}
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 min-w-0">
@@ -899,6 +1047,54 @@ function CompuestoEditor({
           }
         />
       )}
+
+      {/* Sub-panel del Grano/Célula elegido desde "Compone" — mismo editor
+         completo que usan Física/Biología (PanelEditorGrano/PanelEditorCelula),
+         apilado encima de este panel de Compuesto. */}
+      {granoOCelulaAbierto?.tipo === "grano" &&
+        (() => {
+          const granoActivo = granosCatalogo.items.find((g) => g.id === granoOCelulaAbierto.id);
+          if (!granoActivo) return null;
+          return (
+            <PanelEditorGrano
+              item={granoActivo}
+              compuestos={todosLosCompuestos}
+              onCerrar={() => setGranoOCelulaAbierto(null)}
+              onActualizar={granosCatalogo.actualizar}
+              onEliminar={granosCatalogo.eliminar}
+              onAbrirCompuesto={
+                onNavigateCompuesto
+                  ? (compuestoId) => {
+                      setGranoOCelulaAbierto(null);
+                      onNavigateCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
+            />
+          );
+        })()}
+      {granoOCelulaAbierto?.tipo === "celula" &&
+        (() => {
+          const celulaActiva = celulasCatalogo.items.find((c) => c.id === granoOCelulaAbierto.id);
+          if (!celulaActiva) return null;
+          return (
+            <PanelEditorCelula
+              item={celulaActiva}
+              compuestos={todosLosCompuestos}
+              onCerrar={() => setGranoOCelulaAbierto(null)}
+              onActualizar={celulasCatalogo.actualizar}
+              onEliminar={celulasCatalogo.eliminar}
+              onAbrirCompuesto={
+                onNavigateCompuesto
+                  ? (compuestoId) => {
+                      setGranoOCelulaAbierto(null);
+                      onNavigateCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
+            />
+          );
+        })()}
     </div>
   );
 }
