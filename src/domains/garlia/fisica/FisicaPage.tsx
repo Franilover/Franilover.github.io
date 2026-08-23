@@ -56,6 +56,7 @@ import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
+import { CatalogoVetasFisica } from "./CatalogoVetasFisica";
 
 /** Adapta un SubsistemaMagia al shape FilaCatalogo — vive acá (no en
  *  types.ts de física) para no acoplar ese módulo al dominio "runas". */
@@ -487,6 +488,16 @@ function TodasLasBasesView({
             )}
           </div>
         ))}
+
+        {/* Granos y Vetas — catálogo global de composición, mismo patrón que
+            CatalogoTejidosBiologia en Biología: dos grids navegables con
+            editor propio, arriba de Formaciones (que se arman a partir de
+            Vetas vía formacion_vetas, ver useFormacionVetas.ts). */}
+        <div className="flex flex-col gap-2 pt-2 border-t border-primary/10">
+          <CatalogoVetasFisica
+            compuestos={compuestosCatalogo}
+          />
+        </div>
 
         {/* Formaciones y Habilidades — catálogos globales, mismo patrón que
             los bloques de arriba pero usando el editor flotante completo
