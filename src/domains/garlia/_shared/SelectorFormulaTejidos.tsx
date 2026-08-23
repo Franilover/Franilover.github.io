@@ -20,7 +20,7 @@
  */
 
 import { Plus, Trash2, Pencil, MoreVertical, Search, X } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import type { Compuesto } from "@/domains/garlia/elementos/types";
 import type { EntradaCatalogoTejido } from "@/domains/garlia/elementos/useCatalogoTejidos";
@@ -35,6 +35,10 @@ export interface FilaFormulaTejido {
    *  (Célula/Grano). Usado para no reofrecer un Tejido ya vinculado en el
    *  picker de "usar existente". Opcional por compatibilidad retro. */
   tejido_o_veta_id?: string;
+  /** Nombre propio del Tejido/Veta (columna `nombre` de tejidos/vetas) —
+   *  el dato principal de la fila. Distinto del nombre del Compuesto que
+   *  lo compone (ver compuesto_id). Opcional por compatibilidad retro. */
+  nombre?: string;
   catalogo_id: string | null;
   compuesto_id: string | null;
   proporcion: string | null;
@@ -48,6 +52,7 @@ export function SelectorFormulaTejidos({
   catalogoDisponible,
   loadingCatalogo,
   onActualizarCompuesto,
+  onActualizarNombre,
   onActualizarProporcion,
   onQuitar,
   onAbrirCompuesto,
@@ -65,6 +70,9 @@ export function SelectorFormulaTejidos({
   catalogoDisponible?: EntradaCatalogoTejido[];
   loadingCatalogo?: boolean;
   onActualizarCompuesto: (celulaOGranoId: string, compuestoId: string) => void;
+  /** Renombra el Tejido/Veta propio de la fila (distinto del Compuesto que
+   *  lo compone). Si se omite, el nombre se muestra pero no es editable. */
+  onActualizarNombre?: (tejidoOVetaId: string, nombre: string) => void;
   onActualizarProporcion: (vinculoId: string, proporcion: string) => void;
   onQuitar: (vinculoId: string) => void;
   /** Abre el panel flotante del Compuesto elegido en una fila. */
@@ -141,6 +149,11 @@ export function SelectorFormulaTejidos({
               onCambiarCompuesto={(compuestoId) => {
                 if (item.catalogo_id) onActualizarCompuesto(item.catalogo_id, compuestoId);
               }}
+              onCambiarNombre={
+                onActualizarNombre && item.tejido_o_veta_id
+                  ? (nombre) => onActualizarNombre(item.tejido_o_veta_id as string, nombre)
+                  : undefined
+              }
               onCambiarProporcion={(proporcion) => onActualizarProporcion(item.vinculo_id, proporcion)}
               onQuitar={() => onQuitar(item.vinculo_id)}
               onAbrir={
@@ -309,15 +322,20 @@ function FilaFormulaTejidoSoloLectura({
 
   return (
     <div className="flex items-center gap-2 py-1">
-      <button
-        type="button"
-        onClick={onAbrir}
-        disabled={!onAbrir}
-        title={onAbrir ? `Abrir ${elegido?.nombre ?? ""}` : undefined}
-        className="min-w-0 flex-1 text-left px-0 py-1 text-micro font-bold text-primary truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
-      >
-        {elegido?.nombre || "Sin compuesto"}
-      </button>
+      <div className="min-w-0 flex-1 flex flex-col">
+        <span className="truncate text-micro font-bold text-primary">
+          {item.nombre || "Sin nombre"}
+        </span>
+        <button
+          type="button"
+          onClick={onAbrir}
+          disabled={!onAbrir}
+          title={onAbrir ? `Abrir ${elegido?.nombre ?? ""}` : undefined}
+          className="min-w-0 text-left px-0 text-[10px] text-primary/40 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+        >
+          hecho de: {elegido?.nombre || "sin compuesto"}
+        </button>
+      </div>
       {item.proporcion && (
         <span className="shrink-0 text-micro font-black text-primary/50 tabular-nums">
           {item.proporcion}
@@ -331,6 +349,7 @@ function FilaFormulaTejidoRow({
   item,
   compuestos,
   onCambiarCompuesto,
+  onCambiarNombre,
   onCambiarProporcion,
   onQuitar,
   onAbrir,
@@ -338,6 +357,7 @@ function FilaFormulaTejidoRow({
   item: FilaFormulaTejido;
   compuestos: Compuesto[];
   onCambiarCompuesto: (compuestoId: string) => void;
+  onCambiarNombre?: (nombre: string) => void;
   onCambiarProporcion: (proporcion: string) => void;
   onQuitar: () => void;
   onAbrir?: () => void;
@@ -347,6 +367,11 @@ function FilaFormulaTejidoRow({
   const [activo, setActivo] = useState(0);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [proporcionLocal, setProporcionLocal] = useState(item.proporcion ?? "");
+  const [nombreLocal, setNombreLocal] = useState(item.nombre ?? "");
+
+  useEffect(() => {
+    setNombreLocal(item.nombre ?? "");
+  }, [item.nombre]);
 
   const elegido = useMemo(
     () => compuestos.find((c) => c.id === item.compuesto_id) ?? null,
@@ -385,125 +410,142 @@ function FilaFormulaTejidoRow({
   }
 
   return (
-    <div className="flex items-center gap-2 py-1">
-      {/* Valor elegido (clickeable → abre panel) o buscador */}
-      <div className="flex-1 min-w-0 relative">
-        {elegido && !buscando ? (
-          <div className="flex items-center gap-1 group/item">
-            <button
-              type="button"
-              onClick={onAbrir}
-              disabled={!onAbrir}
-              title={onAbrir ? `Abrir ${elegido.nombre}` : undefined}
-              className="min-w-0 flex-1 text-left px-0 py-1 text-micro font-bold text-primary truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
-            >
-              {elegido.nombre}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setBuscando(true);
-                setBusqueda("");
-                setActivo(0);
-              }}
-              title="Reemplazar"
-              className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-primary/25 hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover/item:opacity-100 cursor-pointer"
-            >
-              <Pencil size={10} />
-            </button>
-          </div>
-        ) : (
-          <input
-            autoFocus={buscando}
-            value={busqueda}
-            onBlur={() => {
-              setTimeout(() => setBuscando(false), 120);
-            }}
-            onChange={(e) => {
-              setBusqueda(e.target.value);
-              setActivo(0);
-            }}
-            onKeyDown={onKeyDown}
-            placeholder={elegido ? undefined : "Buscar compuesto…"}
-            className="w-full bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors"
-          />
-        )}
-        {buscando && (
-          <div
-            className="absolute z-20 mt-1 left-0 right-0 max-h-40 overflow-y-auto rounded-md border shadow-lg"
-            style={{
-              background: "var(--bg-main)",
-              borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
-            }}
+    <div className="flex flex-col gap-0.5 py-1">
+      {/* Fila principal: nombre propio del Tejido/Veta (editable) + proporción + menú */}
+      <div className="flex items-center gap-2">
+        <input
+          value={nombreLocal}
+          onChange={(e) => setNombreLocal(e.target.value)}
+          onBlur={() => {
+            if (onCambiarNombre && nombreLocal !== (item.nombre ?? "")) onCambiarNombre(nombreLocal);
+          }}
+          disabled={!onCambiarNombre}
+          placeholder="Nombre…"
+          className="flex-1 min-w-0 bg-transparent px-0 py-1 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors disabled:cursor-default"
+        />
+
+        {/* Proporción: texto libre (ej. "60%", "mayoritario", "trazas") */}
+        <input
+          value={proporcionLocal}
+          onChange={(e) => setProporcionLocal(e.target.value)}
+          onBlur={() => {
+            if (proporcionLocal !== (item.proporcion ?? "")) onCambiarProporcion(proporcionLocal);
+          }}
+          placeholder="Proporción…"
+          className="shrink-0 w-20 bg-transparent px-0 py-1 text-micro font-black text-primary/70 text-right outline-none placeholder:text-primary/25 placeholder:font-normal tabular-nums"
+        />
+
+        {/* Menú de 3 puntos: Quitar */}
+        <div
+          className="relative shrink-0"
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setMenuAbierto(false);
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setMenuAbierto((v) => !v)}
+            title="Más opciones"
+            className="w-5 h-5 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
           >
-            {opciones.length === 0 ? (
-              <p className="text-micro text-primary/25 italic text-center py-2">Sin resultados</p>
-            ) : (
-              opciones.map((c, i) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onMouseEnter={() => setActivo(i)}
-                  onMouseDown={() => elegir(c)}
-                  className={`w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold transition-colors truncate ${
-                    i === activo ? "bg-primary/10 text-primary" : "text-primary/75 hover:bg-primary/6 hover:text-primary"
-                  }`}
-                >
-                  {c.nombre}
-                </button>
-              ))
-            )}
-          </div>
-        )}
+            <MoreVertical size={12} />
+          </button>
+
+          {menuAbierto && (
+            <div
+              className="absolute z-20 mt-1 right-0 rounded-md border shadow-lg overflow-hidden"
+              style={{
+                background: "var(--bg-main)",
+                borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuAbierto(false);
+                  onQuitar();
+                }}
+                className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-micro font-bold whitespace-nowrap text-red-400/70 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
+              >
+                <Trash2 size={11} /> Quitar
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Proporción: texto libre (ej. "60%", "mayoritario", "trazas") */}
-      <input
-        value={proporcionLocal}
-        onChange={(e) => setProporcionLocal(e.target.value)}
-        onBlur={() => {
-          if (proporcionLocal !== (item.proporcion ?? "")) onCambiarProporcion(proporcionLocal);
-        }}
-        placeholder="Proporción…"
-        className="shrink-0 w-20 bg-transparent px-0 py-1 text-micro font-black text-primary/70 text-right outline-none placeholder:text-primary/25 placeholder:font-normal tabular-nums"
-      />
-
-      {/* Menú de 3 puntos: Quitar */}
-      <div
-        className="relative shrink-0"
-        onBlur={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) setMenuAbierto(false);
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setMenuAbierto((v) => !v)}
-          title="Más opciones"
-          className="w-5 h-5 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-        >
-          <MoreVertical size={12} />
-        </button>
-
-        {menuAbierto && (
-          <div
-            className="absolute z-20 mt-1 right-0 rounded-md border shadow-lg overflow-hidden"
-            style={{
-              background: "var(--bg-main)",
-              borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setMenuAbierto(false);
-                onQuitar();
+      {/* Fila secundaria: "hecho de" — el Compuesto que compone este Tejido/Veta */}
+      <div className="flex items-center gap-1.5 pl-0">
+        <span className="shrink-0 text-[10px] text-primary/35">hecho de:</span>
+        <div className="flex-1 min-w-0 relative">
+          {elegido && !buscando ? (
+            <div className="flex items-center gap-1 group/item">
+              <button
+                type="button"
+                onClick={onAbrir}
+                disabled={!onAbrir}
+                title={onAbrir ? `Abrir ${elegido.nombre}` : undefined}
+                className="min-w-0 flex-1 text-left px-0 text-[10px] font-bold text-primary/70 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+              >
+                {elegido.nombre}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBuscando(true);
+                  setBusqueda("");
+                  setActivo(0);
+                }}
+                title="Reemplazar"
+                className="shrink-0 w-4 h-4 flex items-center justify-center rounded text-primary/25 hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover/item:opacity-100 cursor-pointer"
+              >
+                <Pencil size={9} />
+              </button>
+            </div>
+          ) : (
+            <input
+              autoFocus={buscando}
+              value={busqueda}
+              onBlur={() => {
+                setTimeout(() => setBuscando(false), 120);
               }}
-              className="w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-micro font-bold whitespace-nowrap text-red-400/70 hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
+              onChange={(e) => {
+                setBusqueda(e.target.value);
+                setActivo(0);
+              }}
+              onKeyDown={onKeyDown}
+              placeholder={elegido ? undefined : "Buscar compuesto…"}
+              className="w-full bg-transparent px-0 text-[10px] font-bold text-primary/70 outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors"
+            />
+          )}
+          {buscando && (
+            <div
+              className="absolute z-20 mt-1 left-0 right-0 max-h-40 overflow-y-auto rounded-md border shadow-lg"
+              style={{
+                background: "var(--bg-main)",
+                borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+              }}
             >
-              <Trash2 size={11} /> Quitar
-            </button>
-          </div>
-        )}
+              {opciones.length === 0 ? (
+                <p className="text-micro text-primary/25 italic text-center py-2">Sin resultados</p>
+              ) : (
+                opciones.map((c, i) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onMouseEnter={() => setActivo(i)}
+                    onMouseDown={() => elegir(c)}
+                    className={`w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold transition-colors truncate ${
+                      i === activo ? "bg-primary/10 text-primary" : "text-primary/75 hover:bg-primary/6 hover:text-primary"
+                    }`}
+                  >
+                    {c.nombre}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

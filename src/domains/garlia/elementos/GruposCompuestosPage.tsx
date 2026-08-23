@@ -179,6 +179,9 @@ export function GrupoCompuestoPanelFlotante({
                 onActualizarCompuesto={(catalogoId, compuestoId) =>
                   void formula.actualizarCompuesto(catalogoId, compuestoId)
                 }
+                onActualizarNombre={(tejidoOVetaId, nombre) =>
+                  void formula.actualizarNombre(tejidoOVetaId, nombre)
+                }
                 onActualizarProporcion={(vinculoId, proporcion) =>
                   void formula.actualizarProporcion(vinculoId, proporcion)
                 }

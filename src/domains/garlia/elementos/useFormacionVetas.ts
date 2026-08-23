@@ -301,6 +301,22 @@ export function useFormacionVetas(formacionId: string | null) {
     if (error) console.error("[useFormacionVetas] error actualizando grano:", error);
   }, []);
 
+  // ── Editar el nombre propio de la Veta (columna nombre de la tabla vetas,
+  // distinta del Compuesto que la compone) ───────────────────────────────
+  const actualizarNombre = useCallback(async (vetaId: string, nombre: string) => {
+    setVetas((prev) => {
+      if (!prev[vetaId]) return prev;
+      const actualizada = { ...prev[vetaId], nombre };
+      void guardarEnDexie([], [actualizada], []);
+      return { ...prev, [vetaId]: actualizada };
+    });
+    const { error } = await supabase
+      .from(CONFIG_VETAS.tabla)
+      .update({ nombre })
+      .eq("id", vetaId);
+    if (error) console.error("[useFormacionVetas] error actualizando nombre de la veta:", error);
+  }, []);
+
   const actualizarProporcion = useCallback(async (vinculoId: string, proporcion: string) => {
     setVinculos((prev) => {
       const next = prev.map((v) => (v.id === vinculoId ? { ...v, proporcion } : v));
@@ -329,6 +345,7 @@ export function useFormacionVetas(formacionId: string | null) {
     agregarCompuesto,
     vincularExistente,
     actualizarCompuesto,
+    actualizarNombre,
     actualizarProporcion,
     quitarCompuesto,
     load,

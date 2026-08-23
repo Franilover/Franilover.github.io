@@ -326,6 +326,22 @@ export function useOrganoTejidos(organoId: string | null) {
     [],
   );
 
+  // ── Editar el nombre propio del Tejido (columna nombre de la tabla tejidos,
+  // distinta del Compuesto que lo compone) ───────────────────────────────
+  const actualizarNombre = useCallback(async (tejidoId: string, nombre: string) => {
+    setTejidos((prev) => {
+      if (!prev[tejidoId]) return prev;
+      const actualizado = { ...prev[tejidoId], nombre };
+      void guardarEnDexie([], [actualizado], []);
+      return { ...prev, [tejidoId]: actualizado };
+    });
+    const { error } = await supabase
+      .from(CONFIG_TEJIDOS.tabla)
+      .update({ nombre })
+      .eq("id", tejidoId);
+    if (error) console.error("[useOrganoTejidos] error actualizando nombre del tejido:", error);
+  }, []);
+
   // ── Editar la proporción de una fila (columna propia de organo_tejidos) ─
   const actualizarProporcion = useCallback(async (vinculoId: string, proporcion: string) => {
     setVinculos((prev) => {
@@ -357,6 +373,7 @@ export function useOrganoTejidos(organoId: string | null) {
     agregarCompuesto,
     vincularExistente,
     actualizarCompuesto,
+    actualizarNombre,
     actualizarProporcion,
     quitarCompuesto,
     load,
