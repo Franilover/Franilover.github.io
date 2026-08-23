@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
+import { db } from "@/infra/supabase/db";
 
 import {
   CONFIG_CELULAS,
@@ -31,6 +32,58 @@ import {
   type OrganoTejido,
   type Tejido,
 } from "@/domains/garlia/elementos/types";
+
+// ── Cache-first: leer/escribir Dexie para organo_tejidos/tejidos/celulas ──
+// Mismo espíritu que useSupabaseData (ver v33 en infra/supabase/db.ts):
+// pintar de inmediato con lo que ya haya en IndexedDB y revalidar contra
+// Supabase en segundo plano, en vez de arrancar siempre en blanco.
+async function leerVinculosDeDexie(organoId: string): Promise<OrganoTejido[]> {
+  try {
+    if (!db) return [];
+    const rows = await db.organo_tejidos
+      .where("organo_id")
+      .equals(organoId)
+      .toArray();
+    return rows as unknown as OrganoTejido[];
+  } catch {
+    return [];
+  }
+}
+
+async function leerTejidosDeDexie(ids: string[]): Promise<Record<string, Tejido>> {
+  const out: Record<string, Tejido> = {};
+  if (!db || ids.length === 0) return out;
+  try {
+    const rows = await db.tejidos.bulkGet(ids);
+    for (const r of rows) if (r) out[(r as unknown as Tejido).id] = r as unknown as Tejido;
+  } catch {}
+  return out;
+}
+
+async function leerCelulasDeDexie(ids: string[]): Promise<Record<string, Celula>> {
+  const out: Record<string, Celula> = {};
+  if (!db || ids.length === 0) return out;
+  try {
+    const rows = await db.celulas.bulkGet(ids);
+    for (const r of rows) if (r) out[(r as unknown as Celula).id] = r as unknown as Celula;
+  } catch {}
+  return out;
+}
+
+async function guardarEnDexie(
+  vinculos: OrganoTejido[],
+  tejidos: Tejido[],
+  celulas: Celula[],
+) {
+  try {
+    if (!db) return;
+    if (vinculos.length) await db.organo_tejidos.bulkPut(vinculos as any[]);
+    if (tejidos.length) await db.tejidos.bulkPut(tejidos as any[]);
+    if (celulas.length) await db.celulas.bulkPut(celulas as any[]);
+  } catch (e) {
+    console.warn("[useOrganoTejidos] no se pudo guardar en Dexie:", e);
+  }
+}
 
 /** Una fila de la fórmula de un Órgano, ya resuelta: vínculo + tejido + célula. */
 export interface TejidoDeOrgano {
@@ -61,11 +114,30 @@ export function useOrganoTejidos(organoId: string | null) {
   const load = useCallback(async () => {
     if (!organoId) {
       setVinculos([]);
+      setTejidos({});
+      setCelulas({});
       setLoading(false);
       return;
     }
-    setLoading(true);
 
+    // ── Paso 1: pintar de inmediato con lo que ya haya en Dexie ──────────
+    const vinculosLocales = await leerVinculosDeDexie(organoId);
+    if (vinculosLocales.length > 0) {
+      setVinculos(vinculosLocales);
+      const tejidoIdsLocales = vinculosLocales.map((v) => v.tejido_id);
+      const tejidosLocales = await leerTejidosDeDexie(tejidoIdsLocales);
+      setTejidos(tejidosLocales);
+      const celulaIdsLocales = Object.values(tejidosLocales)
+        .map((t) => t.celula_id)
+        .filter((id): id is string => !!id);
+      const celulasLocales = await leerCelulasDeDexie(celulaIdsLocales);
+      setCelulas(celulasLocales);
+      setLoading(false); // ya hay algo para mostrar — dejar de bloquear la UI
+    } else {
+      setLoading(true);
+    }
+
+    // ── Paso 2: revalidar contra Supabase en segundo plano ────────────────
     const { data: vinculoData, error: vinculoError } = await supabase
       .from("organo_tejidos")
       .select("*")
@@ -73,7 +145,8 @@ export function useOrganoTejidos(organoId: string | null) {
       .order("created_at", { ascending: true });
 
     if (vinculoError || !vinculoData) {
-      setVinculos([]);
+      // Sin red / error: si ya pintamos desde Dexie, dejamos eso como está.
+      if (vinculosLocales.length === 0) setVinculos([]);
       setLoading(false);
       return;
     }
@@ -84,6 +157,7 @@ export function useOrganoTejidos(organoId: string | null) {
       setTejidos({});
       setCelulas({});
       setLoading(false);
+      void guardarEnDexie(vinculoData as OrganoTejido[], [], []);
       return;
     }
 
@@ -103,6 +177,7 @@ export function useOrganoTejidos(organoId: string | null) {
     if (celulaIds.length === 0) {
       setCelulas({});
       setLoading(false);
+      void guardarEnDexie(vinculoData as OrganoTejido[], Object.values(tejidosPorId), []);
       return;
     }
 
@@ -116,6 +191,11 @@ export function useOrganoTejidos(organoId: string | null) {
     setCelulas(celulasPorId);
 
     setLoading(false);
+    void guardarEnDexie(
+      vinculoData as OrganoTejido[],
+      Object.values(tejidosPorId),
+      Object.values(celulasPorId),
+    );
   }, [organoId]);
 
   useEffect(() => {
@@ -175,6 +255,7 @@ export function useOrganoTejidos(organoId: string | null) {
       setTejidos((prev) => ({ ...prev, [(nuevoTejido as Tejido).id]: nuevoTejido as Tejido }));
       setCelulas((prev) => ({ ...prev, [(nuevaCelula as Celula).id]: nuevaCelula as Celula }));
       setVinculos((prev) => [...prev, vinculo as OrganoTejido]);
+      void guardarEnDexie([vinculo as OrganoTejido], [nuevoTejido as Tejido], [nuevaCelula as Celula]);
       return vinculo as OrganoTejido;
     },
     [organoId],
@@ -204,6 +285,7 @@ export function useOrganoTejidos(organoId: string | null) {
         if (tejidoData) {
           const tejido = tejidoData as unknown as Tejido;
           setTejidos((prev) => ({ ...prev, [tejido.id]: tejido }));
+          void guardarEnDexie([], [tejido], []);
           if (tejido.celula_id && !celulas[tejido.celula_id]) {
             const { data: celulaData } = await supabase
               .from(CONFIG_CELULAS.tabla)
@@ -213,12 +295,14 @@ export function useOrganoTejidos(organoId: string | null) {
             if (celulaData) {
               const celula = celulaData as unknown as Celula;
               setCelulas((prev) => ({ ...prev, [celula.id]: celula }));
+              void guardarEnDexie([], [], [celula]);
             }
           }
         }
       }
 
       setVinculos((prev) => [...prev, vinculo as OrganoTejido]);
+      void guardarEnDexie([vinculo as OrganoTejido], [], []);
       return vinculo as OrganoTejido;
     },
     [organoId, tejidos, celulas],
@@ -227,9 +311,12 @@ export function useOrganoTejidos(organoId: string | null) {
   // ── Reemplazar el compuesto de una fila (edita la Célula existente) ────
   const actualizarCompuesto = useCallback(
     async (celulaId: string, compuestoId: string) => {
-      setCelulas((prev) =>
-        prev[celulaId] ? { ...prev, [celulaId]: { ...prev[celulaId], compuesto_id: compuestoId } } : prev,
-      );
+      setCelulas((prev) => {
+        if (!prev[celulaId]) return prev;
+        const actualizada = { ...prev[celulaId], compuesto_id: compuestoId };
+        void guardarEnDexie([], [], [actualizada]);
+        return { ...prev, [celulaId]: actualizada };
+      });
       const { error } = await supabase
         .from(CONFIG_CELULAS.tabla)
         .update({ compuesto_id: compuestoId })
@@ -241,7 +328,12 @@ export function useOrganoTejidos(organoId: string | null) {
 
   // ── Editar la proporción de una fila (columna propia de organo_tejidos) ─
   const actualizarProporcion = useCallback(async (vinculoId: string, proporcion: string) => {
-    setVinculos((prev) => prev.map((v) => (v.id === vinculoId ? { ...v, proporcion } : v)));
+    setVinculos((prev) => {
+      const next = prev.map((v) => (v.id === vinculoId ? { ...v, proporcion } : v));
+      const actualizado = next.find((v) => v.id === vinculoId);
+      if (actualizado) void guardarEnDexie([actualizado], [], []);
+      return next;
+    });
     const { error } = await supabase
       .from("organo_tejidos")
       .update({ proporcion })
@@ -253,6 +345,9 @@ export function useOrganoTejidos(organoId: string | null) {
   // en su catálogo propio, mismo trade-off que el resto de vínculos N:N) ──
   const quitarCompuesto = useCallback(async (vinculoId: string) => {
     setVinculos((prev) => prev.filter((v) => v.id !== vinculoId));
+    try {
+      if (db) await db.organo_tejidos.delete(vinculoId);
+    } catch {}
     await supabase.from("organo_tejidos").delete().eq("id", vinculoId);
   }, []);
 

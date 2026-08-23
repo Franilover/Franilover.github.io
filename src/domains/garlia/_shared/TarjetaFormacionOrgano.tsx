@@ -121,7 +121,7 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
           <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
             Fórmula
           </p>
-          {formula.loading ? (
+          {formula.loading && formula.items.length === 0 ? (
             <p className="text-micro text-primary/25 italic">Cargando…</p>
           ) : (
             <SelectorFormulaTejidos

@@ -3,15 +3,14 @@
 /**
  * useFormacionVetas.ts
  * ───────────────────────────────────────────────────────────────────────────
- * Espejo inerte de useOrganoTejidos.ts. Cadena real en Supabase:
+ * Espejo de useOrganoTejidos.ts (cache-first vía Dexie, ver ese archivo para
+ * el razonamiento completo). Cadena real en Supabase:
  *   Formacion → formacion_vetas (proporcion) → Veta → Grano → Compuesto
- * Ver useOrganoTejidos.ts para el razonamiento completo sobre por qué
- * "agregar compuesto" crea Grano+Veta+vínculo en cadena en vez de exponer
- * los 3 niveles como catálogos separados.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
+import { db } from "@/infra/supabase/db";
 
 import {
   CONFIG_GRANOS,
@@ -20,6 +19,55 @@ import {
   type Grano,
   type Veta,
 } from "@/domains/garlia/elementos/types";
+
+// ── Cache-first: leer/escribir Dexie para formacion_vetas/vetas/granos ────
+async function leerVinculosDeDexie(formacionId: string): Promise<FormacionVeta[]> {
+  try {
+    if (!db) return [];
+    const rows = await db.formacion_vetas
+      .where("formacion_id")
+      .equals(formacionId)
+      .toArray();
+    return rows as unknown as FormacionVeta[];
+  } catch {
+    return [];
+  }
+}
+
+async function leerVetasDeDexie(ids: string[]): Promise<Record<string, Veta>> {
+  const out: Record<string, Veta> = {};
+  if (!db || ids.length === 0) return out;
+  try {
+    const rows = await db.vetas.bulkGet(ids);
+    for (const r of rows) if (r) out[(r as unknown as Veta).id] = r as unknown as Veta;
+  } catch {}
+  return out;
+}
+
+async function leerGranosDeDexie(ids: string[]): Promise<Record<string, Grano>> {
+  const out: Record<string, Grano> = {};
+  if (!db || ids.length === 0) return out;
+  try {
+    const rows = await db.granos.bulkGet(ids);
+    for (const r of rows) if (r) out[(r as unknown as Grano).id] = r as unknown as Grano;
+  } catch {}
+  return out;
+}
+
+async function guardarEnDexie(
+  vinculos: FormacionVeta[],
+  vetas: Veta[],
+  granos: Grano[],
+) {
+  try {
+    if (!db) return;
+    if (vinculos.length) await db.formacion_vetas.bulkPut(vinculos as any[]);
+    if (vetas.length) await db.vetas.bulkPut(vetas as any[]);
+    if (granos.length) await db.granos.bulkPut(granos as any[]);
+  } catch (e) {
+    console.warn("[useFormacionVetas] no se pudo guardar en Dexie:", e);
+  }
+}
 
 /** Una fila de la fórmula de una Formación, ya resuelta: vínculo + veta + grano. */
 export interface VetaDeFormacion {
@@ -50,11 +98,30 @@ export function useFormacionVetas(formacionId: string | null) {
   const load = useCallback(async () => {
     if (!formacionId) {
       setVinculos([]);
+      setVetas({});
+      setGranos({});
       setLoading(false);
       return;
     }
-    setLoading(true);
 
+    // ── Paso 1: pintar de inmediato con lo que ya haya en Dexie ──────────
+    const vinculosLocales = await leerVinculosDeDexie(formacionId);
+    if (vinculosLocales.length > 0) {
+      setVinculos(vinculosLocales);
+      const vetaIdsLocales = vinculosLocales.map((v) => v.veta_id);
+      const vetasLocales = await leerVetasDeDexie(vetaIdsLocales);
+      setVetas(vetasLocales);
+      const granoIdsLocales = Object.values(vetasLocales)
+        .map((v) => v.grano_id)
+        .filter((id): id is string => !!id);
+      const granosLocales = await leerGranosDeDexie(granoIdsLocales);
+      setGranos(granosLocales);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    // ── Paso 2: revalidar contra Supabase en segundo plano ────────────────
     const { data: vinculoData, error: vinculoError } = await supabase
       .from("formacion_vetas")
       .select("*")
@@ -62,7 +129,7 @@ export function useFormacionVetas(formacionId: string | null) {
       .order("created_at", { ascending: true });
 
     if (vinculoError || !vinculoData) {
-      setVinculos([]);
+      if (vinculosLocales.length === 0) setVinculos([]);
       setLoading(false);
       return;
     }
@@ -73,6 +140,7 @@ export function useFormacionVetas(formacionId: string | null) {
       setVetas({});
       setGranos({});
       setLoading(false);
+      void guardarEnDexie(vinculoData as FormacionVeta[], [], []);
       return;
     }
 
@@ -92,6 +160,7 @@ export function useFormacionVetas(formacionId: string | null) {
     if (granoIds.length === 0) {
       setGranos({});
       setLoading(false);
+      void guardarEnDexie(vinculoData as FormacionVeta[], Object.values(vetasPorId), []);
       return;
     }
 
@@ -105,6 +174,11 @@ export function useFormacionVetas(formacionId: string | null) {
     setGranos(granosPorId);
 
     setLoading(false);
+    void guardarEnDexie(
+      vinculoData as FormacionVeta[],
+      Object.values(vetasPorId),
+      Object.values(granosPorId),
+    );
   }, [formacionId]);
 
   useEffect(() => {
@@ -162,6 +236,7 @@ export function useFormacionVetas(formacionId: string | null) {
       setVetas((prev) => ({ ...prev, [(nuevaVeta as Veta).id]: nuevaVeta as Veta }));
       setGranos((prev) => ({ ...prev, [(nuevoGrano as Grano).id]: nuevoGrano as Grano }));
       setVinculos((prev) => [...prev, vinculo as FormacionVeta]);
+      void guardarEnDexie([vinculo as FormacionVeta], [nuevaVeta as Veta], [nuevoGrano as Grano]);
       return vinculo as FormacionVeta;
     },
     [formacionId],
@@ -189,6 +264,7 @@ export function useFormacionVetas(formacionId: string | null) {
         if (vetaData) {
           const veta = vetaData as unknown as Veta;
           setVetas((prev) => ({ ...prev, [veta.id]: veta }));
+          void guardarEnDexie([], [veta], []);
           if (veta.grano_id && !granos[veta.grano_id]) {
             const { data: granoData } = await supabase
               .from(CONFIG_GRANOS.tabla)
@@ -198,21 +274,26 @@ export function useFormacionVetas(formacionId: string | null) {
             if (granoData) {
               const grano = granoData as unknown as Grano;
               setGranos((prev) => ({ ...prev, [grano.id]: grano }));
+              void guardarEnDexie([], [], [grano]);
             }
           }
         }
       }
 
       setVinculos((prev) => [...prev, vinculo as FormacionVeta]);
+      void guardarEnDexie([vinculo as FormacionVeta], [], []);
       return vinculo as FormacionVeta;
     },
     [formacionId, vetas, granos],
   );
 
   const actualizarCompuesto = useCallback(async (granoId: string, compuestoId: string) => {
-    setGranos((prev) =>
-      prev[granoId] ? { ...prev, [granoId]: { ...prev[granoId], compuesto_id: compuestoId } } : prev,
-    );
+    setGranos((prev) => {
+      if (!prev[granoId]) return prev;
+      const actualizado = { ...prev[granoId], compuesto_id: compuestoId };
+      void guardarEnDexie([], [], [actualizado]);
+      return { ...prev, [granoId]: actualizado };
+    });
     const { error } = await supabase
       .from(CONFIG_GRANOS.tabla)
       .update({ compuesto_id: compuestoId })
@@ -221,7 +302,12 @@ export function useFormacionVetas(formacionId: string | null) {
   }, []);
 
   const actualizarProporcion = useCallback(async (vinculoId: string, proporcion: string) => {
-    setVinculos((prev) => prev.map((v) => (v.id === vinculoId ? { ...v, proporcion } : v)));
+    setVinculos((prev) => {
+      const next = prev.map((v) => (v.id === vinculoId ? { ...v, proporcion } : v));
+      const actualizado = next.find((v) => v.id === vinculoId);
+      if (actualizado) void guardarEnDexie([actualizado], [], []);
+      return next;
+    });
     const { error } = await supabase
       .from("formacion_vetas")
       .update({ proporcion })
@@ -231,6 +317,9 @@ export function useFormacionVetas(formacionId: string | null) {
 
   const quitarCompuesto = useCallback(async (vinculoId: string) => {
     setVinculos((prev) => prev.filter((v) => v.id !== vinculoId));
+    try {
+      if (db) await db.formacion_vetas.delete(vinculoId);
+    } catch {}
     await supabase.from("formacion_vetas").delete().eq("id", vinculoId);
   }, []);
 
