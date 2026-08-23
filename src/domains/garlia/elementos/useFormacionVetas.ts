@@ -79,7 +79,7 @@ export function useFormacionVetas(formacionId: string | null) {
       .in("id", vetaIds);
 
     const vetasPorId: Record<string, Veta> = {};
-    for (const v of (vetaData ?? []) as Veta[]) vetasPorId[v.id] = v;
+    for (const v of (vetaData ?? []) as unknown as Veta[]) vetasPorId[v.id] = v;
     setVetas(vetasPorId);
 
     const granoIds = Object.values(vetasPorId)
@@ -98,7 +98,7 @@ export function useFormacionVetas(formacionId: string | null) {
       .in("id", granoIds);
 
     const granosPorId: Record<string, Grano> = {};
-    for (const g of (granoData ?? []) as Grano[]) granosPorId[g.id] = g;
+    for (const g of (granoData ?? []) as unknown as Grano[]) granosPorId[g.id] = g;
     setGranos(granosPorId);
 
     setLoading(false);

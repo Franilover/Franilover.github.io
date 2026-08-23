@@ -90,7 +90,7 @@ export function useOrganoTejidos(organoId: string | null) {
       .in("id", tejidoIds);
 
     const tejidosPorId: Record<string, Tejido> = {};
-    for (const t of (tejidoData ?? []) as Tejido[]) tejidosPorId[t.id] = t;
+    for (const t of (tejidoData ?? []) as unknown as Tejido[]) tejidosPorId[t.id] = t;
     setTejidos(tejidosPorId);
 
     const celulaIds = Object.values(tejidosPorId)
@@ -109,7 +109,7 @@ export function useOrganoTejidos(organoId: string | null) {
       .in("id", celulaIds);
 
     const celulasPorId: Record<string, Celula> = {};
-    for (const c of (celulaData ?? []) as Celula[]) celulasPorId[c.id] = c;
+    for (const c of (celulaData ?? []) as unknown as Celula[]) celulasPorId[c.id] = c;
     setCelulas(celulasPorId);
 
     setLoading(false);
