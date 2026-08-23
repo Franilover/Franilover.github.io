@@ -22,9 +22,9 @@ import { supabase } from "@/infra/supabase/supabase";
 import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
+import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
-import type { GrupoCompuesto, Reaccion } from "@/domains/garlia/elementos/types";
+import type { Organo, Reaccion } from "@/domains/garlia/elementos/types";
 
 import { CladisticaPage } from "./CladisticaPage";
 import { useClados } from "./useBiologia";
@@ -129,20 +129,21 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   const { clados, setClados } = useClados();
 
   // ── Órganos y Procesos: catálogos propios, mismo motor que Física ─────
-  // Órganos = tabla real "estructuras_ensambladas" (mismo catálogo que usa
-  // Flora para vincular por planta, y Criaturas por criatura_organos).
+  // Órganos = tabla real "organos" (mismo catálogo que usa Flora para
+  // vincular por planta_organos, y Criaturas por criatura_organos). Ya no
+  // tiene columna `componentes` — la fórmula vive vía Tejidos/Células.
   // Procesos = tabla real "reacciones" (mismo catálogo que usan Procesos de
   // Flora/Minerales y Habilidades de Items). Self-contained, igual que el
   // resto de Biología: trae sus propios datos acá sin tocar CladisticaPage
   // ni depender de una planta puntual.
-  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useEstructurasEnsambladas();
+  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
   const { items: compuestosCatalogo } = useCompuestos();
   const { items: elementosCatalogo } = useElementos();
 
-  async function actualizarOrgano(id: string, cambios: Partial<GrupoCompuesto>) {
+  async function actualizarOrgano(id: string, cambios: Partial<Organo>) {
     setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
-    const { error } = await supabase.from("estructuras_ensambladas").update(cambios).eq("id", id);
+    const { error } = await supabase.from("organos").update(cambios).eq("id", id);
     if (error) console.error("[BiologiaPage] error guardando órgano:", error);
   }
 

@@ -25,7 +25,7 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
+import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { type Compuesto, type Elemento, type Reaccion } from "@/domains/garlia/elementos/types";
 import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage";
@@ -61,7 +61,7 @@ export function FloraEditorMejorado({
 }) {
   const { items: elementos, setItems: setElementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
-  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useEstructurasEnsambladas();
+  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useFlora();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
@@ -85,9 +85,10 @@ export function FloraEditorMejorado({
   const lastEntityClickTarget = useRef<HTMLElement | null>(null);
   const asideEcosistemasRef = useRef<HTMLElement | null>(null);
 
-  // Catálogo de Órganos: tabla real "estructuras_ensambladas" (catálogo
-  // global, compartido con Formaciones de Minerales/Items y Órganos de
-  // Criaturas), separada de Grupos de Compuestos.
+  // Catálogo de Órganos: tabla real "organos" (catálogo propio, separado
+  // de "formaciones" que usan Minerales/Items, compartido con Órganos de
+  // Criaturas vía criatura_organos). Ya no tiene `componentes` inline: la
+  // fórmula vive vía Tejidos/Células.
 
   // Órganos vinculados a esta planta (resueltos contra el catálogo) y procesos
   const {

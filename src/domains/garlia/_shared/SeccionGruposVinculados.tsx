@@ -34,6 +34,7 @@ import type {
 export function SeccionGruposVinculados({
   titulo,
   descripcion,
+  tipo = "organo",
   items,
   catalogo,
   loading,
@@ -53,6 +54,11 @@ export function SeccionGruposVinculados({
   titulo: string;
   descripcion?: string;
   icono: LucideIcon;
+  /** "organo" resuelve la fórmula vía Tejidos/Células; "formacion" vía
+   *  Vetas/Granos — se reenvía tal cual a TarjetaFormacionOrgano. Default
+   *  "organo" por compatibilidad con los llamadores existentes de Flora/
+   *  Criaturas; Minerales/Items deben pasar "formacion" explícitamente. */
+  tipo?: "organo" | "formacion";
   items: GrupoVinculadoResuelto[];
   /** Catálogo completo del propio módulo (Órganos, Formaciones…) para el picker "usar existente". */
   catalogo: EntradaCatalogoGrupo[];
@@ -156,6 +162,7 @@ export function SeccionGruposVinculados({
             <TarjetaFormacionOrgano
               key={item.vinculo_id}
               item={item}
+              tipo={tipo}
               onUpdate={onUpdate}
               onDelete={() => onDelete(item.vinculo_id)}
               compuestos={compuestos}
@@ -171,6 +178,7 @@ export function SeccionGruposVinculados({
       {pickerAbierto && (
         <PickerUsarExistente
           titulo={titulo}
+          tipo={tipo}
           disponibles={disponibles}
           compuestos={compuestos}
           labelBuscar={labelBuscar}

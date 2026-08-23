@@ -4,12 +4,14 @@
  * Entidad plana (mismo molde que Flora/Item/Ecosistema): nombre, imagen,
  * descripción, notas. Ahora extendida con el mismo patrón que Flora:
  * - Formaciones: partes del mineral con fórmula propia (veta, inclusión,
- *   capa, núcleo, superficie, cristal…). "Formación" ya NO es una entidad
- *   1:1 propia de mineral_formaciones: es un GrupoCompuesto con
- *   tipo="formacion" (ver elementos/types.ts), vinculado N:N vía la tabla
- *   puente mineral_formaciones (mismo patrón que planta_organos en Flora).
- *   Esto permite reutilizar la misma formación entre varios minerales y
- *   reutiliza el catálogo/editor de "Grupos de compuestos" tal cual.
+ *   capa, núcleo, superficie, cristal…). "Formación" es una fila real de la
+ *   tabla propia "formaciones" (ver elementos/types.ts), vinculada N:N vía
+ *   la tabla puente mineral_formaciones (mismo patrón que planta_organos en
+ *   Flora). Esto permite reutilizar la misma formación entre varios
+ *   minerales, e incluso compartirla con la Estructura de Items. Una
+ *   Formación ya NO tiene columna `componentes` inline: su fórmula vive dos
+ *   niveles más abajo, vía formacion_vetas→Veta→Grano→Compuesto (ver
+ *   useFormacionVetas).
  * - Procesos: eventos geológicos de formación/transformación
  *   (cristalización, oxidación, metamorfismo…) con consume/produce —
  *   mismo shape que PlantaProceso, pero SIN orden/secuencia: a diferencia
@@ -18,7 +20,7 @@
  *   o al revés), así que no hay drag-and-drop ni columna `orden`.
  */
 
-import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import type { Formacion } from "@/domains/garlia/elementos/types";
 
 export interface Mineral {
   id: string;
@@ -28,8 +30,11 @@ export interface Mineral {
   /** @deprecated Legado: un solo compuesto. Se mantiene por compatibilidad. */
   compuesto_id: string | null;
   /** @deprecated Legado: composición plana sin estructura. Reemplazada por
-   *  Formaciones (grupos_compuestos vinculados vía mineral_formaciones). Se
-   *  mantiene por compatibilidad con datos viejos ya migrados. */
+   *  Formaciones (tabla "formaciones" vinculada vía mineral_formaciones).
+   *  Se mantiene por compatibilidad con datos viejos aún no migrados —
+   *  ver migración one-shot en useMineralFormacionesProcesos, que ahora
+   *  escribe en la tabla "mineral_formaciones_legado" en vez de perder
+   *  este campo. */
   componentes: { compuesto_id: string; tag: string }[];
   notas: string;
   orden: number;
@@ -38,27 +43,27 @@ export interface Mineral {
 }
 
 /**
- * Vínculo N:N entre Mineral y GrupoCompuesto (con tipo="formacion").
- * Reemplaza a la vieja fila-completa `mineral_formaciones` (que antes tenía
- * nombre/componentes/notas propios, 1:1 con mineral_id): ahora esa misma
- * tabla es solo el vínculo puente, y el nombre/fórmula/notas viven en el
- * GrupoCompuesto referenciado — igual que planta_organos en Flora.
+ * Vínculo N:N entre Mineral y Formacion. Tabla puente real
+ * "mineral_formaciones" → formaciones.id. La columna `grupo_compuesto_id`
+ * es el nombre histórico (de cuando existía una tabla unificada
+ * "grupos_compuestos"/"estructuras_ensambladas") pero hoy apunta a
+ * formaciones.id.
  */
 export interface MineralFormacionVinculo {
   id: string;
   mineral_id: string;
-  /** FK a grupos_compuestos.id. */
+  /** FK a formaciones.id (nombre de columna histórico). */
   grupo_compuesto_id: string;
   created_at: string;
 }
 
 /**
- * Vista combinada usada por la UI: el vínculo puente + los datos del
- * GrupoCompuesto ya resueltos — mismo espíritu que PlantaOrganoResuelto en
+ * Vista combinada usada por la UI: el vínculo puente + los datos de la
+ * Formacion ya resueltos — mismo espíritu que PlantaOrganoResuelto en
  * Flora. `vinculo_id` es el id de la fila puente (MineralFormacionVinculo.id),
  * necesario para desvincular sin borrar la formación del catálogo.
  */
-export interface MineralFormacion extends GrupoCompuesto {
+export interface MineralFormacion extends Formacion {
   vinculo_id: string;
 }
 

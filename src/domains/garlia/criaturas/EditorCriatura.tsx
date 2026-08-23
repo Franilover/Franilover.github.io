@@ -80,10 +80,10 @@ import { PanelPerfilCriatura } from "@/domains/garlia/biologia/PerfilAtomicoCria
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
-import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
+import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { usePerfilesAtomicosCriatura } from "@/domains/garlia/biologia/useBiologia";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import type { Organo } from "@/domains/garlia/elementos/types";
 import { useOris } from "@/domains/garlia/fisica/useFisica";
 import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete } from "@/lib/utils/dexieHelpers";
@@ -164,19 +164,21 @@ export function EditorCriatura({
   );
 
   // ── Órganos (composición macro, ensamblaje de compuestos) ────────────────
-  // Catálogo real "estructuras_ensambladas" — compartido con Formaciones de
-  // Minerales/Items y Órganos de Flora. Distinto del Perfil atómico de
-  // arriba, que es composición directa por elemento (nivel micro).
+  // Catálogo real "organos" — compartido con Órganos de Flora (tabla propia,
+  // separada de "formaciones" que usan Minerales/Items). Distinto del
+  // Perfil atómico de arriba, que es composición directa por elemento
+  // (nivel micro). La fórmula del Órgano vive vía Tejidos/Células (ver
+  // useOrganoTejidos), no como columna inline.
   const [editandoGrupoId, setEditandoGrupoId] = useState<string | null>(null);
   const { items: compuestosOrganos, setItems: setCompuestosOrganos } = useCompuestos();
-  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useEstructurasEnsambladas();
+  const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const organosCriatura = useCriaturaOrganos(form.id, catalogoOrganos);
 
-  function onOrganoActualizadoLocal(id: string, updates: Partial<GrupoCompuesto>) {
+  function onOrganoActualizadoLocal(id: string, updates: Partial<Organo>) {
     setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
   }
 
-  async function persistirOrgano(id: string, cambios: Partial<GrupoCompuesto>) {
+  async function persistirOrgano(id: string, cambios: Partial<Organo>) {
     onOrganoActualizadoLocal(id, cambios);
     await organosCriatura.actualizarOrgano(id, cambios);
   }

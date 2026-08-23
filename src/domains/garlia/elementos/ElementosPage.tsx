@@ -40,7 +40,6 @@ import {
   type Compuesto,
   type Elemento,
   type ElementFamily,
-  type GrupoCompuesto,
   type Reaccion,
 } from "./types";
 

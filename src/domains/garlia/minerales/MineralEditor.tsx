@@ -31,7 +31,7 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
+import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
@@ -66,7 +66,7 @@ export function MineralEditor({
 }) {
   const { items: elementos } = useElementos();
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
-  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useEstructurasEnsambladas();
+  const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useFormaciones();
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useMinerales();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
@@ -106,10 +106,10 @@ export function MineralEditor({
     });
   };
 
-  // Catálogo de Formaciones: tabla real "estructuras_ensambladas" (catálogo
-  // global, compartido entre todos los minerales, y también con Estructura
-  // de Items y Órganos de Flora/Criaturas), separada de Grupos de
-  // Compuestos.
+  // Catálogo de Formaciones: tabla real "formaciones" (catálogo propio,
+  // compartido entre todos los minerales y también con Estructura de
+  // Items), separada de "organos" que usan Flora/Criaturas. Ya no tiene
+  // `componentes` inline: la fórmula vive vía Vetas/Granos.
 
   // Formaciones y procesos
   const {
@@ -286,6 +286,7 @@ export function MineralEditor({
                   <SeccionGruposVinculados
                     titulo="Formaciones"
                     icono={Gem}
+                    tipo="formacion"
                     items={formaciones}
                     catalogo={catalogoFormaciones}
                     loading={loadingFormacionesProcesos}
@@ -317,7 +318,16 @@ export function MineralEditor({
                   <AfinidadEntreEntidadesPanel
                     entidadId={form.id}
                     nombreEntidad={form.nombre}
-                    mezcla={formaciones.flatMap((f) => f.componentes ?? [])}
+                    // TODO: Formacion ya no tiene `componentes` inline (la
+                    // fórmula vive vía Vetas/Granos→Compuesto, ver
+                    // useFormacionVetas). Este panel y
+                    // useMezclasAfinidadCatalogo siguen construidos sobre
+                    // el shape viejo y su query a Supabase ya apunta a una
+                    // tabla ("grupos_compuestos") que no existe — quedan
+                    // pendientes de reescribirse para resolver la mezcla
+                    // agregada vía la cadena real de Vetas/Granos. Se pasa
+                    // vacío acá para no romper el build mientras tanto.
+                    mezcla={[]}
                     compuestos={compuestos}
                     elementos={elementos}
                   />
@@ -380,6 +390,7 @@ export function MineralEditor({
       {editandoFormacionId && (
         <GrupoCompuestoPanelFlotante
           grupo={catalogoFormaciones.find((f) => f.id === editandoFormacionId)!}
+          tipo="formacion"
           compuestos={compuestos}
           onCerrar={() => setEditandoFormacionId(null)}
           onActualizar={(id, cambios) => {

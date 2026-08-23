@@ -5,60 +5,54 @@
  * ───────────────────────────────────────────────────────────────────────────
  * Hook para CRUD de Órganos y Procesos de una planta.
  *
- * Órganos: catálogo propio — tabla real "estructuras_ensambladas"
- * (separada de "grupos_compuestos", compartida con Formaciones de
- * Minerales/Items y Órganos de Criaturas). Este hook resuelve los vínculos
- * de `plantaId` (tabla puente "planta_organos", FK `grupo_compuesto_id` →
- * estructuras_ensambladas.id) contra el catálogo de Órganos (recibido como
- * parámetro, ya cargado por useEstructurasEnsambladas en el componente
- * padre) y expone:
- *   - crearYVincularOrgano: crea un Organo nuevo y lo vincula a esta planta
- *     ("Crear órgano" en el picker).
- *   - vincularOrganoExistente: vincula un Organo ya existente del catálogo
- *     ("Usar uno existente" en el picker) — no duplica nada.
- *   - actualizarOrgano: edita la fórmula/nombre/notas del Organo en el
- *     catálogo — el cambio se refleja en todas las plantas que lo usan.
- *   - desvincularOrgano: quita el vínculo planta↔órgano (borra la fila
- *     puente), sin borrar el Organo del catálogo — así sigue disponible
- *     para otras plantas / para volver a vincularlo.
+ * Órganos: catálogo propio — tabla real "organos" (separada de
+ * "formaciones", que usan Minerales/Items; compartida con Órganos de
+ * Criaturas vía "criatura_organos"). Ya no tiene columna `componentes`: la
+ * fórmula vive vía Tejidos/Células (organo_tejidos→tejidos→celulas→
+ * compuesto_id, ver useOrganoTejidos). El CRUD del vínculo N:N ya no se
+ * reimplementa acá — delega directo a useEntidadVinculosGrupo, mismo motor
+ * que usan Formaciones de Minerales/Items y Órganos de Criaturas.
  *
- * Procesos: ahora son solo una etapa del ciclo de vida (descripcion) que
- * vincula 1:1 un Proceso/Reacción de la tabla real "reacciones" vía
+ * Procesos: siguen siendo solo una etapa del ciclo de vida (descripcion)
+ * que vincula 1:1 un Proceso/Reacción de la tabla real "reacciones" vía
  * reaccion_id — el CRUD de ese vínculo vive en useEntidadVinculoReaccion,
- * instanciado desde el componente que renderiza cada PlantaProceso.
+ * instanciado desde el componente que renderiza cada PlantaProceso. Esta
+ * parte no cambió: sigue viviendo acá porque es propia de Flora (con
+ * `orden` para el drag-and-drop del ciclo de vida, a diferencia de
+ * Minerales).
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 
-import type { GrupoCompuesto } from "@/domains/garlia/elementos/types";
+import type { Organo } from "@/domains/garlia/elementos/types";
+import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
-import type {
-  PlantaOrgano,
-  PlantaOrganoResuelto,
-  PlantaProceso,
-  PlantaProcesoInput,
-} from "./types";
+import type { PlantaOrganoResuelto, PlantaProceso, PlantaProcesoInput } from "./types";
 
-export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: GrupoCompuesto[]) {
-  const [vinculos, setVinculos] = useState<PlantaOrgano[]>([]);
+export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Organo[]) {
+  const {
+    items: organos,
+    loading: loadingOrganos,
+    crearYVincular: crearYVincularOrgano,
+    vincularExistente: vincularOrganoExistente,
+    actualizar: actualizarOrgano,
+    desvincular: desvincularOrgano,
+    load: loadOrganos,
+  } = useEntidadVinculosGrupo({
+    entidadId: plantaId,
+    tablaCatalogo: "organos",
+    tablaPuente: "planta_organos",
+    columnaFk: "planta_id",
+    catalogo: catalogoOrganos,
+  });
+
   const [procesos, setProcesos] = useState<PlantaProceso[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingProcesos, setLoadingProcesos] = useState(true);
 
-  // ── Cargar vínculos (planta_organos) y procesos ────────────────────────
-  const load = useCallback(async () => {
-    setLoading(true);
-
-    const { data: vinculoData, error: vinculoError } = await supabase
-      .from("planta_organos")
-      .select("*")
-      .eq("planta_id", plantaId)
-      .order("created_at", { ascending: true });
-
-    if (!vinculoError && vinculoData) {
-      setVinculos(vinculoData as PlantaOrgano[]);
-    }
-
+  // ── Cargar procesos (planta_reacciones) ─────────────────────────────────
+  const loadProcesos = useCallback(async () => {
+    setLoadingProcesos(true);
     const { data: procesoData, error: procesoError } = await supabase
       .from("planta_reacciones")
       .select("*")
@@ -68,129 +62,39 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
     if (!procesoError && procesoData) {
       setProcesos(procesoData as PlantaProceso[]);
     }
-
-    setLoading(false);
+    setLoadingProcesos(false);
   }, [plantaId]);
 
   useEffect(() => {
-    if (plantaId) void load();
-  }, [plantaId, load]);
+    if (plantaId) void loadProcesos();
+  }, [plantaId, loadProcesos]);
 
-  // ── Órganos vinculados a esta planta, ya resueltos contra el catálogo ──
-  // (si un vínculo apunta a un grupo_compuesto_id que ya no existe en el
-  // catálogo, se ignora silenciosamente — huérfano, mismo espíritu que
-  // "huerfanos" en ResultadoBalanceProceso).
-  const organos = useMemo<PlantaOrganoResuelto[]>(() => {
-    const porId = new Map(catalogoOrganos.map((g) => [g.id, g]));
-    return vinculos
-      .map((v) => {
-        const grupo = porId.get(v.grupo_compuesto_id);
-        if (!grupo) return null;
-        return { ...grupo, vinculo_id: v.id };
-      })
-      .filter((o): o is PlantaOrganoResuelto => o !== null);
-  }, [vinculos, catalogoOrganos]);
+  // ── CRUD de procesos: solo una etapa (descripcion) — el consume/produce
+  // vive en la Reacción vinculada 1:1 (ver useEntidadVinculoReaccion,
+  // instanciado por proceso desde la UI). Tabla real "planta_reacciones"
+  // (no "planta_procesos") — tiene columna `orden` propia para el
+  // drag-and-drop del ciclo de vida. ─────────────────────────────────────
+  const crearProceso = useCallback(async () => {
+    const siguienteOrden =
+      procesos.length > 0 ? Math.max(...procesos.map((p) => p.orden ?? 0)) + 1 : 0;
+    const { data, error } = await supabase
+      .from("planta_reacciones")
+      .insert([{ planta_id: plantaId, descripcion: null, reaccion_id: null, orden: siguienteOrden }])
+      .select()
+      .single();
 
-  // ── Crear un Organo nuevo + vincularlo a esta planta ───────────────────
-  const crearYVincularOrgano = useCallback(
-    async (nombre: string = "") => {
-      const { data: nuevoGrupo, error: errorGrupo } = await supabase
-        .from("estructuras_ensambladas")
-        .insert([{ nombre, componentes: [] }])
-        .select()
-        .single();
-      if (errorGrupo || !nuevoGrupo) return null;
-
-      const { data: vinculo, error: errorVinculo } = await supabase
-        .from("planta_organos")
-        .insert([{ planta_id: plantaId, grupo_compuesto_id: (nuevoGrupo as GrupoCompuesto).id }])
-        .select()
-        .single();
-      if (errorVinculo || !vinculo) {
-        // Rollback best-effort: el grupo quedó huérfano en el catálogo,
-        // se deja (no rompe nada, solo queda sin usar todavía) en vez de
-        // complejizar con una transacción real.
-        return null;
-      }
-
-      setVinculos((prev) => [...prev, vinculo as PlantaOrgano]);
-      return { ...(nuevoGrupo as GrupoCompuesto), vinculo_id: (vinculo as PlantaOrgano).id };
-    },
-    [plantaId],
-  );
-
-  // ── Vincular un GrupoCompuesto ya existente del catálogo a esta planta ─
-  const vincularOrganoExistente = useCallback(
-    async (grupoCompuestoId: string) => {
-      // Evita duplicar el vínculo si ya está vinculado.
-      if (vinculos.some((v) => v.grupo_compuesto_id === grupoCompuestoId)) return null;
-
-      const { data: vinculo, error } = await supabase
-        .from("planta_organos")
-        .insert([{ planta_id: plantaId, grupo_compuesto_id: grupoCompuestoId }])
-        .select()
-        .single();
-      if (error || !vinculo) return null;
-
-      setVinculos((prev) => [...prev, vinculo as PlantaOrgano]);
-      return vinculo as PlantaOrgano;
-    },
-    [plantaId, vinculos],
-  );
-
-  // ── Actualizar el Organo en el catálogo (afecta a todas las plantas que
-  // lo tengan vinculado) ──────────────────────────────────────────────────
-  const actualizarOrgano = useCallback(
-    async (grupoCompuestoId: string, updates: Partial<GrupoCompuesto>) => {
-      const { error } = await supabase
-        .from("estructuras_ensambladas")
-        .update(updates)
-        .eq("id", grupoCompuestoId);
-      if (error) {
-        console.error("[usePlantaOrganosProcesos] error actualizando organo:", error);
-      }
-    },
-    [],
-  );
-
-  // ── Desvincular (borra solo la fila puente, el GrupoCompuesto sigue en
-  // el catálogo para otras plantas) ────────────────────────────────────────
-  const desvincularOrgano = useCallback(async (vinculoId: string) => {
-    setVinculos((prev) => prev.filter((v) => v.id !== vinculoId));
-    await supabase.from("planta_organos").delete().eq("id", vinculoId);
-  }, []);
-
-  // ── CRUD de procesos: ahora solo una etapa (descripcion) — el
-  // consume/produce vive en la Reacción vinculada 1:1 (ver
-  // useEntidadVinculoReaccion, instanciado por proceso desde la UI).
-  // Tabla real "planta_reacciones" (no "planta_procesos") — tiene columna
-  // `orden` propia para el drag-and-drop del ciclo de vida. ──────────────
-  const crearProceso = useCallback(
-    async () => {
-      const siguienteOrden =
-        procesos.length > 0 ? Math.max(...procesos.map((p) => p.orden ?? 0)) + 1 : 0;
-      const { data, error } = await supabase
-        .from("planta_reacciones")
-        .insert([{ planta_id: plantaId, descripcion: null, reaccion_id: null, orden: siguienteOrden }])
-        .select()
-        .single();
-
-      if (error || !data) return null;
-      setProcesos((prev) => [...prev, data as PlantaProceso]);
-      return data as PlantaProceso;
-    },
-    [plantaId, procesos],
-  );
+    if (error || !data) return null;
+    setProcesos((prev) => [...prev, data as PlantaProceso]);
+    return data as PlantaProceso;
+  }, [plantaId, procesos]);
 
   const actualizarProceso = useCallback(
     async (id: string, updates: PlantaProcesoInput) => {
-      setProcesos((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, ...updates } : p)),
-      );
+      setProcesos((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
       const { error } = await supabase.from("planta_reacciones").update(updates).eq("id", id);
-      if (error) void load();
+      if (error) void loadProcesos();
     },
-    [load],
+    [loadProcesos],
   );
 
   const eliminarProceso = useCallback(async (id: string) => {
@@ -199,9 +103,9 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
   }, []);
 
   return {
-    organos,
+    organos: organos as PlantaOrganoResuelto[],
     procesos,
-    loading,
+    loading: loadingOrganos || loadingProcesos,
     // Órganos
     crearYVincularOrgano,
     vincularOrganoExistente,
@@ -212,6 +116,8 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Grup
     actualizarProceso,
     eliminarProceso,
     // Reload
-    load,
+    load: useCallback(async () => {
+      await Promise.all([loadOrganos(), loadProcesos()]);
+    }, [loadOrganos, loadProcesos]),
   };
 }

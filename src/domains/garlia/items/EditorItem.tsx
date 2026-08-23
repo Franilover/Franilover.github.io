@@ -36,7 +36,7 @@ import { supabase } from "@/infra/supabase/supabase";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import { useEstructurasEnsambladas } from "@/domains/garlia/elementos/useEstructurasEnsambladas";
+import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
@@ -95,16 +95,16 @@ export function EditorItem({
   const { items: compuestos, setItems: setCompuestos } = useCompuestos();
 
   // Catálogo propio de Formaciones — Estructura del item usa el MISMO
-  // catálogo (tabla real "estructuras_ensambladas") que Formaciones de
-  // Minerales y Órganos de Flora/Criaturas. Un item y un mineral pueden
-  // compartir la misma Formación (ej. "Cristal de Cuarzo" como parte de una
-  // espada y como formación mineral), y editarla en cualquiera de los dos
-  // lugares actualiza a ambos. La tabla puente sigue siendo item_estructura.
-  const { items: catalogoEstructura, setItems: setCatalogoEstructura } = useEstructurasEnsambladas();
+  // catálogo (tabla real "formaciones") que Formaciones de Minerales. Un
+  // item y un mineral pueden compartir la misma Formación (ej. "Cristal de
+  // Cuarzo" como parte de una espada y como formación mineral), y editarla
+  // en cualquiera de los dos lugares actualiza a ambos. La tabla puente
+  // sigue siendo item_estructura (columna histórica grupo_compuesto_id).
+  const { items: catalogoEstructura, setItems: setCatalogoEstructura } = useFormaciones();
 
   const estructura = useEntidadVinculosGrupo({
     entidadId: item.id,
-    tablaCatalogo: "estructuras_ensambladas",
+    tablaCatalogo: "formaciones",
     tablaPuente: "item_estructura",
     columnaFk: "item_id",
     catalogo: catalogoEstructura,
@@ -129,7 +129,7 @@ export function EditorItem({
   // relación (estructura/habilidad) pertenece el grupo que edita.
   async function persistirGrupoCompuesto(id: string, cambios: any) {
     onGrupoCompuestoActualizadoLocal(id, cambios);
-    const { error } = await supabase.from("estructuras_ensambladas").update(cambios).eq("id", id);
+    const { error } = await supabase.from("formaciones").update(cambios).eq("id", id);
     if (error) {
       console.error("[EditorItem] error guardando formación:", error);
     }
@@ -323,12 +323,13 @@ export function EditorItem({
 
               {/* Formaciones — partes materiales del ítem (mango, hoja,
                   empuñadura…), cada una con su propia fórmula de
-                  compuestos. Catálogo real "estructuras_ensambladas", el
-                  mismo que usan Minerales y Criaturas. */}
+                  compuestos. Catálogo real "formaciones", el mismo que
+                  usan las Formaciones de Minerales. */}
               <SeccionGruposVinculados
                 titulo="Formaciones"
                 descripcion="Partes materiales del ítem, cada una con su propia fórmula de compuestos — mismo catálogo que las Formaciones de Minerales."
                 icono={Layers}
+                tipo="formacion"
                 items={estructura.items}
                 catalogo={catalogoEstructura}
                 loading={estructura.loading}
@@ -423,6 +424,7 @@ export function EditorItem({
       {editandoGrupoId && (
         <GrupoCompuestoPanelFlotante
           grupo={catalogoEstructura.find((g) => g.id === editandoGrupoId)!}
+          tipo="formacion"
           compuestos={compuestos}
           onCerrar={() => setEditandoGrupoId(null)}
           onActualizar={persistirGrupoCompuesto}
