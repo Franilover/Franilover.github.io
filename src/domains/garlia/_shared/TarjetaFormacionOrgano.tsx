@@ -32,7 +32,6 @@ import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVi
 import { useOrganoTejidos } from "@/domains/garlia/elementos/useOrganoTejidos";
 import { useFormacionVetas } from "@/domains/garlia/elementos/useFormacionVetas";
 import { SelectorFormulaTejidos } from "@/domains/garlia/_shared/SelectorFormulaTejidos";
-import type { Compuesto } from "@/domains/garlia/elementos/types";
 
 /** Vínculo puente ya resuelto contra el catálogo — mismo shape para
  *  PlantaOrganoResuelto, MineralFormacion, CriaturaOrganoResuelto, y
@@ -45,8 +44,7 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
   item,
   tipo = "organo",
   onDelete,
-  compuestos,
-  onAbrirCompuesto,
+  onAbrirCelula,
   onAbrirGrupo,
   placeholderNombre = "Sin nombre",
   placeholderNotas = "Sin notas.",
@@ -60,8 +58,10 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
    *  (nombre, función, fórmula, notas) es responsabilidad del editor
    *  propio — ver onAbrirGrupo. */
   onDelete?: () => void;
-  compuestos: Compuesto[];
-  onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Abre el editor de la Célula/Grano que compone una fila de la fórmula
+   *  (clickeando "hecho de: [Célula]") — el Compuesto se edita adentro de
+   *  ese panel, no acá. */
+  onAbrirCelula?: (celulaOGranoId: string) => void;
   /** Abre este Órgano/Formación en su editor propio (panel flotante) —
    *  único lugar donde se edita nombre/función/fórmula/notas. Si se omite,
    *  el nombre se muestra como texto plano (no clickeable). */
@@ -123,12 +123,10 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
             <p className="text-micro text-primary/25 italic">Cargando…</p>
           ) : (
             <SelectorFormulaTejidos
-              compuestos={compuestos}
               items={formula.items}
-              onActualizarCompuesto={() => {}}
               onActualizarProporcion={() => {}}
               onQuitar={() => {}}
-              onAbrirCompuesto={onAbrirCompuesto}
+              onAbrirCelula={onAbrirCelula}
               soloLectura
             />
           )}

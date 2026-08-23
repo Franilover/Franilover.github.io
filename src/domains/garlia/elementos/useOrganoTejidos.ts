@@ -98,6 +98,11 @@ export interface TejidoDeOrgano {
   /** Alias de celula_id — id de catálogo donde vive compuesto_id (shape
    *  compartido con VetaDeFormacion, ver FilaFormulaTejido). */
   catalogo_id: string | null;
+  /** Nombre propio de la Célula (columna `nombre` de la tabla celulas) —
+   *  lo que debe mostrar la fila "hecho de", NO el nombre del Compuesto:
+   *  la cadena real es Tejido → Célula → Compuesto, y la fila de fórmula
+   *  no debe saltearse el nivel Célula. */
+  catalogo_nombre: string | null;
   proporcion: string | null;
   nombre: string;
   funcion: string | null;
@@ -216,6 +221,7 @@ export function useOrganoTejidos(organoId: string | null) {
           tejido_o_veta_id: v.tejido_id,
           celula_id: tejido.celula_id,
           catalogo_id: tejido.celula_id,
+          catalogo_nombre: celula?.nombre ?? null,
           proporcion: v.proporcion,
           nombre: tejido.nombre,
           funcion: tejido.funcion,

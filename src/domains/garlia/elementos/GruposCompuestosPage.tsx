@@ -26,8 +26,8 @@ import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
 import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
 import { useGranos } from "@/domains/garlia/elementos/useGranos";
 import { useVetas } from "@/domains/garlia/elementos/useVetas";
-import { PanelEditorTejido, SelectorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
-import { PanelEditorVeta, SelectorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
+import { PanelEditorTejido, PanelEditorCelula, SelectorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { PanelEditorVeta, PanelEditorGrano, SelectorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 import type { Compuesto } from "./types";
@@ -68,6 +68,13 @@ export function GrupoCompuestoPanelFlotante({
   // catálogos globales (useCelulas/useTejidos o useGranos/useVetas) cuando
   // el panel está realmente abierto. ────────────────────────────────────
   const [tejidoOVetaAbiertoId, setTejidoOVetaAbiertoId] = useState<string | null>(null);
+  // Editor de la Célula/Grano que compone una fila — abierto directo desde
+  // "hecho de: [Célula]" en SelectorFormulaTejidos (cadena real
+  // Tejido→Célula→Compuesto), o desde adentro de PanelEditorTejido al
+  // navegar Tejido→Célula. Mismo shape de estado que tejidoOVetaAbiertoId,
+  // pero apunta a Célula/Grano — panel independiente, no reemplaza al de
+  // arriba (pueden estar los dos abiertos: Tejido debajo, Célula encima). ─
+  const [celulaOGranoAbiertoId, setCelulaOGranoAbiertoId] = useState<string | null>(null);
   const celulasCatalogo = useCelulas();
   const tejidosCatalogo = useTejidos();
   const granosCatalogo = useGranos();
@@ -172,21 +179,17 @@ export function GrupoCompuestoPanelFlotante({
               <p className="text-micro text-primary/25 italic">Cargando…</p>
             ) : (
               <SelectorFormulaTejidos
-                compuestos={compuestos}
                 items={formula.items}
                 onVincularExistente={(id) => void formula.vincularExistente(id)}
                 onCrearYVincular={(nombre) => void formula.crearYVincular(nombre)}
                 catalogoDisponible={catalogo.items}
                 loadingCatalogo={catalogo.loading}
                 labelCatalogo={tipo === "organo" ? "Tejido" : "Veta"}
-                onActualizarCompuesto={(catalogoId, compuestoId) =>
-                  void formula.actualizarCompuesto(catalogoId, compuestoId)
-                }
                 onActualizarProporcion={(vinculoId, proporcion) =>
                   void formula.actualizarProporcion(vinculoId, proporcion)
                 }
                 onQuitar={(vinculoId) => void formula.quitarCompuesto(vinculoId)}
-                onAbrirCompuesto={onAbrirCompuesto}
+                onAbrirCelula={(celulaOGranoId) => setCelulaOGranoAbiertoId(celulaOGranoId)}
                 onAbrirTejido={(tejidoOVetaId) => setTejidoOVetaAbiertoId(tejidoOVetaId)}
               />
             )}
@@ -220,7 +223,7 @@ export function GrupoCompuestoPanelFlotante({
               onCerrar={() => setTejidoOVetaAbiertoId(null)}
               onActualizar={tejidosCatalogo.actualizar}
               onEliminar={tejidosCatalogo.eliminar}
-              onAbrirCelula={undefined}
+              onAbrirCelula={(celulaId) => setCelulaOGranoAbiertoId(celulaId)}
             />
           );
         })()
@@ -237,7 +240,44 @@ export function GrupoCompuestoPanelFlotante({
               onCerrar={() => setTejidoOVetaAbiertoId(null)}
               onActualizar={vetasCatalogo.actualizar}
               onEliminar={vetasCatalogo.eliminar}
-              onAbrirGrano={undefined}
+              onAbrirGrano={(granoId) => setCelulaOGranoAbiertoId(granoId)}
+            />
+          );
+        })()
+      )}
+
+      {/* Editor completo de la Célula/Grano que compone una fila — abierto
+         desde "hecho de: [Célula]" en la fórmula, o desde adentro del panel
+         de Tejido/Veta de arriba. El Compuesto se elige/edita adentro de
+         ESTE panel (SelectorCompuesto), no en la fórmula ni en el Tejido. */}
+      {celulaOGranoAbiertoId && tipo === "organo" && (
+        (() => {
+          const celulaActiva = celulasCatalogo.items.find((c) => c.id === celulaOGranoAbiertoId);
+          if (!celulaActiva) return null;
+          return (
+            <PanelEditorCelula
+              item={celulaActiva}
+              compuestos={compuestos}
+              onCerrar={() => setCelulaOGranoAbiertoId(null)}
+              onActualizar={celulasCatalogo.actualizar}
+              onEliminar={celulasCatalogo.eliminar}
+              onAbrirCompuesto={onAbrirCompuesto}
+            />
+          );
+        })()
+      )}
+      {celulaOGranoAbiertoId && tipo === "formacion" && (
+        (() => {
+          const granoActivo = granosCatalogo.items.find((g) => g.id === celulaOGranoAbiertoId);
+          if (!granoActivo) return null;
+          return (
+            <PanelEditorGrano
+              item={granoActivo}
+              compuestos={compuestos}
+              onCerrar={() => setCelulaOGranoAbiertoId(null)}
+              onActualizar={granosCatalogo.actualizar}
+              onEliminar={granosCatalogo.eliminar}
+              onAbrirCompuesto={onAbrirCompuesto}
             />
           );
         })()

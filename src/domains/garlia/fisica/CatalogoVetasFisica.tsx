@@ -208,8 +208,12 @@ function GridSimple<T extends { id: string; nombre: string }>({
 }
 
 // ─── Panel Grano: nombre, función, notas, Compuesto (compuesto_id) ─────────
+// Exportado: reutilizado directo desde SelectorFormulaTejidos (fila "hecho
+// de" de una Veta en la fórmula de una Formación) — clickear ahí debe abrir
+// ESTE panel (Grano), no el del Compuesto directo, misma cadena real que
+// su espejo CatalogoTejidosBiologia.tsx.
 
-function PanelEditorGrano({
+export function PanelEditorGrano({
   item,
   compuestos,
   loadingCompuestos,

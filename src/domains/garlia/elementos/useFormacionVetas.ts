@@ -82,6 +82,11 @@ export interface VetaDeFormacion {
   /** Alias de grano_id — id de catálogo donde vive compuesto_id (shape
    *  compartido con TejidoDeOrgano, ver FilaFormulaTejido). */
   catalogo_id: string | null;
+  /** Nombre propio del Grano (columna `nombre` de la tabla granos) — lo
+   *  que debe mostrar la fila "hecho de", NO el nombre del Compuesto: la
+   *  cadena real es Veta → Grano → Compuesto, y la fila de fórmula no
+   *  debe saltearse el nivel Grano. */
+  catalogo_nombre: string | null;
   proporcion: string | null;
   nombre: string;
   funcion: string | null;
@@ -198,6 +203,7 @@ export function useFormacionVetas(formacionId: string | null) {
           tejido_o_veta_id: v.veta_id,
           grano_id: veta.grano_id,
           catalogo_id: veta.grano_id,
+          catalogo_nombre: grano?.nombre ?? null,
           proporcion: v.proporcion,
           nombre: veta.nombre,
           funcion: veta.funcion,

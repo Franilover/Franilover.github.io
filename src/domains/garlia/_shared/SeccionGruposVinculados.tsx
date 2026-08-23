@@ -23,7 +23,6 @@
 import { Plus, Search, X, type LucideIcon } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-import type { Compuesto } from "@/domains/garlia/elementos/types";
 import { TarjetaFormacionOrgano } from "@/domains/garlia/_shared/TarjetaFormacionOrgano";
 import type {
   EntradaCatalogoGrupo,
@@ -37,11 +36,10 @@ export function SeccionGruposVinculados({
   items,
   catalogo,
   loading,
-  compuestos,
   onCrearNuevo,
   onUsarExistente,
   onDelete,
-  onAbrirCompuesto,
+  onAbrirCelula,
   onAbrirGrupo,
   placeholderNombre,
   placeholderNotas,
@@ -61,13 +59,14 @@ export function SeccionGruposVinculados({
   /** Catálogo completo del propio módulo (Órganos, Formaciones…) para el picker "usar existente". */
   catalogo: EntradaCatalogoGrupo[];
   loading?: boolean;
-  compuestos: Compuesto[];
   /** Crea un registro vacío + lo vincula — el llamador es responsable de
    *  abrir el panel flotante con el id devuelto (ver EditorItem.tsx). */
   onCrearNuevo: () => void | Promise<{ id: string } | null>;
   onUsarExistente: (grupoCompuestoId: string) => void;
   onDelete: (vinculoId: string) => void;
-  onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Abre el editor de la Célula/Grano de una fila de la fórmula — se
+   *  reenvía tal cual a TarjetaFormacionOrgano. */
+  onAbrirCelula?: (celulaOGranoId: string) => void;
   onAbrirGrupo?: (grupoId: string) => void;
   placeholderNombre?: string;
   placeholderNotas?: string;
@@ -161,8 +160,7 @@ export function SeccionGruposVinculados({
               item={item}
               tipo={tipo}
               onDelete={() => onDelete(item.vinculo_id)}
-              compuestos={compuestos}
-              onAbrirCompuesto={onAbrirCompuesto}
+              onAbrirCelula={onAbrirCelula}
               onAbrirGrupo={onAbrirGrupo}
               placeholderNombre={placeholderNombre}
               placeholderNotas={placeholderNotas}
@@ -176,7 +174,6 @@ export function SeccionGruposVinculados({
           titulo={titulo}
           tipo={tipo}
           disponibles={disponibles}
-          compuestos={compuestos}
           labelBuscar={labelBuscar}
           onElegir={(id) => {
             onUsarExistente(id);
@@ -200,7 +197,6 @@ function PickerUsarExistente({
   titulo,
   tipo,
   disponibles,
-  compuestos,
   labelBuscar,
   onElegir,
   onClose,
@@ -209,7 +205,6 @@ function PickerUsarExistente({
   /** Reenviado tal cual a TarjetaFormacionOrgano en cada tarjeta del picker. */
   tipo: "organo" | "formacion";
   disponibles: EntradaCatalogoGrupo[];
-  compuestos: Compuesto[];
   labelBuscar: string;
   onElegir: (id: string) => void;
   onClose: () => void;
@@ -274,7 +269,6 @@ function PickerUsarExistente({
                     <TarjetaFormacionOrgano
                       item={{ ...g, vinculo_id: g.id } as GrupoVinculadoResuelto}
                       tipo={tipo}
-                      compuestos={compuestos}
                     />
                   </div>
                 </button>

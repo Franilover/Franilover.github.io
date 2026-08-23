@@ -31,6 +31,8 @@ import { type Compuesto, type Elemento, type Reaccion } from "@/domains/garlia/e
 import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
+import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
+import { PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import {
@@ -64,6 +66,7 @@ export function FloraEditorMejorado({
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useFlora();
+  const celulasCatalogo = useCelulas();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
     useEcosistemas();
 
@@ -73,11 +76,12 @@ export function FloraEditorMejorado({
     id: string;
     anchor: HTMLElement;
   } | null>(null);
-  // Panel flotante de Elemento o Compuesto, abierto al clickear un item
-  // elegido en Consume/Produce o en la Fórmula química de un Órgano.
-  // Un solo estado: abrir uno nuevo reemplaza el que estuviera abierto.
+  // Panel flotante de Elemento, Compuesto, Órgano o Célula, abierto al
+  // clickear un item elegido en Consume/Produce, en la Fórmula química de
+  // un Órgano, o en "hecho de: [Célula]" de una fila de Tejido. Un solo
+  // estado: abrir uno nuevo reemplaza el que estuviera abierto.
   const [itemAbierto, setItemAbierto] = useState<
-    { tipo: "elemento" | "compuesto" | "organo"; id: string } | null
+    { tipo: "elemento" | "compuesto" | "organo" | "celula"; id: string } | null
   >(null);
   // Último elemento DOM clickeado dentro de la barra de Ecosistemas — usado
   // como anchor del PopoverFlotante, ya que SeccionEntidad.onEntityClick
@@ -287,7 +291,6 @@ export function FloraEditorMejorado({
                 items={organos}
                 catalogo={catalogoOrganos}
                 loading={loadingOrganosProcesos}
-                compuestos={compuestos}
                 onCrearNuevo={async () => {
                   const nuevo = await crearYVincularOrgano();
                   if (nuevo) setItemAbierto({ tipo: "organo", id: nuevo.id });
@@ -295,8 +298,8 @@ export function FloraEditorMejorado({
                 }}
                 onUsarExistente={(id) => void vincularOrganoExistente(id)}
                 onDelete={(vinculoId) => void desvincularOrgano(vinculoId)}
-                onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
                 onAbrirGrupo={(id) => setItemAbierto({ tipo: "organo", id })}
+                onAbrirCelula={(id) => setItemAbierto({ tipo: "celula", id })}
                 placeholderNombre="Nombre del órgano (ej: Hoja)…"
                 placeholderNotas="Notas del órgano…"
                 labelCrear="Crear órgano"
@@ -419,6 +422,25 @@ export function FloraEditorMejorado({
                 );
                 void actualizarOrgano(id, cambios);
               }}
+              onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
+            />
+          );
+        })()}
+
+      {/* Click en "hecho de: [Célula]" en la fila de fórmula de un Tejido —
+          la cadena real es Tejido→Célula→Compuesto, así que esto abre la
+          Célula (donde vive compuesto_id), no el Compuesto directo. */}
+      {itemAbierto?.tipo === "celula" &&
+        (() => {
+          const celula = celulasCatalogo.items.find((c) => c.id === itemAbierto.id);
+          if (!celula) return null;
+          return (
+            <PanelEditorCelula
+              item={celula}
+              compuestos={compuestos}
+              onCerrar={() => setItemAbierto(null)}
+              onActualizar={celulasCatalogo.actualizar}
+              onEliminar={celulasCatalogo.eliminar}
               onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
             />
           );

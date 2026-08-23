@@ -35,6 +35,8 @@ import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
+import { useGranos } from "@/domains/garlia/elementos/useGranos";
+import { PanelEditorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { type Compuesto, type Elemento, type Reaccion } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
@@ -78,6 +80,12 @@ export function MineralEditor({
   // Panel flotante de la Formación abierta al clickear su nombre en la
   // tarjeta — vista completa fuera de la tarjeta inline.
   const [editandoFormacionId, setEditandoFormacionId] = useState<string | null>(null);
+  // Panel flotante del Grano abierto al clickear "hecho de: [Grano]" en la
+  // fila de la fórmula (ver SeccionGruposVinculados → TarjetaFormacionOrgano
+  // → SelectorFormulaTejidos) — la cadena real es Veta→Grano→Compuesto, así
+  // que este click abre el Grano, no el Compuesto directo.
+  const [editandoGranoId, setEditandoGranoId] = useState<string | null>(null);
+  const granosCatalogo = useGranos();
   // Popover flotante de ecosistema — mismo patrón que el chip de Ecosistema
   // en CriaturasJerarquica/GeografiaJerarquica (PopoverFlotante anclado al
   // elemento clickeado, sin navegar a pantalla completa).
@@ -290,7 +298,6 @@ export function MineralEditor({
                     items={formaciones}
                     catalogo={catalogoFormaciones}
                     loading={loadingFormacionesProcesos}
-                    compuestos={compuestos}
                     onCrearNuevo={async () => {
                       const nueva = await crearFormacion();
                       if (nueva) setEditandoFormacionId(nueva.id);
@@ -299,6 +306,7 @@ export function MineralEditor({
                     onUsarExistente={(id) => void vincularFormacionExistente(id)}
                     onDelete={(vinculoId) => void eliminarFormacion(vinculoId)}
                     onAbrirGrupo={setEditandoFormacionId}
+                    onAbrirCelula={setEditandoGranoId}
                     placeholderNombre="Nombre de la formación (ej: Veta, Inclusión de cuarzo)…"
                     placeholderNotas="Notas de la formación…"
                     labelCrear="Crear formación"
@@ -393,6 +401,25 @@ export function MineralEditor({
           onAbrirCompuesto={setEditandoCompuestoId}
         />
       )}
+
+      {/* Click en "hecho de: [Grano]" en la fila de fórmula de una Veta
+          abre este panel — la cadena real es Veta→Grano→Compuesto, así que
+          esto abre el Grano (donde vive compuesto_id), no el Compuesto. */}
+      {editandoGranoId &&
+        (() => {
+          const granoActivo = granosCatalogo.items.find((g) => g.id === editandoGranoId);
+          if (!granoActivo) return null;
+          return (
+            <PanelEditorGrano
+              item={granoActivo}
+              compuestos={compuestos}
+              onCerrar={() => setEditandoGranoId(null)}
+              onActualizar={granosCatalogo.actualizar}
+              onEliminar={granosCatalogo.eliminar}
+              onAbrirCompuesto={setEditandoCompuestoId}
+            />
+          );
+        })()}
 
       {ecosistemaAbierto && (
         <PopoverFlotante

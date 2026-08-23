@@ -41,6 +41,8 @@ import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { ReaccionPanelFlotante } from "@/domains/garlia/elementos/ReaccionesPage";
+import { useGranos } from "@/domains/garlia/elementos/useGranos";
+import { PanelEditorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 import { useItemHabilidadesReaccion } from "@/domains/garlia/_shared/useItemHabilidadesReaccion";
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
@@ -86,6 +88,11 @@ export function EditorItem({
   const [editandoCompuestoId, setEditandoCompuestoId] = useState<string | null>(null);
   const [editandoGrupoId, setEditandoGrupoId] = useState<string | null>(null);
   const [editandoReaccionId, setEditandoReaccionId] = useState<string | null>(null);
+  // Panel del Grano abierto al clickear "hecho de: [Grano]" en la fila de
+  // fórmula de una Veta (Formación → Veta → Grano → Compuesto). Ver misma
+  // nota en MineralEditor.tsx.
+  const [editandoGranoId, setEditandoGranoId] = useState<string | null>(null);
+  const granosCatalogo = useGranos();
   const { onWikilink } = useWikilink();
 
   // Catálogo de criaturas para el selector "Criatura" (origen del ítem)
@@ -333,7 +340,6 @@ export function EditorItem({
                 items={estructura.items}
                 catalogo={catalogoEstructura}
                 loading={estructura.loading}
-                compuestos={compuestos}
                 onCrearNuevo={async () => {
                   const nuevo = await estructura.crearYVincular();
                   if (nuevo) setEditandoGrupoId(nuevo.id);
@@ -341,8 +347,8 @@ export function EditorItem({
                 }}
                 onUsarExistente={(id) => void estructura.vincularExistente(id)}
                 onDelete={(vinculoId) => void estructura.desvincular(vinculoId)}
-                onAbrirCompuesto={setEditandoCompuestoId}
                 onAbrirGrupo={setEditandoGrupoId}
+                onAbrirCelula={setEditandoGranoId}
                 placeholderNombre="Nombre de la formación (ej: Cuarzo)…"
                 placeholderNotas="Notas de esta formación…"
                 labelCrear="Crear formación nueva"
@@ -427,6 +433,25 @@ export function EditorItem({
           onAbrirCompuesto={setEditandoCompuestoId}
         />
       )}
+
+      {/* Click en "hecho de: [Grano]" en la fila de fórmula de una Veta —
+          la cadena real es Veta→Grano→Compuesto, así que esto abre el
+          Grano (donde vive compuesto_id), no el Compuesto directo. */}
+      {editandoGranoId &&
+        (() => {
+          const granoActivo = granosCatalogo.items.find((g) => g.id === editandoGranoId);
+          if (!granoActivo) return null;
+          return (
+            <PanelEditorGrano
+              item={granoActivo}
+              compuestos={compuestos}
+              onCerrar={() => setEditandoGranoId(null)}
+              onActualizar={granosCatalogo.actualizar}
+              onEliminar={granosCatalogo.eliminar}
+              onAbrirCompuesto={setEditandoCompuestoId}
+            />
+          );
+        })()}
 
       {editandoReaccionId && (
         <ReaccionPanelFlotante

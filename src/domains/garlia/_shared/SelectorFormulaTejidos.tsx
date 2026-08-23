@@ -19,10 +19,9 @@
  * cantidad propia, son una fila de catálogo reutilizable.
  */
 
-import { Plus, Trash2, Pencil, MoreVertical, Search, X } from "lucide-react";
+import { Plus, Trash2, MoreVertical, Search, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-import type { Compuesto } from "@/domains/garlia/elementos/types";
 import type { EntradaCatalogoTejido } from "@/domains/garlia/elementos/useCatalogoTejidos";
 
 /** Shape mínimo de una fila de fórmula ya resuelta — cumplen TejidoDeOrgano y VetaDeFormacion.
@@ -40,27 +39,30 @@ export interface FilaFormulaTejido {
    *  lo compone (ver compuesto_id). Opcional por compatibilidad retro. */
   nombre?: string;
   catalogo_id: string | null;
+  /** Nombre propio de la Célula/Grano (columna `nombre` de celulas/granos)
+   *  — esto es lo que debe mostrar la fila "hecho de". La cadena real es
+   *  Tejido→Célula→Compuesto (o Veta→Grano→Compuesto): esta fila de
+   *  fórmula NO debe saltearse el nivel Célula/Grano y mostrar/editar el
+   *  Compuesto directo. Opcional por compatibilidad retro. */
+  catalogo_nombre?: string | null;
   compuesto_id: string | null;
   proporcion: string | null;
 }
 
 export function SelectorFormulaTejidos({
-  compuestos,
   items,
   onVincularExistente,
   onCrearYVincular,
   catalogoDisponible,
   loadingCatalogo,
-  onActualizarCompuesto,
   onActualizarProporcion,
   onQuitar,
-  onAbrirCompuesto,
+  onAbrirCelula,
   onAbrirTejido,
   ocultarBotonAgregar,
   soloLectura,
   labelCatalogo = "Tejido",
 }: {
-  compuestos: Compuesto[];
   items: FilaFormulaTejido[];
   /** Vincula un Tejido/Veta YA EXISTENTE (de otra entidad) sin crear uno nuevo. */
   onVincularExistente?: (tejidoOVetaId: string) => void;
@@ -71,11 +73,13 @@ export function SelectorFormulaTejidos({
   /** Catálogo completo de Tejidos/Vetas ya creados — ver useCatalogoTejidos. */
   catalogoDisponible?: EntradaCatalogoTejido[];
   loadingCatalogo?: boolean;
-  onActualizarCompuesto: (celulaOGranoId: string, compuestoId: string) => void;
   onActualizarProporcion: (vinculoId: string, proporcion: string) => void;
   onQuitar: (vinculoId: string) => void;
-  /** Abre el panel flotante del Compuesto elegido en una fila. */
-  onAbrirCompuesto?: (compuestoId: string) => void;
+  /** Abre el editor de la Célula/Grano que compone esta fila (mismo panel
+   *  que Biología/Física > Catálogo de Células/Granos) — clickeando "hecho
+   *  de: [Célula]". El Compuesto se elige/edita adentro de ESE panel, no
+   *  acá: la fórmula del Tejido no debe saltearse el nivel Célula/Grano. */
+  onAbrirCelula?: (celulaOGranoId: string) => void;
   /** Abre el editor completo del Tejido/Veta propio de la fila (mismo panel
    *  que Biología/Física > Catálogo de Tejidos/Vetas) — clickeando el
    *  nombre. Si se omite, el nombre se muestra pero no es clickeable. */
@@ -115,15 +119,14 @@ export function SelectorFormulaTejidos({
               <FilaFormulaTejidoSoloLectura
                 key={item.vinculo_id}
                 item={item}
-                compuestos={compuestos}
                 onAbrirTejido={
                   onAbrirTejido && item.tejido_o_veta_id
                     ? () => onAbrirTejido(item.tejido_o_veta_id as string)
                     : undefined
                 }
-                onAbrirCompuesto={
-                  onAbrirCompuesto && item.compuesto_id
-                    ? () => onAbrirCompuesto(item.compuesto_id as string)
+                onAbrirCelula={
+                  onAbrirCelula && item.catalogo_id
+                    ? () => onAbrirCelula(item.catalogo_id as string)
                     : undefined
                 }
               />
@@ -146,10 +149,6 @@ export function SelectorFormulaTejidos({
             <FilaFormulaTejidoRow
               key={item.vinculo_id}
               item={item}
-              compuestos={compuestos}
-              onCambiarCompuesto={(compuestoId) => {
-                if (item.catalogo_id) onActualizarCompuesto(item.catalogo_id, compuestoId);
-              }}
               onCambiarProporcion={(proporcion) => onActualizarProporcion(item.vinculo_id, proporcion)}
               onQuitar={() => onQuitar(item.vinculo_id)}
               onAbrirTejido={
@@ -157,9 +156,9 @@ export function SelectorFormulaTejidos({
                   ? () => onAbrirTejido(item.tejido_o_veta_id as string)
                   : undefined
               }
-              onAbrirCompuesto={
-                onAbrirCompuesto && item.compuesto_id
-                  ? () => onAbrirCompuesto(item.compuesto_id as string)
+              onAbrirCelula={
+                onAbrirCelula && item.catalogo_id
+                  ? () => onAbrirCelula(item.catalogo_id as string)
                   : undefined
               }
             />
@@ -329,20 +328,14 @@ function PickerTejidoExistente({
  */
 function FilaFormulaTejidoSoloLectura({
   item,
-  compuestos,
   onAbrirTejido,
-  onAbrirCompuesto,
+  onAbrirCelula,
 }: {
   item: FilaFormulaTejido;
-  compuestos: Compuesto[];
   onAbrirTejido?: () => void;
-  onAbrirCompuesto?: () => void;
+  /** Abre el editor de la Célula/Grano que compone esta fila. */
+  onAbrirCelula?: () => void;
 }) {
-  const elegido = useMemo(
-    () => compuestos.find((c) => c.id === item.compuesto_id) ?? null,
-    [compuestos, item.compuesto_id],
-  );
-
   return (
     <div className="flex items-center gap-2 py-1">
       <div className="min-w-0 flex-1 flex flex-col">
@@ -357,12 +350,12 @@ function FilaFormulaTejidoSoloLectura({
         </button>
         <button
           type="button"
-          onClick={onAbrirCompuesto}
-          disabled={!onAbrirCompuesto}
-          title={onAbrirCompuesto ? `Abrir ${elegido?.nombre ?? ""}` : undefined}
+          onClick={onAbrirCelula}
+          disabled={!onAbrirCelula}
+          title={onAbrirCelula ? `Abrir ${item.catalogo_nombre ?? ""}` : undefined}
           className="min-w-0 text-left px-0 text-[10px] text-primary/40 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
         >
-          hecho de: {elegido?.nombre || "sin compuesto"}
+          hecho de: {item.catalogo_nombre || "sin célula"}
         </button>
       </div>
       {item.proporcion && (
@@ -376,62 +369,21 @@ function FilaFormulaTejidoSoloLectura({
 
 function FilaFormulaTejidoRow({
   item,
-  compuestos,
-  onCambiarCompuesto,
   onCambiarProporcion,
   onQuitar,
   onAbrirTejido,
-  onAbrirCompuesto,
+  onAbrirCelula,
 }: {
   item: FilaFormulaTejido;
-  compuestos: Compuesto[];
-  onCambiarCompuesto: (compuestoId: string) => void;
   onCambiarProporcion: (proporcion: string) => void;
   onQuitar: () => void;
   onAbrirTejido?: () => void;
-  onAbrirCompuesto?: () => void;
+  /** Abre el editor de la Célula/Grano que compone esta fila — el
+   *  Compuesto se elige/edita adentro de ESE panel, no acá. */
+  onAbrirCelula?: () => void;
 }) {
-  const [busqueda, setBusqueda] = useState("");
-  const [buscando, setBuscando] = useState(false);
-  const [activo, setActivo] = useState(0);
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [proporcionLocal, setProporcionLocal] = useState(item.proporcion ?? "");
-
-  const elegido = useMemo(
-    () => compuestos.find((c) => c.id === item.compuesto_id) ?? null,
-    [compuestos, item.compuesto_id],
-  );
-
-  const filtrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return compuestos;
-    return compuestos.filter((c) => c.nombre.toLowerCase().includes(q));
-  }, [compuestos, busqueda]);
-
-  const opciones = filtrados.slice(0, 30);
-
-  function elegir(c: Compuesto) {
-    onCambiarCompuesto(c.id);
-    setBusqueda("");
-    setBuscando(false);
-  }
-
-  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!buscando || opciones.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActivo((i) => (i + 1) % opciones.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActivo((i) => (i - 1 + opciones.length) % opciones.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const c = opciones[activo];
-      if (c) elegir(c);
-    } else if (e.key === "Escape") {
-      setBuscando(false);
-    }
-  }
 
   return (
     <div className="flex flex-col gap-0.5 py-1">
@@ -497,78 +449,20 @@ function FilaFormulaTejidoRow({
         </div>
       </div>
 
-      {/* Fila secundaria: "hecho de" — el Compuesto que compone este Tejido/Veta */}
+      {/* Fila secundaria: "hecho de" — la Célula/Grano que compone este
+         Tejido/Veta. El Compuesto vive un nivel más abajo (adentro de la
+         Célula/Grano) y se elige/edita ahí, no en esta fila. */}
       <div className="flex items-center gap-1.5 pl-0">
         <span className="shrink-0 text-[10px] text-primary/35">hecho de:</span>
-        <div className="flex-1 min-w-0 relative">
-          {elegido && !buscando ? (
-            <div className="flex items-center gap-1 group/item">
-              <button
-                type="button"
-                onClick={onAbrirCompuesto}
-                disabled={!onAbrirCompuesto}
-                title={onAbrirCompuesto ? `Abrir ${elegido.nombre}` : undefined}
-                className="min-w-0 flex-1 text-left px-0 text-[10px] font-bold text-primary/70 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
-              >
-                {elegido.nombre}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBuscando(true);
-                  setBusqueda("");
-                  setActivo(0);
-                }}
-                title="Reemplazar"
-                className="shrink-0 w-4 h-4 flex items-center justify-center rounded text-primary/25 hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover/item:opacity-100 cursor-pointer"
-              >
-                <Pencil size={9} />
-              </button>
-            </div>
-          ) : (
-            <input
-              autoFocus={buscando}
-              value={busqueda}
-              onBlur={() => {
-                setTimeout(() => setBuscando(false), 120);
-              }}
-              onChange={(e) => {
-                setBusqueda(e.target.value);
-                setActivo(0);
-              }}
-              onKeyDown={onKeyDown}
-              placeholder={elegido ? undefined : "Buscar compuesto…"}
-              className="w-full bg-transparent px-0 text-[10px] font-bold text-primary/70 outline-none placeholder:text-primary/30 placeholder:font-normal transition-colors"
-            />
-          )}
-          {buscando && (
-            <div
-              className="absolute z-20 mt-1 left-0 right-0 max-h-40 overflow-y-auto rounded-md border shadow-lg"
-              style={{
-                background: "var(--bg-main)",
-                borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
-              }}
-            >
-              {opciones.length === 0 ? (
-                <p className="text-micro text-primary/25 italic text-center py-2">Sin resultados</p>
-              ) : (
-                opciones.map((c, i) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onMouseEnter={() => setActivo(i)}
-                    onMouseDown={() => elegir(c)}
-                    className={`w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold transition-colors truncate ${
-                      i === activo ? "bg-primary/10 text-primary" : "text-primary/75 hover:bg-primary/6 hover:text-primary"
-                    }`}
-                  >
-                    {c.nombre}
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={onAbrirCelula}
+          disabled={!onAbrirCelula}
+          title={onAbrirCelula ? `Abrir ${item.catalogo_nombre || ""}` : undefined}
+          className="min-w-0 flex-1 text-left px-0 text-[10px] font-bold text-primary/70 truncate transition-colors disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+        >
+          {item.catalogo_nombre || "sin célula"}
+        </button>
       </div>
     </div>
   );

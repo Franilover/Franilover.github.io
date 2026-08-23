@@ -80,6 +80,8 @@ import { PanelPerfilCriatura } from "@/domains/garlia/biologia/PerfilAtomicoCria
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
+import { PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { usePerfilesAtomicosCriatura } from "@/domains/garlia/biologia/useBiologia";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
@@ -173,6 +175,11 @@ export function EditorCriatura({
   const { items: compuestosOrganos, setItems: setCompuestosOrganos } = useCompuestos();
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const organosCriatura = useCriaturaOrganos(form.id, catalogoOrganos);
+  // Panel de la Célula abierto al clickear "hecho de: [Célula]" en la fila
+  // de fórmula de un Tejido (Órgano→Tejido→Célula→Compuesto). Ver misma
+  // nota en MineralEditor.tsx/EditorItem.tsx (su espejo Grano).
+  const [editandoCelulaId, setEditandoCelulaId] = useState<string | null>(null);
+  const celulasCatalogo = useCelulas();
 
   function onOrganoActualizadoLocal(id: string, updates: Partial<Organo>) {
     setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
@@ -586,6 +593,7 @@ export function EditorCriatura({
                     onUsarExistente={(id) => void organosCriatura.vincularOrganoExistente(id)}
                     onDelete={(vinculoId) => void organosCriatura.desvincularOrgano(vinculoId)}
                     onAbrirGrupo={(id) => setEditandoGrupoId(id)}
+                    onAbrirCelula={setEditandoCelulaId}
                   />
                 ) : (
                   <div className="max-h-[70vh] overflow-y-auto pr-0.5">
@@ -901,6 +909,24 @@ export function EditorCriatura({
           onActualizar={persistirOrgano}
         />
       )}
+
+      {/* Click en "hecho de: [Célula]" en la fila de fórmula de un Tejido —
+          la cadena real es Tejido→Célula→Compuesto, así que esto abre la
+          Célula (donde vive compuesto_id), no el Compuesto directo. */}
+      {editandoCelulaId &&
+        (() => {
+          const celulaActiva = celulasCatalogo.items.find((c) => c.id === editandoCelulaId);
+          if (!celulaActiva) return null;
+          return (
+            <PanelEditorCelula
+              item={celulaActiva}
+              compuestos={compuestosOrganos}
+              onCerrar={() => setEditandoCelulaId(null)}
+              onActualizar={celulasCatalogo.actualizar}
+              onEliminar={celulasCatalogo.eliminar}
+            />
+          );
+        })()}
     </div>
   );
 }

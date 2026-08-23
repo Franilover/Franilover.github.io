@@ -201,8 +201,12 @@ function GridSimple<T extends { id: string; nombre: string }>({
 }
 
 // ─── Panel Célula: nombre, función, notas, Compuesto (compuesto_id) ────────
+// Exportado: reutilizado directo desde SelectorFormulaTejidos (fila "hecho
+// de" de un Tejido en la fórmula de un Órgano) — clickear ahí debe abrir
+// ESTE panel (Célula), no el del Compuesto directo, ver cadena real en el
+// comentario de arriba del archivo.
 
-function PanelEditorCelula({
+export function PanelEditorCelula({
   item,
   compuestos,
   loadingCompuestos,
