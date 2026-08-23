@@ -202,6 +202,7 @@ export function SeccionGruposVinculados({
  */
 function PickerUsarExistente({
   titulo,
+  tipo,
   disponibles,
   compuestos,
   labelBuscar,
@@ -209,6 +210,8 @@ function PickerUsarExistente({
   onClose,
 }: {
   titulo: string;
+  /** Reenviado tal cual a TarjetaFormacionOrgano en cada tarjeta del picker. */
+  tipo: "organo" | "formacion";
   disponibles: EntradaCatalogoGrupo[];
   compuestos: Compuesto[];
   labelBuscar: string;
@@ -274,6 +277,7 @@ function PickerUsarExistente({
                   <div className="pointer-events-none">
                     <TarjetaFormacionOrgano
                       item={{ ...g, vinculo_id: g.id } as GrupoVinculadoResuelto}
+                      tipo={tipo}
                       onUpdate={() => {}}
                       onDelete={() => {}}
                       compuestos={compuestos}
