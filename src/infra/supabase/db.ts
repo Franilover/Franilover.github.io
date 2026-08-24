@@ -345,6 +345,17 @@ export interface EntidadGrupoVinculoDexie {
   [key: string]: any;
 }
 
+/** Shape laxo para las tablas de Fases 2-7 del rediseño 1.0 (compuesto_
+ *  elementos, oris_iums, fenomenos, estructura_componentes, organismos,
+ *  sistemas, etc.) — no tienen interfaz local dedicada todavía (se leen
+ *  vía useSupabaseData con su propio tipo en TS de cada dominio); [key:
+ *  string]: any es el mismo escape hatch usado en el resto del archivo
+ *  para tablas puente sin modelo local propio (ver EntidadGrupoVinculoDexie). */
+export interface FilaGenericaDexie {
+  id: string;
+  [key: string]: any;
+}
+
 export interface OfflineOperation {
   id?: number;
   table: string;
@@ -854,6 +865,41 @@ class AgendaFraniDB extends Dexie {
   criatura_organos!: Table<EntidadGrupoVinculoDexie, string>;
   mineral_formaciones!: Table<EntidadGrupoVinculoDexie, string>;
   item_estructura!: Table<EntidadGrupoVinculoDexie, string>;
+
+  // ─── Fase 2/3 del rediseño 1.0 (v34) ─────────────────────────────────────
+  compuesto_elementos!: Table<FilaGenericaDexie, string>;
+  oris_iums!: Table<FilaGenericaDexie, string>;
+  fenomenos!: Table<FilaGenericaDexie, string>;
+
+  // ─── Fases 4-7 del rediseño 1.0 (v35) ────────────────────────────────────
+  estructura_componentes!: Table<FilaGenericaDexie, string>;
+  organismos!: Table<FilaGenericaDexie, string>;
+  sistemas!: Table<FilaGenericaDexie, string>;
+  sistema_organos!: Table<FilaGenericaDexie, string>;
+  organismo_sistemas!: Table<FilaGenericaDexie, string>;
+  reaccion_componentes!: Table<FilaGenericaDexie, string>;
+  procesos!: Table<FilaGenericaDexie, string>;
+  proceso_reacciones!: Table<FilaGenericaDexie, string>;
+  fenomeno_procesos!: Table<FilaGenericaDexie, string>;
+  fenomeno_elementos!: Table<FilaGenericaDexie, string>;
+
+  // ─── v36: minerales/flora ─────────────────────────────────────────────────
+  minerales!: Table<FilaGenericaDexie, string>;
+  flora!: Table<FilaGenericaDexie, string>;
+
+  // ─── v37: mineral_reacciones ──────────────────────────────────────────────
+  mineral_reacciones!: Table<FilaGenericaDexie, string>;
+
+  // ─── Bug preexistente detectado durante el build de Fase 8: estas 5 tablas
+  // están en .stores() desde antes (hechizos/dones desde v11-ish, ver
+  // "← nueva"; mensajes_cache más reciente) pero nunca tuvieron su
+  // declaración de propiedad tipada — TypeScript solo lo marca en cuanto
+  // algo intenta usar db.<tabla>, así que quedó sin detectar hasta ahora.
+  hechizos!: Table<FilaGenericaDexie, string>;
+  dones!: Table<FilaGenericaDexie, string>;
+  personaje_hechizos!: Table<FilaGenericaDexie, string>;
+  personaje_dones!: Table<FilaGenericaDexie, string>;
+  mensajes_cache!: Table<FilaGenericaDexie, string>;
 
   constructor() {
     super("AgendaFranilover");
