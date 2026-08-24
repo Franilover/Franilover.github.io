@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 
 import type { Reaccion } from "@/domains/garlia/elementos/types";
+import { persistirReaccion } from "@/domains/garlia/elementos/persistirReaccion";
 
 interface VinculoHabilidad {
   id: string;
@@ -76,7 +77,7 @@ export function useItemHabilidadesReaccion({
   const crearYVincular = useCallback(async () => {
     const { data: nuevaReaccion, error: errorReaccion } = await supabase
       .from("reacciones")
-      .insert([{ nombre: "", consume: [], produce: [], descripcion: null }])
+      .insert([{ nombre: "", descripcion: null }])
       .select()
       .single();
     if (errorReaccion || !nuevaReaccion) return null;
@@ -93,7 +94,7 @@ export function useItemHabilidadesReaccion({
     }
 
     setVinculos((prev) => [...prev, vinculo as VinculoHabilidad]);
-    return { ...(nuevaReaccion as Reaccion), vinculo_id: (vinculo as VinculoHabilidad).id };
+    return { ...(nuevaReaccion as Reaccion), consume: [], produce: [], vinculo_id: (vinculo as VinculoHabilidad).id };
   }, [itemId]);
 
   // ── Vincular una Reacción ya existente del catálogo ────────────────────
@@ -117,7 +118,7 @@ export function useItemHabilidadesReaccion({
   // ── Actualizar la Reacción vinculada en el catálogo (afecta a todo lo
   // que la use) ────────────────────────────────────────────────────────────
   const actualizar = useCallback(async (reaccionId: string, updates: Partial<Reaccion>) => {
-    const { error } = await supabase.from("reacciones").update(updates).eq("id", reaccionId);
+    const { error } = await persistirReaccion(reaccionId, updates);
     if (error) {
       console.error("[useItemHabilidadesReaccion] error actualizando reacción:", error);
     }

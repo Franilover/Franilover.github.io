@@ -860,7 +860,7 @@ export function ElementosPage({
     try {
       const { data, error } = await supabase
         .from("reacciones")
-        .insert([{ nombre: "Nueva reacción", consume: [], produce: [] }])
+        .insert([{ nombre: "Nueva reacción" }])
         .select()
         .single();
       if (error) throw error;

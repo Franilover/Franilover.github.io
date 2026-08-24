@@ -67,13 +67,13 @@ export function useEntidadVinculoReaccion({
   const crearYVincular = useCallback(async () => {
     const { data: nuevaReaccion, error } = await supabase
       .from("reacciones")
-      .insert([{ nombre: "", consume: [], produce: [], descripcion: null }])
+      .insert([{ nombre: "", descripcion: null }])
       .select()
       .single();
     if (error || !nuevaReaccion) return null;
 
     await persistirReaccionId((nuevaReaccion as Reaccion).id);
-    return nuevaReaccion as Reaccion;
+    return { ...(nuevaReaccion as Reaccion), consume: [], produce: [] };
   }, [persistirReaccionId]);
 
   // ── Vincular una Reacción ya existente del catálogo (reemplaza la actual) ─
@@ -88,7 +88,7 @@ export function useEntidadVinculoReaccion({
   // que la tenga vinculada) ────────────────────────────────────────────────
   const actualizar = useCallback(async (updates: Partial<Reaccion>) => {
     if (!reaccionIdActual) return;
-    const { error } = await supabase.from("reacciones").update(updates).eq("id", reaccionIdActual);
+    const { error } = await persistirReaccion(reaccionIdActual, updates);
     if (error) {
       console.error("[useEntidadVinculoReaccion] error actualizando reacción:", error);
     }

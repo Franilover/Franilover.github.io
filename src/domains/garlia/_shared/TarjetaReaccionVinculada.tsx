@@ -16,6 +16,7 @@ import { ExternalLink, Trash2 } from "lucide-react";
 import React from "react";
 
 import type { Compuesto, Elemento, Reaccion } from "@/domains/garlia/elementos/types";
+import { persistirReaccion } from "@/domains/garlia/elementos/persistirReaccion";
 import { SelectorConsumeProduce, type ItemProceso } from "@/domains/garlia/flora/SelectorConsumeProduce";
 import { BalanceProcesoPanel } from "@/domains/garlia/_shared/BalanceProcesoPanel";
 

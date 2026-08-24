@@ -198,16 +198,12 @@ export interface Compuesto {
   /** Estado físico de esta fila. Solo tiene sentido junto a
    *  sustancia_base_id (o en la fila base misma, que suele ser "liquido"). */
   estado?: EstadoMateria | null;
-  /** true si esta fila es conceptualmente un Fenómeno (Fuego, Rayo) y no
-   *  una sustancia con masa — ver Fase 2.4. Se migrará por completo a la
-   *  tabla "fenomenos" en Fase 6; hasta entonces convive acá marcado. */
-  es_fenomeno?: boolean;
 }
 
 export const CONFIG_COMPUESTOS = {
   tabla: "compuestos",
   select:
-    "id, nombre, simbolo, notas, componentes, created_at, sustancia_base_id, estado, es_fenomeno",
+    "id, nombre, simbolo, notas, componentes, created_at, sustancia_base_id, estado",
 };
 
 /** Fila cruda tal cual vive en Supabase (tabla "compuesto_elementos") —
@@ -573,7 +569,75 @@ export interface Reaccion {
 
 export const CONFIG_REACCIONES = {
   tabla: "reacciones",
-  select: "id, nombre, consume, produce, descripcion, activador, created_at, updated_at",
+  // consume/produce dejaron de persistirse como JSONB en Fase 6.
+  // Se reconstruyen desde reaccion_componentes por useReacciones().
+  select: "id, nombre, descripcion, activador, created_at, updated_at",
+};
+
+export interface ReaccionComponenteRow {
+  id: string;
+  reaccion_id: string;
+  entidad_tipo: "elemento" | "compuesto";
+  entidad_id: string;
+  direccion: "reactivo" | "producto";
+  cantidad: number;
+  created_at: string;
+}
+
+export interface Proceso {
+  id: string;
+  nombre: string;
+  tipo: string | null;
+  descripcion: string | null;
+  condiciones: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProcesoReaccion {
+  id: string;
+  proceso_id: string;
+  reaccion_id: string;
+  orden: number | null;
+  rol: string | null;
+  created_at: string;
+}
+
+export interface Fenomeno {
+  id: string;
+  nombre: string;
+  simbolo: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FenomenoProceso {
+  id: string;
+  fenomeno_id: string;
+  proceso_id: string;
+  rol: string | null;
+  created_at: string;
+}
+
+export interface FenomenoElemento {
+  id: string;
+  fenomeno_id: string;
+  elemento_id: string;
+  cantidad: number;
+  rol: string | null;
+  created_at: string;
+}
+
+export const CONFIG_PROCESOS = {
+  tabla: "procesos",
+  select: "id, nombre, tipo, descripcion, condiciones, notas, created_at, updated_at",
+};
+
+export const CONFIG_FENOMENOS = {
+  tabla: "fenomenos",
+  select: "id, nombre, simbolo, notas, created_at, updated_at",
 };
 
 /** Compacta un ParticleMap en algo tipo "2M 1P" para tarjetas/resúmenes. */

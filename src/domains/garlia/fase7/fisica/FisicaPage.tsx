@@ -25,7 +25,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
-import { persistirReaccion } from "@/domains/garlia/elementos/persistirReaccion";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
 
@@ -53,7 +52,7 @@ import { PanelEditorSubsistema } from "@/domains/garlia/runas/BloqueSubsistemasM
 import type { SubsistemaMagia } from "@/domains/garlia/runas/useSubsistemasMagia";
 
 import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
-import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
@@ -377,7 +376,7 @@ function TodasLasBasesView({
   // subirlos como props hasta RunasPage.
   const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useFormaciones();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
-  const { items: compuestosCatalogo, setItems: setCompuestosCatalogo } = useCompuestos();
+  const { items: compuestosCatalogo, setItems: setCompuestosCatalogo } = useCompuestosConElementos();
   const { items: elementosCatalogo } = useElementos();
 
   // Click en un Compuesto (desde Granos/Vetas, Formaciones o Habilidades)
@@ -397,7 +396,7 @@ function TodasLasBasesView({
 
   async function actualizarHabilidad(id: string, cambios: Partial<Reaccion>) {
     setReaccionesCatalogo((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
-    const { error } = await persistirReaccion(id, cambios);
+    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
     if (error) console.error("[FisicaPage] error guardando habilidad:", error);
   }
 

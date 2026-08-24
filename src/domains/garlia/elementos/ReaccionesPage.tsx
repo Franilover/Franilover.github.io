@@ -19,11 +19,11 @@ import { Beaker, Loader2, Plus, Trash2, X } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { supabase } from "@/infra/supabase/supabase";
 import { SelectorConsumeProduce, type ItemProceso } from "@/domains/garlia/flora/SelectorConsumeProduce";
 import { BalanceProcesoPanel } from "@/domains/garlia/_shared/BalanceProcesoPanel";
 
 import type { Compuesto, Elemento, Reaccion } from "./types";
+import { persistirReaccion } from "./persistirReaccion";
 
 interface Props {
   reacciones: Reaccion[];
@@ -84,7 +84,7 @@ export function ReaccionesPage({
   // padre — mismo patrón que guardar() en GruposCompuestosPage.
   async function guardar(id: string, cambios: Partial<Reaccion>) {
     onActualizar(id, cambios); // optimista: refleja el cambio ya mismo
-    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
+    const { error } = await persistirReaccion(id, cambios);
     if (error) {
       console.error("[ReaccionesPage] error guardando reacción:", error);
     }
