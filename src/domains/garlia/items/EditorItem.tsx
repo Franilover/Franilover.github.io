@@ -42,7 +42,8 @@ import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPag
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { ReaccionPanelFlotante } from "@/domains/garlia/elementos/ReaccionesPage";
 import { useGranos } from "@/domains/garlia/elementos/useGranos";
-import { PanelEditorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
+import { useVetas } from "@/domains/garlia/elementos/useVetas";
+import { PanelEditorGrano, PanelEditorVeta } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 import { useItemHabilidadesReaccion } from "@/domains/garlia/_shared/useItemHabilidadesReaccion";
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
@@ -92,7 +93,11 @@ export function EditorItem({
   // fórmula de una Veta (Formación → Veta → Grano → Compuesto). Ver misma
   // nota en MineralEditor.tsx.
   const [editandoGranoId, setEditandoGranoId] = useState<string | null>(null);
+  // Panel de la Veta abierta desde "Grano → Veta" dentro de PanelEditorGrano
+  // (ver onAbrirVeta abajo) — mismo patrón que editandoGranoId.
+  const [editandoVetaId, setEditandoVetaId] = useState<string | null>(null);
   const granosCatalogo = useGranos();
+  const vetasCatalogo = useVetas();
   const { onWikilink } = useWikilink();
 
   // Catálogo de criaturas para el selector "Criatura" (origen del ítem)
@@ -449,6 +454,40 @@ export function EditorItem({
               onActualizar={granosCatalogo.actualizar}
               onEliminar={granosCatalogo.eliminar}
               onAbrirCompuesto={setEditandoCompuestoId}
+              onAbrirVeta={(vetaId) => {
+                setEditandoGranoId(null);
+                setEditandoVetaId(vetaId);
+              }}
+              onAbrirFormacion={(formacionId) => {
+                setEditandoGranoId(null);
+                setEditandoGrupoId(formacionId);
+              }}
+            />
+          );
+        })()}
+
+      {/* Panel de la Veta abierta desde "Grano → Veta" — se apila igual
+          que el Grano de arriba. */}
+      {editandoVetaId &&
+        (() => {
+          const vetaActiva = vetasCatalogo.items.find((v) => v.id === editandoVetaId);
+          if (!vetaActiva) return null;
+          return (
+            <PanelEditorVeta
+              item={vetaActiva}
+              granos={granosCatalogo.items}
+              loadingGranos={granosCatalogo.loading}
+              onCerrar={() => setEditandoVetaId(null)}
+              onActualizar={vetasCatalogo.actualizar}
+              onEliminar={vetasCatalogo.eliminar}
+              onAbrirGrano={(granoId) => {
+                setEditandoVetaId(null);
+                setEditandoGranoId(granoId);
+              }}
+              onAbrirFormacion={(formacionId) => {
+                setEditandoVetaId(null);
+                setEditandoGrupoId(formacionId);
+              }}
             />
           );
         })()}

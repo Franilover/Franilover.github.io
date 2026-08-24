@@ -82,7 +82,8 @@ import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCo
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
-import { PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
+import { PanelEditorCelula, PanelEditorTejido } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { usePerfilesAtomicosCriatura } from "@/domains/garlia/biologia/useBiologia";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
@@ -181,6 +182,11 @@ export function EditorCriatura({
   // nota en MineralEditor.tsx/EditorItem.tsx (su espejo Grano).
   const [editandoCelulaId, setEditandoCelulaId] = useState<string | null>(null);
   const celulasCatalogo = useCelulas();
+  // Panel del Tejido abierto desde "Célula → Tejido" dentro de
+  // PanelEditorCelula (ver onAbrirTejido abajo) — mismo patrón que
+  // editandoCelulaId/editandoGrupoId.
+  const [editandoTejidoId, setEditandoTejidoId] = useState<string | null>(null);
+  const tejidosCatalogo = useTejidos();
 
   // Click en un Compuesto (desde el panel de Órgano o desde el de Célula)
   // abre acá su editor completo — mismo patrón que FloraEditor.tsx.
@@ -930,6 +936,42 @@ export function EditorCriatura({
               onActualizar={celulasCatalogo.actualizar}
               onEliminar={celulasCatalogo.eliminar}
               onAbrirCompuesto={setEditandoCompuestoId}
+              onAbrirTejido={(tejidoId) => {
+                setEditandoCelulaId(null);
+                setEditandoTejidoId(tejidoId);
+              }}
+              onAbrirOrgano={(organoId) => {
+                setEditandoCelulaId(null);
+                setEditandoGrupoId(organoId);
+              }}
+            />
+          );
+        })()}
+
+      {/* Panel del Tejido abierto desde "Célula → Tejido" — se apila igual
+          que la Célula de arriba. */}
+      {editandoTejidoId &&
+        (() => {
+          const tejidoActivo = tejidosCatalogo.items.find((t) => t.id === editandoTejidoId);
+          if (!tejidoActivo) return null;
+          return (
+            <PanelEditorTejido
+              item={tejidoActivo}
+              celulas={celulasCatalogo.items}
+              loadingCelulas={celulasCatalogo.loading}
+              compuestos={compuestosOrganos}
+              onCerrar={() => setEditandoTejidoId(null)}
+              onActualizar={tejidosCatalogo.actualizar}
+              onEliminar={tejidosCatalogo.eliminar}
+              onAbrirCompuesto={setEditandoCompuestoId}
+              onAbrirCelula={(celulaId) => {
+                setEditandoTejidoId(null);
+                setEditandoCelulaId(celulaId);
+              }}
+              onAbrirOrgano={(organoId) => {
+                setEditandoTejidoId(null);
+                setEditandoGrupoId(organoId);
+              }}
             />
           );
         })()}

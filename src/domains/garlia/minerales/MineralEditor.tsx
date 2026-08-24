@@ -36,7 +36,8 @@ import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { useGranos } from "@/domains/garlia/elementos/useGranos";
-import { PanelEditorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
+import { useVetas } from "@/domains/garlia/elementos/useVetas";
+import { PanelEditorGrano, PanelEditorVeta } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { type Compuesto, type Elemento, type Reaccion } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
@@ -85,7 +86,15 @@ export function MineralEditor({
   // → SelectorFormulaTejidos) — la cadena real es Veta→Grano→Compuesto, así
   // que este click abre el Grano, no el Compuesto directo.
   const [editandoGranoId, setEditandoGranoId] = useState<string | null>(null);
+  // Panel flotante de la Veta abierta desde el breadcrumb "Grano → Veta"
+  // dentro de PanelEditorGrano (ver onAbrirVeta abajo) — antes ese salto no
+  // hacía nada porque no se pasaba el callback. Mismo patrón que
+  // editandoGranoId/editandoFormacionId: cierra el panel de origen y abre
+  // este, apilado en el mismo nivel (no hay jerarquía real entre ellos, uno
+  // reemplaza al otro).
+  const [editandoVetaId, setEditandoVetaId] = useState<string | null>(null);
   const granosCatalogo = useGranos();
+  const vetasCatalogo = useVetas();
   // Popover flotante de ecosistema — mismo patrón que el chip de Ecosistema
   // en CriaturasJerarquica/GeografiaJerarquica (PopoverFlotante anclado al
   // elemento clickeado, sin navegar a pantalla completa).
@@ -417,6 +426,40 @@ export function MineralEditor({
               onActualizar={granosCatalogo.actualizar}
               onEliminar={granosCatalogo.eliminar}
               onAbrirCompuesto={setEditandoCompuestoId}
+              onAbrirVeta={(vetaId) => {
+                setEditandoGranoId(null);
+                setEditandoVetaId(vetaId);
+              }}
+              onAbrirFormacion={(formacionId) => {
+                setEditandoGranoId(null);
+                setEditandoFormacionId(formacionId);
+              }}
+            />
+          );
+        })()}
+
+      {/* Panel flotante de la Veta abierta desde "Grano → Veta" — mismo
+          patrón que el Grano de arriba: cierra su origen y se apila acá. */}
+      {editandoVetaId &&
+        (() => {
+          const vetaActiva = vetasCatalogo.items.find((v) => v.id === editandoVetaId);
+          if (!vetaActiva) return null;
+          return (
+            <PanelEditorVeta
+              item={vetaActiva}
+              granos={granosCatalogo.items}
+              loadingGranos={granosCatalogo.loading}
+              onCerrar={() => setEditandoVetaId(null)}
+              onActualizar={vetasCatalogo.actualizar}
+              onEliminar={vetasCatalogo.eliminar}
+              onAbrirGrano={(granoId) => {
+                setEditandoVetaId(null);
+                setEditandoGranoId(granoId);
+              }}
+              onAbrirFormacion={(formacionId) => {
+                setEditandoVetaId(null);
+                setEditandoFormacionId(formacionId);
+              }}
             />
           );
         })()}

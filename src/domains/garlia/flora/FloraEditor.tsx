@@ -32,7 +32,8 @@ import { ElementoPanelFlotante } from "@/domains/garlia/elementos/ElementosPage"
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
-import { PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
+import { PanelEditorCelula, PanelEditorTejido } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
 import {
@@ -67,6 +68,7 @@ export function FloraEditorMejorado({
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useFlora();
   const celulasCatalogo = useCelulas();
+  const tejidosCatalogo = useTejidos();
   const { ecosistemas, loading: loadingEcosistemas, actualizar: actualizarEcosistema } =
     useEcosistemas();
 
@@ -76,12 +78,13 @@ export function FloraEditorMejorado({
     id: string;
     anchor: HTMLElement;
   } | null>(null);
-  // Panel flotante de Elemento, Compuesto, Órgano o Célula, abierto al
-  // clickear un item elegido en Consume/Produce, en la Fórmula química de
-  // un Órgano, o en "hecho de: [Célula]" de una fila de Tejido. Un solo
+  // Panel flotante de Elemento, Compuesto, Órgano, Célula o Tejido, abierto
+  // al clickear un item elegido en Consume/Produce, en la Fórmula química
+  // de un Órgano, en "hecho de: [Célula]" de una fila de Tejido, o en el
+  // breadcrumb "Célula → Tejido" dentro de PanelEditorCelula. Un solo
   // estado: abrir uno nuevo reemplaza el que estuviera abierto.
   const [itemAbierto, setItemAbierto] = useState<
-    { tipo: "elemento" | "compuesto" | "organo" | "celula"; id: string } | null
+    { tipo: "elemento" | "compuesto" | "organo" | "celula" | "tejido"; id: string } | null
   >(null);
   // Último elemento DOM clickeado dentro de la barra de Ecosistemas — usado
   // como anchor del PopoverFlotante, ya que SeccionEntidad.onEntityClick
@@ -442,6 +445,30 @@ export function FloraEditorMejorado({
               onActualizar={celulasCatalogo.actualizar}
               onEliminar={celulasCatalogo.eliminar}
               onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
+              onAbrirTejido={(id) => setItemAbierto({ tipo: "tejido", id })}
+              onAbrirOrgano={(id) => setItemAbierto({ tipo: "organo", id })}
+            />
+          );
+        })()}
+
+      {/* Panel del Tejido abierto desde "Célula → Tejido" — mismo estado
+          único itemAbierto, reemplaza lo que estuviera abierto. */}
+      {itemAbierto?.tipo === "tejido" &&
+        (() => {
+          const tejido = tejidosCatalogo.items.find((t) => t.id === itemAbierto.id);
+          if (!tejido) return null;
+          return (
+            <PanelEditorTejido
+              item={tejido}
+              celulas={celulasCatalogo.items}
+              loadingCelulas={celulasCatalogo.loading}
+              compuestos={compuestos}
+              onCerrar={() => setItemAbierto(null)}
+              onActualizar={tejidosCatalogo.actualizar}
+              onEliminar={tejidosCatalogo.eliminar}
+              onAbrirCompuesto={(id) => setItemAbierto({ tipo: "compuesto", id })}
+              onAbrirCelula={(id) => setItemAbierto({ tipo: "celula", id })}
+              onAbrirOrgano={(id) => setItemAbierto({ tipo: "organo", id })}
             />
           );
         })()}

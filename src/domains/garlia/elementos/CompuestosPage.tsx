@@ -53,9 +53,15 @@ import { useGranos } from "./useGranos";
 import { useCelulas } from "./useCelulas";
 import { useGranosDeUnCompuesto } from "./useGranosDeUnCompuesto";
 import { useCelulasDeUnCompuesto } from "./useCelulasDeUnCompuesto";
-import { PanelEditorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
-import { PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { PanelEditorGrano, PanelEditorVeta } from "@/domains/garlia/fisica/CatalogoVetasFisica";
+import { PanelEditorCelula, PanelEditorTejido } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { BreadcrumbJerarquia } from "@/domains/garlia/biologia/BreadcrumbJerarquia";
+import { GrupoCompuestoPanelFlotante } from "./GruposCompuestosPage";
+import { useOrganos } from "./useOrganos";
+import { useFormaciones } from "./useFormaciones";
+import { useTejidos } from "./useTejidos";
+import { useVetas } from "./useVetas";
+import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 import {
   autocompletarHastaEstable,
@@ -667,6 +673,8 @@ function CompuestoEditor({
   onNavigateCompuesto,
   granoOCelulaAbierto: granoOCelulaAbiertoProp,
   onGranoOCelulaAbiertoChange,
+  onAbrirOrganoOFormacion,
+  onAbrirTejidoOVeta,
 }: {
   compuesto: Compuesto;
   elementos: Elemento[];
@@ -693,6 +701,17 @@ function CompuestoEditor({
    *  (uso standalone, sin breadcrumb en header). */
   granoOCelulaAbierto?: { tipo: "grano" | "celula"; id: string } | null;
   onGranoOCelulaAbiertoChange?: (v: { tipo: "grano" | "celula"; id: string } | null) => void;
+  /** Salto Compuesto → Célula/Grano → Órgano/Formación (breadcrumb interno
+   *  de PanelEditorCelula/PanelEditorGrano). Antes este salto no hacía
+   *  nada porque no se pasaban onAbrirOrgano/onAbrirFormacion — bug
+   *  reportado ("Hoja → Célula X → Órgano no funciona"). Cierra el
+   *  sub-panel de Grano/Célula y delega en CompuestoPanelFlotante, que
+   *  tiene el catálogo de Órganos/Formaciones para resolver el registro. */
+  onAbrirOrganoOFormacion?: (v: { tipo: "organo" | "formacion"; id: string }) => void;
+  /** Salto Compuesto → Célula/Grano → Tejido/Veta (breadcrumb interno de
+   *  PanelEditorCelula/PanelEditorGrano, nivel intermedio, no el destino
+   *  final Órgano/Formación). Mismo patrón que onAbrirOrganoOFormacion. */
+  onAbrirTejidoOVeta?: (v: { tipo: "tejido" | "veta"; id: string }) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
@@ -957,6 +976,22 @@ function CompuestoEditor({
                     }
                   : undefined
               }
+              onAbrirFormacion={
+                onAbrirOrganoOFormacion
+                  ? (formacionId) => {
+                      setGranoOCelulaAbierto(null);
+                      onAbrirOrganoOFormacion({ tipo: "formacion", id: formacionId });
+                    }
+                  : undefined
+              }
+              onAbrirVeta={
+                onAbrirTejidoOVeta
+                  ? (vetaId) => {
+                      setGranoOCelulaAbierto(null);
+                      onAbrirTejidoOVeta({ tipo: "veta", id: vetaId });
+                    }
+                  : undefined
+              }
             />
           );
         })()}
@@ -976,6 +1011,22 @@ function CompuestoEditor({
                   ? (compuestoId) => {
                       setGranoOCelulaAbierto(null);
                       onNavigateCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
+              onAbrirOrgano={
+                onAbrirOrganoOFormacion
+                  ? (organoId) => {
+                      setGranoOCelulaAbierto(null);
+                      onAbrirOrganoOFormacion({ tipo: "organo", id: organoId });
+                    }
+                  : undefined
+              }
+              onAbrirTejido={
+                onAbrirTejidoOVeta
+                  ? (tejidoId) => {
+                      setGranoOCelulaAbierto(null);
+                      onAbrirTejidoOVeta({ tipo: "tejido", id: tejidoId });
                     }
                   : undefined
               }
@@ -1034,11 +1085,32 @@ export function CompuestoPanelFlotante({
   const [granoOCelulaAbierto, setGranoOCelulaAbierto] = useState<
     { tipo: "grano" | "celula"; id: string } | null
   >(null);
+  // Destino del salto Célula→Órgano / Grano→Formación desde el breadcrumb
+  // interno de PanelEditorCelula/PanelEditorGrano (ver onAbrirOrganoOFormacion
+  // en CompuestoEditor). Requiere los catálogos de Órganos/Formaciones —
+  // GrupoCompuestoPanelFlotante resuelve el resto de su árbol solo.
+  const [organoOFormacionAbierto, setOrganoOFormacionAbierto] = useState<
+    { tipo: "organo" | "formacion"; id: string } | null
+  >(null);
+  // Destino del salto Célula→Tejido / Grano→Veta (nivel intermedio, no el
+  // Órgano/Formación final) — mismo motivo que organoOFormacionAbierto:
+  // antes no se pasaba onAbrirTejido/onAbrirVeta desde acá.
+  const [tejidoOVetaAbierto, setTejidoOVetaAbierto] = useState<
+    { tipo: "tejido" | "veta"; id: string } | null
+  >(null);
   useEffect(() => {
     setGranoOCelulaAbierto(null);
+    setOrganoOFormacionAbierto(null);
+    setTejidoOVetaAbierto(null);
   }, [compuesto.id]);
   const granosDeCompuesto = useGranosDeUnCompuesto(compuesto.id);
   const celulasDeCompuesto = useCelulasDeUnCompuesto(compuesto.id);
+  const organosCatalogo = useOrganos();
+  const formacionesCatalogo = useFormaciones();
+  const tejidosCatalogo = useTejidos();
+  const vetasCatalogoNivel2 = useVetas();
+  const celulasCatalogoNivel2 = useCelulas();
+  const granosCatalogoNivel2 = useGranos();
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1058,7 +1130,9 @@ export function CompuestoPanelFlotante({
   return createPortal(
     <div
       className={`fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 ${
-        granoOCelulaAbierto ? "invisible pointer-events-none" : ""
+        granoOCelulaAbierto || organoOFormacionAbierto || tejidoOVetaAbierto
+          ? "invisible pointer-events-none"
+          : ""
       }`}
       style={{
         background: "color-mix(in srgb, var(--primary) 35%, transparent)",
@@ -1183,9 +1257,131 @@ export function CompuestoPanelFlotante({
             onNavigateCompuesto={onNavigateCompuesto}
             granoOCelulaAbierto={granoOCelulaAbierto}
             onGranoOCelulaAbiertoChange={setGranoOCelulaAbierto}
+            onAbrirOrganoOFormacion={setOrganoOFormacionAbierto}
+            onAbrirTejidoOVeta={setTejidoOVetaAbierto}
           />
         </div>
       </div>
+
+      {organoOFormacionAbierto?.tipo === "organo" &&
+        (() => {
+          const organoActivo = organosCatalogo.items.find(
+            (o) => o.id === organoOFormacionAbierto.id,
+          );
+          if (!organoActivo) return null;
+          return (
+            <GrupoCompuestoPanelFlotante
+              grupo={organoActivo as unknown as EntradaCatalogoGrupo}
+              tipo="organo"
+              compuestos={todosLosCompuestos}
+              onCerrar={() => setOrganoOFormacionAbierto(null)}
+              onActualizar={(id, cambios) =>
+                organosCatalogo.setItems((items) =>
+                  items.map((o) => (o.id === id ? { ...o, ...cambios } : o)),
+                )
+              }
+              onAbrirCompuesto={
+                onNavigateCompuesto
+                  ? (compuestoId) => {
+                      setOrganoOFormacionAbierto(null);
+                      onNavigateCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
+            />
+          );
+        })()}
+      {organoOFormacionAbierto?.tipo === "formacion" &&
+        (() => {
+          const formacionActiva = formacionesCatalogo.items.find(
+            (f) => f.id === organoOFormacionAbierto.id,
+          );
+          if (!formacionActiva) return null;
+          return (
+            <GrupoCompuestoPanelFlotante
+              grupo={formacionActiva as unknown as EntradaCatalogoGrupo}
+              tipo="formacion"
+              compuestos={todosLosCompuestos}
+              onCerrar={() => setOrganoOFormacionAbierto(null)}
+              onActualizar={(id, cambios) =>
+                formacionesCatalogo.setItems((items) =>
+                  items.map((f) => (f.id === id ? { ...f, ...cambios } : f)),
+                )
+              }
+              onAbrirCompuesto={
+                onNavigateCompuesto
+                  ? (compuestoId) => {
+                      setOrganoOFormacionAbierto(null);
+                      onNavigateCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
+            />
+          );
+        })()}
+
+      {/* Panel del Tejido/Veta abierto desde el breadcrumb intermedio
+         "Célula → Tejido" / "Grano → Veta" — mismo editor único que usan
+         Física/Biología (PanelEditorTejido/PanelEditorVeta), apilado al
+         mismo nivel que organoOFormacionAbierto (ambos ocultan este panel
+         de Compuesto mientras están abiertos). Desde acá también se puede
+         seguir subiendo a Órgano/Formación, o volver a bajar a
+         Célula/Grano — reutiliza los mismos estados de arriba. */}
+      {tejidoOVetaAbierto?.tipo === "tejido" &&
+        (() => {
+          const tejidoActivo = tejidosCatalogo.items.find((t) => t.id === tejidoOVetaAbierto.id);
+          if (!tejidoActivo) return null;
+          return (
+            <PanelEditorTejido
+              item={tejidoActivo}
+              celulas={celulasCatalogoNivel2.items}
+              loadingCelulas={celulasCatalogoNivel2.loading}
+              compuestos={todosLosCompuestos}
+              onCerrar={() => setTejidoOVetaAbierto(null)}
+              onActualizar={tejidosCatalogo.actualizar}
+              onEliminar={tejidosCatalogo.eliminar}
+              onAbrirCompuesto={
+                onNavigateCompuesto
+                  ? (compuestoId) => {
+                      setTejidoOVetaAbierto(null);
+                      onNavigateCompuesto(compuestoId);
+                    }
+                  : undefined
+              }
+              onAbrirCelula={(celulaId) => {
+                setTejidoOVetaAbierto(null);
+                setGranoOCelulaAbierto({ tipo: "celula", id: celulaId });
+              }}
+              onAbrirOrgano={(organoId) => {
+                setTejidoOVetaAbierto(null);
+                setOrganoOFormacionAbierto({ tipo: "organo", id: organoId });
+              }}
+            />
+          );
+        })()}
+      {tejidoOVetaAbierto?.tipo === "veta" &&
+        (() => {
+          const vetaActiva = vetasCatalogoNivel2.items.find((v) => v.id === tejidoOVetaAbierto.id);
+          if (!vetaActiva) return null;
+          return (
+            <PanelEditorVeta
+              item={vetaActiva}
+              granos={granosCatalogoNivel2.items}
+              loadingGranos={granosCatalogoNivel2.loading}
+              onCerrar={() => setTejidoOVetaAbierto(null)}
+              onActualizar={vetasCatalogoNivel2.actualizar}
+              onEliminar={vetasCatalogoNivel2.eliminar}
+              onAbrirGrano={(granoId) => {
+                setTejidoOVetaAbierto(null);
+                setGranoOCelulaAbierto({ tipo: "grano", id: granoId });
+              }}
+              onAbrirFormacion={(formacionId) => {
+                setTejidoOVetaAbierto(null);
+                setOrganoOFormacionAbierto({ tipo: "formacion", id: formacionId });
+              }}
+            />
+          );
+        })()}
     </div>,
     document.body,
   );
