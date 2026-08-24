@@ -29,7 +29,7 @@ import { RichEditor } from "@/editor/lexical";
 import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import { type SaveStatus } from "@/ui/saveStatus";
 
-import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
@@ -68,7 +68,7 @@ export function MineralEditor({
   onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const { items: elementos } = useElementos();
-  const { items: compuestos, setItems: setCompuestos } = useCompuestos();
+  const { items: compuestos, setItems: setCompuestos } = useCompuestosConElementos();
   const { items: catalogoFormaciones, setItems: setCatalogoFormaciones } = useFormaciones();
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useMinerales();

@@ -23,7 +23,7 @@ import { RichEditor } from "@/editor/lexical";
 import { SeccionEntidad } from "@/ui/SeccionEntidad";
 import { type SaveStatus } from "@/ui/saveStatus";
 
-import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
@@ -63,7 +63,7 @@ export function FloraEditorMejorado({
   onHeaderControlsChange?: OnHeaderControlsChange;
 }) {
   const { items: elementos, setItems: setElementos } = useElementos();
-  const { items: compuestos, setItems: setCompuestos } = useCompuestos();
+  const { items: compuestos, setItems: setCompuestos } = useCompuestosConElementos();
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reacciones, setItems: setReacciones } = useReacciones();
   const { actualizar, eliminar } = useFlora();

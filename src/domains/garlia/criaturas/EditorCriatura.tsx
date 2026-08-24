@@ -80,7 +80,7 @@ import { PanelPerfilCriatura } from "@/domains/garlia/biologia/PerfilAtomicoCria
 import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCompuestosPage";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
-import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
 import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
 import { PanelEditorCelula, PanelEditorTejido } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
@@ -174,7 +174,7 @@ export function EditorCriatura({
   // (nivel micro). La fórmula del Órgano vive vía Tejidos/Células (ver
   // useOrganoTejidos), no como columna inline.
   const [editandoGrupoId, setEditandoGrupoId] = useState<string | null>(null);
-  const { items: compuestosOrganos, setItems: setCompuestosOrganos } = useCompuestos();
+  const { items: compuestosOrganos, setItems: setCompuestosOrganos } = useCompuestosConElementos();
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const organosCriatura = useCriaturaOrganos(form.id, catalogoOrganos);
   // Panel de la Célula abierto al clickear "hecho de: [Célula]" en la fila

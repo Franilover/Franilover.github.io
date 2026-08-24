@@ -20,11 +20,10 @@ import React, { useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
-import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
-import { persistirReaccion } from "@/domains/garlia/elementos/persistirReaccion";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import type { Organo, Reaccion } from "@/domains/garlia/elementos/types";
 
@@ -142,7 +141,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   // ni depender de una planta puntual.
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
-  const { items: compuestosCatalogo, setItems: setCompuestosCatalogo, loading: loadingCompuestos } = useCompuestos();
+  const { items: compuestosCatalogo, setItems: setCompuestosCatalogo, loading: loadingCompuestos } = useCompuestosConElementos();
   const { items: elementosCatalogo } = useElementos();
 
   // Click en un Compuesto de matriz (Tejido) o en un Compuesto de la
@@ -162,7 +161,7 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
 
   async function actualizarProceso(id: string, cambios: Partial<Reaccion>) {
     setReaccionesCatalogo((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
-    const { error } = await persistirReaccion(id, cambios);
+    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
     if (error) console.error("[BiologiaPage] error guardando proceso:", error);
   }
 

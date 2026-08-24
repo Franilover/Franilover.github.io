@@ -41,9 +41,9 @@ export function usePlantaOrganosProcesos(plantaId: string, catalogoOrganos: Orga
     load: loadOrganos,
   } = useEntidadVinculosGrupo({
     entidadId: plantaId,
+    padreTipo: "planta",
     tablaCatalogo: "organos",
-    tablaPuente: "planta_organos",
-    columnaFk: "planta_id",
+    hijoTipo: "organo",
     catalogo: catalogoOrganos,
   });
 

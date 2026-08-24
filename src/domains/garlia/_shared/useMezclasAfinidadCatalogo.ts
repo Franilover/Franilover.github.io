@@ -23,9 +23,15 @@
  * para reconstruir la mezcla real desde la cadena viva:
  *   planta_organos → Organo → organo_tejidos → Tejido ─┬─ tejido_celulas → Celula → celula_compuestos → Compuesto
  *                                                       └─ tejido_compuestos ─────────────────────────→ Compuesto
- * El lado de Mineral/Formación (formacion_vetas → Veta.grano_id →
- * Grano.compuesto_id) sigue siendo el patrón viejo 1:1 — no se tocó en
- * esta migración, queda fuera de este fix.
+ *
+ * FASE 7: los vínculos Mineral→Formación y Planta→Órgano se leen ahora de
+ * estructura_componentes (padre_tipo='mineral'|'planta', hijo_tipo=
+ * 'formacion'|'organo') en vez de las tablas dedicadas mineral_formaciones/
+ * planta_organos (siguen existiendo sin usarse, limpieza en Fase 8). Esto
+ * también resuelve el TODO que había quedado pendiente del lado Mineral:
+ * ahora se atraviesa formacion_vetas → Veta → estructura_componentes
+ * (veta→grano→compuesto) para armar la mezcla real, mismo criterio que ya
+ * se usaba del lado Flora.
  */
 
 import { useEffect, useState } from "react";
@@ -41,11 +47,11 @@ export interface EntidadConMezcla {
   mezcla: ComponenteCompuestoEnMezcla[];
 }
 
-interface FilaVinculoOrgano {
-  planta_id: string;
-  /** Pese al nombre histórico, apunta a organos.id — se resuelve por
-   *  separado (organo_tejidos → Tejido → Célula/Compuesto), no embebido. */
-  grupo_compuesto_id: string;
+/** Fila de estructura_componentes ya reducida a padre_id/hijo_id — sirve
+ *  tanto para mineral→formacion como para planta→organo. */
+interface FilaVinculo {
+  padre_id: string;
+  hijo_id: string;
 }
 
 export function useMezclasAfinidadCatalogo() {
@@ -58,33 +64,115 @@ export function useMezclasAfinidadCatalogo() {
     async function cargar() {
       setLoading(true);
 
-      const [{ data: minerales }, { data: formaciones }, { data: floras }, { data: vinculosOrgano }] =
-        await Promise.all([
-          supabase.from("minerales").select("id, nombre"),
-          // NOTA: grupo_compuesto_id acá apunta a formaciones.id (nombre
-          // histórico, ver elementos/types.ts) — la cadena real es
-          // Formacion → formacion_vetas → Veta.grano_id → Grano.compuesto_id,
-          // que sigue siendo 1:1 y quedó FUERA del alcance de esta migración
-          // (solo tocamos Célula/Tejido/Órgano, no Grano/Veta). Por ahora
-          // el lado mineral sigue sin resolver mezcla real — ver TODO abajo.
-          supabase.from("mineral_formaciones").select("mineral_id, grupo_compuesto_id"),
-          supabase.from("flora").select("id, nombre"),
-          supabase.from("planta_organos").select("planta_id, grupo_compuesto_id"),
-        ]);
+      const [
+        { data: minerales },
+        { data: floras },
+        { data: vinculosFormacion },
+        { data: vinculosOrganoRaw },
+      ] = await Promise.all([
+        supabase.from("minerales").select("id, nombre"),
+        supabase.from("flora").select("id, nombre"),
+        supabase
+          .from("estructura_componentes")
+          .select("padre_id, hijo_id")
+          .eq("padre_tipo", "mineral")
+          .eq("hijo_tipo", "formacion"),
+        supabase
+          .from("estructura_componentes")
+          .select("padre_id, hijo_id")
+          .eq("padre_tipo", "planta")
+          .eq("hijo_tipo", "organo"),
+      ]);
 
       if (cancelado) return;
 
-      // ── Lado Mineral: TODO — mismo bug que tenía Flora, sin arreglar
-      // todavía (requiere resolver formacion_vetas → Veta → Grano por
-      // separado, análogo a lo que se hizo abajo para Flora/Órganos). Por
-      // ahora la mezcla queda vacía en vez de fallar silenciosamente. ────
-      void formaciones;
+      // ── Lado Mineral: Formación → formacion_vetas → Veta →
+      // estructura_componentes(veta→grano) → estructura_componentes
+      // (grano→compuesto). Mismo criterio de agregación que Flora: cada
+      // aparición de un Compuesto cuenta como cantidad 1. ─────────────────
       const mezclaMineral = new Map<string, ComponenteCompuestoEnMezcla[]>();
+      const formacionIds = [
+        ...new Set(((vinculosFormacion ?? []) as FilaVinculo[]).map((v) => v.hijo_id)),
+      ];
+
+      if (formacionIds.length > 0) {
+        const { data: formacionVetas } = await supabase
+          .from("formacion_vetas")
+          .select("formacion_id, veta_id")
+          .in("formacion_id", formacionIds);
+
+        const vetaIds = [...new Set((formacionVetas ?? []).map((v) => v.veta_id as string))];
+
+        if (vetaIds.length > 0) {
+          const { data: vetaGranoLinks } = await supabase
+            .from("estructura_componentes")
+            .select("padre_id, hijo_id")
+            .eq("padre_tipo", "veta")
+            .eq("hijo_tipo", "grano")
+            .in("padre_id", vetaIds);
+
+          const granoIds = [
+            ...new Set(((vetaGranoLinks ?? []) as FilaVinculo[]).map((v) => v.hijo_id)),
+          ];
+
+          const granoCompuestoLinks =
+            granoIds.length > 0
+              ? (
+                  (
+                    await supabase
+                      .from("estructura_componentes")
+                      .select("padre_id, hijo_id")
+                      .eq("padre_tipo", "grano")
+                      .eq("hijo_tipo", "compuesto")
+                      .in("padre_id", granoIds)
+                  ).data as FilaVinculo[]
+                ) ?? []
+              : [];
+
+          // grano_id → lista de compuesto_id
+          const compuestosPorGrano = new Map<string, string[]>();
+          for (const gc of granoCompuestoLinks) {
+            const acc = compuestosPorGrano.get(gc.padre_id) ?? [];
+            acc.push(gc.hijo_id);
+            compuestosPorGrano.set(gc.padre_id, acc);
+          }
+
+          // veta_id → lista de compuesto_id (agregando todos sus Granos)
+          const compuestosPorVeta = new Map<string, string[]>();
+          for (const vg of (vetaGranoLinks ?? []) as FilaVinculo[]) {
+            const compuestosDelGrano = compuestosPorGrano.get(vg.hijo_id) ?? [];
+            const acc = compuestosPorVeta.get(vg.padre_id) ?? [];
+            compuestosPorVeta.set(vg.padre_id, [...acc, ...compuestosDelGrano]);
+          }
+
+          // formacion_id → lista de compuesto_id (agregando todas sus Vetas)
+          const compuestosPorFormacion = new Map<string, string[]>();
+          for (const fv of formacionVetas ?? []) {
+            const compuestosDeLaVeta = compuestosPorVeta.get(fv.veta_id as string) ?? [];
+            const acc = compuestosPorFormacion.get(fv.formacion_id as string) ?? [];
+            compuestosPorFormacion.set(fv.formacion_id as string, [...acc, ...compuestosDeLaVeta]);
+          }
+
+          // mineral_id → mezcla agregada de todas sus Formaciones.
+          for (const v of (vinculosFormacion ?? []) as FilaVinculo[]) {
+            const compuestoIds = compuestosPorFormacion.get(v.hijo_id) ?? [];
+            if (!v.padre_id || compuestoIds.length === 0) continue;
+            const acumulada = mezclaMineral.get(v.padre_id) ?? [];
+            const nuevos: ComponenteCompuestoEnMezcla[] = compuestoIds.map((compuesto_id) => ({
+              compuesto_id,
+              cantidad: 1,
+            }));
+            mezclaMineral.set(v.padre_id, [...acumulada, ...nuevos]);
+          }
+        }
+      }
 
       // ── Lado Flora: reconstruir la mezcla real desde la cadena viva ────
-      const organoIds = ((vinculosOrgano ?? []) as FilaVinculoOrgano[])
-        .map((v) => v.grupo_compuesto_id)
-        .filter((id): id is string => !!id);
+      const vinculosOrgano = ((vinculosOrganoRaw ?? []) as FilaVinculo[]).map((v) => ({
+        planta_id: v.padre_id,
+        organo_id: v.hijo_id,
+      }));
+      const organoIds = vinculosOrgano.map((v) => v.organo_id).filter((id): id is string => !!id);
 
       const mezclaFlora = new Map<string, ComponenteCompuestoEnMezcla[]>();
 
@@ -147,8 +235,8 @@ export function useMezclasAfinidadCatalogo() {
           // cantidad numérica real en esta cadena (proporcion es texto
           // libre) — cada aparición de un Compuesto cuenta como cantidad 1,
           // aproximación razonable para el cálculo de afinidad.
-          for (const v of (vinculosOrgano ?? []) as FilaVinculoOrgano[]) {
-            const compuestoIds = compuestosPorOrgano.get(v.grupo_compuesto_id) ?? [];
+          for (const v of vinculosOrgano) {
+            const compuestoIds = compuestosPorOrgano.get(v.organo_id) ?? [];
             if (!v.planta_id || compuestoIds.length === 0) continue;
             const acumulada = mezclaFlora.get(v.planta_id) ?? [];
             const nuevos: ComponenteCompuestoEnMezcla[] = compuestoIds.map((compuesto_id) => ({

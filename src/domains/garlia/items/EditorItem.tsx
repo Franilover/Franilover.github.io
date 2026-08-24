@@ -34,7 +34,7 @@ import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCat
 import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 import { supabase } from "@/infra/supabase/supabase";
 
-import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
@@ -104,21 +104,23 @@ export function EditorItem({
   const { criaturas: allCriaturas, loading: loadingCriaturas } = useCriaturasCatalogo();
   // Catálogo de elementos/compuestos — mismo patrón que Flora/Mineral
   const { items: elementos } = useElementos();
-  const { items: compuestos, setItems: setCompuestos } = useCompuestos();
+  const { items: compuestos, setItems: setCompuestos } = useCompuestosConElementos();
 
   // Catálogo propio de Formaciones — Estructura del item usa el MISMO
   // catálogo (tabla real "formaciones") que Formaciones de Minerales. Un
   // item y un mineral pueden compartir la misma Formación (ej. "Cristal de
   // Cuarzo" como parte de una espada y como formación mineral), y editarla
-  // en cualquiera de los dos lugares actualiza a ambos. La tabla puente
-  // sigue siendo item_estructura (columna histórica grupo_compuesto_id).
+  // en cualquiera de los dos lugares actualiza a ambos. FASE 7: el vínculo
+  // vive en estructura_componentes (padre_tipo='item', hijo_tipo='formacion'),
+  // reemplaza la tabla dedicada item_estructura (sigue existiendo sin
+  // usarse, limpieza en Fase 8).
   const { items: catalogoEstructura, setItems: setCatalogoEstructura } = useFormaciones();
 
   const estructura = useEntidadVinculosGrupo({
     entidadId: item.id,
+    padreTipo: "item",
     tablaCatalogo: "formaciones",
-    tablaPuente: "item_estructura",
-    columnaFk: "item_id",
+    hijoTipo: "formacion",
     catalogo: catalogoEstructura,
   });
 
@@ -154,9 +156,9 @@ export function EditorItem({
   // Persistencia directa de la Reacción/Habilidad en catálogo — usada por
   // el panel flotante (ReaccionPanelFlotante), que no sabe que se abrió
   // desde acá.
-  async function actualizarReaccion(id: string, cambios: any) {
+  async function persistirReaccion(id: string, cambios: any) {
     onReaccionActualizadaLocal(id, cambios);
-    const { error } = await persistirReaccion(id, cambios);
+    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
     if (error) {
       console.error("[EditorItem] error guardando reacción:", error);
     }
@@ -498,7 +500,7 @@ export function EditorItem({
           compuestos={compuestos}
           elementos={elementos}
           onCerrar={() => setEditandoReaccionId(null)}
-          onActualizar={actualizarReaccion}
+          onActualizar={persistirReaccion}
           onAbrirItem={(it) => setEditandoCompuestoId(it.tipo === "compuesto" ? it.id : null)}
         />
       )}

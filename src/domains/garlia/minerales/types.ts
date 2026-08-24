@@ -6,8 +6,10 @@
  * - Formaciones: partes del mineral con fórmula propia (veta, inclusión,
  *   capa, núcleo, superficie, cristal…). "Formación" es una fila real de la
  *   tabla propia "formaciones" (ver elementos/types.ts), vinculada N:N vía
- *   la tabla puente mineral_formaciones (mismo patrón que planta_organos en
- *   Flora). Esto permite reutilizar la misma formación entre varios
+ *   estructura_componentes (padre_tipo='mineral', hijo_tipo='formacion' —
+ *   FASE 7, mismo patrón que planta_organos→organo en Flora; la tabla
+ *   dedicada mineral_formaciones sigue existiendo sin usarse, limpieza en
+ *   Fase 8). Esto permite reutilizar la misma formación entre varios
  *   minerales, e incluso compartirla con la Estructura de Items. Una
  *   Formación ya NO tiene columna `componentes` inline: su fórmula vive dos
  *   niveles más abajo, vía formacion_vetas→Veta→Grano→Compuesto (ver
@@ -30,11 +32,12 @@ export interface Mineral {
   /** @deprecated Legado: un solo compuesto. Se mantiene por compatibilidad. */
   compuesto_id: string | null;
   /** @deprecated Legado: composición plana sin estructura. Reemplazada por
-   *  Formaciones (tabla "formaciones" vinculada vía mineral_formaciones).
-   *  Se mantiene por compatibilidad con datos viejos aún no migrados —
-   *  ver migración one-shot en useMineralFormacionesProcesos, que ahora
-   *  escribe en la tabla "mineral_formaciones_legado" en vez de perder
-   *  este campo. */
+   *  Formaciones (tabla "formaciones" vinculada vía estructura_componentes,
+   *  ver arriba). Se mantiene por compatibilidad con datos viejos aún no
+   *  migrados — ver migración one-shot en useMineralFormacionesProcesos,
+   *  que FASE 7 reescribió para crear vínculos mineral→compuesto directos
+   *  en estructura_componentes en vez de archivar en
+   *  mineral_formaciones_legado (esa tabla queda sin usarse desde acá). */
   componentes: { compuesto_id: string; tag: string }[];
   notas: string;
   orden: number;
@@ -43,11 +46,12 @@ export interface Mineral {
 }
 
 /**
- * Vínculo N:N entre Mineral y Formacion. Tabla puente real
- * "mineral_formaciones" → formaciones.id. La columna `grupo_compuesto_id`
- * es el nombre histórico (de cuando existía una tabla unificada
- * "grupos_compuestos"/"estructuras_ensambladas") pero hoy apunta a
- * formaciones.id.
+ * @deprecated FASE 7: el vínculo N:N Mineral↔Formación ya no se lee de la
+ * tabla dedicada "mineral_formaciones" (fila descripta acá) sino de
+ * estructura_componentes (padre_tipo='mineral', hijo_tipo='formacion') —
+ * ver useMineralFormacionesProcesos / useEntidadVinculosGrupo. Sin
+ * consumidores en el código; se deja documentado, no se borra (mismo
+ * criterio de coexistencia no-destructiva del resto de las fases).
  */
 export interface MineralFormacionVinculo {
   id: string;

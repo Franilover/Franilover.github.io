@@ -7,32 +7,33 @@
  * usePlantaOrganosProcesos.ts (ver ese archivo para el razonamiento
  * completo sobre el patrón de vínculo N:N) — el CRUD del vínculo N:N de
  * Formaciones ya no se reimplementa a mano acá, delega directo a
- * useEntidadVinculosGrupo, instanciado contra la tabla real "formaciones"
- * y la tabla puente "mineral_formaciones". Dos diferencias deliberadas
- * frente a Flora:
+ * useEntidadVinculosGrupo, instanciado con padreTipo="mineral" contra el
+ * catálogo real "formaciones" vía estructura_componentes — FASE 7,
+ * reemplaza la tabla dedicada "mineral_formaciones" (sigue existiendo sin
+ * usarse, limpieza en Fase 8). Dos diferencias deliberadas frente a Flora:
  *
  * - Sin `orden`/reordenarProcesos: a diferencia del ciclo de vida de una
  *   planta, los procesos geológicos de un mineral no tienen una secuencia
  *   narrativa única (puede oxidarse sin metamorfizar, o al revés), así que
  *   no hay drag-and-drop ni columna `orden` que persistir.
  *
- * - migrarComponentesLegado: el campo plano `Mineral.componentes` (composición
- *   sin estructura, pre-Formaciones) se migra una sola vez la primera vez
- *   que se cargan formaciones para un mineral que aún no tiene ninguna.
- *   Ya NO se convierte en una Formación real del catálogo (una Formación
- *   ya no tiene columna `componentes` para volcar ahí) — se archiva tal
- *   cual en la tabla real "mineral_formaciones_legado" (id, mineral_id,
- *   nombre, componentes jsonb, notas), pensada justo para este caso: no
- *   se pierde la data vieja, pero tampoco se fuerza una Formación/Tejido/
- *   Célula sintética solo para alojarla. Migrar esa data a una Formación
- *   real con su fórmula vía Vetas/Granos queda como paso manual aparte.
+ * - migrarComponentesLegado: el campo plano `Mineral.componentes`
+ *   (composición sin estructura, pre-Formaciones) se migra una sola vez la
+ *   primera vez que se cargan formaciones para un mineral que aún no tiene
+ *   ninguna. FASE 7: ya NO se archiva aparte en "mineral_formaciones_legado"
+ *   (esa tabla sigue existiendo sin usarse, limpieza en Fase 8) — en vez de
+ *   eso crea directo un vínculo mineral→compuesto en estructura_componentes
+ *   por cada entrada del JSONB legado (mismo criterio que se usó para migrar
+ *   flora.componentes en Fase 7), preservando `tag` como `rol` cuando existe.
+ *   Sigue sin crear una Formación real: ese ensamblaje con fórmula vía
+ *   Vetas/Granos queda como paso manual aparte.
  *
  * Formaciones: catálogo propio — tabla real "formaciones" (separada de
  * "organos", que usan Flora/Criaturas; compartida con Estructura de
- * Items), vinculado N:N vía la tabla puente "mineral_formaciones" (solo
- * {id, mineral_id, grupo_compuesto_id, created_at} — el nombre/función/
- * notas viven en la Formación, la fórmula vive más abajo vía
- * formacion_vetas, no en esta tabla).
+ * Items), vinculado N:N vía estructura_componentes (padre_tipo='mineral',
+ * hijo_tipo='formacion' para el catálogo, hijo_tipo='compuesto' para la
+ * migración legado) — el nombre/función/notas viven en la Formación, la
+ * fórmula vive más abajo vía formacion_vetas, no acá.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -58,9 +59,9 @@ export function useMineralFormacionesProcesos(
     load: loadFormaciones,
   } = useEntidadVinculosGrupo({
     entidadId: mineralId,
+    padreTipo: "mineral",
     tablaCatalogo: "formaciones",
-    tablaPuente: "mineral_formaciones",
-    columnaFk: "mineral_id",
+    hijoTipo: "formacion",
     catalogo: catalogoFormaciones,
   });
 
@@ -93,11 +94,13 @@ export function useMineralFormacionesProcesos(
 
   // ── Migración one-shot del campo legado `componentes` ──────────────────
   // Se corre después de la primera carga: si el mineral tiene composición
-  // legado pero todavía no tiene ninguna Formación vinculada, la archiva
-  // en "mineral_formaciones_legado" (tabla real pensada para esto — no se
-  // inventa una Formación/fórmula sintética) para no perder la data ya
-  // cargada por el usuario. No crea vínculo en mineral_formaciones: queda
-  // como registro de consulta/migración manual aparte.
+  // legado pero todavía no tiene ninguna Formación vinculada, crea un
+  // vínculo directo mineral→compuesto en estructura_componentes por cada
+  // entrada del JSONB legado (FASE 7 — mismo criterio que se usó para
+  // migrar flora.componentes). `tag`, si existe, se preserva como `rol`.
+  // Sigue sin inventar una Formación/fórmula sintética: eso queda como
+  // paso manual aparte, vía useFormacionVetas sobre una Formación creada
+  // a mano.
   useEffect(() => {
     if (!mineralId || loadingFormaciones) return;
     if (formaciones.length > 0) return;
@@ -105,14 +108,15 @@ export function useMineralFormacionesProcesos(
     if (!legado || legado.length === 0) return;
 
     void (async () => {
-      const { error } = await supabase.from("mineral_formaciones_legado").insert([
-        {
-          mineral_id: mineralId,
-          nombre: "",
-          componentes: legado.map((c) => ({ compuesto_id: c.compuesto_id, cantidad: 1 })),
-          notas: legado.some((c) => c.tag) ? legado.map((c) => c.tag).filter(Boolean).join(", ") : null,
-        },
-      ]);
+      const { error } = await supabase.from("estructura_componentes").insert(
+        legado.map((c) => ({
+          padre_tipo: "mineral",
+          padre_id: mineralId,
+          hijo_tipo: "compuesto",
+          hijo_id: c.compuesto_id,
+          rol: c.tag || null,
+        })),
+      );
       if (error) {
         console.error("[useMineralFormacionesProcesos] error migrando componentes legado:", error);
       }

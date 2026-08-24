@@ -6,7 +6,9 @@
  * Hook para CRUD de Órganos de una criatura. Ya NO reimplementa el patrón de
  * vínculo N:N a mano — delega directo a useEntidadVinculosGrupo (ver ese
  * archivo para el razonamiento completo), instanciado contra el catálogo
- * real "organos" y la tabla puente "criatura_organos".
+ * real "organos" vía estructura_componentes (padre_tipo='criatura',
+ * hijo_tipo='organo') — FASE 7, reemplaza la tabla dedicada
+ * "criatura_organos" (sigue existiendo sin usarse, limpieza en Fase 8).
  *
  * Distinto de `perfiles_atomicos_criatura`: ese es composición directa por
  * ELEMENTO (nivel micro, como `compuestos`), esto es ensamblaje por
@@ -35,9 +37,9 @@ export function useCriaturaOrganos(criaturaId: string, catalogoOrganos: Organo[]
     load,
   } = useEntidadVinculosGrupo({
     entidadId: criaturaId,
+    padreTipo: "criatura",
     tablaCatalogo: "organos",
-    tablaPuente: "criatura_organos",
-    columnaFk: "criatura_id",
+    hijoTipo: "organo",
     catalogo: catalogoOrganos,
   });
 
