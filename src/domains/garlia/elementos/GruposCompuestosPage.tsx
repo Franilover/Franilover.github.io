@@ -18,7 +18,7 @@ import { Boxes, Beaker, Layers, Gem, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { SelectorFormulaTejidos } from "@/domains/garlia/_shared/SelectorFormulaTejidos";
+import { SelectorFormulaTejidos, type FilaFormulaTejido } from "@/domains/garlia/_shared/SelectorFormulaTejidos";
 import { useOrganoTejidos } from "@/domains/garlia/elementos/useOrganoTejidos";
 import { useFormacionVetas } from "@/domains/garlia/elementos/useFormacionVetas";
 import { useCatalogoTejidos } from "@/domains/garlia/elementos/useCatalogoTejidos";
@@ -258,7 +258,7 @@ export function GrupoCompuestoPanelFlotante({
                 <p className="text-micro text-primary/25 italic">Cargando…</p>
               ) : (
                 <SelectorFormulaTejidos
-                  items={formula.items}
+                  items={formula.items as unknown as FilaFormulaTejido[]}
                   onVincularExistente={(id) => void formula.vincularExistente(id)}
                   onCrearYVincular={(nombre) => void formula.crearYVincular(nombre)}
                   catalogoDisponible={catalogo.items}
