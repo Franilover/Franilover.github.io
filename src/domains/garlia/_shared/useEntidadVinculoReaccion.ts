@@ -24,7 +24,7 @@
 
 import { useCallback, useMemo } from "react";
 import { supabase } from "@/infra/supabase/supabase";
-
+import { persistirReaccion } from "@/domains/garlia/elementos/persistirReaccion";
 import type { Reaccion } from "@/domains/garlia/elementos/types";
 
 export function useEntidadVinculoReaccion({
