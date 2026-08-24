@@ -99,10 +99,10 @@ const DEXIE_TABLES = new Set([
   "organo_tejidos",
   "formacion_vetas",
   "reacciones",
-  "planta_organos",
-  "criatura_organos",
-  "mineral_formaciones",
-  "item_estructura",
+  // ─── Fase 7: tabla puente unificada, reemplaza planta_organos/
+  // criatura_organos/mineral_formaciones/item_estructura (dropeadas en
+  // Dexie v34) — ver useEntidadVinculosGrupo.ts ────────────────────────────
+  "estructura_componentes",
 ]);
 
 const OFFLINE_WRITABLE = new Set([
@@ -157,10 +157,8 @@ const OFFLINE_WRITABLE = new Set([
   "organo_tejidos",
   "formacion_vetas",
   "reacciones",
-  "planta_organos",
-  "criatura_organos",
-  "mineral_formaciones",
-  "item_estructura",
+  // ─── Fase 7: tabla puente unificada (ver nota arriba en DEXIE_TABLES) ───
+  "estructura_componentes",
 ]);
 
 // Tablas con ID numérico autogenerado por la DB — no se pueden crear offline
