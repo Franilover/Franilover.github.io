@@ -28,7 +28,7 @@ import { useGranos } from "@/domains/garlia/elementos/useGranos";
 import { useVetas } from "@/domains/garlia/elementos/useVetas";
 import { PanelEditorTejido, PanelEditorCelula } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { BreadcrumbJerarquia } from "@/domains/garlia/biologia/BreadcrumbJerarquia";
-import { PanelEditorVeta, PanelEditorGrano, SelectorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
+import { PanelEditorVeta, PanelEditorGrano } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { useCelulasDeUnOrgano } from "@/domains/garlia/elementos/useCelulasDeUnOrgano";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
