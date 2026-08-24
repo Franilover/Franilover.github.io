@@ -216,7 +216,7 @@ export function GrupoCompuestoPanelFlotante({
                   label: "Grano",
                   icono: <Gem size={10} />,
                   activo: false,
-                  items: vetas.items
+                    items: vetas.items
                     .map((v) => (v.grano_id ? { id: v.grano_id, nombre: v.catalogo_nombre ?? "" } : null))
                     .filter((g): g is { id: string; nombre: string } => g !== null),
                   loading: vetas.loading,
