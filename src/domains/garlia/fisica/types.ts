@@ -33,11 +33,26 @@ export interface Oris {
   formula: string;
   dominio: string;
   descripcion?: string | null;
-  /** Mezcla de Iums que compone este Oris: { [iumId]: cantidad }. Se usa
-   *  para calcular su gráfico A/T/S (ver contarLetrasDeOris) — igual que
-   *  un Compuesto es mezcla de Elementos en la Tabla Química. */
+  /** @deprecated Fuente original (jsonb, claves = iums.id). Se conserva en
+   *  Supabase como respaldo de la migración a oris_iums (Fase 3), pero el
+   *  frontend ya no debe escribir acá — usar useOrisConIums() para leer. */
   iums_composicion: Record<string, number>;
 }
+
+/** Fila cruda tal cual vive en Supabase (tabla "oris_iums") — fuente
+ *  normalizada de la mezcla de Iums, reemplaza a iums_composicion (jsonb)
+ *  como fuente de verdad. Ver Fase 3 del rediseño 1.0. */
+export interface OrisIumRow {
+  id: string;
+  oris_id: string;
+  ium_id: string;
+  cantidad: number;
+}
+
+export const ORIS_IUMS_CONFIG = {
+  tabla: "oris_iums",
+  select: "id, oris_id, ium_id, cantidad",
+};
 
 export const ORIS_CONFIG = {
   tabla: "oris",

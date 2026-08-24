@@ -175,19 +175,54 @@ export interface ComponenteCompuesto {
   cantidad: number;
 }
 
+/** Estado físico de una sustancia (§ Fase 2 del rediseño 1.0). Null si el
+ *  compuesto no forma parte de una familia de estados (ej. Piedra, Metal). */
+export type EstadoMateria = "solido" | "liquido" | "gas";
+
 /** Fila cruda tal cual vive en Supabase (tabla "compuestos"). */
 export interface Compuesto {
   id: string;
   nombre: string;
   simbolo?: string | null;
   notas?: string | null;
+  /** @deprecated Fuente original (jsonb). Se conserva en Supabase como
+   *  respaldo de la migración a compuesto_elementos, pero el frontend ya
+   *  no debe escribir acá — usar useCompuestosConElementos() para leer
+   *  y las mutaciones de compuesto_elementos para escribir. Ver Fase 2. */
   componentes: ComponenteCompuesto[];
   created_at?: string;
+  /** Fila base de la que este compuesto es un estado (ej. Hielo → Agua).
+   *  Null si es la sustancia base o si no pertenece a una familia de
+   *  estados — ver Fase 2.2 del rediseño 1.0. */
+  sustancia_base_id?: string | null;
+  /** Estado físico de esta fila. Solo tiene sentido junto a
+   *  sustancia_base_id (o en la fila base misma, que suele ser "liquido"). */
+  estado?: EstadoMateria | null;
+  /** true si esta fila es conceptualmente un Fenómeno (Fuego, Rayo) y no
+   *  una sustancia con masa — ver Fase 2.4. Se migrará por completo a la
+   *  tabla "fenomenos" en Fase 6; hasta entonces convive acá marcado. */
+  es_fenomeno?: boolean;
 }
 
 export const CONFIG_COMPUESTOS = {
   tabla: "compuestos",
-  select: "id, nombre, simbolo, notas, componentes, created_at",
+  select:
+    "id, nombre, simbolo, notas, componentes, created_at, sustancia_base_id, estado, es_fenomeno",
+};
+
+/** Fila cruda tal cual vive en Supabase (tabla "compuesto_elementos") —
+ *  fuente normalizada de la composición, reemplaza a componentes (jsonb)
+ *  como fuente de verdad. Ver Fase 2.1 del rediseño 1.0. */
+export interface CompuestoElementoRow {
+  id: string;
+  compuesto_id: string;
+  elemento_id: string;
+  cantidad: number;
+}
+
+export const CONFIG_COMPUESTO_ELEMENTOS = {
+  tabla: "compuesto_elementos",
+  select: "id, compuesto_id, elemento_id, cantidad",
 };
 
 // ─── Grupos de Compuestos: conjuntos reutilizables de Compuestos ──────────
@@ -371,10 +406,17 @@ export const CONFIG_CELULA_COMPUESTOS = {
 
 // ─── Granos / Vetas: composición de una Formación (minerales) ────────────
 // Espejo inerte de Célula/Tejido: Formacion → formacion_vetas → Veta →
-// Grano → Compuesto.
+// (estructura_componentes) → Grano → (estructura_componentes) → Compuesto.
+//
+// FASE 4: compuesto_id y grano_id son FK legadas 1:1, YA NO usadas desde el
+// frontend (ver useFormacionVetas.ts) — la composición real N:M vive en
+// estructura_componentes. Se mantienen en el tipo solo porque la columna
+// todavía existe en Supabase (limpieza pendiente para Fase 8); no escribir
+// en ellas desde código nuevo.
 export interface Grano {
   id: string;
   nombre: string;
+  /** @deprecated Fase 4 — usar estructura_componentes (padre=grano, hijo=compuesto). */
   compuesto_id: string | null;
   estructura: unknown;
   funcion: string | null;
@@ -386,6 +428,7 @@ export interface Grano {
 export interface Veta {
   id: string;
   nombre: string;
+  /** @deprecated Fase 4 — usar estructura_componentes (padre=veta, hijo=grano). */
   grano_id: string | null;
   estructura: unknown;
   funcion: string | null;
@@ -411,6 +454,35 @@ export const CONFIG_GRANOS = {
 export const CONFIG_VETAS = {
   tabla: "vetas",
   select: "id, nombre, grano_id, estructura, funcion, notas, created_at, updated_at",
+};
+
+// ─── estructura_componentes: relación N:M genérica de composición ────────
+// Reemplaza los FK singulares grano.compuesto_id y veta.grano_id.
+// Diseñada para reutilizarse en Fase 7 (unificación transversal) — mismo
+// patrón para cualquier "X está compuesto de Y con proporción Z".
+// Combinaciones válidas hoy (constraint CHECK en Supabase):
+//   padre_tipo='veta'  + hijo_tipo='grano'
+//   padre_tipo='grano' + hijo_tipo='compuesto'
+// (Formacion<-Veta sigue viviendo en formacion_vetas, no se toca acá.)
+export type EstructuraPadreTipo = "veta" | "grano";
+export type EstructuraHijoTipo = "grano" | "compuesto";
+
+export interface EstructuraComponente {
+  id: string;
+  padre_tipo: EstructuraPadreTipo;
+  padre_id: string;
+  hijo_tipo: EstructuraHijoTipo;
+  hijo_id: string;
+  cantidad: number | null;
+  proporcion: number | null;
+  unidad: string | null;
+  rol: string | null;
+  created_at: string;
+}
+
+export const CONFIG_ESTRUCTURA_COMPONENTES = {
+  tabla: "estructura_componentes",
+  select: "id, padre_tipo, padre_id, hijo_tipo, hijo_id, cantidad, proporcion, unidad, rol, created_at",
 };
 
 // ─── Procesos/Reacciones: recetas reutilizables de consume/produce ────────

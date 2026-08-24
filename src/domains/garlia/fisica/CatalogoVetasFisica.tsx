@@ -12,29 +12,32 @@
  * "Usar existente" (que vive dentro de la fórmula de una Formación
  * puntual, ver useFormacionVetas.ts).
  *
- * Ojo con la cadena real (ver elementos/types.ts): Grano → compuesto_id
- * (apunta directo a un Compuesto), pero Veta → grano_id (apunta a un
- * Grano, NO a un Compuesto directo). Por eso son dos paneles distintos,
- * no uno genérico: el de Grano usa SelectorCompuesto, el de Veta usa
- * SelectorGrano (nuevo, definido acá mismo).
+ * FASE 4 — la cadena real (ver elementos/types.ts) ya NO es 1:1: Grano
+ * puede estar hecho de VARIOS Compuestos, y Veta puede tener VARIOS
+ * Granos, cada vínculo vía la tabla genérica `estructura_componentes`
+ * (columnas legadas `compuesto_id`/`grano_id` ya no se leen ni escriben
+ * desde acá). Por eso ambos paneles muestran una LISTA con botón
+ * "agregar" en vez de un selector singular: el de Grano usa
+ * useGranosDeUnCompuesto/agregarCompuestoAGrano (vía useFormacionVetas),
+ * el de Veta usa useVetasDeUnGrano/agregarGranoAVeta.
  *
  * Breadcrumb Grano ⇄ Veta ⇄ Formación (espejo de BreadcrumbJerarquia de
  * Biología, componente genérico reutilizado tal cual — ver biologia/
- * BreadcrumbJerarquia.tsx): a diferencia de Grano→Veta (1:1 directo vía
- * grano_id, resuelto con useVetasDeUnGrano), Veta→Formación es M:N vía
- * `formacion_vetas` (useFormacionesDeUnaVeta), y Grano→Formación es
- * transitivo, atravesando ambos tramos (useFormacionesDeUnGrano).
+ * BreadcrumbJerarquia.tsx): Grano→Veta ahora es N:M vía
+ * estructura_componentes (useVetasDeUnGrano), Veta→Formación sigue siendo
+ * M:N vía `formacion_vetas` (useFormacionesDeUnaVeta, sin cambios), y
+ * Grano→Formación es transitivo, atravesando ambos tramos
+ * (useFormacionesDeUnGrano).
  *
  * Mismo lenguaje visual que GridCatalogoGrupo (grid de 3 columnas, click
  * abre panel flotante centrado).
  */
 
-import { Gem, Layers, Boxes, Plus, Trash2, X, Search, Check } from "lucide-react";
+import { Gem, Layers, Boxes, Plus, Trash2, X, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useConfirm } from "@/ui/ConfirmModal";
-import { SelectorCompuesto } from "@/domains/garlia/_shared/SelectorCompuesto";
 import { useGranos } from "@/domains/garlia/elementos/useGranos";
 import { useVetas } from "@/domains/garlia/elementos/useVetas";
 import { useVetasDeUnGrano } from "@/domains/garlia/elementos/useVetasDeUnGrano";
@@ -258,11 +261,15 @@ function GridSimple<T extends { id: string; nombre: string }>({
   );
 }
 
-// ─── Panel Grano: nombre, función, notas, Compuesto (compuesto_id) ─────────
+// ─── Panel Grano: nombre, función, notas, Compuestos (N:M, Fase 4) ─────────
 // Exportado: reutilizado directo desde SelectorFormulaTejidos (fila "hecho
 // de" de una Veta en la fórmula de una Formación) — clickear ahí debe abrir
 // ESTE panel (Grano), no el del Compuesto directo, misma cadena real que
 // su espejo CatalogoTejidosBiologia.tsx.
+//
+// FASE 4: un Grano puede estar hecho de VARIOS Compuestos — se listan con
+// su cantidad/proporción y se agregan/quitan uno a uno, en vez del
+// SelectorCompuesto singular que escribía grano.compuesto_id.
 
 export function PanelEditorGrano({
   item,
@@ -297,6 +304,67 @@ export function PanelEditorGrano({
 
   const vetasQueUsanEsteGrano = useVetasDeUnGrano(item.id);
   const formacionesQueUsanEsteGrano = useFormacionesDeUnGrano(item.id);
+  // Este panel es de catálogo global (no cuelga de ninguna Formación
+  // puntual), así que consulta/edita estructura_componentes directo contra
+  // Supabase en vez de pasar por useFormacionVetas (pensado para el flujo
+  // "fórmula de una Formación"). No existe un "useCompuestosDeUnGrano"
+  // dedicado todavía — se resuelve acá mismo con las filas crudas.
+  const [vinculos, setVinculos] = useState<
+    Array<{ vinculo_id: string; compuesto_id: string; cantidad: number | null; proporcion: number | null }>
+  >([]);
+  const [loadingVinculos, setLoadingVinculos] = useState(true);
+  const [agregando, setAgregando] = useState(false);
+
+  const cargarVinculos = React.useCallback(async () => {
+    setLoadingVinculos(true);
+    const { supabase } = await import("@/infra/supabase/supabase");
+    const { CONFIG_ESTRUCTURA_COMPONENTES } = await import("@/domains/garlia/elementos/types");
+    const { data } = await supabase
+      .from(CONFIG_ESTRUCTURA_COMPONENTES.tabla)
+      .select(CONFIG_ESTRUCTURA_COMPONENTES.select)
+      .eq("padre_tipo", "grano")
+      .eq("hijo_tipo", "compuesto")
+      .eq("padre_id", item.id)
+      .order("created_at", { ascending: true });
+    setVinculos(
+      (data ?? []).map((d: any) => ({
+        vinculo_id: d.id,
+        compuesto_id: d.hijo_id,
+        cantidad: d.cantidad,
+        proporcion: d.proporcion,
+      })),
+    );
+    setLoadingVinculos(false);
+  }, [item.id]);
+
+  useEffect(() => {
+    void cargarVinculos();
+  }, [cargarVinculos]);
+
+  async function agregarCompuesto(compuestoId: string) {
+    setAgregando(true);
+    const { supabase } = await import("@/infra/supabase/supabase");
+    const { CONFIG_ESTRUCTURA_COMPONENTES } = await import("@/domains/garlia/elementos/types");
+    const { data, error } = await supabase
+      .from(CONFIG_ESTRUCTURA_COMPONENTES.tabla)
+      .insert([{ padre_tipo: "grano", padre_id: item.id, hijo_tipo: "compuesto", hijo_id: compuestoId, cantidad: 1 }])
+      .select()
+      .single();
+    setAgregando(false);
+    if (!error && data) {
+      setVinculos((prev) => [
+        ...prev,
+        { vinculo_id: data.id, compuesto_id: data.hijo_id, cantidad: data.cantidad, proporcion: data.proporcion },
+      ]);
+    }
+  }
+
+  async function quitarCompuesto(vinculoId: string) {
+    setVinculos((prev) => prev.filter((v) => v.vinculo_id !== vinculoId));
+    const { supabase } = await import("@/infra/supabase/supabase");
+    const { CONFIG_ESTRUCTURA_COMPONENTES } = await import("@/domains/garlia/elementos/types");
+    await supabase.from(CONFIG_ESTRUCTURA_COMPONENTES.tabla).delete().eq("id", vinculoId);
+  }
 
   async function handleEliminar() {
     const ok = await confirm({
@@ -310,10 +378,12 @@ export function PanelEditorGrano({
     setEliminando(false);
     if (!res.ok) {
       setErrorEliminar(
-        "No se pudo eliminar — probablemente alguna Veta todavía lo usa. Cambiale el compuesto desde ahí o quitalo primero.",
+        "No se pudo eliminar — probablemente alguna Veta todavía lo usa. Quitalo de ahí primero.",
       );
     }
   }
+
+  const compuestosUsados = new Set(vinculos.map((v) => v.compuesto_id));
 
   return (
     <PanelFlotanteBase onCerrar={onCerrar}>
@@ -370,16 +440,24 @@ export function PanelEditorGrano({
 
         <div>
           <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-            Compuesto
+            Compuestos · {vinculos.length}
           </p>
-          <SelectorCompuesto
+          <ListaCompuestosDeGrano
+            vinculos={vinculos}
+            loading={loadingVinculos}
             compuestos={compuestos}
-            loadingCompuestos={loadingCompuestos}
-            compuestoId={item.compuesto_id}
-            onChange={(compuestoId) => onActualizar(item.id, { compuesto_id: compuestoId })}
-            onCompuestoCreado={onCompuestoCreado}
-            onEditarCompuesto={onAbrirCompuesto}
+            onQuitar={quitarCompuesto}
+            onAbrirCompuesto={onAbrirCompuesto}
           />
+          <div className="mt-2">
+            <SelectorCompuestoParaAgregar
+              compuestos={compuestos.filter((c) => !compuestosUsados.has(c.id))}
+              loadingCompuestos={loadingCompuestos}
+              agregando={agregando}
+              onElegir={agregarCompuesto}
+              onCompuestoCreado={onCompuestoCreado}
+            />
+          </div>
         </div>
 
         <NotasField
@@ -393,10 +471,155 @@ export function PanelEditorGrano({
   );
 }
 
-// ─── Panel Veta: nombre, función, notas, Grano (grano_id) ──────────────────
+/** Lista de Compuestos que componen un Grano — cada fila con nombre y botón quitar. */
+function ListaCompuestosDeGrano({
+  vinculos,
+  loading,
+  compuestos,
+  onQuitar,
+  onAbrirCompuesto,
+}: {
+  vinculos: Array<{ vinculo_id: string; compuesto_id: string; cantidad: number | null; proporcion: number | null }>;
+  loading: boolean;
+  compuestos: Compuesto[];
+  onQuitar: (vinculoId: string) => void;
+  onAbrirCompuesto?: (compuestoId: string) => void;
+}) {
+  if (loading && vinculos.length === 0) {
+    return <p className="text-micro text-primary/25 italic py-1">Cargando…</p>;
+  }
+  if (vinculos.length === 0) {
+    return <p className="text-micro text-primary/25 italic py-1">Sin compuestos todavía</p>;
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      {vinculos.map((v) => {
+        const compuesto = compuestos.find((c) => c.id === v.compuesto_id);
+        return (
+          <div
+            key={v.vinculo_id}
+            className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2.5 pr-1.5 py-1.5 border border-primary/10"
+          >
+            <button
+              type="button"
+              onClick={() => onAbrirCompuesto?.(v.compuesto_id)}
+              disabled={!onAbrirCompuesto}
+              className="flex-1 min-w-0 truncate text-left text-micro font-bold text-primary/80 disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+            >
+              {compuesto?.nombre ?? "(compuesto no encontrado)"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onQuitar(v.vinculo_id)}
+              title="Quitar"
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+            >
+              <X size={11} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Buscador simple para agregar un Compuesto nuevo a la lista de un Grano
+ *  (no reemplaza, solo agrega — contraparte "agregar" del SelectorCompuesto
+ *  singular que existía antes de Fase 4). */
+function SelectorCompuestoParaAgregar({
+  compuestos,
+  loadingCompuestos,
+  agregando,
+  onElegir,
+  onCompuestoCreado,
+}: {
+  compuestos: Compuesto[];
+  loadingCompuestos?: boolean;
+  agregando?: boolean;
+  onElegir: (compuestoId: string) => void;
+  onCompuestoCreado?: (c: Compuesto) => void;
+}) {
+  const [busqueda, setBusqueda] = useState("");
+  const [abierto, setAbierto] = useState(false);
+
+  const filtrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return compuestos;
+    return compuestos.filter((c) => c.nombre.toLowerCase().includes(q));
+  }, [compuestos, busqueda]);
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        disabled={agregando}
+        className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40 cursor-pointer"
+      >
+        <Plus size={10} /> Agregar compuesto
+      </button>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2.5 pr-1.5 py-1.5 border border-primary/15">
+        <Search size={12} className="text-primary/30 shrink-0" />
+        <input
+          autoFocus
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          onBlur={() => setTimeout(() => setAbierto(false), 120)}
+          placeholder={loadingCompuestos ? "Cargando…" : "Buscar compuesto…"}
+          className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal"
+        />
+        <button
+          type="button"
+          onMouseDown={() => setAbierto(false)}
+          title="Cancelar"
+          className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-primary/30 hover:text-primary transition-colors cursor-pointer"
+        >
+          <X size={10} />
+        </button>
+      </div>
+      <div
+        className="absolute z-20 mt-1 left-0 right-0 max-h-48 overflow-y-auto rounded-md border shadow-lg"
+        style={{
+          background: "var(--bg-main)",
+          borderColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+        }}
+      >
+        {filtrados.length === 0 ? (
+          <p className="text-micro text-primary/25 italic text-center py-2">Sin resultados</p>
+        ) : (
+          filtrados.slice(0, 30).map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onMouseDown={() => {
+                onElegir(c.id);
+                setAbierto(false);
+                setBusqueda("");
+              }}
+              className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-micro font-bold text-primary/75 hover:bg-primary/6 hover:text-primary transition-colors truncate"
+            >
+              {c.nombre || "Sin nombre"}
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Panel Veta: nombre, función, notas, Granos (N:M, Fase 4) ──────────────
 // Exportado: reutilizado directo desde SelectorFormulaTejidos/GruposCompuestosPage
 // (editor de la fórmula de una Formación) para abrir el mismo editor completo
 // al clickear el nombre de una fila — un solo editor de Veta en toda la app.
+//
+// FASE 4: una Veta puede tener VARIOS Granos — se listan y se
+// agregan/quitan uno a uno, en vez del SelectorGrano singular que escribía
+// veta.grano_id.
 
 export function PanelEditorVeta({
   item,
@@ -425,6 +648,64 @@ export function PanelEditorVeta({
 
   const formacionesQueUsanEstaVeta = useFormacionesDeUnaVeta(item.id);
 
+  // Granos que componen esta Veta — N:M vía estructura_componentes.
+  const [vinculos, setVinculos] = useState<
+    Array<{ vinculo_id: string; grano_id: string; cantidad: number | null; proporcion: number | null }>
+  >([]);
+  const [loadingVinculos, setLoadingVinculos] = useState(true);
+  const [agregando, setAgregando] = useState(false);
+
+  const cargarVinculos = React.useCallback(async () => {
+    setLoadingVinculos(true);
+    const { supabase } = await import("@/infra/supabase/supabase");
+    const { CONFIG_ESTRUCTURA_COMPONENTES } = await import("@/domains/garlia/elementos/types");
+    const { data } = await supabase
+      .from(CONFIG_ESTRUCTURA_COMPONENTES.tabla)
+      .select(CONFIG_ESTRUCTURA_COMPONENTES.select)
+      .eq("padre_tipo", "veta")
+      .eq("hijo_tipo", "grano")
+      .eq("padre_id", item.id)
+      .order("created_at", { ascending: true });
+    setVinculos(
+      (data ?? []).map((d: any) => ({
+        vinculo_id: d.id,
+        grano_id: d.hijo_id,
+        cantidad: d.cantidad,
+        proporcion: d.proporcion,
+      })),
+    );
+    setLoadingVinculos(false);
+  }, [item.id]);
+
+  useEffect(() => {
+    void cargarVinculos();
+  }, [cargarVinculos]);
+
+  async function agregarGrano(granoId: string) {
+    setAgregando(true);
+    const { supabase } = await import("@/infra/supabase/supabase");
+    const { CONFIG_ESTRUCTURA_COMPONENTES } = await import("@/domains/garlia/elementos/types");
+    const { data, error } = await supabase
+      .from(CONFIG_ESTRUCTURA_COMPONENTES.tabla)
+      .insert([{ padre_tipo: "veta", padre_id: item.id, hijo_tipo: "grano", hijo_id: granoId, cantidad: 1 }])
+      .select()
+      .single();
+    setAgregando(false);
+    if (!error && data) {
+      setVinculos((prev) => [
+        ...prev,
+        { vinculo_id: data.id, grano_id: data.hijo_id, cantidad: data.cantidad, proporcion: data.proporcion },
+      ]);
+    }
+  }
+
+  async function quitarGrano(vinculoId: string) {
+    setVinculos((prev) => prev.filter((v) => v.vinculo_id !== vinculoId));
+    const { supabase } = await import("@/infra/supabase/supabase");
+    const { CONFIG_ESTRUCTURA_COMPONENTES } = await import("@/domains/garlia/elementos/types");
+    await supabase.from(CONFIG_ESTRUCTURA_COMPONENTES.tabla).delete().eq("id", vinculoId);
+  }
+
   async function handleEliminar() {
     const ok = await confirm({
       title: "Eliminar veta",
@@ -441,6 +722,8 @@ export function PanelEditorVeta({
       );
     }
   }
+
+  const granosUsados = new Set(vinculos.map((v) => v.grano_id));
 
   return (
     <PanelFlotanteBase onCerrar={onCerrar}>
@@ -462,12 +745,11 @@ export function PanelEditorVeta({
               label: "Grano",
               icono: <Gem size={10} />,
               activo: false,
-              items: item.grano_id
-                ? granos
-                    .filter((g) => g.id === item.grano_id)
-                    .map((g) => ({ id: g.id, nombre: g.nombre }))
-                : [],
-              loading: loadingGranos,
+              items: vinculos
+                .map((v) => granos.find((g) => g.id === v.grano_id))
+                .filter((g): g is Grano => !!g)
+                .map((g) => ({ id: g.id, nombre: g.nombre })),
+              loading: loadingGranos || loadingVinculos,
               onNavegar: onAbrirGrano,
             },
             { label: "Veta", icono: <Layers size={10} />, activo: true },
@@ -498,15 +780,23 @@ export function PanelEditorVeta({
 
         <div>
           <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-            Grano
+            Granos · {vinculos.length}
           </p>
-          <SelectorGrano
+          <ListaGranosDeVeta
+            vinculos={vinculos}
+            loading={loadingVinculos}
             granos={granos}
-            loadingGranos={loadingGranos}
-            granoId={item.grano_id}
-            onChange={(granoId) => onActualizar(item.id, { grano_id: granoId })}
+            onQuitar={quitarGrano}
             onAbrirGrano={onAbrirGrano}
           />
+          <div className="mt-2">
+            <SelectorGranoParaAgregar
+              granos={granos.filter((g) => !granosUsados.has(g.id))}
+              loadingGranos={loadingGranos}
+              agregando={agregando}
+              onElegir={agregarGrano}
+            />
+          </div>
         </div>
 
         <NotasField
@@ -520,29 +810,77 @@ export function PanelEditorVeta({
   );
 }
 
-// ─── SelectorGrano: mismo lenguaje visual que SelectorCompuesto, pero
-// eligiendo un Grano del catálogo (para Veta.grano_id) — no crea Granos
-// nuevos desde acá (para eso está el botón "Nuevo" de la grid).
-// Exportado junto con PanelEditorVeta — ver nota arriba. ───────────────────
+/** Lista de Granos que componen una Veta — cada fila con nombre y botón quitar. */
+function ListaGranosDeVeta({
+  vinculos,
+  loading,
+  granos,
+  onQuitar,
+  onAbrirGrano,
+}: {
+  vinculos: Array<{ vinculo_id: string; grano_id: string; cantidad: number | null; proporcion: number | null }>;
+  loading: boolean;
+  granos: Grano[];
+  onQuitar: (vinculoId: string) => void;
+  onAbrirGrano?: (granoId: string) => void;
+}) {
+  if (loading && vinculos.length === 0) {
+    return <p className="text-micro text-primary/25 italic py-1">Cargando…</p>;
+  }
+  if (vinculos.length === 0) {
+    return <p className="text-micro text-primary/25 italic py-1">Sin granos todavía</p>;
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      {vinculos.map((v) => {
+        const grano = granos.find((g) => g.id === v.grano_id);
+        return (
+          <div
+            key={v.vinculo_id}
+            className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2.5 pr-1.5 py-1.5 border border-primary/10"
+          >
+            <Gem size={12} className="text-accent/60 shrink-0" />
+            <button
+              type="button"
+              onClick={() => onAbrirGrano?.(v.grano_id)}
+              disabled={!onAbrirGrano}
+              className="flex-1 min-w-0 truncate text-left text-micro font-bold text-primary/80 disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
+            >
+              {grano?.nombre || "Sin nombre"}
+            </button>
+            <button
+              type="button"
+              onClick={() => onQuitar(v.vinculo_id)}
+              title="Quitar"
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+            >
+              <X size={11} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-export function SelectorGrano({
+/** Buscador simple para agregar un Grano nuevo a la lista de una Veta
+ *  (no reemplaza, solo agrega — contraparte "agregar" del SelectorGrano
+ *  singular que existía antes de Fase 4). No crea Granos nuevos desde
+ *  acá — para eso está el botón "Nuevo" de la grid. */
+function SelectorGranoParaAgregar({
   granos,
   loadingGranos,
-  granoId,
-  onChange,
-  onAbrirGrano,
+  agregando,
+  onElegir,
 }: {
   granos: Grano[];
   loadingGranos?: boolean;
-  granoId: string | null;
-  onChange: (granoId: string | null) => void;
-  onAbrirGrano?: (granoId: string) => void;
+  agregando?: boolean;
+  onElegir: (granoId: string) => void;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [abierto, setAbierto] = useState(false);
   const [activo, setActivo] = useState(0);
-
-  const elegido = useMemo(() => granos.find((g) => g.id === granoId) ?? null, [granos, granoId]);
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -551,7 +889,7 @@ export function SelectorGrano({
   }, [granos, busqueda]);
 
   function elegir(g: Grano) {
-    onChange(g.id);
+    onElegir(g.id);
     setAbierto(false);
     setBusqueda("");
   }
@@ -573,35 +911,16 @@ export function SelectorGrano({
     }
   }
 
-  if (elegido && !abierto) {
+  if (!abierto) {
     return (
-      <div className="flex items-center gap-1.5 bg-primary/5 rounded-md pl-2.5 pr-1.5 py-1.5 border border-primary/10">
-        <Gem size={12} className="text-accent/60 shrink-0" />
-        <button
-          type="button"
-          onClick={() => onAbrirGrano?.(elegido.id)}
-          disabled={!onAbrirGrano}
-          className="flex-1 min-w-0 truncate text-left text-micro font-bold text-primary/80 disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer"
-        >
-          {elegido.nombre || "Sin nombre"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setAbierto(true)}
-          title="Cambiar"
-          className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-        >
-          <Search size={11} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          title="Quitar"
-          className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-        >
-          <X size={11} />
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        disabled={agregando}
+        className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40 cursor-pointer"
+      >
+        <Plus size={10} /> Agregar grano
+      </button>
     );
   }
 
@@ -621,16 +940,14 @@ export function SelectorGrano({
           placeholder={loadingGranos ? "Cargando…" : "Buscar grano…"}
           className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-micro font-bold text-primary outline-none placeholder:text-primary/30 placeholder:font-normal"
         />
-        {elegido && (
-          <button
-            type="button"
-            onMouseDown={() => setAbierto(false)}
-            title="Cancelar"
-            className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-primary/30 hover:text-primary transition-colors cursor-pointer"
-          >
-            <X size={10} />
-          </button>
-        )}
+        <button
+          type="button"
+          onMouseDown={() => setAbierto(false)}
+          title="Cancelar"
+          className="shrink-0 w-5 h-5 flex items-center justify-center rounded text-primary/30 hover:text-primary transition-colors cursor-pointer"
+        >
+          <X size={10} />
+        </button>
       </div>
 
       <div
@@ -653,7 +970,6 @@ export function SelectorGrano({
                 i === activo ? "bg-primary/10 text-primary" : "text-primary/75 hover:bg-primary/6 hover:text-primary"
               }`}
             >
-              {g.id === granoId && <Check size={10} className="text-accent shrink-0" />}
               {g.nombre || "Sin nombre"}
             </button>
           ))

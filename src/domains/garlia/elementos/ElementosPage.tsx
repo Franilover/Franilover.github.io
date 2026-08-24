@@ -25,7 +25,10 @@ import { CompuestosPage } from "./CompuestosPage";
 
 import { ReaccionesPage } from "./ReaccionesPage";
 import { ElementoEditor } from "./ElementoEditor";
-import { useCompuestos } from "./useCompuestos";
+import {
+  useCompuestosConElementos,
+  sincronizarComponentesCompuesto,
+} from "./useCompuestosConElementos";
 import { useReacciones } from "./useReacciones";
 import {
   type EditorHeaderControls,
@@ -760,25 +763,35 @@ export function ElementosPage({
 
   // ── Compuestos / Reglas: ahora apiladas verticalmente debajo de
   // Elementos en este mismo bloque "Química", sin selector de tabs ─────────
+  // Fase 2 del rediseño: useCompuestosConElementos reconstruye
+  // "componentes" desde la tabla relacional compuesto_elementos en vez de
+  // leer compuestos.componentes (jsonb, @deprecated). Mismo shape de
+  // retorno (items/setItems/loading) que useCompuestos — el resto de esta
+  // página y CompuestosPage no necesitan cambios.
   const {
     items: compuestos,
     setItems: setCompuestos,
     loading: loadingCompuestos,
-  } = useCompuestos();
+  } = useCompuestosConElementos();
   const [creatingCompuesto, setCreatingCompuesto] = useState(false);
   const [compuestoRecienCreadoId, setCompuestoRecienCreadoId] = useState<string | null>(null);
 
   async function handleCreateCompuesto() {
     setCreatingCompuesto(true);
     try {
+      // Fase 2: ya no se manda componentes: [] al jsonb (deprecado) — el
+      // compuesto nace sin composición y se completa por
+      // sincronizarComponentesCompuesto cuando el usuario agrega elementos
+      // desde el editor (ver CompuestoEditor.persist).
       const { data, error } = await supabase
         .from("compuestos")
-        .insert([{ nombre: "Nuevo compuesto", simbolo: "??", componentes: [] }])
+        .insert([{ nombre: "Nuevo compuesto", simbolo: "??" }])
         .select()
         .single();
       if (error) throw error;
-      setCompuestos((prev) => [...prev, data as Compuesto]);
-      setCompuestoRecienCreadoId((data as Compuesto).id);
+      const nuevoCompuesto = { ...(data as Compuesto), componentes: [] };
+      setCompuestos((prev) => [...prev, nuevoCompuesto]);
+      setCompuestoRecienCreadoId(nuevoCompuesto.id);
     } catch (e) {
       console.error("[ElementosPage] error creando compuesto:", e);
     } finally {
@@ -803,14 +816,29 @@ export function ElementosPage({
   ) {
     setCreatingCompuesto(true);
     try {
+      // Fase 2 del rediseño: el insert base ya NO manda componentes al
+      // jsonb — se crea la fila "vacía" y la composición real se escribe
+      // en compuesto_elementos vía sincronizarComponentesCompuesto, mismo
+      // criterio que CompuestoEditor.persist(). El Laboratorio (origen de
+      // este flujo) sigue mandando "componentes" en datos porque el tipo
+      // Pick<Compuesto,...> no cambió — solo cambia dónde termina viviendo.
+      const { componentes, ...datosBase } = datos;
       const { data, error } = await supabase
         .from("compuestos")
-        .insert([datos])
+        .insert([datosBase])
         .select()
         .single();
       if (error) throw error;
-      setCompuestos((prev) => [...prev, data as Compuesto]);
-      setCompuestoRecienCreadoId((data as Compuesto).id);
+
+      const nuevoCompuesto = data as Compuesto;
+
+      if (componentes && componentes.length > 0) {
+        const ok = await sincronizarComponentesCompuesto(nuevoCompuesto.id, componentes);
+        if (!ok) throw new Error("no se pudo guardar la composición del compuesto nuevo");
+      }
+
+      setCompuestos((prev) => [...prev, { ...nuevoCompuesto, componentes: componentes ?? [] }]);
+      setCompuestoRecienCreadoId(nuevoCompuesto.id);
     } catch (e) {
       console.error("[ElementosPage] error creando compuesto combinado:", e);
     } finally {

@@ -34,10 +34,13 @@ import { FISICA_CONCEPTOS_CONFIG, type FisicaConcepto } from "@/domains/garlia/f
 import {
   useFisicaConceptos,
   useIums,
-  useOris,
   useParticulas,
   useParticulasBase,
 } from "@/domains/garlia/fisica/useFisica";
+import {
+  useOrisConIums,
+  sincronizarIumsDeOris,
+} from "@/domains/garlia/fisica/useOrisConIums";
 
 import {
   PanelCombinacionesRunas,
@@ -363,7 +366,7 @@ function BloqueFisica({
   const { items: particulaBase, loading: loadingParticulaBase } = useParticulasBase();
   const { items: particulas, loading: loadingParticulas } = useParticulas();
   const { items: iums, loading: loadingIums } = useIums();
-  const { items: oris, setItems: setOris, loading: loadingOris } = useOris();
+  const { items: oris, setItems: setOris, loading: loadingOris } = useOrisConIums();
   const { items: conceptos, setItems: setConceptos, loading: loadingConceptos } =
     useFisicaConceptos();
   const [creating, setCreating] = useState(false);
@@ -417,10 +420,29 @@ function BloqueFisica({
   ) {
     let total = 0;
     if (orisNuevos.length > 0) {
-      const { data, error } = await supabase.from(ORIS_CONFIG.tabla).insert(orisNuevos).select();
+      // Fase 3 del rediseño: iums_composicion (jsonb) ya no se manda al
+      // insert base — se crean las filas de Oris "vacías" de composición
+      // y se sincroniza cada una contra oris_iums después, mismo criterio
+      // que sincronizarComponentesCompuesto en Compuestos (Fase 2).
+      const orisSinComposicion = orisNuevos.map(({ iums_composicion, ...resto }) => resto);
+      const { data, error } = await supabase
+        .from(ORIS_CONFIG.tabla)
+        .insert(orisSinComposicion)
+        .select();
       if (error) throw error;
       const insertados = (data ?? []) as Oris[];
-      setOris((prev) => [...prev, ...insertados]);
+
+      for (let i = 0; i < insertados.length; i++) {
+        const composicion = orisNuevos[i]?.iums_composicion;
+        if (composicion && Object.keys(composicion).length > 0) {
+          await sincronizarIumsDeOris(insertados[i].id, composicion);
+        }
+      }
+
+      setOris((prev) => [
+        ...prev,
+        ...insertados.map((o, i) => ({ ...o, iums_composicion: orisNuevos[i]?.iums_composicion ?? {} })),
+      ]);
       total += insertados.length;
     }
     if (conceptosNuevos.length > 0) {
@@ -446,11 +468,22 @@ function BloqueFisica({
   ) {
     let actualizados = 0;
 
-    for (const { id, ...datos } of orisActualizar) {
-      const { error } = await supabase.from(ORIS_CONFIG.tabla).update(datos).eq("id", id);
-      if (error) {
-        console.error("[BloqueFisica] error actualizando Oris", id, error);
-        continue;
+    for (const { id, iums_composicion, ...datos } of orisActualizar) {
+      // Fase 3: iums_composicion se sincroniza aparte contra oris_iums,
+      // el resto de columnas sigue actualizándose igual que siempre.
+      if (Object.keys(datos).length > 0) {
+        const { error } = await supabase.from(ORIS_CONFIG.tabla).update(datos).eq("id", id);
+        if (error) {
+          console.error("[BloqueFisica] error actualizando Oris", id, error);
+          continue;
+        }
+      }
+      if (iums_composicion !== undefined) {
+        const ok = await sincronizarIumsDeOris(id, iums_composicion);
+        if (!ok) {
+          console.error("[BloqueFisica] error sincronizando iums de Oris", id);
+          continue;
+        }
       }
       actualizados++;
     }

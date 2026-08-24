@@ -3,29 +3,32 @@
 /**
  * useFormacionesDeUnGrano.ts
  * ───────────────────────────────────────────────────────────────────────────
- * Dirección inversa y transitiva de useFormacionVetas: dado un grano_id,
- * resuelve TODAS las Formaciones que lo alcanzan atravesando la cadena real
- * en sentido inverso:
- *   Grano ← grano_id ← Veta → formacion_vetas → Formacion
- * A diferencia de su espejo useOrganosDeUnaCelula (Célula→Tejido es M:N vía
- * tejido_celulas), acá el primer tramo Grano→Veta es 1:1 directo (columna
- * `vetas.grano_id`, sin tabla puente) — por eso el primer paso es un filtro
- * simple en vez de una consulta a una tabla puente. El segundo tramo
- * (Veta→Formación) sí es M:N vía `formacion_vetas`, igual que su espejo.
+ * FASE 4 — reescrito para N:M real en ambos tramos. Dado un granoId,
+ * resuelve TODAS las Formaciones que lo alcanzan atravesando la cadena
+ * completa:
+ *   Grano ← estructura_componentes(padre=veta,hijo=grano) ← Veta
+ *         → formacion_vetas → Formacion
  *
- * Una misma Veta puede ser usada por varias Formaciones distintas — este
- * hook junta la unión completa, sin duplicados, para el nivel "Formación"
- * del breadcrumb parado en un Grano.
+ * Antes (Fase 0-3) el primer tramo Grano→Veta era 1:1 directo (columna
+ * `vetas.grano_id`) y se resolvía con un filtro simple. Ahora es N:M vía
+ * `estructura_componentes` — un mismo Grano puede estar en varias Vetas —
+ * así que el primer paso pasa a ser una consulta a la tabla puente igual
+ * que el segundo tramo (Veta→Formación, que ya era M:N vía
+ * `formacion_vetas` y no cambia).
+ *
+ * Una misma Veta puede ser usada por varias Formaciones distintas, y un
+ * mismo Grano por varias Vetas — este hook junta la unión completa, sin
+ * duplicados, para el nivel "Formación" del breadcrumb parado en un Grano.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 
 import {
+  CONFIG_ESTRUCTURA_COMPONENTES,
   CONFIG_FORMACIONES,
-  CONFIG_VETAS,
+  type EstructuraComponente,
   type Formacion,
-  type Veta,
 } from "@/domains/garlia/elementos/types";
 
 interface VinculoFormacionVeta {
@@ -50,13 +53,15 @@ export function useFormacionesDeUnGrano(granoId: string | null) {
     }
     setLoading(true);
 
-    // Paso 1: Vetas que apuntan a este Grano (1:1 directo, filtro simple).
-    const { data: vetaData, error: vetaError } = await supabase
-      .from(CONFIG_VETAS.tabla)
-      .select("id")
-      .eq("grano_id", granoId);
+    // Paso 1: Vetas que contienen este Grano — N:M vía estructura_componentes.
+    const { data: vgData, error: vgError } = await supabase
+      .from(CONFIG_ESTRUCTURA_COMPONENTES.tabla)
+      .select(CONFIG_ESTRUCTURA_COMPONENTES.select)
+      .eq("padre_tipo", "veta")
+      .eq("hijo_tipo", "grano")
+      .eq("hijo_id", granoId);
 
-    if (vetaError || !vetaData) {
+    if (vgError || !vgData) {
       setVetaIds([]);
       setVinculosFormacion([]);
       setFormaciones({});
@@ -64,7 +69,9 @@ export function useFormacionesDeUnGrano(granoId: string | null) {
       return;
     }
 
-    const idsVetas = (vetaData as unknown as Pick<Veta, "id">[]).map((v) => v.id);
+    const idsVetas = Array.from(
+      new Set((vgData as unknown as EstructuraComponente[]).map((l) => l.padre_id)),
+    );
     setVetaIds(idsVetas);
 
     if (idsVetas.length === 0) {

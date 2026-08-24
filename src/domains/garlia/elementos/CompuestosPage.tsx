@@ -49,6 +49,7 @@ import { AtomoVisual } from "./ElementoEditor";
 import { SelectorTagsCompuesto } from "./SelectorTagsCompuesto";
 import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
 import { useUsosCompuesto, type TipoUsoCompuesto, type UsoCompuesto } from "./useUsosCompuesto";
+import { sincronizarComponentesCompuesto } from "./useCompuestosConElementos";
 import { useGranos } from "./useGranos";
 import { useCelulas } from "./useCelulas";
 import { useGranosDeUnCompuesto } from "./useGranosDeUnCompuesto";
@@ -758,8 +759,27 @@ function CompuestoEditor({
   async function persist(cambios: Partial<Compuesto>) {
     setSaving(true);
     try {
-      const { error } = await supabase.from("compuestos").update(cambios).eq("id", compuesto.id);
-      if (error) throw error;
+      // Fase 2 del rediseño: compuestos.componentes (jsonb) quedó @deprecated
+      // como respaldo crudo. Un cambio de composición ya no se escribe ahí —
+      // se sincroniza contra compuesto_elementos (tabla relacional), que es
+      // la fuente real desde la que useCompuestosConElementos reconstruye
+      // "componentes" al leer. El resto de columnas (nombre, simbolo, notas,
+      // estado, etc.) sigue guardándose igual que siempre.
+      const { componentes, ...cambiosSinComponentes } = cambios;
+
+      if (Object.keys(cambiosSinComponentes).length > 0) {
+        const { error } = await supabase
+          .from("compuestos")
+          .update(cambiosSinComponentes)
+          .eq("id", compuesto.id);
+        if (error) throw error;
+      }
+
+      if (componentes !== undefined) {
+        const ok = await sincronizarComponentesCompuesto(compuesto.id, componentes);
+        if (!ok) throw new Error("no se pudo sincronizar compuesto_elementos");
+      }
+
       onActualizar(compuesto.id, cambios);
     } catch (e) {
       console.error("[CompuestoEditor] error guardando:", e);
