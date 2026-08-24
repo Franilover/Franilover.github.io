@@ -59,7 +59,7 @@ export function useCompuestosConElementos() {
           console.error("[useCompuestosConElementos] error cargando compuesto_elementos:", error);
           setFilas([]);
         } else {
-          setFilas((data ?? []) as CompuestoElementoRow[]);
+          setFilas((data ?? []) as unknown as CompuestoElementoRow[]);
         }
         setLoadingFilas(false);
       }
