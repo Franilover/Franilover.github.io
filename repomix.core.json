@@ -1,0 +1,13 @@
+{
+  "$schema": "https://repomix.com",
+  "output": {
+    "filePath": "contexto-core.xml"
+  },
+  "include": [
+    "src/domains/garlia/supabase/**/*",
+    "src/lib/api/queries/garlia/**/*",
+    "src/lib/types/**/*",
+    "src/infra/**/*"
+  ]
+}
+

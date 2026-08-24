@@ -18,8 +18,9 @@
  * como respaldo crudo en Supabase.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { useOris } from "./useFisica";
@@ -27,31 +28,14 @@ import { ORIS_IUMS_CONFIG, type Oris, type OrisIumRow } from "./types";
 
 export function useOrisConIums() {
   const { items: orisBase, setItems: setOrisBase, loading: loadingBase } = useOris();
-  const [filas, setFilas] = useState<OrisIumRow[]>([]);
-  const [loadingFilas, setLoadingFilas] = useState(true);
-
-  useEffect(() => {
-    let cancelado = false;
-    async function cargar() {
-      setLoadingFilas(true);
-      const { data, error } = await supabase
-        .from(ORIS_IUMS_CONFIG.tabla)
-        .select(ORIS_IUMS_CONFIG.select);
-      if (!cancelado) {
-        if (error) {
-          console.error("[useOrisConIums] error cargando oris_iums:", error);
-          setFilas([]);
-        } else {
-          setFilas((data ?? []) as OrisIumRow[]);
-        }
-        setLoadingFilas(false);
-      }
-    }
-    void cargar();
-    return () => {
-      cancelado = true;
-    };
-  }, []);
+  // Fase 8: pasa por useSupabaseData → cache offline en Dexie
+  // (oris_iums ya está en DEXIE_TABLES/OFFLINE_WRITABLE, v34).
+  const {
+    data: filas,
+    loading: loadingFilas,
+  } = useSupabaseData<OrisIumRow>(ORIS_IUMS_CONFIG.tabla, {
+    select: ORIS_IUMS_CONFIG.select,
+  });
 
   const composicionPorOris = useMemo(() => {
     const mapa = new Map<string, Record<string, number>>();

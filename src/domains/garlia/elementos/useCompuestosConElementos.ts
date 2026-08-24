@@ -30,8 +30,9 @@
  * useCompuestoElementosMutations más abajo.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
 
 import { useCompuestos } from "./useCompuestos";
@@ -44,31 +45,14 @@ import {
 
 export function useCompuestosConElementos() {
   const { items: compuestosBase, setItems: setCompuestosBase, loading: loadingBase } = useCompuestos();
-  const [filas, setFilas] = useState<CompuestoElementoRow[]>([]);
-  const [loadingFilas, setLoadingFilas] = useState(true);
-
-  useEffect(() => {
-    let cancelado = false;
-    async function cargar() {
-      setLoadingFilas(true);
-      const { data, error } = await supabase
-        .from(CONFIG_COMPUESTO_ELEMENTOS.tabla)
-        .select(CONFIG_COMPUESTO_ELEMENTOS.select);
-      if (!cancelado) {
-        if (error) {
-          console.error("[useCompuestosConElementos] error cargando compuesto_elementos:", error);
-          setFilas([]);
-        } else {
-          setFilas((data ?? []) as unknown as CompuestoElementoRow[]);
-        }
-        setLoadingFilas(false);
-      }
-    }
-    void cargar();
-    return () => {
-      cancelado = true;
-    };
-  }, []);
+  // Fase 8: pasa por useSupabaseData → cache offline en Dexie
+  // (compuesto_elementos ya está en DEXIE_TABLES/OFFLINE_WRITABLE, v34).
+  const {
+    data: filas,
+    loading: loadingFilas,
+  } = useSupabaseData<CompuestoElementoRow>(CONFIG_COMPUESTO_ELEMENTOS.tabla, {
+    select: CONFIG_COMPUESTO_ELEMENTOS.select,
+  });
 
   // Índice compuesto_id → componentes[], reconstruido desde la tabla
   // relacional con el mismo shape que antes vivía en el jsonb.

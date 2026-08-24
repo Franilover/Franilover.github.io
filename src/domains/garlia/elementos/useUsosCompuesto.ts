@@ -39,9 +39,9 @@
  * — el join se arma en memoria.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
-import { supabase } from "@/infra/supabase/supabase";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 export type TipoUsoCompuesto = "item" | "mineral" | "flora";
 
@@ -78,43 +78,36 @@ const TIPO_POR_PADRE: Record<string, TipoUsoCompuesto> = {
 };
 
 export function useUsosCompuesto() {
-  const [items, setItems] = useState<EntidadRow[]>([]);
-  const [minerales, setMinerales] = useState<EntidadRow[]>([]);
-  const [flora, setFlora] = useState<EntidadRow[]>([]);
-  const [vinculos, setVinculos] = useState<VinculoRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Fase 8: pasa por useSupabaseData → cache offline en Dexie (items ya
+  // cacheaba desde antes; minerales/flora y estructura_componentes recién
+  // entran a Dexie en v35/v36 — ver infra/supabase/db.ts).
+  const { data: items, loading: loadingItems } = useSupabaseData<EntidadRow>(
+    "items",
+    { select: "id, nombre, imagen_url" },
+  );
+  const { data: minerales, loading: loadingMinerales } = useSupabaseData<EntidadRow>(
+    "minerales",
+    { select: "id, nombre, imagen_url" },
+  );
+  const { data: flora, loading: loadingFlora } = useSupabaseData<EntidadRow>(
+    "flora",
+    { select: "id, nombre, imagen_url" },
+  );
+  const { data: vinculosCrudos, loading: loadingVinculos } = useSupabaseData<VinculoRow>(
+    "estructura_componentes",
+    { select: "padre_tipo, padre_id, hijo_tipo, hijo_id, rol" },
+  );
 
-  useEffect(() => {
-    let cancelado = false;
-    async function cargar() {
-      setLoading(true);
-      const [
-        { data: itemsData },
-        { data: mineralesData },
-        { data: floraData },
-        { data: vinculosData },
-      ] = await Promise.all([
-        supabase.from("items").select("id, nombre, imagen_url"),
-        supabase.from("minerales").select("id, nombre, imagen_url"),
-        supabase.from("flora").select("id, nombre, imagen_url"),
-        supabase
-          .from("estructura_componentes")
-          .select("padre_tipo, padre_id, hijo_tipo, hijo_id, rol")
-          .eq("hijo_tipo", "compuesto"),
-      ]);
+  // useSupabaseData no soporta filtrar server-side por hijo_tipo aquí (el
+  // select es fijo por tabla, y estructura_componentes se comparte con
+  // useFormacionVetas/useMineralFormacionesProcesos con otros filtros) —
+  // se filtra en memoria, barato dado el tamaño de la tabla.
+  const vinculos = useMemo(
+    () => vinculosCrudos.filter((v) => v.hijo_tipo === "compuesto"),
+    [vinculosCrudos],
+  );
 
-      if (cancelado) return;
-      setItems((itemsData as EntidadRow[]) ?? []);
-      setMinerales((mineralesData as EntidadRow[]) ?? []);
-      setFlora((floraData as EntidadRow[]) ?? []);
-      setVinculos((vinculosData as VinculoRow[]) ?? []);
-      setLoading(false);
-    }
-    void cargar();
-    return () => {
-      cancelado = true;
-    };
-  }, []);
+  const loading = loadingItems || loadingMinerales || loadingFlora || loadingVinculos;
 
   /** Mapa compuesto_id → usos, calculado una sola vez para todo el catálogo. */
   const usosPorCompuesto = useMemo(() => {

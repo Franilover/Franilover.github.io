@@ -1,0 +1,12 @@
+{
+  "$schema": "https://repomix.com",
+  "output": {
+    "filePath": "contexto-garlia-rutas.xml"
+  },
+  "include": [
+    "src/domains/garlia/**/*",
+    "src/app/(public)/garlia/**/*",
+    "src/app/(admin)/myself/garlia/**/*"
+  ]
+}
+

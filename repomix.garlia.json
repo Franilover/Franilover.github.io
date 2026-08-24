@@ -1,0 +1,10 @@
+{
+  "$schema": "https://repomix.com",
+  "output": {
+    "filePath": "contexto-garlia.xml"
+  },
+  "include": [
+    "src/domains/garlia/**/*"
+  ]
+}
+

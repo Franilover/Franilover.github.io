@@ -1691,6 +1691,40 @@ class AgendaFraniDB extends Dexie {
       oris_iums: "id, oris_id, ium_id",
       fenomenos: "id, nombre, created_at",
     });
+
+    // ─── v35: cache offline de las tablas creadas en Fases 4-7 del rediseño
+    // 1.0. Los datos y el frontend ya migraron a este esquema (useFormacion-
+    // Vetas, useUsosCompuesto, useOrganismos, useSistemas, useReacciones,
+    // persistirReaccion), pero Dexie nunca se actualizó — quedaban pegando
+    // directo a Supabase sin cache, igual que compuesto_elementos/oris_iums
+    // antes de v34.
+    //   Fase 4 — estructura_componentes: Veta→Grano→Compuesto (N:M en cadena)
+    //   Fase 5 — organismos, sistemas, sistema_organos, organismo_sistemas
+    //   Fase 6 — reaccion_componentes (reemplaza consume/produce jsonb),
+    //            procesos, proceso_reacciones, fenomeno_procesos,
+    //            fenomeno_elementos (estas últimas tres sin hook frontend
+    //            propio todavía, pero se cachean igual por consistencia)
+    this.version(35).stores({
+      estructura_componentes: "id, padre_tipo, padre_id, hijo_tipo, hijo_id",
+      organismos: "id, nombre, created_at",
+      sistemas: "id, nombre, created_at",
+      sistema_organos: "id, sistema_id, organo_id",
+      organismo_sistemas: "id, organismo_id, sistema_id",
+      reaccion_componentes: "id, reaccion_id, entidad_tipo, entidad_id",
+      procesos: "id, nombre, created_at",
+      proceso_reacciones: "id, proceso_id, reaccion_id",
+      fenomeno_procesos: "id, fenomeno_id, proceso_id",
+      fenomeno_elementos: "id, fenomeno_id, elemento_id",
+    });
+    // ─── v36: minerales y flora nunca entraron a Dexie en ningún versionado
+    // anterior — quedaron fuera del barrido de v32 (que sí trajo elementos,
+    // compuestos, oris, etc.) por alguna razón no documentada. Se detecta
+    // ahora al migrar useUsosCompuesto.ts (Fase 7) a cache-first: ese hook
+    // trae minerales/flora completas y sin esto no tendría nada que cachear.
+    this.version(36).stores({
+      minerales: "id, nombre, created_at",
+      flora: "id, nombre, created_at",
+    });
   }
 }
 

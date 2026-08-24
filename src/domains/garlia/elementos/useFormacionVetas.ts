@@ -78,15 +78,19 @@ async function leerComponentesDeDexie(
 ): Promise<EstructuraComponente[]> {
   if (!db || padreIds.length === 0) return [];
   try {
+    const idsSet = new Set(padreIds);
     const rows = await db.estructura_componentes
-      .where("padre_id")
-      .anyOf(padreIds)
+      .where("padre_tipo")
+      .equals(padreTipo)
       .toArray();
-    return (rows as unknown as EstructuraComponente[]).filter((r) => r.padre_tipo === padreTipo);
+    return (rows as unknown as EstructuraComponente[]).filter((r) =>
+      idsSet.has(r.padre_id),
+    );
   } catch {
     return [];
   }
 }
+
 
 async function guardarEnDexie(
   vinculos: FormacionVeta[],

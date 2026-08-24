@@ -109,9 +109,21 @@ const DEXIE_TABLES = new Set([
   "compuesto_elementos",
   "oris_iums",
   "fenomenos",
+  // ─── Fases 4-7 del rediseño 1.0 — ver v35 en infra/supabase/db.ts ────────
+  "estructura_componentes",
+  "organismos",
+  "sistemas",
+  "sistema_organos",
+  "organismo_sistemas",
+  "reaccion_componentes",
+  "procesos",
+  "proceso_reacciones",
+  "fenomeno_procesos",
+  "fenomeno_elementos",
+  // ─── v36: minerales/flora, cache que faltaba desde antes de Fase 8 ──────
+  "minerales",
+  "flora",
 ]);
-
-const OFFLINE_WRITABLE = new Set([
   "notas",
   "ensayos",
   "secciones_cancion",
@@ -171,6 +183,20 @@ const OFFLINE_WRITABLE = new Set([
   "compuesto_elementos",
   "oris_iums",
   "fenomenos",
+  // ─── Fases 4-7 del rediseño 1.0 (ver v35 en infra/supabase/db.ts) ───────────
+  "estructura_componentes",
+  "organismos",
+  "sistemas",
+  "sistema_organos",
+  "organismo_sistemas",
+  "reaccion_componentes",
+  "procesos",
+  "proceso_reacciones",
+  "fenomeno_procesos",
+  "fenomeno_elementos",
+  // ─── v36: minerales/flora ────────────────────────────────────────────────
+  "minerales",
+  "flora",
 ]);
 
 // Tablas con ID numérico autogenerado por la DB — no se pueden crear offline
