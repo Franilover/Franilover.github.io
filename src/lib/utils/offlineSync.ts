@@ -77,6 +77,12 @@ const SYNC_TABLES: Record<
     excludeFields: ["status", "deleted"],
   },
   ciudades: { supabaseTable: "ciudades", excludeFields: ["status", "deleted"] },
+  // ─── Fase 7: tabla puente unificada Órgano/Formación (reemplaza
+  // planta_organos/criatura_organos/mineral_formaciones/item_estructura) ──
+  estructura_componentes: {
+    supabaseTable: "estructura_componentes",
+    excludeFields: ["status", "deleted"],
+  },
 };
 
 const MAX_RETRIES = 3;
