@@ -335,13 +335,19 @@ export interface ReaccionDexie {
   updated_at?: string;
 }
 
-/** Tablas puente {entidad_id, grupo_compuesto_id} hacia Órgano/Formación —
- *  mismo shape genérico que usa useEntidadVinculosGrupo.ts en las 4 tablas
- *  reales (planta_organos, criatura_organos, mineral_formaciones,
- *  item_estructura); el nombre de columna es histórico, ver ese archivo. */
-export interface EntidadGrupoVinculoDexie {
+/** Tabla puente única (v34) hacia Órgano/Formación, reemplaza las 4 tablas
+ *  dedicadas {entidad_id, grupo_compuesto_id} (planta_organos,
+ *  criatura_organos, mineral_formaciones, item_estructura — dropeadas).
+ *  Shape genérico: padre_tipo/padre_id fijan la entidad dueña, hijo_tipo/
+ *  hijo_id el registro del catálogo compartido (formacion|organo). Ver
+ *  useEntidadVinculosGrupo.ts. */
+export interface EstructuraComponenteDexie {
   id: string;
-  grupo_compuesto_id: string;
+  padre_tipo: string;
+  padre_id: string;
+  hijo_tipo: string;
+  hijo_id: string;
+  created_at?: string;
   [key: string]: any;
 }
 
@@ -816,10 +822,9 @@ class AgendaFraniDB extends Dexie {
   organo_tejidos!: Table<OrganoTejidoDexie, string>;
   formacion_vetas!: Table<FormacionVetaDexie, string>;
   reacciones!: Table<ReaccionDexie, string>;
-  planta_organos!: Table<EntidadGrupoVinculoDexie, string>;
-  criatura_organos!: Table<EntidadGrupoVinculoDexie, string>;
-  mineral_formaciones!: Table<EntidadGrupoVinculoDexie, string>;
-  item_estructura!: Table<EntidadGrupoVinculoDexie, string>;
+  // ─── v34: tabla puente unificada, reemplaza planta_organos/
+  // criatura_organos/mineral_formaciones/item_estructura (dropeadas). ────
+  estructura_componentes!: Table<EstructuraComponenteDexie, string>;
 
   constructor() {
     super("AgendaFranilover");
@@ -1639,6 +1644,28 @@ class AgendaFraniDB extends Dexie {
       criatura_organos: "id, criatura_id, grupo_compuesto_id",
       mineral_formaciones: "id, mineral_id, grupo_compuesto_id",
       item_estructura: "id, item_id, grupo_compuesto_id",
+    });
+
+    // ─── v34: unificación de las 4 tablas puente dedicadas
+    // (planta_organos, criatura_organos, mineral_formaciones, item_estructura)
+    // en una única tabla genérica `estructura_componentes`
+    // (padre_tipo/padre_id/hijo_tipo/hijo_id) — ver
+    // useEntidadVinculosGrupo.ts y la migración
+    // fase7_unificacion_estructura_componentes en Supabase.
+    //
+    // Los 4 stores viejos se declaran `null`: esto los DROPea de IndexedDB
+    // en el próximo open() de cada cliente. Es seguro porque:
+    //  - SYNC_TABLES (lib/utils/offlineSync.ts) nunca incluyó estas 4 tablas,
+    //    así que no hay operaciones encoladas en offline_queue que puedan
+    //    quedar huérfanas tras el drop.
+    //  - Ningún hook las sigue usando en runtime — todo el código pasó a
+    //    consultar estructura_componentes vía useEntidadVinculosGrupo.
+    this.version(34).stores({
+      estructura_componentes: "id, padre_tipo, padre_id, hijo_tipo, hijo_id, created_at",
+      planta_organos: null,
+      criatura_organos: null,
+      mineral_formaciones: null,
+      item_estructura: null,
     });
   }
 }
