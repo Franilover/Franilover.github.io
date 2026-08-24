@@ -29,6 +29,7 @@ import type { Organo, Reaccion } from "@/domains/garlia/elementos/types";
 
 import { CladisticaPage } from "./CladisticaPage";
 import { CatalogoTejidosBiologia } from "./CatalogoTejidosBiologia";
+import { CatalogoSistemasBiologia } from "./CatalogoSistemasBiologia";
 import { useClados } from "./useBiologia";
 import type { Clado } from "./types";
 
@@ -282,6 +283,13 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
             compuestos={compuestosCatalogo}
             loadingCompuestos={loadingCompuestos}
             onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+            onAbrirOrgano={(id) => setOrganoAAbrirId(id)}
+          />
+        </div>
+
+        <div className="p-2.5 border-t border-primary/10 pt-4">
+          <CatalogoSistemasBiologia
+            organos={catalogoOrganos}
             onAbrirOrgano={(id) => setOrganoAAbrirId(id)}
           />
         </div>
