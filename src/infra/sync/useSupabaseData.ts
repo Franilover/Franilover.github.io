@@ -99,10 +99,16 @@ const DEXIE_TABLES = new Set([
   "organo_tejidos",
   "formacion_vetas",
   "reacciones",
-  // ─── Fase 7: tabla puente unificada, reemplaza planta_organos/
-  // criatura_organos/mineral_formaciones/item_estructura (dropeadas en
-  // Dexie v34) — ver useEntidadVinculosGrupo.ts ────────────────────────────
-  "estructura_componentes",
+  "planta_organos",
+  "criatura_organos",
+  "mineral_formaciones",
+  "item_estructura",
+  // ─── Fase 2/3 del rediseño 1.0: tablas relacionales que reemplazan a los
+  // jsonb legado (compuestos.componentes) como fuente de lectura — ver
+  // v34 en infra/supabase/db.ts, useCompuestosConElementos, useOrisConIums ──
+  "compuesto_elementos",
+  "oris_iums",
+  "fenomenos",
 ]);
 
 const OFFLINE_WRITABLE = new Set([
@@ -157,8 +163,14 @@ const OFFLINE_WRITABLE = new Set([
   "organo_tejidos",
   "formacion_vetas",
   "reacciones",
-  // ─── Fase 7: tabla puente unificada (ver nota arriba en DEXIE_TABLES) ───
-  "estructura_componentes",
+  "planta_organos",
+  "criatura_organos",
+  "mineral_formaciones",
+  "item_estructura",
+  // ─── Fase 2/3 del rediseño 1.0 (ver v34 en infra/supabase/db.ts) ────────────
+  "compuesto_elementos",
+  "oris_iums",
+  "fenomenos",
 ]);
 
 // Tablas con ID numérico autogenerado por la DB — no se pueden crear offline

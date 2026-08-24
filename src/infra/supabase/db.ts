@@ -335,19 +335,13 @@ export interface ReaccionDexie {
   updated_at?: string;
 }
 
-/** Tabla puente única (v34) hacia Órgano/Formación, reemplaza las 4 tablas
- *  dedicadas {entidad_id, grupo_compuesto_id} (planta_organos,
- *  criatura_organos, mineral_formaciones, item_estructura — dropeadas).
- *  Shape genérico: padre_tipo/padre_id fijan la entidad dueña, hijo_tipo/
- *  hijo_id el registro del catálogo compartido (formacion|organo). Ver
- *  useEntidadVinculosGrupo.ts. */
-export interface EstructuraComponenteDexie {
+/** Tablas puente {entidad_id, grupo_compuesto_id} hacia Órgano/Formación —
+ *  mismo shape genérico que usa useEntidadVinculosGrupo.ts en las 4 tablas
+ *  reales (planta_organos, criatura_organos, mineral_formaciones,
+ *  item_estructura); el nombre de columna es histórico, ver ese archivo. */
+export interface EntidadGrupoVinculoDexie {
   id: string;
-  padre_tipo: string;
-  padre_id: string;
-  hijo_tipo: string;
-  hijo_id: string;
-  created_at?: string;
+  grupo_compuesto_id: string;
   [key: string]: any;
 }
 
@@ -647,6 +641,40 @@ export interface CompuestoLocal {
   simbolo?: string;
   componentes?: any;
   created_at?: string;
+  /** Fase 2: referencia a la sustancia base (familia Agua/Hielo/Nieve/Vapor). */
+  sustancia_base_id?: string;
+  /** Fase 2: estado de esa familia (ej. "sólido", "líquido", "gaseoso"). */
+  estado?: string;
+  [key: string]: any;
+}
+
+// ─── Fase 2/3 del rediseño 1.0: tablas relacionales que reemplazan a los
+// jsonb legado como fuente de lectura (ver useCompuestosConElementos,
+// useOrisConIums) ───────────────────────────────────────────────────────────
+export interface CompuestoElementoLocal {
+  id: string;
+  compuesto_id: string;
+  elemento_id: string;
+  cantidad?: number;
+  created_at?: string;
+  [key: string]: any;
+}
+
+export interface OrisIumLocal {
+  id: string;
+  oris_id: string;
+  ium_id: string;
+  cantidad?: number;
+  created_at?: string;
+  [key: string]: any;
+}
+
+export interface FenomenoLocal {
+  id: string;
+  nombre?: string;
+  simbolo?: string;
+  notas?: string;
+  created_at?: string;
   [key: string]: any;
 }
 
@@ -822,9 +850,10 @@ class AgendaFraniDB extends Dexie {
   organo_tejidos!: Table<OrganoTejidoDexie, string>;
   formacion_vetas!: Table<FormacionVetaDexie, string>;
   reacciones!: Table<ReaccionDexie, string>;
-  // ─── v34: tabla puente unificada, reemplaza planta_organos/
-  // criatura_organos/mineral_formaciones/item_estructura (dropeadas). ────
-  estructura_componentes!: Table<EstructuraComponenteDexie, string>;
+  planta_organos!: Table<EntidadGrupoVinculoDexie, string>;
+  criatura_organos!: Table<EntidadGrupoVinculoDexie, string>;
+  mineral_formaciones!: Table<EntidadGrupoVinculoDexie, string>;
+  item_estructura!: Table<EntidadGrupoVinculoDexie, string>;
 
   constructor() {
     super("AgendaFranilover");
@@ -1646,26 +1675,21 @@ class AgendaFraniDB extends Dexie {
       item_estructura: "id, item_id, grupo_compuesto_id",
     });
 
-    // ─── v34: unificación de las 4 tablas puente dedicadas
-    // (planta_organos, criatura_organos, mineral_formaciones, item_estructura)
-    // en una única tabla genérica `estructura_componentes`
-    // (padre_tipo/padre_id/hijo_tipo/hijo_id) — ver
-    // useEntidadVinculosGrupo.ts y la migración
-    // fase7_unificacion_estructura_componentes en Supabase.
-    //
-    // Los 4 stores viejos se declaran `null`: esto los DROPea de IndexedDB
-    // en el próximo open() de cada cliente. Es seguro porque:
-    //  - SYNC_TABLES (lib/utils/offlineSync.ts) nunca incluyó estas 4 tablas,
-    //    así que no hay operaciones encoladas en offline_queue que puedan
-    //    quedar huérfanas tras el drop.
-    //  - Ningún hook las sigue usando en runtime — todo el código pasó a
-    //    consultar estructura_componentes vía useEntidadVinculosGrupo.
+    // ─── v34: cache offline de las tablas relacionales creadas en Fases 2 y 3
+    // del rediseño 1.0 — compuesto_elementos (Fase 2, reemplaza a
+    // compuestos.componentes jsonb como fuente de lectura, ver
+    // useCompuestosConElementos) y oris_iums (Fase 3, ver useOrisConIums).
+    // También fenomenos (Fase 2: tabla nueva para Fuego/Rayo marcados
+    // es_fenomeno; la migración física completa vía fenomeno_elementos/
+    // fenomeno_procesos queda para Fase 6, pero la tabla base ya existe en
+    // Supabase y necesita cache igual que el resto). Hasta esta versión,
+    // useCompuestosConElementos pegaba directo a Supabase sin pasar por
+    // Dexie — se reiniciaba en blanco sin conexión, a diferencia del resto
+    // del catálogo de Química que sí cachea desde v32.
     this.version(34).stores({
-      estructura_componentes: "id, padre_tipo, padre_id, hijo_tipo, hijo_id, created_at",
-      planta_organos: null,
-      criatura_organos: null,
-      mineral_formaciones: null,
-      item_estructura: null,
+      compuesto_elementos: "id, compuesto_id, elemento_id",
+      oris_iums: "id, oris_id, ium_id",
+      fenomenos: "id, nombre, created_at",
     });
   }
 }
