@@ -75,8 +75,6 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
   const tejidos = useOrganoTejidos(tipo === "organo" ? item.id : null);
   const vetas = useFormacionVetas(tipo === "formacion" ? item.id : null);
 
-  const formula = tipo === "organo" ? tejidos : vetas;
-
   return (
     <div className="group py-3 px-3 rounded-lg border border-primary/10">
       <div className="flex items-center justify-between mb-2 gap-2">
@@ -119,16 +117,68 @@ export function TarjetaFormacionOrgano<T extends VinculadoConFormula>({
           <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
             Fórmula
           </p>
-          {formula.loading && formula.items.length === 0 ? (
+          {tipo === "organo" ? (
+            tejidos.loading && tejidos.items.length === 0 ? (
+              <p className="text-micro text-primary/25 italic">Cargando…</p>
+            ) : (
+              <SelectorFormulaTejidos
+                items={tejidos.items}
+                onActualizarProporcion={() => {}}
+                onQuitar={() => {}}
+                onAbrirCelula={onAbrirCelula}
+                soloLectura
+              />
+            )
+          ) : vetas.loading && vetas.items.length === 0 ? (
             <p className="text-micro text-primary/25 italic">Cargando…</p>
+          ) : vetas.items.length === 0 ? (
+            <p className="text-micro text-primary/25 italic">Nada definido todavía.</p>
           ) : (
-            <SelectorFormulaTejidos
-              items={formula.items}
-              onActualizarProporcion={() => {}}
-              onQuitar={() => {}}
-              onAbrirCelula={onAbrirCelula}
-              soloLectura
-            />
+            <div className="flex flex-col divide-y divide-primary/10">
+              {vetas.items.map((veta) => (
+                <div key={veta.vinculo_id} className="py-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    {onAbrirGrupo ? (
+                      <button
+                        type="button"
+                        onClick={() => onAbrirGrupo(veta.veta_id)}
+                        className="min-w-0 truncate text-left text-xs font-semibold text-primary/70 hover:text-accent hover:underline"
+                      >
+                        {veta.nombre || "Veta sin nombre"}
+                      </button>
+                    ) : (
+                      <span className="min-w-0 truncate text-xs font-semibold text-primary/70">
+                        {veta.nombre || "Veta sin nombre"}
+                      </span>
+                    )}
+                    {veta.proporcion && (
+                      <span className="shrink-0 text-micro text-primary/40">
+                        {veta.proporcion}
+                      </span>
+                    )}
+                  </div>
+
+                  {veta.granos.length > 0 && (
+                    <div className="mt-1 ml-2 flex flex-col gap-0.5">
+                      {veta.granos.map((grano) => (
+                        <button
+                          key={grano.vinculo_id}
+                          type="button"
+                          onClick={() => onAbrirCelula?.(grano.grano_id)}
+                          disabled={!onAbrirCelula}
+                          className="text-left text-micro text-primary/50 hover:text-accent disabled:hover:text-primary/50 disabled:cursor-default"
+                        >
+                          hecho de: {" "}
+                          <span className="font-medium">
+                            {grano.nombre || "Grano sin nombre"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
