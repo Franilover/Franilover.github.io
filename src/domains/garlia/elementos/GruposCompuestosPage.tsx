@@ -208,42 +208,45 @@ export function GrupoCompuestoPanelFlotante({
           </div>
         )}
 
-
         {tipo === "formacion" && (
-  <div className="shrink-0 px-3 pt-2">
-    <BreadcrumbJerarquia
-      niveles={[
-        {
-          label: "Grano",
-          icono: <Gem size={10} />,
-          activo: false,
-          items: vetas.items
-            .map((v) => {
-              const item = v as typeof v & { grano_id?: string; catalogo_nombre?: string };
-              return item.grano_id ? { id: item.grano_id, nombre: item.catalogo_nombre ?? "" } : null;
-            })
-            .filter((g): g is { id: string; nombre: string } => g !== null),
-          loading: vetas.loading,
-          onNavegar: (granoId) => setCelulaOGranoAbiertoId(granoId),
-        },
-        {
-          label: "Veta",
-          icono: <Layers size={10} />,
-          activo: false,
-          items: vetas.items.map((v) => ({ id: v.veta_id, nombre: v.nombre })),
-          loading: vetas.loading,
-          onNavegar: (vetaId) => setTejidoOVetaAbiertoId(vetaId),
-        },
-        { label: "Formación", icono: <Boxes size={10} />, activo: true },
-      ]}
-    />
-  </div>
-)}
-
-
+          <div className="shrink-0 px-3 pt-2">
+            <BreadcrumbJerarquia
+              niveles={[
+                {
+                  label: "Grano",
+                  icono: <Gem size={10} />,
+                  activo: false,
+                  items: Array.from(
+                    new Map(
+                      vetas.items
+                        .map((v) => {
+                          const item = v as typeof v & { grano_id?: string; catalogo_nombre?: string };
+                          return item.grano_id ? [item.grano_id, { id: item.grano_id, nombre: item.catalogo_nombre ?? "" }] : null;
+                        })
+                        .filter((entry): entry is [string, { id: string; nombre: string }] => entry !== null)
+                    ).values()
+                  ),
+                  loading: vetas.loading,
+                  onNavegar: (granoId) => setCelulaOGranoAbiertoId(granoId),
+                },
+                {
+                  label: "Veta",
+                  icono: <Layers size={10} />,
+                  activo: false,
+                  items: Array.from(
+                    new Map(vetas.items.map((v) => [v.veta_id, { id: v.veta_id, nombre: v.nombre }])).values()
+                  ),
+                  loading: vetas.loading,
+                  onNavegar: (vetaId) => setTejidoOVetaAbiertoId(vetaId),
+                },
+                { label: "Formación", icono: <Boxes size={10} />, activo: true },
+              ]}
+            />
+          </div>
+        )}
 
         {/* Contenido: dos columnas — izquierda composición (fórmula),
-           derecha texto (función + notas). Header ya tiene el título. */}
+            derecha texto (función + notas). Header ya tiene el título. */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           <div className="flex flex-col md:flex-row gap-4 md:gap-6">
             {/* Columna izquierda: composición / vínculos */}
