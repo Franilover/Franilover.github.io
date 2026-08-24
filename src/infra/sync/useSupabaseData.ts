@@ -123,8 +123,11 @@ const DEXIE_TABLES = new Set([
   // ─── v36: minerales/flora, cache que faltaba desde antes de Fase 8 ──────
   "minerales",
   "flora",
+  // ─── v37: mineral_reacciones (Procesos de un Mineral) ───────────────────
+  "mineral_reacciones",
 ]);
-  "notas",
+
+const OFFLINE_WRITABLE = new Set([
   "ensayos",
   "secciones_cancion",
   "capitulos",
@@ -197,6 +200,8 @@ const DEXIE_TABLES = new Set([
   // ─── v36: minerales/flora ────────────────────────────────────────────────
   "minerales",
   "flora",
+  // ─── v37: mineral_reacciones ─────────────────────────────────────────────
+  "mineral_reacciones",
 ]);
 
 // Tablas con ID numérico autogenerado por la DB — no se pueden crear offline

@@ -1725,6 +1725,14 @@ class AgendaFraniDB extends Dexie {
       minerales: "id, nombre, created_at",
       flora: "id, nombre, created_at",
     });
+
+    // ─── v37: mineral_reacciones (Procesos de Minerales, ver
+    // useMineralFormacionesProcesos.ts) — mismo caso que sistema_organos/
+    // organismo_sistemas: hook filtra por mineral_id, nunca tuvo cache
+    // Dexie. Se agrega ahora al completar el barrido de Fase 8.
+    this.version(37).stores({
+      mineral_reacciones: "id, mineral_id, reaccion_id, created_at",
+    });
   }
 }
 

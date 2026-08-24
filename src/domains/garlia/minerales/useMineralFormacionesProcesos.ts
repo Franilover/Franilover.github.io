@@ -38,11 +38,36 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
+import { db } from "@/infra/supabase/db";
 
 import type { Formacion } from "@/domains/garlia/elementos/types";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 
 import type { Mineral, MineralFormacion, MineralProceso, MineralProcesoInput } from "./types";
+
+// ── Cache-first para mineral_reacciones (Fase 8): mismo patrón que
+// useSistemaOrganos.ts — Dexie filtrado por mineral_id, luego revalidar.
+async function leerProcesosDeDexie(mineralId: string): Promise<MineralProceso[]> {
+  try {
+    if (!db) return [];
+    const rows = await db.mineral_reacciones
+      .where("mineral_id")
+      .equals(mineralId)
+      .toArray();
+    return rows as unknown as MineralProceso[];
+  } catch {
+    return [];
+  }
+}
+
+async function guardarProcesosEnDexie(procesos: MineralProceso[]) {
+  try {
+    if (!db || procesos.length === 0) return;
+    await db.mineral_reacciones.bulkPut(procesos as any[]);
+  } catch (e) {
+    console.warn("[useMineralFormacionesProcesos] no se pudo guardar procesos en Dexie:", e);
+  }
+}
 
 export function useMineralFormacionesProcesos(
   mineralId: string,
@@ -73,9 +98,18 @@ export function useMineralFormacionesProcesos(
   const [procesos, setProcesos] = useState<MineralProceso[]>([]);
   const [loadingProcesos, setLoadingProcesos] = useState(true);
 
-  // ── Cargar procesos (mineral_reacciones) ────────────────────────────────
+  // ── Cargar procesos (mineral_reacciones) — Fase 8: cache-first vía Dexie ─
   const loadProcesos = useCallback(async () => {
-    setLoadingProcesos(true);
+    // Paso 1: pintar de inmediato con lo que ya haya en Dexie.
+    const procesosLocales = await leerProcesosDeDexie(mineralId);
+    if (procesosLocales.length > 0) {
+      setProcesos(procesosLocales);
+      setLoadingProcesos(false);
+    } else {
+      setLoadingProcesos(true);
+    }
+
+    // Paso 2: revalidar contra Supabase en segundo plano.
     const { data: procesoData, error: procesoError } = await supabase
       .from("mineral_reacciones")
       .select("*")
@@ -84,6 +118,9 @@ export function useMineralFormacionesProcesos(
 
     if (!procesoError && procesoData) {
       setProcesos(procesoData as MineralProceso[]);
+      void guardarProcesosEnDexie(procesoData as MineralProceso[]);
+    } else if (procesosLocales.length === 0) {
+      setProcesos([]);
     }
     setLoadingProcesos(false);
   }, [mineralId]);
@@ -140,12 +177,18 @@ export function useMineralFormacionesProcesos(
 
     if (error || !data) return null;
     setProcesos((prev) => [...prev, data as MineralProceso]);
+    void guardarProcesosEnDexie([data as MineralProceso]);
     return data as MineralProceso;
   }, [mineralId]);
 
   const actualizarProceso = useCallback(
     async (id: string, updates: MineralProcesoInput) => {
-      setProcesos((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+      setProcesos((prev) => {
+        const next = prev.map((p) => (p.id === id ? { ...p, ...updates } : p));
+        const actualizado = next.find((p) => p.id === id);
+        if (actualizado) void guardarProcesosEnDexie([actualizado]);
+        return next;
+      });
       const { error } = await supabase.from("mineral_reacciones").update(updates).eq("id", id);
       if (error) void loadProcesos();
     },
@@ -154,6 +197,9 @@ export function useMineralFormacionesProcesos(
 
   const eliminarProceso = useCallback(async (id: string) => {
     setProcesos((prev) => prev.filter((p) => p.id !== id));
+    try {
+      if (db) await db.mineral_reacciones.delete(id);
+    } catch {}
     await supabase.from("mineral_reacciones").delete().eq("id", id);
   }, []);
 
