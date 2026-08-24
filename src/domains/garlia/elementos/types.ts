@@ -404,6 +404,67 @@ export const CONFIG_CELULA_COMPUESTOS = {
   select: "id, celula_id, compuesto_id, rol, proporcion, created_at",
 };
 
+// ─── Sistemas / Organismos: techo de la cadena biológica ──────────────────
+// Fase 5: Organo → sistema_organos → Sistema → organismo_sistemas → Organismo,
+// mismo patrón que organo_tejidos (catálogo simple + tabla puente N:M).
+// Diferencia: sistema_organos NO tiene columna `proporcion` (un Sistema es
+// una agrupación funcional de Órganos, no una fórmula proporcional como
+// Tejido→Célula); organismo_sistemas sí la tiene, igual que organo_tejidos.
+export interface Sistema {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Organismo {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** Fila puente sistema_organos: vincula un Órgano a un Sistema (M:N), sin proporción. */
+export interface SistemaOrgano {
+  id: string;
+  sistema_id: string;
+  organo_id: string;
+  created_at: string;
+}
+
+/** Fila puente organismo_sistemas: vincula un Sistema a un Organismo, con proporción libre. */
+export interface OrganismoSistema {
+  id: string;
+  organismo_id: string;
+  sistema_id: string;
+  proporcion: string | null;
+  created_at: string;
+}
+
+export const CONFIG_SISTEMAS = {
+  tabla: "sistemas",
+  select: "id, nombre, descripcion, notas, created_at, updated_at",
+};
+
+export const CONFIG_ORGANISMOS = {
+  tabla: "organismos",
+  select: "id, nombre, descripcion, notas, created_at, updated_at",
+};
+
+export const CONFIG_SISTEMA_ORGANOS = {
+  tabla: "sistema_organos",
+  select: "id, sistema_id, organo_id, created_at",
+};
+
+export const CONFIG_ORGANISMO_SISTEMAS = {
+  tabla: "organismo_sistemas",
+  select: "id, organismo_id, sistema_id, proporcion, created_at",
+};
+
 // ─── Granos / Vetas: composición de una Formación (minerales) ────────────
 // Espejo inerte de Célula/Tejido: Formacion → formacion_vetas → Veta →
 // (estructura_componentes) → Grano → (estructura_componentes) → Compuesto.
