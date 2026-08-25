@@ -36,17 +36,16 @@ import { useAlertasEstequiometria } from "./useAlertasEstequiometria";
 import { useConsistenciaIssues } from "./useConsistenciaIssues";
 import type { AlertaEstequiometria, ConsistenciaIssue } from "./types";
 
-/** Orden de severidad para agrupar de más a menos grave. Los códigos
- *  exactos de "severidad"/"severity" no están 100% cerrados en el schema
- *  (son texto libre), así que las que no matchean ningún grupo conocido
- *  caen en "otras" en vez de perderse. */
-const ORDEN_SEVERIDAD = ["critica", "critical", "alta", "high", "media", "medium", "baja", "low"];
-
+/** Valores reales confirmados en Supabase (Paso 8): "warning" e "info" en
+ *  ambas tablas hoy. Se agrega el resto (crítica/alta/baja) como fallback
+ *  por si aparecen a futuro — pero warning/info van primero y explícitos
+ *  para no depender de que "warning" contenga "alt" o similar por
+ *  casualidad de substring. */
 function grupoSeveridad(valor: string): string {
   const v = valor.toLowerCase();
-  if (v.includes("crit")) return "Crítica";
-  if (v.includes("alt") || v.includes("high")) return "Alta";
-  if (v.includes("med")) return "Media";
+  if (v === "critical" || v.includes("crit")) return "Crítica";
+  if (v === "warning" || v.includes("alt") || v.includes("high")) return "Alta";
+  if (v === "info" || v.includes("med")) return "Media";
   if (v.includes("baj") || v.includes("low")) return "Baja";
   return "Otras";
 }
