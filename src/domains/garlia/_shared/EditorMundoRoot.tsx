@@ -75,9 +75,9 @@ const ElementosSection = lazy(() =>
     default: m.ElementosSection,
   })),
 );
-const EstadoMaestroPanel = lazy(() =>
-  import("@/domains/garlia/auditoria/EstadoMaestroPanel").then((m) => ({
-    default: m.EstadoMaestroPanel,
+const AuditoriaSection = lazy(() =>
+  import("@/domains/garlia/auditoria/AuditoriaSection").then((m) => ({
+    default: m.AuditoriaSection,
   })),
 );
 
@@ -117,10 +117,10 @@ function ActiveSection() {
       // no comparte el mega-grid de Entidades/Geografía/Organización.
       return <ElementosSection selectedId={selectedId} />;
     case "auditoria":
-      // Dashboard de auditoría "Estado del Mundo" (Fase 1, Paso 0-3): por
-      // ahora solo el panel Estado Maestro; Auditoría/Alertas se suman acá
-      // mismo cuando estén listos (Paso 4-6), sin otro toque de navegación.
-      return <EstadoMaestroPanel />;
+      // Dashboard de auditoría "Estado del Mundo" (Fase 1 completa):
+      // orquestador con tabs internas Estado/Auditoría/Alertas — ver
+      // AuditoriaSection.tsx.
+      return <AuditoriaSection />;
     case "notas-gos":
       // Reusa el mismo editor de ensayos que EnsayosShell (/myself/escritorio),
       // pero ahora como pestaña más dentro de Mundo — igual que runas/personajes.
