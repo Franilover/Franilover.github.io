@@ -23,10 +23,30 @@ import { ElementosPage } from "./ElementosPage";
 import { useElementos } from "./useElementos";
 import type { Elemento } from "./types";
 
+/**
+ * Prefijo usado para distinguir, dentro de un mismo selectedId de
+ * SectionKey "elementos", si lo que se quiere abrir es un ELEMENTO
+ * (id crudo, comportamiento de siempre) o un COMPUESTO (id con este
+ * prefijo). Se agregó para que el panel de auditoría (domains/garlia/
+ * auditoria) pueda enlazar directo a un compuesto vía
+ * openEntity("elementos", compuestoIdParaNavegacion(id)) sin necesitar
+ * una SectionKey nueva ni tocar useMundoNavigationStore.
+ */
+const PREFIJO_COMPUESTO = "compuesto:";
+
+export function compuestoIdParaNavegacion(compuestoId: string) {
+  return `${PREFIJO_COMPUESTO}${compuestoId}`;
+}
+
 export function ElementosSection({ selectedId }: { selectedId: string | null }) {
   const { items: elementos, setItems: setElementos, loading } = useElementos();
   const [creating, setCreating] = useState(false);
   const [recienCreadoId, setRecienCreadoId] = useState<string | null>(null);
+
+  const esCompuesto = selectedId?.startsWith(PREFIJO_COMPUESTO) ?? false;
+  const compuestoIdInicial = esCompuesto
+    ? selectedId!.slice(PREFIJO_COMPUESTO.length)
+    : null;
 
   async function handleCreate() {
     setCreating(true);
@@ -114,7 +134,8 @@ export function ElementosSection({ selectedId }: { selectedId: string | null }) 
         setElementos((prev) => prev.map((e) => (e.id === id ? { ...e, ...cambios } : e)))
       }
       onEliminar={handleEliminar}
-      seleccionarId={selectedId ?? recienCreadoId}
+      seleccionarId={esCompuesto ? recienCreadoId : (selectedId ?? recienCreadoId)}
+      compuestoIdInicial={compuestoIdInicial}
       onImportarElementos={handleImportarElementos}
       onActualizarVarios={handleActualizarVarios}
     />

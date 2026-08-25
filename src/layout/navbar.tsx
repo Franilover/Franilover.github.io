@@ -29,6 +29,7 @@ import {
   Shirt,
   Upload,
   Wand2,
+  ClipboardCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -828,6 +829,13 @@ const Navbar = () => {
         mundoSection !== null &&
         MAGIA_SECTIONS.has(mundoSection),
       onSelect: () => mundoSelectSection("runas"),
+    },
+    {
+      key: "auditoria",
+      label: "Auditoría",
+      icon: ClipboardCheck,
+      active: isGarliaeditor && mundoSection === "auditoria",
+      onSelect: () => mundoSelectSection("auditoria"),
     },
     { key: "div-2", divider: true },
     {

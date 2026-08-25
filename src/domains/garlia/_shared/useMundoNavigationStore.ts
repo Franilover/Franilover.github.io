@@ -43,7 +43,8 @@ export type SectionKey =
   | "notas-gos"
   | "mapa"
   | "linea-tiempo"
-  | "aventura";
+  | "aventura"
+  | "auditoria";
 
 /** Una pestaña de entidad abierta: sección + id puntual. */
 export interface MundoTab {

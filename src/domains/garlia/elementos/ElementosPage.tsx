@@ -195,6 +195,15 @@ interface Props {
   /** Id a dejar seleccionado tras crear (mismo patrón que runaRecienCreadaId). */
   seleccionarId?: string | null;
   /**
+   * Id de un COMPUESTO a abrir de entrada, desde afuera del componente —
+   * mismo mecanismo que ya usa internamente "Usado en compuestos" del
+   * editor de Elemento (ver compuestoAAbrir más abajo), expuesto ahora
+   * como prop para que otras secciones (ej. el panel de auditoría) puedan
+   * enlazar directo a un compuesto puntual vía openEntity("elementos", id).
+   * Opcional: si no se pasa, el comportamiento es exactamente el de antes.
+   */
+  compuestoIdInicial?: string | null;
+  /**
    * Inserta en Supabase un lote de elementos nuevos (sin id) y devuelve
    * cuántos quedaron guardados. El botón "Subir JSON" llama a esto tras
    * parsear el archivo — mismo espíritu que onCreate pero para varios a
@@ -645,6 +654,7 @@ export function ElementosPage({
   onImportarElementos,
   onActualizarVarios,
   onSeleccionarIdChange,
+  compuestoIdInicial,
 }: Props) {
   const [seleccionadoId, setSeleccionadoIdRaw] = useState<string | null>(null);
   const setSeleccionadoId = (
@@ -659,7 +669,9 @@ export function ElementosPage({
   // Al clickear un compuesto en "Usado en compuestos" desde el editor de un
   // Elemento: cierra el panel de Elemento y fuerza la apertura de este
   // compuesto en CompuestosPage (más abajo en la misma página).
-  const [compuestoAAbrir, setCompuestoAAbrir] = useState<string | null>(null);
+  const [compuestoAAbrir, setCompuestoAAbrir] = useState<string | null>(
+    compuestoIdInicial ?? null,
+  );
   const [seleccionMultiple, setSeleccionMultiple] = useState<Set<string>>(new Set());
   const [eliminandoVarios, setEliminandoVarios] = useState(false);
 
