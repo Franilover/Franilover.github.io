@@ -48,6 +48,10 @@ const SECTION_TABLE: Record<SectionKey, string | null> = {
   mapa: null,
   "linea-tiempo": null,
   aventura: null,
+  // "auditoria" no abre pestañas de entidad puntual (dashboard de solo
+  // lectura, sin openEntity("auditoria", id) en ningún lado) — mismo caso
+  // que mapa/aventura.
+  auditoria: null,
 };
 
 /**
