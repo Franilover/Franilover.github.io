@@ -485,7 +485,80 @@ export interface TejidoCompuesto {
   created_at: string;
 }
 
-/** Fila puente celula_compuestos: de qué Compuestos está hecha una Célula (membrana, citoplasma, etc.). */
+/** Fila real de la tabla "estructuras": la capa entre Compuesto y Célula
+ *  (ej. Diente, Pétalo, Médula Lipídica) — un Compuesto organizado
+ *  espacialmente, con propiedades calculadas propias (masa/rigidez/
+ *  estabilidad/etc. en propiedades_calculadas, jsonb) derivadas de sus
+ *  compuestos vía estructura_compuestos. Mismo patrón calculado que
+ *  Elemento/Compuesto: solo lectura desde el frontend. */
+export interface Estructura {
+  id: string;
+  nombre: string;
+  /** @deprecated Legacy: compuesto único 1:1, reemplazado por
+   *  estructura_compuestos (M:N) — puede seguir poblado en filas viejas. */
+  compuesto_id?: string | null;
+  funcion: string | null;
+  notas: string | null;
+  propiedades_calculadas: Record<string, unknown> | null;
+  estado_calculo: string | null;
+  calculado_at: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export const CONFIG_ESTRUCTURAS = {
+  tabla: "estructuras",
+  select:
+    "id, nombre, compuesto_id, funcion, notas, propiedades_calculadas, estado_calculo, calculado_at, created_at, updated_at",
+};
+
+/** Fila puente estructura_compuestos: de qué Compuestos está hecha una Estructura (M:N). */
+export interface EstructuraCompuesto {
+  id: string;
+  estructura_id: string;
+  compuesto_id: string;
+  cantidad: number | null;
+  proporcion: number | null;
+  unidad: string | null;
+  tipo_proporcion: string | null;
+  rol: string | null;
+  orden: number | null;
+  created_at: string;
+}
+
+export const CONFIG_ESTRUCTURA_COMPUESTOS = {
+  tabla: "estructura_compuestos",
+  select:
+    "id, estructura_id, compuesto_id, cantidad, proporcion, unidad, tipo_proporcion, rol, orden, created_at",
+};
+
+/** Fila puente celula_estructuras: de qué Estructura(s) real(es) está hecha
+ *  una Célula — reemplaza a celula_compuestos (ver abajo) como fuente de
+ *  verdad desde la migración de estructuras (ago-2026): hoy 12/12 células
+ *  tienen exactamente 1 fila acá, cada una apuntando a su Estructura real. */
+export interface CelulaEstructura {
+  id: string;
+  celula_id: string;
+  estructura_id: string;
+  cantidad: number | null;
+  proporcion: number | null;
+  rol: string | null;
+  orden: number | null;
+  created_at: string;
+}
+
+export const CONFIG_CELULA_ESTRUCTURAS = {
+  tabla: "celula_estructuras",
+  select: "id, celula_id, estructura_id, cantidad, proporcion, rol, orden, created_at",
+};
+
+/** Fila puente celula_compuestos: de qué Compuestos está hecha una Célula.
+ *  @deprecated Legacy — reemplazada por celula_estructuras (ver arriba).
+ *  Vacía desde la migración de estructuras (ago-2026): la fuente real de
+ *  "de qué está hecha la célula" es ahora Célula → Estructura → Compuesto,
+ *  no un vínculo directo Célula → Compuesto. Se conserva el tipo por si
+ *  algún dato viejo la vuelve a poblar, pero el frontend ya no la usa
+ *  para mostrar composición (ver useCelulaEstructuras). */
 export interface CelulaCompuesto {
   id: string;
   celula_id: string;

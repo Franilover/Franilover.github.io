@@ -13,13 +13,16 @@
  * Migración ago-2026 (ver elementos/types.ts): Célula→Compuesto y
  * Tejido→Célula dejaron de ser 1:1 (compuesto_id/celula_id, legacy) y
  * pasaron a M:N vía tablas puente:
- *   - celula_compuestos (useCelulaCompuestos)  → de qué está hecha la Célula
+ *   - celula_estructuras (useCelulaEstructuras) → de qué Estructura(s)
+ *     real(es) está hecha la Célula (celula_compuestos, el vínculo directo
+ *     Célula→Compuesto, quedó vacía tras esta migración — ver nota en
+ *     types.ts; el panel de Célula ya no la usa ni permite editarla)
  *   - tejido_celulas    (useTejidoCelulas)     → qué Células pueblan el Tejido
  *   - tejido_compuestos (useTejidoCompuestos)  → matriz extracelular directa
- * Por eso los dos paneles ya no usan un selector único (SelectorCompuesto/
- * SelectorCelula single-pick): cada uno lista sus vínculos con
- * ListaVinculosMN (agregar por búsqueda, quitar por fila) — mismo espíritu
- * que useOrganoTejidos, aplicado un nivel más abajo en la cadena.
+ * El panel de Tejido sigue con selector M:N editable (ListaVinculosMN,
+ * agregar por búsqueda, quitar por fila) — el de Célula pasó a solo
+ * lectura porque su composición real ahora viene de una migración/trigger,
+ * no de edición manual (ver ListaEstructurasDeCelula).
  *
  * Mismo lenguaje visual que GridCatalogoGrupo (grid de 3 columnas, click
  * abre panel flotante centrado).
@@ -32,7 +35,7 @@ import { createPortal } from "react-dom";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
 import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
-import { useCelulaCompuestos, type CompuestoDeCelula } from "@/domains/garlia/elementos/useCelulaCompuestos";
+import { useCelulaEstructuras, type EstructuraDeCelula } from "@/domains/garlia/elementos/useCelulaEstructuras";
 import { useTejidoCelulas, type CelulaDeTejido } from "@/domains/garlia/elementos/useTejidoCelulas";
 import { useTejidoCompuestos, type CompuestoDeTejido } from "@/domains/garlia/elementos/useTejidoCompuestos";
 import { useTejidosDeUnaCelula } from "@/domains/garlia/elementos/useTejidosDeUnaCelula";
@@ -265,8 +268,74 @@ function GridSimple<T extends { id: string; nombre: string }>({
   );
 }
 
-// ─── Panel Célula: nombre, función, notas, Compuestos (M:N vía
-// celula_compuestos) ────────────────────────────────────────────────────
+// ─── Lista de Estructuras de una Célula (solo lectura) ─────────────────────
+// Reemplaza a ListaVinculosMN<CompuestoDeCelula> en el panel de Célula:
+// celula_estructuras se puebla por migración/triggers, no por edición
+// manual, así que acá no hay buscador ni botón de quitar — solo se
+// muestra la Estructura real y, anidados debajo, sus Compuestos (vía
+// estructura_compuestos), para no perder de vista "de qué está hecha en
+// el fondo" sin tener que abrir la Estructura aparte.
+function ListaEstructurasDeCelula({
+  items,
+  loading,
+  onAbrirCompuesto,
+}: {
+  items: EstructuraDeCelula[];
+  loading: boolean;
+  onAbrirCompuesto?: (compuestoId: string) => void;
+}) {
+  if (loading) {
+    return <p className="text-micro text-primary/25 italic py-1">Cargando…</p>;
+  }
+  if (items.length === 0) {
+    return (
+      <p className="text-micro text-primary/25 italic py-1">
+        Sin Estructura vinculada todavía.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((v) => (
+        <div
+          key={v.vinculo_id}
+          className="flex flex-col gap-1.5 bg-primary/5 rounded-md px-2.5 py-2 border border-primary/10"
+        >
+          <div className="flex items-center gap-1.5">
+            <Boxes size={11} className="text-primary/40 shrink-0" />
+            <span className="text-micro font-black text-primary/80 truncate">
+              {v.estructura.nombre}
+            </span>
+            {v.rol && (
+              <span className="text-micro text-primary/40 truncate">· {v.rol}</span>
+            )}
+          </div>
+
+          {v.compuestos.length > 0 && (
+            <div className="flex flex-col gap-1 pl-3 border-l border-primary/10">
+              {v.compuestos.map((c) => (
+                <button
+                  key={c.vinculo_id}
+                  type="button"
+                  onClick={() => onAbrirCompuesto?.(c.compuesto_id)}
+                  disabled={!onAbrirCompuesto}
+                  className="flex items-center gap-1.5 text-left text-micro text-primary/60 disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer w-fit"
+                >
+                  {c.compuesto.nombre}
+                  {c.rol && <span className="text-primary/35"> · {c.rol}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Panel Célula: nombre, función, notas, Estructura real (vía
+// celula_estructuras) ────────────────────────────────────────────────────
 // Exportado: reutilizado directo desde SelectorFormulaTejidos (fila "hecho
 // de" de un Tejido en la fórmula de un Órgano) — clickear ahí debe abrir
 // ESTE panel (Célula), no el del Compuesto directo, ver cadena real en el
@@ -302,7 +371,7 @@ export function PanelEditorCelula({
   const [eliminando, setEliminando] = useState(false);
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
 
-  const vinculosCompuesto = useCelulaCompuestos(item.id);
+  const estructurasDeCelula = useCelulaEstructuras(item.id);
   const tejidosQueUsanEstaCelula = useTejidosDeUnaCelula(item.id);
   const organosQueUsanEstaCelula = useOrganosDeUnaCelula(item.id);
 
@@ -370,22 +439,18 @@ export function PanelEditorCelula({
         {errorEliminar && <ErrorBanner texto={errorEliminar} />}
 
         <div className="flex flex-col md:flex-row gap-3 md:gap-5 mt-1">
-          {/* Columna izquierda: composición / vínculos */}
+          {/* Columna izquierda: composición real — Estructura(s) de la que
+              viene la célula, con sus Compuestos. Solo lectura: se puebla
+              por migración/triggers (celula_estructuras +
+              estructura_compuestos), no por edición manual acá — ver
+              useCelulaEstructuras. */}
           <div className="md:w-1/2 min-w-0">
             <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-              Compuestos · de qué está hecha la célula
+              Estructura · de qué está hecha la célula
             </p>
-            <ListaVinculosMN<CompuestoDeCelula>
-              items={vinculosCompuesto.items}
-              loading={vinculosCompuesto.loading}
-              catalogo={compuestos}
-              loadingCatalogo={loadingCompuestos}
-              getNombre={(v) => v.compuesto.nombre}
-              getCatalogoId={(v) => v.compuesto_id}
-              rolPlaceholder="Rol (ej. membrana, citoplasma)…"
-              onAgregar={(compuestoId) => void vinculosCompuesto.vincularExistente(compuestoId)}
-              onActualizarRol={vinculosCompuesto.actualizarRol}
-              onQuitar={vinculosCompuesto.quitar}
+            <ListaEstructurasDeCelula
+              items={estructurasDeCelula.items}
+              loading={estructurasDeCelula.loading}
               onAbrirCompuesto={onAbrirCompuesto}
             />
           </div>
