@@ -21,8 +21,9 @@ export function useFloraCatalogoMin() {
   useEffect(() => {
     let cancelado = false;
     void supabase
-      .from("flora")
+      .from("organismos")
       .select("id, nombre, imagen_url")
+      .eq("tipo_organismo", "vegetal")
       .order("nombre")
       .then(({ data }) => {
         if (cancelado) return;

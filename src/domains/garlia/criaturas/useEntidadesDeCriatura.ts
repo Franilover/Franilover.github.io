@@ -69,7 +69,12 @@ export function useEntidadesDeCriatura(criaturaId: string) {
 
       const [{ data: flora }, { data: minerales }] = await Promise.all([
         floraIds.length
-          ? supabase.from("flora").select("id, nombre, imagen_url").in("id", floraIds).order("nombre")
+          ? supabase
+              .from("organismos")
+              .select("id, nombre, imagen_url")
+              .eq("tipo_organismo", "vegetal")
+              .in("id", floraIds)
+              .order("nombre")
           : Promise.resolve({ data: [] as EntidadDeCriaturaMin[] }),
         mineralIds.length
           ? supabase.from("minerales").select("id, nombre, imagen_url").in("id", mineralIds).order("nombre")

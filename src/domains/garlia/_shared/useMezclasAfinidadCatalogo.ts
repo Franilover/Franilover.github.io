@@ -71,7 +71,7 @@ export function useMezclasAfinidadCatalogo() {
         { data: vinculosOrganoRaw },
       ] = await Promise.all([
         supabase.from("minerales").select("id, nombre"),
-        supabase.from("flora").select("id, nombre"),
+        supabase.from("organismos").select("id, nombre").eq("tipo_organismo", "vegetal"),
         supabase
           .from("estructura_componentes")
           .select("padre_id, hijo_id")

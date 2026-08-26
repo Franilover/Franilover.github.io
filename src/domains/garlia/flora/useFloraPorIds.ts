@@ -34,8 +34,9 @@ export function useFloraPorIds(ids: string[]) {
     let cancelado = false;
     setLoading(true);
     void supabase
-      .from("flora")
+      .from("organismos")
       .select("id, nombre, imagen_url")
+      .eq("tipo_organismo", "vegetal")
       .in("id", ids)
       .order("nombre")
       .then(({ data }) => {

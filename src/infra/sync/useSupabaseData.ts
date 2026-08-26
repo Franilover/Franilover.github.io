@@ -122,7 +122,8 @@ const DEXIE_TABLES = new Set([
   "fenomeno_elementos",
   // ─── v36: minerales/flora, cache que faltaba desde antes de Fase 8 ──────
   "minerales",
-  "flora",
+  // "flora" (legacy) removida 2026-08-26: migrada a "organismos"
+  // (tipo_organismo='vegetal'), ya listada arriba.
   // ─── v37: mineral_reacciones (Procesos de un Mineral) ───────────────────
   "mineral_reacciones",
 ]);
@@ -199,7 +200,7 @@ const OFFLINE_WRITABLE = new Set([
   "fenomeno_elementos",
   // ─── v36: minerales/flora ────────────────────────────────────────────────
   "minerales",
-  "flora",
+  // "flora" (legacy) removida 2026-08-26: migrada a "organismos".
   // ─── v37: mineral_reacciones ─────────────────────────────────────────────
   "mineral_reacciones",
 ]);
