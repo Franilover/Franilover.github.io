@@ -73,7 +73,8 @@ function FilaCompuesto({ row }: { row: AuditoriaCompuestoRow }) {
           <span
             key={r.label}
             title={`${r.label}: ${r.ok ? "coincide" : "discrepancia"}`}
-            className={`w-2 h-2 rounded-full ${r.ok ? "bg-green-500/70" : "bg-red-500/70"}`}
+            className="w-2 h-2 rounded-full"
+            style={{ background: r.ok ? "var(--primary)" : "color-mix(in srgb, var(--primary) 30%, transparent)" }}
           />
         ))}
       </div>

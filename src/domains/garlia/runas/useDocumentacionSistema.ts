@@ -49,6 +49,23 @@ export interface CapaDocumentacion {
   conceptos: ConceptoDocumentacion[];
 }
 
+/** Capas que son bitácora/estado interno del proceso de construcción
+ *  ("Auditoría", "Motor", changelog de versiones dentro de "Arquitectura"/
+ *  "General"), no explicaciones conceptuales del sistema. La tab "Lógica"
+ *  es la versión humana de cómo funciona el mundo — este ruido de proceso
+ *  (triggers, "Fin de v1", auditoría cruzada, etc.) no aporta ahí y se
+ *  filtra para que "Manual científico" y el resto de capas conceptuales
+ *  queden como protagonistas. Las filas siguen existiendo en Supabase
+ *  intactas; esto solo afecta qué se lista en esta pantalla. */
+const CAPAS_OCULTAS = new Set([
+  "Arquitectura",
+  "General",
+  "Motor",
+  "Auditoría",
+  "Auditoría matemática",
+  "Auditoría de simplificación",
+]);
+
 export function useDocumentacionSistema() {
   const { data, loading } = useSupabaseData<ConceptoDocumentacion>(
     CONFIG_DOCUMENTACION_SISTEMA.tabla,
@@ -58,7 +75,10 @@ export function useDocumentacionSistema() {
     },
   );
 
-  const activos = useMemo(() => data.filter((c) => c.activo), [data]);
+  const activos = useMemo(
+    () => data.filter((c) => c.activo && !CAPAS_OCULTAS.has(c.capa)),
+    [data],
+  );
 
   const capas = useMemo<CapaDocumentacion[]>(() => {
     const orden: string[] = [];

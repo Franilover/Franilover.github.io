@@ -50,10 +50,10 @@ export function Badge({ children, active, onClick, variant = "default" }: BadgeP
     default: active
       ? "bg-primary text-btn-text shadow-sm shadow-primary/20"
       : "bg-primary/8 text-primary/60 hover:bg-primary/12",
-    success: "bg-green-50 text-green-600 border border-green-100",
-    warning: "bg-amber-50 text-amber-600 border border-amber-100",
-    danger:  "bg-red-50 text-red-500 border border-red-100",
-    info:    "bg-blue-50 text-blue-500 border border-blue-100",
+    success: "bg-primary/8 text-primary/60 border border-primary/10",
+    warning: "bg-primary/8 text-primary/60 border border-primary/10",
+    danger:  "bg-primary/8 text-primary/60 border border-primary/10",
+    info:    "bg-primary/8 text-primary/60 border border-primary/10",
   };
 
   const Tag = onClick ? "button" : "span";
