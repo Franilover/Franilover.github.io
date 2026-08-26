@@ -23,8 +23,10 @@
  *
  *   - compuesto_consistencia_issues: es genérica (entity_type/entity_id),
  *     no exclusiva de compuestos pese al prefijo del nombre de tabla. Hoy
- *     en la práctica solo hay filas con entity_type derivado de compuestos,
- *     pero el tipo no debe asumir eso.
+ *     en la práctica solo hay filas con entity_type derivado de compuestos
+ *     (13 filas, todas ya resueltas — resolved_at poblado, ver estado_proyecto
+ *     v100), pero el tipo no debe asumir eso: puede volver a haber issues
+ *     abiertos o de otro entity_type en cualquier momento.
  *
  *   - v_auditoria_compuestos_derivacion: estado_derivacion viene SIEMPRE en
  *     "discrepancia" para las 90 filas actuales (verificado). Esto NO
