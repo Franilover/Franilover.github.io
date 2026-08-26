@@ -32,8 +32,11 @@
  * ElementoEditor/CompuestosPage: derivado, no editable desde el frontend).
  */
 
-import { ChevronDown, ChevronRight, Layers, Loader2 } from "lucide-react";
+import { BookOpenText, ChevronDown, ChevronRight, Layers, Loader2 } from "lucide-react";
 import React, { useState } from "react";
+
+import { useEstadoProyecto } from "@/domains/garlia/auditoria/useEstadoProyecto";
+import { Text } from "@/ui/Tipografia";
 
 import {
   useDocumentacionSistema,
@@ -85,6 +88,15 @@ export function LogicaSistemaPage() {
     );
   }
 
+  // Dos columnas internas, lado a lado (misma idea que el toggle
+  // Química/Física/Biología, pero acá conviven a la vez porque son la
+  // misma lógica vista en dos niveles):
+  //   izquierda → mapa técnico de capas ya existente (documentacion_sistema
+  //     completo, capa por capa, con fórmulas/dependencias).
+  //   derecha   → "Manual humano": la capa documentacion_sistema.capa=
+  //     "Manual humano" (leyes sencillas) + lo nuevo de estado_proyecto
+  //     (explicaciones humanas del registro maestro), en el mismo espíritu
+  //     de lectura pero en lenguaje llano, sin fórmulas.
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-2 rounded-lg border border-primary/10 px-3 py-2.5">
@@ -97,21 +109,113 @@ export function LogicaSistemaPage() {
         </p>
       </div>
 
-      {/* Mapa de capas: una caja por capa, en el orden real en que aparecen
-          en documentacion_sistema (ver orden numérico de cada concepto),
-          conectadas por una línea vertical — mismo espíritu que el
-          diagrama de bloques apilados (Fundamentos → Propiedades →
-          Organización → Comportamiento). */}
-      <div className="flex flex-col">
-        {capas.map((c, i) => (
-          <CajaCapa
-            key={c.capa}
-            capa={c}
-            esUltima={i === capas.length - 1}
-            abierta={capaAbierta === c.capa}
-            onToggle={() => setCapaAbierta((prev) => (prev === c.capa ? null : c.capa))}
-          />
-        ))}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+        {/* Columna izquierda: mapa de capas técnico ya existente. */}
+        <div className="flex flex-col">
+          {capas.map((c, i) => (
+            <CajaCapa
+              key={c.capa}
+              capa={c}
+              esUltima={i === capas.length - 1}
+              abierta={capaAbierta === c.capa}
+              onToggle={() => setCapaAbierta((prev) => (prev === c.capa ? null : c.capa))}
+            />
+          ))}
+        </div>
+
+        {/* Columna derecha: manual humano (nuevo). */}
+        <ManualHumanoColumna capas={capas} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Columna derecha "Manual humano": leyes sencillas (documentacion_sistema
+ * con capa="Manual humano", ya cargadas en `capas` — no se vuelve a pedir
+ * a Supabase) + las explicaciones humanas que se están agregando en
+ * estado_proyecto (resumen, siguiente paso, principios). Solo lectura,
+ * igual que el resto de esta pantalla — no escribe en ninguna tabla.
+ */
+function ManualHumanoColumna({ capas }: { capas: CapaDocumentacion[] }) {
+  const capaManual = capas.find((c) => c.capa.toLowerCase() === "manual humano") ?? null;
+  const { maestro, loading: loadingMaestro } = useEstadoProyecto();
+  const colorManual = "#0ea5e9"; // celeste — distinto de las familias técnicas, para que se lea como "la otra columna"
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border-2 border-sky-500/25 bg-sky-500/[0.03] p-3.5">
+      <div className="flex items-center gap-2">
+        <BookOpenText size={15} className="text-sky-600/70 shrink-0" />
+        <span className="text-[15px] font-black tracking-tight text-primary/85">
+          Manual humano
+        </span>
+        {capaManual && (
+          <span className="text-micro font-black uppercase tracking-wide px-2 py-0.5 rounded-full text-sky-700 bg-sky-500/15">
+            {capaManual.conceptos.length} ley{capaManual.conceptos.length === 1 ? "" : "es"}
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-primary/55 leading-snug">
+        Las mismas capas de la izquierda, explicadas simple: leyes sencillas y el avance real del
+        proyecto contado en palabras.
+      </p>
+
+      {/* Leyes sencillas (documentacion_sistema, capa="Manual humano") */}
+      <div className="flex flex-col gap-2">
+        {!capaManual || capaManual.conceptos.length === 0 ? (
+          <p className="text-micro text-primary/30 italic px-1">
+            Todavía no hay leyes sencillas documentadas.
+          </p>
+        ) : (
+          capaManual.conceptos.map((concepto) => (
+            <TarjetaConcepto key={concepto.id} concepto={concepto} color={colorManual} />
+          ))
+        )}
+      </div>
+
+      {/* Explicaciones humanas nuevas de estado_proyecto */}
+      <div className="mt-2 pt-3 border-t border-sky-500/15 flex flex-col gap-2.5">
+        <Text variant="lbl" className="text-sky-700/70">
+          Estado del proyecto, en palabras
+        </Text>
+
+        {loadingMaestro ? (
+          <div className="flex items-center gap-2 text-primary/30 py-2">
+            <Loader2 className="animate-spin" size={14} />
+            <span className="text-micro">Cargando estado_proyecto...</span>
+          </div>
+        ) : !maestro ? (
+          <p className="text-micro text-primary/30 italic">Sin registro estado_proyecto.</p>
+        ) : (
+          <>
+            <div>
+              <Text variant="lbl">Resumen</Text>
+              <p className="text-sm text-primary/75 leading-relaxed mt-1">{maestro.resumen}</p>
+            </div>
+            <div>
+              <Text variant="lbl">Siguiente paso</Text>
+              <p className="text-sm text-primary/75 leading-relaxed mt-1">
+                {maestro.siguiente_paso}
+              </p>
+            </div>
+            {maestro.principios.length > 0 && (
+              <div>
+                <Text variant="lbl">Principios rectores</Text>
+                <div className="mt-1.5 flex flex-col gap-1.5">
+                  {maestro.principios.map((p, i) => (
+                    <div
+                      key={i}
+                      className="text-micro text-primary/55 italic pl-2.5"
+                      style={{ borderLeft: "2px solid color-mix(in srgb, #0ea5e9 25%, transparent)" }}
+                    >
+                      {p}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
