@@ -50,6 +50,7 @@ import { SelectorTagsCompuesto } from "./SelectorTagsCompuesto";
 import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
 import { useUsosCompuesto, type TipoUsoCompuesto, type UsoCompuesto } from "./useUsosCompuesto";
 import { sincronizarComponentesCompuesto } from "./useCompuestosConElementos";
+import { useCompuestoEnlaces, type CompuestoEnlaceRow } from "./useCompuestoEnlaces";
 import {
   useCompuestoEstabilidad,
   useCompuestoElementosProporcion,
@@ -833,6 +834,67 @@ function EstabilidadDetalleBloque({
   );
 }
 
+/**
+ * Enlaces reales instanciados del compuesto (tabla "compuesto_enlaces"):
+ * el grafo elemento↔elemento que alimenta compuesto_estabilidad — a
+ * diferencia de ese bloque (un número agregado por compuesto), acá se ve
+ * cada enlace individual con su intensidad/coste/estabilidad/
+ * reversibilidad. Solo lectura.
+ */
+function EnlacesCompuestoBloque({
+  enlaces,
+  loading,
+  elementos,
+}: {
+  enlaces: CompuestoEnlaceRow[];
+  loading: boolean;
+  elementos: Elemento[];
+}) {
+  if (loading || enlaces.length === 0) return null;
+
+  const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(2));
+  const nombreEl = (id: string) => {
+    const el = elementos.find((e) => e.id === id);
+    return el ? `${el.simbolo || "??"} · ${el.nombre}` : "—";
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+      <div className="flex items-center gap-1.5">
+        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+          Enlaces
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {enlaces.map((e) => (
+          <div
+            key={e.id}
+            className="flex flex-col gap-0.5 rounded-md border border-primary/10 px-2 py-1"
+          >
+            <span className="text-micro font-bold text-primary/70 truncate">
+              {nombreEl(e.elemento_a_id)} ↔ {nombreEl(e.elemento_b_id)}
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span title="Intensidad" className="text-micro tabular-nums text-primary/50">
+                int {fmt(e.intensidad)}
+              </span>
+              <span title="Coste energético" className="text-micro tabular-nums text-primary/50">
+                coste {fmt(e.coste_energetico)}
+              </span>
+              <span title="Estabilidad" className="text-micro tabular-nums text-primary/50">
+                estab {fmt(e.estabilidad)}
+              </span>
+              <span title="Reversibilidad" className="text-micro tabular-nums text-primary/50">
+                rev {fmt(e.reversibilidad)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CompuestoEditor({
   compuesto,
   elementos,
@@ -929,6 +991,7 @@ function CompuestoEditor({
   const { item: estabilidadDetalle, loading: estabilidadLoading } = useCompuestoEstabilidad(
     compuesto.id,
   );
+  const { items: enlacesCompuesto, loading: enlacesLoading } = useCompuestoEnlaces(compuesto.id);
 
   async function persistElemento(id: string, cambios: Partial<Elemento>) {
     try {
@@ -1150,6 +1213,7 @@ function CompuestoEditor({
           />
           <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
         </div>
+        <EnlacesCompuestoBloque enlaces={enlacesCompuesto} loading={enlacesLoading} elementos={elementos} />
       </div>
 
       {editandoElementoId && (
