@@ -356,6 +356,23 @@ export interface FilaGenericaDexie {
   [key: string]: any;
 }
 
+// ─── v38: cache offline de las vistas v_auditoria_* consumidas por el panel
+// de auditoría (domains/garlia/auditoria) — hasta ahora useAuditoriaCompuestos
+// y useAuditoriaElementos pegaban directo a Supabase en cada apertura del
+// panel, sin ningún cache local (no estaban en DEXIE_TABLES de
+// useSupabaseData.ts), de ahí la demora de carga percibida. Son vistas de
+// SOLO LECTURA (prefijo v_) — se cachean igual que el resto, pero NUNCA
+// entran en OFFLINE_WRITABLE (ver useSupabaseData.ts).
+export interface AuditoriaCompuestoDexie {
+  id: string;
+  [key: string]: any;
+}
+
+export interface AuditoriaElementoDexie {
+  id: string;
+  [key: string]: any;
+}
+
 export interface OfflineOperation {
   id?: number;
   table: string;
@@ -900,6 +917,10 @@ class AgendaFraniDB extends Dexie {
   personaje_hechizos!: Table<FilaGenericaDexie, string>;
   personaje_dones!: Table<FilaGenericaDexie, string>;
   mensajes_cache!: Table<FilaGenericaDexie, string>;
+
+  // ─── v38: cache de vistas v_auditoria_* (solo lectura) ───────────────────
+  v_auditoria_compuestos_derivacion!: Table<AuditoriaCompuestoDexie, string>;
+  v_auditoria_elementos_derivacion!: Table<AuditoriaElementoDexie, string>;
 
   constructor() {
     super("AgendaFranilover");
@@ -1778,6 +1799,19 @@ class AgendaFraniDB extends Dexie {
     // Dexie. Se agrega ahora al completar el barrido de Fase 8.
     this.version(37).stores({
       mineral_reacciones: "id, mineral_id, reaccion_id, created_at",
+    });
+
+    // ─── v38: cache offline del panel de auditoría (domains/garlia/auditoria)
+    // — v_auditoria_compuestos_derivacion y v_auditoria_elementos_derivacion
+    // pegaban directo a Supabase en cada apertura del panel sin cache local
+    // (nunca entraron a DEXIE_TABLES en useSupabaseData.ts), de ahí la carga
+    // lenta reportada. Mismo patrón cache-first que el resto: se pinta lo
+    // que ya está en Dexie al instante y se revalida contra Supabase en
+    // segundo plano. Son vistas de solo lectura — no llevan status/pending
+    // ni entran en OFFLINE_WRITABLE.
+    this.version(38).stores({
+      v_auditoria_compuestos_derivacion: "id, nombre",
+      v_auditoria_elementos_derivacion: "id, nombre, numero_atomico",
     });
   }
 }

@@ -126,6 +126,12 @@ const DEXIE_TABLES = new Set([
   // (tipo_organismo='vegetal'), ya listada arriba.
   // ─── v37: mineral_reacciones (Procesos de un Mineral) ───────────────────
   "mineral_reacciones",
+  // ─── v38: panel de auditoría (domains/garlia/auditoria) — vistas de SOLO
+  // LECTURA (prefijo v_), cacheadas para que abrir el panel no dependa del
+  // round-trip completo a Supabase cada vez. A propósito NO están en
+  // OFFLINE_WRITABLE más abajo: son vistas derivadas, no se editan.
+  "v_auditoria_compuestos_derivacion",
+  "v_auditoria_elementos_derivacion",
 ]);
 
 const OFFLINE_WRITABLE = new Set([
