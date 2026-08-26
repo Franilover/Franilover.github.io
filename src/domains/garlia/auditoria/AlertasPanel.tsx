@@ -34,28 +34,7 @@ import { compuestoIdParaNavegacion } from "@/domains/garlia/elementos/ElementosS
 
 import { useAlertasEstequiometria } from "./useAlertasEstequiometria";
 import { useConsistenciaIssues } from "./useConsistenciaIssues";
-import type { AlertaEstequiometria, ConsistenciaIssue } from "./types";
-
-/** Valores reales confirmados en Supabase (Paso 8): "warning" e "info" en
- *  ambas tablas hoy. Se agrega el resto (crítica/alta/baja) como fallback
- *  por si aparecen a futuro — pero warning/info van primero y explícitos
- *  para no depender de que "warning" contenga "alt" o similar por
- *  casualidad de substring. */
-function grupoSeveridad(valor: string): string {
-  const v = valor.toLowerCase();
-  if (v === "critical" || v.includes("crit")) return "Crítica";
-  if (v === "warning" || v.includes("alt") || v.includes("high")) return "Alta";
-  if (v === "info" || v.includes("med")) return "Media";
-  if (v.includes("baj") || v.includes("low")) return "Baja";
-  return "Otras";
-}
-
-function varianteBadgeSeveridad(grupo: string): "danger" | "warning" | "info" | "default" {
-  if (grupo === "Crítica") return "danger";
-  if (grupo === "Alta") return "warning";
-  if (grupo === "Media") return "info";
-  return "default";
-}
+import { grupoSeveridad, varianteBadgeSeveridad, type AlertaEstequiometria, type ConsistenciaIssue } from "./types";
 
 function agruparPorSeveridad<T>(items: T[], severidadDe: (item: T) => string) {
   const grupos = new Map<string, T[]>();

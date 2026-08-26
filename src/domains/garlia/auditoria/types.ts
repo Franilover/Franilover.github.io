@@ -207,3 +207,31 @@ export const CONFIG_CONSISTENCIA_ISSUES = {
   tabla: "compuesto_consistencia_issues",
   select: "id, entity_type, entity_id, issue_code, severity, details, detected_at, resolved_at",
 };
+
+// ─── Clasificación de severidad (alertas + issues) ──────────────────────
+// Vivía solo en AlertasPanel.tsx; se movió acá porque useAlertasEstequiometria
+// y useConsistenciaIssues también la necesitan (para exponer un conteo
+// "alta o crítica" que AuditoriaSection usa al decidir el layout de
+// columnas) — types.ts no importa de ningún hook/panel, así que es el
+// lugar neutral que evita un ciclo hooks → panel → hooks.
+//
+// Valores reales confirmados en Supabase (Paso 8): "warning" e "info" en
+// ambas tablas hoy. Se agrega el resto (crítica/alta/baja) como fallback
+// por si aparecen a futuro — pero warning/info van primero y explícitos
+// para no depender de que "warning" contenga "alt" o similar por
+// casualidad de substring.
+export function grupoSeveridad(valor: string): string {
+  const v = valor.toLowerCase();
+  if (v === "critical" || v.includes("crit")) return "Crítica";
+  if (v === "warning" || v.includes("alt") || v.includes("high")) return "Alta";
+  if (v === "info" || v.includes("med")) return "Media";
+  if (v.includes("baj") || v.includes("low")) return "Baja";
+  return "Otras";
+}
+
+export function varianteBadgeSeveridad(grupo: string): "danger" | "warning" | "info" | "default" {
+  if (grupo === "Crítica") return "danger";
+  if (grupo === "Alta") return "warning";
+  if (grupo === "Media") return "info";
+  return "default";
+}

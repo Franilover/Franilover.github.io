@@ -18,9 +18,23 @@ import { useMemo } from "react";
 
 import {
   CONFIG_AUDITORIA_COMPUESTOS,
+  PROPIEDADES_COMPUESTO_COMPARABLES,
   type AuditoriaCompuestoRow,
 } from "@/domains/garlia/auditoria/types";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
+
+/** Misma tolerancia que AuditoriaDerivacionPanel.tsx — duplicada acá a
+ *  propósito (constante primitiva, no vale la pena una dependencia
+ *  cruzada solo por esto) para poder calcular el conteo de discrepancias
+ *  reales sin que el header de AuditoriaSection tenga que reimplementar
+ *  la lógica de comparación por propiedad. */
+const TOLERANCIA = 0.0005;
+
+function tieneDiscrepancia(row: AuditoriaCompuestoRow): boolean {
+  return PROPIEDADES_COMPUESTO_COMPARABLES.some(
+    (p) => Math.abs(Number(row[p.campo]) - Number(row[p.campoDerivado])) > TOLERANCIA,
+  );
+}
 
 export function useAuditoriaCompuestos() {
   const { data, loading } = useSupabaseData<AuditoriaCompuestoRow>(
@@ -29,6 +43,7 @@ export function useAuditoriaCompuestos() {
   );
 
   const items = useMemo(() => data, [data]);
+  const conDiscrepancia = useMemo(() => items.filter(tieneDiscrepancia).length, [items]);
 
-  return { items, loading };
+  return { items, loading, conDiscrepancia };
 }

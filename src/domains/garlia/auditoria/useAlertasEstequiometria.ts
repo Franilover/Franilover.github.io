@@ -18,6 +18,7 @@ import {
   type AlertaEstequiometria,
 } from "@/domains/garlia/auditoria/types";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
+import { grupoSeveridad } from "./types";
 
 export function useAlertasEstequiometria() {
   const { data, loading } = useSupabaseData<AlertaEstequiometria>(
@@ -26,6 +27,17 @@ export function useAlertasEstequiometria() {
   );
 
   const items = useMemo(() => data, [data]);
+  // "Alta o crítica" — usado por el header de AuditoriaSection para
+  // decidir si la columna Alertas se destaca en el layout. Toda fila acá
+  // ya está activa por definición (ver nota de cabecera de types.ts).
+  const altaOCritica = useMemo(
+    () =>
+      items.filter((a) => {
+        const g = grupoSeveridad(a.severidad);
+        return g === "Alta" || g === "Crítica";
+      }).length,
+    [items],
+  );
 
-  return { items, loading };
+  return { items, loading, altaOCritica };
 }

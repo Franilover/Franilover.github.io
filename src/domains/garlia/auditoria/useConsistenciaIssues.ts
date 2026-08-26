@@ -19,6 +19,7 @@ import {
   type ConsistenciaIssue,
 } from "@/domains/garlia/auditoria/types";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
+import { grupoSeveridad } from "./types";
 
 export function useConsistenciaIssues() {
   const { data, loading } = useSupabaseData<ConsistenciaIssue>(
@@ -28,6 +29,16 @@ export function useConsistenciaIssues() {
 
   const abiertos = useMemo(() => data.filter((i) => i.resolved_at === null), [data]);
   const cerrados = useMemo(() => data.filter((i) => i.resolved_at !== null), [data]);
+  // Solo entre los ABIERTOS — un issue cerrado de severidad alta ya no
+  // necesita destacar el layout, ver nota en useAlertasEstequiometria.ts.
+  const altaOCritica = useMemo(
+    () =>
+      abiertos.filter((i) => {
+        const g = grupoSeveridad(i.severity);
+        return g === "Alta" || g === "Crítica";
+      }).length,
+    [abiertos],
+  );
 
-  return { items: data, abiertos, cerrados, loading };
+  return { items: data, abiertos, cerrados, loading, altaOCritica };
 }
