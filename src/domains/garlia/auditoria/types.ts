@@ -63,12 +63,19 @@ export interface EstadoProyecto {
   titulo: string;
   etapa_actual: string;
   objetivo_actual: string;
-  /** Array de strings — cada entrada es un hito ya cerrado, con su propia
-   *  narrativa de auditoría/decisión incluida en el texto. */
-  completado: string[];
-  en_progreso: string[];
-  pendiente: string[];
-  principios: string[];
+  /** Columnas jsonb en Supabase — la FORMA no es uniforme hoy (re-verificado
+   *  en vivo): completado/en_progreso/principios llegan como array de
+   *  strings, pero pendiente llegó como OBJETO {clave: texto} (4 entradas),
+   *  no como array. Asumir siempre string[] rompía .map()/.length en UI al
+   *  abrir el acordeón de "Pendiente" (ver normalizarListaJsonb en
+   *  EstadoMaestroPanel.tsx, que soporta ambas formas). Tipado como
+   *  `unknown` acá a propósito para no mentir sobre una garantía que la
+   *  base no cumple; no asumir array en ningún consumidor nuevo sin pasar
+   *  primero por el normalizador. */
+  completado: unknown;
+  en_progreso: unknown;
+  pendiente: unknown;
+  principios: unknown;
   resumen: string;
   siguiente_paso: string;
   ultima_actualizacion: string;

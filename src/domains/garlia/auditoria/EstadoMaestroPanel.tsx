@@ -21,6 +21,34 @@ import { Text } from "@/ui/Tipografia";
 
 import { useEstadoProyecto } from "./useEstadoProyecto";
 
+/**
+ * Las columnas jsonb de estado_proyecto (completado/en_progreso/pendiente/
+ * principios) NO tienen forma garantizada: hoy "pendiente" llegó como
+ * objeto {clave: texto} en vez de array de strings (re-verificado en vivo
+ * contra Supabase), y como es una tabla narrativa editada a mano, cualquier
+ * otra columna podría cambiar de forma el día de mañana. Antes el
+ * componente asumía siempre string[] y llamaba items.map() directo — con
+ * un objeto eso explota (TypeError: items.map is not a function),
+ * tumbando toda la columna 1 del panel de auditoría en un error en blanco.
+ * Este normalizador acepta cualquier forma jsonb razonable y siempre
+ * devuelve string[], para que la UI nunca vuelva a crashear por esto.
+ */
+function normalizarListaJsonb(valor: unknown): string[] {
+  if (Array.isArray(valor)) {
+    return valor.map((v) => (typeof v === "string" ? v : JSON.stringify(v)));
+  }
+  if (valor && typeof valor === "object") {
+    // Objeto {clave: texto} — se muestra como "clave: texto" para no
+    // perder la clave, que suele ser la propiedad afectada (ej. "masa").
+    return Object.entries(valor as Record<string, unknown>).map(
+      ([clave, texto]) =>
+        typeof texto === "string" ? `${clave}: ${texto}` : `${clave}: ${JSON.stringify(texto)}`,
+    );
+  }
+  if (typeof valor === "string" && valor.trim() !== "") return [valor];
+  return [];
+}
+
 function ListaColapsable({
   titulo,
   items,
@@ -85,6 +113,14 @@ export function EstadoMaestroPanel() {
   if (loading) return <Loading text="Cargando estado del proyecto..." fullScreen={false} />;
   if (!maestro) return <EmptyState label="Sin registro estado_proyecto" />;
 
+  // Normalizado UNA vez acá — nunca pasar maestro.completado/en_progreso/
+  // pendiente/principios crudos a un .map()/.length más abajo (ver nota
+  // del normalizador arriba: la forma real en Supabase no es uniforme).
+  const completado = normalizarListaJsonb(maestro.completado);
+  const enProgreso = normalizarListaJsonb(maestro.en_progreso);
+  const pendiente = normalizarListaJsonb(maestro.pendiente);
+  const principios = normalizarListaJsonb(maestro.principios);
+
   return (
     <div className="space-y-4">
       {/* Cabecera: título, versión, última actualización */}
@@ -131,20 +167,20 @@ export function EstadoMaestroPanel() {
       <div className="space-y-2">
         <ListaColapsable
           titulo="Completado"
-          items={maestro.completado}
+          items={completado}
           variant="success"
         />
-        {maestro.en_progreso.length > 0 && (
+        {enProgreso.length > 0 && (
           <ListaColapsable
             titulo="En progreso"
-            items={maestro.en_progreso}
+            items={enProgreso}
             variant="info"
             abiertoPorDefecto
           />
         )}
         <ListaColapsable
           titulo="Pendiente"
-          items={maestro.pendiente}
+          items={pendiente}
           variant="warning"
         />
       </div>
@@ -153,7 +189,7 @@ export function EstadoMaestroPanel() {
       <div>
         <Text variant="lbl">Principios rectores</Text>
         <div className="mt-1.5 space-y-1.5">
-          {maestro.principios.map((p, i) => (
+          {principios.map((p, i) => (
             <div key={i} className="text-xs text-primary/60 italic pl-3" style={{
               borderLeft: "2px solid color-mix(in srgb, var(--primary) 10%, transparent)",
             }}>
