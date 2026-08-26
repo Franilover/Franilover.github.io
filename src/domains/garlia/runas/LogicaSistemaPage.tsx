@@ -150,27 +150,31 @@ export function LogicaSistemaPage() {
 
       {/* Explorador: sidebar de capas + panel de detalle */}
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4 items-start">
-        <SidebarCapas
-          capas={capasFiltradas}
-          capaActivaId={buscando ? null : capaActiva?.capa ?? null}
-          onSeleccionar={(id) => setCapaActivaId(id)}
-          deshabilitada={buscando}
-        />
+        <div className="md:sticky md:top-4">
+          <SidebarCapas
+            capas={capasFiltradas}
+            capaActivaId={buscando ? null : capaActiva?.capa ?? null}
+            onSeleccionar={(id) => setCapaActivaId(id)}
+            deshabilitada={buscando}
+          />
+        </div>
 
         <div className="min-w-0 rounded-xl border border-primary/10 bg-primary/[0.015] overflow-hidden">
-          {buscando ? (
-            <PanelResultadosBusqueda
-              capas={capasFiltradas}
-              total={totalResultadosBusqueda}
-              query={busqueda}
-            />
-          ) : capaActiva ? (
-            <PanelCapa capa={capaActiva} />
-          ) : (
-            <div className="py-16 text-center text-micro text-primary/30">
-              Sin resultados.
-            </div>
-          )}
+          <div className="max-h-[70vh] overflow-y-auto">
+            {buscando ? (
+              <PanelResultadosBusqueda
+                capas={capasFiltradas}
+                total={totalResultadosBusqueda}
+                query={busqueda}
+              />
+            ) : capaActiva ? (
+              <PanelCapa capa={capaActiva} />
+            ) : (
+              <div className="py-16 text-center text-micro text-primary/30">
+                Sin resultados.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
