@@ -17,14 +17,15 @@
  * respecto a lo que de verdad está escrito — si se agrega o edita un
  * concepto en Supabase, esta vista lo refleja solo con recargar.
  *
- * Diseño: cada capa es una "caja" con su propio color de acento (agrupadas
- * por familia — micro/composición/organización/dinámica/auditoría, ver
- * COLOR_POR_FAMILIA — asignado por coincidencia de texto en el nombre de
- * la capa, así que una capa nueva en Supabase cae en un color razonable
- * sin tocar código) y conectadas por una línea vertical con flecha, mismo
- * espíritu que el diagrama de capas original (Fundamentos → Propiedades
- * emergentes → Organización → Comportamiento) pero con las capas y
- * conteos reales de hoy en vez de un mapa fijo desactualizado.
+ * Diseño: cada capa es un bloque siempre expandido (sin acordeón/dropdown)
+ * con su propio color de acento — tonos apagados/desaturados a propósito,
+ * para que se lea como referencia técnica y no como un dashboard de
+ * semáforos — resuelto por coincidencia de texto sobre el nombre de la
+ * capa (ver colorDeCapa), así que una capa nueva en Supabase cae en un
+ * color razonable sin tocar código. Los conceptos de cada capa se
+ * muestran en grid de hasta 2 columnas (no una lista vertical larga) para
+ * aprovechar mejor el ancho disponible en capas con muchos conceptos
+ * (ej. Estructuras con 38, Células con 34).
  *
  * Solo lectura: esta pantalla no escribe en documentacion_sistema, es un
  * visor. Editar los conceptos se sigue haciendo desde Supabase directamente
@@ -32,8 +33,8 @@
  * ElementoEditor/CompuestosPage: derivado, no editable desde el frontend).
  */
 
-import { BookOpenText, ChevronDown, ChevronRight, Layers, Loader2 } from "lucide-react";
-import React, { useState } from "react";
+import { BookOpenText, Layers, Loader2 } from "lucide-react";
+import React from "react";
 
 import { useEstadoProyecto } from "@/domains/garlia/auditoria/useEstadoProyecto";
 import { Text } from "@/ui/Tipografia";
@@ -45,22 +46,22 @@ import {
 } from "./useDocumentacionSistema";
 
 /**
- * Color de acento por familia de capas, para que el mapa se lea de un
- * vistazo (mismo principio que el diagrama enviado: Fundamentos/
- * Propiedades/Organización/Comportamiento en bloques visualmente
- * distintos). Se resuelve por coincidencia de texto sobre el nombre real
- * de la capa (ver colorDeCapa) — no una lista fija de claves — para que
- * una capa nueva agregada en Supabase (ej. "Ecología") caiga en un color
- * razonable sin tocar este archivo.
+ * Color de acento por familia de capas — deliberadamente apagado/desaturado
+ * (tonos "dusty", no colores de marca vivos) para que se lea como
+ * referencia técnica y no como un dashboard de semáforos. Se resuelve por
+ * coincidencia de texto sobre el nombre real de la capa (ver colorDeCapa)
+ * — no una lista fija de claves — para que una capa nueva agregada en
+ * Supabase (ej. "Ecología") caiga en un color razonable sin tocar este
+ * archivo.
  */
 const FAMILIAS: { test: RegExp; color: string }[] = [
-  { test: /fundamento|base|principio/i, color: "#64748b" }, // gris pizarra — cimientos
-  { test: /partícula|elemento/i, color: "#3b82f6" }, // azul — micro/física
-  { test: /compuesto/i, color: "#22c55e" }, // verde — composición química
-  { test: /estructura|célula|tejido|órgano|sistema|organismo|jerarquía/i, color: "#a855f7" }, // violeta — organización biológica
-  { test: /propiedad/i, color: "#f59e0b" }, // ámbar — propiedades emergentes
-  { test: /proceso|dinámica|motor/i, color: "#ef4444" }, // rojo — dinámica/tiempo
-  { test: /auditoría/i, color: "#14b8a6" }, // teal — verificación
+  { test: /fundamento|base|principio/i, color: "#78716c" }, // gris piedra — cimientos
+  { test: /partícula|elemento/i, color: "#5b7a99" }, // azul apagado — micro/física
+  { test: /compuesto/i, color: "#5e8c6a" }, // verde apagado — composición química
+  { test: /estructura|célula|tejido|órgano|sistema|organismo|jerarquía/i, color: "#8a6d9e" }, // violeta apagado — organización biológica
+  { test: /propiedad/i, color: "#b08a4e" }, // ámbar apagado — propiedades emergentes
+  { test: /proceso|dinámica|motor/i, color: "#b06a5e" }, // terracota — dinámica/tiempo
+  { test: /auditoría/i, color: "#4d8f88" }, // teal apagado — verificación
 ];
 const COLOR_DEFECTO = "#8b8b99";
 
@@ -70,7 +71,6 @@ function colorDeCapa(nombre: string): string {
 
 export function LogicaSistemaPage() {
   const { capas, total, loading } = useDocumentacionSistema();
-  const [capaAbierta, setCapaAbierta] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -92,7 +92,9 @@ export function LogicaSistemaPage() {
   // Química/Física/Biología, pero acá conviven a la vez porque son la
   // misma lógica vista en dos niveles):
   //   izquierda → mapa técnico de capas ya existente (documentacion_sistema
-  //     completo, capa por capa, con fórmulas/dependencias).
+  //     completo, capa por capa, con fórmulas/dependencias). Siempre
+  //     expandido — sin acordeón — porque es la referencia de trabajo del
+  //     día a día, no algo que se navega una vez y se cierra.
   //   derecha   → "Manual humano": la capa documentacion_sistema.capa=
   //     "Manual humano" (leyes sencillas) + lo nuevo de estado_proyecto
   //     (explicaciones humanas del registro maestro), en el mismo espíritu
@@ -110,16 +112,10 @@ export function LogicaSistemaPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-        {/* Columna izquierda: mapa de capas técnico ya existente. */}
-        <div className="flex flex-col">
-          {capas.map((c, i) => (
-            <CajaCapa
-              key={c.capa}
-              capa={c}
-              esUltima={i === capas.length - 1}
-              abierta={capaAbierta === c.capa}
-              onToggle={() => setCapaAbierta((prev) => (prev === c.capa ? null : c.capa))}
-            />
+        {/* Columna izquierda: mapa de capas técnico, siempre abierto. */}
+        <div className="flex flex-col gap-3">
+          {capas.map((c) => (
+            <BloqueCapa key={c.capa} capa={c} />
           ))}
         </div>
 
@@ -221,79 +217,39 @@ function ManualHumanoColumna({ capas }: { capas: CapaDocumentacion[] }) {
   );
 }
 
-function CajaCapa({
-  capa,
-  esUltima,
-  abierta,
-  onToggle,
-}: {
-  capa: CapaDocumentacion;
-  esUltima: boolean;
-  abierta: boolean;
-  onToggle: () => void;
-}) {
+function BloqueCapa({ capa }: { capa: CapaDocumentacion }) {
   const color = colorDeCapa(capa.capa);
 
   return (
-    <div className="flex flex-col items-stretch">
+    <div
+      className="rounded-xl border overflow-hidden"
+      style={{
+        borderColor: `color-mix(in srgb, ${color} 22%, transparent)`,
+        background: `color-mix(in srgb, ${color} 3%, var(--bg-main))`,
+      }}
+    >
       <div
-        className="rounded-xl border-2 overflow-hidden transition-shadow"
-        style={{
-          borderColor: `color-mix(in srgb, ${color} ${abierta ? 55 : 30}%, transparent)`,
-          background: `color-mix(in srgb, ${color} ${abierta ? 7 : 4}%, var(--bg-main))`,
-        }}
+        className="flex items-center gap-2.5 px-3.5 py-2.5 border-b"
+        style={{ borderColor: `color-mix(in srgb, ${color} 14%, transparent)` }}
       >
-        <button
-          type="button"
-          onClick={onToggle}
-          className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left cursor-pointer"
-        >
-          <span
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{ background: color }}
-          />
-          <span className="text-[15px] font-black tracking-tight text-primary/85 truncate">
-            {capa.capa}
-          </span>
-          <span
-            className="text-micro font-black uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0"
-            style={{
-              color: `color-mix(in srgb, ${color} 70%, black)`,
-              background: `color-mix(in srgb, ${color} 16%, transparent)`,
-            }}
-          >
-            {capa.conceptos.length} concepto{capa.conceptos.length === 1 ? "" : "s"}
-          </span>
-          <span className="flex-1" />
-          {abierta ? (
-            <ChevronDown size={15} className="text-primary/40 shrink-0" />
-          ) : (
-            <ChevronRight size={15} className="text-primary/40 shrink-0" />
-          )}
-        </button>
-
-        {abierta && (
-          <div
-            className="flex flex-col gap-2 px-3.5 pb-3.5 pt-1 border-t"
-            style={{ borderColor: `color-mix(in srgb, ${color} 20%, transparent)` }}
-          >
-            {capa.conceptos.map((concepto) => (
-              <TarjetaConcepto key={concepto.id} concepto={concepto} color={color} />
-            ))}
-          </div>
-        )}
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+        <span className="text-sm font-bold tracking-tight text-primary/75 truncate">
+          {capa.capa}
+        </span>
+        <span className="flex-1" />
+        <span className="text-micro font-semibold text-primary/35 shrink-0">
+          {capa.conceptos.length} concepto{capa.conceptos.length === 1 ? "" : "s"}
+        </span>
       </div>
 
-      {/* Conector vertical hacia la siguiente capa — línea + flechita,
-          mismo lenguaje visual que el diagrama de bloques apilados. */}
-      {!esUltima && (
-        <div className="flex flex-col items-center h-5">
-          <div className="w-px flex-1" style={{ background: "color-mix(in srgb, var(--primary) 18%, transparent)" }} />
-          <svg width="10" height="6" viewBox="0 0 10 6" className="text-primary/25 -mt-px">
-            <path d="M0 0 L5 6 L10 0 Z" fill="currentColor" />
-          </svg>
-        </div>
-      )}
+      {/* Grid de tarjetas en vez de lista vertical: aprovecha mejor el
+          ancho de la columna cuando hay varios conceptos cortos por capa
+          (ej. Estructuras con 38, Células con 34). */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5">
+        {capa.conceptos.map((concepto) => (
+          <TarjetaConcepto key={concepto.id} concepto={concepto} color={color} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -307,26 +263,26 @@ function TarjetaConcepto({
 }) {
   return (
     <div
-      className="flex flex-col gap-1.5 rounded-lg border-l-4 bg-primary/[0.03] px-3 py-2.5"
-      style={{ borderLeftColor: color }}
+      className="flex flex-col gap-1 rounded-lg border-l-[3px] bg-primary/[0.02] px-2.5 py-2"
+      style={{ borderLeftColor: `color-mix(in srgb, ${color} 55%, transparent)` }}
     >
-      <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/60">
+      <span className="text-micro font-bold uppercase tracking-[0.1em] text-primary/50">
         {concepto.concepto}
       </span>
-      <p className="text-sm text-primary/75 leading-snug">{concepto.explicacion}</p>
+      <p className="text-sm text-primary/70 leading-snug">{concepto.explicacion}</p>
 
       {concepto.formula && (
-        <div className="rounded bg-primary/5 px-2 py-1 font-mono text-micro text-primary/60 w-fit">
+        <div className="rounded bg-primary/5 px-2 py-1 font-mono text-micro text-primary/50 w-fit">
           {concepto.formula}
         </div>
       )}
 
       {concepto.ejemplo && (
-        <p className="text-micro text-primary/45 italic">Ejemplo: {concepto.ejemplo}</p>
+        <p className="text-micro text-primary/40 italic">Ejemplo: {concepto.ejemplo}</p>
       )}
 
       {concepto.dependencias && (
-        <p className="text-micro text-primary/35">Depende de: {concepto.dependencias}</p>
+        <p className="text-micro text-primary/30">Depende de: {concepto.dependencias}</p>
       )}
     </div>
   );
