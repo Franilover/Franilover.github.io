@@ -47,22 +47,41 @@ export const CONFIG_COMPUESTO_ENLACES = {
 export function useCompuestoEnlaces(compuestoId: string | null) {
   const [items, setItems] = useState<CompuestoEnlaceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!compuestoId) {
       setItems([]);
       setLoading(false);
+      setError(null);
       return;
     }
     setLoading(true);
+    setError(null);
 
-    const { data, error } = await supabase
+    const { data, error: fetchError } = await supabase
       .from(CONFIG_COMPUESTO_ENLACES.tabla)
       .select(CONFIG_COMPUESTO_ENLACES.select)
       .eq("compuesto_id", compuestoId);
 
-    if (error || !data) {
+    if (fetchError || !data) {
+      // Antes esto se tragaba en silencio (setItems([]) sin loguear nada),
+      // indistinguible en UI de "este compuesto no tiene enlaces" — el
+      // bloque Enlaces simplemente desaparecía (ver EnlacesCompuestoBloque:
+      // `if (loading || enlaces.length === 0) return null`), reportado
+      // como "no carga" sin ninguna pista de si era un error real o 0 filas.
+      // El select con embed (enlace_sitios:enlace_sitios_id (...)) es más
+      // frágil que un select plano — cualquier problema resolviendo esa
+      // relación en PostgREST cae acá. Logueado para poder diagnosticarlo
+      // la próxima vez en vez de adivinar contra el esquema a ciegas.
+      if (fetchError) {
+        console.error(
+          `[useCompuestoEnlaces] Error cargando enlaces de compuesto ${compuestoId}:`,
+          fetchError,
+        );
+      }
       setItems([]);
+      setError(fetchError?.message ?? null);
       setLoading(false);
       return;
     }
@@ -101,5 +120,5 @@ export function useCompuestoEnlaces(compuestoId: string | null) {
     void load();
   }, [load]);
 
-  return { items, loading, load };
+  return { items, loading, error, load };
 }

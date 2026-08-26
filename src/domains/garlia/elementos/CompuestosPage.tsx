@@ -844,13 +844,31 @@ function EstabilidadDetalleBloque({
 function EnlacesCompuestoBloque({
   enlaces,
   loading,
+  error,
   elementos,
 }: {
   enlaces: CompuestoEnlaceRow[];
   loading: boolean;
+  error?: string | null;
   elementos: Elemento[];
 }) {
-  if (loading || enlaces.length === 0) return null;
+  if (loading) return null;
+  // Antes: `if (loading || enlaces.length === 0) return null` — un error
+  // real de fetch (ver useCompuestoEnlaces) caía en el mismo return null
+  // que "este compuesto no tiene enlaces", indistinguible en pantalla.
+  // Ahora el error se muestra explícito; solo el caso realmente vacío
+  // (sin error, 0 filas) sigue sin renderizar nada.
+  if (error) {
+    return (
+      <div className="flex flex-col gap-1.5 rounded-lg border border-red-200 bg-red-50 p-2">
+        <span className="text-micro font-black uppercase tracking-[0.2em] text-red-500">
+          Enlaces — error al cargar
+        </span>
+        <span className="text-micro text-red-500/80">{error}</span>
+      </div>
+    );
+  }
+  if (enlaces.length === 0) return null;
 
   const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(2));
   const nombreEl = (id: string) => {
@@ -991,7 +1009,7 @@ function CompuestoEditor({
   const { item: estabilidadDetalle, loading: estabilidadLoading } = useCompuestoEstabilidad(
     compuesto.id,
   );
-  const { items: enlacesCompuesto, loading: enlacesLoading } = useCompuestoEnlaces(compuesto.id);
+  const { items: enlacesCompuesto, loading: enlacesLoading, error: enlacesError } = useCompuestoEnlaces(compuesto.id);
 
   async function persistElemento(id: string, cambios: Partial<Elemento>) {
     try {
@@ -1213,7 +1231,7 @@ function CompuestoEditor({
           />
           <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
         </div>
-        <EnlacesCompuestoBloque enlaces={enlacesCompuesto} loading={enlacesLoading} elementos={elementos} />
+        <EnlacesCompuestoBloque enlaces={enlacesCompuesto} loading={enlacesLoading} error={enlacesError} elementos={elementos} />
       </div>
 
       {editandoElementoId && (
