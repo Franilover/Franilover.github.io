@@ -20,6 +20,7 @@
 
 import {
   Atom,
+  Boxes,
   Bug,
   Brain,
   Dices,
@@ -73,6 +74,7 @@ import {
 import { useWikilink } from "@/domains/garlia/_shared/WikilinkContext";
 import { useCriaturaAsideCatalogs } from "@/domains/garlia/criaturas/useCriaturaAsideCatalogs";
 import { useCriaturaOrganos } from "@/domains/garlia/criaturas/useCriaturaOrganos";
+import { useCriaturaOrganismos } from "@/domains/garlia/criaturas/useCriaturaOrganismos";
 import { useMembresiaSubsistemaCriatura } from "@/domains/garlia/criaturas/useMembresiaSubsistemaCriatura";
 import { usePersonajesDeCriatura } from "@/domains/garlia/criaturas/usePersonajesDeCriatura";
 import { useMembresiaGruposCriatura } from "@/domains/garlia/grupos/useMembresiaGruposCriatura";
@@ -85,9 +87,10 @@ import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
 import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
 import { PanelEditorCelula, PanelEditorTejido } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
+import { useOrganismos } from "@/domains/garlia/elementos/useOrganismos";
 import { usePerfilesAtomicosCriatura } from "@/domains/garlia/biologia/useBiologia";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
-import type { Organo } from "@/domains/garlia/elementos/types";
+import type { Organo, Organismo } from "@/domains/garlia/elementos/types";
 import { useOris } from "@/domains/garlia/fisica/useFisica";
 import { supabase } from "@/infra/supabase/supabase";
 import { dexiePut, dexieDelete } from "@/lib/utils/dexieHelpers";
@@ -125,7 +128,7 @@ export function EditorCriatura({
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [showModalDnd, setShowModalDnd] = useState(false);
   const [panelActivo, setPanelActivo] = useState<
-    "clasificacion" | "ilustraciones" | "perfilAtomico" | "organos" | null
+    "clasificacion" | "ilustraciones" | "perfilAtomico" | "organos" | "organismo" | null
   >(null);
   const { onWikilink } = useWikilink();
 
@@ -177,6 +180,13 @@ export function EditorCriatura({
   const { items: compuestosOrganos, setItems: setCompuestosOrganos } = useCompuestosConElementos();
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
   const organosCriatura = useCriaturaOrganos(form.id, catalogoOrganos);
+  // ── Organismo (techo de la cadena: Célula→Tejido→Órgano→Sistema→
+  // Organismo, aplicado a esta Criatura) — tabla dedicada
+  // criatura_organismos, hueco de datos real hasta ahora (0 filas), ver
+  // useCriaturaOrganismos.ts. Catálogo de Organismo es independiente del
+  // de Órganos de arriba, así que trae su propio useOrganismos().
+  const { items: catalogoOrganismos } = useOrganismos();
+  const organismosCriatura = useCriaturaOrganismos(form.id);
   // Panel de la Célula abierto al clickear "hecho de: [Célula]" en la fila
   // de fórmula de un Tejido (Órgano→Tejido→Célula→Compuesto). Ver misma
   // nota en MineralEditor.tsx/EditorItem.tsx (su espejo Grano).
@@ -397,6 +407,22 @@ export function EditorCriatura({
       </button>
 
       <button
+        className={`shrink-0 flex items-center gap-1 px-2 h-7 rounded-lg border text-micro font-black uppercase tracking-widest transition-all ${
+          panelActivo === "organismo"
+            ? "border-primary/40 text-primary bg-primary/8"
+            : "border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5"
+        }`}
+        title="Organismo"
+        type="button"
+        onClick={() =>
+          setPanelActivo((p) => (p === "organismo" ? null : "organismo"))
+        }
+      >
+        <Boxes size={11} />
+        <span className="hidden md:inline">Organismo</span>
+      </button>
+
+      <button
         className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all"
         title="Reglas D&D 2024"
         type="button"
@@ -604,6 +630,16 @@ export function EditorCriatura({
                     onDelete={(vinculoId) => void organosCriatura.desvincularOrgano(vinculoId)}
                     onAbrirGrupo={(id) => setEditandoGrupoId(id)}
                     onAbrirCelula={setEditandoCelulaId}
+                  />
+                ) : panelActivo === "organismo" ? (
+                  <PanelOrganismosCriatura
+                    items={organismosCriatura.items}
+                    loading={organismosCriatura.loading}
+                    catalogo={catalogoOrganismos}
+                    onAgregar={(id) => void organismosCriatura.vincularExistente(id)}
+                    onActualizar={organismosCriatura.actualizarVinculo}
+                    onMarcarPrincipal={organismosCriatura.marcarPrincipal}
+                    onQuitar={(vinculoId) => void organismosCriatura.quitar(vinculoId)}
                   />
                 ) : (
                   <div className="max-h-[70vh] overflow-y-auto pr-0.5">
@@ -1107,6 +1143,163 @@ function ModalReglasDndCriatura({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Panel Organismo: vincula/gestiona Organismo(s) de la criatura vía
+// criatura_organismos (rol, cantidad, es_principal) — mismo lenguaje
+// visual que SeccionGruposVinculados/ListaVinculos* de Biología, pero
+// propio acá porque el shape (es_principal + cantidad numérica) no calza
+// con esos componentes genéricos (pensados para rol/proporción de texto). ─
+
+function PanelOrganismosCriatura({
+  items,
+  loading,
+  catalogo,
+  onAgregar,
+  onActualizar,
+  onMarcarPrincipal,
+  onQuitar,
+}: {
+  items: {
+    vinculo_id: string;
+    organismo_id: string;
+    rol: string | null;
+    cantidad: number;
+    es_principal: boolean;
+    organismo: Organismo;
+  }[];
+  loading: boolean;
+  catalogo: Organismo[];
+  onAgregar: (organismoId: string) => void;
+  onActualizar: (
+    vinculoId: string,
+    cambios: Partial<{ rol: string | null; cantidad: number }>,
+  ) => void;
+  onMarcarPrincipal: (vinculoId: string, esPrincipal: boolean) => void;
+  onQuitar: (vinculoId: string) => void;
+}) {
+  const [buscando, setBuscando] = useState(false);
+
+  const yaVinculadosIds = useMemo(() => new Set(items.map((v) => v.organismo_id)), [items]);
+  const disponibles = useMemo(
+    () => catalogo.filter((o) => !yaVinculadosIds.has(o.id)),
+    [catalogo, yaVinculadosIds],
+  );
+
+  return (
+    <div className="flex flex-col gap-3 max-h-[70vh] overflow-y-auto pr-0.5">
+      <div>
+        <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/40">
+          Organismo
+        </p>
+        <p className="text-micro text-primary/40 mt-0.5">
+          Techo de la cadena biológica (Célula→Tejido→Órgano→Sistema→Organismo) aplicado a
+          esta criatura — qué Organismo(s) del catálogo tiene, con cantidad y cuál es el
+          principal.
+        </p>
+      </div>
+
+      {loading ? (
+        <p className="text-micro text-primary/25 italic py-1">Cargando…</p>
+      ) : items.length === 0 ? (
+        <p className="text-micro text-primary/25 italic py-1">Sin Organismo vinculado todavía.</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {items.map((v) => (
+            <div
+              key={v.vinculo_id}
+              className="flex flex-col gap-1.5 bg-primary/5 rounded-md px-2.5 py-2 border border-primary/10"
+            >
+              <div className="flex items-center gap-1.5">
+                <Boxes size={11} className="text-primary/40 shrink-0" />
+                <span className="flex-1 min-w-0 truncate text-micro font-bold text-primary/80">
+                  {v.organismo.nombre || "Sin nombre"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onMarcarPrincipal(v.vinculo_id, !v.es_principal)}
+                  title={v.es_principal ? "Principal — click para desmarcar" : "Marcar como principal"}
+                  className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-black uppercase tracking-widest border transition-colors cursor-pointer ${
+                    v.es_principal
+                      ? "border-accent/40 text-accent bg-accent/10"
+                      : "border-primary/15 text-primary/35 hover:text-primary hover:border-primary/35"
+                  }`}
+                >
+                  <Star size={9} />
+                  Principal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onQuitar(v.vinculo_id)}
+                  title="Quitar"
+                  className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-primary/40 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 pl-[19px]">
+                <input
+                  value={v.rol ?? ""}
+                  onChange={(e) => onActualizar(v.vinculo_id, { rol: e.target.value })}
+                  placeholder="Rol (ej. huésped, simbionte)…"
+                  className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-micro text-primary/60 outline-none placeholder:text-primary/25"
+                />
+                <input
+                  type="number"
+                  value={v.cantidad}
+                  onChange={(e) =>
+                    onActualizar(v.vinculo_id, { cantidad: Number(e.target.value) || 0 })
+                  }
+                  className="w-16 shrink-0 bg-transparent px-0 py-0.5 text-micro text-primary/60 outline-none text-right"
+                  title="Cantidad"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {buscando ? (
+        <div className="flex flex-col gap-1 border border-primary/10 rounded-md p-2">
+          {disponibles.length === 0 ? (
+            <p className="text-micro text-primary/25 italic py-1">
+              No hay más Organismos disponibles en el catálogo.
+            </p>
+          ) : (
+            disponibles.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => {
+                  onAgregar(o.id);
+                  setBuscando(false);
+                }}
+                className="text-left text-micro text-primary/70 hover:text-accent px-1.5 py-1 rounded hover:bg-primary/5 transition-colors cursor-pointer"
+              >
+                {o.nombre}
+              </button>
+            ))
+          )}
+          <button
+            type="button"
+            onClick={() => setBuscando(false)}
+            className="self-start text-micro text-primary/35 hover:text-primary/60 mt-1 cursor-pointer"
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setBuscando(true)}
+          className="flex items-center gap-1 self-start text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors cursor-pointer"
+        >
+          <Wand2 size={10} /> Agregar organismo existente
+        </button>
+      )}
     </div>
   );
 }

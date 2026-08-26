@@ -654,6 +654,30 @@ export const CONFIG_ORGANISMO_SISTEMAS = {
   select: "id, organismo_id, sistema_id, proporcion, created_at",
 };
 
+/** Fila puente criatura_organismos: qué Organismo(s) tiene una Criatura —
+ *  techo de la cadena biológica (Célula→Tejido→Órgano→Sistema→Organismo)
+ *  aplicado a una Criatura real, no solo al catálogo. A diferencia de
+ *  organismo_sistemas, tiene `es_principal` (para distinguir el organismo
+ *  base del cuerpo de posibles simbiontes/parásitos vinculados) y
+ *  `cantidad` (obligatoria, default numérico en la base) en vez de una
+ *  `proporcion` de texto libre. Hueco de datos real al momento de crear
+ *  este hook (0 filas en Supabase) — no es solo un hueco de frontend, ver
+ *  useCriaturaOrganismos.ts para el detalle. */
+export interface CriaturaOrganismo {
+  id: string;
+  criatura_id: string;
+  organismo_id: string;
+  rol: string | null;
+  cantidad: number;
+  es_principal: boolean;
+  created_at: string;
+}
+
+export const CONFIG_CRIATURA_ORGANISMOS = {
+  tabla: "criatura_organismos",
+  select: "id, criatura_id, organismo_id, rol, cantidad, es_principal, created_at",
+};
+
 // ─── Granos / Vetas: composición de una Formación (minerales) ────────────
 // Espejo inerte de Célula/Tejido: Formacion → formacion_vetas → Veta →
 // (estructura_componentes) → Grano → (estructura_componentes) → Compuesto.
