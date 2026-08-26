@@ -108,7 +108,7 @@ function BloqueAlertasEstequiometria() {
             </Text>
             <Badge variant={varianteBadgeSeveridad(grupo)}>{alertas.length}</Badge>
           </div>
-          <div className="max-h-[280px] overflow-y-auto">
+          <div>
             {alertas.map((alerta) => (
               <FilaAlertaEstequiometria key={alerta.id} alerta={alerta} />
             ))}
@@ -207,7 +207,7 @@ function BloqueConsistenciaIssues() {
               </Text>
               <Badge variant={varianteBadgeSeveridad(grupo)}>{issues.length}</Badge>
             </div>
-            <div className="max-h-[280px] overflow-y-auto">
+            <div>
               {issues.map((issue) => (
                 <FilaConsistenciaIssue key={issue.id} issue={issue} />
               ))}

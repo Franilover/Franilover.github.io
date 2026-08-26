@@ -3,20 +3,21 @@
 /**
  * AuditoriaSection.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Orquestador de la sección "Auditoría": agrupa los 3 paneles (Estado
- * Maestro / Auditoría de derivación / Alertas) bajo tabs internas, mismo
- * patrón visual que SelectorSeccionMagia en RunasPage.tsx (chips
- * redondeados con ícono, sin dependencias nuevas). Reemplaza el registro
- * directo de EstadoMaestroPanel en EditorMundoRoot.tsx hecho en el paso
- * anterior — un solo toque adicional a EditorMundoRoot para apuntar acá.
+ * Orquestador de la sección "Estado del Mundo". Antes eran 3 tabs
+ * (Estado / Auditoría / Alertas) mostradas una a la vez — con el volumen
+ * real de datos (estado maestro + tablas de auditoría + alertas) obligaba
+ * a saltar de tab en tab para tener una foto completa. Ahora las 3 viven
+ * a la vez, como 3 columnas internas de una sola página:
+ *   Estado | Auditoría de derivación | Alertas
+ * cada una con su propio scroll interno, así que se puede tener el estado
+ * maestro a la vista mientras se revisa una discrepancia sin perder
+ * contexto. Responsive: en pantallas angostas las columnas se apilan.
  *
- * La tab activa NO se persiste entre sesiones (a diferencia de
- * useMagiaSeccionStore): es un dashboard de solo lectura, no hay costo real
- * en que siempre abra en "Estado" — evita sumar otro store solo para esto.
+ * Solo lectura, igual que antes — ningún panel escribe en Supabase.
  */
 
 import { ClipboardList, ListChecks, ShieldAlert } from "lucide-react";
-import React, { useState } from "react";
+import React from "react";
 
 import { Text } from "@/ui/Tipografia";
 
@@ -24,59 +25,43 @@ import { EstadoMaestroPanel } from "./EstadoMaestroPanel";
 import { AuditoriaDerivacionPanel } from "./AuditoriaDerivacionPanel";
 import { AlertasPanel } from "./AlertasPanel";
 
-type TabAuditoria = "estado" | "derivacion" | "alertas";
-
-const TABS: { key: TabAuditoria; label: string; Icon: React.ElementType }[] = [
-  { key: "estado", label: "Estado", Icon: ClipboardList },
-  { key: "derivacion", label: "Auditoría", Icon: ListChecks },
-  { key: "alertas", label: "Alertas", Icon: ShieldAlert },
-];
-
-function SelectorTabAuditoria({
-  tab,
-  onCambiarTab,
-}: {
-  tab: TabAuditoria;
-  onCambiarTab: (tab: TabAuditoria) => void;
-}) {
+function ColumnaHeader({ Icon, label }: { Icon: React.ElementType; label: string }) {
   return (
-    <div className="flex items-center justify-center gap-0.5">
-      {TABS.map(({ key, label, Icon }) => {
-        const activa = tab === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onCambiarTab(key)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.1em] transition-colors ${
-              activa ? "bg-primary/10 text-primary" : "text-primary/35 hover:text-primary/60"
-            }`}
-          >
-            <Icon size={11} />
-            {label}
-          </button>
-        );
-      })}
+    <div className="flex items-center gap-1.5 px-1 pb-2 mb-2 border-b border-primary/10">
+      <Icon size={13} className="text-primary/35 shrink-0" />
+      <Text variant="lbl" className="text-primary/50">
+        {label}
+      </Text>
     </div>
   );
 }
 
 export function AuditoriaSection() {
-  const [tab, setTab] = useState<TabAuditoria>("estado");
-
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-primary/10">
+      <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-primary/10">
         <Text variant="lbl" className="text-primary/50">
           Estado del Mundo
         </Text>
-        <SelectorTabAuditoria tab={tab} onCambiarTab={setTab} />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-        {tab === "estado" && <EstadoMaestroPanel />}
-        {tab === "derivacion" && <AuditoriaDerivacionPanel />}
-        {tab === "alertas" && <AlertasPanel />}
+      <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden px-4 py-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:h-full">
+          <div className="min-w-0 md:h-full md:overflow-y-auto md:pr-1">
+            <ColumnaHeader Icon={ClipboardList} label="Estado" />
+            <EstadoMaestroPanel />
+          </div>
+
+          <div className="min-w-0 md:h-full md:overflow-y-auto md:pr-1">
+            <ColumnaHeader Icon={ListChecks} label="Auditoría" />
+            <AuditoriaDerivacionPanel />
+          </div>
+
+          <div className="min-w-0 md:h-full md:overflow-y-auto md:pr-1">
+            <ColumnaHeader Icon={ShieldAlert} label="Alertas" />
+            <AlertasPanel />
+          </div>
+        </div>
       </div>
     </div>
   );

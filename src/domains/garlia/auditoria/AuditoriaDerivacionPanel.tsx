@@ -67,12 +67,7 @@ function FilaCompuesto({ row }: { row: AuditoriaCompuestoRow }) {
           <span
             key={r.label}
             title={`${r.label}: ${r.ok ? "coincide" : "discrepancia"}`}
-            className="w-2 h-2 rounded-full"
-            style={{
-              background: r.ok
-                ? "color-mix(in srgb, #22c55e 70%, transparent)"
-                : "color-mix(in srgb, #ef4444 70%, transparent)",
-            }}
+            className={`w-2 h-2 rounded-full ${r.ok ? "bg-green-500/70" : "bg-red-500/70"}`}
           />
         ))}
       </div>
@@ -113,7 +108,7 @@ function TablaCompuestos() {
           Solo con discrepancias
         </Badge>
       </div>
-      <div className="border border-primary/10 rounded-lg overflow-hidden max-h-[420px] overflow-y-auto">
+      <div className="border border-primary/10 rounded-lg overflow-hidden">
         {filtrados.map((row) => (
           <FilaCompuesto key={row.id} row={row} />
         ))}
@@ -139,7 +134,7 @@ function TablaElementos() {
       <Text variant="lbl" className="mb-2 px-1 block">
         Elementos ({items.length}) — valores de referencia, sin semáforo propio
       </Text>
-      <div className="border border-primary/10 rounded-lg overflow-hidden max-h-[420px] overflow-y-auto">
+      <div className="border border-primary/10 rounded-lg overflow-hidden">
         {items.map((row) => (
           <button
             key={row.id}
