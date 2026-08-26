@@ -4,22 +4,23 @@
  * useMagiaSeccionStore (Zustand + persist)
  * ───────────────────────────────────────────────────────────────────────────
  * Recuerda, entre recargas, qué sub-tab de "Magia" estaba abierta (Runas /
- * Química / Física / Biología) y qué item estaba seleccionado dentro de
- * cada una (runa / elemento / oris). Antes ambos eran useState locales en
- * RunasPage — se perdían al refrescar la página, forzando volver a navegar
- * desde cero cada vez.
+ * Química / Física / Biología / Lógica) y qué item estaba seleccionado
+ * dentro de cada una (runa / elemento / oris). Antes ambos eran useState
+ * locales en RunasPage — se perdían al refrescar la página, forzando
+ * volver a navegar desde cero cada vez.
  *
  * Solo se persiste lo que ya tiene soporte de deep-link vía props en su
  * página respectiva (seleccionarRunaId / seleccionarElementoId /
- * seleccionarOrisId) — Biología no expone ese hook todavía (Cladística
- * maneja su selección internamente), así que por ahora solo se recuerda
- * qué sub-tab quedó activa ahí, no un item puntual.
+ * seleccionarOrisId) — Biología y Lógica no exponen ese hook todavía
+ * (Cladística y el mapa de capas manejan su selección internamente), así
+ * que por ahora solo se recuerda qué sub-tab quedó activa ahí, no un item
+ * puntual.
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type SeccionMagia = "runas" | "tabla" | "fisica" | "biologia";
+export type SeccionMagia = "runas" | "tabla" | "fisica" | "biologia" | "logica";
 
 interface MagiaSeccionState {
   seccion: SeccionMagia;
