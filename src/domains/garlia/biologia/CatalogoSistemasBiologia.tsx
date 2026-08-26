@@ -39,6 +39,10 @@ import {
 import { useSistemasDeUnOrgano } from "@/domains/garlia/elementos/useSistemasDeUnOrgano";
 import type { Organismo, Organo, Sistema } from "@/domains/garlia/elementos/types";
 import { BreadcrumbJerarquia } from "./BreadcrumbJerarquia";
+import {
+  GridPropiedadesCalculadas,
+  fuenteDePropiedadesCalculadas,
+} from "@/domains/garlia/_shared/GridPropiedadesCalculadas";
 
 interface Props {
   organos: Organo[];
@@ -473,6 +477,17 @@ function PanelEditorOrganismo({
               onQuitar={vinculosSistema.quitar}
               onAbrirItem={onAbrirSistema}
             />
+
+            <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1 mt-4">
+              Propiedades calculadas
+              {fuenteDePropiedadesCalculadas(item.propiedades_calculadas) && (
+                <span className="normal-case font-normal text-primary/25">
+                  {" "}
+                  · derivadas de {fuenteDePropiedadesCalculadas(item.propiedades_calculadas)}
+                </span>
+              )}
+            </p>
+            <GridPropiedadesCalculadas propiedades={item.propiedades_calculadas} />
           </div>
 
           <div className="md:w-1/2 min-w-0 flex flex-col gap-3">

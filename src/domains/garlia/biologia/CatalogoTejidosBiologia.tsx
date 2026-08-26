@@ -47,6 +47,7 @@ import { useTejidosDeUnaCelula } from "@/domains/garlia/elementos/useTejidosDeUn
 import { useOrganosDeUnTejido } from "@/domains/garlia/elementos/useOrganosDeUnTejido";
 import { useOrganosDeUnaCelula } from "@/domains/garlia/elementos/useOrganosDeUnaCelula";
 import type { Celula, Compuesto, Estructura, Tejido } from "@/domains/garlia/elementos/types";
+import { GridPropiedadesCalculadas } from "@/domains/garlia/_shared/GridPropiedadesCalculadas";
 import { BreadcrumbJerarquia } from "./BreadcrumbJerarquia";
 
 interface Props {
@@ -309,60 +310,8 @@ function GridSimple<T extends { id: string; nombre: string }>({
 // estructura_compuestos). Mismo motivo de solo-lectura que Célula: se
 // puebla por migración/cálculo, no por edición manual acá. ─────────────────
 
-/** Etiquetas legibles para las claves numéricas más comunes de
- *  propiedades_calculadas — el resto de claves (fuente, método, version,
- *  ponderación) son metadata, no métricas, y se omiten del grid. */
-const ETIQUETAS_METRICA_ESTRUCTURA: Record<string, string> = {
-  masa: "Masa",
-  carga: "Carga",
-  rigidez: "Rigidez",
-  cohesion: "Cohesión",
-  estabilidad: "Estabilidad",
-  flexibilidad: "Flexibilidad",
-  compatibilidad: "Compatibilidad",
-  energia_enlace: "Energía de enlace",
-  subestructuras: "Subestructuras",
-  soporte_estructural: "Soporte estructural",
-  componentes_directos: "Componentes directos",
-  interfaces_con_datos: "Interfaces con datos",
-  resistencia_estructural: "Resistencia estructural",
-  flexibilidad_estructural: "Flexibilidad estructural",
-};
-
-/** Claves de metadata (no métricas) que no se muestran como tarjeta. */
-const CLAVES_METADATA_ESTRUCTURA = new Set(["fuente", "metodo", "version", "ponderacion"]);
-
-function GridMetricasEstructura({ propiedades }: { propiedades: Record<string, unknown> | null }) {
-  if (!propiedades) {
-    return <p className="text-micro text-primary/25 italic py-1">Sin propiedades calculadas todavía.</p>;
-  }
-
-  const entradas = Object.entries(propiedades).filter(
-    ([clave, valor]) => !CLAVES_METADATA_ESTRUCTURA.has(clave) && valor !== null && valor !== undefined,
-  );
-
-  if (entradas.length === 0) {
-    return <p className="text-micro text-primary/25 italic py-1">Sin propiedades calculadas todavía.</p>;
-  }
-
-  return (
-    <div className="grid grid-cols-2 gap-1.5">
-      {entradas.map(([clave, valor]) => (
-        <div
-          key={clave}
-          className="flex flex-col gap-0.5 bg-primary/5 rounded-md px-2 py-1.5 border border-primary/10"
-        >
-          <span className="text-[10px] font-black uppercase tracking-widest text-primary/35 truncate">
-            {ETIQUETAS_METRICA_ESTRUCTURA[clave] ?? clave}
-          </span>
-          <span className="text-micro font-black text-primary/80">
-            {typeof valor === "number" ? Number(valor.toFixed(4)).toString() : String(valor)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
+/** Etiquetas legibles y grid: ver componente compartido
+ *  GridPropiedadesCalculadas (mismo jsonb shape que usa Organismo). */
 
 function ListaCompuestosDeEstructura({
   items,
@@ -452,7 +401,7 @@ function PanelVerEstructura({
             <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
               Propiedades calculadas
             </p>
-            <GridMetricasEstructura propiedades={item.propiedades_calculadas} />
+            <GridPropiedadesCalculadas propiedades={item.propiedades_calculadas} />
           </div>
 
           <div className="md:w-1/2 min-w-0 flex flex-col gap-3">
