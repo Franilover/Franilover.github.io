@@ -30,21 +30,29 @@
  *
  *   - v_auditoria_compuestos_derivacion: estado_derivacion viene SIEMPRE en
  *     "discrepancia" para las 90 filas actuales (verificado). Esto NO
- *     significa que los 90 compuestos estén mal: masa/carga/rigidez/
- *     flexibilidad derivadas coinciden con las almacenadas en el 100% de
- *     los casos verificados; la discrepancia real está acotada a
- *     estabilidad/energía de enlace, cuya fórmula canónica sigue pendiente
- *     de decisión (ver estado_proyecto, pendientes de energia_enlace). Por
- *     eso el semáforo de UI se calcula en frontend comparando cada par
- *     valor/valor_derivado por separado — NUNCA leyendo estado_derivacion
- *     como si fuera un veredicto binario ok/mal, porque hoy marcaría el
- *     100% de las filas como rojas de forma engañosa.
+ *     significa que los 90 compuestos estén mal en todas sus propiedades:
+ *     masa/carga derivadas SÍ coinciden con las almacenadas en el 100% de
+ *     los casos (0/90 diffs), pero estabilidad, rigidez y flexibilidad
+ *     también discrepan hoy (89/90, 87/90 y 90/90 respectivamente —
+ *     re-verificado tras el cambio de fórmula de rigidez/flexibilidad en
+ *     estado_proyecto v141-v142, que ahora incorpora enlaces; la vista
+ *     _derivada aparenta seguir comparando contra la fórmula vieja sin
+ *     enlaces). Ya NO es correcto decir que la discrepancia está acotada a
+ *     estabilidad/energía de enlace. Por eso el semáforo de UI se calcula
+ *     en frontend comparando cada par valor/valor_derivado por separado —
+ *     NUNCA leyendo estado_derivacion como si fuera un veredicto binario
+ *     ok/mal, porque hoy marcaría el 100% de las filas como rojas de forma
+ *     engañosa.
  *
  *   - v_auditoria_elementos_derivacion: fuente_propiedades y
- *     metodo_propiedades están NULL en las 67/67 filas (verificado) — son
- *     columnas vestigiales sin señal usable. Esta vista se muestra como
- *     tabla de valores planos, sin semáforo propio (inventar un veredicto
- *     que la vista no provee sería fabricar información).
+ *     metodo_propiedades YA NO están NULL (re-verificado) — las 67/67 filas
+ *     tienen ahora un valor constante único en cada columna
+ *     ("Teoria_Elementos_y_Compuestos_v1.0" / "derivacion_estructural_por_
+ *     nivel_armonico"). Es metadata de procedencia igual para toda la
+ *     tabla, no un veredicto por fila, así que la conclusión de UI sigue
+ *     siendo correcta: esta vista se muestra como tabla de valores planos,
+ *     sin semáforo propio (inventar un veredicto que la vista no provee
+ *     seguiría siendo fabricar información).
  */
 
 // ─── estado_proyecto ────────────────────────────────────────────────────
@@ -143,8 +151,10 @@ export interface AuditoriaElementoRow {
   ocupacion_externa: number;
   capacidad_externa: number;
   saturacion_externa: number;
-  /** NULL en 67/67 filas actuales — ver nota de cabecera. Se tipa igual
-   *  por si la vista se completa a futuro, pero no depender de esto hoy. */
+  /** Metadata de procedencia, valor CONSTANTE e igual para las 67/67 filas
+   *  actuales ("Teoria_Elementos_y_Compuestos_v1.0" / "derivacion_estructural_
+   *  por_nivel_armonico") — ya no NULL, pero al ser el mismo valor para toda
+   *  la tabla sigue sin ser una señal por fila. Ver nota de cabecera. */
   fuente_propiedades: string | null;
   metodo_propiedades: string | null;
 }

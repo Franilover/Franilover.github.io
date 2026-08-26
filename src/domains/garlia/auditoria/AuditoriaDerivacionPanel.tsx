@@ -7,13 +7,19 @@
  *   1. Compuestos — semáforo POR PROPIEDAD (masa/carga/estabilidad/rigidez/
  *      flexibilidad), comparando almacenado vs derivado. NO se usa
  *      estado_derivacion de la vista como veredicto único: hoy marca
- *      "discrepancia" en 90/90 filas porque agrupa estabilidad/energía
- *      -pendiente de fórmula canónica, ver estado_proyecto- junto con
- *      masa/carga/rigidez/flexibilidad -que sí coinciden siempre-. Mostrar
- *      esa columna sola pintaría el 100% de rojo de forma engañosa.
+ *      "discrepancia" en 90/90 filas, pero la discrepancia real NO está
+ *      acotada a estabilidad/energía. Re-verificado (2026) tras el cambio
+ *      de fórmula de rigidez/flexibilidad en estado_proyecto v141-v142
+ *      (ahora incorpora enlaces): masa/carga SÍ coinciden siempre
+ *      (0/90 diffs), pero estabilidad (89/90), rigidez (87/90) y
+ *      flexibilidad (90/90) también discrepan hoy. Mostrar la columna
+ *      estado_derivacion sola pintaría el 100% de rojo de forma engañosa;
+ *      por eso el semáforo se calcula por propiedad, individualmente.
  *   2. Elementos — tabla de valores planos, SIN semáforo: la vista no trae
- *      columna de veredicto usable (fuente_propiedades/metodo_propiedades
- *      están NULL en las 67/67 filas actuales).
+ *      columna de veredicto usable. fuente_propiedades/metodo_propiedades
+ *      ya no están NULL (67/67 filas tienen ahora un valor constante de
+ *      procedencia), pero al ser el mismo valor para toda la tabla siguen
+ *      sin ser una señal por fila, así que no se modela semáforo con ellas.
  *
  * Click en una fila de compuesto/elemento navega al editor real ya
  * existente (ElementosPage vía ElementosSection) usando
@@ -158,8 +164,9 @@ function TablaElementos() {
         ))}
       </div>
       <Text variant="xs" className="text-primary/30 mt-1.5 px-1">
-        Esta vista no trae columna de veredicto (fuente_propiedades/metodo_propiedades
-        vacías) — se muestra como referencia. Click abre el elemento en su editor real.
+        Esta vista no trae columna de veredicto por fila (fuente_propiedades/
+        metodo_propiedades son el mismo valor de procedencia para toda la tabla)
+        — se muestra como referencia. Click abre el elemento en su editor real.
       </Text>
     </div>
   );
