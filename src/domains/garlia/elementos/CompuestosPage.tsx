@@ -24,6 +24,7 @@ import {
   Plus,
   Save,
   Search,
+  Sparkles,
   Trash2,
   Wand2,
   X,
@@ -50,6 +51,12 @@ import { SelectorTagsCompuesto } from "./SelectorTagsCompuesto";
 import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
 import { useUsosCompuesto, type TipoUsoCompuesto, type UsoCompuesto } from "./useUsosCompuesto";
 import { sincronizarComponentesCompuesto } from "./useCompuestosConElementos";
+import {
+  useCompuestoEstabilidad,
+  useCompuestoElementosProporcion,
+  type CompuestoElementoProporcion,
+  type CompuestoEstabilidadRow,
+} from "./useCompuestoEstabilidad";
 import { useGranos } from "./useGranos";
 import { useCelulas } from "./useCelulas";
 import { useGranosDeUnCompuesto } from "./useGranosDeUnCompuesto";
@@ -86,10 +93,12 @@ import {
   ENLACE_LABEL,
   LAYER_LABEL,
   REACTIVIDAD_LABEL,
+  propiedadesCalculadasDeCompuesto,
   type ComponenteCompuesto,
   type Compuesto,
   type Elemento,
   type LayerName,
+  type PropiedadCalculada,
   type TipoAfinidad,
   type TipoEnlace,
 } from "./types";
@@ -662,6 +671,179 @@ function UsosCompuestoBloque({
   );
 }
 
+/**
+ * Sección de solo lectura con las propiedades físicas que Supabase calcula
+ * automáticamente (masa, estabilidad, rigidez, compatibilidad, energía de
+ * enlace, etc. — columnas directas en "compuestos") a partir de
+ * compuesto_elementos + elementos + compuesto_enlaces. Mismo criterio
+ * visual que PropiedadesFisicasBloque de ElementoEditor: nunca editable,
+ * marcado como "derivado".
+ */
+function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: PropiedadCalculada[] }) {
+  const conValor = propiedades.filter((p) => p.valor !== null);
+  if (conValor.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+      <div className="flex items-center gap-1.5">
+        <Sparkles size={11} className="text-accent/60 shrink-0" />
+        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+          Propiedades físicas
+        </span>
+        <span className="text-micro text-primary/25 normal-case tracking-normal">
+          — derivado automáticamente, no editable
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {conValor.map((p) => (
+          <div
+            key={p.clave}
+            title={p.descripcion}
+            className="flex flex-col gap-1 rounded-md border border-primary/10 px-2 py-1.5"
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-micro font-bold text-primary/50 truncate">{p.label}</span>
+              <span className="text-micro font-black text-primary/70 tabular-nums shrink-0 truncate max-w-[6.5rem] text-right">
+                {p.valor}
+              </span>
+            </div>
+            {p.proporcion !== undefined && (
+              <div className="h-1 rounded-full bg-primary/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-accent/50"
+                  style={{ width: `${p.proporcion * 100}%` }}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Composición real del compuesto (tabla "compuesto_elementos"): a
+ * diferencia de "cantidad" (editable arriba en SelectorElementosCompuesto),
+ * acá se muestra proporcion_molar/proporcion_deducida — la proporción real
+ * entre elementos que puede diferir de la cantidad simple (ej. Agua: 4:1 en
+ * cantidad pero 10:1 en proporcion_molar). Solo lectura.
+ */
+function ComposicionRealBloque({
+  proporciones,
+  loading,
+  elementos,
+}: {
+  proporciones: CompuestoElementoProporcion[];
+  loading: boolean;
+  elementos: Elemento[];
+}) {
+  if (loading || proporciones.length === 0) return null;
+  const tieneAlguna = proporciones.some((p) => p.proporcion_molar !== null);
+  if (!tieneAlguna) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+      <div className="flex items-center gap-1.5">
+        <Sparkles size={11} className="text-accent/60 shrink-0" />
+        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+          Composición real
+        </span>
+        <span className="text-micro text-primary/25 normal-case tracking-normal">
+          — proporción molar derivada, no editable
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {proporciones.map((p) => {
+          const el = elementos.find((e) => e.id === p.elemento_id);
+          return (
+            <div
+              key={p.id}
+              className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-primary/10 px-2 py-1"
+            >
+              <span className="text-micro font-bold text-primary/70 truncate">
+                {el?.simbolo || "??"} · {el?.nombre ?? "—"}
+              </span>
+              <span title="Proporción molar" className="text-micro tabular-nums text-primary/60">
+                molar {p.proporcion_molar !== null ? p.proporcion_molar : "—"}
+              </span>
+              <span
+                title="Proporción deducida (normalizada)"
+                className="text-micro font-black tabular-nums text-primary/70"
+              >
+                {p.proporcion_deducida !== null
+                  ? `${(p.proporcion_deducida * 100).toFixed(1)}%`
+                  : "—"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Detalle de estabilidad del compuesto (tabla "compuesto_estabilidad"):
+ * tensión, calidad de enlaces y complejidad estructural, calculado a partir
+ * de compuesto_enlaces — más granular que "estabilidad" (columna directa,
+ * ya mostrada en PropiedadesFisicasCompuestoBloque). No todos los
+ * compuestos tienen esta fila auxiliar (ver estado_proyecto), por eso
+ * devuelve null silenciosamente si no existe.
+ */
+function EstabilidadDetalleBloque({
+  detalle,
+  loading,
+}: {
+  detalle: CompuestoEstabilidadRow | null;
+  loading: boolean;
+}) {
+  if (loading || !detalle) return null;
+
+  const fmt = (v: number | null, digitos = 3) => (v === null ? "—" : v.toFixed(digitos));
+
+  const filas: { label: string; valor: string; descripcion: string }[] = [
+    { label: "Tensión", valor: fmt(detalle.tension), descripcion: "Cuánto desbalance/estrés hay entre los enlaces del compuesto." },
+    { label: "Calidad de enlaces", valor: fmt(detalle.calidad_enlaces), descripcion: "Qué tan buenos (compatibles y estables) son los enlaces formados." },
+    { label: "Complejidad estructural", valor: fmt(detalle.complejidad_estructural), descripcion: "Qué tan compleja es la estructura de enlaces del compuesto." },
+    { label: "Coste de organización", valor: fmt(detalle.coste_organizacion), descripcion: "Cuánto \"cuesta\" mantener organizada la estructura del compuesto." },
+    { label: "Confianza", valor: fmt(detalle.confianza), descripcion: "Qué tan confiable es este cálculo dado el estado actual de datos." },
+  ];
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+      <div className="flex items-center gap-1.5">
+        <Sparkles size={11} className="text-accent/60 shrink-0" />
+        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+          Estabilidad — detalle
+        </span>
+        {detalle.clasificacion && (
+          <span className="text-micro font-bold text-primary/50 bg-primary/5 rounded px-1.5 py-0.5">
+            {detalle.clasificacion}
+          </span>
+        )}
+        <span className="text-micro text-primary/25 normal-case tracking-normal">
+          — derivado, no editable
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {filas.map((f) => (
+          <div
+            key={f.label}
+            title={f.descripcion}
+            className="flex items-center justify-between gap-1 rounded-md border border-primary/10 px-2 py-1.5"
+          >
+            <span className="text-micro font-bold text-primary/50 truncate">{f.label}</span>
+            <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
+              {f.valor}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CompuestoEditor({
   compuesto,
   elementos,
@@ -743,6 +925,21 @@ function CompuestoEditor({
   // CatalogoVetasFisica/CatalogoTejidosBiologia.
   const granosCatalogo = useGranos();
   const celulasCatalogo = useCelulas();
+
+  // Propiedades físicas calculadas por Supabase (masa, estabilidad, rigidez,
+  // etc. — columnas directas en "compuestos") + detalle de proporción real
+  // por elemento (compuesto_elementos.proporcion_molar/deducida) + análisis
+  // de tensión/calidad de enlaces (compuesto_estabilidad). Las 3 fuentes son
+  // solo lectura, derivadas — ver propiedadesCalculadasDeCompuesto en types.ts.
+  const propiedadesFisicas = useMemo(
+    () => propiedadesCalculadasDeCompuesto(local),
+    [local],
+  );
+  const { items: proporcionElementos, loading: proporcionLoading } =
+    useCompuestoElementosProporcion(compuesto.id);
+  const { item: estabilidadDetalle, loading: estabilidadLoading } = useCompuestoEstabilidad(
+    compuesto.id,
+  );
 
   async function persistElemento(id: string, cambios: Partial<Elemento>) {
     try {
@@ -954,6 +1151,14 @@ function CompuestoEditor({
             </div>
           </div>
         </div>
+
+        <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
+        <ComposicionRealBloque
+          proporciones={proporcionElementos}
+          loading={proporcionLoading}
+          elementos={elementos}
+        />
+        <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
       </div>
 
       {editandoElementoId && (

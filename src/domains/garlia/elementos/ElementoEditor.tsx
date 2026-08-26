@@ -12,7 +12,7 @@
  * a Supabase + propagación al estado del padre via onActualizar.
  */
 
-import { Beaker, ChevronLeft } from "lucide-react";
+import { Beaker, ChevronLeft, Link2, Sparkles } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -35,14 +35,17 @@ import {
   PARTICLE_TYPES,
   capacidadExterna,
   layerTotal,
+  propiedadesCalculadasDeElemento,
   type Compuesto,
   type Elemento,
   type ElementFamily,
   type LayerName,
   type ParticleMap,
   type ParticleType,
+  type PropiedadCalculada,
 } from "./types";
 import { useParticulas } from "../fisica/useFisica";
+import { useElementoSitiosEnlace, type ElementoSitioEnlace } from "./useElementoSitiosEnlace";
 
 interface Props {
   elemento: Elemento;
@@ -128,6 +131,11 @@ export function ElementoEditor({
   // el elemento solo — mismo cálculo que para compuestos, aplicado a un
   // elemento suelto (ver calcularReactividadElemento en afinidad.ts).
   const reactividad = useMemo(() => calcularReactividadElemento(local), [local]);
+
+  // Propiedades físicas calculadas por Supabase (masa, estabilidad, rigidez,
+  // dureza, etc.) — puramente de lectura, ver propiedadesCalculadasDeElemento.
+  const propiedadesFisicas = useMemo(() => propiedadesCalculadasDeElemento(local), [local]);
+  const { items: sitiosEnlace, loading: sitiosLoading } = useElementoSitiosEnlace(elemento.id);
 
   // Compuestos donde se usa este elemento — para la columna junto a Notas.
   const compuestosQueLoUsan = useMemo(
@@ -441,6 +449,145 @@ export function ElementoEditor({
             </div>
           </div>
         </div>
+
+        <PropiedadesFisicasBloque propiedades={propiedadesFisicas} />
+        <SitiosEnlaceBloque sitios={sitiosEnlace} loading={sitiosLoading} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Sitios de enlace del elemento (tabla "elemento_sitios_enlace"): agrupa
+ * sitios idénticos (mismo tipo+geometría+afinidad+capacidad+selectividad,
+ * que es lo usual — ver useElementoSitiosEnlace) en una sola fila con un
+ * contador "×N", en vez de repetir la fila por cada numero_sitio. Solo
+ * lectura, mismo criterio derivado que PropiedadesFisicasBloque.
+ */
+function SitiosEnlaceBloque({
+  sitios,
+  loading,
+}: {
+  sitios: ElementoSitioEnlace[];
+  loading: boolean;
+}) {
+  const grupos = useMemo(() => {
+    const mapa = new Map<string, { sitio: ElementoSitioEnlace; cantidad: number }>();
+    for (const s of sitios) {
+      const clave = [
+        s.tipo,
+        s.geometria_clave,
+        s.afinidad,
+        s.capacidad,
+        s.selectividad,
+        s.saturacion,
+        s.estado,
+      ].join("|");
+      const existente = mapa.get(clave);
+      if (existente) existente.cantidad += 1;
+      else mapa.set(clave, { sitio: s, cantidad: 1 });
+    }
+    return Array.from(mapa.values());
+  }, [sitios]);
+
+  if (loading || grupos.length === 0) return null;
+
+  const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(2));
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+      <div className="flex items-center gap-1.5">
+        <Link2 size={11} className="text-accent/60 shrink-0" />
+        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+          Sitios de enlace
+        </span>
+        <span className="text-micro text-primary/25 normal-case tracking-normal">
+          — {sitios.length} sitio{sitios.length === 1 ? "" : "s"}, derivado
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        {grupos.map(({ sitio, cantidad }, i) => (
+          <div
+            key={i}
+            className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] items-center gap-2 rounded-md border border-primary/10 px-2 py-1"
+          >
+            <span className="text-micro font-black text-primary/60 shrink-0">×{cantidad}</span>
+            <span className="text-micro font-bold text-primary/70 truncate capitalize">
+              {sitio.tipo}
+              {sitio.geometria_clave && (
+                <span className="font-normal text-primary/40"> · {sitio.geometria_clave}</span>
+              )}
+            </span>
+            <span title="Afinidad" className="text-micro tabular-nums text-primary/50">
+              af {fmt(sitio.afinidad)}
+            </span>
+            <span title="Capacidad" className="text-micro tabular-nums text-primary/50">
+              cap {fmt(sitio.capacidad)}
+            </span>
+            <span title="Selectividad" className="text-micro tabular-nums text-primary/50">
+              sel {fmt(sitio.selectividad)}
+            </span>
+            <span
+              title="Saturación"
+              className={`text-micro font-bold tabular-nums ${
+                (sitio.saturacion ?? 0) > 0 ? "text-primary/70" : "text-primary/30"
+              }`}
+            >
+              sat {fmt(sitio.saturacion)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Sección de solo lectura con las propiedades físicas que Supabase calcula
+ * automáticamente (trigger calcular_propiedades_elemento) a partir de las 3
+ * capas de partículas. Nunca editable desde acá — cambian solo si cambia la
+ * composición del elemento arriba. El título "derivado" + el ícono distinto
+ * marcan visualmente que no son campos manuales, mismo criterio pedido para
+ * Compuesto.
+ */
+function PropiedadesFisicasBloque({ propiedades }: { propiedades: PropiedadCalculada[] }) {
+  const conValor = propiedades.filter((p) => p.valor !== null);
+  if (conValor.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+      <div className="flex items-center gap-1.5">
+        <Sparkles size={11} className="text-accent/60 shrink-0" />
+        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+          Propiedades físicas
+        </span>
+        <span className="text-micro text-primary/25 normal-case tracking-normal">
+          — derivado automáticamente, no editable
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {conValor.map((p) => (
+          <div
+            key={p.clave}
+            title={p.descripcion}
+            className="flex flex-col gap-1 rounded-md border border-primary/10 px-2 py-1.5"
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-micro font-bold text-primary/50 truncate">{p.label}</span>
+              <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
+                {p.valor}
+              </span>
+            </div>
+            {p.proporcion !== undefined && (
+              <div className="h-1 rounded-full bg-primary/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-accent/50"
+                  style={{ width: `${p.proporcion * 100}%` }}
+                />
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -73,10 +73,26 @@ export function useCompuestosConElementos() {
     }));
   }, [compuestosBase, componentesPorCompuesto]);
 
+  // Filas crudas de compuesto_elementos indexadas por compuesto_id — a
+  // diferencia de "componentes" (que solo reconstruye elemento_id/cantidad
+  // por compatibilidad con afinidad.ts), acá sí viaja proporcion_molar/
+  // proporcion_deducida/rol, para la sección de solo lectura "Composición
+  // real" de CompuestoEditor.
+  const filasPorCompuesto = useMemo(() => {
+    const mapa = new Map<string, CompuestoElementoRow[]>();
+    for (const fila of filas) {
+      const lista = mapa.get(fila.compuesto_id) ?? [];
+      lista.push(fila);
+      mapa.set(fila.compuesto_id, lista);
+    }
+    return mapa;
+  }, [filas]);
+
   return {
     items,
     setItems: setCompuestosBase,
     loading: loadingBase || loadingFilas,
+    filasPorCompuesto,
   };
 }
 

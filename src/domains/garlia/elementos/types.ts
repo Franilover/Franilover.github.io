@@ -156,13 +156,79 @@ export interface Elemento {
    * filas viejas; default false si no está seteado.
    */
   es_catalizador?: boolean | null;
+
+  // ─── Propiedades físicas calculadas (Supabase, solo lectura) ───────────
+  // Estas columnas las pobla/recalcula automáticamente
+  // calcular_propiedades_elemento (trigger BEFORE INSERT/UPDATE en
+  // Supabase) a partir de nucleo/media/externa — el frontend NUNCA debe
+  // escribir acá directamente, solo leer y mostrar. Ver estado_proyecto
+  // ("Elementos: motor propio de cálculo") para el detalle de la
+  // derivación. Todas nullable porque pueden no estar calculadas aún.
+  masa_base?: number | null;
+  estabilidad?: number | null;
+  rigidez?: number | null;
+  flexibilidad?: number | null;
+  dureza?: number | null;
+  conductividad?: number | null;
+  transparencia?: number | null;
+  capacidad_transformacion?: number | null;
+  dinamismo_particular?: number | null;
+  valencia_estructural?: number | null;
+  capacidad_enlace?: number | null;
+  polaridad_estructural?: number | null;
+  saturacion_enlace?: number | null;
+  regimen_estructural?: string | null;
 }
 
 export const CONFIG = {
   tabla: "elementos",
   select:
-    "id, numero_atomico, nombre, simbolo, familia, es_noble, notas, nucleo, media, externa, es_catalizador",
+    "id, numero_atomico, nombre, simbolo, familia, es_noble, notas, nucleo, media, externa, es_catalizador, " +
+    "masa_base, estabilidad, rigidez, flexibilidad, dureza, conductividad, transparencia, " +
+    "capacidad_transformacion, dinamismo_particular, valencia_estructural, capacidad_enlace, " +
+    "polaridad_estructural, saturacion_enlace, regimen_estructural",
 };
+
+/** Una propiedad física calculada del Elemento, lista para renderizar en
+ *  la sección de solo lectura de ElementoEditor — ver PROPIEDADES_ELEMENTO. */
+export interface PropiedadCalculada {
+  clave: string;
+  label: string;
+  /** Valor ya formateado como string (o null si no está calculado). */
+  valor: string | null;
+  /** 0-1 para dibujar barra de progreso; undefined si el valor no es una
+   *  proporción (ej. valencia_estructural, que es un conteo). */
+  proporcion?: number;
+  descripcion: string;
+}
+
+/** Arma la lista de propiedades físicas calculadas de un Elemento para
+ *  mostrar en la sección "Propiedades físicas (derivado)" de
+ *  ElementoEditor — puramente de presentación, sin recalcular nada acá
+ *  (los valores ya vienen calculados desde Supabase). */
+export function propiedadesCalculadasDeElemento(el: Elemento): PropiedadCalculada[] {
+  const fmt = (v?: number | null, digitos = 3) =>
+    v === null || v === undefined ? null : v.toFixed(digitos);
+  const prop = (v?: number | null) =>
+    v === null || v === undefined ? undefined : Math.max(0, Math.min(1, v));
+
+  return [
+    { clave: "masa_base", label: "Masa", valor: fmt(el.masa_base, 2), descripcion: "Peso base del elemento, derivado de sus 3 capas de partículas." },
+    { clave: "estabilidad", label: "Estabilidad", valor: fmt(el.estabilidad), proporcion: prop(el.estabilidad), descripcion: "Qué tan resistente es a romperse o transformarse." },
+    { clave: "rigidez", label: "Rigidez", valor: fmt(el.rigidez), proporcion: prop(el.rigidez), descripcion: "Resistencia a deformarse bajo fuerza." },
+    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(el.flexibilidad), proporcion: prop(el.flexibilidad), descripcion: "Capacidad de deformarse sin romperse." },
+    { clave: "dureza", label: "Dureza", valor: fmt(el.dureza), proporcion: prop(el.dureza), descripcion: "Resistencia a ser rayado o penetrado." },
+    { clave: "conductividad", label: "Conductividad", valor: fmt(el.conductividad), proporcion: prop(el.conductividad), descripcion: "Facilidad para transmitir energía/interacción." },
+    { clave: "transparencia", label: "Transparencia", valor: fmt(el.transparencia), proporcion: prop(el.transparencia), descripcion: "Cuánto deja pasar en vez de bloquear/absorber." },
+    { clave: "capacidad_transformacion", label: "Cap. transformación", valor: fmt(el.capacidad_transformacion), proporcion: prop(el.capacidad_transformacion), descripcion: "Potencial/facilidad de cambio del elemento (no es velocidad real)." },
+    { clave: "dinamismo_particular", label: "Dinamismo", valor: fmt(el.dinamismo_particular, 2), descripcion: "Magnitud combinada de dinámica/transformación/interacción — usada como base de duración de procesos." },
+    { clave: "valencia_estructural", label: "Valencia estructural", valor: fmt(el.valencia_estructural, 0), descripcion: "Cantidad de enlaces que puede sostener estructuralmente." },
+    { clave: "capacidad_enlace", label: "Capacidad de enlace", valor: fmt(el.capacidad_enlace), proporcion: prop(el.capacidad_enlace), descripcion: "Qué tan disponible está para formar enlaces nuevos." },
+    { clave: "polaridad_estructural", label: "Polaridad estructural", valor: fmt(el.polaridad_estructural), descripcion: "Desbalance direccional de su estructura de enlace." },
+    { clave: "saturacion_enlace", label: "Saturación de enlace", valor: fmt(el.saturacion_enlace), proporcion: prop(el.saturacion_enlace), descripcion: "Qué tan cerca está de agotar su capacidad de enlace." },
+    { clave: "regimen_estructural", label: "Régimen estructural", valor: el.regimen_estructural ?? null, descripcion: "Clasificación estructural derivada (ej. equilibrio)." },
+  ];
+}
 
 // ─── Compuestos: combinaciones de elementos de la Tabla Química ───────────
 // Ej. Agua = Fluxio + Cristalio, Fuego = Plasmio + Reactivo, etc. Cada
@@ -198,27 +264,81 @@ export interface Compuesto {
   /** Estado físico de esta fila. Solo tiene sentido junto a
    *  sustancia_base_id (o en la fila base misma, que suele ser "liquido"). */
   estado?: EstadoMateria | null;
+
+  // ─── Propiedades físicas calculadas (Supabase, solo lectura) ───────────
+  // Pobladas/recalculadas automáticamente por triggers en Supabase a partir
+  // de compuesto_elementos + elementos + compuesto_enlaces (ver
+  // estado_proyecto: "90/90 compuestos pasan auditoría composición
+  // elemento→propiedades"). El frontend nunca escribe acá directamente.
+  tipo_compuesto?: string | null;
+  estado_estructura?: string | null;
+  formula_canonica?: string | null;
+  masa?: number | null;
+  carga?: number | null;
+  estabilidad?: number | null;
+  rigidez?: number | null;
+  flexibilidad?: number | null;
+  compatibilidad?: number | null;
+  energia_enlace?: number | null;
+  clasificacion?: string | null;
+  tipo_estructura?: string | null;
 }
 
 export const CONFIG_COMPUESTOS = {
   tabla: "compuestos",
   select:
-    "id, nombre, simbolo, notas, componentes, created_at, sustancia_base_id, estado",
+    "id, nombre, simbolo, notas, componentes, created_at, sustancia_base_id, estado, " +
+    "tipo_compuesto, estado_estructura, formula_canonica, masa, carga, estabilidad, rigidez, " +
+    "flexibilidad, compatibilidad, energia_enlace, clasificacion, tipo_estructura",
 };
+
+/** Una propiedad física calculada del Compuesto, lista para renderizar en
+ *  la sección de solo lectura de CompuestoEditor — mismo shape que
+ *  PropiedadCalculada de Elemento (ver propiedadesCalculadasDeElemento). */
+export function propiedadesCalculadasDeCompuesto(c: Compuesto): PropiedadCalculada[] {
+  const fmt = (v?: number | null, digitos = 3) =>
+    v === null || v === undefined ? null : v.toFixed(digitos);
+  const prop = (v?: number | null) =>
+    v === null || v === undefined ? undefined : Math.max(0, Math.min(1, v));
+
+  return [
+    { clave: "masa", label: "Masa", valor: fmt(c.masa, 2), descripcion: "Masa total del compuesto, derivada de sus elementos componentes." },
+    { clave: "carga", label: "Carga", valor: fmt(c.carga, 2), descripcion: "Carga neta del compuesto, suma de la carga de sus elementos." },
+    { clave: "estabilidad", label: "Estabilidad", valor: fmt(c.estabilidad), proporcion: prop(c.estabilidad), descripcion: "Qué tan resistente es el compuesto a romperse o transformarse." },
+    { clave: "rigidez", label: "Rigidez", valor: fmt(c.rigidez), proporcion: prop(c.rigidez), descripcion: "Resistencia del compuesto a deformarse bajo fuerza." },
+    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(c.flexibilidad), proporcion: prop(c.flexibilidad), descripcion: "Capacidad del compuesto de deformarse sin romperse." },
+    { clave: "compatibilidad", label: "Compatibilidad", valor: fmt(c.compatibilidad), proporcion: prop(c.compatibilidad), descripcion: "Qué tan compatibles son entre sí los sitios de enlace usados." },
+    { clave: "energia_enlace", label: "Energía de enlace", valor: fmt(c.energia_enlace, 4), descripcion: "Energía acumulada en los enlaces del compuesto." },
+    { clave: "tipo_compuesto", label: "Tipo", valor: c.tipo_compuesto ?? null, descripcion: "Clasificación estructural (sustancia, mezcla, aleación, material estructural)." },
+    { clave: "clasificacion", label: "Clasificación", valor: c.clasificacion ?? null, descripcion: "Clasificación derivada más específica del compuesto." },
+    { clave: "estado_estructura", label: "Estado de estructura", valor: c.estado_estructura ?? null, descripcion: "Qué tan completa/consistente está la definición estructural del compuesto." },
+  ];
+}
 
 /** Fila cruda tal cual vive en Supabase (tabla "compuesto_elementos") —
  *  fuente normalizada de la composición, reemplaza a componentes (jsonb)
- *  como fuente de verdad. Ver Fase 2.1 del rediseño 1.0. */
+ *  como fuente de verdad. Ver Fase 2.1 del rediseño 1.0.
+ *
+ *  proporcion_molar/proporcion_deducida/proporcion_fuente: proporción real
+ *  entre los elementos del compuesto (219/219 filas pobladas, ver
+ *  estado_proyecto "CERRADO MODELO DE PROPORCIÓN"), solo lectura — derivada
+ *  por Supabase, no por cantidad directamente (proporcion_molar puede
+ *  diferir de cantidad, ej. Agua: cantidad 4:1 pero proporcion_molar 10:1). */
 export interface CompuestoElementoRow {
   id: string;
   compuesto_id: string;
   elemento_id: string;
   cantidad: number;
+  proporcion_molar?: number | null;
+  proporcion_deducida?: number | null;
+  proporcion_fuente?: string | null;
+  rol?: string | null;
 }
 
 export const CONFIG_COMPUESTO_ELEMENTOS = {
   tabla: "compuesto_elementos",
-  select: "id, compuesto_id, elemento_id, cantidad",
+  select:
+    "id, compuesto_id, elemento_id, cantidad, proporcion_molar, proporcion_deducida, proporcion_fuente, rol",
 };
 
 // ─── Grupos de Compuestos: conjuntos reutilizables de Compuestos ──────────
