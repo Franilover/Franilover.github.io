@@ -5,24 +5,34 @@
  * ───────────────────────────────────────────────────────────────────────────
  * Sub-tab "Lógica" del toggle de Magia (junto a Runas/Química/Física/
  * Biología, ver RunasPage.tsx → SECCIONES_MAGIA). Es la versión "explicación
- * humana" del sistema entero: un mapa de capas — Fundamento → Partículas →
- * Elementos → Compuestos → Estructuras → Células → Tejidos → Propiedades
- * emergentes → Procesos y dinámica → ... — con, dentro de cada una, los
- * conceptos reales que ya están documentados en Supabase
- * (documentacion_sistema: concepto + explicación + fórmula + ejemplo).
+ * humana" del sistema entero: los conceptos reales que ya están documentados
+ * en Supabase (documentacion_sistema: concepto + explicación + fórmula +
+ * ejemplo + dependencias), organizados por capa (Fundamento → Partículas →
+ * Elementos → ... → Manual humano).
  *
- * A propósito NO es un diagrama aparte con estados ✅/🟡/⚪ inventados: el
- * único indicador que se muestra es el conteo real de conceptos por capa
- * (ver useDocumentacionSistema), así que nunca puede quedar desactualizado
- * respecto a lo que de verdad está escrito — si se agrega o edita un
- * concepto en Supabase, esta vista lo refleja solo con recargar.
+ * REDISEÑO v2 (explorador de archivos): con ~22 capas y hasta 50 conceptos
+ * en una sola capa, mostrar todo expandido a la vez (v1) era imposible de
+ * escanear. Ahora:
+ *   - Sidebar izquierda: lista de capas con su conteo — se selecciona UNA
+ *     capa a la vez (o "Todas" para ver el listado global filtrado).
+ *   - Buscador global arriba: filtra por concepto/explicación/ejemplo a
+ *     través de TODAS las capas a la vez (no solo la seleccionada), porque
+ *     con este volumen "ubicar una regla" es la tarea más común — al
+ *     escribir, la sidebar pasa a mostrar solo las capas con resultados y
+ *     el panel derecho lista esos resultados con su capa de origen visible.
+ *   - Panel derecho: los conceptos de la capa activa (o los resultados de
+ *     búsqueda), en lista vertical de una columna — más fácil de leer
+ *     fórmula/ejemplo/dependencias en línea que un grid apretado.
  *
- * Diseño: cada capa es un bloque siempre expandido (sin acordeón/dropdown),
- * neutro — sin colores de acento por capa, para no desentonar con el resto
- * del editor. Los conceptos de cada capa se muestran en grid de hasta 2
- * columnas (no una lista vertical larga) para aprovechar mejor el ancho
- * disponible en capas con muchos conceptos (ej. Estructuras con 38,
- * Células con 34).
+ * estado_proyecto (el changelog v128...v148) YA NO vive acá — se maneja en
+ * otra pantalla (ver domains/garlia/auditoria). Esta vista es solo el mapa
+ * de conceptos: documentacion_sistema, capa por capa.
+ *
+ * A propósito NO es un diagrama con estados ✅/🟡/⚪ inventados: el único
+ * indicador es el conteo real de conceptos por capa (ver
+ * useDocumentacionSistema), así que nunca puede quedar desactualizado — si
+ * se agrega/edita un concepto en Supabase, esta vista lo refleja solo con
+ * recargar.
  *
  * Solo lectura: esta pantalla no escribe en documentacion_sistema, es un
  * visor. Editar los conceptos se sigue haciendo desde Supabase directamente
@@ -30,11 +40,8 @@
  * ElementoEditor/CompuestosPage: derivado, no editable desde el frontend).
  */
 
-import { BookOpenText, Layers, Loader2 } from "lucide-react";
-import React from "react";
-
-import { useEstadoProyecto } from "@/domains/garlia/auditoria/useEstadoProyecto";
-import { Text } from "@/ui/Tipografia";
+import { Layers, Loader2, Search, X } from "lucide-react";
+import React, { useMemo, useState } from "react";
 
 import {
   useDocumentacionSistema,
@@ -42,8 +49,50 @@ import {
   type ConceptoDocumentacion,
 } from "./useDocumentacionSistema";
 
+/** Filtra conceptos por texto libre — concepto, explicación y ejemplo son
+ *  los campos donde alguien buscaría "esa regla que decía tal cosa". No
+ *  se busca en fórmula/dependencias: son notación técnica, no lenguaje
+ *  natural, y ensuciarían el filtro con falsos positivos (ej. buscar "e"
+ *  matchearía casi cualquier fórmula). */
+function coincide(concepto: ConceptoDocumentacion, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    concepto.concepto.toLowerCase().includes(q) ||
+    concepto.explicacion.toLowerCase().includes(q) ||
+    (concepto.ejemplo?.toLowerCase().includes(q) ?? false)
+  );
+}
+
 export function LogicaSistemaPage() {
   const { capas, total, loading } = useDocumentacionSistema();
+  const [capaActivaId, setCapaActivaId] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+
+  // Capas con al menos un concepto que matchee la búsqueda (o todas, si no
+  // hay búsqueda activa) — es lo que se lista en la sidebar.
+  const capasFiltradas = useMemo(() => {
+    if (!busqueda.trim()) return capas;
+    return capas
+      .map((c) => ({ ...c, conceptos: c.conceptos.filter((co) => coincide(co, busqueda)) }))
+      .filter((c) => c.conceptos.length > 0);
+  }, [capas, busqueda]);
+
+  const buscando = busqueda.trim().length > 0;
+
+  // Capa realmente seleccionada: si hay búsqueda activa, ignoramos la
+  // selección manual y mostramos resultados de TODAS las capas filtradas
+  // (con su nombre de capa visible en cada tarjeta) — es más útil que
+  // forzar a elegir una capa primero para poder buscar dentro de ella.
+  const capaActiva = useMemo(
+    () => (buscando ? null : capasFiltradas.find((c) => c.capa === capaActivaId) ?? capasFiltradas[0] ?? null),
+    [buscando, capasFiltradas, capaActivaId],
+  );
+
+  const totalResultadosBusqueda = useMemo(
+    () => capasFiltradas.reduce((acc, c) => acc + c.conceptos.length, 0),
+    [capasFiltradas],
+  );
 
   if (loading) {
     return (
@@ -61,145 +110,138 @@ export function LogicaSistemaPage() {
     );
   }
 
-  // Dos columnas internas, lado a lado (misma idea que el toggle
-  // Química/Física/Biología, pero acá conviven a la vez porque son la
-  // misma lógica vista en dos niveles):
-  //   izquierda → mapa técnico de capas ya existente (documentacion_sistema
-  //     completo, capa por capa, con fórmulas/dependencias). Siempre
-  //     expandido — sin acordeón — porque es la referencia de trabajo del
-  //     día a día, no algo que se navega una vez y se cierra.
-  //   derecha   → "Manual humano": la capa documentacion_sistema.capa=
-  //     "Manual humano" (leyes sencillas) + lo nuevo de estado_proyecto
-  //     (explicaciones humanas del registro maestro), en el mismo espíritu
-  //     de lectura pero en lenguaje llano, sin fórmulas.
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-2 rounded-lg border border-primary/10 px-3 py-2.5">
-        <Layers size={15} className="text-primary/40 shrink-0" />
-        <p className="text-sm text-primary/60">
-          Cómo está armado el sistema, capa por capa — de lo más chico (partículas) a lo más
-          grande (organismos).{" "}
-          <span className="font-bold text-primary/80">{total} conceptos</span> documentados en
-          total.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-        {/* Columna izquierda: mapa de capas técnico, siempre abierto. */}
-        <div className="flex flex-col gap-3">
-          {capas.map((c) => (
-            <BloqueCapa key={c.capa} capa={c} />
-          ))}
+    <div className="flex flex-col gap-4">
+      {/* Cabecera + buscador global */}
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-2 rounded-lg border border-primary/10 px-3 py-2.5">
+          <Layers size={15} className="text-primary/40 shrink-0" />
+          <p className="text-sm text-primary/60">
+            Cómo está armado el sistema, capa por capa.{" "}
+            <span className="font-bold text-primary/80">{total} conceptos</span> documentados en
+            total.
+          </p>
         </div>
 
-        {/* Columna derecha: manual humano (nuevo). */}
-        <ManualHumanoColumna capas={capas} />
+        <div className="relative">
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-primary/30 pointer-events-none"
+          />
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar un concepto, explicación o ejemplo en todas las capas..."
+            className="w-full rounded-lg border border-primary/10 bg-primary/[0.02] pl-9 pr-9 py-2.5 text-sm text-primary/80 placeholder:text-primary/30 outline-none focus:border-primary/25 transition-colors"
+          />
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
+              title="Limpiar búsqueda"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Explorador: sidebar de capas + panel de detalle */}
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4 items-start">
+        <SidebarCapas
+          capas={capasFiltradas}
+          capaActivaId={buscando ? null : capaActiva?.capa ?? null}
+          onSeleccionar={(id) => setCapaActivaId(id)}
+          deshabilitada={buscando}
+        />
+
+        <div className="min-w-0 rounded-xl border border-primary/10 bg-primary/[0.015] overflow-hidden">
+          {buscando ? (
+            <PanelResultadosBusqueda
+              capas={capasFiltradas}
+              total={totalResultadosBusqueda}
+              query={busqueda}
+            />
+          ) : capaActiva ? (
+            <PanelCapa capa={capaActiva} />
+          ) : (
+            <div className="py-16 text-center text-micro text-primary/30">
+              Sin resultados.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 /**
- * Columna derecha "Manual humano": leyes sencillas (documentacion_sistema
- * con capa="Manual humano", ya cargadas en `capas` — no se vuelve a pedir
- * a Supabase) + las explicaciones humanas que se están agregando en
- * estado_proyecto (resumen, siguiente paso, principios). Solo lectura,
- * igual que el resto de esta pantalla — no escribe en ninguna tabla.
+ * Sidebar de capas — lista simple con conteo, sin colores de acento. La
+ * capa activa se marca con fondo sutil, no con borde/color de familia
+ * (ver historial: se descartó el sistema de colores por capa por
+ * desentonar). Cuando hay búsqueda activa, se deshabilita visualmente
+ * (los resultados vienen de todas las capas a la vez) pero se sigue
+ * mostrando para que la persona vea en qué capas están los resultados.
  */
-function ManualHumanoColumna({ capas }: { capas: CapaDocumentacion[] }) {
-  const capaManual = capas.find((c) => c.capa.toLowerCase() === "manual humano") ?? null;
-  const { maestro, loading: loadingMaestro } = useEstadoProyecto();
-
+function SidebarCapas({
+  capas,
+  capaActivaId,
+  onSeleccionar,
+  deshabilitada,
+}: {
+  capas: CapaDocumentacion[];
+  capaActivaId: string | null;
+  onSeleccionar: (id: string) => void;
+  deshabilitada: boolean;
+}) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-primary/10 bg-primary/[0.02] p-3.5">
-      <div className="flex items-center gap-2">
-        <BookOpenText size={15} className="text-primary/40 shrink-0" />
-        <span className="text-[15px] font-black tracking-tight text-primary/85">
-          Manual humano
-        </span>
-        {capaManual && (
-          <span className="text-micro font-semibold text-primary/35">
-            {capaManual.conceptos.length} ley{capaManual.conceptos.length === 1 ? "" : "es"}
-          </span>
-        )}
-      </div>
-      <p className="text-sm text-primary/55 leading-snug">
-        Las mismas capas de la izquierda, explicadas simple: leyes sencillas y el avance real del
-        proyecto contado en palabras.
-      </p>
-
-      {/* Leyes sencillas (documentacion_sistema, capa="Manual humano") */}
-      <div className="flex flex-col gap-2">
-        {!capaManual || capaManual.conceptos.length === 0 ? (
-          <p className="text-micro text-primary/30 italic px-1">
-            Todavía no hay leyes sencillas documentadas.
-          </p>
-        ) : (
-          capaManual.conceptos.map((concepto) => (
-            <TarjetaConcepto key={concepto.id} concepto={concepto} />
-          ))
-        )}
-      </div>
-
-      {/* Explicaciones humanas nuevas de estado_proyecto */}
-      <div className="mt-2 pt-3 border-t border-primary/10 flex flex-col gap-2.5">
-        <Text variant="lbl">Estado del proyecto, en palabras</Text>
-
-        {loadingMaestro ? (
-          <div className="flex items-center gap-2 text-primary/30 py-2">
-            <Loader2 className="animate-spin" size={14} />
-            <span className="text-micro">Cargando estado_proyecto...</span>
-          </div>
-        ) : !maestro ? (
-          <p className="text-micro text-primary/30 italic">Sin registro estado_proyecto.</p>
-        ) : (
-          <>
-            <div>
-              <Text variant="lbl">Resumen</Text>
-              <p className="text-sm text-primary/75 leading-relaxed mt-1">{maestro.resumen}</p>
-            </div>
-            <div>
-              <Text variant="lbl">Siguiente paso</Text>
-              <p className="text-sm text-primary/75 leading-relaxed mt-1">
-                {maestro.siguiente_paso}
-              </p>
-            </div>
-            {maestro.principios.length > 0 && (
-              <div>
-                <Text variant="lbl">Principios rectores</Text>
-                <div className="mt-1.5 flex flex-col gap-1.5">
-                  {maestro.principios.map((p, i) => (
-                    <div key={i} className="text-micro text-primary/55 italic">
-                      {p}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
+    <div className="rounded-xl border border-primary/10 bg-primary/[0.015] overflow-hidden">
+      <div className="max-h-[70vh] overflow-y-auto flex flex-col p-1.5 gap-0.5">
+        {capas.map((c) => {
+          const activa = !deshabilitada && c.capa === capaActivaId;
+          return (
+            <button
+              key={c.capa}
+              type="button"
+              disabled={deshabilitada}
+              onClick={() => onSeleccionar(c.capa)}
+              className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
+                activa ? "bg-primary/10" : deshabilitada ? "opacity-50" : "hover:bg-primary/5"
+              }`}
+            >
+              <span
+                className={`text-sm truncate flex-1 min-w-0 ${
+                  activa ? "font-bold text-primary/85" : "font-medium text-primary/60"
+                }`}
+              >
+                {c.capa}
+              </span>
+              <span className="text-micro font-semibold text-primary/30 shrink-0">
+                {c.conceptos.length}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function BloqueCapa({ capa }: { capa: CapaDocumentacion }) {
+/** Panel de detalle: todos los conceptos de la capa activa, en lista
+ *  vertical de una columna (no grid) — más fácil de leer fórmula +
+ *  ejemplo + dependencias en línea sin apretar el ancho de cada tarjeta. */
+function PanelCapa({ capa }: { capa: CapaDocumentacion }) {
   return (
-    <div className="rounded-xl border border-primary/10 bg-primary/[0.015] overflow-hidden">
-      <div className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-primary/10">
-        <span className="text-sm font-bold tracking-tight text-primary/75 truncate">
-          {capa.capa}
-        </span>
-        <span className="flex-1" />
-        <span className="text-micro font-semibold text-primary/35 shrink-0">
+    <div className="flex flex-col">
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-primary/10 sticky top-0 bg-[var(--bg-main)]">
+        <span className="text-[15px] font-bold tracking-tight text-primary/85">{capa.capa}</span>
+        <span className="text-micro font-semibold text-primary/35">
           {capa.conceptos.length} concepto{capa.conceptos.length === 1 ? "" : "s"}
         </span>
       </div>
-
-      {/* Grid de tarjetas en vez de lista vertical: aprovecha mejor el
-          ancho de la columna cuando hay varios conceptos cortos por capa
-          (ej. Estructuras con 38, Células con 34). */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5">
+      <div className="flex flex-col divide-y divide-primary/[0.06]">
         {capa.conceptos.map((concepto) => (
           <TarjetaConcepto key={concepto.id} concepto={concepto} />
         ))}
@@ -208,16 +250,63 @@ function BloqueCapa({ capa }: { capa: CapaDocumentacion }) {
   );
 }
 
+/** Panel de resultados de búsqueda: conceptos de todas las capas que
+ *  matchean, agrupados por capa de origen (con el nombre de la capa
+ *  visible como sub-header) para no perder el contexto de dónde vive
+ *  cada regla. */
+function PanelResultadosBusqueda({
+  capas,
+  total,
+  query,
+}: {
+  capas: CapaDocumentacion[];
+  total: number;
+  query: string;
+}) {
+  if (total === 0) {
+    return (
+      <div className="py-16 text-center text-sm text-primary/30">
+        Sin resultados para "{query}".
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div className="px-4 py-3 border-b border-primary/10 sticky top-0 bg-[var(--bg-main)]">
+        <span className="text-sm text-primary/60">
+          <span className="font-bold text-primary/80">{total}</span> resultado
+          {total === 1 ? "" : "s"} para "{query}"
+        </span>
+      </div>
+      <div className="flex flex-col">
+        {capas.map((c) => (
+          <div key={c.capa} className="flex flex-col">
+            <div className="px-4 pt-3 pb-1.5">
+              <span className="text-micro font-bold uppercase tracking-[0.1em] text-primary/35">
+                {c.capa}
+              </span>
+            </div>
+            <div className="flex flex-col divide-y divide-primary/[0.06]">
+              {c.conceptos.map((concepto) => (
+                <TarjetaConcepto key={concepto.id} concepto={concepto} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TarjetaConcepto({ concepto }: { concepto: ConceptoDocumentacion }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg bg-primary/[0.03] px-2.5 py-2">
-      <span className="text-micro font-bold uppercase tracking-[0.1em] text-primary/50">
-        {concepto.concepto}
-      </span>
-      <p className="text-sm text-primary/70 leading-snug">{concepto.explicacion}</p>
+    <div className="flex flex-col gap-1.5 px-4 py-3">
+      <span className="text-sm font-bold text-primary/80">{concepto.concepto}</span>
+      <p className="text-sm text-primary/65 leading-relaxed">{concepto.explicacion}</p>
 
       {concepto.formula && (
-        <div className="rounded bg-primary/5 px-2 py-1 font-mono text-micro text-primary/50 w-fit">
+        <div className="rounded bg-primary/5 px-2 py-1 font-mono text-micro text-primary/50 w-fit mt-0.5">
           {concepto.formula}
         </div>
       )}
