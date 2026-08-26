@@ -12,7 +12,7 @@
  * a Supabase + propagación al estado del padre via onActualizar.
  */
 
-import { Beaker, ChevronLeft, Link2, Sparkles } from "lucide-react";
+import { Beaker, ChevronLeft } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -450,8 +450,10 @@ export function ElementoEditor({
           </div>
         </div>
 
-        <PropiedadesFisicasBloque propiedades={propiedadesFisicas} />
-        <SitiosEnlaceBloque sitios={sitiosEnlace} loading={sitiosLoading} />
+        <div className="grid grid-cols-2 gap-2 items-start">
+          <PropiedadesFisicasBloque propiedades={propiedadesFisicas} />
+          <SitiosEnlaceBloque sitios={sitiosEnlace} loading={sitiosLoading} />
+        </div>
       </div>
     </div>
   );
@@ -497,44 +499,44 @@ function SitiosEnlaceBloque({
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
       <div className="flex items-center gap-1.5">
-        <Link2 size={11} className="text-accent/60 shrink-0" />
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Sitios de enlace
-        </span>
-        <span className="text-micro text-primary/25 normal-case tracking-normal">
-          — {sitios.length} sitio{sitios.length === 1 ? "" : "s"}, derivado
         </span>
       </div>
       <div className="flex flex-col gap-1">
         {grupos.map(({ sitio, cantidad }, i) => (
           <div
             key={i}
-            className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] items-center gap-2 rounded-md border border-primary/10 px-2 py-1"
+            className="flex flex-col gap-0.5 rounded-md border border-primary/10 px-2 py-1"
           >
-            <span className="text-micro font-black text-primary/60 shrink-0">×{cantidad}</span>
-            <span className="text-micro font-bold text-primary/70 truncate capitalize">
-              {sitio.tipo}
-              {sitio.geometria_clave && (
-                <span className="font-normal text-primary/40"> · {sitio.geometria_clave}</span>
-              )}
-            </span>
-            <span title="Afinidad" className="text-micro tabular-nums text-primary/50">
-              af {fmt(sitio.afinidad)}
-            </span>
-            <span title="Capacidad" className="text-micro tabular-nums text-primary/50">
-              cap {fmt(sitio.capacidad)}
-            </span>
-            <span title="Selectividad" className="text-micro tabular-nums text-primary/50">
-              sel {fmt(sitio.selectividad)}
-            </span>
-            <span
-              title="Saturación"
-              className={`text-micro font-bold tabular-nums ${
-                (sitio.saturacion ?? 0) > 0 ? "text-primary/70" : "text-primary/30"
-              }`}
-            >
-              sat {fmt(sitio.saturacion)}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-micro font-black text-primary/60 shrink-0">×{cantidad}</span>
+              <span className="text-micro font-bold text-primary/70 truncate capitalize">
+                {sitio.tipo}
+                {sitio.geometria_clave && (
+                  <span className="font-normal text-primary/40"> · {sitio.geometria_clave}</span>
+                )}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span title="Afinidad" className="text-micro tabular-nums text-primary/50">
+                af {fmt(sitio.afinidad)}
+              </span>
+              <span title="Capacidad" className="text-micro tabular-nums text-primary/50">
+                cap {fmt(sitio.capacidad)}
+              </span>
+              <span title="Selectividad" className="text-micro tabular-nums text-primary/50">
+                sel {fmt(sitio.selectividad)}
+              </span>
+              <span
+                title="Saturación"
+                className={`text-micro font-bold tabular-nums ${
+                  (sitio.saturacion ?? 0) > 0 ? "text-primary/70" : "text-primary/30"
+                }`}
+              >
+                sat {fmt(sitio.saturacion)}
+              </span>
+            </div>
           </div>
         ))}
       </div>
@@ -557,15 +559,11 @@ function PropiedadesFisicasBloque({ propiedades }: { propiedades: PropiedadCalcu
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
       <div className="flex items-center gap-1.5">
-        <Sparkles size={11} className="text-accent/60 shrink-0" />
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Propiedades físicas
         </span>
-        <span className="text-micro text-primary/25 normal-case tracking-normal">
-          — derivado automáticamente, no editable
-        </span>
       </div>
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
         {conValor.map((p) => (
           <div
             key={p.clave}

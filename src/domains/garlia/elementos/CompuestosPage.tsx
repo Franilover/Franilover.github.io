@@ -24,7 +24,6 @@ import {
   Plus,
   Save,
   Search,
-  Sparkles,
   Trash2,
   Wand2,
   X,
@@ -686,12 +685,8 @@ function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: Propi
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
       <div className="flex items-center gap-1.5">
-        <Sparkles size={11} className="text-accent/60 shrink-0" />
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Propiedades físicas
-        </span>
-        <span className="text-micro text-primary/25 normal-case tracking-normal">
-          — derivado automáticamente, no editable
         </span>
       </div>
       <div className="grid grid-cols-4 gap-1.5">
@@ -745,12 +740,8 @@ function ComposicionRealBloque({
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
       <div className="flex items-center gap-1.5">
-        <Sparkles size={11} className="text-accent/60 shrink-0" />
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Composición real
-        </span>
-        <span className="text-micro text-primary/25 normal-case tracking-normal">
-          — proporción molar derivada, no editable
         </span>
       </div>
       <div className="flex flex-col gap-1">
@@ -759,22 +750,24 @@ function ComposicionRealBloque({
           return (
             <div
               key={p.id}
-              className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-md border border-primary/10 px-2 py-1"
+              className="flex flex-col gap-0.5 rounded-md border border-primary/10 px-2 py-1"
             >
               <span className="text-micro font-bold text-primary/70 truncate">
                 {el?.simbolo || "??"} · {el?.nombre ?? "—"}
               </span>
-              <span title="Proporción molar" className="text-micro tabular-nums text-primary/60">
-                molar {p.proporcion_molar !== null ? p.proporcion_molar : "—"}
-              </span>
-              <span
-                title="Proporción deducida (normalizada)"
-                className="text-micro font-black tabular-nums text-primary/70"
-              >
-                {p.proporcion_deducida !== null
-                  ? `${(p.proporcion_deducida * 100).toFixed(1)}%`
-                  : "—"}
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span title="Proporción molar" className="text-micro tabular-nums text-primary/60">
+                  molar {p.proporcion_molar !== null ? p.proporcion_molar : "—"}
+                </span>
+                <span
+                  title="Proporción deducida (normalizada)"
+                  className="text-micro font-black tabular-nums text-primary/70"
+                >
+                  {p.proporcion_deducida !== null
+                    ? `${(p.proporcion_deducida * 100).toFixed(1)}%`
+                    : "—"}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -813,7 +806,6 @@ function EstabilidadDetalleBloque({
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
       <div className="flex items-center gap-1.5">
-        <Sparkles size={11} className="text-accent/60 shrink-0" />
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Estabilidad — detalle
         </span>
@@ -822,11 +814,8 @@ function EstabilidadDetalleBloque({
             {detalle.clasificacion}
           </span>
         )}
-        <span className="text-micro text-primary/25 normal-case tracking-normal">
-          — derivado, no editable
-        </span>
       </div>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
         {filas.map((f) => (
           <div
             key={f.label}
@@ -1153,12 +1142,14 @@ function CompuestoEditor({
         </div>
 
         <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
-        <ComposicionRealBloque
-          proporciones={proporcionElementos}
-          loading={proporcionLoading}
-          elementos={elementos}
-        />
-        <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
+        <div className="grid grid-cols-2 gap-2 items-start">
+          <ComposicionRealBloque
+            proporciones={proporcionElementos}
+            loading={proporcionLoading}
+            elementos={elementos}
+          />
+          <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
+        </div>
       </div>
 
       {editandoElementoId && (
