@@ -17,15 +17,12 @@
  * respecto a lo que de verdad está escrito — si se agrega o edita un
  * concepto en Supabase, esta vista lo refleja solo con recargar.
  *
- * Diseño: cada capa es un bloque siempre expandido (sin acordeón/dropdown)
- * con su propio color de acento — tonos apagados/desaturados a propósito,
- * para que se lea como referencia técnica y no como un dashboard de
- * semáforos — resuelto por coincidencia de texto sobre el nombre de la
- * capa (ver colorDeCapa), así que una capa nueva en Supabase cae en un
- * color razonable sin tocar código. Los conceptos de cada capa se
- * muestran en grid de hasta 2 columnas (no una lista vertical larga) para
- * aprovechar mejor el ancho disponible en capas con muchos conceptos
- * (ej. Estructuras con 38, Células con 34).
+ * Diseño: cada capa es un bloque siempre expandido (sin acordeón/dropdown),
+ * neutro — sin colores de acento por capa, para no desentonar con el resto
+ * del editor. Los conceptos de cada capa se muestran en grid de hasta 2
+ * columnas (no una lista vertical larga) para aprovechar mejor el ancho
+ * disponible en capas con muchos conceptos (ej. Estructuras con 38,
+ * Células con 34).
  *
  * Solo lectura: esta pantalla no escribe en documentacion_sistema, es un
  * visor. Editar los conceptos se sigue haciendo desde Supabase directamente
@@ -44,30 +41,6 @@ import {
   type CapaDocumentacion,
   type ConceptoDocumentacion,
 } from "./useDocumentacionSistema";
-
-/**
- * Color de acento por familia de capas — deliberadamente apagado/desaturado
- * (tonos "dusty", no colores de marca vivos) para que se lea como
- * referencia técnica y no como un dashboard de semáforos. Se resuelve por
- * coincidencia de texto sobre el nombre real de la capa (ver colorDeCapa)
- * — no una lista fija de claves — para que una capa nueva agregada en
- * Supabase (ej. "Ecología") caiga en un color razonable sin tocar este
- * archivo.
- */
-const FAMILIAS: { test: RegExp; color: string }[] = [
-  { test: /fundamento|base|principio/i, color: "#78716c" }, // gris piedra — cimientos
-  { test: /partícula|elemento/i, color: "#5b7a99" }, // azul apagado — micro/física
-  { test: /compuesto/i, color: "#5e8c6a" }, // verde apagado — composición química
-  { test: /estructura|célula|tejido|órgano|sistema|organismo|jerarquía/i, color: "#8a6d9e" }, // violeta apagado — organización biológica
-  { test: /propiedad/i, color: "#b08a4e" }, // ámbar apagado — propiedades emergentes
-  { test: /proceso|dinámica|motor/i, color: "#b06a5e" }, // terracota — dinámica/tiempo
-  { test: /auditoría/i, color: "#4d8f88" }, // teal apagado — verificación
-];
-const COLOR_DEFECTO = "#8b8b99";
-
-function colorDeCapa(nombre: string): string {
-  return FAMILIAS.find((f) => f.test.test(nombre))?.color ?? COLOR_DEFECTO;
-}
 
 export function LogicaSistemaPage() {
   const { capas, total, loading } = useDocumentacionSistema();
@@ -136,17 +109,16 @@ export function LogicaSistemaPage() {
 function ManualHumanoColumna({ capas }: { capas: CapaDocumentacion[] }) {
   const capaManual = capas.find((c) => c.capa.toLowerCase() === "manual humano") ?? null;
   const { maestro, loading: loadingMaestro } = useEstadoProyecto();
-  const colorManual = "#0ea5e9"; // celeste — distinto de las familias técnicas, para que se lea como "la otra columna"
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border-2 border-sky-500/25 bg-sky-500/[0.03] p-3.5">
+    <div className="flex flex-col gap-3 rounded-xl border border-primary/10 bg-primary/[0.02] p-3.5">
       <div className="flex items-center gap-2">
-        <BookOpenText size={15} className="text-sky-600/70 shrink-0" />
+        <BookOpenText size={15} className="text-primary/40 shrink-0" />
         <span className="text-[15px] font-black tracking-tight text-primary/85">
           Manual humano
         </span>
         {capaManual && (
-          <span className="text-micro font-black uppercase tracking-wide px-2 py-0.5 rounded-full text-sky-700 bg-sky-500/15">
+          <span className="text-micro font-semibold text-primary/35">
             {capaManual.conceptos.length} ley{capaManual.conceptos.length === 1 ? "" : "es"}
           </span>
         )}
@@ -164,16 +136,14 @@ function ManualHumanoColumna({ capas }: { capas: CapaDocumentacion[] }) {
           </p>
         ) : (
           capaManual.conceptos.map((concepto) => (
-            <TarjetaConcepto key={concepto.id} concepto={concepto} color={colorManual} />
+            <TarjetaConcepto key={concepto.id} concepto={concepto} />
           ))
         )}
       </div>
 
       {/* Explicaciones humanas nuevas de estado_proyecto */}
-      <div className="mt-2 pt-3 border-t border-sky-500/15 flex flex-col gap-2.5">
-        <Text variant="lbl" className="text-sky-700/70">
-          Estado del proyecto, en palabras
-        </Text>
+      <div className="mt-2 pt-3 border-t border-primary/10 flex flex-col gap-2.5">
+        <Text variant="lbl">Estado del proyecto, en palabras</Text>
 
         {loadingMaestro ? (
           <div className="flex items-center gap-2 text-primary/30 py-2">
@@ -199,11 +169,7 @@ function ManualHumanoColumna({ capas }: { capas: CapaDocumentacion[] }) {
                 <Text variant="lbl">Principios rectores</Text>
                 <div className="mt-1.5 flex flex-col gap-1.5">
                   {maestro.principios.map((p, i) => (
-                    <div
-                      key={i}
-                      className="text-micro text-primary/55 italic pl-2.5"
-                      style={{ borderLeft: "2px solid color-mix(in srgb, #0ea5e9 25%, transparent)" }}
-                    >
+                    <div key={i} className="text-micro text-primary/55 italic">
                       {p}
                     </div>
                   ))}
@@ -218,21 +184,9 @@ function ManualHumanoColumna({ capas }: { capas: CapaDocumentacion[] }) {
 }
 
 function BloqueCapa({ capa }: { capa: CapaDocumentacion }) {
-  const color = colorDeCapa(capa.capa);
-
   return (
-    <div
-      className="rounded-xl border overflow-hidden"
-      style={{
-        borderColor: `color-mix(in srgb, ${color} 22%, transparent)`,
-        background: `color-mix(in srgb, ${color} 3%, var(--bg-main))`,
-      }}
-    >
-      <div
-        className="flex items-center gap-2.5 px-3.5 py-2.5 border-b"
-        style={{ borderColor: `color-mix(in srgb, ${color} 14%, transparent)` }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+    <div className="rounded-xl border border-primary/10 bg-primary/[0.015] overflow-hidden">
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-primary/10">
         <span className="text-sm font-bold tracking-tight text-primary/75 truncate">
           {capa.capa}
         </span>
@@ -247,25 +201,16 @@ function BloqueCapa({ capa }: { capa: CapaDocumentacion }) {
           (ej. Estructuras con 38, Células con 34). */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5">
         {capa.conceptos.map((concepto) => (
-          <TarjetaConcepto key={concepto.id} concepto={concepto} color={color} />
+          <TarjetaConcepto key={concepto.id} concepto={concepto} />
         ))}
       </div>
     </div>
   );
 }
 
-function TarjetaConcepto({
-  concepto,
-  color,
-}: {
-  concepto: ConceptoDocumentacion;
-  color: string;
-}) {
+function TarjetaConcepto({ concepto }: { concepto: ConceptoDocumentacion }) {
   return (
-    <div
-      className="flex flex-col gap-1 rounded-lg border-l-[3px] bg-primary/[0.02] px-2.5 py-2"
-      style={{ borderLeftColor: `color-mix(in srgb, ${color} 55%, transparent)` }}
-    >
+    <div className="flex flex-col gap-1 rounded-lg bg-primary/[0.03] px-2.5 py-2">
       <span className="text-micro font-bold uppercase tracking-[0.1em] text-primary/50">
         {concepto.concepto}
       </span>
