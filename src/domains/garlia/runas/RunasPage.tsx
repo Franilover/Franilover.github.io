@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Atom, Beaker, Dna, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X, Zap } from "lucide-react";
+import { Atom, Beaker, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -27,10 +27,10 @@ import type { SaveStatus } from "@/ui/saveStatus";
 
 import { ElementosPage } from "@/domains/garlia/elementos/ElementosPage";
 import type { Elemento } from "@/domains/garlia/elementos/types";
-import { BiologiaPage } from "@/domains/garlia/biologia/BiologiaPage";
+import { BiologiaCatalogos, BiologiaCladograma } from "@/domains/garlia/biologia/BiologiaPage";
 import { SandboxPage } from "@/domains/garlia/sandbox/SandboxPage";
 import { LogicaSistemaPage } from "./LogicaSistemaPage";
-import { FisicaPage } from "@/domains/garlia/fisica/FisicaPage";
+import { FisicaPage, BloqueFisicaMinerales } from "@/domains/garlia/fisica/FisicaPage";
 import { ORIS_CONFIG, type Oris } from "@/domains/garlia/fisica/types";
 import { FISICA_CONCEPTOS_CONFIG, type FisicaConcepto } from "@/domains/garlia/fisica/types";
 import {
@@ -60,11 +60,7 @@ import { RANGOS_ACIERTO } from "./types";
 import { useConfigRunas } from "./useConfigRunas";
 import { useGruposRunas } from "./useGruposRunas";
 import { useSubsistemasMagia } from "./useSubsistemasMagia";
-import {
-  useMagiaSeccionStore,
-  type SeccionMagia,
-  type SubSeccionQuimica,
-} from "./useMagiaSeccionStore";
+import { useMagiaSeccionStore, type SeccionMagia } from "./useMagiaSeccionStore";
 
 interface EntidadMagicaMin {
   id: string;
@@ -708,9 +704,11 @@ function BloqueEnsayoConSubBloques({
 // SeccionMagia se importa (y persiste) desde useMagiaSeccionStore.ts —
 // arriba, junto al resto de imports del store.
 
-// Física y Biología ya no son tabs propias acá — su contenido se movió
-// adentro de "Química" como sub-secciones (ver SelectorSubSeccionQuimica
-// más abajo), respetando la jerarquía Partículas Base > Partículas >
+// Física y Biología ya no son tabs propias acá — su contenido vive
+// directamente adentro de "Química", apilado en una sola vista sin
+// sub-tabs (fila de catálogos base, Elementos, Física/Biología en dos
+// columnas y el cladograma al final — ver el render de "tabla" más
+// abajo), respetando la jerarquía Partículas Base > Partículas >
 // Elementos que ya tenían.
 const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementType }[] = [
   { key: "runas", label: "Runas", Icon: Waypoints },
@@ -718,49 +716,6 @@ const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementTy
   { key: "sandbox", label: "Sandbox", Icon: Beaker },
   { key: "logica", label: "Lógica", Icon: Sparkles },
 ];
-
-// ─── Submenú interno de "Química": Tabla / Física / Biología ───────────────
-// Reemplaza a las antiguas tabs de nivel superior "Física" y "Biología".
-// Misma jerarquía de siempre (Partículas Base > Partículas > Iums > Oris
-// para Física; Elementos > Compuestos > … para Química/Tabla; Cladística
-// > Tejidos > Órganos para Biología), ahora navegable desde acá en vez de
-// todo apilado y scrolleable en una sola vista.
-const SUBSECCIONES_QUIMICA: { key: SubSeccionQuimica; label: string; Icon: React.ElementType }[] = [
-  { key: "tabla", label: "Tabla", Icon: Atom },
-  { key: "fisica", label: "Física", Icon: Zap },
-  { key: "biologia", label: "Biología", Icon: Dna },
-];
-
-function SelectorSubSeccionQuimica({
-  sub,
-  onCambiarSub,
-}: {
-  sub: SubSeccionQuimica;
-  onCambiarSub: (sub: SubSeccionQuimica) => void;
-}) {
-  return (
-    <div className="flex items-center gap-1 border-b border-primary/10 pb-2 mb-4">
-      {SUBSECCIONES_QUIMICA.map(({ key, label, Icon }) => {
-        const activa = sub === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onCambiarSub(key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-micro font-bold uppercase tracking-[0.1em] transition-colors ${
-              activa
-                ? "bg-primary/10 text-primary"
-                : "text-primary/40 hover:text-primary/70 hover:bg-primary/5"
-            }`}
-          >
-            <Icon size={12} />
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 function SelectorSeccionMagia({
   seccion,
@@ -832,10 +787,6 @@ export function RunasPage({
   const setSeccionMagia = useMagiaSeccionStore((s) => s.setSeccion);
   const itemPorSeccion = useMagiaSeccionStore((s) => s.itemPorSeccion);
   const setItemDeSeccion = useMagiaSeccionStore((s) => s.setItem);
-  // Sub-tab interna de "Química" (Tabla/Física/Biología) — reemplaza a
-  // las antiguas tabs de nivel superior "Física" y "Biología".
-  const subSeccionQuimica = useMagiaSeccionStore((s) => s.subSeccionQuimica);
-  const setSubSeccionQuimica = useMagiaSeccionStore((s) => s.setSubSeccionQuimica);
 
   // Runa actualmente seleccionada en el grid (click para mostrar su
   // patrón + explicación/grupos, click de nuevo para esconder). Reemplaza
@@ -1000,34 +951,59 @@ export function RunasPage({
       />
 
       {seccionMagia === "tabla" && elementos ? (
-        <div className="mt-4">
-          <SelectorSubSeccionQuimica
-            sub={subSeccionQuimica}
-            onCambiarSub={setSubSeccionQuimica}
+        // Química ya no tiene sub-tabs internas (Tabla/Física/Biología):
+        // todo vive apilado en una sola vista —
+        //   1. Fila de 5 catálogos base de Física (Partícula Base,
+        //      Partículas, Iums, Oris, Subsistemas) — ver la nueva grilla
+        //      de 5 columnas dentro de TodasLasBasesView en FisicaPage.tsx.
+        //   2. Elementos/Compuestos/Estructuras/Materiales/Reacciones,
+        //      igual que siempre (ElementosPage).
+        //   3. Dos columnas: Física · minerales (Granos/Vetas/Formaciones —
+        //      ver BloqueFisicaMinerales) y Biología (Tejidos/Sistemas/
+        //      Órganos, sin el cladograma — BiologiaCatalogos).
+        //   4. El cladograma de Biología, aparte y abajo de todo.
+        // El bloque de RichEditor de fisica_conceptos se eliminó del todo
+        // (ver FisicaPage.tsx).
+        <div className="mt-4 flex flex-col gap-8">
+          <BloqueFisica
+            seleccionarOrisId={itemPorSeccion.fisica ?? null}
+            onOrisSeleccionadoChange={(id) => setItemDeSeccion("fisica", id)}
+            onSelectCriatura={(id) => abrirPanel("criatura", id)}
           />
 
-          {subSeccionQuimica === "tabla" ? (
-            <ElementosPage
-              elementos={elementos}
-              loading={loadingElementos}
-              creating={creatingElemento}
-              onCreate={onCreateElemento}
-              onActualizar={onActualizarElemento ?? (() => {})}
-              onEliminar={onEliminarElemento}
-              seleccionarId={seleccionarElementoId ?? itemPorSeccion.tabla ?? null}
-              onSeleccionarIdChange={(id) => setItemDeSeccion("tabla", id)}
-              onImportarElementos={onImportarElementos}
-              onEliminarVarios={onEliminarVariosElementos}
-            />
-          ) : subSeccionQuimica === "fisica" ? (
-            <BloqueFisica
-              seleccionarOrisId={itemPorSeccion.fisica ?? null}
-              onOrisSeleccionadoChange={(id) => setItemDeSeccion("fisica", id)}
-              onSelectCriatura={(id) => abrirPanel("criatura", id)}
-            />
-          ) : (
-            <BiologiaPage onSelectCriatura={(id) => abrirPanel("criatura", id)} />
-          )}
+          <ElementosPage
+            elementos={elementos}
+            loading={loadingElementos}
+            creating={creatingElemento}
+            onCreate={onCreateElemento}
+            onActualizar={onActualizarElemento ?? (() => {})}
+            onEliminar={onEliminarElemento}
+            seleccionarId={seleccionarElementoId ?? itemPorSeccion.tabla ?? null}
+            onSeleccionarIdChange={(id) => setItemDeSeccion("tabla", id)}
+            onImportarElementos={onImportarElementos}
+            onEliminarVarios={onEliminarVariosElementos}
+          />
+
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex-1 min-w-0">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/40 mb-3">
+                Física · minerales
+              </p>
+              <BloqueFisicaMinerales
+                onSelectCriatura={(id) => abrirPanel("criatura", id)}
+              />
+            </div>
+            <div className="flex-1 min-w-0 lg:border-l lg:border-primary/10 lg:pl-6">
+              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/40 mb-3">
+                Biología
+              </p>
+              <BiologiaCatalogos onSelectCriatura={(id) => abrirPanel("criatura", id)} />
+            </div>
+          </div>
+
+          <div>
+            <BiologiaCladograma onSelectCriatura={(id) => abrirPanel("criatura", id)} />
+          </div>
         </div>
       ) : seccionMagia === "sandbox" ? (
         <div className="mt-4">

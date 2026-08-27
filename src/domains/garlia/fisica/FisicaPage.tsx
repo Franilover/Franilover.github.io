@@ -32,7 +32,6 @@ import { OrisEditor } from "./OrisEditor";
 import { IumVisual, ParticulaVisual } from "./ParticulaVisual";
 import {
   FISICA_CONCEPTOS_CONFIG,
-  agruparPorBloque,
   iumAFilaIum,
   orisAFilaCatalogo,
   particulaAFilaCatalogo,
@@ -365,7 +364,123 @@ function TodasLasBasesView({
 }) {
   const catalogos = catalogosBases(particulaBase, particulas, iums, oris, subsistemas);
 
-  // ── Formaciones: catálogo propio, debajo de Subsistemas ──
+  const [nombreNuevoSubsistema, setNombreNuevoSubsistema] = useState("");
+  const [creandoAbierto, setCreandoAbierto] = useState(false);
+  // Cuando se crea un subsistema nuevo, abrimos su popover automáticamente
+  // anclado a la fila donde estaba el input de creación (no hay tarjeta
+  // propia todavía en ese frame) — se guarda el id para que BasesItemCard
+  // lo detecte y se auto-abra apenas aparece en la lista.
+  const [autoAbrirSubsistemaId, setAutoAbrirSubsistemaId] = useState<string | null>(null);
+
+  const handleCrearSubsistema = async () => {
+    const nombre = nombreNuevoSubsistema.trim();
+    if (!nombre) return;
+    const nuevo = await onCrearSubsistema(nombre);
+    setNombreNuevoSubsistema("");
+    setCreandoAbierto(false);
+    if (nuevo) setAutoAbrirSubsistemaId(nuevo.id);
+  };
+
+  return (
+    <div className="shrink-0 flex flex-col">
+      <div className="p-2.5 flex flex-col gap-4">
+        {/* Partícula Base / Partículas / Iums / Oris / Subsistemas — una
+            sola fila de 5 columnas (antes iban apiladas verticalmente,
+            una sección completa por catálogo). Cada columna conserva su
+            título+contador y su propio mini-grid de tarjetas. */}
+        <div className="grid grid-cols-5 gap-3 items-start">
+          {catalogos.map(({ key, titulo, filas }) => (
+            <div key={key} className="flex flex-col gap-2 min-w-0">
+              <div className="flex items-center justify-between gap-1.5 text-primary/50 pb-1.5 border-b border-primary/10">
+                <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
+                {key === "subsistemas" && (
+                  <button
+                    type="button"
+                    onClick={() => setCreandoAbierto((o) => !o)}
+                    title="Añadir subsistema"
+                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
+                  >
+                    <Plus size={11} />
+                  </button>
+                )}
+              </div>
+
+              {key === "subsistemas" && creandoAbierto && (
+                <div className="flex flex-col gap-1.5 -mt-1 mb-1">
+                  <input
+                    autoFocus
+                    className="w-full min-w-0 bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/80 outline-none placeholder:text-primary/30 focus:border-primary/25"
+                    placeholder="Nombre del subsistema (ej. Luminia)…"
+                    value={nombreNuevoSubsistema}
+                    onChange={(e) => setNombreNuevoSubsistema(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleCrearSubsistema();
+                      if (e.key === "Escape") setCreandoAbierto(false);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!nombreNuevoSubsistema.trim() || creandoSubsistema}
+                    onClick={() => void handleCrearSubsistema()}
+                    className="shrink-0 text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity disabled:opacity-40"
+                  >
+                    Crear
+                  </button>
+                </div>
+              )}
+
+              {filas.length === 0 ? (
+                <div className="py-4 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
+                  Sin {titulo.toLowerCase()} todavía
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 items-start">
+                  {filas.map((f, i) => {
+                    const original = key === "oris" ? oris[i] : key === "subsistemas" ? subsistemas[i] : null;
+                    return (
+                      <BasesItemCard
+                        key={f.nombre + i}
+                        fila={f}
+                        bloque={key}
+                        original={key === "oris" ? (original as Oris) : undefined}
+                        originalSubsistema={key === "subsistemas" ? (original as SubsistemaMagia) : undefined}
+                        onActualizarOris={onActualizarOris}
+                        onEliminarOris={onEliminarOris}
+                        onActualizarSubsistema={onActualizarSubsistema}
+                        onEliminarSubsistema={onEliminarSubsistema}
+                        onSelectCriatura={onSelectCriatura}
+                        autoAbrir={
+                          key === "subsistemas" && original
+                            ? (original as SubsistemaMagia).id === autoAbrirSubsistemaId
+                            : false
+                        }
+                        onAutoAbierto={() => setAutoAbrirSubsistemaId(null)}
+                        oris={key === "subsistemas" ? oris : undefined}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "Física · minerales": Subsistemas ya no va acá (ver la fila de 5 en
+ * TodasLasBasesView) — solo Granos, Vetas y Formaciones, la jerarquía de
+ * composición mineral de Física. Extraído de TodasLasBasesView para que
+ * RunasPage pueda ubicarlo en su propia columna del layout general
+ * (junto a BiologiaCatalogos), separado de la fila de catálogos base.
+ */
+export function BloqueFisicaMinerales({
+  onSelectCriatura,
+}: {
+  onSelectCriatura?: (id: string) => void;
+}) {
   // Formaciones = tabla real "formaciones" (mismo catálogo que Minerales e
   // Items). Ya no tiene columna `componentes` — la fórmula vive vía
   // Vetas/Granos. (El catálogo "reacciones" ya no se renderiza acá como
@@ -393,135 +508,37 @@ function TodasLasBasesView({
     if (error) console.error("[FisicaPage] error guardando formación:", error);
   }
 
-  const [nombreNuevoSubsistema, setNombreNuevoSubsistema] = useState("");
-  const [creandoAbierto, setCreandoAbierto] = useState(false);
-  // Cuando se crea un subsistema nuevo, abrimos su popover automáticamente
-  // anclado a la fila donde estaba el input de creación (no hay tarjeta
-  // propia todavía en ese frame) — se guarda el id para que BasesItemCard
-  // lo detecte y se auto-abra apenas aparece en la lista.
-  const [autoAbrirSubsistemaId, setAutoAbrirSubsistemaId] = useState<string | null>(null);
-
-  const handleCrearSubsistema = async () => {
-    const nombre = nombreNuevoSubsistema.trim();
-    if (!nombre) return;
-    const nuevo = await onCrearSubsistema(nombre);
-    setNombreNuevoSubsistema("");
-    setCreandoAbierto(false);
-    if (nuevo) setAutoAbrirSubsistemaId(nuevo.id);
-  };
-
   return (
-    <div className="shrink-0 flex flex-col">
-      <div className="p-2.5 flex flex-col gap-4">
-        {catalogos.map(({ key, titulo, filas }, idx) => (
-          <div key={key} className="flex flex-col gap-2">
-            <div
-              className={`flex items-center justify-between gap-1.5 text-primary/50 pb-1.5 ${
-                idx > 0 ? "pt-2 border-t border-primary/10" : ""
-              }`}
-            >
-              <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
-              {key === "subsistemas" && (
-                <button
-                  type="button"
-                  onClick={() => setCreandoAbierto((o) => !o)}
-                  title="Añadir subsistema"
-                  className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-                >
-                  <Plus size={11} />
-                </button>
-              )}
-            </div>
+    <div className="flex flex-col gap-4">
+      {/* Granos y Vetas — catálogo global de composición, mismo patrón que
+          CatalogoTejidosBiologia en Biología: dos grids navegables con
+          editor propio, arriba de Formaciones (que se arman a partir de
+          Vetas vía formacion_vetas, ver useFormacionVetas.ts). */}
+      <div className="flex flex-col gap-2">
+        <CatalogoVetasFisica
+          compuestos={compuestosCatalogo}
+          onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+          onAbrirFormacion={(id) => setFormacionAAbrirId(id)}
+        />
+      </div>
 
-            {key === "subsistemas" && creandoAbierto && (
-              <div className="flex items-center gap-1.5 -mt-1 mb-1">
-                <input
-                  autoFocus
-                  className="flex-1 min-w-0 bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/80 outline-none placeholder:text-primary/30 focus:border-primary/25"
-                  placeholder="Nombre del subsistema (ej. Luminia)…"
-                  value={nombreNuevoSubsistema}
-                  onChange={(e) => setNombreNuevoSubsistema(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void handleCrearSubsistema();
-                    if (e.key === "Escape") setCreandoAbierto(false);
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!nombreNuevoSubsistema.trim() || creandoSubsistema}
-                  onClick={() => void handleCrearSubsistema()}
-                  className="shrink-0 text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity disabled:opacity-40"
-                >
-                  Crear
-                </button>
-              </div>
-            )}
-
-            {filas.length === 0 ? (
-              <div className="py-4 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
-                Sin {titulo.toLowerCase()} todavía
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2 items-start">
-                {filas.map((f, i) => {
-                  const original = key === "oris" ? oris[i] : key === "subsistemas" ? subsistemas[i] : null;
-                  return (
-                    <BasesItemCard
-                      key={f.nombre + i}
-                      fila={f}
-                      bloque={key}
-                      original={key === "oris" ? (original as Oris) : undefined}
-                      originalSubsistema={key === "subsistemas" ? (original as SubsistemaMagia) : undefined}
-                      onActualizarOris={onActualizarOris}
-                      onEliminarOris={onEliminarOris}
-                      onActualizarSubsistema={onActualizarSubsistema}
-                      onEliminarSubsistema={onEliminarSubsistema}
-                      onSelectCriatura={onSelectCriatura}
-                      autoAbrir={
-                        key === "subsistemas" && original
-                          ? (original as SubsistemaMagia).id === autoAbrirSubsistemaId
-                          : false
-                      }
-                      onAutoAbierto={() => setAutoAbrirSubsistemaId(null)}
-                      oris={key === "subsistemas" ? oris : undefined}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-
-        {/* Granos y Vetas — catálogo global de composición, mismo patrón que
-            CatalogoTejidosBiologia en Biología: dos grids navegables con
-            editor propio, arriba de Formaciones (que se arman a partir de
-            Vetas vía formacion_vetas, ver useFormacionVetas.ts). */}
-        <div className="flex flex-col gap-2 pt-2 border-t border-primary/10">
-          <CatalogoVetasFisica
-            compuestos={compuestosCatalogo}
-            onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
-            onAbrirFormacion={(id) => setFormacionAAbrirId(id)}
-          />
-        </div>
-
-        {/* Formaciones — catálogo global, mismo patrón que los bloques de
-            arriba pero usando el editor flotante completo
-            (GrupoCompuestoPanelFlotante) en vez del popover liviano de
-            BasesItemCard, ya que acá el contenido (fórmula de compuestos)
-            es más rico. */}
-        <div className="flex flex-col gap-2 pt-2 border-t border-primary/10">
-          <GridCatalogoGrupo
-            modo="grupo"
-            titulo="Formaciones"
-            icono="formacion"
-            items={catalogoFormaciones}
-            compuestos={compuestosCatalogo}
-            onActualizar={actualizarFormacion}
-            onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
-            abrirIdExterno={formacionAAbrirId}
-            onAbrirIdExternoConsumido={() => setFormacionAAbrirId(null)}
-          />
-        </div>
+      {/* Formaciones — catálogo global, mismo patrón que los bloques de
+          arriba pero usando el editor flotante completo
+          (GrupoCompuestoPanelFlotante) en vez del popover liviano de
+          BasesItemCard, ya que acá el contenido (fórmula de compuestos)
+          es más rico. */}
+      <div className="flex flex-col gap-2 pt-2 border-t border-primary/10">
+        <GridCatalogoGrupo
+          modo="grupo"
+          titulo="Formaciones"
+          icono="formacion"
+          items={catalogoFormaciones}
+          compuestos={compuestosCatalogo}
+          onActualizar={actualizarFormacion}
+          onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+          abrirIdExterno={formacionAAbrirId}
+          onAbrirIdExternoConsumido={() => setFormacionAAbrirId(null)}
+        />
       </div>
 
       {compuestoAbiertoId &&
@@ -690,146 +707,6 @@ function BasesItemCard({
         </PopoverFlotante>
       )}
     </>
-  );
-}
-
-/**
- * Vista de todos los Conceptos en la columna derecha, agrupados por
- * bloque. Mismo patrón que TodasLasBasesView: cada
- * bloque es una sección con título y separador horizontal, apilados uno
- * arriba del otro; los conceptos dentro de cada bloque van en columna
- * única (una lista vertical), ya que cada uno lleva su editor de texto
- * enriquecido y necesita ancho completo.
- */
-function TodosLosConceptosView({
-  bloques,
-  onBack,
-  onActualizarConcepto,
-  onEliminarConcepto,
-  onAgregarConcepto,
-  agregandoConceptoDe,
-  mostrarInputSeccion,
-  nuevaSeccionNombre,
-  onCambiarNuevaSeccionNombre,
-  onConfirmarNuevaSeccion,
-  onCancelarNuevaSeccion,
-  onAbrirNuevaSeccion,
-  creandoSeccion,
-}: {
-  bloques: { bloque: string; items: FisicaConcepto[] }[];
-  onBack: () => void;
-  onActualizarConcepto: (id: string, cambios: Partial<FisicaConcepto>) => void;
-  onEliminarConcepto?: (id: string) => void;
-  onAgregarConcepto?: (bloque: string) => void;
-  agregandoConceptoDe?: string | null;
-  mostrarInputSeccion: boolean;
-  nuevaSeccionNombre: string;
-  onCambiarNuevaSeccionNombre: (v: string) => void;
-  onConfirmarNuevaSeccion: () => void;
-  onCancelarNuevaSeccion: () => void;
-  onAbrirNuevaSeccion: () => void;
-  creandoSeccion?: boolean;
-}) {
-  return (
-    <div className="shrink-0 flex flex-col">
-      <div
-        style={{ background: "var(--bg-main)" }}
-        className="shrink-0 flex items-center justify-end gap-1.5 px-2.5 py-1.5 border-b border-primary/10"
-      >
-        {mostrarInputSeccion ? (
-          <div className="flex items-center gap-1 min-w-0">
-            <input
-              autoFocus
-              value={nuevaSeccionNombre}
-              onChange={(e) => onCambiarNuevaSeccionNombre(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onConfirmarNuevaSeccion();
-                if (e.key === "Escape") onCancelarNuevaSeccion();
-              }}
-              placeholder="Nombre de la sección…"
-              className="w-40 min-w-0 bg-primary/5 rounded px-1.5 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
-            />
-            <button
-              type="button"
-              disabled={creandoSeccion || !nuevaSeccionNombre.trim()}
-              onClick={onConfirmarNuevaSeccion}
-              className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/40 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {creandoSeccion ? <Loader2 className="animate-spin" size={10} /> : "✓"}
-            </button>
-            <button
-              type="button"
-              onClick={onCancelarNuevaSeccion}
-              className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/30 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={onAbrirNuevaSeccion}
-            title="Añadir nueva sección de conceptos"
-            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-micro font-black uppercase tracking-wide text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-          >
-            <Plus size={11} />
-            Sección
-          </button>
-        )}
-      </div>
-
-      <div className="p-2.5 flex flex-col gap-4">
-        {bloques.length === 0 ? (
-          <div className="py-8 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
-            Sin conceptos todavía
-          </div>
-        ) : (
-          bloques.map(({ bloque, items }, idx) => {
-            return (
-            <div key={bloque} className="flex flex-col gap-2">
-              <div
-                className={`flex items-center justify-between gap-1.5 text-primary/50 pb-1.5 ${
-                  idx > 0 ? "pt-2 border-t border-primary/10" : ""
-                }`}
-              >
-                <p className="text-micro font-black uppercase tracking-[0.2em]">
-                  {bloque} · {items.length}
-                </p>
-                {onAgregarConcepto && (
-                  <button
-                    type="button"
-                    disabled={agregandoConceptoDe === bloque}
-                    onClick={() => onAgregarConcepto(bloque)}
-                    title={`Añadir concepto en "${bloque}"`}
-                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/30 hover:text-primary hover:bg-primary/10 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {agregandoConceptoDe === bloque ? (
-                      <Loader2 className="animate-spin" size={10} />
-                    ) : (
-                      <Plus size={11} />
-                    )}
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-y-6 items-start">
-                {items.map((c) => (
-                  <ConceptoEditor
-                    key={c.id}
-                    concepto={c}
-                    onBack={onBack}
-                    onActualizar={onActualizarConcepto}
-                    onEliminar={onEliminarConcepto}
-                    embedded
-                  />
-                ))}
-              </div>
-            </div>
-            );
-          })
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -1202,8 +1079,6 @@ export function FisicaPage({
     [conceptosLocal, seleccion],
   );
 
-  const bloquesConceptos = useMemo(() => agruparPorBloque(conceptosLocal), [conceptosLocal]);
-
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {/* Ancla fantasma + popover flotante de Oris cuando se abre por
@@ -1308,48 +1183,26 @@ export function FisicaPage({
             }}
           />
         ) : (
-          <div className="flex-1 min-h-0 flex flex-row">
-            <div className="w-1/2 min-w-0 min-h-0 overflow-y-auto border-r border-primary/10">
-              <TodasLasBasesView
-                particulaBase={particulaBase}
-                particulas={particulas}
-                iums={iums}
-                oris={oris}
-                subsistemas={subsistemas}
-                onActualizarOris={onActualizarOris}
-                onEliminarOris={onEliminarOris}
-                onActualizarSubsistema={onActualizarSubsistema}
-                onEliminarSubsistema={onEliminarSubsistema}
-                onSelectCriatura={onSelectCriatura}
-                onCrearSubsistema={onCrearSubsistema}
-                creandoSubsistema={creandoSubsistema}
-              />
-            </div>
-            <div className="w-1/2 min-w-0 min-h-0 overflow-y-auto">
-              <TodosLosConceptosView
-                bloques={bloquesConceptos}
-                onBack={() => setSeleccion(null)}
-                onActualizarConcepto={(id, cambios) => {
-                  setConceptosLocal((prev) =>
-                    prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
-                  );
-                  onActualizarConcepto(id, cambios);
-                }}
-                onEliminarConcepto={handleEliminarConcepto}
-                onAgregarConcepto={handleAgregarConcepto}
-                agregandoConceptoDe={agregandoConceptoDe}
-                mostrarInputSeccion={mostrarInputSeccion}
-                nuevaSeccionNombre={nuevaSeccionNombre}
-                onCambiarNuevaSeccionNombre={setNuevaSeccionNombre}
-                onConfirmarNuevaSeccion={handleCrearSeccion}
-                onCancelarNuevaSeccion={() => {
-                  setMostrarInputSeccion(false);
-                  setNuevaSeccionNombre("");
-                }}
-                onAbrirNuevaSeccion={() => setMostrarInputSeccion(true)}
-                creandoSeccion={creandoSeccion}
-              />
-            </div>
+          // Antes acá había 2 columnas: catálogos base a la izquierda y
+          // TodosLosConceptosView (RichEditor de fisica_conceptos) a la
+          // derecha. Se quitó el bloque de conceptos — ver comentario en
+          // los imports — así que ahora TodasLasBasesView ocupa todo el
+          // ancho disponible.
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <TodasLasBasesView
+              particulaBase={particulaBase}
+              particulas={particulas}
+              iums={iums}
+              oris={oris}
+              subsistemas={subsistemas}
+              onActualizarOris={onActualizarOris}
+              onEliminarOris={onEliminarOris}
+              onActualizarSubsistema={onActualizarSubsistema}
+              onEliminarSubsistema={onEliminarSubsistema}
+              onSelectCriatura={onSelectCriatura}
+              onCrearSubsistema={onCrearSubsistema}
+              creandoSubsistema={creandoSubsistema}
+            />
           </div>
         )}
       </div>

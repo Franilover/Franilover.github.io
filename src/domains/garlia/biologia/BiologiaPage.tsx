@@ -124,12 +124,13 @@ function parsearArchivoBiologiaJSON(raw: string, cladosExistentes: Clado[]): Imp
   return { cladosNuevos, cladosActualizar, padresOmitidos };
 }
 
-export function BiologiaPage({ onSelectCriatura }: Props) {
-  // Traído acá solo para armar el JSON de descarga — Cladística sigue
-  // manejando sus propios datos internamente (self-contained), esto no le
-  // saca esa responsabilidad.
-  const { clados, setClados } = useClados();
-
+/**
+ * Catálogos de Biología (Células vía Tejidos, Tejidos, Sistemas, Órganos)
+ * — sin Cladística, que ahora se muestra aparte vía BiologiaCladograma
+ * (ver más abajo) para poder ubicarla en otro lugar del layout general
+ * (RunasPage la pone al final, debajo de las columnas de Física/Biología).
+ */
+export function BiologiaCatalogos({ onSelectCriatura }: Props) {
   // ── Órganos: catálogo propio, mismo motor que Física ─────
   // Órganos = tabla real "organos" (mismo catálogo que usa Flora para
   // vincular por planta_organos, y Criaturas por criatura_organos). Ya no
@@ -158,6 +159,72 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
     const { error } = await supabase.from("organos").update(cambios).eq("id", id);
     if (error) console.error("[BiologiaPage] error guardando órgano:", error);
   }
+
+  return (
+    <div className="flex flex-col gap-4 min-h-0">
+      <div className="p-2.5">
+        <CatalogoTejidosBiologia
+          compuestos={compuestosCatalogo}
+          loadingCompuestos={loadingCompuestos}
+          onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+          onAbrirOrgano={(id) => setOrganoAAbrirId(id)}
+        />
+      </div>
+
+      <div className="p-2.5 border-t border-primary/10 pt-4">
+        <CatalogoSistemasBiologia
+          organos={catalogoOrganos}
+          onAbrirOrgano={(id) => setOrganoAAbrirId(id)}
+        />
+      </div>
+
+      <div className="p-2.5 border-t border-primary/10 pt-4">
+        <GridCatalogoGrupo
+          modo="grupo"
+          titulo="Órganos"
+          icono="organo"
+          items={catalogoOrganos}
+          compuestos={compuestosCatalogo}
+          onActualizar={actualizarOrgano}
+          onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
+          abrirIdExterno={organoAAbrirId}
+          onAbrirIdExternoConsumido={() => setOrganoAAbrirId(null)}
+        />
+      </div>
+
+      {compuestoAbiertoId &&
+        (() => {
+          const compuesto = compuestosCatalogo.find((c) => c.id === compuestoAbiertoId);
+          if (!compuesto) return null;
+          return (
+            <CompuestoPanelFlotante
+              compuesto={compuesto}
+              elementos={elementosCatalogo}
+              todosLosCompuestos={compuestosCatalogo}
+              onCerrar={() => setCompuestoAbiertoId(null)}
+              onActualizar={(id, cambios) =>
+                setCompuestosCatalogo((prev) =>
+                  prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+                )
+              }
+            />
+          );
+        })()}
+    </div>
+  );
+}
+
+/**
+ * Cladograma de Biología (Cladística), con import/export propio — separado
+ * de BiologiaCatalogos para poder ubicarlo en otra zona del layout general
+ * (ver comentario arriba). Mismo comportamiento de siempre, solo que ahora
+ * no vive pegado a la columna de Tejidos/Sistemas/Órganos.
+ */
+export function BiologiaCladograma({ onSelectCriatura }: Props) {
+  // Traído acá solo para armar el JSON de descarga — Cladística sigue
+  // manejando sus propios datos internamente (self-contained), esto no le
+  // saca esa responsabilidad.
+  const { clados, setClados } = useClados();
 
   const inputArchivoRef = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
@@ -220,107 +287,69 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   }
 
   return (
+    <div className="min-w-0">
+      <div className="flex items-center justify-end gap-1 px-2 mb-1">
+        <input
+          ref={inputArchivoRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleArchivoSeleccionado}
+          className="hidden"
+        />
+        <button
+          type="button"
+          disabled={importando}
+          onClick={() => inputArchivoRef.current?.click()}
+          title='Subir un JSON con clados: crea los nuevos y actualiza los existentes (mismo nombre), mismo formato que "Descargar datos"'
+          className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+        >
+          {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
+        </button>
+        <button
+          type="button"
+          onClick={() => descargarDatosBiologia({ clados })}
+          title="Descargar el cladograma de Biología (clados) como JSON"
+          className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
+        >
+          <Download size={14} />
+        </button>
+      </div>
+
+      {mensajeImportacion && (
+        <div className="flex items-center justify-between gap-2 px-2 mb-1 text-micro text-primary/60">
+          <span className="min-w-0">{mensajeImportacion}</span>
+          <button
+            type="button"
+            onClick={() => setMensajeImportacion(null)}
+            className="shrink-0 text-primary/30 hover:text-primary/60 cursor-pointer"
+            title="Cerrar"
+          >
+            <X size={10} />
+          </button>
+        </div>
+      )}
+
+      <CladisticaPage onSelectCriatura={onSelectCriatura} />
+    </div>
+  );
+}
+
+/**
+ * Wrapper de compatibilidad: Cladograma + catálogos lado a lado, como
+ * antes de separarlos en BiologiaCladograma/BiologiaCatalogos. Ya no lo
+ * usa RunasPage (que ahora ubica cada mitad en su propio lugar del
+ * layout general), pero se mantiene por si algún otro consumidor lo
+ * necesita en el futuro.
+ */
+export function BiologiaPage({ onSelectCriatura }: Props) {
+  return (
     <div className="flex flex-col sm:flex-row gap-3 min-h-0">
-      {/* Columna izquierda: Cladística — comportamiento sin cambios, solo
-          ahora vive fija al lado de Órganos/Procesos en vez de ocupar todo
-          el ancho detrás de un tab. */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-end gap-1 px-2 mb-1">
-          <input
-            ref={inputArchivoRef}
-            type="file"
-            accept="application/json,.json"
-            onChange={handleArchivoSeleccionado}
-            className="hidden"
-          />
-          <button
-            type="button"
-            disabled={importando}
-            onClick={() => inputArchivoRef.current?.click()}
-            title='Subir un JSON con clados: crea los nuevos y actualiza los existentes (mismo nombre), mismo formato que "Descargar datos"'
-            className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
-          </button>
-          <button
-            type="button"
-            onClick={() => descargarDatosBiologia({ clados })}
-            title="Descargar el cladograma de Biología (clados) como JSON"
-            className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-          >
-            <Download size={14} />
-          </button>
-        </div>
-
-        {mensajeImportacion && (
-          <div className="flex items-center justify-between gap-2 px-2 mb-1 text-micro text-primary/60">
-            <span className="min-w-0">{mensajeImportacion}</span>
-            <button
-              type="button"
-              onClick={() => setMensajeImportacion(null)}
-              className="shrink-0 text-primary/30 hover:text-primary/60 cursor-pointer"
-              title="Cerrar"
-            >
-              <X size={10} />
-            </button>
-          </div>
-        )}
-
-        <CladisticaPage onSelectCriatura={onSelectCriatura} />
+        <BiologiaCladograma onSelectCriatura={onSelectCriatura} />
       </div>
-
-      {/* Columna derecha: Órganos — apilados, cada uno con su propio
-          separador de sección, sin tabs. */}
-      <div className="flex-1 min-w-0 flex flex-col gap-4 border-l border-primary/10 pl-3">
-        <div className="p-2.5">
-          <CatalogoTejidosBiologia
-            compuestos={compuestosCatalogo}
-            loadingCompuestos={loadingCompuestos}
-            onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
-            onAbrirOrgano={(id) => setOrganoAAbrirId(id)}
-          />
-        </div>
-
-        <div className="p-2.5 border-t border-primary/10 pt-4">
-          <CatalogoSistemasBiologia
-            organos={catalogoOrganos}
-            onAbrirOrgano={(id) => setOrganoAAbrirId(id)}
-          />
-        </div>
-
-        <div className="p-2.5 border-t border-primary/10 pt-4">
-          <GridCatalogoGrupo
-            modo="grupo"
-            titulo="Órganos"
-            icono="organo"
-            items={catalogoOrganos}
-            compuestos={compuestosCatalogo}
-            onActualizar={actualizarOrgano}
-            onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
-            abrirIdExterno={organoAAbrirId}
-            onAbrirIdExternoConsumido={() => setOrganoAAbrirId(null)}
-          />
-        </div>
+      <div className="flex-1 min-w-0 border-l border-primary/10 pl-3">
+        <BiologiaCatalogos onSelectCriatura={onSelectCriatura} />
       </div>
-
-      {compuestoAbiertoId &&
-        (() => {
-          const compuesto = compuestosCatalogo.find((c) => c.id === compuestoAbiertoId);
-          if (!compuesto) return null;
-          return (
-            <CompuestoPanelFlotante
-              compuesto={compuesto}
-              elementos={elementosCatalogo}
-              todosLosCompuestos={compuestosCatalogo}
-              onCerrar={() => setCompuestoAbiertoId(null)}
-              onActualizar={(id, cambios) =>
-                setCompuestosCatalogo((prev) =>
-                  prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
-                )
-              }
-            />
-          );
-        })()}
     </div>
   );
 }
