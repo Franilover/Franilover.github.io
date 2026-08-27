@@ -275,14 +275,14 @@ export function ElementoEditor({
               </div>
             </div>
 
-            <div className="grid grid-cols-[auto_1fr] gap-2 items-stretch">
-              <div className="flex flex-col gap-2 shrink-0 w-[3.75rem]">
+            <div className="grid grid-cols-[minmax(6.5rem,auto)_auto] gap-2 items-stretch justify-start">
+              <div className="flex flex-col gap-2 shrink-0">
                 {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
                   <div
                     key={layer}
-                    className="flex flex-col gap-2 p-1 rounded-lg border border-primary/10"
+                    className="flex flex-col gap-1.5 p-1.5 rounded-lg border border-primary/10"
                   >
-                    <span className="text-[9px] font-black uppercase tracking-[0.05em] text-primary/40 text-center truncate">
+                    <span className="text-[9px] font-black uppercase tracking-[0.05em] text-primary/40 text-center whitespace-nowrap">
                       {LAYER_LABEL[layer]}
                     </span>
                     <div className="border-t border-primary/10" />
@@ -292,11 +292,11 @@ export function ElementoEditor({
                         return (
                           <div
                             key={particle}
-                            className="flex items-center justify-center gap-0.5 py-1"
+                            className="flex items-center justify-between gap-1.5 px-1 py-1"
                             title={particle}
                           >
-                            <span className="text-xs font-bold text-primary/60 shrink-0">
-                              {PARTICLE_INITIAL[particle]}
+                            <span className="text-xs font-bold text-primary/60 whitespace-nowrap">
+                              {particle}
                             </span>
                             <input
                               type="number"
@@ -306,7 +306,7 @@ export function ElementoEditor({
                                 setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
                               }
                               onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
-                              className="w-5 shrink-0 text-center bg-transparent text-sm font-black text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="w-6 shrink-0 text-center bg-transparent text-sm font-black text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </div>
                         );
@@ -319,13 +319,14 @@ export function ElementoEditor({
               {/* Visualización tipo átomo real: núcleo + capas orbitales,
                   con las partículas propias del mundo (Masa, Cinética,
                   Voluntad…) en vez de protones/neutrones/electrones
-                  genéricos. La columna de al lado ahora tiene ancho fijo
-                  y angosto (w-[3.75rem], solo lo que necesitan inicial +
-                  input de 2 dígitos) en vez de "auto" heredando el ancho
-                  de la etiqueta Núcleo/Media/Externa — antes esa etiqueta
-                  con tracking ancho terminaba empujando la columna más de
-                  lo que el contenido realmente necesitaba. */}
-              <AtomoVisual elemento={local} className="w-full max-w-72 mx-auto aspect-square" />
+                  genéricos. Columna "auto" (no "1fr"): el gráfico es
+                  cuadrado y se ata a la altura de la pila de partículas de
+                  al lado (aspect-square h-full, por defecto en
+                  AtomoVisual sin className angosto) — no necesita reclamar
+                  el ancho extra que sobra, y ese espacio ahora lo gana la
+                  columna de partículas para mostrar el nombre completo sin
+                  cortarse. */}
+              <AtomoVisual elemento={local} />
             </div>
           </div>
         </div>
