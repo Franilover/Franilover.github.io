@@ -22,6 +22,7 @@ import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 
 import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
+import { MaterialesPage } from "../materiales/MaterialesPage";
 
 import { ReaccionesPage } from "./ReaccionesPage";
 import { ElementoEditor } from "./ElementoEditor";
@@ -1182,6 +1183,19 @@ export function ElementosPage({
           }}
         />
       </div>
+
+
+            {/* Materiales */}
+      <div className="flex flex-col border-t border-primary/10">
+        <div className="shrink-0 px-3 pt-3 text-primary/40">
+          <p className="text-micro font-black uppercase tracking-widest">
+            Materiales
+          </p>
+        </div>
+
+        <MaterialesPage />
+      </div>
+
 
       {/* Reacciones */}
       <div className="flex flex-col border-t border-primary/10">
