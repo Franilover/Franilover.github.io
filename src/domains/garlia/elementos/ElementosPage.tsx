@@ -1001,52 +1001,51 @@ export function ElementosPage({
         </div>
       </div>
 
-      {/* Compuestos */}
-      <div className="flex flex-col border-t border-primary/10">
-        <div className="shrink-0 px-3 pt-3 text-primary/40">
-          <p className="text-micro font-black uppercase tracking-widest">Compuestos</p>
-        </div>
-        <CompuestosPage
-          compuestos={compuestos}
-          elementos={elementos}
-          loading={loadingCompuestos}
-          creating={creatingCompuesto}
-          onCreate={handleCreateCompuesto}
-          onCrearConComponentes={handleCrearCompuestoConComponentes}
-          onActualizar={(id, cambios) =>
-            setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
-          }
-          onEliminar={handleEliminarCompuesto}
-          seleccionarId={compuestoAAbrir ?? compuestoRecienCreadoId}
-          onSeleccionarIdConsumido={() => {
-            setCompuestoAAbrir(null);
-            setCompuestoRecienCreadoId(null);
-          }}
-        />
-      </div>
-
-
-      {/* Estructuras */}
-      <div className="flex flex-col border-t border-primary/10">
-        <div className="shrink-0 px-3 pt-3 text-primary/40">
-          <p className="text-micro font-black uppercase tracking-widest">
-            Estructuras
-          </p>
+      {/* Compuestos / Estructuras / Materiales — fila de 3 columnas desde
+          md (768px) en vez de lg (1024px): el panel de contenido dentro del
+          layout de la app suele quedar más angosto que el viewport
+          completo por el sidebar de navegación, así que lg: no llegaba a
+          activarse en compus normales. md: se activa mucho antes y sigue
+          dejando mobile angosto apilado. */}
+      <div className="grid grid-cols-1 md:grid-cols-3 border-t border-primary/10">
+        <div className="min-w-0 border-b md:border-b-0 md:border-r border-primary/10">
+          <div className="px-3 pt-3 text-primary/40">
+            <p className="text-micro font-black uppercase tracking-widest">Compuestos</p>
+          </div>
+          <CompuestosPage
+            compuestos={compuestos}
+            elementos={elementos}
+            loading={loadingCompuestos}
+            creating={creatingCompuesto}
+            onCreate={handleCreateCompuesto}
+            onCrearConComponentes={handleCrearCompuestoConComponentes}
+            onActualizar={(id, cambios) =>
+              setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
+            }
+            onEliminar={handleEliminarCompuesto}
+            seleccionarId={compuestoAAbrir ?? compuestoRecienCreadoId}
+            onSeleccionarIdConsumido={() => {
+              setCompuestoAAbrir(null);
+              setCompuestoRecienCreadoId(null);
+            }}
+          />
         </div>
 
-        <EstructurasPage />
-      </div>
-
-            {/* Materiales */}
-      <div className="flex flex-col border-t border-primary/10">
-        <div className="shrink-0 px-3 pt-3 text-primary/40">
-          <p className="text-micro font-black uppercase tracking-widest">
-            Materiales
-          </p>
+        <div className="min-w-0 border-b md:border-b-0 md:border-r border-primary/10">
+          <div className="px-3 pt-3 text-primary/40">
+            <p className="text-micro font-black uppercase tracking-widest">Estructuras</p>
+          </div>
+          <EstructurasPage />
         </div>
 
-        <MaterialesPage />
+        <div className="min-w-0">
+          <div className="px-3 pt-3 text-primary/40">
+            <p className="text-micro font-black uppercase tracking-widest">Materiales</p>
+          </div>
+          <MaterialesPage />
+        </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 border-t border-primary/10">
   <div className="min-w-0 border-b lg:border-b-0 lg:border-r border-primary/10">
     <div className="px-3 pt-3 text-primary/40">
