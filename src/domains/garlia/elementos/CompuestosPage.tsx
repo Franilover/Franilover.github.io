@@ -812,22 +812,16 @@ function CompuestoEditor({
           </div>
         )}
 
-        {/* Dos columnas: propiedades/composición/estabilidad/enlaces del
-            compuesto (izquierda) · átomo/molécula, más chico (derecha).
-            Reemplaza al bloque "Usado en Item/Mineral/Flora" — informativo
-            de solo lectura sobre otras entidades del catálogo, no datos
-            propios de Química — y a los 4 cuadros de Reactividad/Peso/
-            Carga/Enlace que vivían debajo del átomo, ya antiguos y
-            redundantes con Propiedades físicas + Estabilidad. */}
+        {/* Dos columnas: propiedades/estabilidad/enlaces del compuesto
+            (izquierda) · átomo/molécula (más grande) + composición real
+            debajo (derecha). Reemplaza al bloque "Usado en Item/Mineral/
+            Flora" — informativo de solo lectura sobre otras entidades del
+            catálogo, no datos propios de Química — y a los 4 cuadros de
+            Reactividad/Peso/Carga/Enlace que vivían debajo del átomo, ya
+            antiguos y redundantes con Propiedades físicas + Estabilidad. */}
         <div className="grid grid-cols-2 gap-3 items-start">
           <div className="flex flex-col gap-2 min-w-0">
             <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
-            <ComposicionRealBloque
-              proporciones={proporcionElementos}
-              loading={proporcionLoading}
-              elementos={elementos}
-              onAbrirElemento={setEditandoElementoId}
-            />
             <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
             <EnlacesCompuestoBloque
               enlaces={enlacesCompuesto}
@@ -838,8 +832,14 @@ function CompuestoEditor({
             />
           </div>
 
-          <div className="flex flex-col gap-3 min-w-0 max-w-[14rem] mx-auto">
+          <div className="flex flex-col gap-3 min-w-0 max-w-[18rem] mx-auto">
             <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
+            <ComposicionRealBloque
+              proporciones={proporcionElementos}
+              loading={proporcionLoading}
+              elementos={elementos}
+              onAbrirElemento={setEditandoElementoId}
+            />
           </div>
         </div>
       </div>
