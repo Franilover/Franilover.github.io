@@ -7,16 +7,19 @@
  * es un sitio individual (numero_sitio) con su geometría, afinidad,
  * capacidad, selectividad y saturación — poblados/recalculados en Supabase
  * (propagar_elemento_a_sitios + calcular_propiedades_sitio), nunca escritos
- * desde el frontend. Solo lectura, mismo criterio que las Propiedades
- * físicas de ElementoEditor.
+ * desde el frontend. Solo lectura.
  *
- * Liviano y sin cache Dexie (como useCelulasDeUnCompuesto): se resuelve en
- * vivo contra Supabase cada vez que cambia elementoId.
+ * v39: migrado a useSupabaseData (cache-first vía Dexie + timeout + retry +
+ * realtime) — antes pegaba directo a Supabase sin cache ni timeout en cada
+ * cambio de elementoId, dejando el panel vacío indefinidamente con mala
+ * conexión (ver infra/supabase/db.ts v39). Trae la tabla completa (ya
+ * cacheada por useSupabaseData) y filtra/ordena en memoria por elementoId,
+ * mismo patrón que useUsosCompuesto.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo } from "react";
 
-import { supabase } from "@/infra/supabase/supabase";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 /** Fila cruda tal cual vive en Supabase (tabla "elemento_sitios_enlace"). */
 export interface ElementoSitioEnlace {
@@ -42,36 +45,17 @@ export const CONFIG_ELEMENTO_SITIOS_ENLACE = {
 };
 
 export function useElementoSitiosEnlace(elementoId: string | null) {
-  const [items, setItems] = useState<ElementoSitioEnlace[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, isOffline, refetch } =
+    useSupabaseData<ElementoSitioEnlace>(CONFIG_ELEMENTO_SITIOS_ENLACE.tabla, {
+      select: CONFIG_ELEMENTO_SITIOS_ENLACE.select,
+    });
 
-  const load = useCallback(async () => {
-    if (!elementoId) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const items = useMemo(() => {
+    if (!elementoId) return [];
+    return data
+      .filter((r) => r.elemento_id === elementoId)
+      .sort((a, b) => (a.numero_sitio ?? 0) - (b.numero_sitio ?? 0));
+  }, [data, elementoId]);
 
-    const { data, error } = await supabase
-      .from(CONFIG_ELEMENTO_SITIOS_ENLACE.tabla)
-      .select(CONFIG_ELEMENTO_SITIOS_ENLACE.select)
-      .eq("elemento_id", elementoId)
-      .order("numero_sitio", { ascending: true });
-
-    if (error || !data) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-
-    setItems(data as unknown as ElementoSitioEnlace[]);
-    setLoading(false);
-  }, [elementoId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { items, loading, load };
+  return { items, loading: elementoId ? loading : false, isOffline, load: refetch };
 }

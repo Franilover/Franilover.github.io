@@ -132,6 +132,13 @@ const DEXIE_TABLES = new Set([
   // OFFLINE_WRITABLE más abajo: son vistas derivadas, no se editan.
   "v_auditoria_compuestos_derivacion",
   "v_auditoria_elementos_derivacion",
+  // ─── v39: paneles de abajo de los editores flotantes (Sitios de enlace,
+  // Estabilidad, Enlaces reales) — ver infra/supabase/db.ts. Solo lectura,
+  // por eso NO están en OFFLINE_WRITABLE más abajo.
+  "compuesto_estabilidad",
+  "compuesto_enlaces",
+  "enlace_sitios",
+  "elemento_sitios_enlace",
 ]);
 
 const OFFLINE_WRITABLE = new Set([

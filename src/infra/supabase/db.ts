@@ -1813,6 +1813,29 @@ class AgendaFraniDB extends Dexie {
       v_auditoria_compuestos_derivacion: "id, nombre",
       v_auditoria_elementos_derivacion: "id, nombre, numero_atomico",
     });
+
+    // ─── v39: paneles de abajo de ElementoEditor/CompuestoEditor (Sitios de
+    // enlace, Estabilidad, Enlaces reales) — compuesto_estabilidad,
+    // compuesto_enlaces y elemento_sitios_enlace pegaban directo a Supabase
+    // en cada apertura de editor flotante, sin cache Dexie ni timeout
+    // (useCompuestoEstabilidad.ts / useCompuestoEnlaces.ts /
+    // useElementoSitiosEnlace.ts, antes de migrar a useSupabaseData). Con
+    // mala conexión el panel quedaba vacío indefinidamente. Mismo patrón
+    // cache-first que el resto: se pinta lo que ya está en Dexie al
+    // instante y se revalida contra Supabase en segundo plano. Son datos
+    // calculados/derivados en Supabase (solo lectura desde el frontend) —
+    // no entran en OFFLINE_WRITABLE.
+    // enlace_sitios es el catálogo referenciado por compuesto_enlaces
+    // (enlace_sitios_id) — antes se traía embebido en un solo select con
+    // join de PostgREST (frágil sin red, no cacheable tal cual en Dexie).
+    // Se cachea acá como tabla plana propia y el join se resuelve en
+    // memoria en useCompuestoEnlaces.ts, mismo patrón que useUsosCompuesto.
+    this.version(39).stores({
+      compuesto_estabilidad: "id, compuesto_id",
+      compuesto_enlaces: "id, compuesto_id, elemento_a_id, elemento_b_id, enlace_sitios_id",
+      enlace_sitios: "id",
+      elemento_sitios_enlace: "id, elemento_id, numero_sitio",
+    });
   }
 }
 

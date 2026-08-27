@@ -8,15 +8,20 @@
  * complejidad estructural, calculado en Supabase a partir de
  * compuesto_enlaces (ver estado_proyecto "v_auditoria_compuestos_derivacion"
  * / "77 de 90 compuestos tienen fila auxiliar" — no todos los compuestos
- * tienen fila, ver items === null abajo). Solo lectura.
+ * tienen fila, ver item === null abajo). Solo lectura.
  *
- * Liviano y sin cache Dexie, mismo criterio que useElementoSitiosEnlace:
- * se resuelve en vivo contra Supabase cada vez que cambia compuestoId.
+ * v39: migrado a useSupabaseData (cache-first vía Dexie + timeout + retry +
+ * realtime) — antes pegaba directo a Supabase sin cache ni timeout en cada
+ * cambio de compuestoId, mismo problema que useCompuestoEnlaces y
+ * useElementoSitiosEnlace (ver infra/supabase/db.ts v39).
+ * useCompuestoElementosProporcion migra también: compuesto_elementos ya
+ * estaba en Dexie desde v34 pero este hook seguía haciendo fetch manual sin
+ * timeout en vez de aprovechar ese cache.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo } from "react";
 
-import { supabase } from "@/infra/supabase/supabase";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 /** Fila cruda tal cual vive en Supabase (tabla "compuesto_estabilidad"). */
 export interface CompuestoEstabilidadRow {
@@ -57,71 +62,35 @@ export interface CompuestoElementoProporcion {
   rol: string | null;
 }
 
+const SELECT_COMPUESTO_ELEMENTOS_PROPORCION =
+  "id, elemento_id, cantidad, proporcion_molar, proporcion_deducida, proporcion_fuente, rol";
+
 export function useCompuestoElementosProporcion(compuestoId: string | null) {
-  const [items, setItems] = useState<CompuestoElementoProporcion[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, isOffline, refetch } =
+    useSupabaseData<CompuestoElementoProporcion>("compuesto_elementos", {
+      select: SELECT_COMPUESTO_ELEMENTOS_PROPORCION,
+    });
 
-  const load = useCallback(async () => {
-    if (!compuestoId) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const items = useMemo(() => {
+    if (!compuestoId) return [];
+    return data.filter(
+      (r) => (r as unknown as { compuesto_id: string }).compuesto_id === compuestoId,
+    );
+  }, [data, compuestoId]);
 
-    const { data, error } = await supabase
-      .from("compuesto_elementos")
-      .select("id, elemento_id, cantidad, proporcion_molar, proporcion_deducida, proporcion_fuente, rol")
-      .eq("compuesto_id", compuestoId);
-
-    if (error || !data) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-
-    setItems(data as unknown as CompuestoElementoProporcion[]);
-    setLoading(false);
-  }, [compuestoId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { items, loading, load };
+  return { items, loading: compuestoId ? loading : false, isOffline, load: refetch };
 }
 
 export function useCompuestoEstabilidad(compuestoId: string | null) {
-  const [item, setItem] = useState<CompuestoEstabilidadRow | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, isOffline, refetch } =
+    useSupabaseData<CompuestoEstabilidadRow>(CONFIG_COMPUESTO_ESTABILIDAD.tabla, {
+      select: CONFIG_COMPUESTO_ESTABILIDAD.select,
+    });
 
-  const load = useCallback(async () => {
-    if (!compuestoId) {
-      setItem(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const item = useMemo(() => {
+    if (!compuestoId) return null;
+    return data.find((r) => r.compuesto_id === compuestoId) ?? null;
+  }, [data, compuestoId]);
 
-    const { data, error } = await supabase
-      .from(CONFIG_COMPUESTO_ESTABILIDAD.tabla)
-      .select(CONFIG_COMPUESTO_ESTABILIDAD.select)
-      .eq("compuesto_id", compuestoId)
-      .maybeSingle();
-
-    if (error || !data) {
-      setItem(null);
-      setLoading(false);
-      return;
-    }
-
-    setItem(data as unknown as CompuestoEstabilidadRow);
-    setLoading(false);
-  }, [compuestoId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { item, loading, load };
+  return { item, loading: compuestoId ? loading : false, isOffline, load: refetch };
 }
