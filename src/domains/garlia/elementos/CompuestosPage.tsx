@@ -47,7 +47,6 @@ import {
 } from "../_shared/useEditorHeaderControls";
 import { ElementoPanelFlotante } from "./ElementosPage";
 import { AtomoVisual } from "./ElementoEditor";
-import { SelectorTagsCompuesto } from "./SelectorTagsCompuesto";
 import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
 import { useUsosCompuesto, type TipoUsoCompuesto, type UsoCompuesto } from "./useUsosCompuesto";
 import { sincronizarComponentesCompuesto } from "./useCompuestosConElementos";
@@ -826,9 +825,10 @@ function CompuestoEditor({
     granoOCelulaAbiertoProp !== undefined ? granoOCelulaAbiertoProp : granoOCelulaAbiertoLocal;
   const setGranoOCelulaAbierto = onGranoOCelulaAbiertoChange ?? setGranoOCelulaAbiertoLocal;
 
-  const { porCategoria: tagsPorCategoria, loading: tagsLoading } = useTagsCatalogo();
-  const { tagIdsDe, toggleTag, loading: compuestoTagsLoading } = useCompuestoTags();
-  const tagIdsAsignados = tagIdsDe(compuesto.id);
+  // useTagsCatalogo/useCompuestoTags (Naturaleza/Oris/Uso) se sacaron de
+  // acá: alimentaban solo SelectorTagsCompuesto, que ya no se renderiza en
+  // este editor. Siguen vivos en MasonryGruposNaturaleza (vista de
+  // catálogo, más abajo en este mismo archivo) sin relación con esto.
   const { usosPorCompuesto, loading: usosLoading } = useUsosCompuesto();
   const usos = usosPorCompuesto.get(compuesto.id) ?? [];
   // Catálogos globales de Grano/Célula — solo para tener sus handlers
@@ -997,16 +997,7 @@ function CompuestoEditor({
             del compuesto — reactividad/peso, molécula (derecha). */}
         <div className="grid grid-cols-3 gap-3 items-start">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <SelectorTagsCompuesto
-              compuestoId={compuesto.id}
-              porCategoria={tagsPorCategoria}
-              tagIdsAsignados={tagIdsAsignados}
-              onToggle={(tagId) => toggleTag(compuesto.id, tagId)}
-              loading={tagsLoading || compuestoTagsLoading}
-            />
-
-            <div className="border-t border-primary/10 mt-2 pt-2">
-              <RichEditor
+            <RichEditor
               minHeight="16rem"
               placeholder="Descripción del compuesto…"
               value={local.notas ?? ""}
@@ -1015,7 +1006,6 @@ function CompuestoEditor({
                 persist({ notas: v });
               }}
               />
-            </div>
           </div>
 
           <div className="flex flex-col gap-1.5 min-w-0">
