@@ -54,6 +54,7 @@ export const CONFIG_COMPUESTO_ESTABILIDAD = {
  */
 export interface CompuestoElementoProporcion {
   id: string;
+  compuesto_id: string;
   elemento_id: string;
   cantidad: number;
   proporcion_molar: number | null;
@@ -63,7 +64,7 @@ export interface CompuestoElementoProporcion {
 }
 
 const SELECT_COMPUESTO_ELEMENTOS_PROPORCION =
-  "id, elemento_id, cantidad, proporcion_molar, proporcion_deducida, proporcion_fuente, rol";
+  "id, compuesto_id, elemento_id, cantidad, proporcion_molar, proporcion_deducida, proporcion_fuente, rol";
 
 export function useCompuestoElementosProporcion(compuestoId: string | null) {
   const { data, loading, isOffline, refetch } =
@@ -73,9 +74,7 @@ export function useCompuestoElementosProporcion(compuestoId: string | null) {
 
   const items = useMemo(() => {
     if (!compuestoId) return [];
-    return data.filter(
-      (r) => (r as unknown as { compuesto_id: string }).compuesto_id === compuestoId,
-    );
+    return data.filter((r) => r.compuesto_id === compuestoId);
   }, [data, compuestoId]);
 
   return { items, loading: compuestoId ? loading : false, isOffline, load: refetch };
