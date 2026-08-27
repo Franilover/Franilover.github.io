@@ -246,7 +246,7 @@ export function ElementoEditor({
             y Catalizador ya se editan/derivan en otro lado, y N° atómico/
             Familia son metadatos de catálogo, no algo que se ajuste
             seguido comparado con las partículas de las 3 capas. */}
-        <div className="grid grid-cols-[1fr_1.15fr] gap-3 items-start">
+        <div className="grid grid-cols-[0.85fr_1.3fr] gap-3 items-start">
           <div className="flex flex-col gap-2 min-w-0">
             <PropiedadesFisicasBloque propiedades={propiedadesFisicas} />
             <SitiosEnlaceBloque sitios={sitiosEnlace} loading={sitiosLoading} />
@@ -275,27 +275,28 @@ export function ElementoEditor({
               </div>
             </div>
 
-            <div className="grid grid-cols-[1fr_auto] gap-2 items-stretch">
-              <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-[auto_1fr] gap-2 items-stretch">
+              <div className="flex flex-col gap-2 shrink-0 w-[3.75rem]">
                 {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
                   <div
                     key={layer}
-                    className="flex flex-col gap-2 p-2 rounded-lg border border-primary/10"
+                    className="flex flex-col gap-2 p-1 rounded-lg border border-primary/10"
                   >
-                    <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 text-center">
+                    <span className="text-[9px] font-black uppercase tracking-[0.05em] text-primary/40 text-center truncate">
                       {LAYER_LABEL[layer]}
                     </span>
                     <div className="border-t border-primary/10" />
-                    <div className="flex flex-col items-stretch gap-1.5">
+                    <div className="flex flex-col items-stretch gap-1">
                       {LAYER_PARTICLES[layer].map((particle) => {
                         const value = local[layer]?.[particle] ?? 0;
                         return (
                           <div
                             key={particle}
-                            className="flex items-center justify-between gap-1.5 pl-2.5 pr-1 py-1.5"
+                            className="flex items-center justify-center gap-0.5 py-1"
+                            title={particle}
                           >
-                            <span className="text-xs font-bold text-primary/60 truncate">
-                              {particle}
+                            <span className="text-xs font-bold text-primary/60 shrink-0">
+                              {PARTICLE_INITIAL[particle]}
                             </span>
                             <input
                               type="number"
@@ -305,7 +306,7 @@ export function ElementoEditor({
                                 setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
                               }
                               onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
-                              className="w-9 shrink-0 text-center bg-transparent text-sm font-black text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="w-5 shrink-0 text-center bg-transparent text-sm font-black text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </div>
                         );
@@ -318,11 +319,13 @@ export function ElementoEditor({
               {/* Visualización tipo átomo real: núcleo + capas orbitales,
                   con las partículas propias del mundo (Masa, Cinética,
                   Voluntad…) en vez de protones/neutrones/electrones
-                  genéricos. Ancho fijo y acotado (no "auto" ligado a la
-                  altura de la pila de partículas de al lado): así no
-                  empuja el layout ni genera scroll horizontal cuando la
-                  columna de Núcleo/Media/Externa es más alta. */}
-              <AtomoVisual elemento={local} className="w-24 shrink-0 aspect-square" />
+                  genéricos. La columna de al lado ahora tiene ancho fijo
+                  y angosto (w-[3.75rem], solo lo que necesitan inicial +
+                  input de 2 dígitos) en vez de "auto" heredando el ancho
+                  de la etiqueta Núcleo/Media/Externa — antes esa etiqueta
+                  con tracking ancho terminaba empujando la columna más de
+                  lo que el contenido realmente necesitaba. */}
+              <AtomoVisual elemento={local} className="w-full max-w-72 mx-auto aspect-square" />
             </div>
           </div>
         </div>
