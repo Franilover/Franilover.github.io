@@ -20,8 +20,6 @@ import {
   Download,
   Loader2,
   Package,
-  Gem,
-  Sprout,
   Plus,
   Save,
   Search,
@@ -29,7 +27,6 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import Image from "next/image";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -47,7 +44,6 @@ import {
 import { ElementoPanelFlotante } from "./ElementosPage";
 import { AtomoVisual } from "./ElementoEditor";
 import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
-import { useUsosCompuesto, type TipoUsoCompuesto, type UsoCompuesto } from "./useUsosCompuesto";
 import { sincronizarComponentesCompuesto } from "./useCompuestosConElementos";
 import { useCompuestoEnlaces, type CompuestoEnlaceRow } from "./useCompuestoEnlaces";
 import {
@@ -73,11 +69,9 @@ import {
   calcularAfinidad,
   calcularBalancePorCapa,
   calcularCancelacionCarga,
-  calcularDeficitConCatalizadores,
   calcularElectromagnetismo,
   calcularEnlaceResultante,
   calcularPerfilAtomico,
-  calcularPeso,
   calcularReactividad,
   combinarComponentes,
   compuestoEsInerte,
@@ -241,92 +235,6 @@ function AtomoVisualCompuesto({
   );
 }
 
-/**
- * Reactividad ("energía de activación") + peso molecular de un compuesto —
- * derivados directos del perfil atómico, sin datos nuevos que cargar. Los
- * catalizadores presentes en la mezcla ya están descontados del déficit
- * (ver calcularDeficitConCatalizadores en afinidad.ts).
- */
-function AnalisisReactivoPeso({
-  compuesto,
-  elementos,
-}: {
-  compuesto: Compuesto;
-  elementos: Elemento[];
-}) {
-  const reactividad = useMemo(
-    () => calcularReactividad(compuesto, elementos),
-    [compuesto, elementos],
-  );
-  const { catalizadoresActivos, deficitBase } = useMemo(
-    () => calcularDeficitConCatalizadores(compuesto, elementos),
-    [compuesto, elementos],
-  );
-  const peso = useMemo(() => calcularPeso(compuesto, elementos), [compuesto, elementos]);
-  const perfil = useMemo(() => calcularPerfilAtomico(compuesto, elementos), [compuesto, elementos]);
-
-  const voluntad = perfil.externa.Voluntad ?? 0;
-  const percepcion = perfil.externa.Percepción ?? 0;
-  const catalisis = perfil.externa.Catálisis ?? 0;
-  const transicion = perfil.externa.Transición ?? 0;
-
-  const cargaNeta = voluntad - percepcion;
-  const cargaTitulo =
-    cargaNeta > 0 ? "Predomina Voluntad" : cargaNeta < 0 ? "Predomina Percepción" : "Cargas equilibradas";
-  const cargaDescripcion =
-    cargaNeta > 0
-      ? "Más propenso a emitir: tiene Voluntad libre de sobra para donar y activar enlaces con otros compuestos."
-      : cargaNeta < 0
-        ? "Más propenso a recibir: tiene huecos de Percepción libres, a la espera de que otro compuesto le done Voluntad."
-        : "Ni dona ni recibe carga de más: su Voluntad y Percepción se cancelan entre sí en igual medida.";
-
-  const enlaceTitulo =
-    catalisis > transicion ? "Predomina Catálisis" : transicion > catalisis ? "Predomina Transición" : "Enlace intermedio";
-  const enlaceDescripcion =
-    catalisis > transicion
-      ? "Enlace fuerte y duradero: una vez formado, cuesta romperlo o hacerlo reaccionar de nuevo."
-      : transicion > catalisis
-        ? "Enlace débil y metaestable: se forma con facilidad, pero también se rompe o transforma con facilidad."
-        : "Firmeza media: ni especialmente estable ni especialmente inestable frente a nuevas reacciones.";
-
-  return (
-    <div className="grid grid-cols-2 gap-1.5">
-      <div className="flex flex-col gap-0.5 px-2 py-1.5">
-        <span className="text-micro font-black uppercase tracking-wide">
-          {REACTIVIDAD_LABEL[reactividad.nivel]}
-        </span>
-        <span className="text-micro opacity-70">
-          Déficit {reactividad.deficitTotal}/{reactividad.capacidadTotal}
-          {catalizadoresActivos.length > 0 && (
-            <> · reducido de {deficitBase} por {catalizadoresActivos.length} catalizador(es)</>
-          )}
-        </span>
-      </div>
-      <div className="flex flex-col gap-0.5 px-2 py-1.5">
-        <span className="text-micro font-black uppercase tracking-wide text-primary/60">
-          {peso.pesoTotal} · peso {peso.categoria}
-        </span>
-        <span className="text-micro text-primary/40">
-          Núcleo×3 {peso.porCapa.nucleo} · Media×2 {peso.porCapa.media} · Externa×1{" "}
-          {peso.porCapa.externa}
-        </span>
-      </div>
-      <div className="flex flex-col gap-0.5 px-2 py-1.5">
-        <span className="text-micro font-black uppercase tracking-wide text-primary/60">
-          {cargaTitulo}
-        </span>
-        <span className="text-micro text-primary/40">{cargaDescripcion}</span>
-      </div>
-      <div className="flex flex-col gap-0.5 px-2 py-1.5">
-        <span className="text-micro font-black uppercase tracking-wide text-primary/60">
-          {enlaceTitulo}
-        </span>
-        <span className="text-micro text-primary/40">{enlaceDescripcion}</span>
-      </div>
-    </div>
-  );
-}
-
 const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
   complementa: "text-primary bg-primary/10 border-primary/20",
   compite: "text-primary/70 bg-primary/5 border-primary/10",
@@ -339,94 +247,6 @@ const ENLACE_COLOR: Record<TipoEnlace, string> = {
   debil: "text-primary/70 bg-primary/5 border-primary/10",
   neutro: "text-primary/30 bg-primary/[0.02] border-primary/10",
 };
-
-/** Detalle editable de un compuesto — mismo criterio que ElementoEditor. */
-const ICONO_USO: Record<TipoUsoCompuesto, React.ElementType> = {
-  item: Package,
-  mineral: Gem,
-  flora: Sprout,
-};
-
-const LABEL_USO: Record<TipoUsoCompuesto, string> = {
-  item: "Item",
-  mineral: "Mineral",
-  flora: "Flora",
-};
-
-/**
- * Lista de quién usa este Compuesto en el resto del catálogo (Items,
- * Minerales, Flora) — se muestra debajo de la fórmula de elementos en
- * CompuestoEditor. Puramente informativo (sin navegación, ya que esas
- * entidades viven fuera del dominio de Química), agrupado por tipo con un
- * ícono distinto para cada uno.
- */
-function UsosCompuestoBloque({
-  usos,
-  loading,
-}: {
-  usos: UsoCompuesto[];
-  loading: boolean;
-}) {
-  if (loading) {
-    return (
-      <div className="flex items-center gap-1.5 text-micro text-primary/30 px-1 py-1">
-        <Loader2 className="animate-spin" size={11} />
-        Buscando dónde se usa…
-      </div>
-    );
-  }
-
-  if (usos.length === 0) {
-    return (
-      <p className="text-micro text-primary/25 px-1 py-1">
-        No se usa en ningún Item, Mineral o Flora todavía.
-      </p>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      <p className="text-micro font-black uppercase tracking-widest text-primary/40 px-1">
-        Usado en
-      </p>
-      <div className="flex flex-col gap-1">
-        {usos.map((uso, i) => {
-          const Icono = ICONO_USO[uso.tipo];
-          return (
-            <div
-              key={`${uso.tipo}-${uso.id}-${uso.detalle ?? ""}-${i}`}
-              className="flex items-center gap-1.5 px-1.5 py-1 rounded-md border border-primary/10 bg-primary/[0.02]"
-              title={`${LABEL_USO[uso.tipo]}${uso.detalle ? " · " + uso.detalle : ""}`}
-            >
-              {uso.imagen_url ? (
-                <Image
-                  src={uso.imagen_url}
-                  alt=""
-                  width={18}
-                  height={18}
-                  className="w-[18px] h-[18px] rounded object-cover shrink-0 border border-primary/10"
-                />
-              ) : (
-                <span className="w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 bg-primary/8 text-primary/40">
-                  <Icono size={11} />
-                </span>
-              )}
-              <span className="text-micro font-bold text-primary/40 uppercase tracking-wide shrink-0">
-                {LABEL_USO[uso.tipo]}
-              </span>
-              <span className="text-micro font-bold text-primary/80 truncate">{uso.nombre}</span>
-              {uso.detalle && (
-                <span className="text-micro text-primary/35 truncate ml-auto shrink-0">
-                  {uso.detalle}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 /**
  * Sección de solo lectura con las propiedades físicas que Supabase calcula
@@ -828,8 +648,9 @@ function CompuestoEditor({
   // acá: alimentaban solo SelectorTagsCompuesto, que ya no se renderiza en
   // este editor. Siguen vivos en MasonryGruposNaturaleza (vista de
   // catálogo, más abajo en este mismo archivo) sin relación con esto.
-  const { usosPorCompuesto, loading: usosLoading } = useUsosCompuesto();
-  const usos = usosPorCompuesto.get(compuesto.id) ?? [];
+  // useUsosCompuesto (bloque "Usado en Item/Mineral/Flora") también se
+  // sacó de acá: era informativo, de solo lectura, sobre otras entidades
+  // del catálogo — no datos propios de Química.
   // Catálogos globales de Grano/Célula — solo para tener sus handlers
   // actualizar/eliminar disponibles cuando se abre el sub-panel de arriba;
   // useSupabaseData cachea vía Dexie, así que instanciarlos acá no repite
@@ -991,43 +812,36 @@ function CompuestoEditor({
           </div>
         )}
 
-        {/* Dos columnas: Usos (izquierda) · análisis del compuesto —
-            átomo/molécula y reactividad/peso (derecha). */}
+        {/* Dos columnas: propiedades/composición/estabilidad/enlaces del
+            compuesto (izquierda) · átomo/molécula, más chico (derecha).
+            Reemplaza al bloque "Usado en Item/Mineral/Flora" — informativo
+            de solo lectura sobre otras entidades del catálogo, no datos
+            propios de Química — y a los 4 cuadros de Reactividad/Peso/
+            Carga/Enlace que vivían debajo del átomo, ya antiguos y
+            redundantes con Propiedades físicas + Estabilidad. */}
         <div className="grid grid-cols-2 gap-3 items-start">
-          <div className="flex flex-col gap-1.5 min-w-0">
-            <div className="border-t border-primary/10 pt-2">
-              <UsosCompuestoBloque usos={usos} loading={usosLoading} />
-            </div>
+          <div className="flex flex-col gap-2 min-w-0">
+            <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
+            <ComposicionRealBloque
+              proporciones={proporcionElementos}
+              loading={proporcionLoading}
+              elementos={elementos}
+              onAbrirElemento={setEditandoElementoId}
+            />
+            <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
+            <EnlacesCompuestoBloque
+              enlaces={enlacesCompuesto}
+              loading={enlacesLoading}
+              error={enlacesError}
+              elementos={elementos}
+              onAbrirElemento={setEditandoElementoId}
+            />
           </div>
 
-          <div className="flex flex-col gap-3 min-w-0">
-            <div className="flex flex-col gap-1.5">
-              <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <AnalisisReactivoPeso compuesto={local} elementos={elementos} />
-            </div>
+          <div className="flex flex-col gap-3 min-w-0 max-w-[14rem] mx-auto">
+            <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
           </div>
         </div>
-
-        <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
-        <div className="grid grid-cols-2 gap-2 items-start">
-          <ComposicionRealBloque
-            proporciones={proporcionElementos}
-            loading={proporcionLoading}
-            elementos={elementos}
-            onAbrirElemento={setEditandoElementoId}
-          />
-          <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
-        </div>
-        <EnlacesCompuestoBloque
-          enlaces={enlacesCompuesto}
-          loading={enlacesLoading}
-          error={enlacesError}
-          elementos={elementos}
-          onAbrirElemento={setEditandoElementoId}
-        />
       </div>
 
       {editandoElementoId && (
