@@ -11,16 +11,16 @@
  *
  * Solo se persiste lo que ya tiene soporte de deep-link vía props en su
  * página respectiva (seleccionarRunaId / seleccionarElementoId /
- * seleccionarOrisId) — Biología y Lógica no exponen ese hook todavía
- * (Cladística y el mapa de capas manejan su selección internamente), así
- * que por ahora solo se recuerda qué sub-tab quedó activa ahí, no un item
- * puntual.
+ * seleccionarOrisId) — Biología, Sandbox y Lógica no exponen ese hook
+ * todavía (Cladística, el motor de simulación y el mapa de capas manejan
+ * su selección internamente), así que por ahora solo se recuerda qué
+ * sub-tab quedó activa ahí, no un item puntual.
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type SeccionMagia = "runas" | "tabla" | "fisica" | "biologia" | "logica";
+export type SeccionMagia = "runas" | "tabla" | "fisica" | "biologia" | "sandbox" | "logica";
 
 interface MagiaSeccionState {
   seccion: SeccionMagia;

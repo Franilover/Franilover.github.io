@@ -11,7 +11,7 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Atom, Dna, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X, Zap } from "lucide-react";
+import { Atom, Beaker, Dna, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X, Zap } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -28,6 +28,7 @@ import type { SaveStatus } from "@/ui/saveStatus";
 import { ElementosPage } from "@/domains/garlia/elementos/ElementosPage";
 import type { Elemento } from "@/domains/garlia/elementos/types";
 import { BiologiaPage } from "@/domains/garlia/biologia/BiologiaPage";
+import { SandboxPage } from "@/domains/garlia/sandbox/SandboxPage";
 import { LogicaSistemaPage } from "./LogicaSistemaPage";
 import { FisicaPage } from "@/domains/garlia/fisica/FisicaPage";
 import { ORIS_CONFIG, type Oris } from "@/domains/garlia/fisica/types";
@@ -689,14 +690,16 @@ function BloqueEnsayoConSubBloques({
   );
 }
 
-// ─── Toggle "Runas" / "Tabla" / "Física" / "Biología" / "Lógica" ───────────
+// ─── Toggle "Runas" / "Tabla" / "Física" / "Biología" / "Sandbox" / "Lógica" ─
 // Runas: el bloque de herramientas de runas (probador, lista, config), sin
 // ensayo. Tabla: grid de Elementos (Tabla Química/Alquímica) + detalle,
 // solo si se pasan props de elementos. Física: grid de Oris + catálogos
 // fijos + conceptos, y al final los Subsistemas de Magia (chips que abren
 // en modal flotante) — ver BloqueFisica más abajo. Biología:
-// taxonomía/ecosistemas/perfiles. Lógica: mapa de capas del sistema entero
-// en lenguaje humano, leído de documentacion_sistema — ver
+// taxonomía/ecosistemas/perfiles. Sandbox: entorno experimental aislado
+// (crear simulación, entidades, disparar eventos, Play/Pause/Step/Reset) —
+// ver domains/garlia/sandbox/SandboxPage.tsx. Lógica: mapa de capas del
+// sistema entero en lenguaje humano, leído de documentacion_sistema — ver
 // LogicaSistemaPage.tsx.
 // SeccionMagia se importa (y persiste) desde useMagiaSeccionStore.ts —
 // arriba, junto al resto de imports del store.
@@ -706,6 +709,7 @@ const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementTy
   { key: "tabla", label: "Química", Icon: Atom },
   { key: "fisica", label: "Física", Icon: Zap },
   { key: "biologia", label: "Biología", Icon: Dna },
+  { key: "sandbox", label: "Sandbox", Icon: Beaker },
   { key: "logica", label: "Lógica", Icon: Sparkles },
 ];
 
@@ -968,6 +972,10 @@ export function RunasPage({
       ) : seccionMagia === "biologia" ? (
         <div className="mt-4">
           <BiologiaPage onSelectCriatura={(id) => abrirPanel("criatura", id)} />
+        </div>
+      ) : seccionMagia === "sandbox" ? (
+        <div className="mt-4">
+          <SandboxPage />
         </div>
       ) : seccionMagia === "logica" ? (
         <div className="mt-4">
