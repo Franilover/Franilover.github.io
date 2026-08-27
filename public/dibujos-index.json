@@ -453,6 +453,16 @@
           "type": "image"
         }
       ]
+    },
+    {
+      "name": "Mineral Graviris.png",
+      "url": "/dibujos/Mineral Graviris.png",
+      "type": "image"
+    },
+    {
+      "name": "Mineral Graviris.webp",
+      "url": "/dibujos/Mineral Graviris.webp",
+      "type": "image"
     }
   ]
 }
