@@ -258,11 +258,17 @@ export interface Compuesto {
   nombre: string;
   simbolo?: string | null;
   notas?: string | null;
-  /** @deprecated Fuente original (jsonb). Se conserva en Supabase como
-   *  respaldo de la migración a compuesto_elementos, pero el frontend ya
-   *  no debe escribir acá — usar useCompuestosConElementos() para leer
-   *  y las mutaciones de compuesto_elementos para escribir. Ver Fase 2. */
-  componentes: ComponenteCompuesto[];
+  /** @deprecated La columna "componentes" (jsonb) fue ELIMINADA de la tabla
+   *  "compuestos" en Supabase (migración de Materiales del equipo de datos,
+   *  ver auditoría 2026-08-26: pedirla en el select rompía CONFIG_COMPUESTOS
+   *  con "column componentes does not exist", tumbando useCompuestos()
+   *  entero — de ahí el bug reportado de "los datos se muestran al abrir y
+   *  después desaparecen"). Ya no existe en la base ni se pide en el
+   *  select. El campo queda tipado opcional solo por si algún consumidor
+   *  viejo todavía lo referencia — usar useCompuestosConElementos() para
+   *  leer composición real y las mutaciones de compuesto_elementos para
+   *  escribir. Ver Fase 2. */
+  componentes?: ComponenteCompuesto[];
   created_at?: string;
   /** Fila base de la que este compuesto es un estado (ej. Hielo → Agua).
    *  Null si es la sustancia base o si no pertenece a una familia de
@@ -293,8 +299,13 @@ export interface Compuesto {
 
 export const CONFIG_COMPUESTOS = {
   tabla: "compuestos",
+  // "componentes" removido del select (2026-08-26): la columna ya no existe
+  // en Supabase (eliminada en la migración de Materiales del equipo de
+  // datos). Pedirla hacía fallar el select ENTERO con un 42703 en cada
+  // carga — PostgREST no devuelve resultado parcial, así que useCompuestos()
+  // fallaba de punta a punta. Ver comentario en Compuesto.componentes.
   select:
-    "id, nombre, simbolo, notas, componentes, created_at, sustancia_base_id, estado, " +
+    "id, nombre, simbolo, notas, created_at, sustancia_base_id, estado, " +
     "tipo_compuesto, estado_estructura, formula_canonica, masa, carga, estabilidad, rigidez, " +
     "flexibilidad, compatibilidad, energia_enlace, clasificacion, tipo_estructura",
 };
