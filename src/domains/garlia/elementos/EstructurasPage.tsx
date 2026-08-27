@@ -6,7 +6,7 @@ import { useEstructuras } from "./useEstructuras";
 import { useEstructuraComposicion } from "./useEstructuraComposicion";
 import type { Estructura } from "./types";
 
-const text = (value: unknown, fallback = "") => value == null ? fallback : String(value);
+const text = (value: unknown, fallback = ""): string => value == null ? fallback : String(value);
 
 function Editor({ estructura, onClose }: { estructura: Estructura; onClose: () => void }) {
   const { items, loading } = useEstructuraComposicion(estructura.id);
