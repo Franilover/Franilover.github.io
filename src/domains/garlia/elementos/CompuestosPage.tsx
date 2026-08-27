@@ -13,6 +13,7 @@
  */
 
 import {
+  Atom,
   Beaker,
   ChevronLeft,
   Combine,
@@ -1001,6 +1002,8 @@ function CompuestoEditor({
   onGranoOCelulaAbiertoChange,
   onAbrirOrganoOFormacion,
   onAbrirTejidoOVeta,
+  elementoAbierto: elementoAbiertoProp,
+  onElementoAbiertoChange,
 }: {
   compuesto: Compuesto;
   elementos: Elemento[];
@@ -1038,11 +1041,22 @@ function CompuestoEditor({
    *  PanelEditorCelula/PanelEditorGrano, nivel intermedio, no el destino
    *  final Órgano/Formación). Mismo patrón que onAbrirOrganoOFormacion. */
   onAbrirTejidoOVeta?: (v: { tipo: "tejido" | "veta"; id: string }) => void;
+  /** Controlado opcionalmente desde CompuestoPanelFlotante, que necesita el
+   *  mismo estado para que el breadcrumb del header (Compuesto ⇄ Elemento)
+   *  abra el mismo ElementoPanelFlotante que ya abre "Compone" en el
+   *  cuerpo. Si no se pasa, el editor usa su propio estado interno (uso
+   *  standalone, sin breadcrumb en header) — mismo patrón exacto que
+   *  granoOCelulaAbierto. */
+  elementoAbierto?: string | null;
+  onElementoAbiertoChange?: (id: string | null) => void;
 }) {
   const { confirm, ConfirmModal } = useConfirm();
   const [saving, setSaving] = useState(false);
   const [local, setLocal] = useState(compuesto);
-  const [editandoElementoId, setEditandoElementoId] = useState<string | null>(null);
+  const [editandoElementoIdLocal, setEditandoElementoIdLocal] = useState<string | null>(null);
+  const editandoElementoId =
+    elementoAbiertoProp !== undefined ? elementoAbiertoProp : editandoElementoIdLocal;
+  const setEditandoElementoId = onElementoAbiertoChange ?? setEditandoElementoIdLocal;
   // Sub-panel anidado del Grano/Célula elegido desde SeUsaEnGranoOCelulaBloque
   // o desde el breadcrumb del header — mismo patrón que editandoElementoId,
   // pero apunta a una de dos entidades distintas según qué rama se
@@ -1464,6 +1478,12 @@ export function CompuestoPanelFlotante({
   const [granoOCelulaAbierto, setGranoOCelulaAbierto] = useState<
     { tipo: "grano" | "celula"; id: string } | null
   >(null);
+  // Levantado desde CompuestoEditor (mismo motivo/patrón exacto que
+  // granoOCelulaAbierto): el breadcrumb de este header también necesita
+  // controlar qué Elemento se abre, para que clickear "Elemento" desde acá
+  // y clickear un elemento en el cuerpo (ElementoPanelFlotante embebido)
+  // compartan el mismo estado en vez de dos paneles independientes.
+  const [elementoAbierto, setElementoAbierto] = useState<string | null>(null);
   // Destino del salto Célula→Órgano / Grano→Formación desde el breadcrumb
   // interno de PanelEditorCelula/PanelEditorGrano (ver onAbrirOrganoOFormacion
   // en CompuestoEditor). Requiere los catálogos de Órganos/Formaciones —
@@ -1481,6 +1501,7 @@ export function CompuestoPanelFlotante({
     setGranoOCelulaAbierto(null);
     setOrganoOFormacionAbierto(null);
     setTejidoOVetaAbierto(null);
+    setElementoAbierto(null);
   }, [compuesto.id]);
   const granosDeCompuesto = useGranosDeUnCompuesto(compuesto.id);
   const celulasDeCompuesto = useCelulasDeUnCompuesto(compuesto.id);
@@ -1509,7 +1530,7 @@ export function CompuestoPanelFlotante({
   return createPortal(
     <div
       className={`fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 ${
-        granoOCelulaAbierto || organoOFormacionAbierto || tejidoOVetaAbierto
+        granoOCelulaAbierto || organoOFormacionAbierto || tejidoOVetaAbierto || elementoAbierto
           ? "invisible pointer-events-none"
           : ""
       }`}
@@ -1612,7 +1633,23 @@ export function CompuestoPanelFlotante({
                 loading: celulasDeCompuesto.loading,
                 onNavegar: (celulaId) => setGranoOCelulaAbierto({ tipo: "celula", id: celulaId }),
               },
-              { label: "Compuesto", icono: <Package size={10} />, activo: true },
+              { label: "Compuesto", icono: <Package size={10} />, activo: false },
+              {
+                label: "Elemento",
+                icono: <Atom size={10} />,
+                activo: true,
+                // Composición real de este Compuesto — mismos componentes
+                // (elemento_id + cantidad) que ya resuelve el bloque
+                // "Compone" del cuerpo, no un fetch nuevo.
+                items: (compuesto.componentes ?? []).map((comp) => ({
+                  id: comp.elemento_id,
+                  nombre:
+                    elementos.find((e) => e.id === comp.elemento_id)?.nombre ??
+                    "(elemento desconocido)",
+                })),
+                loading: false,
+                onNavegar: setElementoAbierto,
+              },
             ]}
           />
         </div>
@@ -1638,9 +1675,49 @@ export function CompuestoPanelFlotante({
             onGranoOCelulaAbiertoChange={setGranoOCelulaAbierto}
             onAbrirOrganoOFormacion={setOrganoOFormacionAbierto}
             onAbrirTejidoOVeta={setTejidoOVetaAbierto}
+            elementoAbierto={elementoAbierto}
+            onElementoAbiertoChange={setElementoAbierto}
           />
         </div>
       </div>
+
+      {elementoAbierto &&
+        (() => {
+          const elementoActivo = elementos.find((e) => e.id === elementoAbierto);
+          if (!elementoActivo) return null;
+          return (
+            <ElementoPanelFlotante
+              elemento={elementoActivo}
+              todosLosElementos={elementos}
+              onCerrar={() => setElementoAbierto(null)}
+              onActualizar={async (id, cambios) => {
+                // El elemento vive en el catálogo global (elementos), no en
+                // este compuesto puntual — persiste directo, mismo patrón
+                // exacto que persistElemento dentro de CompuestoEditor (no
+                // se puede reusar esa función porque vive en otro
+                // componente y el catálogo en memoria acá es de solo
+                // lectura vía props, sin setter propio).
+                try {
+                  const { error } = await supabase
+                    .from("elementos")
+                    .update(cambios)
+                    .eq("id", id);
+                  if (error) throw error;
+                } catch (e) {
+                  console.error(
+                    "[CompuestoPanelFlotante] error guardando elemento:",
+                    e,
+                  );
+                }
+              }}
+              compuestos={todosLosCompuestos}
+              onNavigateCompuesto={(compuestoId) => {
+                setElementoAbierto(null);
+                onNavigateCompuesto?.(compuestoId);
+              }}
+            />
+          );
+        })()}
 
       {organoOFormacionAbierto?.tipo === "organo" &&
         (() => {
