@@ -165,6 +165,7 @@ export interface Elemento {
   // ("Elementos: motor propio de cálculo") para el detalle de la
   // derivación. Todas nullable porque pueden no estar calculadas aún.
   masa_base?: number | null;
+  volumen_base?: number | null;
   estabilidad?: number | null;
   rigidez?: number | null;
   flexibilidad?: number | null;
@@ -185,7 +186,7 @@ export const CONFIG = {
   tabla: "elementos",
   select:
     "id, numero_atomico, nombre, simbolo, familia, es_noble, notas, nucleo, media, externa, es_catalizador, " +
-    "masa_base, estabilidad, rigidez, flexibilidad, dureza, conductividad, transparencia, interaccion, " +
+    "masa_base, volumen_base, estabilidad, rigidez, flexibilidad, dureza, conductividad, transparencia, interaccion, " +
     "capacidad_transformacion, dinamismo_particular, valencia_estructural, capacidad_enlace, " +
     "polaridad_estructural, saturacion_enlace, regimen_estructural",
 };
@@ -221,7 +222,8 @@ export function propiedadesCalculadasDeElemento(el: Elemento): PropiedadCalculad
     v === null || v === undefined ? undefined : Math.max(0, Math.min(1, v));
 
   return [
-    { clave: "masa_base", label: "Masa", valor: fmt(el.masa_base, 2), descripcion: "Peso base del elemento, derivado de sus 3 capas de partículas.", formula: "Masa = 1.00·Masa(núcleo) + 0.75·Equilibrio(núcleo) + 0.50·Cinética(núcleo)" },
+    { clave: "masa_base", label: "Masa", valor: fmt(el.masa_base, 2), descripcion: "Cantidad de masa fundamental del elemento en la escala interna de Garlia.", formula: "Masa = 1.00·Masa(núcleo) + 0.75·Equilibrio(núcleo) + 0.50·Cinética(núcleo)" },
+    { clave: "volumen_base", label: "Volumen", valor: fmt(el.volumen_base, 2), descripcion: "Espacio de referencia asociado a la configuración del elemento; no es una magnitud 0–1.", formula: "Volumen base = número total de partículas de la configuración elemental" },
     { clave: "estabilidad", label: "Estabilidad", valor: fmt(el.estabilidad), proporcion: prop(el.estabilidad), descripcion: "Qué tan resistente es a romperse o transformarse.", formula: "Propiedad derivada de la composición y estructura del compuesto." },
     { clave: "rigidez", label: "Rigidez", valor: fmt(el.rigidez), proporcion: prop(el.rigidez), descripcion: "Resistencia a deformarse bajo fuerza.", formula: "Propiedad derivada de la composición y estructura del compuesto." },
     { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(el.flexibilidad), proporcion: prop(el.flexibilidad), descripcion: "Capacidad de deformarse sin romperse.", formula: "Propiedad derivada de la composición y estructura del compuesto." },
@@ -299,6 +301,8 @@ export interface Compuesto {
   interaccion?: number | null;
   compatibilidad?: number | null;
   energia_enlace?: number | null;
+  volumen?: number | null;
+  densidad?: number | null;
   clasificacion?: string | null;
   tipo_estructura?: string | null;
 }
@@ -314,7 +318,7 @@ export const CONFIG_COMPUESTOS = {
     "id, nombre, simbolo, notas, created_at, sustancia_base_id, estado, " +
     "tipo_compuesto, estado_estructura, formula_canonica, masa, carga, estabilidad, rigidez, " +
     "flexibilidad, dureza, conductividad, transparencia, interaccion, " +
-    "compatibilidad, energia_enlace, clasificacion, tipo_estructura",
+    "compatibilidad, energia_enlace, volumen, densidad, clasificacion, tipo_estructura",
 };
 
 /** Una propiedad física calculada del Compuesto, lista para renderizar en
@@ -327,7 +331,9 @@ export function propiedadesCalculadasDeCompuesto(c: Compuesto): PropiedadCalcula
     v === null || v === undefined ? undefined : Math.max(0, Math.min(1, v));
 
   return [
-    { clave: "masa", label: "Masa", valor: fmt(c.masa, 2), descripcion: "Masa total del compuesto, derivada de sus elementos componentes.", formula: "Masa = Σ (cantidad × masa base de cada elemento)" },
+    { clave: "masa", label: "Masa", valor: fmt(c.masa, 2), descripcion: "Cantidad total de masa contenida en el compuesto. Es una magnitud interna, no un índice 0–1.", formula: "Masa = Σ (cantidad × masa base de cada elemento)" },
+    { clave: "volumen", label: "Volumen", valor: fmt(c.volumen, 2), descripcion: "Espacio ocupado por el compuesto según su cantidad de partículas y su organización estructural.", formula: "V = V_composición × F_geom" },
+    { clave: "densidad", label: "Densidad", valor: fmt(c.densidad, 4), descripcion: "Concentración de masa respecto al volumen ocupado. No es un índice 0–1.", formula: "ρ = M / V" },
     { clave: "carga", label: "Carga", valor: fmt(c.carga, 2), descripcion: "Carga neta del compuesto, suma de la carga de sus elementos.", formula: "Carga = Σ (cantidad × carga de cada elemento)" },
     { clave: "estabilidad", label: "Estabilidad", valor: fmt(c.estabilidad), proporcion: prop(c.estabilidad), descripcion: "Qué tan resistente es el compuesto a romperse o transformarse.", formula: "Estabilidad = propiedad derivada de la composición y estructura del compuesto." },
     { clave: "rigidez", label: "Rigidez", valor: fmt(c.rigidez), proporcion: prop(c.rigidez), descripcion: "Resistencia del compuesto a deformarse bajo fuerza.", formula: "Rigidez = propiedad derivada de la composición y estructura del compuesto." },

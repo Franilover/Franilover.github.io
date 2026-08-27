@@ -14,6 +14,10 @@ const RANGOS_GENERALES = [
 ];
 
 const SIGNIFICADOS: Record<string, string> = {
+  masa_base: "Cantidad total de masa fundamental de la entidad en la escala interna del sistema; no es un porcentaje.",
+  volumen_base: "Espacio de referencia ocupado por la configuración elemental; no es un índice 0–1.",
+  volumen: "Espacio ocupado por el compuesto en función de su composición y organización espacial; no es un índice 0–1.",
+  densidad: "Relación entre la masa contenida y el volumen ocupado: masa por unidad de volumen; no es un índice 0–1.",
   rigidez: "Resistencia a cambiar de forma cuando actúa una fuerza.",
   flexibilidad: "Capacidad de cambiar de forma conservando su integridad.",
   estabilidad: "Tendencia a conservar su estado frente a ruptura o transformación.",
@@ -114,7 +118,7 @@ export function InfoFormulasPopover({ propiedades }: { propiedades: PropiedadCal
                         </div>
                       </>
                     ) : (
-                      <div className="text-micro text-primary/40 leading-relaxed">Este valor no es un índice 0–1.</div>
+                      <div className="text-micro text-primary/40 leading-relaxed">Magnitud absoluta o derivada; se interpreta por su escala interna y su fórmula, no por la escala 0–1.</div>
                     )}
                   </div>
                 </React.Fragment>
