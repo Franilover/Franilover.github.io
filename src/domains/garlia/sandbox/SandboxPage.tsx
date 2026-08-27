@@ -26,7 +26,7 @@ import { Card, PageHeader } from "@/ui/Layout";
 import { Input, Select } from "@/ui/Inputs";
 import { Text } from "@/ui/Tipografia";
 
-import { useCrearSandbox, useSandbox } from "./useSandbox";
+import { useCrearSandbox, useListaSandboxes, useSandbox } from "./useSandbox";
 
 /** Etiqueta de sub-sección dentro de una Card — mismo tratamiento tipográfico
  *  que el resto del dominio (micro, black, uppercase, tracking amplio,
@@ -46,6 +46,7 @@ export function SandboxPage() {
   const [simulacionId, setSimulacionId] = useState<string | null>(null);
   const [nombreNuevo, setNombreNuevo] = useState("");
   const { crear, creando } = useCrearSandbox();
+  const { simulaciones, loading: cargandoLista, refetch: refetchLista } = useListaSandboxes();
 
   const {
     simulacion,
@@ -60,7 +61,11 @@ export function SandboxPage() {
     step,
     reset,
     dispararEvento,
+    agregarEntidad,
   } = useSandbox(simulacionId);
+
+  const [tipoEntidadNueva, setTipoEntidadNueva] = useState("");
+  const [agregandoEntidad, setAgregandoEntidad] = useState(false);
 
   const [entidadSeleccionada, setEntidadSeleccionada] = useState("");
   const [eventoSeleccionado, setEventoSeleccionado] = useState("");
@@ -71,6 +76,18 @@ export function SandboxPage() {
     if (id) {
       setSimulacionId(id);
       setNombreNuevo("");
+      refetchLista();
+    }
+  }
+
+  async function handleAgregarEntidad() {
+    if (!tipoEntidadNueva.trim()) return;
+    setAgregandoEntidad(true);
+    try {
+      await agregarEntidad({ entidadTipo: tipoEntidadNueva.trim() });
+      setTipoEntidadNueva("");
+    } finally {
+      setAgregandoEntidad(false);
     }
   }
 
@@ -97,19 +114,37 @@ export function SandboxPage() {
 
       {/* Crear / cargar simulación — siempre visible arriba, ocupa el ancho completo */}
       <Card className="mb-6" padding="md">
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-          <div className="flex-1">
-            <Input
-              label="Nueva simulación"
-              onChange={(e) => setNombreNuevo(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCrear()}
-              placeholder="Nombre del sandbox"
-              value={nombreNuevo}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <EtiquetaSeccion>Cargar existente</EtiquetaSeccion>
+            <Select
+              onChange={(e) => setSimulacionId(e.target.value || null)}
+              options={[
+                { value: "", label: cargandoLista ? "Cargando..." : "— Elegir sandbox —" },
+                ...simulaciones.map((s) => ({
+                  value: s.id,
+                  label: `${s.nombre} (t=${s.tiempo_simulado})`,
+                })),
+              ]}
+              value={simulacionId ?? ""}
             />
           </div>
-          <Btn icon={<Plus size={14} />} loading={creando} onClick={handleCrear}>
-            Crear
-          </Btn>
+          <div>
+            <EtiquetaSeccion>Crear nueva</EtiquetaSeccion>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <Input
+                  onChange={(e) => setNombreNuevo(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCrear()}
+                  placeholder="Nombre del sandbox"
+                  value={nombreNuevo}
+                />
+              </div>
+              <Btn icon={<Plus size={14} />} loading={creando} onClick={handleCrear}>
+                Crear
+              </Btn>
+            </div>
+          </div>
         </div>
         {simulacionId && (
           <p
@@ -235,6 +270,27 @@ export function SandboxPage() {
                   {entidades.length}
                 </span>
               </div>
+
+              <div className="flex items-end gap-2 mb-4">
+                <div className="flex-1">
+                  <Input
+                    onChange={(e) => setTipoEntidadNueva(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAgregarEntidad()}
+                    placeholder="Tipo de entidad (ej. material, criatura)"
+                    value={tipoEntidadNueva}
+                  />
+                </div>
+                <Btn
+                  icon={<Plus size={14} />}
+                  loading={agregandoEntidad}
+                  onClick={handleAgregarEntidad}
+                  size="sm"
+                  variant="outline"
+                >
+                  Agregar
+                </Btn>
+              </div>
+
               {entidades.length === 0 ? (
                 <EmptyState label="Sin entidades todavía" />
               ) : (

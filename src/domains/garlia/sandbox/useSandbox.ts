@@ -172,6 +172,34 @@ export function useSandbox(simulacionId: string | null) {
   };
 }
 
+/** Lista simulaciones existentes (no descartadas), para poder cargar una
+ *  en vez de crear siempre una nueva vacía. Independiente de useSandbox
+ *  porque se necesita ANTES de tener un simulacionId elegido. */
+export function useListaSandboxes() {
+  const [simulaciones, setSimulaciones] = useState<SandboxSimulacion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await sandboxService.listarSimulaciones();
+      setSimulaciones(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { simulaciones, loading, error, refetch };
+}
+
 /** Hook auxiliar para crear una simulación nueva y devolver su id.
  *  Separado de useSandbox porque antes de tener un id no hay nada que
  *  orquestar todavía — evita mezclar "crear" con "operar sobre". */
