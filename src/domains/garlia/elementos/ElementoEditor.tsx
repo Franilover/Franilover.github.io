@@ -30,7 +30,6 @@ import {
   calcularReactividadElemento,
 } from "./afinidad";
 import {
-  ELEMENT_FAMILIES,
   LAYER_LABEL,
   LAYER_PARTICLES,
   PARTICLE_INITIAL,
@@ -40,7 +39,6 @@ import {
   propiedadesCalculadasDeElemento,
   type Compuesto,
   type Elemento,
-  type ElementFamily,
   type LayerName,
   type ParticleMap,
   type ParticleType,
@@ -242,141 +240,21 @@ export function ElementoEditor({
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
         {/* Propiedades físicas + Sitios de enlace (izquierda, apiladas) +
-            Selectores (derecha) — 2 columnas. Reemplaza al bloque de Notas
-            que vivía acá: Propiedades/Sitios son datos calculados/reales
-            que explican el elemento mejor y de forma gráfica, a diferencia
-            del campo de texto libre que quedaba desactualizado. La 3ra
-            columna ("en qué compuestos se usa") ya se había sacado antes:
-            era navegación de solo lectura, redundante con el breadcrumb
-            Elemento›Compuesto de arriba. */}
+            Núcleo/Media/Externa apiladas verticalmente + átomo gráfico
+            (derecha) — 2 columnas. Reemplaza al bloque de selectores
+            (N° atómico, Familia, Noble, Catalizador) que vivía acá: Noble
+            y Catalizador ya se editan/derivan en otro lado, y N° atómico/
+            Familia son metadatos de catálogo, no algo que se ajuste
+            seguido comparado con las partículas de las 3 capas. */}
         <div className="grid grid-cols-[1.4fr_minmax(9rem,0.7fr)] gap-3 items-start">
           <div className="flex flex-col gap-2">
             <PropiedadesFisicasBloque propiedades={propiedadesFisicas} />
             <SitiosEnlaceBloque sitios={sitiosEnlace} loading={sitiosLoading} />
           </div>
 
-          {/* Columna de selectores: N° atómico, Familia, Noble, Catalizador
-              — cada fila con borde sutil propio (mismo estilo que las
-              columnas de capa atómica y las filas de Elementos que lo
-              componen en Compuestos), label a la izquierda y control a
-              la derecha, sin bordes individuales en los controles. */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
-              <label
-                className="text-micro font-black uppercase tracking-[0.2em] text-primary/30"
-                title="El Número Atómico es solo la posición de orden en la Tabla Periódica (1 a 62) — no es la suma de partículas del elemento."
-              >
-                N° atómico
-              </label>
-              <input
-                type="number"
-                value={local.numero_atomico}
-                onChange={(e) =>
-                  setLocal((p) => ({ ...p, numero_atomico: Number(e.target.value) }))
-                }
-                onBlur={() => persist({ numero_atomico: local.numero_atomico })}
-                className="w-16 shrink-0 bg-transparent rounded-md px-1 py-1 text-micro font-bold text-primary outline-none text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-primary/10 px-2 py-1.5">
-              <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-                Familia
-              </label>
-              <select
-                value={local.familia}
-                onChange={(e) => {
-                  const familia = e.target.value as ElementFamily;
-                  setLocal((p) => ({ ...p, familia }));
-                  persist({ familia });
-                }}
-                className="w-28 shrink-0 bg-transparent rounded-md px-1 py-1 text-micro font-bold text-primary outline-none text-right"
-              >
-                {ELEMENT_FAMILIES.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div
-              className={`flex items-center justify-between gap-2 rounded-lg border px-2 py-1.5 transition-colors ${
-                esNobleDerivado
-                  ? "bg-primary border-primary"
-                  : "border-primary/10"
-              }`}
-            >
-              <label
-                className={`text-micro font-black uppercase tracking-[0.2em] ${
-                  esNobleDerivado ? "text-btn-text/70" : "text-primary/30"
-                }`}
-                title="Estado Noble (sección 3.2): se calcula solo — capa externa 100% saturada. No puede iniciar ni aceptar enlaces nuevos, sin importar el balance de Voluntad/Percepción."
-              >
-                Noble
-              </label>
-              <span
-                title={
-                  esNobleDerivado
-                    ? "Capa externa saturada — bloquea enlaces nuevos en toda la app."
-                    : `Capa externa ${totalExterna}/${capacidadTotalExterna} — todavía no está saturada.`
-                }
-                className={`text-micro font-bold ${
-                  esNobleDerivado ? "text-btn-text" : "text-primary/40"
-                }`}
-              >
-                {esNobleDerivado ? "Sí" : "No"}
-              </span>
-            </div>
-
-            <div
-              className={`relative flex items-center justify-between gap-2 rounded-lg border px-2 py-1.5 transition-colors ${
-                local.es_catalizador
-                  ? "bg-primary border-primary"
-                  : "border-primary/10"
-              }`}
-            >
-              <label
-                title="Reduce el déficit/energía de activación de un compuesto sin sumar sus partículas a las capas y sin consumirse — igual que un catalizador real."
-                className={`text-micro font-black uppercase tracking-[0.2em] ${
-                  local.es_catalizador ? "text-btn-text/70" : "text-primary/30"
-                }`}
-              >
-                Catalizador
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  const es_catalizador = !local.es_catalizador;
-                  setLocal((p) => ({ ...p, es_catalizador }));
-                  persist({ es_catalizador });
-                }}
-                className={`absolute inset-0 w-full h-full cursor-pointer`}
-                aria-label="Alternar catalizador"
-              />
-              <span
-                className={`text-micro font-bold pointer-events-none ${
-                  local.es_catalizador ? "text-btn-text" : "text-primary/50"
-                }`}
-              >
-                {local.es_catalizador ? "Sí" : "No"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Átomo (izquierda) + Capas atómicas (derecha), lado a lado.
-            items-stretch para que el átomo (cuadrado, aspect-square) crezca
-            hasta la misma altura que el bloque de capas de al lado. */}
-        <div className="grid grid-cols-[auto_1fr] gap-3 items-stretch">
-          {/* Visualización tipo átomo real: núcleo + capas orbitales, pero
-              con las partículas propias del mundo (Masa, Cinética,
-              Voluntad…) en vez de protones/neutrones/electrones genéricos. */}
-          <AtomoVisual elemento={local} />
-
-          {/* Capas: título con el ratio deficit/capacidad y, justo detrás,
-              las partículas dominantes (mismo chip que antes vivía en Rol,
-              ahora eliminado). */}
+          {/* Columna derecha: título con ratio deficit/capacidad +
+              partículas dominantes, luego 2 mini-columnas — Núcleo/Media/
+              Externa apiladas (izquierda) y el átomo visual (derecha). */}
           <div className="flex flex-col gap-1.5 min-w-0">
             <div className="flex items-center justify-end">
               <div className="flex items-center gap-1.5">
@@ -396,43 +274,52 @@ export function ElementoEditor({
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
-                <div
-                  key={layer}
-                  className="flex flex-col gap-2 p-2 rounded-lg border border-primary/10"
-                >
-                  <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 text-center">
-                    {LAYER_LABEL[layer]}
-                  </span>
-                  <div className="border-t border-primary/10" />
-                  <div className="flex flex-col items-stretch gap-1.5">
-                    {LAYER_PARTICLES[layer].map((particle) => {
-                      const value = local[layer]?.[particle] ?? 0;
-                      return (
-                        <div
-                          key={particle}
-                          className="flex items-center justify-between gap-1.5 pl-2.5 pr-1 py-1.5"
-                        >
-                          <span className="text-xs font-bold text-primary/60 truncate">
-                            {particle}
-                          </span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={value}
-                            onChange={(e) =>
-                              setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
-                            }
-                            onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
-                            className="w-9 shrink-0 text-center bg-transparent text-sm font-black text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                          />
-                        </div>
-                      );
-                    })}
+
+            <div className="grid grid-cols-[1fr_auto] gap-2 items-stretch">
+              <div className="flex flex-col gap-2">
+                {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
+                  <div
+                    key={layer}
+                    className="flex flex-col gap-2 p-2 rounded-lg border border-primary/10"
+                  >
+                    <span className="text-micro font-black uppercase tracking-[0.15em] text-primary/40 text-center">
+                      {LAYER_LABEL[layer]}
+                    </span>
+                    <div className="border-t border-primary/10" />
+                    <div className="flex flex-col items-stretch gap-1.5">
+                      {LAYER_PARTICLES[layer].map((particle) => {
+                        const value = local[layer]?.[particle] ?? 0;
+                        return (
+                          <div
+                            key={particle}
+                            className="flex items-center justify-between gap-1.5 pl-2.5 pr-1 py-1.5"
+                          >
+                            <span className="text-xs font-bold text-primary/60 truncate">
+                              {particle}
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={value}
+                              onChange={(e) =>
+                                setLayerValue(layer, particle, Math.max(0, Number(e.target.value)))
+                              }
+                              onBlur={() => persist({ [layer]: local[layer] } as Partial<Elemento>)}
+                              className="w-9 shrink-0 text-center bg-transparent text-sm font-black text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              {/* Visualización tipo átomo real: núcleo + capas orbitales,
+                  con las partículas propias del mundo (Masa, Cinética,
+                  Voluntad…) en vez de protones/neutrones/electrones
+                  genéricos. */}
+              <AtomoVisual elemento={local} />
             </div>
           </div>
         </div>
