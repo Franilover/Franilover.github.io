@@ -39,7 +39,6 @@ import {
 } from "../_shared/useEditorHeaderControls";
 import {
   ELEMENT_FAMILIES,
-  FAMILY_COLOR,
   type Compuesto,
   type Elemento,
   type ElementFamily,
@@ -254,16 +253,8 @@ function ElementoCasilla({
       className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
         enSeleccionMultiple || seleccionado
           ? "border-primary/50 ring-2 ring-primary/40"
-          : "hover:brightness-125"
+          : "border-primary/15 hover:border-primary/35 hover:bg-primary/5"
       }`}
-      style={
-        enSeleccionMultiple || seleccionado
-          ? undefined
-          : {
-              backgroundColor: FAMILY_COLOR[elemento.familia].bg,
-              borderColor: FAMILY_COLOR[elemento.familia].border,
-            }
-      }
     >
       <div className="flex items-start justify-between">
         <span className="text-micro font-black text-primary/30 tabular-nums">
@@ -277,10 +268,7 @@ function ElementoCasilla({
         )}
       </div>
 
-      <span
-        className="text-base font-black text-center leading-none py-0.5"
-        style={{ color: FAMILY_COLOR[elemento.familia].text }}
-      >
+      <span className="text-base font-black text-center leading-none py-0.5 text-primary">
         {elemento.simbolo || "??"}
       </span>
 
@@ -932,10 +920,7 @@ export function ElementosPage({
             {gruposPeriodicos.map(({ familia, elementos: elsDeFamilia }) => (
               <div key={familia} className="flex flex-col gap-1">
                 <p className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: FAMILY_COLOR[familia].text }}
-                  />
+                  <span className="w-2 h-2 rounded-full shrink-0 border border-primary/30" />
                   {familia} · {elsDeFamilia.length} elemento{elsDeFamilia.length === 1 ? "" : "s"}
                 </p>
                 <div
