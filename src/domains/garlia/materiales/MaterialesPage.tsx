@@ -76,22 +76,85 @@ function MaterialPill({ material, selected, onClick }: { material: Material; sel
   return <button type="button" onClick={onClick} title={material.nombre} className={`inline-flex min-w-0 max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-left text-micro font-bold tracking-wide transition-colors ${selected ? "border-primary/40 bg-primary/10 text-primary ring-2 ring-primary/20" : "border-primary/15 text-primary/70 hover:border-primary/30 hover:bg-primary/10"}`}><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/30" /><span className="truncate">{material.nombre}</span></button>;
 }
 
+/**
+ * Panel flotante de Materiales — mismo shell exacto que ElementosPage /
+ * CompuestosPage (createPortal a document.body, fixed inset-0 z-[9999],
+ * backdrop con blur, contenedor w-full h-full max-w-6xl rounded-2xl con
+ * animación popIn, header shrink-0 con caja de ícono + botón cerrar, cuerpo
+ * flex-1 min-h-0 overflow-y-auto). Materiales es de solo lectura
+ * (propiedades_calculadas viene de Supabase), así que no se replica el
+ * sistema headerControls editable/guardable — se usa siempre el header
+ * "default" (caja de ícono) que Elemento/Compuesto muestran cuando no hay
+ * headerControls.
+ */
 function MaterialEditorFlotante({ material, onClose }: { material: Material; onClose: () => void }) {
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", handleKeyDown); };
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [onClose]);
 
+  if (typeof document === "undefined") return null;
+
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
-      <button type="button" aria-label="Cerrar editor" onClick={onClose} className="absolute inset-0 bg-black/35 backdrop-blur-[2px]" />
-      <section className="relative z-10 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-primary/15 bg-main shadow-2xl animate-[popIn_0.18s_ease-out]">
-        <header className="flex shrink-0 items-start gap-3 border-b border-primary/10 bg-primary/[0.03] px-5 py-4"><div className="mt-0.5 rounded-lg border border-primary/15 bg-primary/5 p-2"><Box className="h-5 w-5 text-primary/70" /></div><div className="min-w-0 flex-1"><h2 className="truncate text-base font-semibold text-primary">{material.nombre}</h2><p className="mt-0.5 text-xs text-primary/45">Editor de material · propiedades calculadas</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 text-primary/40 transition-colors hover:bg-primary/10 hover:text-primary" aria-label="Cerrar"><X className="h-4 w-4" /></button></header>
-        <div className="min-h-0 overflow-y-auto p-5"><MaterialDetail material={material} /></div>
-      </section>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6"
+      style={{
+        background: "color-mix(in srgb, var(--primary) 35%, transparent)",
+        backdropFilter: "blur(8px)",
+      }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="w-full h-full max-w-6xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        style={{
+          background: "var(--bg-main)",
+          border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+          animation: "popIn 160ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
+      >
+        <div
+          className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-b"
+          style={{
+            borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
+            background: "color-mix(in srgb, var(--primary) 3%, transparent)",
+          }}
+        >
+          <div
+            className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
+            style={{
+              background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+              borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
+            }}
+          >
+            <Box className="text-primary/50" size={12} />
+          </div>
+          <span className="flex-1 min-w-0 truncate text-sm font-black text-primary">
+            {material.nombre}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            title="Cerrar (Esc)"
+            className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/8 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-5">
+          <MaterialDetail material={material} />
+        </div>
+      </div>
     </div>,
     document.body,
   );

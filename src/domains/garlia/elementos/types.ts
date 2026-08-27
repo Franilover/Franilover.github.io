@@ -180,15 +180,84 @@ export interface Elemento {
   polaridad_estructural?: number | null;
   saturacion_enlace?: number | null;
   regimen_estructural?: string | null;
+
+  // ─── Resto de columnas reales de Supabase (2026-08-27) ──────────────────
+  // Agregadas al tipo para que coincidan 1:1 con la tabla real y no se
+  // pierda tipado sobre datos que ya viajan en el fetch (CONFIG.select) —
+  // ver auditoría de columnas faltantes en elementos/compuestos/materiales.
+  created_at?: string | null;
+  updated_at?: string | null;
+  carga_q?: number | null;
+  catalisis_total?: number | null;
+  transicion_total?: number | null;
+  balance_ct?: number | null;
+  capacidad_externa?: number | null;
+  externa_saturada?: boolean | null;
+  ocupacion_externa?: number | null;
+  capacidad_externa_restante?: number | null;
+  saturacion_externa?: number | null;
+  nucleo_particulas_totales?: number | null;
+  media_particulas_totales?: number | null;
+  nucleo_vector_fundamental?: Record<string, unknown> | null;
+  media_vector_fundamental?: Record<string, unknown> | null;
+  externa_vector_fundamental?: Record<string, unknown> | null;
+  perfil_fisico?: Record<string, unknown> | null;
+  vector_fundamental_total?: Record<string, unknown> | null;
+  nucleo_catalisis?: number | null;
+  media_catalisis?: number | null;
+  externa_catalisis?: number | null;
+  nucleo_transicion?: number | null;
+  media_transicion?: number | null;
+  externa_transicion?: number | null;
+  nucleo_carga_q?: number | null;
+  media_carga_q?: number | null;
+  externa_carga_q?: number | null;
+  regimen_por_capa?: Record<string, unknown> | null;
+  estado_fisico?: Record<string, unknown> | null;
+  propiedades_emergentes?: Record<string, unknown> | null;
+  validacion_fisica?: Record<string, unknown> | null;
+  estado_configuracion?: Record<string, unknown> | null;
+  valencia_fuente?: string | null;
+  sitios_enlace_externos?: number | null;
+  disponibilidad_enlace?: number | null;
+  selectividad_enlace?: number | null;
+  capacidad_enlace_bruta?: number | null;
+  sitios_enlace?: Record<string, unknown> | null;
+  afinidad_enlace?: number | null;
+  disponibilidad_sitios?: number | null;
+  capacidad_externa_enlace?: number | null;
+  carga_q_norm?: number | null;
 }
 
 export const CONFIG = {
   tabla: "elementos",
+  // "es_catalizador" removido del select (2026-08-27): esa columna NO
+  // existe en la tabla real "elementos" de Supabase — pedirla hacía
+  // fallar el select ENTERO con un 42703 en cada carga (PostgREST no
+  // devuelve resultado parcial), tumbando useElementos() de punta a
+  // punta, mismo patrón que el bug ya documentado en CONFIG_COMPUESTOS.
+  // Elemento.es_catalizador queda opcional/undefined para todas las filas
+  // hasta que se agregue la columna en Supabase — afinidad.ts,
+  // ElementoEditor, ElementosPage y SandboxPage ya tratan el campo como
+  // opcional (`?? false` / `el?.es_catalizador`), así que la feature de
+  // "catalizador" queda deshabilitada (todo se comporta como no-
+  // catalizador) sin romper tipos ni el resto del fetch.
   select:
-    "id, numero_atomico, nombre, simbolo, familia, es_noble, notas, nucleo, media, externa, es_catalizador, " +
-    "masa_base, volumen_base, estabilidad, rigidez, flexibilidad, dureza, conductividad, transparencia, interaccion, " +
-    "capacidad_transformacion, dinamismo_particular, valencia_estructural, capacidad_enlace, " +
-    "polaridad_estructural, saturacion_enlace, regimen_estructural",
+    "id, numero_atomico, nombre, simbolo, familia, es_noble, notas, nucleo, media, externa, " +
+    "created_at, updated_at, carga_q, catalisis_total, transicion_total, balance_ct, " +
+    "regimen_estructural, capacidad_externa, externa_saturada, ocupacion_externa, " +
+    "capacidad_externa_restante, saturacion_externa, nucleo_particulas_totales, " +
+    "media_particulas_totales, nucleo_vector_fundamental, media_vector_fundamental, " +
+    "externa_vector_fundamental, perfil_fisico, vector_fundamental_total, nucleo_catalisis, " +
+    "media_catalisis, externa_catalisis, nucleo_transicion, media_transicion, externa_transicion, " +
+    "nucleo_carga_q, media_carga_q, externa_carga_q, regimen_por_capa, estado_fisico, " +
+    "propiedades_emergentes, validacion_fisica, masa_base, estabilidad, rigidez, flexibilidad, " +
+    "capacidad_transformacion, estado_configuracion, dureza, conductividad, transparencia, " +
+    "interaccion, valencia_estructural, capacidad_enlace, polaridad_estructural, " +
+    "saturacion_enlace, valencia_fuente, sitios_enlace_externos, disponibilidad_enlace, " +
+    "selectividad_enlace, capacidad_enlace_bruta, sitios_enlace, afinidad_enlace, " +
+    "disponibilidad_sitios, capacidad_externa_enlace, carga_q_norm, dinamismo_particular, " +
+    "volumen_base",
 };
 
 /** Una propiedad física calculada del Elemento, lista para renderizar en
@@ -305,6 +374,20 @@ export interface Compuesto {
   densidad?: number | null;
   clasificacion?: string | null;
   tipo_estructura?: string | null;
+
+  // ─── Resto de columnas reales de Supabase (2026-08-27) ──────────────────
+  // Faltaban en el select/tipo pese a existir en la tabla real "compuestos"
+  // — ver auditoría de columnas faltantes en elementos/compuestos/materiales.
+  updated_at?: string | null;
+  estructura?: Record<string, unknown> | null;
+  validacion?: Record<string, unknown> | null;
+  propiedades_emergentes?: Record<string, unknown> | null;
+  auditoria?: Record<string, unknown> | null;
+  umbral_estabilidad?: number | null;
+  topologia_enlace?: string | null;
+  tipo_estructura_derivada?: string | null;
+  naturaleza_semantica?: string | null;
+  razon_clasificacion?: string | null;
 }
 
 export const CONFIG_COMPUESTOS = {
@@ -314,11 +397,18 @@ export const CONFIG_COMPUESTOS = {
   // datos). Pedirla hacía fallar el select ENTERO con un 42703 en cada
   // carga — PostgREST no devuelve resultado parcial, así que useCompuestos()
   // fallaba de punta a punta. Ver comentario en Compuesto.componentes.
+  //
+  // 2026-08-27: agregadas las columnas reales que faltaban (estructura,
+  // validacion, propiedades_emergentes, auditoria, umbral_estabilidad,
+  // topologia_enlace, tipo_estructura_derivada, naturaleza_semantica,
+  // razon_clasificacion, updated_at) — ver auditoría de columnas faltantes.
   select:
-    "id, nombre, simbolo, notas, created_at, sustancia_base_id, estado, " +
+    "id, nombre, simbolo, notas, created_at, updated_at, sustancia_base_id, estado, " +
     "tipo_compuesto, estado_estructura, formula_canonica, masa, carga, estabilidad, rigidez, " +
-    "flexibilidad, dureza, conductividad, transparencia, interaccion, " +
-    "compatibilidad, energia_enlace, volumen, densidad, clasificacion, tipo_estructura",
+    "flexibilidad, propiedades_emergentes, estructura, validacion, compatibilidad, " +
+    "tipo_estructura, energia_enlace, umbral_estabilidad, clasificacion, razon_clasificacion, " +
+    "auditoria, topologia_enlace, tipo_estructura_derivada, naturaleza_semantica, dureza, " +
+    "conductividad, transparencia, interaccion, volumen, densidad",
 };
 
 /** Una propiedad física calculada del Compuesto, lista para renderizar en
