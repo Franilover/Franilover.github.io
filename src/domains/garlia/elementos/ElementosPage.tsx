@@ -1218,13 +1218,22 @@ export function ElementosPage({
       </p>
     </div>
 
-    <ReaccionesPage
-      reacciones={reacciones}
-      loading={loadingReacciones}
-      creating={creatingReaccion}
-      onCreate={handleCreateReaccion}
-      onEliminar={handleEliminarReaccion}
-    />
+        <ReaccionesPage
+  reacciones={reacciones}
+  compuestos={compuestos}
+  elementos={elementos}
+  loading={loadingReacciones}
+  creating={creatingReaccion}
+  onCreate={handleCreateReaccion}
+  onEliminar={handleEliminarReaccion}
+  onActualizar={(id, cambios) =>
+    setReacciones((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)),
+    )
+  }
+/>
+
+|
   </div>
 
   <div className="min-w-0 border-b lg:border-b-0 lg:border-r border-primary/10">
