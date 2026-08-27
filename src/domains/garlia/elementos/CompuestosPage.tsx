@@ -812,38 +812,39 @@ function CompuestoEditor({
           </div>
         )}
 
-        {/* Fila superior: gráfico compacto a la izquierda + Propiedades
-            físicas/Estabilidad (ambos bloques de stats cortos, en grid) a
-            la derecha — aprovechan mejor el ancho ahí que apilados en una
-            columna angosta. Composición real y Enlaces son listas que
-            leen mejor a lo ancho, así que van a ancho completo debajo.
-            Reemplaza al bloque "Usado en Item/Mineral/Flora" — informativo
-            de solo lectura sobre otras entidades del catálogo, no datos
-            propios de Química — y a los 4 cuadros de Reactividad/Peso/
-            Carga/Enlace que vivían debajo del átomo, ya antiguos y
-            redundantes con Propiedades físicas + Estabilidad. */}
+        {/* Fila superior: gráfico compacto + Estabilidad. Propiedades
+            físicas baja a su propia fila a ancho completo (su grid interno
+            es de 4 columnas — compartiendo mitad de ancho con Estabilidad
+            forzaba 3 filas, con la última a medio llenar; a ancho completo
+            entra en 2 filas parejas). Reemplaza al bloque "Usado en Item/
+            Mineral/Flora" — informativo de solo lectura sobre otras
+            entidades del catálogo, no datos propios de Química — y a los
+            4 cuadros de Reactividad/Peso/Carga/Enlace que vivían debajo
+            del átomo, ya antiguos y redundantes con Propiedades físicas +
+            Estabilidad. */}
         <div className="grid grid-cols-[minmax(11rem,14rem)_1fr] gap-3 items-start">
           <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
-
-          <div className="grid grid-cols-2 gap-3 min-w-0">
-            <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
-            <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
-          </div>
+          <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
         </div>
 
-        <ComposicionRealBloque
-          proporciones={proporcionElementos}
-          loading={proporcionLoading}
-          elementos={elementos}
-          onAbrirElemento={setEditandoElementoId}
-        />
-        <EnlacesCompuestoBloque
-          enlaces={enlacesCompuesto}
-          loading={enlacesLoading}
-          error={enlacesError}
-          elementos={elementos}
-          onAbrirElemento={setEditandoElementoId}
-        />
+        <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
+
+        {/* Composición real (izquierda) · Enlaces (derecha). */}
+        <div className="grid grid-cols-2 gap-3 items-start">
+          <ComposicionRealBloque
+            proporciones={proporcionElementos}
+            loading={proporcionLoading}
+            elementos={elementos}
+            onAbrirElemento={setEditandoElementoId}
+          />
+          <EnlacesCompuestoBloque
+            enlaces={enlacesCompuesto}
+            loading={enlacesLoading}
+            error={enlacesError}
+            elementos={elementos}
+            onAbrirElemento={setEditandoElementoId}
+          />
+        </div>
       </div>
 
       {editandoElementoId && (
