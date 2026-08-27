@@ -246,8 +246,8 @@ export function ElementoEditor({
             y Catalizador ya se editan/derivan en otro lado, y N° atómico/
             Familia son metadatos de catálogo, no algo que se ajuste
             seguido comparado con las partículas de las 3 capas. */}
-        <div className="grid grid-cols-[1.4fr_minmax(9rem,0.7fr)] gap-3 items-start">
-          <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-[1fr_1.15fr] gap-3 items-start">
+          <div className="flex flex-col gap-2 min-w-0">
             <PropiedadesFisicasBloque propiedades={propiedadesFisicas} />
             <SitiosEnlaceBloque sitios={sitiosEnlace} loading={sitiosLoading} />
           </div>
@@ -318,8 +318,11 @@ export function ElementoEditor({
               {/* Visualización tipo átomo real: núcleo + capas orbitales,
                   con las partículas propias del mundo (Masa, Cinética,
                   Voluntad…) en vez de protones/neutrones/electrones
-                  genéricos. */}
-              <AtomoVisual elemento={local} />
+                  genéricos. Ancho fijo y acotado (no "auto" ligado a la
+                  altura de la pila de partículas de al lado): así no
+                  empuja el layout ni genera scroll horizontal cuando la
+                  columna de Núcleo/Media/Externa es más alta. */}
+              <AtomoVisual elemento={local} className="w-24 shrink-0 aspect-square" />
             </div>
           </div>
         </div>
@@ -438,21 +441,21 @@ function PropiedadesFisicasBloque({ propiedades }: { propiedades: PropiedadCalcu
   if (conValor.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+    <div className="flex flex-col gap-1.5 min-w-0 rounded-lg border border-primary/10 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Propiedades físicas
         </span>
         <InfoFormulasPopover propiedades={conValor} />
       </div>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-2 gap-1.5 min-w-0">
         {conValor.map((p) => (
           <div
             key={p.clave}
             title={p.descripcion}
-            className="flex flex-col gap-1 rounded-md border border-primary/10 px-2 py-1.5"
+            className="flex flex-col gap-1 min-w-0 rounded-md border border-primary/10 px-1.5 py-1.5"
           >
-            <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center justify-between gap-1 min-w-0">
               <span className="text-micro font-bold text-primary/50 truncate">{p.label}</span>
               <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
                 {p.valor}
