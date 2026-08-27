@@ -12,7 +12,7 @@
  * a Supabase + propagación al estado del padre via onActualizar.
  */
 
-import { Atom, Beaker, ChevronLeft, Package } from "lucide-react";
+import { Atom, ChevronLeft, Package } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -61,12 +61,12 @@ interface Props {
    *  propia barra para evitar la barra duplicada. Si no se pasa, este
    *  editor sigue mostrando su propia barra (uso standalone). */
   onHeaderControlsChange?: OnHeaderControlsChange;
-  /** Catálogo de compuestos, para mostrar en qué compuestos se usa este
-   *  elemento (columna junto a Notas). Si no se pasa, esa sección no se
-   *  muestra. */
+  /** Catálogo de compuestos — usado para calcular compuestosQueLoUsan, que
+   *  alimenta el nivel "Compuesto" del breadcrumb de arriba (ya no hay
+   *  columna de lista visible; la navegación vive en el breadcrumb). */
   compuestos?: Compuesto[];
   /** Navega al panel flotante de un Compuesto donde se usa este elemento,
-   *  al clickear uno de la lista. */
+   *  elegido desde el popover del nivel "Compuesto" en el breadcrumb. */
   onNavigateCompuesto?: (compuestoId: string) => void;
 }
 
@@ -242,9 +242,11 @@ export function ElementoEditor({
 
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
-        {/* Notas (izquierda) + Selectores (centro, apilados verticalmente)
-            + En qué compuestos se usa (derecha) — misma fila de 3 columnas. */}
-        <div className="grid grid-cols-[1.4fr_minmax(9rem,0.7fr)_1fr] gap-3 items-start">
+        {/* Notas (izquierda) + Selectores (derecha) — 2 columnas. La 3ra
+            columna ("en qué compuestos se usa") se sacó: era navegación
+            de solo lectura, redundante con el breadcrumb Elemento›Compuesto
+            de arriba. */}
+        <div className="grid grid-cols-[1.4fr_minmax(9rem,0.7fr)] gap-3 items-start">
           <div className="flex flex-col gap-0.5">
             <RichEditor
               minHeight="10rem"
@@ -363,45 +365,6 @@ export function ElementoEditor({
               >
                 {local.es_catalizador ? "Sí" : "No"}
               </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-0.5">
-            <div className="min-h-[10rem] max-h-[10rem] overflow-y-auto p-1 flex flex-col gap-0.5">
-              {compuestos === undefined ? (
-                <p className="text-micro text-primary/25 text-center py-3">
-                  No disponible acá.
-                </p>
-              ) : compuestosQueLoUsan.length === 0 ? (
-                <p className="text-micro text-primary/25 text-center py-3">
-                  Este elemento todavía no se usa en ningún compuesto.
-                </p>
-              ) : (
-                compuestosQueLoUsan.map((c) => {
-                  const comp = (c.componentes ?? []).find((x) => x.elemento_id === elemento.id);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => onNavigateCompuesto?.(c.id)}
-                      disabled={!onNavigateCompuesto}
-                      title={onNavigateCompuesto ? "Abrir este compuesto" : undefined}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors hover:bg-primary/5 disabled:cursor-default disabled:hover:bg-transparent cursor-pointer"
-                    >
-                      <Beaker size={11} className="text-accent/60 shrink-0" />
-                      <span className="shrink-0 text-micro font-black text-primary/70">
-                        {c.simbolo || "??"}
-                      </span>
-                      <span className="flex-1 min-w-0 truncate text-micro text-primary/70">
-                        {c.nombre}
-                      </span>
-                      {comp && (
-                        <span className="shrink-0 text-micro text-primary/30">{comp.cantidad}×</span>
-                      )}
-                    </button>
-                  );
-                })
-              )}
             </div>
           </div>
         </div>

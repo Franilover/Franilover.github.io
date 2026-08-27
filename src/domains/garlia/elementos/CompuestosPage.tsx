@@ -72,7 +72,6 @@ import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVi
 import { InfoFormulasPopover } from "./InfoFormulasPopover";
 
 import {
-  autocompletarHastaEstable,
   calcularAfinidad,
   calcularBalancePorCapa,
   calcularCancelacionCarga,
@@ -86,7 +85,6 @@ import {
   compuestoEsInerte,
   encontrarCompuestoDuplicado,
   generarSimboloCompuesto,
-  sugerirElementosParaCompletar,
 } from "./afinidad";
 import {
   AFINIDAD_LABEL,
@@ -213,246 +211,6 @@ function CompuestoCasilla({
       )}
       <span className="truncate">{compuesto.nombre}</span>
     </button>
-  );
-}
-
-/**
- * Selector de elementos a combinar — una sola columna: barra de búsqueda
- * arriba que, al enfocarse, despliega debajo (como dropdown flotante) la
- * lista de elementos disponibles para agregar; al elegir uno o cerrar el
- * dropdown (click afuera / Escape), abajo queda la lista fija de elementos
- * ya en el compuesto, con su stepper +/- de cantidad y sin fondo de caja —
- * solo separadores sutiles entre filas. Los que más ayudan a cerrar el
- * déficit actual (sugerirElementosParaCompletar) se destacan con un
- * puntito en el dropdown.
- */
-function SelectorElementosCompuesto({
-  elementos,
-  componentes,
-  onChange,
-  onAbrirElemento,
-}: {
-  elementos: Elemento[];
-  componentes: ComponenteCompuesto[];
-  onChange: (componentes: ComponenteCompuesto[]) => void;
-  /** Abre el panel flotante del Elemento (mismo patrón que "Editar" en
-   *  SelectorCompuesto) al clickear su nombre, sin disparar sumar/quitar. */
-  onAbrirElemento?: (elementoId: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [abierto, setAbierto] = useState(false);
-  const contenedorRef = useRef<HTMLDivElement>(null);
-  const idsElegidos = new Set(componentes.map((c) => c.elemento_id));
-
-  const sugerencias = useMemo(
-    () => sugerirElementosParaCompletar(componentes, elementos),
-    [componentes, elementos],
-  );
-  const idsSugeridos = useMemo(
-    () => new Set(sugerencias.slice(0, 3).map((s) => s.elemento.id)),
-    [sugerencias],
-  );
-
-  function agregarElemento(id: string) {
-    if (idsElegidos.has(id)) return;
-    onChange([...componentes, { elemento_id: id, cantidad: 1 }]);
-  }
-
-  function quitarElemento(id: string) {
-    onChange(componentes.filter((c) => c.elemento_id !== id));
-  }
-
-  function setCantidad(id: string, cantidad: number) {
-    onChange(
-      componentes.map((c) =>
-        c.elemento_id === id ? { ...c, cantidad: Math.max(1, cantidad) } : c,
-      ),
-    );
-  }
-
-  const disponibles = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = elementos.filter((el) => !idsElegidos.has(el.id));
-    const filtrados = !q
-      ? base
-      : base.filter(
-          (el) =>
-            el.nombre.toLowerCase().includes(q) || (el.simbolo ?? "").toLowerCase().includes(q),
-        );
-    // Sugeridos primero, después el resto en su orden original.
-    return [
-      ...filtrados.filter((el) => idsSugeridos.has(el.id)),
-      ...filtrados.filter((el) => !idsSugeridos.has(el.id)),
-    ];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elementos, query, idsElegidos, idsSugeridos]);
-
-  // Cerrar el dropdown al clickear afuera o al presionar Escape.
-  useEffect(() => {
-    if (!abierto) return;
-    function onPointerDown(e: PointerEvent) {
-      if (contenedorRef.current && !contenedorRef.current.contains(e.target as Node)) {
-        setAbierto(false);
-      }
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setAbierto(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [abierto]);
-
-  return (
-    <div ref={contenedorRef} className="flex flex-col gap-1.5">
-      {/* Barra de búsqueda — al enfocarse despliega el dropdown de
-          disponibles debajo. */}
-      <div className="relative">
-        <div className="shrink-0 flex items-center gap-2 px-2.5 h-8 rounded-md border border-primary/10 bg-primary/[0.03] focus-within:border-primary/30 transition-colors">
-          <Search size={12} className="text-primary/35 shrink-0" />
-          <input
-            type="text"
-            value={query}
-            onFocus={() => setAbierto(true)}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setAbierto(true);
-            }}
-            placeholder="Buscar elemento para agregar…"
-            className="flex-1 bg-transparent outline-none text-micro text-primary/80 placeholder:text-primary/30"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="shrink-0 text-primary/30 hover:text-primary/60 transition-colors cursor-pointer"
-              title="Limpiar búsqueda"
-            >
-              <X size={11} />
-            </button>
-          )}
-        </div>
-
-        {abierto && (
-          <div className="absolute z-20 top-full left-0 right-0 mt-1 max-h-[18rem] overflow-y-auto flex flex-col gap-0.5 rounded-md border border-primary/15 bg-bg-main shadow-lg p-1">
-            {disponibles.length === 0 ? (
-              <p className="text-micro text-primary/25 text-center py-3">
-                {elementos.length === 0
-                  ? "Todavía no hay elementos en la Tabla Química para combinar."
-                  : query
-                    ? "Sin resultados."
-                    : "Ya agregaste todos los elementos disponibles."}
-              </p>
-            ) : (
-              disponibles.map((el) => {
-                const sugerido = idsSugeridos.has(el.id);
-                return (
-                  <div
-                    key={el.id}
-                    className={`group w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
-                      sugerido ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-primary/5"
-                    }`}
-                  >
-                    {sugerido && <span className="w-1 h-1 rounded-full bg-primary/40 shrink-0" />}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        agregarElemento(el.id);
-                        setQuery("");
-                        setAbierto(false);
-                      }}
-                      title={
-                        sugerido
-                          ? `${el.nombre} — completa parte del déficit actual`
-                          : "Agregar al compuesto"
-                      }
-                      className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
-                    >
-                      <span className="shrink-0 text-micro font-black text-primary/70 w-8">
-                        {el.simbolo || "??"}
-                      </span>
-                      <span className="flex-1 min-w-0 text-micro text-primary/80 truncate">
-                        {el.nombre}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        agregarElemento(el.id);
-                        setQuery("");
-                        setAbierto(false);
-                      }}
-                      title="Agregar al compuesto"
-                      className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 group-hover:text-primary cursor-pointer"
-                    >
-                      <Plus size={10} />
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Elementos ya en el compuesto — cada fila con un borde sutil
-          propio (mismo estilo que las columnas de capa atómica), sin
-          bordes individuales en los botones internos. */}
-      <div className="flex flex-col gap-1.5">
-        {componentes.length === 0 ? (
-          <p className="text-micro text-primary/25 text-center py-3">
-            Todavía no agregaste ningún elemento.
-          </p>
-        ) : (
-          componentes.map((c, i) => (
-            <div
-              key={c.elemento_id}
-              className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg border border-primary/10"
-            >
-              <span
-                className={`flex-1 min-w-0 truncate text-micro font-bold text-primary/80 ${
-                  onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
-                }`}
-                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
-                onClick={() => onAbrirElemento?.(c.elemento_id)}
-              >
-                {nombreElemento(elementos, c.elemento_id)}
-              </span>
-              <div className="shrink-0 flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setCantidad(c.elemento_id, c.cantidad - 1)}
-                  className="w-5 h-5 flex items-center justify-center rounded text-primary/50 hover:text-primary transition-all cursor-pointer"
-                >
-                  −
-                </button>
-                <span className="w-4 text-center text-micro font-black text-primary tabular-nums">
-                  {c.cantidad}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setCantidad(c.elemento_id, c.cantidad + 1)}
-                  className="w-5 h-5 flex items-center justify-center rounded text-primary/50 hover:text-primary transition-all cursor-pointer"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={() => quitarElemento(c.elemento_id)}
-                  title="Quitar"
-                  className="w-5 h-5 flex items-center justify-center rounded text-red-400/50 hover:text-red-400 transition-all cursor-pointer"
-                >
-                  <X size={10} />
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -722,7 +480,7 @@ function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: Propi
 
 /**
  * Composición real del compuesto (tabla "compuesto_elementos"): a
- * diferencia de "cantidad" (editable arriba en SelectorElementosCompuesto),
+ * diferencia de "cantidad" (ahora editada en otro lado, no en este editor),
  * acá se muestra proporcion_molar/proporcion_deducida — la proporción real
  * entre elementos que puede diferir de la cantidad simple (ej. Agua: 4:1 en
  * cantidad pero 10:1 en proporcion_molar) — más las propiedades físicas de
@@ -1141,15 +899,6 @@ function CompuestoEditor({
     }
   }
 
-  // Auto-completar hasta estable: agrega, en orden greedy, los elementos
-  // que más déficit cierran con menos desperdicio (ver afinidad.ts) hasta
-  // que las 3 capas queden en 0 o ya no haya candidatos que ayuden.
-  function handleAutoCompletar() {
-    const nuevosComponentes = autocompletarHastaEstable(local.componentes ?? [], elementos);
-    setLocal((p) => ({ ...p, componentes: nuevosComponentes }));
-    persist({ componentes: nuevosComponentes });
-  }
-
   // Símbolo auto-generado a partir de los símbolos de los elementos
   // componentes (ej. 2× Fluxio + 1× Cristalio → "Fl2Cr"). Editable después.
   function handleAutoGenerarSimbolo() {
@@ -1270,28 +1019,6 @@ function CompuestoEditor({
           </div>
 
           <div className="flex flex-col gap-1.5 min-w-0">
-            <div className="flex items-center justify-end">
-              <button
-                type="button"
-                onClick={handleAutoCompletar}
-                disabled={(elementos.length ?? 0) === 0}
-                title="Agregar automáticamente los elementos que faltan para estabilizar las 3 capas"
-                className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-micro font-black uppercase tracking-wide border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <Wand2 size={10} />
-                Auto-completar
-              </button>
-            </div>
-            <SelectorElementosCompuesto
-              elementos={elementos}
-              componentes={local.componentes ?? []}
-              onChange={(componentes) => {
-                setLocal((p) => ({ ...p, componentes }));
-                persist({ componentes });
-              }}
-              onAbrirElemento={setEditandoElementoId}
-            />
-
             <div className="border-t border-primary/10 pt-2">
               <UsosCompuestoBloque usos={usos} loading={usosLoading} />
             </div>
