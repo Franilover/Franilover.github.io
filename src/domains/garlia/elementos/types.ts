@@ -953,6 +953,15 @@ export interface Proceso {
   notas: string | null;
   created_at: string;
   updated_at: string;
+  /** Columnas reales de "procesos" que faltaban en tipo/select (2026-08-27,
+   *  ver auditoría de columnas faltantes) — describen la receta
+   *  entrada→transformación→salida del proceso en lenguaje natural. */
+  regla_clave: string | null;
+  entrada: string | null;
+  transformacion: string | null;
+  salida: string | null;
+  conservacion: string | null;
+  estado_fundamento: string | null;
 }
 
 export interface ProcesoReaccion {
@@ -992,12 +1001,32 @@ export interface FenomenoElemento {
 
 export const CONFIG_PROCESOS = {
   tabla: "procesos",
-  select: "id, nombre, tipo, descripcion, condiciones, notas, created_at, updated_at",
+  // 2026-08-27: agregadas las columnas reales que faltaban (regla_clave,
+  // entrada, transformacion, salida, conservacion, estado_fundamento) —
+  // ver auditoría de columnas faltantes en elementos/compuestos/materiales.
+  select:
+    "id, nombre, tipo, descripcion, condiciones, notas, created_at, updated_at, " +
+    "regla_clave, entrada, transformacion, salida, conservacion, estado_fundamento",
 };
 
 export const CONFIG_FENOMENOS = {
   tabla: "fenomenos",
   select: "id, nombre, simbolo, notas, created_at, updated_at",
+};
+
+export const CONFIG_PROCESO_REACCIONES = {
+  tabla: "proceso_reacciones",
+  select: "id, proceso_id, reaccion_id, orden, rol, created_at",
+};
+
+export const CONFIG_FENOMENO_PROCESOS = {
+  tabla: "fenomeno_procesos",
+  select: "id, fenomeno_id, proceso_id, rol, created_at",
+};
+
+export const CONFIG_FENOMENO_ELEMENTOS = {
+  tabla: "fenomeno_elementos",
+  select: "id, fenomeno_id, elemento_id, cantidad, rol, created_at",
 };
 
 /** Compacta un ParticleMap en algo tipo "2M 1P" para tarjetas/resúmenes. */
