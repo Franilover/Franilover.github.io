@@ -33,7 +33,6 @@ import Image from "next/image";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
@@ -992,22 +991,9 @@ function CompuestoEditor({
           </div>
         )}
 
-        {/* Tres columnas, orden invertido 3-1-2: Notas con RichEditor
-            (izquierda) · Elementos que lo componen (centro) · análisis
-            del compuesto — reactividad/peso, molécula (derecha). */}
-        <div className="grid grid-cols-3 gap-3 items-start">
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <RichEditor
-              minHeight="16rem"
-              placeholder="Descripción del compuesto…"
-              value={local.notas ?? ""}
-              onChange={(v) => {
-                setLocal((p) => ({ ...p, notas: v }));
-                persist({ notas: v });
-              }}
-              />
-          </div>
-
+        {/* Dos columnas: Usos (izquierda) · análisis del compuesto —
+            átomo/molécula y reactividad/peso (derecha). */}
+        <div className="grid grid-cols-2 gap-3 items-start">
           <div className="flex flex-col gap-1.5 min-w-0">
             <div className="border-t border-primary/10 pt-2">
               <UsosCompuestoBloque usos={usos} loading={usosLoading} />
