@@ -72,8 +72,24 @@ function MaterialDetail({ material }: { material: Material }) {
   );
 }
 
+/** Mismo diseño que CompuestoCasilla (elementos/CompuestosPage.tsx): chip
+ *  compacto rounded-full, px-2.5 py-1, text-micro font-bold tracking-wide,
+ *  mismos estados seleccionado/hover. */
 function MaterialPill({ material, selected, onClick }: { material: Material; selected: boolean; onClick: () => void }) {
-  return <button type="button" onClick={onClick} title={material.nombre} className={`inline-flex min-w-0 max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-left text-micro font-bold tracking-wide transition-colors ${selected ? "border-primary/40 bg-primary/10 text-primary ring-2 ring-primary/20" : "border-primary/15 text-primary/70 hover:border-primary/30 hover:bg-primary/10"}`}><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/30" /><span className="truncate">{material.nombre}</span></button>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={material.nombre}
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-micro font-bold tracking-wide transition-colors truncate max-w-full ${
+        selected
+          ? "text-primary border border-primary/40 ring-2 ring-primary/30"
+          : "hover:bg-primary/10 text-primary/70 border border-primary/15"
+      }`}
+    >
+      <span className="truncate">{material.nombre}</span>
+    </button>
+  );
 }
 
 /**
@@ -167,7 +183,7 @@ export function MaterialesPage() {
   const filtrados = useMemo(() => { const query = busqueda.trim().toLowerCase(); if (!query) return materiales; return materiales.filter((material) => material.nombre.toLowerCase().includes(query) || material.tipo_material.toLowerCase().includes(query) || material.descripcion?.toLowerCase().includes(query)); }, [materiales, busqueda]);
   const seleccionado = materiales.find((material) => material.id === seleccionadoId) ?? null;
 
-  return <div className="relative flex min-h-0 flex-col"><header className="flex shrink-0 items-center justify-between gap-4 px-4 py-3"><div><h2 className="text-sm font-semibold text-primary">Materiales</h2><p className="mt-0.5 text-xs text-primary/40">{materiales.length} materiales</p></div><div className="relative w-56 max-w-[45vw]"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-primary/30" /><input value={busqueda} onChange={(event) => setBusqueda(event.target.value)} placeholder="Buscar…" className="w-full rounded-full border border-primary/10 bg-primary/[0.02] py-1.5 pl-8 pr-3 text-xs text-primary outline-none placeholder:text-primary/30 focus:border-primary/25" /></div></header><div className="px-4 pb-4">{loading ? <div className="flex items-center gap-2 py-6 text-xs text-primary/40"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando materiales…</div> : filtrados.length === 0 ? <div className="py-6 text-center text-xs text-primary/35">No se encontraron materiales.</div> : <div className="flex flex-wrap gap-2">{filtrados.map((material) => <MaterialPill key={material.id} material={material} selected={material.id === seleccionadoId} onClick={() => setSeleccionadoId(material.id)} />)}</div>}</div>{seleccionado && <MaterialEditorFlotante material={seleccionado} onClose={() => setSeleccionadoId(null)} />}</div>;
+  return <div className="relative flex min-h-0 flex-col"><header className="flex shrink-0 items-center justify-between gap-4 px-4 py-3"><div><h2 className="text-sm font-semibold text-primary">Materiales</h2><p className="mt-0.5 text-xs text-primary/40">{materiales.length} materiales</p></div><div className="relative w-56 max-w-[45vw]"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-primary/30" /><input value={busqueda} onChange={(event) => setBusqueda(event.target.value)} placeholder="Buscar…" className="w-full rounded-full border border-primary/10 bg-primary/[0.02] py-1.5 pl-8 pr-3 text-xs text-primary outline-none placeholder:text-primary/30 focus:border-primary/25" /></div></header><div className="px-4 pb-4">{loading ? <div className="flex items-center gap-2 py-6 text-xs text-primary/40"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando materiales…</div> : filtrados.length === 0 ? <div className="py-6 text-center text-xs text-primary/35">No se encontraron materiales.</div> : <div className="flex flex-wrap gap-1">{filtrados.map((material) => <MaterialPill key={material.id} material={material} selected={material.id === seleccionadoId} onClick={() => setSeleccionadoId(material.id)} />)}</div>}</div>{seleccionado && <MaterialEditorFlotante material={seleccionado} onClose={() => setSeleccionadoId(null)} />}</div>;
 }
 
 export default MaterialesPage;

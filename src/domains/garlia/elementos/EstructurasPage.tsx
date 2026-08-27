@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, ChevronRight, X } from "lucide-react";
+import { Box, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { useEstructuras } from "./useEstructuras";
@@ -50,5 +50,30 @@ function Editor({ estructura, onClose }: { estructura: Estructura; onClose: () =
 export default function EstructurasPage() {
   const { items, loading } = useEstructuras();
   const [selected, setSelected] = useState<Estructura | null>(null);
-  return <div className="px-3 pb-4 pt-2">{loading ? <p className="py-5 text-center text-micro text-primary/35">Cargando…</p> : <div className="flex flex-wrap gap-1.5">{items.map((estructura) => <button key={estructura.id} type="button" onClick={() => setSelected(estructura)} title={estructura.nombre} className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/15 px-2.5 py-1 text-micro font-bold tracking-wide text-primary/70 transition-colors hover:border-primary/30 hover:bg-primary/10"><span className="truncate">{estructura.nombre}</span><ChevronRight className="h-3 w-3 shrink-0 opacity-35" /></button>)}</div>}{selected && <Editor estructura={selected} onClose={() => setSelected(null)} />}</div>;
+  return (
+    <div className="px-3 pb-4 pt-2">
+      {loading ? (
+        <p className="py-5 text-center text-micro text-primary/35">Cargando…</p>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {items.map((estructura) => (
+            <button
+              key={estructura.id}
+              type="button"
+              onClick={() => setSelected(estructura)}
+              title={estructura.nombre}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-micro font-bold tracking-wide transition-colors truncate max-w-full ${
+                selected?.id === estructura.id
+                  ? "text-primary border border-primary/40 ring-2 ring-primary/30"
+                  : "hover:bg-primary/10 text-primary/70 border border-primary/15"
+              }`}
+            >
+              <span className="truncate">{estructura.nombre}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {selected && <Editor estructura={selected} onClose={() => setSelected(null)} />}
+    </div>
+  );
 }
