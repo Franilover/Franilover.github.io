@@ -45,6 +45,7 @@ import { useFormacionesDeUnaVeta } from "@/domains/garlia/elementos/useFormacion
 import { useFormacionesDeUnGrano } from "@/domains/garlia/elementos/useFormacionesDeUnGrano";
 import type { Grano, Compuesto, Veta } from "@/domains/garlia/elementos/types";
 import { BreadcrumbJerarquia } from "../biologia/BreadcrumbJerarquia";
+import { PillCatalogoItem } from "@/domains/garlia/_shared/PillCatalogoItem";
 
 interface Props {
   compuestos: Compuesto[];
@@ -239,23 +240,15 @@ function GridSimple<T extends { id: string; nombre: string }>({
   }
 
   return (
-    <div className="grid grid-cols-3 gap-2 items-start">
+    <div className="flex flex-wrap gap-1">
       {items.map((item) => (
-        <button
+        <PillCatalogoItem
           key={item.id}
-          type="button"
+          nombre={item.nombre}
+          icono={icono}
+          seleccionado={seleccionadoId === item.id}
           onClick={() => onSeleccionar(item.id)}
-          className={`w-full flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-left transition-all cursor-pointer ${
-            seleccionadoId === item.id
-              ? "border-primary/30 bg-primary/5"
-              : "border-primary/10 bg-primary/[0.02] hover:border-primary/25 hover:bg-primary/5"
-          }`}
-        >
-          {icono}
-          <span className="text-micro font-black text-primary truncate">
-            {item.nombre || "(sin nombre)"}
-          </span>
-        </button>
+        />
       ))}
     </div>
   );

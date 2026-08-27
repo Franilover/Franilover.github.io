@@ -28,6 +28,7 @@ import { GrupoCompuestoPanelFlotante } from "@/domains/garlia/elementos/GruposCo
 import { ReaccionPanelFlotante } from "@/domains/garlia/elementos/ReaccionesPage";
 import type { Compuesto, Elemento, Reaccion } from "@/domains/garlia/elementos/types";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
+import { PillCatalogoItem } from "@/domains/garlia/_shared/PillCatalogoItem";
 
 type Props =
   | {
@@ -102,27 +103,21 @@ export function GridCatalogoGrupo(props: Props) {
           Sin {props.titulo.toLowerCase()} todavía
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2 items-start">
+        <div className="flex flex-wrap gap-1">
           {props.items.map((item) => (
-            <button
+            <PillCatalogoItem
               key={item.id}
-              type="button"
+              nombre={item.nombre}
+              seleccionado={seleccionadoId === item.id}
               onClick={() => setSeleccionadoId(item.id)}
-              className={`w-full flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-left transition-all cursor-pointer ${
-                seleccionadoId === item.id
-                  ? "border-primary/30 bg-primary/5"
-                  : "border-primary/10 bg-primary/[0.02] hover:border-primary/25 hover:bg-primary/5"
-              }`}
-            >
-              {props.modo === "grupo" ? (
-                <IconoGrupo tipo={props.icono} />
-              ) : (
-                <FlaskConical size={12} className="text-primary/40 shrink-0" />
-              )}
-              <span className="text-micro font-black text-primary truncate">
-                {item.nombre || "(sin nombre)"}
-              </span>
-            </button>
+              icono={
+                props.modo === "grupo" ? (
+                  <IconoGrupo tipo={props.icono} />
+                ) : (
+                  <FlaskConical size={12} className="text-primary/40 shrink-0" />
+                )
+              }
+            />
           ))}
         </div>
       )}
