@@ -1709,13 +1709,24 @@ function MasonryGruposNaturaleza({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  // Antes: containerWidth arrancaba en 0 y el layout se pintaba con un
+  // ancho estimado (900px, ver fallback más abajo) hasta que el
+  // ResizeObserver medía el ancho real — un reflow grande y visible del
+  // masonry entero apenas cargaba (más notorio ahora que la columna mide
+  // ~1/3 del panel por el grid de 3 columnas, no el ancho completo). Con
+  // "medido" no se renderiza el masonry hasta tener el ancho real, así
+  // que no hay salto: solo aparece ya con el layout correcto.
+  const [medido, setMedido] = useState(false);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
-      if (width) setContainerWidth(width);
+      if (width) {
+        setContainerWidth(width);
+        setMedido(true);
+      }
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -1779,28 +1790,40 @@ function MasonryGruposNaturaleza({
 
   return (
     <div ref={containerRef} className="flex gap-4 items-start">
-      {columnas.map((columna, i) => (
-        <div key={i} className="flex flex-col gap-4 min-w-0" style={{ width: anchoColumna }}>
-          {columna.map((grupo) => (
-            <div key={grupo.id}>
-              <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
-                {grupo.nombre}
+      {!medido ? (
+        // Placeholder mientras se mide el contenedor real — evita pintar
+        // con el ancho estimado (900) y después saltar al recalcular con
+        // el ancho verdadero. Altura aproximada para que no haya salto de
+        // scroll cuando el masonry real aparece encima.
+        <div className="flex-1 py-6 text-center text-micro text-primary/30">Cargando…</div>
+      ) : (
+        columnas.map((columna, i) => (
+          <div
+            key={i}
+            className="flex flex-col gap-4 min-w-0 transition-[width] duration-150 ease-out"
+            style={{ width: anchoColumna }}
+          >
+            {columna.map((grupo) => (
+              <div key={grupo.id}>
+                <div className="mb-1 px-1 text-micro font-bold uppercase tracking-[0.12em] text-primary/40">
+                  {grupo.nombre}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {grupo.compuestos.map((c) => (
+                    <CompuestoCasilla
+                      key={c.id}
+                      compuesto={c}
+                      elementos={elementos}
+                      seleccionado={c.id === activoId}
+                      onClick={() => onSeleccionar(c.id)}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1">
-                {grupo.compuestos.map((c) => (
-                  <CompuestoCasilla
-                    key={c.id}
-                    compuesto={c}
-                    elementos={elementos}
-                    seleccionado={c.id === activoId}
-                    onClick={() => onSeleccionar(c.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ))}
+            ))}
+          </div>
+        ))
+      )}
     </div>
   );
 }
