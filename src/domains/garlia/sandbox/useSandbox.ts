@@ -2,15 +2,13 @@
 
 /**
  * useSandbox.ts — dominio Sandbox
- * ───────────────────────────────────────────────────────────────────────────
- * Hook de orquestación del vertical slice. Deliberadamente NO es un motor:
- * solo hace fetch de estado + llama RPCs de sandboxService.ts + refetch.
- * Toda regla de simulación (evaluar condición, aplicar efecto, expirar
- * estado) vive en Supabase. Este hook nunca debe empezar a calcular esas
- * cosas en el cliente.
  *
- * Arquitectura respetada:
- *   Frontend → useSandbox() → sandboxService → RPC Supabase → motor → estado
+ * Orquestación del Sandbox:
+ * Frontend → useSandbox() → sandboxService → RPC Supabase → motor → estado
+ *
+ * IMPORTANTE:
+ * Este hook no contiene reglas de simulación.
+ * Solo prepara datos, llama RPCs y vuelve a cargar el estado.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -31,7 +29,6 @@ interface UseSandboxState {
   catalogoEventos: InteraccionEventoCatalogo[];
   loading: boolean;
   error: string | null;
-  /** true mientras una acción de control (play/pause/step/reset) está en curso */
   ejecutandoAccion: boolean;
 }
 
@@ -47,14 +44,31 @@ export function useSandbox(simulacionId: string | null) {
   });
 
   const refetch = useCallback(async () => {
-    if (!simulacionId) return;
-    setState((s) => ({ ...s, loading: true, error: null }));
+    if (!simulacionId) {
+      setState((s) => ({
+        ...s,
+        simulacion: null,
+        entidades: [],
+        eventos: [],
+        loading: false,
+        error: null,
+      }));
+      return;
+    }
+
+    setState((s) => ({
+      ...s,
+      loading: true,
+      error: null,
+    }));
+
     try {
       const [simulacion, entidades, eventos] = await Promise.all([
         sandboxService.obtenerSimulacion(simulacionId),
         sandboxService.listarEntidades(simulacionId),
         sandboxService.listarEventos(simulacionId),
       ]);
+
       setState((s) => ({
         ...s,
         simulacion,
@@ -71,16 +85,19 @@ export function useSandbox(simulacionId: string | null) {
     }
   }, [simulacionId]);
 
-  // Carga inicial + al cambiar de simulación
   useEffect(() => {
     refetch();
   }, [refetch]);
 
-  // Catálogo de eventos: independiente de la simulación activa, se carga una vez
   useEffect(() => {
     sandboxService
       .listarCatalogoEventos()
-      .then((catalogoEventos) => setState((s) => ({ ...s, catalogoEventos })))
+      .then((catalogoEventos) =>
+        setState((s) => ({
+          ...s,
+          catalogoEventos,
+        })),
+      )
       .catch((err) =>
         setState((s) => ({
           ...s,
@@ -92,7 +109,13 @@ export function useSandbox(simulacionId: string | null) {
   const ejecutarControl = useCallback(
     async (accion: AccionControlSandbox, delta?: number) => {
       if (!simulacionId) return;
-      setState((s) => ({ ...s, ejecutandoAccion: true, error: null }));
+
+      setState((s) => ({
+        ...s,
+        ejecutandoAccion: true,
+        error: null,
+      }));
+
       try {
         await sandboxService.controlSandbox(simulacionId, accion, delta);
         await refetch();
@@ -102,7 +125,10 @@ export function useSandbox(simulacionId: string | null) {
           error: err instanceof Error ? err.message : String(err),
         }));
       } finally {
-        setState((s) => ({ ...s, ejecutandoAccion: false }));
+        setState((s) => ({
+          ...s,
+          ejecutandoAccion: false,
+        }));
       }
     },
     [simulacionId, refetch],
@@ -116,7 +142,12 @@ export function useSandbox(simulacionId: string | null) {
       datos?: Record<string, unknown>;
     }) => {
       if (!simulacionId) return;
-      setState((s) => ({ ...s, error: null }));
+
+      setState((s) => ({
+        ...s,
+        error: null,
+      }));
+
       try {
         await sandboxService.encolarEventoSandbox({
           simulacionId,
@@ -125,6 +156,7 @@ export function useSandbox(simulacionId: string | null) {
           tiempoProgramado: params.tiempoProgramado,
           datos: params.datos,
         });
+
         await refetch();
       } catch (err) {
         setState((s) => ({
@@ -142,22 +174,56 @@ export function useSandbox(simulacionId: string | null) {
       entidadOrigenId?: string | null;
       estadoInicial?: Record<string, unknown>;
     }) => {
-      if (!simulacionId) return;
-      setState((s) => ({ ...s, error: null }));
+      if (!simulacionId) return null;
+
+      setState((s) => ({
+        ...s,
+        error: null,
+      }));
+
       try {
-        await sandboxService.agregarEntidadSandbox({
+        const id = await sandboxService.agregarEntidadSandbox({
           simulacionId,
           ...params,
         });
+
         await refetch();
+
+        return id;
       } catch (err) {
         setState((s) => ({
           ...s,
           error: err instanceof Error ? err.message : String(err),
         }));
+
+        return null;
       }
     },
     [simulacionId, refetch],
+  );
+
+  /**
+   * Agrega un Elemento o Compuesto del catálogo al Sandbox.
+   *
+   * No crea una RPC nueva:
+   * utiliza agregar_entidad_sandbox existente.
+   *
+   * El catálogo conserva la identidad mediante entidadOrigenId.
+   * estadoInicial contiene únicamente el estado experimental inicial.
+   */
+  const agregarEntidadDesdeCatalogo = useCallback(
+    async (params: {
+      entidadTipo: "elemento" | "compuesto";
+      entidadOrigenId: string;
+      estadoInicial: Record<string, unknown>;
+    }) => {
+      return agregarEntidad({
+        entidadTipo: params.entidadTipo,
+        entidadOrigenId: params.entidadOrigenId,
+        estadoInicial: params.estadoInicial,
+      });
+    },
+    [agregarEntidad],
   );
 
   return {
@@ -169,12 +235,10 @@ export function useSandbox(simulacionId: string | null) {
     reset: () => ejecutarControl("reset"),
     dispararEvento,
     agregarEntidad,
+    agregarEntidadDesdeCatalogo,
   };
 }
 
-/** Lista simulaciones existentes (no descartadas), para poder cargar una
- *  en vez de crear siempre una nueva vacía. Independiente de useSandbox
- *  porque se necesita ANTES de tener un simulacionId elegido. */
 export function useListaSandboxes() {
   const [simulaciones, setSimulaciones] = useState<SandboxSimulacion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -183,6 +247,7 @@ export function useListaSandboxes() {
   const refetch = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       const data = await sandboxService.listarSimulaciones();
       setSimulaciones(data);
@@ -197,29 +262,49 @@ export function useListaSandboxes() {
     refetch();
   }, [refetch]);
 
-  return { simulaciones, loading, error, refetch };
+  return {
+    simulaciones,
+    loading,
+    error,
+    refetch,
+  };
 }
 
-/** Hook auxiliar para crear una simulación nueva y devolver su id.
- *  Separado de useSandbox porque antes de tener un id no hay nada que
- *  orquestar todavía — evita mezclar "crear" con "operar sobre". */
 export function useCrearSandbox() {
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const crear = useCallback(async (nombre: string, contexto?: Record<string, unknown>) => {
-    setCreando(true);
-    setError(null);
-    try {
-      const id = await sandboxService.crearSandbox(nombre, contexto);
-      return id;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      return null;
-    } finally {
-      setCreando(false);
-    }
-  }, []);
+  const crear = useCallback(
+    async (
+      nombre: string,
+      contexto?: Record<string, unknown>,
+    ) => {
+      setCreando(true);
+      setError(null);
 
-  return { crear, creando, error };
+      try {
+        const id = await sandboxService.crearSandbox(
+          nombre,
+          contexto,
+        );
+
+        return id;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : String(err),
+        );
+
+        return null;
+      } finally {
+        setCreando(false);
+      }
+    },
+    [],
+  );
+
+  return {
+    crear,
+    creando,
+    error,
+  };
 }
