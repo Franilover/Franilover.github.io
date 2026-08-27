@@ -498,12 +498,24 @@ function SitiosEnlaceBloque({
 
   const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(2));
 
+  // Fórmulas de sitio (ver elemento_propiedad_reglas en Supabase): cada
+  // campo de un sitio de enlace se hereda directamente de una propiedad ya
+  // calculada del elemento — no son valores nuevos e independientes, así
+  // que el popover explica esa herencia en vez de una fórmula desde cero.
+  const PROPIEDADES_SITIO: PropiedadCalculada[] = [
+    { clave: "sitio_afinidad", label: "Afinidad", valor: "—", descripcion: "Qué tan bien conecta el sitio con otros.", formula: "Afinidad = (afinidad de enlace + interacción del elemento) / 2" },
+    { clave: "sitio_capacidad", label: "Capacidad", valor: "—", descripcion: "Cuánto puede sostener el sitio.", formula: "Capacidad = capacidad de enlace del elemento" },
+    { clave: "sitio_selectividad", label: "Selectividad", valor: "—", descripcion: "Qué tan exigente es el sitio al aceptar enlaces.", formula: "Selectividad = selectividad de enlace del elemento" },
+    { clave: "sitio_saturacion", label: "Saturación", valor: "—", descripcion: "Qué tan ocupado está el sitio.", formula: "Saturación = enlaces usados en este sitio / capacidad del sitio" },
+  ];
+
   return (
     <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Sitios de enlace
         </span>
+        <InfoFormulasPopover propiedades={PROPIEDADES_SITIO} />
       </div>
       <div className="flex flex-col gap-1">
         {grupos.map(({ sitio, cantidad }, i) => (

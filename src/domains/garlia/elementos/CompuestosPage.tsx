@@ -95,6 +95,7 @@ import {
   LAYER_LABEL,
   REACTIVIDAD_LABEL,
   propiedadesCalculadasDeCompuesto,
+  propiedadesCalculadasDeElemento,
   type ComponenteCompuesto,
   type Compuesto,
   type Elemento,
@@ -725,7 +726,11 @@ function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: Propi
  * diferencia de "cantidad" (editable arriba en SelectorElementosCompuesto),
  * acá se muestra proporcion_molar/proporcion_deducida — la proporción real
  * entre elementos que puede diferir de la cantidad simple (ej. Agua: 4:1 en
- * cantidad pero 10:1 en proporcion_molar). Solo lectura.
+ * cantidad pero 10:1 en proporcion_molar) — más las propiedades físicas de
+ * cada elemento componente (masa, estabilidad, transparencia, etc., mismas
+ * columnas que ElementoEditor → propiedadesCalculadasDeElemento), para ver
+ * de un vistazo qué aporta cada elemento a las propiedades del compuesto de
+ * arriba sin tener que abrir cada Elemento por separado. Solo lectura.
  */
 function ComposicionRealBloque({
   proporciones,
@@ -736,6 +741,26 @@ function ComposicionRealBloque({
   loading: boolean;
   elementos: Elemento[];
 }) {
+  // Propiedades de todos los elementos componentes juntas, para que el
+  // popover de info liste la fórmula de cada una una sola vez (no
+  // repetida por elemento) — mismo criterio que PropiedadesFisicasBloque.
+  // Calculado antes de cualquier return temprano (reglas de hooks).
+  const propiedadesParaInfo = useMemo(() => {
+    const vistas = new Set<string>();
+    const acc: PropiedadCalculada[] = [];
+    for (const p of proporciones) {
+      const el = elementos.find((e) => e.id === p.elemento_id);
+      if (!el) continue;
+      for (const prop of propiedadesCalculadasDeElemento(el)) {
+        if (prop.valor === null || vistas.has(prop.clave)) continue;
+        vistas.add(prop.clave);
+        acc.push(prop);
+      }
+    }
+    return acc;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proporciones, elementos]);
+
   if (loading || proporciones.length === 0) return null;
   const tieneAlguna = proporciones.some((p) => p.proporcion_molar !== null);
   if (!tieneAlguna) return null;
@@ -746,14 +771,18 @@ function ComposicionRealBloque({
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Composición real
         </span>
+        <InfoFormulasPopover propiedades={propiedadesParaInfo} />
       </div>
       <div className="flex flex-col gap-1">
         {proporciones.map((p) => {
           const el = elementos.find((e) => e.id === p.elemento_id);
+          const propiedadesElemento = el
+            ? propiedadesCalculadasDeElemento(el).filter((prop) => prop.valor !== null)
+            : [];
           return (
             <div
               key={p.id}
-              className="flex flex-col gap-0.5 rounded-md border border-primary/10 px-2 py-1"
+              className="flex flex-col gap-1 rounded-md border border-primary/10 px-2 py-1.5"
             >
               <span className="text-micro font-bold text-primary/70 truncate">
                 {el?.simbolo || "??"} · {el?.nombre ?? "—"}
@@ -771,6 +800,19 @@ function ComposicionRealBloque({
                     : "—"}
                 </span>
               </div>
+              {propiedadesElemento.length > 0 && (
+                <div className="flex items-center gap-x-2.5 gap-y-0.5 flex-wrap pt-0.5 border-t border-primary/[0.06]">
+                  {propiedadesElemento.map((prop) => (
+                    <span
+                      key={prop.clave}
+                      title={prop.descripcion}
+                      className="text-micro text-primary/45 whitespace-nowrap"
+                    >
+                      {prop.label} <span className="font-bold text-primary/60">{prop.valor}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
