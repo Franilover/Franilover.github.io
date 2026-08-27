@@ -60,8 +60,6 @@ import {
 } from "./useCompuestoEstabilidad";
 import { useGranos } from "./useGranos";
 import { useCelulas } from "./useCelulas";
-import { useGranosDeUnCompuesto } from "./useGranosDeUnCompuesto";
-import { useCelulasDeUnCompuesto } from "./useCelulasDeUnCompuesto";
 import { PanelEditorGrano, PanelEditorVeta } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { PanelEditorCelula, PanelEditorTejido } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
 import { BreadcrumbJerarquia } from "@/domains/garlia/biologia/BreadcrumbJerarquia";
@@ -1503,8 +1501,11 @@ export function CompuestoPanelFlotante({
     setTejidoOVetaAbierto(null);
     setElementoAbierto(null);
   }, [compuesto.id]);
-  const granosDeCompuesto = useGranosDeUnCompuesto(compuesto.id);
-  const celulasDeCompuesto = useCelulasDeUnCompuesto(compuesto.id);
+  // granosDeCompuesto/celulasDeCompuesto quitados: solo alimentaban los
+  // niveles Grano/Célula del breadcrumb de este header, que ahora es
+  // Elemento›Compuesto — granoOCelulaAbierto (abajo) sigue vivo porque
+  // controla el sub-panel del bloque "Compone" en el cuerpo, sin relación
+  // con el header.
   const organosCatalogo = useOrganos();
   const formacionesCatalogo = useFormaciones();
   const tejidosCatalogo = useTejidos();
@@ -1612,32 +1613,9 @@ export function CompuestoPanelFlotante({
           <BreadcrumbJerarquia
             niveles={[
               {
-                label: "Grano",
-                icono: <Gem size={10} />,
-                activo: false,
-                items: granosDeCompuesto.items.map((g) => ({
-                  id: g.grano_id,
-                  nombre: g.grano.nombre,
-                })),
-                loading: granosDeCompuesto.loading,
-                onNavegar: (granoId) => setGranoOCelulaAbierto({ tipo: "grano", id: granoId }),
-              },
-              {
-                label: "Célula",
-                icono: <Beaker size={10} />,
-                activo: false,
-                items: celulasDeCompuesto.items.map((c) => ({
-                  id: c.celula_id,
-                  nombre: c.celula.nombre,
-                })),
-                loading: celulasDeCompuesto.loading,
-                onNavegar: (celulaId) => setGranoOCelulaAbierto({ tipo: "celula", id: celulaId }),
-              },
-              { label: "Compuesto", icono: <Package size={10} />, activo: false },
-              {
                 label: "Elemento",
                 icono: <Atom size={10} />,
-                activo: true,
+                activo: false,
                 // Composición real de este Compuesto — mismos componentes
                 // (elemento_id + cantidad) que ya resuelve el bloque
                 // "Compone" del cuerpo, no un fetch nuevo.
@@ -1650,6 +1628,7 @@ export function CompuestoPanelFlotante({
                 loading: false,
                 onNavegar: setElementoAbierto,
               },
+              { label: "Compuesto", icono: <Package size={10} />, activo: true },
             ]}
           />
         </div>

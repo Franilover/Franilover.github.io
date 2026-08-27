@@ -215,15 +215,19 @@ export function ElementoEditor({
       <ConfirmModal />
       {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
-      {/* Breadcrumb Compuesto › Elemento — mismo componente y patrón que
-          Célula/Tejido/Órgano (BreadcrumbJerarquia): parado en Elemento,
-          clickear "Compuesto" abre un popover con los compuestos que usan
-          este elemento (compuestosQueLoUsan, ya calculado más abajo para la
-          columna de la derecha) y navega vía onNavigateCompuesto — mismo
-          callback que ya usa esa columna, ver ElementoPanelFlotante. */}
+      {/* Breadcrumb Elemento › Compuesto — mismo componente y patrón que
+          Célula/Tejido/Órgano (BreadcrumbJerarquia), y mismo orden y
+          niveles que el breadcrumb de CompuestoPanelFlotante (de menor a
+          mayor: el Elemento es lo micro, el Compuesto se forma de
+          elementos). Parado en Elemento, clickear "Compuesto" abre un
+          popover con los compuestos que usan este elemento
+          (compuestosQueLoUsan, ya calculado más abajo para la columna de
+          la derecha) y navega vía onNavigateCompuesto — mismo callback que
+          ya usa esa columna, ver ElementoPanelFlotante. */}
       <div className="shrink-0 px-2.5 pt-2">
         <BreadcrumbJerarquia
           niveles={[
+            { label: "Elemento", icono: <Atom size={10} />, activo: true },
             {
               label: "Compuesto",
               icono: <Package size={10} />,
@@ -232,7 +236,6 @@ export function ElementoEditor({
               loading: false,
               onNavegar: onNavigateCompuesto,
             },
-            { label: "Elemento", icono: <Atom size={10} />, activo: true },
           ]}
         />
       </div>
