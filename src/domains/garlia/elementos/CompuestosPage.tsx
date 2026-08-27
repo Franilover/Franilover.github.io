@@ -268,7 +268,7 @@ function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: Propi
         </span>
         <InfoFormulasPopover propiedades={conValor} />
       </div>
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-5 gap-1.5">
         {conValor.map((p) => (
           <div
             key={p.clave}
