@@ -24,6 +24,10 @@ import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
 import { MaterialesPage } from "../materiales/MaterialesPage";
 
+import EstructurasPage from "./EstructurasPage";
+import ProcesosPage from "./ProcesosPage";
+import FenomenosPage from "./FenomenosPage";
+
 import { ReaccionesPage } from "./ReaccionesPage";
 import { ElementoEditor } from "./ElementoEditor";
 import {
@@ -1185,6 +1189,17 @@ export function ElementosPage({
       </div>
 
 
+      {/* Estructuras */}
+      <div className="flex flex-col border-t border-primary/10">
+        <div className="shrink-0 px-3 pt-3 text-primary/40">
+          <p className="text-micro font-black uppercase tracking-widest">
+            Estructuras
+          </p>
+        </div>
+
+        <EstructurasPage />
+      </div>
+
             {/* Materiales */}
       <div className="flex flex-col border-t border-primary/10">
         <div className="shrink-0 px-3 pt-3 text-primary/40">
@@ -1195,28 +1210,46 @@ export function ElementosPage({
 
         <MaterialesPage />
       </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 border-t border-primary/10">
+  <div className="min-w-0 border-b lg:border-b-0 lg:border-r border-primary/10">
+    <div className="px-3 pt-3 text-primary/40">
+      <p className="text-micro font-black uppercase tracking-widest">
+        Reacciones
+      </p>
+    </div>
+
+    <ReaccionesPage
+      reacciones={reacciones}
+      loading={loadingReacciones}
+      creating={creatingReaccion}
+      onCreate={handleCreateReaccion}
+      onEliminar={handleEliminarReaccion}
+    />
+  </div>
+
+  <div className="min-w-0 border-b lg:border-b-0 lg:border-r border-primary/10">
+    <div className="px-3 pt-3 text-primary/40">
+      <p className="text-micro font-black uppercase tracking-widest">
+        Procesos
+      </p>
+    </div>
+
+    <ProcesosPage />
+  </div>
+
+  <div className="min-w-0">
+    <div className="px-3 pt-3 text-primary/40">
+      <p className="text-micro font-black uppercase tracking-widest">
+        Fenómenos
+      </p>
+    </div>
+
+    <FenomenosPage />
+  </div>
+</div>
 
 
-      {/* Reacciones */}
-      <div className="flex flex-col border-t border-primary/10">
-        <ReaccionesPage
-          reacciones={reacciones}
-          compuestos={compuestos}
-          elementos={elementos}
-          loading={loadingReacciones}
-          creating={creatingReaccion}
-          onCreate={handleCreateReaccion}
-          onActualizar={(id, cambios) =>
-            setReacciones((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)))
-          }
-          onEliminar={handleEliminarReaccion}
-          onAbrirItem={(item) =>
-            item.tipo === "compuesto"
-              ? setCompuestoAAbrir(item.id)
-              : setSeleccionadoId(item.id)
-          }
-        />
-      </div>
+
 
       {/* Reglas */}
       <div className="flex flex-col border-t border-primary/10">
