@@ -40,7 +40,7 @@
  * ElementoEditor/CompuestosPage: derivado, no editable desde el frontend).
  */
 
-import { Layers, Loader2, Search, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 import {
@@ -65,7 +65,7 @@ function coincide(concepto: ConceptoDocumentacion, query: string): boolean {
 }
 
 export function LogicaSistemaPage() {
-  const { capas, total, loading } = useDocumentacionSistema();
+  const { capas, loading } = useDocumentacionSistema();
   const [capaActivaId, setCapaActivaId] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
 
@@ -111,45 +111,34 @@ export function LogicaSistemaPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Cabecera + buscador global */}
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-center gap-2 rounded-lg border border-primary/10 px-3 py-2.5">
-          <Layers size={15} className="text-primary/40 shrink-0" />
-          <p className="text-sm text-primary/60">
-            Cómo está armado el sistema, capa por capa.{" "}
-            <span className="font-bold text-primary/80">{total} conceptos</span> documentados en
-            total.
-          </p>
-        </div>
-
-        <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-primary/30 pointer-events-none"
-          />
-          <input
-            type="text"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar un concepto, explicación o ejemplo en todas las capas..."
-            className="w-full rounded-lg border border-primary/10 bg-primary/[0.02] pl-9 pr-9 py-2.5 text-sm text-primary/80 placeholder:text-primary/30 outline-none focus:border-primary/25 transition-colors"
-          />
-          {busqueda && (
-            <button
-              type="button"
-              onClick={() => setBusqueda("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
-              title="Limpiar búsqueda"
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
+    <div className="flex flex-col gap-3">
+      {/* Buscador global */}
+      <div className="relative">
+        <Search
+          size={14}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-primary/30 pointer-events-none"
+        />
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar un concepto, explicación o ejemplo en todas las capas..."
+          className="w-full rounded-lg border border-primary/10 bg-primary/[0.02] pl-9 pr-9 py-2 text-sm text-primary/80 placeholder:text-primary/30 outline-none focus:border-primary/25 transition-colors"
+        />
+        {busqueda && (
+          <button
+            type="button"
+            onClick={() => setBusqueda("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-primary/30 hover:text-primary/60 hover:bg-primary/5 transition-colors"
+            title="Limpiar búsqueda"
+          >
+            <X size={13} />
+          </button>
+        )}
       </div>
 
       {/* Explorador: sidebar de capas + panel de detalle */}
-      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-3 items-start">
         <div className="md:sticky md:top-4">
           <SidebarCapas
             capas={capasFiltradas}
@@ -160,7 +149,7 @@ export function LogicaSistemaPage() {
         </div>
 
         <div className="min-w-0 rounded-xl border border-primary/10 bg-primary/[0.015] overflow-hidden">
-          <div className="max-h-[70vh] overflow-y-auto">
+          <div className="max-h-[75vh] overflow-y-auto">
             {buscando ? (
               <PanelResultadosBusqueda
                 capas={capasFiltradas}
@@ -202,7 +191,7 @@ function SidebarCapas({
 }) {
   return (
     <div className="rounded-xl border border-primary/10 bg-primary/[0.015] overflow-hidden">
-      <div className="max-h-[70vh] overflow-y-auto flex flex-col p-1.5 gap-0.5">
+      <div className="max-h-[75vh] overflow-y-auto flex flex-col p-1 gap-0.5">
         {capas.map((c) => {
           const activa = !deshabilitada && c.capa === capaActivaId;
           return (
@@ -239,7 +228,7 @@ function SidebarCapas({
 function PanelCapa({ capa }: { capa: CapaDocumentacion }) {
   return (
     <div className="flex flex-col">
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-primary/10 sticky top-0 bg-[var(--bg-main)]">
+      <div className="flex items-center gap-2.5 px-3 py-2 border-b border-primary/10 sticky top-0 bg-[var(--bg-main)]">
         <span className="text-[15px] font-bold tracking-tight text-primary/85">{capa.capa}</span>
         <span className="text-micro font-semibold text-primary/35">
           {capa.conceptos.length} concepto{capa.conceptos.length === 1 ? "" : "s"}
@@ -277,7 +266,7 @@ function PanelResultadosBusqueda({
 
   return (
     <div className="flex flex-col">
-      <div className="px-4 py-3 border-b border-primary/10 sticky top-0 bg-[var(--bg-main)]">
+      <div className="px-3 py-2 border-b border-primary/10 sticky top-0 bg-[var(--bg-main)]">
         <span className="text-sm text-primary/60">
           <span className="font-bold text-primary/80">{total}</span> resultado
           {total === 1 ? "" : "s"} para "{query}"
@@ -286,7 +275,7 @@ function PanelResultadosBusqueda({
       <div className="flex flex-col">
         {capas.map((c) => (
           <div key={c.capa} className="flex flex-col">
-            <div className="px-4 pt-3 pb-1.5">
+            <div className="px-3 pt-2.5 pb-1">
               <span className="text-micro font-bold uppercase tracking-[0.1em] text-primary/35">
                 {c.capa}
               </span>
@@ -305,9 +294,9 @@ function PanelResultadosBusqueda({
 
 function TarjetaConcepto({ concepto }: { concepto: ConceptoDocumentacion }) {
   return (
-    <div className="flex flex-col gap-1.5 px-4 py-3">
+    <div className="flex flex-col gap-1.5 px-3 py-2.5">
       <span className="text-sm font-bold text-primary/80">{concepto.concepto}</span>
-      <p className="text-sm text-primary/65 leading-relaxed">{concepto.explicacion}</p>
+      <p className="text-sm text-primary/70 leading-relaxed">{concepto.explicacion}</p>
 
       {concepto.formula && (
         <div className="rounded bg-primary/5 px-2 py-1 font-mono text-micro text-primary/50 w-fit mt-0.5">
@@ -316,11 +305,11 @@ function TarjetaConcepto({ concepto }: { concepto: ConceptoDocumentacion }) {
       )}
 
       {concepto.ejemplo && (
-        <p className="text-micro text-primary/40 italic">Ejemplo: {concepto.ejemplo}</p>
+        <p className="text-micro text-primary/45 italic leading-relaxed">Ejemplo: {concepto.ejemplo}</p>
       )}
 
       {concepto.dependencias && (
-        <p className="text-micro text-primary/30">Depende de: {concepto.dependencias}</p>
+        <p className="text-micro text-primary/35 leading-relaxed">Depende de: {concepto.dependencias}</p>
       )}
     </div>
   );
