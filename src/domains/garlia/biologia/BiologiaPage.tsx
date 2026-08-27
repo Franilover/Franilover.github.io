@@ -23,9 +23,8 @@ import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
 import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
-import { useReacciones } from "@/domains/garlia/elementos/useReacciones";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
-import type { Organo, Reaccion } from "@/domains/garlia/elementos/types";
+import type { Organo } from "@/domains/garlia/elementos/types";
 
 import { CladisticaPage } from "./CladisticaPage";
 import { CatalogoTejidosBiologia } from "./CatalogoTejidosBiologia";
@@ -131,16 +130,17 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
   // saca esa responsabilidad.
   const { clados, setClados } = useClados();
 
-  // ── Órganos y Procesos: catálogos propios, mismo motor que Física ─────
+  // ── Órganos: catálogo propio, mismo motor que Física ─────
   // Órganos = tabla real "organos" (mismo catálogo que usa Flora para
   // vincular por planta_organos, y Criaturas por criatura_organos). Ya no
   // tiene columna `componentes` — la fórmula vive vía Tejidos/Células.
-  // Procesos = tabla real "reacciones" (mismo catálogo que usan Procesos de
-  // Flora/Minerales y Habilidades de Items). Self-contained, igual que el
-  // resto de Biología: trae sus propios datos acá sin tocar CladisticaPage
-  // ni depender de una planta puntual.
+  // (El catálogo "reacciones" ya no se renderiza acá como "Procesos" — es
+  // la misma tabla que Química → Tabla → Reacciones y Física → Habilidades,
+  // así que se dejó un único render global en Tabla→Reacciones para evitar
+  // 3 fetches/estados desincronizados del mismo dato.) Self-contained,
+  // igual que el resto de Biología: trae sus propios datos acá sin tocar
+  // CladisticaPage ni depender de una planta puntual.
   const { items: catalogoOrganos, setItems: setCatalogoOrganos } = useOrganos();
-  const { items: reaccionesCatalogo, setItems: setReaccionesCatalogo } = useReacciones();
   const { items: compuestosCatalogo, setItems: setCompuestosCatalogo, loading: loadingCompuestos } = useCompuestosConElementos();
   const { items: elementosCatalogo } = useElementos();
 
@@ -157,12 +157,6 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
     setCatalogoOrganos((prev) => prev.map((g) => (g.id === id ? { ...g, ...cambios } : g)));
     const { error } = await supabase.from("organos").update(cambios).eq("id", id);
     if (error) console.error("[BiologiaPage] error guardando órgano:", error);
-  }
-
-  async function actualizarProceso(id: string, cambios: Partial<Reaccion>) {
-    setReaccionesCatalogo((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
-    const { error } = await supabase.from("reacciones").update(cambios).eq("id", id);
-    if (error) console.error("[BiologiaPage] error guardando proceso:", error);
   }
 
   const inputArchivoRef = useRef<HTMLInputElement>(null);
@@ -275,8 +269,8 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
         <CladisticaPage onSelectCriatura={onSelectCriatura} />
       </div>
 
-      {/* Columna derecha: Órganos arriba, Procesos abajo — apilados, cada
-          uno con su propio separador de sección, sin tabs. */}
+      {/* Columna derecha: Órganos — apilados, cada uno con su propio
+          separador de sección, sin tabs. */}
       <div className="flex-1 min-w-0 flex flex-col gap-4 border-l border-primary/10 pl-3">
         <div className="p-2.5">
           <CatalogoTejidosBiologia
@@ -305,17 +299,6 @@ export function BiologiaPage({ onSelectCriatura }: Props) {
             onAbrirCompuesto={(id) => setCompuestoAbiertoId(id)}
             abrirIdExterno={organoAAbrirId}
             onAbrirIdExternoConsumido={() => setOrganoAAbrirId(null)}
-          />
-        </div>
-
-        <div className="p-2.5 border-t border-primary/10 pt-4">
-          <GridCatalogoGrupo
-            modo="reaccion"
-            titulo="Procesos"
-            items={reaccionesCatalogo}
-            compuestos={compuestosCatalogo}
-            elementos={elementosCatalogo}
-            onActualizar={actualizarProceso}
           />
         </div>
       </div>
