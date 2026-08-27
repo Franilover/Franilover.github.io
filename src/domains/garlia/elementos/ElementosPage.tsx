@@ -1232,8 +1232,6 @@ export function ElementosPage({
     )
   }
 />
-
-|
   </div>
 
   <div className="min-w-0 border-b lg:border-b-0 lg:border-r border-primary/10">
