@@ -12,6 +12,8 @@ function Editor({ estructura, onClose }: { estructura: Estructura; onClose: () =
   const { items, loading } = useEstructuraComposicion(estructura.id);
   const row = estructura as unknown as Record<string, unknown>;
   const props = (row.propiedades_calculadas ?? {}) as Record<string, unknown>;
+  const descripcion = text(row.descripcion);
+  const estadoCalculo = text(row.estado_calculo, "calculada");
   const propiedades = ["masa", "rigidez", "estabilidad", "flexibilidad", "dureza", "conductividad"]
     .filter((key) => props[key] !== undefined && props[key] !== null);
 
@@ -21,11 +23,11 @@ function Editor({ estructura, onClose }: { estructura: Estructura; onClose: () =
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2"><Box className="h-5 w-5 shrink-0 text-primary/50" /><h2 className="truncate text-lg font-bold">{estructura.nombre}</h2></div>
-            <p className="mt-1 text-xs text-primary/40">Estructura · {text(row.estado_calculo, "calculada")}</p>
+            <p className="mt-1 text-xs text-primary/40">Estructura · {estadoCalculo}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-primary/50 hover:bg-primary/10 hover:text-primary"><X className="h-4 w-4" /></button>
         </div>
-        {row.descripcion && <p className="mb-4 text-sm leading-relaxed text-primary/55">{text(row.descripcion)}</p>}
+        {descripcion && <p className="mb-4 text-sm leading-relaxed text-primary/55">{descripcion}</p>}
         <div className="space-y-3">
           <section className="rounded-xl border border-primary/10 p-3">
             <p className="mb-2 text-micro font-black uppercase tracking-widest text-primary/40">Propiedades</p>
