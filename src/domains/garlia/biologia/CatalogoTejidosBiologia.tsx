@@ -35,7 +35,6 @@ import { createPortal } from "react-dom";
 import { useConfirm } from "@/ui/ConfirmModal";
 import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
 import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
-import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import {
   useEstructuraComposicion,
   type CompuestoDeEstructura,
@@ -70,48 +69,17 @@ export function CatalogoTejidosBiologia({
 }: Props) {
   const celulas = useCelulas();
   const tejidos = useTejidos();
-  const estructuras = useEstructuras();
 
   const [celulaSeleccionadaId, setCelulaSeleccionadaId] = useState<string | null>(null);
   const [tejidoSeleccionadoId, setTejidoSeleccionadoId] = useState<string | null>(null);
-  const [estructuraSeleccionadaId, setEstructuraSeleccionadaId] = useState<string | null>(null);
 
   const celulaActiva = celulas.items.find((c) => c.id === celulaSeleccionadaId) ?? null;
   const tejidoActivo = tejidos.items.find((t) => t.id === tejidoSeleccionadoId) ?? null;
-  const estructuraActiva = estructuras.items.find((e) => e.id === estructuraSeleccionadaId) ?? null;
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ── Estructuras ────────────────────────────────────────────────── */}
-      {/* Solo lectura, igual que Elemento/Compuesto: se puebla por
-          migración/cálculo, no hay botón "Nueva" acá. Capa más nueva y
-          la base de Célula (celula_estructuras) — va primero, respetando
-          "lo micro forma lo macro". */}
-      <div className="flex flex-col gap-2">
-        <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
-          Estructuras · {estructuras.items.length}
-        </p>
-
-        <GridSimple
-          items={estructuras.items}
-          loading={estructuras.loading}
-          icono={<Boxes size={12} className="text-primary/40 shrink-0" />}
-          seleccionadoId={estructuraSeleccionadaId}
-          onSeleccionar={setEstructuraSeleccionadaId}
-          labelVacio="estructuras"
-        />
-
-        {estructuraActiva && (
-          <PanelVerEstructura
-            item={estructuraActiva}
-            onCerrar={() => setEstructuraSeleccionadaId(null)}
-            onAbrirCompuesto={onAbrirCompuesto}
-          />
-        )}
-      </div>
-
       {/* ── Células ────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2 border-t border-primary/10 pt-4">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Células · {celulas.items.length}
@@ -302,143 +270,6 @@ function GridSimple<T extends { id: string; nombre: string }>({
         </button>
       ))}
     </div>
-  );
-}
-
-// ─── Panel Estructura: solo lectura — propiedades_calculadas (masa,
-// rigidez, estabilidad, etc.) + de qué Compuestos está hecha (vía
-// estructura_compuestos). Mismo motivo de solo-lectura que Célula: se
-// puebla por migración/cálculo, no por edición manual acá. ─────────────────
-
-/** Etiquetas legibles y grid: ver componente compartido
- *  GridPropiedadesCalculadas (mismo jsonb shape que usa Organismo). */
-
-function ListaCompuestosDeEstructura({
-  items,
-  loading,
-  onAbrirCompuesto,
-}: {
-  items: CompuestoDeEstructura[];
-  loading: boolean;
-  onAbrirCompuesto?: (compuestoId: string) => void;
-}) {
-  if (loading) {
-    return <p className="text-micro text-primary/25 italic py-1">Cargando…</p>;
-  }
-  if (items.length === 0) {
-    return <p className="text-micro text-primary/25 italic py-1">Sin Compuesto vinculado todavía.</p>;
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      {items.map((v) => (
-        <button
-          key={v.vinculo_id}
-          type="button"
-          onClick={() => onAbrirCompuesto?.(v.compuesto_id)}
-          disabled={!onAbrirCompuesto}
-          className="flex items-center gap-1.5 text-left text-micro text-primary/60 disabled:cursor-default hover:enabled:text-accent hover:enabled:underline cursor-pointer w-fit"
-        >
-          {v.compuesto.nombre}
-          {v.rol && <span className="text-primary/35"> · {v.rol}</span>}
-          {v.proporcion != null && <span className="text-primary/35"> · {v.proporcion}</span>}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function PanelVerEstructura({
-  item,
-  onCerrar,
-  onAbrirCompuesto,
-}: {
-  item: Estructura;
-  onCerrar: () => void;
-  onAbrirCompuesto?: (compuestoId: string) => void;
-}) {
-  const composicion = useEstructuraComposicion(item.id);
-
-  return (
-    <PanelFlotanteBase onCerrar={onCerrar}>
-      <div
-        className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-b"
-        style={{
-          borderColor: "color-mix(in srgb, var(--primary) 8%, transparent)",
-          background: "color-mix(in srgb, var(--primary) 3%, transparent)",
-        }}
-      >
-        <div
-          className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border"
-          style={{
-            background: "color-mix(in srgb, var(--primary) 8%, transparent)",
-            borderColor: "color-mix(in srgb, var(--primary) 18%, transparent)",
-          }}
-        >
-          <Boxes className="text-primary/50" size={12} />
-        </div>
-        <span className="flex-1 min-w-0 text-sm font-black text-primary truncate">
-          {item.nombre || "(sin nombre)"}
-        </span>
-        {item.estado_calculo && (
-          <span className="shrink-0 text-micro text-primary/35 uppercase tracking-widest">
-            {item.estado_calculo}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={onCerrar}
-          title="Cerrar (Esc)"
-          className="shrink-0 p-1.5 rounded-lg text-primary/40 hover:text-primary hover:bg-primary/8 transition-colors cursor-pointer"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <div className="flex flex-col md:flex-row gap-3 md:gap-5">
-          <div className="md:w-1/2 min-w-0">
-            <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-              Propiedades calculadas
-            </p>
-            <GridPropiedadesCalculadas propiedades={item.propiedades_calculadas} />
-          </div>
-
-          <div className="md:w-1/2 min-w-0 flex flex-col gap-3">
-            <div>
-              <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-                Función
-              </p>
-              <p className="text-micro text-primary/60">{item.funcion || "—"}</p>
-            </div>
-
-            <div>
-              <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-                Compuestos · de qué está hecha
-              </p>
-              <ListaCompuestosDeEstructura
-                items={composicion.items}
-                loading={composicion.loading}
-                onAbrirCompuesto={onAbrirCompuesto}
-              />
-            </div>
-
-            {item.notas && (
-              <div>
-                <p className="text-micro font-black uppercase tracking-widest text-primary/30 mb-1">
-                  Notas
-                </p>
-                <p className="text-micro text-primary/50 whitespace-pre-wrap">{item.notas}</p>
-              </div>
-            )}
-
-            <p className="text-micro text-primary/25 italic">
-              Solo lectura: Estructura se puebla por migración/cálculo, no se edita desde acá.
-            </p>
-          </div>
-        </div>
-      </div>
-    </PanelFlotanteBase>
   );
 }
 

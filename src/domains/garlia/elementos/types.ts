@@ -529,9 +529,8 @@ export interface TejidoCompuesto {
 export interface Estructura {
   id: string;
   nombre: string;
-  /** @deprecated Legacy: compuesto único 1:1, reemplazado por
-   *  estructura_compuestos (M:N) — puede seguir poblado en filas viejas. */
-  compuesto_id?: string | null;
+  tipo: string | null;
+  descripcion: string | null;
   funcion: string | null;
   notas: string | null;
   propiedades_calculadas: Record<string, unknown> | null;
@@ -544,7 +543,7 @@ export interface Estructura {
 export const CONFIG_ESTRUCTURAS = {
   tabla: "estructuras",
   select:
-    "id, nombre, compuesto_id, funcion, notas, propiedades_calculadas, estado_calculo, calculado_at, created_at, updated_at",
+    "id, nombre, tipo, descripcion, funcion, notas, propiedades_calculadas, estado_calculo, calculado_at, created_at, updated_at",
 };
 
 /** Fila puente estructura_compuestos: de qué Compuestos está hecha una Estructura (M:N). */
