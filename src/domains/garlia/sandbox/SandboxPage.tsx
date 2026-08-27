@@ -25,14 +25,15 @@ import {
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
-import {
-  useCompuestos,
-  useElementos,
-} from "@/domains/garlia/elementos";
+import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { useElementos } from "@/domains/garlia/elementos/useElementos";
+
 import type {
   Compuesto,
   Elemento,
 } from "@/domains/garlia/elementos/types";
+
+
 
 import { Btn } from "@/ui/Buttons";
 import { Badge, EmptyState, Loading } from "@/ui/Feedback";
