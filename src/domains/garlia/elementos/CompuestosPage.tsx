@@ -445,7 +445,7 @@ function EstabilidadDetalleBloque({
           </span>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-3 gap-1.5">
         {filas.map((f) => (
           <div
             key={f.label}
@@ -812,20 +812,20 @@ function CompuestoEditor({
           </div>
         )}
 
-        {/* Gráfico a la izquierda, sin nada al lado (Propiedades físicas
-            y Estabilidad bajan a sus propias filas horizontales a ancho
-            completo, una debajo de la otra). Reemplaza al bloque "Usado
-            en Item/Mineral/Flora" — informativo de solo lectura sobre
-            otras entidades del catálogo, no datos propios de Química — y
-            a los 4 cuadros de Reactividad/Peso/Carga/Enlace que vivían
-            debajo del átomo, ya antiguos y redundantes con Propiedades
-            físicas + Estabilidad. */}
-        <div className="max-w-[14rem]">
+        {/* Gráfico a la izquierda (columna fija) + Propiedades físicas y
+            Estabilidad apiladas a la derecha, una debajo de la otra.
+            Reemplaza al bloque "Usado en Item/Mineral/Flora" — informativo
+            de solo lectura sobre otras entidades del catálogo, no datos
+            propios de Química — y a los 4 cuadros de Reactividad/Peso/
+            Carga/Enlace que vivían debajo del átomo, ya antiguos y
+            redundantes con Propiedades físicas + Estabilidad. */}
+        <div className="grid grid-cols-[minmax(11rem,14rem)_1fr] gap-3 items-start">
           <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
+          <div className="flex flex-col gap-3 min-w-0">
+            <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
+            <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
+          </div>
         </div>
-
-        <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
-        <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
 
         {/* Composición real (izquierda) · Enlaces (derecha). */}
         <div className="grid grid-cols-2 gap-3 items-start">
