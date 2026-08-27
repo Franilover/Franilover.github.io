@@ -736,10 +736,12 @@ function ComposicionRealBloque({
   proporciones,
   loading,
   elementos,
+  onAbrirElemento,
 }: {
   proporciones: CompuestoElementoProporcion[];
   loading: boolean;
   elementos: Elemento[];
+  onAbrirElemento?: (elementoId: string) => void;
 }) {
   // Propiedades de todos los elementos componentes juntas, para que el
   // popover de info liste la fórmula de cada una una sola vez (no
@@ -784,9 +786,17 @@ function ComposicionRealBloque({
               key={p.id}
               className="flex flex-col gap-1 rounded-md border border-primary/10 px-2 py-1.5"
             >
-              <span className="text-micro font-bold text-primary/70 truncate">
+              <button
+                type="button"
+                disabled={!onAbrirElemento}
+                onClick={() => onAbrirElemento?.(p.elemento_id)}
+                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                className={`text-micro font-bold text-primary/70 truncate text-left ${
+                  onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
+                }`}
+              >
                 {el?.simbolo || "??"} · {el?.nombre ?? "—"}
-              </span>
+              </button>
               <div className="flex items-center gap-2 flex-wrap">
                 <span title="Proporción molar" className="text-micro tabular-nums text-primary/60">
                   molar {p.proporcion_molar !== null ? p.proporcion_molar : "—"}
@@ -890,11 +900,13 @@ function EnlacesCompuestoBloque({
   loading,
   error,
   elementos,
+  onAbrirElemento,
 }: {
   enlaces: CompuestoEnlaceRow[];
   loading: boolean;
   error?: string | null;
   elementos: Elemento[];
+  onAbrirElemento?: (elementoId: string) => void;
 }) {
   if (loading) return null;
   // Antes: `if (loading || enlaces.length === 0) return null` — un error
@@ -934,7 +946,25 @@ function EnlacesCompuestoBloque({
             className="flex flex-col gap-0.5 rounded-md border border-primary/10 px-2 py-1"
           >
             <span className="text-micro font-bold text-primary/70 truncate">
-              {nombreEl(e.elemento_a_id)} ↔ {nombreEl(e.elemento_b_id)}
+              <button
+                type="button"
+                disabled={!onAbrirElemento}
+                onClick={() => onAbrirElemento?.(e.elemento_a_id)}
+                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                className={onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""}
+              >
+                {nombreEl(e.elemento_a_id)}
+              </button>
+              {" ↔ "}
+              <button
+                type="button"
+                disabled={!onAbrirElemento}
+                onClick={() => onAbrirElemento?.(e.elemento_b_id)}
+                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                className={onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""}
+              >
+                {nombreEl(e.elemento_b_id)}
+              </button>
             </span>
             <div className="flex items-center gap-2 flex-wrap">
               <span title="Intensidad" className="text-micro tabular-nums text-primary/50">
@@ -1272,10 +1302,17 @@ function CompuestoEditor({
             proporciones={proporcionElementos}
             loading={proporcionLoading}
             elementos={elementos}
+            onAbrirElemento={setEditandoElementoId}
           />
           <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
         </div>
-        <EnlacesCompuestoBloque enlaces={enlacesCompuesto} loading={enlacesLoading} error={enlacesError} elementos={elementos} />
+        <EnlacesCompuestoBloque
+          enlaces={enlacesCompuesto}
+          loading={enlacesLoading}
+          error={enlacesError}
+          elementos={elementos}
+          onAbrirElemento={setEditandoElementoId}
+        />
       </div>
 
       {editandoElementoId && (
