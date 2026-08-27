@@ -70,6 +70,7 @@ import { useFormaciones } from "./useFormaciones";
 import { useTejidos } from "./useTejidos";
 import { useVetas } from "./useVetas";
 import type { EntradaCatalogoGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
+import { InfoFormulasPopover } from "./InfoFormulasPopover";
 
 import {
   autocompletarHastaEstable,
@@ -689,6 +690,7 @@ function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: Propi
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Propiedades físicas
         </span>
+        <InfoFormulasPopover propiedades={conValor} />
       </div>
       <div className="grid grid-cols-4 gap-1.5">
         {conValor.map((p) => (

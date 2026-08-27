@@ -200,6 +200,13 @@ export interface PropiedadCalculada {
    *  proporción (ej. valencia_estructural, que es un conteo). */
   proporcion?: number;
   descripcion: string;
+  /** Fórmula corta y legible (no la implementación SQL literal) — de
+   *  dónde sale el número, para el popover de info junto al título de la
+   *  sección. Ver elemento_propiedad_reglas / compuesto_reglas en
+   *  Supabase, fuente canónica de estas fórmulas. Opcional: si no hay
+   *  fórmula documentada (ej. clasificaciones textuales derivadas por
+   *  regla simple), se omite del popover. */
+  formula?: string;
 }
 
 /** Arma la lista de propiedades físicas calculadas de un Elemento para
@@ -213,20 +220,20 @@ export function propiedadesCalculadasDeElemento(el: Elemento): PropiedadCalculad
     v === null || v === undefined ? undefined : Math.max(0, Math.min(1, v));
 
   return [
-    { clave: "masa_base", label: "Masa", valor: fmt(el.masa_base, 2), descripcion: "Peso base del elemento, derivado de sus 3 capas de partículas." },
-    { clave: "estabilidad", label: "Estabilidad", valor: fmt(el.estabilidad), proporcion: prop(el.estabilidad), descripcion: "Qué tan resistente es a romperse o transformarse." },
-    { clave: "rigidez", label: "Rigidez", valor: fmt(el.rigidez), proporcion: prop(el.rigidez), descripcion: "Resistencia a deformarse bajo fuerza." },
-    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(el.flexibilidad), proporcion: prop(el.flexibilidad), descripcion: "Capacidad de deformarse sin romperse." },
-    { clave: "dureza", label: "Dureza", valor: fmt(el.dureza), proporcion: prop(el.dureza), descripcion: "Resistencia a ser rayado o penetrado." },
-    { clave: "conductividad", label: "Conductividad", valor: fmt(el.conductividad), proporcion: prop(el.conductividad), descripcion: "Facilidad para transmitir energía/interacción." },
-    { clave: "transparencia", label: "Transparencia", valor: fmt(el.transparencia), proporcion: prop(el.transparencia), descripcion: "Cuánto deja pasar en vez de bloquear/absorber." },
-    { clave: "capacidad_transformacion", label: "Cap. transformación", valor: fmt(el.capacidad_transformacion), proporcion: prop(el.capacidad_transformacion), descripcion: "Potencial/facilidad de cambio del elemento (no es velocidad real)." },
-    { clave: "dinamismo_particular", label: "Dinamismo", valor: fmt(el.dinamismo_particular, 2), descripcion: "Magnitud combinada de dinámica/transformación/interacción — usada como base de duración de procesos." },
-    { clave: "valencia_estructural", label: "Valencia estructural", valor: fmt(el.valencia_estructural, 0), descripcion: "Cantidad de enlaces que puede sostener estructuralmente." },
-    { clave: "capacidad_enlace", label: "Capacidad de enlace", valor: fmt(el.capacidad_enlace), proporcion: prop(el.capacidad_enlace), descripcion: "Qué tan disponible está para formar enlaces nuevos." },
-    { clave: "polaridad_estructural", label: "Polaridad estructural", valor: fmt(el.polaridad_estructural), descripcion: "Desbalance direccional de su estructura de enlace." },
-    { clave: "saturacion_enlace", label: "Saturación de enlace", valor: fmt(el.saturacion_enlace), proporcion: prop(el.saturacion_enlace), descripcion: "Qué tan cerca está de agotar su capacidad de enlace." },
-    { clave: "regimen_estructural", label: "Régimen estructural", valor: el.regimen_estructural ?? null, descripcion: "Clasificación estructural derivada (ej. equilibrio)." },
+    { clave: "masa_base", label: "Masa", valor: fmt(el.masa_base, 2), descripcion: "Peso base del elemento, derivado de sus 3 capas de partículas.", formula: "Masa = 1.00·Masa(núcleo) + 0.75·Equilibrio(núcleo) + 0.50·Cinética(núcleo)" },
+    { clave: "estabilidad", label: "Estabilidad", valor: fmt(el.estabilidad), proporcion: prop(el.estabilidad), descripcion: "Qué tan resistente es a romperse o transformarse.", formula: "Estabilidad = 0.50·estabilidad(núcleo) + 0.20·estabilidad(media) + 0.20·catálisis + 0.10·saturación externa" },
+    { clave: "rigidez", label: "Rigidez", valor: fmt(el.rigidez), proporcion: prop(el.rigidez), descripcion: "Resistencia a deformarse bajo fuerza.", formula: "Rigidez = 1 − Flexibilidad (mismos componentes, en sentido inverso)" },
+    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(el.flexibilidad), proporcion: prop(el.flexibilidad), descripcion: "Capacidad de deformarse sin romperse.", formula: "Flexibilidad = 0.45·(1−estabilidad núcleo) + 0.20·(1−estabilidad media) + 0.25·transición + 0.10·(1−saturación externa)" },
+    { clave: "dureza", label: "Dureza", valor: fmt(el.dureza), proporcion: prop(el.dureza), descripcion: "Resistencia a ser rayado o penetrado.", formula: "Dureza = 0.65·rigidez + 0.20·saturación de enlace + 0.15·saturación externa" },
+    { clave: "conductividad", label: "Conductividad", valor: fmt(el.conductividad), proporcion: prop(el.conductividad), descripcion: "Facilidad para transmitir energía/interacción.", formula: "Conductividad = 0.35·interacción externa + 0.30·interacción media + 0.20·información externa + 0.15·dinámica externa" },
+    { clave: "transparencia", label: "Transparencia", valor: fmt(el.transparencia), proporcion: prop(el.transparencia), descripcion: "Cuánto deja pasar en vez de bloquear/absorber.", formula: "Transparencia = 0.45·información externa + 0.30·(1−interacción externa) + 0.15·(1−transformación externa) + 0.10·flexibilidad" },
+    { clave: "capacidad_transformacion", label: "Cap. transformación", valor: fmt(el.capacidad_transformacion), proporcion: prop(el.capacidad_transformacion), descripcion: "Potencial/facilidad de cambio del elemento (no es velocidad real).", formula: "Cap. transformación = 0.60·transición + 0.20·(1−catálisis) + 0.20·(1−saturación externa)" },
+    { clave: "dinamismo_particular", label: "Dinamismo", valor: fmt(el.dinamismo_particular, 2), descripcion: "Magnitud combinada de dinámica/transformación/interacción — usada como base de duración de procesos.", formula: "Dinamismo = combinación de dinámica + transformación + interacción de la capa externa" },
+    { clave: "valencia_estructural", label: "Valencia estructural", valor: fmt(el.valencia_estructural, 0), descripcion: "Cantidad de enlaces que puede sostener estructuralmente.", formula: "Valencia = mín(ocupación, capacidad externa − ocupación, capacidad externa / 2)" },
+    { clave: "capacidad_enlace", label: "Capacidad de enlace", valor: fmt(el.capacidad_enlace), proporcion: prop(el.capacidad_enlace), descripcion: "Qué tan disponible está para formar enlaces nuevos.", formula: "Cap. de enlace = valencia / (capacidad externa / 2)" },
+    { clave: "polaridad_estructural", label: "Polaridad estructural", valor: fmt(el.polaridad_estructural), descripcion: "Desbalance direccional de su estructura de enlace.", formula: "Polaridad = |2 · saturación externa − 1|" },
+    { clave: "saturacion_enlace", label: "Saturación de enlace", valor: fmt(el.saturacion_enlace), proporcion: prop(el.saturacion_enlace), descripcion: "Qué tan cerca está de agotar su capacidad de enlace.", formula: "Saturación de enlace = sitios de enlace usados / sitios de enlace disponibles" },
+    { clave: "regimen_estructural", label: "Régimen estructural", valor: el.regimen_estructural ?? null, descripcion: "Clasificación estructural derivada (ej. equilibrio).", formula: "Catálisis > Transición → conservación · Catálisis = Transición → equilibrio · Transición > Catálisis → transformación" },
   ];
 }
 
@@ -302,14 +309,14 @@ export function propiedadesCalculadasDeCompuesto(c: Compuesto): PropiedadCalcula
     v === null || v === undefined ? undefined : Math.max(0, Math.min(1, v));
 
   return [
-    { clave: "masa", label: "Masa", valor: fmt(c.masa, 2), descripcion: "Masa total del compuesto, derivada de sus elementos componentes." },
-    { clave: "carga", label: "Carga", valor: fmt(c.carga, 2), descripcion: "Carga neta del compuesto, suma de la carga de sus elementos." },
-    { clave: "estabilidad", label: "Estabilidad", valor: fmt(c.estabilidad), proporcion: prop(c.estabilidad), descripcion: "Qué tan resistente es el compuesto a romperse o transformarse." },
-    { clave: "rigidez", label: "Rigidez", valor: fmt(c.rigidez), proporcion: prop(c.rigidez), descripcion: "Resistencia del compuesto a deformarse bajo fuerza." },
-    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(c.flexibilidad), proporcion: prop(c.flexibilidad), descripcion: "Capacidad del compuesto de deformarse sin romperse." },
-    { clave: "compatibilidad", label: "Compatibilidad", valor: fmt(c.compatibilidad), proporcion: prop(c.compatibilidad), descripcion: "Qué tan compatibles son entre sí los sitios de enlace usados." },
-    { clave: "energia_enlace", label: "Energía de enlace", valor: fmt(c.energia_enlace, 4), descripcion: "Energía acumulada en los enlaces del compuesto." },
-    { clave: "tipo_compuesto", label: "Tipo", valor: c.tipo_compuesto ?? null, descripcion: "Clasificación estructural (sustancia, mezcla, aleación, material estructural)." },
+    { clave: "masa", label: "Masa", valor: fmt(c.masa, 2), descripcion: "Masa total del compuesto, derivada de sus elementos componentes.", formula: "Masa = Σ (cantidad × masa base de cada elemento)" },
+    { clave: "carga", label: "Carga", valor: fmt(c.carga, 2), descripcion: "Carga neta del compuesto, suma de la carga de sus elementos.", formula: "Carga = Σ (cantidad × carga de cada elemento)" },
+    { clave: "estabilidad", label: "Estabilidad", valor: fmt(c.estabilidad), proporcion: prop(c.estabilidad), descripcion: "Qué tan resistente es el compuesto a romperse o transformarse.", formula: "Estabilidad = Σ (peso · estabilidad de cada elemento) + 0.25·energía de enlace − 0.25·inestabilidad" },
+    { clave: "rigidez", label: "Rigidez", valor: fmt(c.rigidez), proporcion: prop(c.rigidez), descripcion: "Resistencia del compuesto a deformarse bajo fuerza.", formula: "Rigidez = Σ (peso · rigidez de cada elemento) + 0.20·energía de enlace" },
+    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(c.flexibilidad), proporcion: prop(c.flexibilidad), descripcion: "Capacidad del compuesto de deformarse sin romperse.", formula: "Flexibilidad = Σ (peso · flexibilidad de cada elemento) + 0.20·(1−energía de enlace)" },
+    { clave: "compatibilidad", label: "Compatibilidad", valor: fmt(c.compatibilidad), proporcion: prop(c.compatibilidad), descripcion: "Qué tan compatibles son entre sí los sitios de enlace usados.", formula: "Compatibilidad = función de carga, catálisis, transición, interacción y transformación entre los sitios enlazados" },
+    { clave: "energia_enlace", label: "Energía de enlace", valor: fmt(c.energia_enlace, 4), descripcion: "Energía acumulada en los enlaces del compuesto.", formula: "Energía de enlace = Σ (coste energético × intensidad × (1 − reversibilidad)) de cada enlace" },
+    { clave: "tipo_compuesto", label: "Tipo", valor: c.tipo_compuesto ?? null, descripcion: "Clasificación estructural (sustancia, mezcla, aleación, material estructural).", formula: "Sin enlace definido → mezcla · con estructura de enlace válida → compuesto" },
     { clave: "clasificacion", label: "Clasificación", valor: c.clasificacion ?? null, descripcion: "Clasificación derivada más específica del compuesto." },
     { clave: "estado_estructura", label: "Estado de estructura", valor: c.estado_estructura ?? null, descripcion: "Qué tan completa/consistente está la definición estructural del compuesto." },
   ];

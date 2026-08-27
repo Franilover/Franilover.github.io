@@ -23,6 +23,8 @@ import { EditorHeaderBar } from "../_shared/EditorHeaderBar";
 import { usePublishHeaderControls, type OnHeaderControlsChange } from "../_shared/useEditorHeaderControls";
 import { type SaveStatus } from "@/ui/saveStatus";
 
+import { InfoFormulasPopover } from "./InfoFormulasPopover";
+
 import {
   calcularParticulaDominante,
   calcularReactividadElemento,
@@ -562,6 +564,7 @@ function PropiedadesFisicasBloque({ propiedades }: { propiedades: PropiedadCalcu
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Propiedades físicas
         </span>
+        <InfoFormulasPopover propiedades={conValor} />
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         {conValor.map((p) => (
