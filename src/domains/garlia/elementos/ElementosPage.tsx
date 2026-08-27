@@ -8,15 +8,14 @@
  * editables). Mismo patrón que RunasPage: sin navegar a otra ruta, toggle
  * de selección adentro de la misma página.
  *
- * Elementos, Compuestos y Reglas se apilan verticalmente en una sola
- * columna con scroll (en vez de tabs que muestran una sección a la vez).
+ * Elementos y Compuestos se apilan verticalmente en una sola columna con
+ * scroll (en vez de tabs que muestran una sección a la vez).
  */
 
-import { Atom, Download, GitCompare, Loader2, Plus, Save, Scale, Trash2, Upload, X } from "lucide-react";
+import { Atom, Download, GitCompare, Loader2, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 
@@ -39,10 +38,6 @@ import {
   type EditorHeaderControls,
 } from "../_shared/useEditorHeaderControls";
 import {
-  useInfoTablaQuimica,
-  type SeccionInfoTablaQuimica,
-} from "./useInfoTablaQuimica";
-import {
   ELEMENT_FAMILIES,
   FAMILY_COLOR,
   type Compuesto,
@@ -52,24 +47,21 @@ import {
 } from "./types";
 
 // ─── Descarga: todos los elementos de la Tabla Química en un solo JSON ─────
-// Incluye también el contenido del modal de info y los compuestos
-// (editables desde Supabase), para que el JSON exportado quede
-// autocontenido con la tabla + su explicación + las combinaciones.
+// Incluye también los compuestos (editables desde Supabase), para que el
+// JSON exportado quede autocontenido con la tabla + las combinaciones.
 export function descargarDatosElementos(
   elementos: Elemento[],
-  infoTabla: SeccionInfoTablaQuimica[],
   compuestos: Compuesto[],
 ) {
   const payload = {
     exportado_en: new Date().toISOString(),
     elementos,
-    info_tabla_quimica: infoTabla,
     compuestos,
   };
   descargarJSON(payload, "tabla-elementos");
 }
 
-// ─── Descarga: solo Elementos + Compuestos (sin las reglas) ───────────────
+// ─── Descarga: solo Elementos + Compuestos ─────────────────────────────────
 function descargarElementosYCompuestos(elementos: Elemento[], compuestos: Compuesto[]) {
   const payload = {
     exportado_en: new Date().toISOString(),
@@ -77,15 +69,6 @@ function descargarElementosYCompuestos(elementos: Elemento[], compuestos: Compue
     compuestos,
   };
   descargarJSON(payload, "elementos-compuestos");
-}
-
-// ─── Descarga: solo las reglas de la Química ───────────────────────────────
-function descargarReglas(infoTabla: SeccionInfoTablaQuimica[]) {
-  const payload = {
-    exportado_en: new Date().toISOString(),
-    info_tabla_quimica: infoTabla,
-  };
-  descargarJSON(payload, "reglas-quimica");
 }
 
 function descargarJSON(payload: unknown, nombreBase: string) {
@@ -114,8 +97,8 @@ function descargarJSON(payload: unknown, nombreBase: string) {
 // - "numero_atomico" es obligatorio y debe ser único frente a lo ya
 //   cargado en la tabla (evita pisar el elemento equivocado sin darse
 //   cuenta al importar un lote como el de este chat).
-// - Si el archivo trae "info_tabla_quimica" o "compuestos" se devuelven
-//   también, sueltos, para que el caller decida si los sube.
+// - Si el archivo trae "compuestos" se devuelven también, sueltos, para
+//   que el caller decida si los sube.
 export interface ImportacionElementos {
   elementosNuevos: Omit<Elemento, "id">[];
   /**
@@ -124,7 +107,6 @@ export interface ImportacionElementos {
    * Incluye el id existente para poder hacer el UPDATE.
    */
   elementosActualizar: (Partial<Elemento> & { id: string })[];
-  infoTablaQuimica?: SeccionInfoTablaQuimica[];
   compuestos?: Compuesto[];
 }
 
@@ -179,7 +161,6 @@ export function parsearArchivoElementosJSON(
   return {
     elementosNuevos,
     elementosActualizar,
-    infoTablaQuimica: Array.isArray(data?.info_tabla_quimica) ? data.info_tabla_quimica : undefined,
     compuestos: Array.isArray(data?.compuestos) ? data.compuestos : undefined,
   };
 }
@@ -457,139 +438,6 @@ export function ElementoPanelFlotante({
   );
 }
 
-// ─── Reglas: reglas de la Química, editable desde Supabase ────────────────
-// Solo lo propio de acá (estructura de capas, estabilidad/familias,
-// manifestaciones) — la jerarquía Partícula Base→Partículas→Iums y la
-// resonancia con Iums ya se explican en la sección Física, no se repiten.
-//
-// El contenido (lista de secciones título+texto) ya no está hardcodeado:
-// vive en la tabla `config_info_tabla_quimica` (useInfoTablaQuimica). Se
-// muestran todas las secciones de una, siempre editables inline (sin modo
-// lectura/edición ni barra lateral) — cada cambio se guarda automáticamente
-// al salir del campo (onBlur).
-function ReglasQuimica({
-  info,
-  loading,
-  guardarSecciones,
-}: {
-  info: { secciones: SeccionInfoTablaQuimica[] };
-  loading: boolean;
-  guardarSecciones: (secciones: SeccionInfoTablaQuimica[]) => Promise<void>;
-}) {
-  const [borrador, setBorrador] = useState<SeccionInfoTablaQuimica[]>(info.secciones);
-  const [saving, setSaving] = useState(false);
-
-  // Sincroniza el borrador cuando cambian los datos remotos (primera carga,
-  // o si se recargan tras guardar).
-  const infoSeccionesRef = useRef(info.secciones);
-  if (infoSeccionesRef.current !== info.secciones) {
-    infoSeccionesRef.current = info.secciones;
-    if (borrador !== info.secciones) setBorrador(info.secciones);
-  }
-
-  function actualizarSeccion(id: string, cambios: Partial<SeccionInfoTablaQuimica>) {
-    setBorrador((prev) => prev.map((s) => (s.id === id ? { ...s, ...cambios } : s)));
-  }
-
-  async function persistir(secciones: SeccionInfoTablaQuimica[]) {
-    setSaving(true);
-    try {
-      // Descarta secciones vacías (título y contenido en blanco) al guardar.
-      const limpio = secciones.filter((s) => s.titulo.trim() || s.contenido.trim());
-      await guardarSecciones(limpio);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function eliminarSeccion(id: string) {
-    const siguiente = borrador.filter((s) => s.id !== id);
-    setBorrador(siguiente);
-    void persistir(siguiente);
-  }
-
-  function agregarSeccion() {
-    setBorrador((prev) => [
-      ...prev,
-      { id: `seccion-${Date.now()}`, titulo: "", contenido: "" },
-    ]);
-  }
-
-  return (
-    <div className="p-3">
-      <div className="shrink-0 flex items-center justify-between pb-3">
-        <div className="text-primary/40">
-          <p className="text-micro font-black uppercase tracking-widest">
-            Reglas
-            {saving && <Loader2 className="inline-block animate-spin ml-1.5 align-[-2px]" size={10} />}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={agregarSeccion}
-          title="Agregar sección"
-          className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <Plus size={12} />
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="p-6 text-sm text-primary/30 text-center">Cargando…</div>
-      ) : (
-        <div className="columns-1 lg:columns-2 gap-x-10">
-          {borrador.map((seccion) => (
-            <div
-              key={seccion.id}
-              className="group break-inside-avoid mb-7 pb-6 border-b border-primary/10 last:border-b-0 flex flex-col gap-2"
-            >
-              <div className="flex items-center gap-1.5">
-                <input
-                  value={seccion.titulo}
-                  onChange={(e) => actualizarSeccion(seccion.id, { titulo: e.target.value })}
-                  onBlur={() => persistir(borrador)}
-                  placeholder="Título"
-                  className="flex-1 min-w-0 bg-transparent px-0 py-0.5 text-sm font-black uppercase tracking-[0.15em] text-primary/70 outline-none placeholder:text-primary/25 placeholder:normal-case placeholder:font-normal"
-                />
-                <button
-                  type="button"
-                  onClick={() => eliminarSeccion(seccion.id)}
-                  title="Eliminar sección"
-                  className="shrink-0 flex items-center justify-center w-6 h-6 rounded text-primary/0 group-hover:text-primary/30 hover:!text-red-400 transition-all cursor-pointer"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-              <RichEditor
-                minHeight="6rem"
-                placeholder="Contenido…"
-                value={seccion.contenido}
-                onChange={(v) => {
-                  const siguiente = borrador.map((s) =>
-                    s.id === seccion.id ? { ...s, contenido: v } : s
-                  );
-                  setBorrador(siguiente);
-                  void persistir(siguiente);
-                }}
-              />
-            </div>
-          ))}
-
-          {borrador.length === 0 && (
-            <button
-              type="button"
-              onClick={agregarSeccion}
-              className="text-sm text-primary/30 hover:text-primary/60 transition-all cursor-pointer"
-            >
-              + Agregar sección
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Dropdown genérico para el botón "Descargar" ───────────────────────────
 // Botón icon-only que al hacer click despliega un menú con las opciones de
 // descarga. Se cierra al elegir una opción o al hacer click afuera.
@@ -772,13 +620,7 @@ export function ElementosPage({
       setImportando(false);
     }
   }
-  const {
-    info: infoTabla,
-    loading: loadingInfoTabla,
-    guardarSecciones,
-  } = useInfoTablaQuimica();
-
-  // ── Compuestos / Reglas: ahora apiladas verticalmente debajo de
+  // ── Compuestos: ahora apiladas verticalmente debajo de
   // Elementos en este mismo bloque "Química", sin selector de tabs ─────────
   // Fase 2 del rediseño: useCompuestosConElementos reconstruye
   // "componentes" desde la tabla relacional compuesto_elementos en vez de
@@ -987,17 +829,12 @@ export function ElementosPage({
                 {
                   key: "todo",
                   label: "Descargar todo",
-                  onClick: () => descargarDatosElementos(elementos, infoTabla.secciones, compuestos),
+                  onClick: () => descargarDatosElementos(elementos, compuestos),
                 },
                 {
                   key: "elementos-compuestos",
                   label: "Elementos y Compuestos",
                   onClick: () => descargarElementosYCompuestos(elementos, compuestos),
-                },
-                {
-                  key: "reglas",
-                  label: "Reglas",
-                  onClick: () => descargarReglas(infoTabla.secciones),
                 },
               ]}
             />
@@ -1255,21 +1092,6 @@ export function ElementosPage({
   </div>
 </div>
 
-
-
-
-      {/* Reglas */}
-      <div className="flex flex-col border-t border-primary/10">
-        <div className="shrink-0 flex items-center gap-1.5 px-3 pt-3 text-primary/40">
-          <Scale size={12} />
-          <p className="text-micro font-black uppercase tracking-widest">Reglas</p>
-        </div>
-        <ReglasQuimica
-          info={infoTabla}
-          loading={loadingInfoTabla}
-          guardarSecciones={guardarSecciones}
-        />
-      </div>
 
       {comparadorAbierto && (
         <ComparadorElementosModal
