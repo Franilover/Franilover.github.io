@@ -812,18 +812,20 @@ function CompuestoEditor({
           </div>
         )}
 
-        {/* Fila superior: gráfico compacto + Propiedades físicas +
-            Estabilidad, los 3 lado a lado. Reemplaza al bloque "Usado en
-            Item/Mineral/Flora" — informativo de solo lectura sobre otras
-            entidades del catálogo, no datos propios de Química — y a los
-            4 cuadros de Reactividad/Peso/Carga/Enlace que vivían debajo
-            del átomo, ya antiguos y redundantes con Propiedades físicas +
-            Estabilidad. */}
-        <div className="grid grid-cols-[minmax(11rem,14rem)_minmax(14rem,1.3fr)_1fr] gap-3 items-start">
+        {/* Gráfico a la izquierda, sin nada al lado (Propiedades físicas
+            y Estabilidad bajan a sus propias filas horizontales a ancho
+            completo, una debajo de la otra). Reemplaza al bloque "Usado
+            en Item/Mineral/Flora" — informativo de solo lectura sobre
+            otras entidades del catálogo, no datos propios de Química — y
+            a los 4 cuadros de Reactividad/Peso/Carga/Enlace que vivían
+            debajo del átomo, ya antiguos y redundantes con Propiedades
+            físicas + Estabilidad. */}
+        <div className="max-w-[14rem]">
           <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
-          <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
-          <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
         </div>
+
+        <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
+        <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
 
         {/* Composición real (izquierda) · Enlaces (derecha). */}
         <div className="grid grid-cols-2 gap-3 items-start">
