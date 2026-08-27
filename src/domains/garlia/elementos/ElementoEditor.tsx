@@ -15,7 +15,6 @@
 import { Atom, ChevronLeft, Package } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 
-import { RichEditor } from "@/editor/lexical";
 import { supabase } from "@/infra/supabase/supabase";
 import { useConfirm } from "@/ui/ConfirmModal";
 
@@ -242,21 +241,18 @@ export function ElementoEditor({
 
       {/* Body */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
-        {/* Notas (izquierda) + Selectores (derecha) — 2 columnas. La 3ra
-            columna ("en qué compuestos se usa") se sacó: era navegación
-            de solo lectura, redundante con el breadcrumb Elemento›Compuesto
-            de arriba. */}
+        {/* Propiedades físicas + Sitios de enlace (izquierda, apiladas) +
+            Selectores (derecha) — 2 columnas. Reemplaza al bloque de Notas
+            que vivía acá: Propiedades/Sitios son datos calculados/reales
+            que explican el elemento mejor y de forma gráfica, a diferencia
+            del campo de texto libre que quedaba desactualizado. La 3ra
+            columna ("en qué compuestos se usa") ya se había sacado antes:
+            era navegación de solo lectura, redundante con el breadcrumb
+            Elemento›Compuesto de arriba. */}
         <div className="grid grid-cols-[1.4fr_minmax(9rem,0.7fr)] gap-3 items-start">
-          <div className="flex flex-col gap-0.5">
-            <RichEditor
-              minHeight="10rem"
-              placeholder="Descripción del elemento…"
-              value={local.notas ?? ""}
-              onChange={(v) => {
-                setLocal((p) => ({ ...p, notas: v }));
-                persist({ notas: v });
-              }}
-            />
+          <div className="flex flex-col gap-2">
+            <PropiedadesFisicasBloque propiedades={propiedadesFisicas} />
+            <SitiosEnlaceBloque sitios={sitiosEnlace} loading={sitiosLoading} />
           </div>
 
           {/* Columna de selectores: N° atómico, Familia, Noble, Catalizador
@@ -439,11 +435,6 @@ export function ElementoEditor({
               ))}
             </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 items-start">
-          <PropiedadesFisicasBloque propiedades={propiedadesFisicas} />
-          <SitiosEnlaceBloque sitios={sitiosEnlace} loading={sitiosLoading} />
         </div>
       </div>
     </div>
