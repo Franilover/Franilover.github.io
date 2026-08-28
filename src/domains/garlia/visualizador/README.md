@@ -2,9 +2,25 @@
 
 ## Objetivo
 
-`VisualizadorPage.tsx` es una primera V1 navegable de una nueva sección de Garlia dedicada a **explicar visualmente el sistema del universo**. No reemplaza Sandbox, Física, Runas ni los editores existentes.
+`VisualizadorPage.tsx` es la V1 visual del laboratorio de Garlia. **No tiene ruta propia**: debe mostrarse como la segunda tab hermana de `Sandbox` mediante `SandboxVisualizadorTabs.tsx`.
 
-Ruta pública: `/garlia/visualizador`.
+El Sandbox sigue siendo el entorno de simulación experimental. Visualizador es la capa de explicación, inspección y lectura visual del mismo universo.
+
+## Integración
+
+Montaje esperado:
+
+```tsx
+<SandboxVisualizadorTabs />
+```
+
+en el punto donde actualmente se renderiza `SandboxPage`.
+
+La barra debe quedar visualmente así:
+
+`Sandbox | Visualizador`
+
+No crear `/garlia/visualizador` ni otra ruta paralela.
 
 ## Principio
 
@@ -27,9 +43,11 @@ La V1 contiene fixtures visuales únicamente para construir y revisar UX. Ningú
 11. **Runas** — patrón → semántica → operación → mecanismo, sin asumir hechizos.
 12. **Proceso** — evento → interacción → proceso → mecanismo → efecto → nuevo estado.
 
-## Componentes objetivo
+## Componentes
 
-La V1 está concentrada en una página para facilitar revisión. En la siguiente iteración el equipo puede extraer componentes reutilizables:
+`SandboxVisualizadorTabs.tsx` es el shell de integración.
+
+La V1 visual puede evolucionar a componentes reutilizables como:
 
 - `FlowNode`
 - `MetricCard`
@@ -39,13 +57,12 @@ La V1 está concentrada en una página para facilitar revisión. En la siguiente
 - `GenealogyGraph`
 - `PropertyInspector`
 - `CausalTrace`
-- `VisualizadorNav`
 
-No duplicar la lógica de `PropertyControl.tsx`; reutilizar el componente ya existente para controles de propiedades.
+Reutilizar `PropertyControl.tsx`; no duplicar su lógica.
 
 ## Datos reales
 
-Los adapters reales deben consumir preferentemente vistas/contratos ya existentes, por ejemplo:
+Los adapters deben consumir preferentemente vistas/contratos ya existentes:
 
 - propiedades calculadas/canónicas
 - genealogía micro → macro
@@ -74,6 +91,8 @@ No añadir gráficos como decoración.
 
 El visualizador puede permitir exploración y, cuando el contrato lo autorice, edición experimental. La edición real de estado debe pasar por las APIs/RPCs canónicas; React no debe ejecutar reglas de física, química, magia o simulación.
 
-## Punto especialmente importante
+## Partículas propias de Garlia
 
-Las “partículas” del visualizador son las partículas fundamentales propias de Garlia (Masa, Cinética, Potencial, Información, Voluntad, Percepción, Transición, Ciclo, Entropía, Catálisis y Equilibrio). No introducir protones/electrones/neutrones como parte del modelo de Garlia.
+Las “partículas” del visualizador son las partículas fundamentales propias de Garlia: Masa, Cinética, Potencial, Información, Voluntad, Percepción, Transición, Ciclo, Entropía, Catálisis y Equilibrio.
+
+No introducir protones/electrones/neutrones como parte del modelo de Garlia.
