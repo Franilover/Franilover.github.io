@@ -310,10 +310,14 @@ function RutaFisicaCanvas({
   route,
   hoverId,
   setHoverId,
+  selectedNodeId,
+  onSelectNode,
 }: {
   route: ReturnType<typeof useFisicaRoute>;
   hoverId: string | null;
   setHoverId: (id: string | null) => void;
+  selectedNodeId: string | null;
+  onSelectNode: (id: string) => void;
 }) {
   const { oris, orisSel, setOrisSelId, iumPorId, particulasDelOrisSel } = route;
 
@@ -389,8 +393,9 @@ function RutaFisicaCanvas({
             <StructureCanvas
               columns={columns}
               edges={edges}
-              selectedNodeId={orisSel ? `oris-${orisSel.id}` : null}
+              selectedNodeId={selectedNodeId ?? (orisSel ? `oris-${orisSel.id}` : null)}
               onHoverNode={setHoverId}
+              onSelectNode={onSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
             />
           </div>
@@ -404,10 +409,14 @@ function RutaAlquimiaCanvas({
   route,
   hoverId,
   setHoverId,
+  selectedNodeId,
+  onSelectNode,
 }: {
   route: ReturnType<typeof useAlquimiaRoute>;
   hoverId: string | null;
   setHoverId: (id: string | null) => void;
+  selectedNodeId: string | null;
+  onSelectNode: (id: string) => void;
 }) {
   const { elementos, elementoSel, setElementoSelId, capas, capaSel, setCapaSel, particulasDeCapaSel } = route;
 
@@ -493,8 +502,9 @@ function RutaAlquimiaCanvas({
             <StructureCanvas
               columns={columns}
               edges={edges}
-              selectedNodeId={elementoSel ? `elemento-${elementoSel.id}` : null}
+              selectedNodeId={selectedNodeId ?? (elementoSel ? `elemento-${elementoSel.id}` : null)}
               onHoverNode={setHoverId}
+              onSelectNode={onSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
             />
           </div>
@@ -504,16 +514,70 @@ function RutaAlquimiaCanvas({
   );
 }
 
+/** Conteo A/T/S de una sola partícula a partir de su fórmula real (ej.
+ *  "ATS", "AA") — mismo criterio letra-por-letra que contarLetrasDeComposicion,
+ *  aplicado a una fórmula ya resuelta en vez de a una lista de composición.
+ *  No es una regla nueva: es leer los mismos 3 caracteres que ya se
+ *  muestran como sublabel del nodo. */
+function contarLetrasDeFormula(formula: string): { A: number; T: number; S: number } {
+  const out = { A: 0, T: 0, S: 0 };
+  for (const c of formula) {
+    if (c === "A" || c === "T" || c === "S") out[c] += 1;
+  }
+  return out;
+}
+
 function RutasSection() {
   const [perspectiva, setPerspectiva] = useState<Perspectiva>("fisica");
   const [hoverId, setHoverId] = useState<string | null>(null);
+  // Nodo fijado por click dentro del canvas — distinto del Oris/Elemento
+  // elegido en el ChipSelector. Se limpia al cambiar de contexto (Oris,
+  // Elemento, capa o perspectiva) para no dejar seleccionado un nodo que
+  // ya no existe en el canvas nuevo.
+  const [nodoSelId, setNodoSelId] = useState<string | null>(null);
 
   const fisicaRoute = useFisicaRoute();
   const alquimiaRoute = useAlquimiaRoute();
 
+  useEffect(() => {
+    setNodoSelId(null);
+  }, [perspectiva, fisicaRoute.orisSel?.id, alquimiaRoute.elementoSel?.id, alquimiaRoute.capaSel]);
+
+  // Partícula clickeada dentro del canvas activo, si el nodo seleccionado
+  // es de nivel "partícula" — usa las mismas listas ya expandidas por el
+  // hook de ruta (particulasDelOrisSel / particulasDeCapaSel), sin volver
+  // a consultar nada.
+  const particulaClickeada = useMemo(() => {
+    if (!nodoSelId || !nodoSelId.startsWith("particula-")) return null;
+    if (perspectiva === "fisica") {
+      const idx = Number(nodoSelId.slice("particula-".length));
+      return fisicaRoute.particulasDelOrisSel[idx] ?? null;
+    }
+    // Formato alquimia: `particula-${capa}-${i}`
+    const idx = Number(nodoSelId.slice(nodoSelId.lastIndexOf("-") + 1));
+    return alquimiaRoute.particulasDeCapaSel[idx] ?? null;
+  }, [nodoSelId, perspectiva, fisicaRoute.particulasDelOrisSel, alquimiaRoute.particulasDeCapaSel]);
+
   // Inspector: solo presentacional — el shape se arma acá a partir de datos
   // ya resueltos por el hook de ruta activo, sin calcular nada nuevo.
+  // Si hay una partícula clickeada, tiene prioridad: es la única entidad
+  // cuya A/T/S es geometría relevante para el usuario en este momento
+  // (sección "A/T/S es información contextual, no geometría principal").
   const inspectorEntity: InspectorEntity | null = useMemo(() => {
+    if (particulaClickeada) {
+      const letras = contarLetrasDeFormula(particulaClickeada.formula);
+      return {
+        eyebrow: "Partícula",
+        title: particulaClickeada.nombre,
+        subtitle: particulaClickeada.formula,
+        visual: <ParticulaVisual formula={particulaClickeada.formula} size={40} />,
+        fields: [
+          { label: "A (antítesis)", value: letras.A },
+          { label: "T (tesis)", value: letras.T },
+          { label: "S (síntesis)", value: letras.S },
+        ],
+      };
+    }
     if (perspectiva === "fisica") {
       const o = fisicaRoute.orisSel;
       if (!o) return null;
@@ -546,7 +610,7 @@ function RutasSection() {
         { label: "Es noble", value: e.es_noble ? "Sí" : "No" },
       ],
     };
-  }, [perspectiva, fisicaRoute, alquimiaRoute]);
+  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute]);
 
   // Trace: ruta ya resuelta, en el mismo orden que el modelo real — nunca
   // fusiona Física y Alquimia en una sola secuencia.
@@ -590,9 +654,21 @@ function RutasSection() {
       <div className="mt-5 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
         <div>
           {perspectiva === "fisica" ? (
-            <RutaFisicaCanvas route={fisicaRoute} hoverId={hoverId} setHoverId={setHoverId} />
+            <RutaFisicaCanvas
+              route={fisicaRoute}
+              hoverId={hoverId}
+              setHoverId={setHoverId}
+              selectedNodeId={nodoSelId}
+              onSelectNode={setNodoSelId}
+            />
           ) : (
-            <RutaAlquimiaCanvas route={alquimiaRoute} hoverId={hoverId} setHoverId={setHoverId} />
+            <RutaAlquimiaCanvas
+              route={alquimiaRoute}
+              hoverId={hoverId}
+              setHoverId={setHoverId}
+              selectedNodeId={nodoSelId}
+              onSelectNode={setNodoSelId}
+            />
           )}
         </div>
 
