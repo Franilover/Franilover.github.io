@@ -254,10 +254,10 @@ function ElementoCasilla({
       type="button"
       onClick={onClick}
       title={`Click: ver detalle · Shift+Click: agregar/quitar de la selección múltiple · Familia: ${elemento.familia}`}
-      className={`group flex flex-col items-stretch gap-0.5 p-1.5 rounded-md border transition-colors text-left ${
+      className={`group flex flex-col items-stretch gap-0.5 p-1.5 border-r border-b transition-colors text-left ${
         enSeleccionMultiple || seleccionado
-          ? "border-primary/50 ring-2 ring-primary/40"
-          : "border-primary/15 hover:border-primary/35 hover:bg-primary/5"
+          ? "border-primary/10 bg-primary/10 ring-1 ring-inset ring-primary/40"
+          : "border-primary/10 hover:bg-primary/5"
       }`}
     >
       <div className="flex items-start justify-between">
@@ -812,7 +812,7 @@ export function ElementosPage({
           </div>
         ) : (
           <div
-            className="grid gap-1"
+            className="grid gap-0 border-t border-l border-primary/10"
             style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
           >
             {elementosFiltrados.map((el) => (
