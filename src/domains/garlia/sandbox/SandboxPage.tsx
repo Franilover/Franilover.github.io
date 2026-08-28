@@ -60,6 +60,7 @@ import {
 import type {
   EstadoActualEntidad,
   EstadoTemporalEntidad,
+  SandboxEntidad,
 } from "./types";
 
 type TipoCatalogo = "elemento" | "compuesto";
@@ -284,25 +285,6 @@ function formatearValor(valor: unknown): string {
   return String(valor);
 }
 
-function PropiedadPreview({
-  label,
-  value,
-}: {
-  label: string;
-  value: unknown;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-1">
-      <span className="text-micro font-bold text-primary/45 truncate">
-        {label}
-      </span>
-      <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
-        {formatearValor(value)}
-      </span>
-    </div>
-  );
-}
-
 /** Etiqueta legible para claves snake_case comunes de estado_actual. Claves
  *  no listadas se muestran tal cual, mismo criterio que ETIQUETAS_METRICA en
  *  GridPropiedadesCalculadas.tsx. */
@@ -342,6 +324,83 @@ const ETIQUETAS_PROPIEDAD: Record<string, string> = {
 
 function etiquetaPropiedad(clave: string): string {
   return ETIQUETAS_PROPIEDAD[clave] ?? clave;
+}
+
+/**
+ * Deriva PropiedadCalculada[] para una entidad YA VIVA en Sandbox
+ * (estado_actual, no estado_inicial) — usada por el panel lateral.
+ *
+ * IMPORTANTE — por qué esto NO es lo mismo que propiedadesEditables:
+ *   - estado_actual lo escribe el motor de Supabase, nunca este componente
+ *     (regla del equipo: no tocar estado_actual). Por eso no se pasa
+ *     onChange en ningún caso — el panel de una entidad viva es SIEMPRE
+ *     de solo lectura, sin excepción.
+ *   - `proporcion` solo se rellena cuando la entidad tiene
+ *     entidad_origen_id resuelto contra el catálogo real (Elemento o
+ *     Compuesto) y ESE campo específico ya viene marcado como índice por
+ *     propiedadesCalculadasDeElemento/DeCompuesto — nunca se infiere por
+ *     nombre. Para entidades manuales (sin origen) o campos que el motor
+ *     haya agregado/mutado y que no estén en el catálogo original, se
+ *     muestra como magnitud abierta de solo lectura: correcto, porque no
+ *     tenemos ninguna señal real de que sea un índice [0,1].
+ */
+function propiedadesCalculadasDeEntidadSandbox(
+  entidad: SandboxEntidad,
+  elementos: Elemento[],
+  compuestos: Compuesto[],
+): PropiedadCalculada[] {
+  const propiedadesActuales = (entidad.estado_actual?.propiedades ?? {}) as Record<
+    string,
+    unknown
+  >;
+
+  // Catálogo de referencia (para tomar `proporcion`/`formula`/`descripcion`
+  // reales de las claves que coincidan) — solo si sabemos el origen.
+  let propiedadesOrigenPorClave: Record<string, PropiedadCalculada> = {};
+  if (entidad.entidad_origen_id) {
+    const origenBase =
+      entidad.entidad_tipo === "elemento"
+        ? elementos.find((el) => el.id === entidad.entidad_origen_id)
+        : entidad.entidad_tipo === "compuesto"
+          ? compuestos.find((c) => c.id === entidad.entidad_origen_id)
+          : undefined;
+
+    if (origenBase) {
+      const lista =
+        entidad.entidad_tipo === "elemento"
+          ? propiedadesCalculadasDeElemento(origenBase as Elemento)
+          : propiedadesCalculadasDeCompuesto(origenBase as Compuesto);
+      propiedadesOrigenPorClave = Object.fromEntries(lista.map((p) => [p.clave, p]));
+    }
+  }
+
+  return Object.entries(propiedadesActuales)
+    .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
+    .map(([clave, valor]) => {
+      const refCatalogo = propiedadesOrigenPorClave[clave];
+      const valorNum = typeof valor === "number" ? valor : Number(valor);
+      const valorFormateado =
+        typeof valor === "number"
+          ? Number.isInteger(valor)
+            ? String(valor)
+            : valor.toFixed(refCatalogo?.proporcion !== undefined ? 2 : 3)
+          : String(valor);
+
+      return {
+        clave,
+        label: etiquetaPropiedad(clave),
+        valor: valorFormateado,
+        // Solo se propaga proporcion/formula/descripcion cuando vienen de
+        // una referencia real del catálogo Y el valor actual sigue siendo
+        // numérico coherente con esa forma — nunca inventado acá.
+        proporcion:
+          refCatalogo?.proporcion !== undefined && !Number.isNaN(valorNum)
+            ? valorNum
+            : undefined,
+        formula: refCatalogo?.formula,
+        descripcion: refCatalogo?.descripcion ?? "",
+      } satisfies PropiedadCalculada;
+    });
 }
 
 /** Una tarjeta del grid — mismo look que GridPropiedadesCalculadas
@@ -480,6 +539,82 @@ function EstadoEntidadGrid({ estado }: { estado: EstadoActualEntidad }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Panel lateral de inspección para la entidad seleccionada en Sandbox.
+ *
+ * Reutiliza:
+ *   - PropertyControlGrid / PropertyControl (_shared) — misma pieza base
+ *     que el editor de estado_inicial más arriba en este archivo.
+ *   - propiedadesCalculadasDeEntidadSandbox — deriva PropiedadCalculada[]
+ *     de estado_actual, con proporcion/formula reales SOLO cuando hay
+ *     entidad_origen_id resuelto contra el catálogo (ver esa función).
+ *
+ * SIEMPRE de solo lectura (no se pasa onChangeClave): estado_actual lo
+ * escribe el motor de Supabase vía control_sandbox/procesar_eventos, nunca
+ * este panel — es la misma regla que separa esto del editor de estado_inicial
+ * de la sección "Agregar desde catálogo".
+ *
+ * "Trazabilidad" queda como botón deshabilitado con motivo explícito: hoy
+ * no existe ninguna RPC ni vista en Supabase que resuelva la cadena
+ * evento → interacción → proceso → mecanismo → condición → efecto más allá
+ * del puntero simple `evento_origen_id` en sandbox_eventos. Preparar esa
+ * vista es trabajo de backend antes de que este botón pueda hacer algo real.
+ */
+function PanelEntidadSeleccionada({
+  entidad,
+  elementos,
+  compuestos,
+}: {
+  entidad: SandboxEntidad | null;
+  elementos: Elemento[];
+  compuestos: Compuesto[];
+}) {
+  if (!entidad) {
+    return (
+      <div className="hidden xl:flex flex-col items-center justify-center h-40 rounded-lg border border-dashed border-primary/15">
+        <p className="text-micro text-primary/30 text-center px-4">
+          Selecciona una entidad de la lista para ver sus propiedades.
+        </p>
+      </div>
+    );
+  }
+
+  const propiedades = propiedadesCalculadasDeEntidadSandbox(entidad, elementos, compuestos);
+
+  return (
+    <div className="flex flex-col gap-3 sticky top-4">
+      <div>
+        <span className="text-[10px] font-black uppercase tracking-widest text-primary/30 block">
+          Entidad
+        </span>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <span className="text-sm font-black text-primary">{entidad.entidad_tipo}</span>
+          <span className="text-micro font-bold text-primary/35 shrink-0">
+            {entidad.entidad_origen_id ? "catálogo" : "manual"}
+          </span>
+        </div>
+        <code className="text-micro font-mono text-primary/30">{entidad.id.slice(0, 8)}</code>
+      </div>
+
+      <div>
+        <span className="text-[10px] font-black uppercase tracking-widest text-primary/30 block mb-1.5">
+          Propiedades
+        </span>
+        <PropertyControlGrid propiedades={propiedades} columnas={2} />
+      </div>
+
+      <button
+        type="button"
+        disabled
+        title="Requiere una vista/RPC en Supabase que resuelva la cadena causal completa (evento → interacción → proceso → mecanismo → efecto). Hoy solo existe evento_origen_id como puntero simple."
+        className="w-full text-micro font-bold text-primary/25 border border-primary/10 rounded-md py-1.5 cursor-not-allowed"
+      >
+        Trazabilidad (pendiente de backend)
+      </button>
     </div>
   );
 }
@@ -747,7 +882,7 @@ export function SandboxPage() {
       )}
 
       {simulacionId && simulacion && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-[1fr_1fr_20rem] gap-6 items-start">
           {/* COLUMNA IZQUIERDA: tiempo_simulado, Event log, Disparar evento */}
           <div className="flex flex-col gap-5">
             <div className="pb-5 border-b border-primary/10">
@@ -1003,8 +1138,15 @@ export function SandboxPage() {
               ) : (
                 <div className="flex flex-col divide-y divide-primary/8">
                   {entidades.map((e) => (
-                    <div className="py-2.5 first:pt-0 last:pb-0" key={e.id}>
-                      <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      key={e.id}
+                      onClick={() => setEntidadSeleccionada(e.id)}
+                      className={`text-left py-2.5 first:pt-0 last:pb-0 rounded-md transition-colors ${
+                        entidadSeleccionada === e.id ? "bg-primary/8" : "hover:bg-primary/[0.04]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 px-1.5">
                         <span className="text-xs font-black text-primary">
                           {e.entidad_tipo}
                         </span>
@@ -1015,7 +1157,7 @@ export function SandboxPage() {
                       </div>
 
                       {e.entidad_origen_id && (
-                        <p className="mt-0.5 text-micro text-primary/30">
+                        <p className="mt-0.5 px-1.5 text-micro text-primary/30">
                           origen ·{" "}
                           <code className="font-mono">
                             {e.entidad_origen_id.slice(0, 8)}
@@ -1023,15 +1165,25 @@ export function SandboxPage() {
                         </p>
                       )}
 
-                      <div className="mt-1.5">
+                      <div className="mt-1.5 px-1.5">
                         <EstadoEntidadGrid estado={e.estado_actual} />
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
             </div>
           </div>
+
+          {/* COLUMNA PANEL: inspector de la entidad seleccionada (reusa
+              entidadSeleccionada, ya existente para "Disparar evento" —
+              no se creó estado nuevo). Siempre de solo lectura: estado_actual
+              lo escribe el motor, este panel nunca escribe sobre él. */}
+          <PanelEntidadSeleccionada
+            entidad={entidades.find((e) => e.id === entidadSeleccionada) ?? null}
+            elementos={elementos}
+            compuestos={compuestos}
+          />
         </div>
       )}
     </div>

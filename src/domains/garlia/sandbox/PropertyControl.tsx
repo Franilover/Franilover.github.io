@@ -41,6 +41,15 @@
  *     está en estado_inicial o estado_actual); es responsabilidad del
  *     caller no pasar onChange en el segundo caso.
  *
+ * COMPATIBILIDAD FUTURA: todas las props son nombradas (un solo objeto),
+ * `onChange` es opcional y va al final solo por legibilidad, no por
+ * posición fija. Cuando se necesite edición completa (fórmula/dependencias/
+ * procedencia/gráfico — ver roadmap del laboratorio visual), esa
+ * información se agrega como props nuevas opcionales sin tocar las
+ * existentes: ningún consumidor actual (PropertyControlGrid, SandboxPage)
+ * se rompe. No se implementa nada de eso todavía — solo se deja la puerta
+ * abierta.
+ *
  * Visual: mismas clases que TarjetaPropiedad (SandboxPage.tsx) y
  * TarjetaPropiedadesFisicas (GridPropiedadesCalculadas.tsx) — no introduce
  * un cuarto lenguaje visual de tarjeta.
