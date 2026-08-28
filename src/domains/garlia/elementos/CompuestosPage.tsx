@@ -1900,51 +1900,6 @@ export function CompuestosPage({
   return (
     <div className="flex relative">
       <div className="flex-1 p-3 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div className="text-primary/40">
-            <p className="text-micro font-black uppercase tracking-widest">
-              Compuestos
-            </p>
-          </div>
-          <div className="shrink-0 flex items-center gap-1.5">
-            <button
-              type="button"
-              disabled={compuestos.length < 2}
-              onClick={() => setLaboratorioAbierto(true)}
-              title="Combinar dos compuestos existentes en uno nuevo"
-              className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              <Combine size={14} />
-            </button>
-
-            <button
-              type="button"
-              disabled={compuestos.length === 0}
-              onClick={() => descargarDatosCompuestos(compuestos, elementos)}
-              title="Descargar todos los compuestos como JSON"
-              className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              <Download size={14} />
-            </button>
-
-            {onCreate && (
-              <button
-                type="button"
-                disabled={creating || elementos.length === 0}
-                onClick={onCreate}
-                title={
-                  elementos.length === 0
-                    ? "Primero cargá elementos en la Tabla Química"
-                    : "Nuevo compuesto"
-                }
-                className="flex items-center justify-center p-1.5 rounded-md bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {creating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
-              </button>
-            )}
-          </div>
-        </div>
-
         {loading && compuestos.length === 0 ? (
           <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
         ) : compuestos.length === 0 ? (
