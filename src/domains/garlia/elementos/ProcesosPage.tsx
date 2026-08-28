@@ -59,13 +59,13 @@ function ProcesoDetail({ proceso }: { proceso: Proceso }) {
                   key === "regla_clave" ? (
                     <div
                       key={key}
-                      className="flex items-center justify-between gap-2 rounded-md border border-primary/10 px-2 py-1"
+                      className="flex items-center justify-between gap-2 px-2 py-1"
                     >
                       <span className="text-micro font-bold text-primary/50 truncate">{label}</span>
                       <span className="text-micro font-black text-primary/70 text-right">{formatValue(value)}</span>
                     </div>
                   ) : (
-                    <div key={key} className="rounded-md border border-primary/10 px-2 py-1">
+                    <div key={key} className="px-2 py-1">
                       <span className="text-micro font-bold text-primary/45">{label}</span>
                       <p className="mt-0.5 text-micro leading-relaxed text-primary/65">{value}</p>
                     </div>
@@ -108,7 +108,7 @@ function ProcesoDetail({ proceso }: { proceso: Proceso }) {
                 {relaciones.map((relacion) => {
                   const reaccion = reacciones.find((item) => item.id === relacion.reaccion_id);
                   return (
-                    <div key={relacion.id} className="rounded-md border border-primary/10 px-2 py-1">
+                    <div key={relacion.id} className="px-2 py-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-micro font-bold text-primary/70 truncate">
                           {reaccion?.nombre ?? relacion.reaccion_id.slice(0, 8)}

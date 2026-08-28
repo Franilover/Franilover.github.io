@@ -52,7 +52,7 @@ function FenomenoDetail({ fenomeno }: { fenomeno: Fenomeno }) {
                 return (
                   <div
                     key={relacion.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-primary/10 px-2 py-1"
+                    className="flex items-center justify-between gap-2 px-2 py-1"
                   >
                     <span className="text-micro font-bold text-primary/70 truncate">
                       {proceso?.nombre ?? relacion.proceso_id.slice(0, 8)}
@@ -81,7 +81,7 @@ function FenomenoDetail({ fenomeno }: { fenomeno: Fenomeno }) {
               {relacionesElementos.map((relacion) => {
                 const elemento = elementos.find((item) => item.id === relacion.elemento_id);
                 return (
-                  <div key={relacion.id} className="rounded-md border border-primary/10 px-2 py-1">
+                  <div key={relacion.id} className="px-2 py-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-micro font-bold text-primary/70 truncate">
                         {elemento?.nombre ?? relacion.elemento_id.slice(0, 8)}
