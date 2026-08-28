@@ -405,7 +405,7 @@ function TodasLasBasesView({
               className="flex flex-col gap-2 min-w-[180px]"
               style={{ flexGrow: Math.max(filas.length, 1), flexBasis: 0 }}
             >
-              <div className="flex items-center justify-between gap-1.5 text-primary/50 pb-1.5 border-b border-primary/10">
+              <div className="flex items-center justify-between gap-1.5 text-primary/50 pb-1.5">
                 <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
                 {key === "subsistemas" && (
                   <button
