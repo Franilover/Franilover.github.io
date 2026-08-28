@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import SandboxPage from "./SandboxPage";
+import { SandboxPage } from "./SandboxPage";
 import VisualizadorPage from "../visualizador/VisualizadorPage";
 
 /**
@@ -29,6 +29,7 @@ export default function SandboxVisualizadorTabs() {
               : "border-transparent text-primary/35 hover:text-primary/60"
           }`}
           aria-selected={tab === "sandbox"}
+          role="tab"
         >
           Sandbox
         </button>
@@ -41,15 +42,16 @@ export default function SandboxVisualizadorTabs() {
               : "border-transparent text-primary/35 hover:text-primary/60"
           }`}
           aria-selected={tab === "visualizador"}
+          role="tab"
         >
           Visualizador
         </button>
       </div>
 
-      <div hidden={tab !== "sandbox"}>
+      <div hidden={tab !== "sandbox"} role="tabpanel">
         <SandboxPage />
       </div>
-      <div hidden={tab !== "visualizador"}>
+      <div hidden={tab !== "visualizador"} role="tabpanel">
         <VisualizadorPage />
       </div>
     </div>
