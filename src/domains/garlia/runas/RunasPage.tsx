@@ -28,6 +28,15 @@ import type { SaveStatus } from "@/ui/saveStatus";
 import { ElementosPage } from "@/domains/garlia/elementos/ElementosPage";
 import type { Elemento } from "@/domains/garlia/elementos/types";
 import { BiologiaCatalogos, BiologiaCladograma } from "@/domains/garlia/biologia/BiologiaPage";
+import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
+import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
+import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
+import { useSistemas } from "@/domains/garlia/elementos/useSistemas";
+import { useOrganismos } from "@/domains/garlia/elementos/useOrganismos";
+import { useGranos } from "@/domains/garlia/elementos/useGranos";
+import { useVetas } from "@/domains/garlia/elementos/useVetas";
+import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
+import { FilaAsimetrica } from "@/domains/garlia/_shared/FilaAsimetrica";
 import { SandboxPage } from "@/domains/garlia/sandbox/SandboxPage";
 import { LogicaSistemaPage } from "./LogicaSistemaPage";
 import { FisicaPage, BloqueFisicaMinerales } from "@/domains/garlia/fisica/FisicaPage";
@@ -774,6 +783,20 @@ export function RunasPage({
   const { config: configRunas, actualizar: actualizarConfigRunas } = useConfigRunas();
   const abrirPanel = usePanelFlotante((s) => s.abrir);
 
+  // Conteos para decidir el layout de FilaAsimetrica entre "Física ·
+  // minerales" y "Biología" más abajo (ver _shared/FilaAsimetrica.tsx) —
+  // no se usa el resto de lo que devuelven estos hooks acá, cada bloque
+  // (BloqueFisicaMinerales/BiologiaCatalogos) sigue haciendo su propio
+  // fetch/render; esto solo suma los totales de cada lado.
+  const { items: granosParaConteo } = useGranos();
+  const { items: vetasParaConteo } = useVetas();
+  const { items: formacionesParaConteo } = useFormaciones();
+  const { items: celulasParaConteo } = useCelulas();
+  const { items: tejidosParaConteo } = useTejidos();
+  const { items: organosParaConteo } = useOrganos();
+  const { items: sistemasParaConteo } = useSistemas();
+  const { items: organismosParaConteo } = useOrganismos();
+
   // Grupos de runas — antes vivían en el editor externo de una runa
   // individual (FormularioRuna), recibidos por props. Ahora la asignación
   // de grupos se hace acá mismo, en el panel derecho.
@@ -984,22 +1007,42 @@ export function RunasPage({
             onEliminarVarios={onEliminarVariosElementos}
           />
 
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="flex-1 min-w-0">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/40 mb-3">
-                Física · minerales
-              </p>
-              <BloqueFisicaMinerales
-                onSelectCriatura={(id) => abrirPanel("criatura", id)}
-              />
-            </div>
-            <div className="flex-1 min-w-0 lg:border-l lg:border-primary/10 lg:pl-6">
-              <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/40 mb-3">
-                Biología
-              </p>
-              <BiologiaCatalogos onSelectCriatura={(id) => abrirPanel("criatura", id)} />
-            </div>
-          </div>
+          {/* Física · minerales / Biología — layout adaptativo (ver
+              _shared/FilaAsimetrica.tsx): mitad y mitad si los totales de
+              ítems de cada lado son comparables, o 2/3 para el que tenga
+              más si uno domina claramente, en vez del 50/50 fijo de
+              siempre que dejaba a un lado con mucho hueco vacío cuando el
+              otro tenía bastantes más catálogos/ítems. */}
+          <FilaAsimetrica
+            bloques={[
+              {
+                key: "fisica-minerales",
+                titulo: "Física · minerales",
+                total:
+                  granosParaConteo.length +
+                  vetasParaConteo.length +
+                  formacionesParaConteo.length,
+                contenido: (
+                  <BloqueFisicaMinerales
+                    onSelectCriatura={(id) => abrirPanel("criatura", id)}
+                  />
+                ),
+              },
+              {
+                key: "biologia",
+                titulo: "Biología",
+                total:
+                  celulasParaConteo.length +
+                  tejidosParaConteo.length +
+                  organosParaConteo.length +
+                  sistemasParaConteo.length +
+                  organismosParaConteo.length,
+                contenido: (
+                  <BiologiaCatalogos onSelectCriatura={(id) => abrirPanel("criatura", id)} />
+                ),
+              },
+            ]}
+          />
 
           <div>
             <BiologiaCladograma onSelectCriatura={(id) => abrirPanel("criatura", id)} />
