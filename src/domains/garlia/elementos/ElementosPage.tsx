@@ -34,6 +34,11 @@ import {
   sincronizarComponentesCompuesto,
 } from "./useCompuestosConElementos";
 import { useReacciones } from "./useReacciones";
+import { useEstructuras } from "./useEstructuras";
+import { useMateriales } from "../materiales/useMateriales";
+import { useProcesos } from "./useProcesos";
+import { useFenomenos } from "./useFenomenos";
+import { FilaAsimetrica } from "../_shared/FilaAsimetrica";
 import {
   type EditorHeaderControls,
 } from "../_shared/useEditorHeaderControls";
@@ -693,6 +698,16 @@ export function ElementosPage({
     }
   }
 
+  // ── Conteos para decidir el layout de FilaAsimetrica (ver
+  // _shared/FilaAsimetrica.tsx) — no se usa el resto de lo que devuelven
+  // estos hooks acá, cada subpágina (EstructurasPage/MaterialesPage/
+  // ProcesosPage/FenomenosPage) sigue haciendo su propio fetch/render;
+  // esto solo lee el total para elegir 3 columnas iguales vs 2/3+1/3.
+  const { items: estructurasParaConteo } = useEstructuras();
+  const { items: materialesParaConteo } = useMateriales();
+  const { items: procesosParaConteo } = useProcesos();
+  const { items: fenomenosParaConteo } = useFenomenos();
+
   // ── Reacciones: catálogo de recetas reutilizables de consume/produce,
   // apilado debajo de Grupos de Compuestos ────────────────────────────────
   const {
@@ -986,95 +1001,91 @@ export function ElementosPage({
         </div>
       </div>
 
-      {/* Compuestos / Estructuras / Materiales — fila de 3 columnas desde
-          md (768px) en vez de lg (1024px): el panel de contenido dentro del
-          layout de la app suele quedar más angosto que el viewport
-          completo por el sidebar de navegación, así que lg: no llegaba a
-          activarse en compus normales. md: se activa mucho antes y sigue
-          dejando mobile angosto apilado. */}
-      <div className="grid grid-cols-1 md:grid-cols-3 border-t border-primary/10">
-        <div className="min-w-0 border-b md:border-b-0 md:border-r border-primary/10">
-          <div className="px-3 pt-3 text-primary/40">
-            <p className="text-micro font-black uppercase tracking-widest">Compuestos</p>
-          </div>
-          <CompuestosPage
-            compuestos={compuestos}
-            elementos={elementos}
-            loading={loadingCompuestos}
-            creating={creatingCompuesto}
-            onCreate={handleCreateCompuesto}
-            onCrearConComponentes={handleCrearCompuestoConComponentes}
-            onActualizar={(id, cambios) =>
-              setCompuestos((prev) => prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)))
-            }
-            onEliminar={handleEliminarCompuesto}
-            seleccionarId={compuestoAAbrir ?? compuestoRecienCreadoId}
-            onSeleccionarIdConsumido={() => {
-              setCompuestoAAbrir(null);
-              setCompuestoRecienCreadoId(null);
-            }}
-          />
-        </div>
+      {/* Compuestos / Estructuras / Materiales — layout adaptativo (ver
+          _shared/FilaAsimetrica.tsx): 3 columnas iguales si los totales son
+          comparables, o una columna grande (2/3) + dos apiladas (1/3) si
+          uno de los tres domina en cantidad de ítems, para no dejar un
+          hueco vacío enorme al lado de un bloque con pocos ítems. */}
+      <FilaAsimetrica
+        bloques={[
+          {
+            key: "compuestos",
+            titulo: "Compuestos",
+            total: compuestos.length,
+            contenido: (
+              <CompuestosPage
+                compuestos={compuestos}
+                elementos={elementos}
+                loading={loadingCompuestos}
+                creating={creatingCompuesto}
+                onCreate={handleCreateCompuesto}
+                onCrearConComponentes={handleCrearCompuestoConComponentes}
+                onActualizar={(id, cambios) =>
+                  setCompuestos((prev) =>
+                    prev.map((c) => (c.id === id ? { ...c, ...cambios } : c)),
+                  )
+                }
+                onEliminar={handleEliminarCompuesto}
+                seleccionarId={compuestoAAbrir ?? compuestoRecienCreadoId}
+                onSeleccionarIdConsumido={() => {
+                  setCompuestoAAbrir(null);
+                  setCompuestoRecienCreadoId(null);
+                }}
+              />
+            ),
+          },
+          {
+            key: "estructuras",
+            titulo: "Estructuras",
+            total: estructurasParaConteo.length,
+            contenido: <EstructurasPage />,
+          },
+          {
+            key: "materiales",
+            titulo: "Materiales",
+            total: materialesParaConteo.length,
+            contenido: <MaterialesPage />,
+          },
+        ]}
+      />
 
-        <div className="min-w-0 border-b md:border-b-0 md:border-r border-primary/10">
-          <div className="px-3 pt-3 text-primary/40">
-            <p className="text-micro font-black uppercase tracking-widest">Estructuras</p>
-          </div>
-          <EstructurasPage />
-        </div>
-
-        <div className="min-w-0">
-          <div className="px-3 pt-3 text-primary/40">
-            <p className="text-micro font-black uppercase tracking-widest">Materiales</p>
-          </div>
-          <MaterialesPage />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 border-t border-primary/10">
-  <div className="min-w-0 border-b lg:border-b-0 lg:border-r border-primary/10">
-    <div className="px-3 pt-3 text-primary/40">
-      <p className="text-micro font-black uppercase tracking-widest">
-        Reacciones
-      </p>
-    </div>
-
-        <ReaccionesPage
-  reacciones={reacciones}
-  compuestos={compuestos}
-  elementos={elementos}
-  loading={loadingReacciones}
-  creating={creatingReaccion}
-  onCreate={handleCreateReaccion}
-  onEliminar={handleEliminarReaccion}
-  onActualizar={(id, cambios) =>
-    setReacciones((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)),
-    )
-  }
-/>
-  </div>
-
-  <div className="min-w-0 border-b lg:border-b-0 lg:border-r border-primary/10">
-    <div className="px-3 pt-3 text-primary/40">
-      <p className="text-micro font-black uppercase tracking-widest">
-        Procesos
-      </p>
-    </div>
-
-    <ProcesosPage />
-  </div>
-
-  <div className="min-w-0">
-    <div className="px-3 pt-3 text-primary/40">
-      <p className="text-micro font-black uppercase tracking-widest">
-        Fenómenos
-      </p>
-    </div>
-
-    <FenomenosPage />
-  </div>
-</div>
+      <FilaAsimetrica
+        bloques={[
+          {
+            key: "reacciones",
+            titulo: "Reacciones",
+            total: reacciones.length,
+            contenido: (
+              <ReaccionesPage
+                reacciones={reacciones}
+                compuestos={compuestos}
+                elementos={elementos}
+                loading={loadingReacciones}
+                creating={creatingReaccion}
+                onCreate={handleCreateReaccion}
+                onEliminar={handleEliminarReaccion}
+                onActualizar={(id, cambios) =>
+                  setReacciones((prev) =>
+                    prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)),
+                  )
+                }
+              />
+            ),
+          },
+          {
+            key: "procesos",
+            titulo: "Procesos",
+            total: procesosParaConteo.length,
+            contenido: <ProcesosPage />,
+          },
+          {
+            key: "fenomenos",
+            titulo: "Fenómenos",
+            total: fenomenosParaConteo.length,
+            contenido: <FenomenosPage />,
+          },
+        ]}
+      />
 
 
       {comparadorAbierto && (

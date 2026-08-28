@@ -1800,7 +1800,7 @@ function MasonryGruposNaturaleza({
         columnas.map((columna, i) => (
           <div
             key={i}
-            className="flex flex-col gap-4 min-w-0 transition-[width] duration-150 ease-out"
+            className="flex flex-col gap-4 min-w-0"
             style={{ width: anchoColumna }}
           >
             {columna.map((grupo) => (
