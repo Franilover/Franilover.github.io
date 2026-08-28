@@ -12,11 +12,18 @@
  *
  * Solo lectura: mismo motivo que useCelulaEstructuras — estructura_compuestos
  * se puebla por migración/cálculo, no por edición manual desde acá.
+ *
+ * Migrado a useSupabaseData (2026-08-28, barrido de huecos de persistencia
+ * de Química): antes pegaba directo a Supabase con supabase.from() +
+ * useState/useEffect propios, sin pasar por Dexie ni tener timeout, pese a
+ * que "estructura_compuestos" y "compuestos" ya estaban en DEXIE_TABLES.
+ * Mismo patrón que useCompuestoEnlaces (ver db.ts v39): dos useSupabaseData
+ * en paralelo (vínculo + catálogo), resolviendo el join en memoria con
+ * useMemo — así ambas capas quedan cache-first y offline-first, sin
+ * inventar un modelo relacional que PostgREST no ofrece embebido.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-
-import { supabase } from "@/infra/supabase/supabase";
+import { useMemo } from "react";
 
 import {
   CONFIG_COMPUESTOS,
@@ -24,6 +31,7 @@ import {
   type Compuesto,
   type EstructuraCompuesto,
 } from "@/domains/garlia/elementos/types";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 
 /** Un Compuesto vinculado a la Estructura, ya resuelto. */
 export interface CompuestoDeEstructura {
@@ -35,59 +43,35 @@ export interface CompuestoDeEstructura {
 }
 
 export function useEstructuraComposicion(estructuraId: string | null) {
-  const [vinculos, setVinculos] = useState<EstructuraCompuesto[]>([]);
-  const [compuestos, setCompuestos] = useState<Record<string, Compuesto>>({});
-  const [loading, setLoading] = useState(true);
+  const { data: vinculosTodos, loading: loadingVinculos } =
+    useSupabaseData<EstructuraCompuesto>(CONFIG_ESTRUCTURA_COMPUESTOS.tabla, {
+      select: CONFIG_ESTRUCTURA_COMPUESTOS.select,
+      order: { campo: "orden" },
+    });
 
-  const load = useCallback(async () => {
-    if (!estructuraId) {
-      setVinculos([]);
-      setCompuestos({});
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+  const { data: compuestosTodos, loading: loadingCompuestos } =
+    useSupabaseData<Compuesto>(CONFIG_COMPUESTOS.tabla, {
+      select: CONFIG_COMPUESTOS.select,
+    });
 
-    const { data: vinculoData, error } = await supabase
-      .from(CONFIG_ESTRUCTURA_COMPUESTOS.tabla)
-      .select(CONFIG_ESTRUCTURA_COMPUESTOS.select)
-      .eq("estructura_id", estructuraId)
-      .order("orden", { ascending: true });
+  const vinculos = useMemo(
+    () =>
+      estructuraId
+        ? vinculosTodos.filter((v) => v.estructura_id === estructuraId)
+        : [],
+    [vinculosTodos, estructuraId],
+  );
 
-    if (error || !vinculoData) {
-      setVinculos([]);
-      setCompuestos({});
-      setLoading(false);
-      return;
-    }
-    const vinculosResueltos = vinculoData as unknown as EstructuraCompuesto[];
-    setVinculos(vinculosResueltos);
-
-    const compuestoIds = [...new Set(vinculosResueltos.map((v) => v.compuesto_id))];
-    if (compuestoIds.length === 0) {
-      setCompuestos({});
-      setLoading(false);
-      return;
-    }
-
-    const { data: compuestoData } = await supabase
-      .from(CONFIG_COMPUESTOS.tabla)
-      .select(CONFIG_COMPUESTOS.select)
-      .in("id", compuestoIds);
-    const compuestosPorId: Record<string, Compuesto> = {};
-    for (const c of (compuestoData ?? []) as unknown as Compuesto[]) compuestosPorId[c.id] = c;
-    setCompuestos(compuestosPorId);
-    setLoading(false);
-  }, [estructuraId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const compuestosPorId = useMemo(() => {
+    const mapa: Record<string, Compuesto> = {};
+    for (const c of compuestosTodos) mapa[c.id] = c;
+    return mapa;
+  }, [compuestosTodos]);
 
   const items = useMemo<CompuestoDeEstructura[]>(() => {
     return vinculos
       .map((v) => {
-        const compuesto = compuestos[v.compuesto_id];
+        const compuesto = compuestosPorId[v.compuesto_id];
         if (!compuesto) return null;
         return {
           vinculo_id: v.id,
@@ -98,7 +82,10 @@ export function useEstructuraComposicion(estructuraId: string | null) {
         };
       })
       .filter((c): c is CompuestoDeEstructura => c !== null);
-  }, [vinculos, compuestos]);
+  }, [vinculos, compuestosPorId]);
 
-  return { items, loading };
+  return {
+    items,
+    loading: estructuraId ? loadingVinculos || loadingCompuestos : false,
+  };
 }

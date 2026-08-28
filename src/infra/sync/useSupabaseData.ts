@@ -148,6 +148,14 @@ const DEXIE_TABLES = new Set([
   "materiales",
   "material_componentes",
   "material_estructuras",
+  // ─── v41: Tags de Compuestos (editor flotante de Compuesto) — catálogo
+  // "tags" es solo lectura (no entra en OFFLINE_WRITABLE); la relación
+  // "compuesto_tags" sí se edita desde el editor, por eso sí entra ahí.
+  // Vista de perfil reactivo de Material — solo lectura, calculada en
+  // Supabase, mismo patrón que las vistas v_auditoria_*.
+  "tags",
+  "compuesto_tags",
+  "v_perfil_reactivo_material",
 ]);
 
 const OFFLINE_WRITABLE = new Set([
@@ -225,6 +233,14 @@ const OFFLINE_WRITABLE = new Set([
   // "flora" (legacy) removida 2026-08-26: migrada a "organismos".
   // ─── v37: mineral_reacciones ─────────────────────────────────────────────
   "mineral_reacciones",
+  // NOTA v41: "compuesto_tags" a propósito NO entra acá. No tiene columna
+  // "id" propia (PK compuesta real: compuesto_id+tag_id), y el flujo
+  // offline genérico de este archivo (getDexieRow/makePendingRow/
+  // addRow/updateRow/deleteRow) asume "id" en todos lados — forzarla acá
+  // rompería ese contrato en vez de arreglar el hueco. Se cachea igual en
+  // DEXIE_TABLES (lectura) y useTagsCompuestos.ts escribe a Dexie a mano
+  // con su propia key compuesta, mismo espíritu pero sin pasar por este
+  // helper genérico.
 ]);
 
 // Tablas con ID numérico autogenerado por la DB — no se pueden crear offline

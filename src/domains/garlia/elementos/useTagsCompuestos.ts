@@ -7,17 +7,28 @@
  * naturaleza / oris / uso, cada tag con color hex para la UI) + tabla
  * relacional "compuesto_tags" (many-to-many, ON DELETE CASCADE).
  *
- * Ambas tablas viven en Supabase con RLS de solo-lectura pública, así que
- * el catálogo de tags se lee con useSupabaseData (mismo patrón que
- * useCompuestos.ts) y las relaciones se escriben directo con
- * supabase.from("compuesto_tags").insert/delete — igual que persist() en
- * CompuestoEditor (CompuestosPage.tsx).
+ * Ambas tablas viven en Supabase con RLS de solo-lectura pública. El
+ * catálogo "tags" se lee con useSupabaseData (mismo patrón que
+ * useCompuestos.ts) y ahora está en DEXIE_TABLES → sobrevive offline.
+ *
+ * "compuesto_tags" también se lee con useSupabaseData (cache-first,
+ * offline-first) pero se escribe a mano: no tiene columna "id" propia
+ * (PK compuesta real: compuesto_id+tag_id), así que no encaja en el
+ * addRow/updateRow/deleteRow genérico de useSupabaseData, que asume "id"
+ * en todo el flujo offline (getDexieRow, makePendingRow, etc. — ver nota
+ * en useSupabaseData.ts junto a DEXIE_TABLES). En su lugar, cada toggle
+ * escribe optimistamente en memoria (igual que antes), pega a Supabase, y
+ * además refleja el resultado en Dexie a mano con dexiePut/dexieDelete
+ * usando la key compuesta [compuesto_id+tag_id] declarada en db.ts (v41)
+ * — así el catálogo de tags asignados por compuesto también sobrevive
+ * offline, aunque la escritura en sí siga necesitando red.
  */
 
 import { useCallback, useMemo } from "react";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
+import { dexiePut, dexieDelete } from "@/infra/sync/useOfflineSync";
 
 export type CategoriaTag = "naturaleza" | "oris" | "uso";
 
@@ -121,6 +132,9 @@ export function useCompuestoTags() {
         setData((prev) =>
           prev.filter((r) => !(r.compuesto_id === compuestoId && r.tag_id === tagId)),
         );
+        // Optimista también en Dexie: si falla la escritura remota se
+        // revierte más abajo, igual que con el estado en memoria.
+        void dexieDelete(CONFIG_COMPUESTO_TAGS.tabla, [compuestoId, tagId] as any);
         const { error } = await supabase
           .from(CONFIG_COMPUESTO_TAGS.tabla)
           .delete()
@@ -129,9 +143,17 @@ export function useCompuestoTags() {
         if (error) {
           console.error("[useCompuestoTags] error quitando tag:", error);
           setData((prev) => [...prev, { compuesto_id: compuestoId, tag_id: tagId }]);
+          void dexiePut(CONFIG_COMPUESTO_TAGS.tabla, {
+            compuesto_id: compuestoId,
+            tag_id: tagId,
+          });
         }
       } else {
         setData((prev) => [...prev, { compuesto_id: compuestoId, tag_id: tagId }]);
+        void dexiePut(CONFIG_COMPUESTO_TAGS.tabla, {
+          compuesto_id: compuestoId,
+          tag_id: tagId,
+        });
         const { error } = await supabase
           .from(CONFIG_COMPUESTO_TAGS.tabla)
           .insert([{ compuesto_id: compuestoId, tag_id: tagId }]);
@@ -140,6 +162,7 @@ export function useCompuestoTags() {
           setData((prev) =>
             prev.filter((r) => !(r.compuesto_id === compuestoId && r.tag_id === tagId)),
           );
+          void dexieDelete(CONFIG_COMPUESTO_TAGS.tabla, [compuestoId, tagId] as any);
         }
       }
     },

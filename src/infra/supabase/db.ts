@@ -922,6 +922,12 @@ class AgendaFraniDB extends Dexie {
   v_auditoria_compuestos_derivacion!: Table<AuditoriaCompuestoDexie, string>;
   v_auditoria_elementos_derivacion!: Table<AuditoriaElementoDexie, string>;
 
+  // ─── v41: tags de Compuestos (catálogo + relación) y vista de perfil
+  // reactivo de Material — ver detalle en version(41).stores() más abajo.
+  tags!: Table<FilaGenericaDexie, string>;
+  compuesto_tags!: Table<FilaGenericaDexie, string>;
+  v_perfil_reactivo_material!: Table<FilaGenericaDexie, string>;
+
   constructor() {
     super("AgendaFranilover");
 
@@ -1851,6 +1857,27 @@ class AgendaFraniDB extends Dexie {
       materiales: "id, nombre, tipo_material, material_padre_id, orden, created_at",
       material_componentes: "id, material_id, componente_tipo, componente_id, created_at",
       material_estructuras: "id, material_id, estructura_id, created_at",
+    });
+
+    // ─── v41: barrido de los 4 huecos restantes en Química —
+    // useTagsCompuestos.ts pegaba directo a Supabase para el catálogo
+    // "tags" (solo lectura, editor flotante de Compuesto) y para la
+    // relación "compuesto_tags" (many-to-many, se edita desde ese mismo
+    // editor con insert/delete directo). usePerfilReactivoMaterial.ts ya
+    // usaba useSupabaseData pero su tabla ("v_perfil_reactivo_material")
+    // nunca se declaró acá ni en DEXIE_TABLES — sin conexión el panel de
+    // perfil reactivo del editor de Material quedaba en blanco, a
+    // diferencia de las otras vistas v_auditoria_* (v38) que sí tienen
+    // cache propio. Mismo patrón cache-first que el resto: "tags" y
+    // "v_perfil_reactivo_material" son de solo lectura (no entran en
+    // OFFLINE_WRITABLE); "compuesto_tags" sí se escribe offline.
+    this.version(41).stores({
+      tags: "id, nombre",
+      // Sin columna "id" propia en Supabase (PK compuesta real:
+      // compuesto_id+tag_id) — se declara key compuesta acá en vez de "id"
+      // para no inventar un id sintético que no existe en la fuente.
+      compuesto_tags: "[compuesto_id+tag_id], compuesto_id, tag_id",
+      v_perfil_reactivo_material: "id, material_id",
     });
   }
 }
