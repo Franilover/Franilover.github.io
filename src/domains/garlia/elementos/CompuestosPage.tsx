@@ -56,6 +56,7 @@ import { useGranos } from "./useGranos";
 import { useCelulas } from "./useCelulas";
 import { PanelEditorGrano, PanelEditorVeta } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { PanelEditorCelula, PanelEditorTejido } from "@/domains/garlia/biologia/CatalogoTejidosBiologia";
+import { TarjetaPropiedadesFisicas } from "../_shared/GridPropiedadesCalculadas";
 import { BreadcrumbJerarquia } from "@/domains/garlia/biologia/BreadcrumbJerarquia";
 import { GrupoCompuestoPanelFlotante } from "./GruposCompuestosPage";
 import { useOrganos } from "./useOrganos";
@@ -257,43 +258,7 @@ const ENLACE_COLOR: Record<TipoEnlace, string> = {
  * marcado como "derivado".
  */
 function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: PropiedadCalculada[] }) {
-  const conValor = propiedades.filter((p) => p.valor !== null);
-  if (conValor.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-1.5 p-2">
-      <div className="flex items-center gap-1.5">
-        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-          Propiedades físicas
-        </span>
-        <InfoFormulasPopover propiedades={conValor} />
-      </div>
-      <div className="grid grid-cols-5 gap-1.5">
-        {conValor.map((p) => (
-          <div
-            key={p.clave}
-            title={p.descripcion}
-            className="flex flex-col gap-1 rounded-md border border-primary/10 px-2 py-1.5"
-          >
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-micro font-bold text-primary/50 truncate">{p.label}</span>
-              <span className="text-micro font-black text-primary/70 tabular-nums shrink-0 truncate max-w-[6.5rem] text-right">
-                {p.valor}
-              </span>
-            </div>
-            {p.proporcion !== undefined && (
-              <div className="h-1 rounded-full bg-primary/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-accent/50"
-                  style={{ width: `${p.proporcion * 100}%` }}
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <TarjetaPropiedadesFisicas propiedades={propiedades} columnas={5} />;
 }
 
 /**

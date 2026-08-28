@@ -155,37 +155,38 @@ export function propiedadesCalculadasGenerico(
 }
 
 /**
- * Bloque de solo lectura con el mismo layout que PropiedadesFisicasBloque
- * (Elemento) y PropiedadesFisicasCompuestoBloque (Compuesto): título +
+ * Tarjeta de solo lectura reutilizable para "Propiedades físicas": título +
  * InfoFormulasPopover + grid de tarjetas con barra de proporción cuando
- * aplica. Pensado para Material y Estructura, que guardan sus propiedades
- * en el jsonb propiedades_calculadas en vez de columnas propias.
+ * aplica. Es el único lugar donde vive este diseño — Elemento, Compuesto,
+ * Material y Estructura lo comparten pasando su propia lista ya calculada
+ * (cada nivel tiene su función propia: propiedadesCalculadasDeElemento,
+ * propiedadesCalculadasDeCompuesto, propiedadesCalculadasGenerico), así que
+ * un cambio visual acá se refleja en los 4 sin duplicar JSX/clases.
  */
-export function PropiedadesFisicasGenerico({
+export function TarjetaPropiedadesFisicas({
   propiedades,
   columnas = 3,
 }: {
-  propiedades: Record<string, unknown> | null | undefined;
-  /** Cuántas columnas usar en el grid — Material/Estructura tienen menos
-   *  propiedades visibles que Compuesto (5 cols), así que 3 por defecto
-   *  deja tarjetas más legibles sin quedar angostas de más. */
+  propiedades: PropiedadCalculada[];
+  /** Cuántas columnas usar en el grid — Compuesto tiene más propiedades
+   *  visibles (5 cols) que Elemento/Material/Estructura (2–3). */
   columnas?: 2 | 3 | 4 | 5;
 }) {
-  const lista = propiedadesCalculadasGenerico(propiedades);
-  if (lista.length === 0) return null;
+  const conValor = propiedades.filter((p) => p.valor !== null);
+  if (conValor.length === 0) return null;
 
   const gridCols = { 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4", 5: "grid-cols-5" }[columnas];
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+    <div className="flex flex-col gap-1.5 min-w-0 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Propiedades físicas
         </span>
-        <InfoFormulasPopover propiedades={lista} />
+        <InfoFormulasPopover propiedades={conValor} />
       </div>
-      <div className={`grid ${gridCols} gap-1.5`}>
-        {lista.map((p) => (
+      <div className={`grid ${gridCols} gap-1.5 min-w-0`}>
+        {conValor.map((p) => (
           <div
             key={p.clave}
             title={p.descripcion}
@@ -210,4 +211,21 @@ export function PropiedadesFisicasGenerico({
       </div>
     </div>
   );
+}
+
+/**
+ * Wrapper de PropiedadesFisicasGenerico para Material y Estructura, que
+ * guardan sus propiedades en el jsonb propiedades_calculadas en vez de
+ * columnas propias — traduce el jsonb a PropiedadCalculada[] y delega el
+ * render a TarjetaPropiedadesFisicas.
+ */
+export function PropiedadesFisicasGenerico({
+  propiedades,
+  columnas = 3,
+}: {
+  propiedades: Record<string, unknown> | null | undefined;
+  columnas?: 2 | 3 | 4 | 5;
+}) {
+  const lista = propiedadesCalculadasGenerico(propiedades);
+  return <TarjetaPropiedadesFisicas propiedades={lista} columnas={columnas} />;
 }

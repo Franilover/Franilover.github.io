@@ -24,6 +24,7 @@ import { usePublishHeaderControls, type OnHeaderControlsChange } from "../_share
 import { type SaveStatus } from "@/ui/saveStatus";
 
 import { InfoFormulasPopover } from "./InfoFormulasPopover";
+import { TarjetaPropiedadesFisicas } from "../_shared/GridPropiedadesCalculadas";
 
 import {
   calcularParticulaDominante,
@@ -441,43 +442,7 @@ function SitiosEnlaceBloque({
  * Compuesto.
  */
 function PropiedadesFisicasBloque({ propiedades }: { propiedades: PropiedadCalculada[] }) {
-  const conValor = propiedades.filter((p) => p.valor !== null);
-  if (conValor.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-1.5 min-w-0 p-2">
-      <div className="flex items-center gap-1.5">
-        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-          Propiedades físicas
-        </span>
-        <InfoFormulasPopover propiedades={conValor} />
-      </div>
-      <div className="grid grid-cols-2 gap-1.5 min-w-0">
-        {conValor.map((p) => (
-          <div
-            key={p.clave}
-            title={p.descripcion}
-            className="flex flex-col gap-1 min-w-0 rounded-md border border-primary/10 px-1.5 py-1.5"
-          >
-            <div className="flex items-center justify-between gap-1 min-w-0">
-              <span className="text-micro font-bold text-primary/50 truncate">{p.label}</span>
-              <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
-                {p.valor}
-              </span>
-            </div>
-            {p.proporcion !== undefined && (
-              <div className="h-1 rounded-full bg-primary/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-accent/50"
-                  style={{ width: `${p.proporcion * 100}%` }}
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <TarjetaPropiedadesFisicas propiedades={propiedades} columnas={2} />;
 }
 
 // ─── Visualización tipo átomo real ──────────────────────────────────────
