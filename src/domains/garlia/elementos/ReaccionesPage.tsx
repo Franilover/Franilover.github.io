@@ -6,9 +6,13 @@
  * Sub-sección "Reacciones" dentro de Química, apilada debajo de Grupos de
  * Compuestos: catálogo de recetas reutilizables de consume/produce (ej.
  * "Fotosíntesis básica" = consume Luz+Agua, produce Glucosa+Oxígeno).
- * Pensadas para vincularse en vivo desde Procesos (Flora/Minerales) y
- * Habilidades (Items) — editar la Reacción acá actualiza todos los lugares
- * que la usan.
+ *
+ * Reacción es un concepto independiente de Proceso (no una etapa obligatoria
+ * dentro de él, ver documentacion_sistema #1120): representa una
+ * transformación material específica y puede vincularse opcionalmente desde
+ * Procesos (Flora/Minerales) y Habilidades (Items) — editar la Reacción acá
+ * actualiza todos los lugares que la usan, pero un Proceso sin Reacción
+ * asociada es un estado normal, no incompleto.
  *
  * Mismo patrón visual que GruposCompuestosPage: pills + panel flotante
  * centrado con el detalle (SelectorConsumeProduce + BalanceProcesoPanel +
@@ -110,7 +114,9 @@ export function ReaccionesPage({
         <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
       ) : reacciones.length === 0 ? (
         <div className="py-6 text-micro text-primary/25 text-center">
-          Todavía no hay reacciones creadas.
+          Todavía no hay reacciones creadas. Una Reacción es opcional: representa una
+          transformación material específica (consume/produce) y puede vincularse a un
+          Proceso, pero no todo Proceso necesita una.
         </div>
       ) : (
         <div className="flex flex-wrap gap-1">

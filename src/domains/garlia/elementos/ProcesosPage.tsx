@@ -99,13 +99,17 @@ function ProcesoDetail({ proceso }: { proceso: Proceso }) {
 
       <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
         <h3 className="text-sm font-semibold text-primary">Reacciones</h3>
-        <p className="mt-1 text-xs text-primary/45">Reacciones que componen este proceso</p>
+        <p className="mt-1 text-xs text-primary/45">
+          Opcional: transformación material específica asociada a este proceso, si existe.
+        </p>
         {loadingRelaciones ? (
           <div className="flex items-center gap-2 py-5 text-sm text-primary/45">
             <Loader2 className="h-4 w-4 animate-spin" /> Cargando reacciones…
           </div>
         ) : relaciones.length === 0 ? (
-          <p className="py-4 text-sm text-primary/40">Este proceso no tiene reacciones asociadas.</p>
+          <p className="py-4 text-sm text-primary/40">
+            Sin reacción asociada — no todo proceso tiene una, y eso no es un dato faltante.
+          </p>
         ) : (
           <div className="mt-3 space-y-2">
             {relaciones.map((relacion) => {
