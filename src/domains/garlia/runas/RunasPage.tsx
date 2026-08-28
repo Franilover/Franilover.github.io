@@ -11,7 +11,17 @@
  * Dones se eliminaron, queda un solo bloque de Runas.
  */
 
-import { Atom, Beaker, Maximize2, Plus, ScrollText, Sparkles, Waypoints, X } from "lucide-react";
+import {
+  Atom,
+  Beaker,
+  BarChart3,
+  Maximize2,
+  Plus,
+  ScrollText,
+  Sparkles,
+  Waypoints,
+  X,
+} from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { EntityCard } from "@/domains/garlia/_shared/EntityCard";
@@ -38,6 +48,7 @@ import { useVetas } from "@/domains/garlia/elementos/useVetas";
 import { useFormaciones } from "@/domains/garlia/elementos/useFormaciones";
 import { FilaAsimetrica } from "@/domains/garlia/_shared/FilaAsimetrica";
 import { SandboxPage } from "@/domains/garlia/sandbox/SandboxPage";
+import VisualizadorPage from "@/domains/garlia/visualizador/VisualizadorPage";
 import { LogicaSistemaPage } from "./LogicaSistemaPage";
 import { FisicaPage, BloqueFisicaMinerales } from "@/domains/garlia/fisica/FisicaPage";
 import { ORIS_CONFIG, type Oris } from "@/domains/garlia/fisica/types";
@@ -723,6 +734,7 @@ const SECCIONES_MAGIA: { key: SeccionMagia; label: string; Icon: React.ElementTy
   { key: "runas", label: "Runas", Icon: Waypoints },
   { key: "tabla", label: "Química", Icon: Atom },
   { key: "sandbox", label: "Sandbox", Icon: Beaker },
+  { key: "visualizador", label: "Visualizador", Icon: BarChart3 },
   { key: "logica", label: "Lógica", Icon: Sparkles },
 ];
 
@@ -1051,6 +1063,10 @@ export function RunasPage({
       ) : seccionMagia === "sandbox" ? (
         <div className="mt-4">
           <SandboxPage />
+        </div>
+      ) : seccionMagia === "visualizador" ? (
+        <div className="mt-4">
+          <VisualizadorPage />
         </div>
       ) : seccionMagia === "logica" ? (
         <div className="mt-4">

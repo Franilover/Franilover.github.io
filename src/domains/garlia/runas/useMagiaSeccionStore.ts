@@ -26,7 +26,14 @@ import { persist } from "zustand/middleware";
 // SeccionMagia (en vez de borrarlos) solo para no romper el `seccion`
 // persistido de sesiones viejas: quien lea el store hoy debe tratarlos
 // como "tabla" (ver migrate más abajo).
-export type SeccionMagia = "runas" | "tabla" | "fisica" | "biologia" | "sandbox" | "logica";
+export type SeccionMagia =
+  | "runas"
+  | "tabla"
+  | "fisica"
+  | "biologia"
+  | "sandbox"
+  | "visualizador"
+  | "logica";
 
 // Sub-secciones dentro de la tab "Química": antes física/biología tenían
 // su propia jerarquía Partículas Base > Partículas > Elementos por
