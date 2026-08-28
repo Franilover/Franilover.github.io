@@ -619,20 +619,13 @@ export function SandboxPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-3 pb-4 pt-2">
-      <div className="mb-5">
-        <h1 className="text-sm font-black text-primary">Sandbox</h1>
-        <p className="mt-0.5 text-micro text-primary/40">
-          Entorno experimental aislado — el motor de reglas vive en Supabase
-        </p>
-      </div>
-
       {error && (
         <div className="mb-4 px-3 py-2 rounded-md border border-primary/15 text-micro font-bold text-primary/70">
           {error}
         </div>
       )}
 
-      <div className="mb-5 pb-5 border-b border-primary/10">
+      <div className="mb-4 pb-4 border-b border-primary/10">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <EtiquetaSeccion>Cargar existente</EtiquetaSeccion>
@@ -701,7 +694,8 @@ export function SandboxPage() {
       )}
 
       {simulacionId && simulacion && (
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* COLUMNA IZQUIERDA: tiempo_simulado, Event log, Disparar evento */}
           <div className="flex flex-col gap-5">
             <div className="pb-5 border-b border-primary/10">
               <div className="flex items-center justify-between mb-3">
@@ -760,7 +754,89 @@ export function SandboxPage() {
               </div>
             </div>
 
-            {/* CATÁLOGO → SANDBOX */}
+            <div className="pb-5 border-b border-primary/10">
+              <BloqueHeader label="Event log" count={eventos.length} />
+
+              {eventos.length === 0 ? (
+                <p className="py-2 text-micro text-primary/30">
+                  Sin eventos todavía
+                </p>
+              ) : (
+                <div className="flex flex-col divide-y divide-primary/8">
+                  {eventos.map((ev) => (
+                    <div
+                      className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                      key={ev.id}
+                    >
+                      <span className="text-micro font-bold text-primary/60 truncate">
+                        t={ev.tiempo_programado} · {ev.evento_id.slice(0, 8)}
+                      </span>
+
+                      <span
+                        className={`text-micro font-bold shrink-0 ${
+                          ev.estado === "procesado"
+                            ? "text-primary/70"
+                            : "text-primary/35"
+                        }`}
+                      >
+                        {ev.estado}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* DISPARAR EVENTO */}
+            <div>
+              <EtiquetaSeccion>Disparar evento</EtiquetaSeccion>
+
+              <div className="grid grid-cols-1 gap-2">
+                <Select
+                  label="Entidad"
+                  onChange={(e) => setEntidadSeleccionada(e.target.value)}
+                  options={[
+                    { value: "", label: "—" },
+                    ...entidades.map((e) => ({
+                      value: e.id,
+                      label: e.entidad_tipo,
+                    })),
+                  ]}
+                  value={entidadSeleccionada}
+                />
+
+                <Select
+                  label="Evento"
+                  onChange={(e) => setEventoSeleccionado(e.target.value)}
+                  options={[
+                    { value: "", label: "—" },
+                    ...catalogoEventos.map((ev) => ({
+                      value: ev.id,
+                      label: String(ev.nombre ?? ev.id),
+                    })),
+                  ]}
+                  value={eventoSeleccionado}
+                />
+              </div>
+
+              <SandboxBtn
+                className="mt-3 w-full"
+                disabled={!entidadSeleccionada || !eventoSeleccionado}
+                onClick={() =>
+                  dispararEvento({
+                    eventoId: eventoSeleccionado,
+                    entidadId: entidadSeleccionada,
+                  })
+                }
+                size="sm"
+              >
+                Encolar evento
+              </SandboxBtn>
+            </div>
+          </div>
+
+          {/* COLUMNA DERECHA: Agregar desde catálogo, Entidades */}
+          <div className="flex flex-col gap-5">
             <div className="pb-5 border-b border-primary/10">
               <EtiquetaSeccion>Agregar desde catálogo</EtiquetaSeccion>
 
@@ -907,57 +983,8 @@ export function SandboxPage() {
               )}
             </div>
 
-            {/* DISPARAR EVENTO */}
+            {/* ENTIDADES */}
             <div>
-              <EtiquetaSeccion>Disparar evento</EtiquetaSeccion>
-
-              <div className="grid grid-cols-1 gap-2">
-                <Select
-                  label="Entidad"
-                  onChange={(e) => setEntidadSeleccionada(e.target.value)}
-                  options={[
-                    { value: "", label: "—" },
-                    ...entidades.map((e) => ({
-                      value: e.id,
-                      label: e.entidad_tipo,
-                    })),
-                  ]}
-                  value={entidadSeleccionada}
-                />
-
-                <Select
-                  label="Evento"
-                  onChange={(e) => setEventoSeleccionado(e.target.value)}
-                  options={[
-                    { value: "", label: "—" },
-                    ...catalogoEventos.map((ev) => ({
-                      value: ev.id,
-                      label: String(ev.nombre ?? ev.id),
-                    })),
-                  ]}
-                  value={eventoSeleccionado}
-                />
-              </div>
-
-              <SandboxBtn
-                className="mt-3 w-full"
-                disabled={!entidadSeleccionada || !eventoSeleccionado}
-                onClick={() =>
-                  dispararEvento({
-                    eventoId: eventoSeleccionado,
-                    entidadId: entidadSeleccionada,
-                  })
-                }
-                size="sm"
-              >
-                Encolar evento
-              </SandboxBtn>
-            </div>
-          </div>
-
-          {/* ESTADO EN VIVO */}
-          <div className="flex flex-col gap-5">
-            <div className="pb-5 border-b border-primary/10 lg:border-b-0">
               <BloqueHeader label="Entidades" count={entidades.length} />
 
               {entidades.length === 0 ? (
@@ -990,39 +1017,6 @@ export function SandboxPage() {
                       <div className="mt-1.5">
                         <EstadoEntidadGrid estado={e.estado_actual} />
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <BloqueHeader label="Event log" count={eventos.length} />
-
-              {eventos.length === 0 ? (
-                <p className="py-2 text-micro text-primary/30">
-                  Sin eventos todavía
-                </p>
-              ) : (
-                <div className="flex flex-col divide-y divide-primary/8">
-                  {eventos.map((ev) => (
-                    <div
-                      className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                      key={ev.id}
-                    >
-                      <span className="text-micro font-bold text-primary/60 truncate">
-                        t={ev.tiempo_programado} · {ev.evento_id.slice(0, 8)}
-                      </span>
-
-                      <span
-                        className={`text-micro font-bold shrink-0 ${
-                          ev.estado === "procesado"
-                            ? "text-primary/70"
-                            : "text-primary/35"
-                        }`}
-                      >
-                        {ev.estado}
-                      </span>
                     </div>
                   ))}
                 </div>
