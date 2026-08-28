@@ -317,33 +317,6 @@ export function BiologiaCladograma({ onSelectCriatura }: Props) {
 
   return (
     <div className="min-w-0">
-      <div className="flex items-center justify-end gap-1 px-2 mb-1">
-        <input
-          ref={inputArchivoRef}
-          type="file"
-          accept="application/json,.json"
-          onChange={handleArchivoSeleccionado}
-          className="hidden"
-        />
-        <button
-          type="button"
-          disabled={importando}
-          onClick={() => inputArchivoRef.current?.click()}
-          title='Subir un JSON con clados: crea los nuevos y actualiza los existentes (mismo nombre), mismo formato que "Descargar datos"'
-          className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-        >
-          {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
-        </button>
-        <button
-          type="button"
-          onClick={() => descargarDatosBiologia({ clados })}
-          title="Descargar el cladograma de Biología (clados) como JSON"
-          className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer"
-        >
-          <Download size={14} />
-        </button>
-      </div>
-
       {mensajeImportacion && (
         <div className="flex items-center justify-between gap-2 px-2 mb-1 text-micro text-primary/60">
           <span className="min-w-0">{mensajeImportacion}</span>

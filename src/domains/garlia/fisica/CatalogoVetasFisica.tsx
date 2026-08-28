@@ -82,15 +82,6 @@ export function CatalogoVetasFisica({
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Granos · {granos.items.length}
           </p>
-          <button
-            type="button"
-            onClick={() => void granos.crear()}
-            disabled={granos.creando}
-            title="Crear grano nuevo"
-            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40 cursor-pointer"
-          >
-            <Plus size={10} /> Nuevo
-          </button>
         </div>
 
         <GridSimple
@@ -152,15 +143,6 @@ export function CatalogoVetasFisica({
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Vetas · {vetas.items.length}
           </p>
-          <button
-            type="button"
-            onClick={() => void vetas.crear()}
-            disabled={vetas.creando}
-            title="Crear veta nueva"
-            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40 cursor-pointer"
-          >
-            <Plus size={10} /> Nueva
-          </button>
         </div>
 
         <GridSimple

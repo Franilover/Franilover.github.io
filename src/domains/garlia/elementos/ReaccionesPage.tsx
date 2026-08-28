@@ -106,23 +106,6 @@ export function ReaccionesPage({
 
   return (
     <div className="p-3 flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div className="text-primary/40">
-          <p className="text-micro font-black uppercase tracking-widest">Reacciones</p>
-        </div>
-        {onCreate && (
-          <button
-            type="button"
-            disabled={creating}
-            onClick={onCreate}
-            title="Nueva reacción"
-            className="flex items-center justify-center p-1.5 rounded-md bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {creating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
-          </button>
-        )}
-      </div>
-
       {loading && reacciones.length === 0 ? (
         <div className="py-6 text-micro text-primary/30 text-center">Cargando…</div>
       ) : reacciones.length === 0 ? (

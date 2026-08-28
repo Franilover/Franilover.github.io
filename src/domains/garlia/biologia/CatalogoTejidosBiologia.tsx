@@ -88,15 +88,6 @@ export function CatalogoTejidosBiologia({
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Células · {celulas.items.length}
           </p>
-          <button
-            type="button"
-            onClick={() => void celulas.crear()}
-            disabled={celulas.creando}
-            title="Crear célula nueva"
-            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40 cursor-pointer"
-          >
-            <Plus size={10} /> Nueva
-          </button>
         </div>
 
         <GridSimple
@@ -160,15 +151,6 @@ export function CatalogoTejidosBiologia({
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Tejidos · {tejidos.items.length}
           </p>
-          <button
-            type="button"
-            onClick={() => void tejidos.crear()}
-            disabled={tejidos.creando}
-            title="Crear tejido nuevo"
-            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40 cursor-pointer"
-          >
-            <Plus size={10} /> Nuevo
-          </button>
         </div>
 
         <GridSimple

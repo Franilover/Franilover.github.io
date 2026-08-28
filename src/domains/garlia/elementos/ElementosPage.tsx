@@ -827,51 +827,6 @@ export function ElementosPage({
             >
               <GitCompare size={14} />
             </button>
-            <DropdownDescargar
-              opciones={[
-                {
-                  key: "todo",
-                  label: "Descargar todo",
-                  onClick: () => descargarDatosElementos(elementos, compuestos),
-                },
-                {
-                  key: "elementos-compuestos",
-                  label: "Elementos y Compuestos",
-                  onClick: () => descargarElementosYCompuestos(elementos, compuestos),
-                },
-              ]}
-            />
-            {onImportarElementos && (
-              <>
-                <input
-                  ref={inputArchivoRef}
-                  type="file"
-                  accept="application/json,.json"
-                  onChange={handleArchivoSeleccionado}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  disabled={importando}
-                  onClick={() => inputArchivoRef.current?.click()}
-                  title='Subir un JSON con elementos: crea los nuevos y actualiza los existentes (mismo número atómico), mismo formato que "Descargar datos"'
-                  className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {importando ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />}
-                </button>
-              </>
-            )}
-            {onCreate && (
-              <button
-                type="button"
-                disabled={creating}
-                onClick={onCreate}
-                title="Nuevo elemento"
-                className="flex items-center justify-center p-1.5 rounded-md bg-primary text-btn-text hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {creating ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
-              </button>
-            )}
           </div>
         </div>
 

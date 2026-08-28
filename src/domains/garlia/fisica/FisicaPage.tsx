@@ -20,7 +20,7 @@
  * "oris" y "fisica_conceptos", separadas de "elementos".
  */
 
-import { ChevronLeft, Download, Info, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { ChevronLeft, Info, Sparkles, Trash2, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -407,41 +407,7 @@ function TodasLasBasesView({
             >
               <div className="flex items-center justify-between gap-1.5 text-primary/50 pb-1.5">
                 <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
-                {key === "subsistemas" && (
-                  <button
-                    type="button"
-                    onClick={() => setCreandoAbierto((o) => !o)}
-                    title="Añadir subsistema"
-                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-                  >
-                    <Plus size={11} />
-                  </button>
-                )}
               </div>
-
-              {key === "subsistemas" && creandoAbierto && (
-                <div className="flex flex-col gap-1.5 -mt-1 mb-1">
-                  <input
-                    autoFocus
-                    className="w-full min-w-0 bg-primary/[0.02] border border-primary/10 rounded-lg px-2.5 py-1.5 text-xs text-primary/80 outline-none placeholder:text-primary/30 focus:border-primary/25"
-                    placeholder="Nombre del subsistema (ej. Luminia)…"
-                    value={nombreNuevoSubsistema}
-                    onChange={(e) => setNombreNuevoSubsistema(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void handleCrearSubsistema();
-                      if (e.key === "Escape") setCreandoAbierto(false);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!nombreNuevoSubsistema.trim() || creandoSubsistema}
-                    onClick={() => void handleCrearSubsistema()}
-                    className="shrink-0 text-micro font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-primary text-bg-main hover:opacity-90 transition-opacity disabled:opacity-40"
-                  >
-                    Crear
-                  </button>
-                </div>
-              )}
 
               {filas.length === 0 ? (
                 <div className="py-4 text-micro text-primary/25 text-center border border-dashed border-primary/10 rounded-md">
@@ -1127,44 +1093,6 @@ export function FisicaPage({
           />
         </PopoverFlotante>
       )}
-
-      {/* Barra superior: solo acciones de import/export — sin tabs ni
-          grupos, todo vive en una única vista de 2 columnas. */}
-      <div className="shrink-0 flex flex-col gap-1 px-3 pt-2 pb-1.5 border-b border-primary/10">
-        <div className="flex items-center justify-end gap-2">
-          <div className="shrink-0 flex items-center gap-0.5">
-            {onImportarFisica && (
-              <>
-                <input
-                  ref={inputArchivoRef}
-                  type="file"
-                  accept="application/json,.json"
-                  onChange={handleArchivoSeleccionado}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  disabled={importando}
-                  onClick={() => inputArchivoRef.current?.click()}
-                  title='Subir un JSON con Oris y/o conceptos: crea los nuevos y actualiza los existentes (mismo formato que "Descargar datos")'
-                  className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {importando ? <Loader2 className="animate-spin" size={10} /> : <Upload size={10} />}
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => descargarDatosFisica(particulaBase, particulas, iums, oris, conceptosLocal)}
-              title="Descargar todos los datos de Física (catálogos + Oris + conceptos) como JSON"
-              className="flex items-center justify-center w-5 h-5 rounded-md text-primary/40 hover:text-primary hover:bg-primary/5 transition-all cursor-pointer"
-            >
-              <Download size={10} />
-            </button>
-          </div>
-        </div>
-
-      </div>
 
       {mensajeImportacion && (
         <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-1.5 border-b border-primary/10 text-micro text-primary/60 bg-primary/[0.03]">

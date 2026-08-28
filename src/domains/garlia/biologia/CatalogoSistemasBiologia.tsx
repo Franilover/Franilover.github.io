@@ -135,15 +135,6 @@ export function CatalogoSistemasBiologia({ organos, loadingOrganos, onAbrirOrgan
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Sistemas · {sistemas.items.length}
           </p>
-          <button
-            type="button"
-            onClick={() => void crearSistema()}
-            disabled={creandoSistema}
-            title="Crear sistema nuevo"
-            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40 cursor-pointer"
-          >
-            <Plus size={10} /> Nuevo
-          </button>
         </div>
 
         <GridSimple
@@ -184,15 +175,6 @@ export function CatalogoSistemasBiologia({ organos, loadingOrganos, onAbrirOrgan
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Organismos · {organismos.items.length}
           </p>
-          <button
-            type="button"
-            onClick={() => void crearOrganismo()}
-            disabled={creandoOrganismo}
-            title="Crear organismo nuevo"
-            className="flex items-center gap-1 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary transition-colors disabled:opacity-40 cursor-pointer"
-          >
-            <Plus size={10} /> Nuevo
-          </button>
         </div>
 
         <GridSimple
