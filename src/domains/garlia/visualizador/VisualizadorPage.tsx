@@ -320,9 +320,44 @@ function RutaFisicaCanvas({
   selectedNodeId: string | null;
   onSelectNode: (id: string) => void;
 }) {
-  const { oris, orisSel, setOrisSelId, iumPorId, particulasDelOrisSel } = route;
+  const {
+    oris,
+    orisSel,
+    setOrisSelId,
+    iumPorId,
+    particulasDelOrisSel,
+    iumSel,
+    setIumSelId,
+    particulasDelIumSel,
+  } = route;
+
+  // Zoom: click en un nodo IUM entra al nivel Ium → Partículas propias del
+  // Ium (particulasDelIumSel, ya resuelto por el hook, sin recalcular
+  // nada). "iumSel" viene del mismo hook — reutiliza su propio estado en
+  // vez de duplicar un id de zoom acá.
+  const enZoomIum = Boolean(iumSel);
 
   const columns: CanvasColumn[] = useMemo(() => {
+    if (enZoomIum && iumSel) {
+      // Vista con zoom: Partículas del Ium (nivel 1) → Ium (nivel 2).
+      const particulaNodesZoom = particulasDelIumSel.map((p, i) => ({
+        id: `particula-ium-${i}`,
+        label: p.nombre,
+        sublabel: p.formula,
+        visual: <ParticulaVisual formula={p.formula} size={40} />,
+      }));
+      const iumNodeZoom = {
+        id: `ium-${iumSel.id}`,
+        label: iumSel.nombre,
+        sublabel: "Ium seleccionado",
+        tone: "accent" as const,
+        visual: <IumVisual particulas={particulasDelIumSel} size={52} />,
+      };
+      return [
+        { id: "particulas", label: "Partículas del Ium", nodes: particulaNodesZoom },
+        { id: "ium", label: "IUM", nodes: [iumNodeZoom] },
+      ];
+    }
     if (!orisSel) return [];
     // Nivel 1: partículas reales expandidas del Oris (vía sus IUMs).
     const particulaNodes = particulasDelOrisSel.slice(0, 12).map((p, i) => ({
@@ -360,9 +395,19 @@ function RutaFisicaCanvas({
       { id: "iums", label: "IUM", nodes: iumNodes },
       { id: "oris", label: "Oris", nodes: [orisNode] },
     ];
-  }, [orisSel, iumPorId, particulasDelOrisSel]);
+  }, [enZoomIum, iumSel, particulasDelIumSel, orisSel, iumPorId, particulasDelOrisSel]);
 
   const edges: CanvasEdge[] = useMemo(() => {
+    if (enZoomIum && iumSel) {
+      // Cada partícula del Ium se conecta al Ium — trazabilidad real 1:1,
+      // a diferencia de la vista de conjunto (donde particulasDeOris no
+      // trae mapeo partícula→IUM individual).
+      return particulasDelIumSel.map((_, i) => ({
+        fromNodeId: `particula-ium-${i}`,
+        toNodeId: `ium-${iumSel.id}`,
+        weight: 0.5,
+      }));
+    }
     if (!orisSel) return [];
     const out: CanvasEdge[] = [];
     const iumIds = Object.keys(orisSel.iums_composicion).filter((id) => orisSel.iums_composicion[id] > 0);
@@ -382,27 +427,55 @@ function RutaFisicaCanvas({
         });
     }
     return out;
-  }, [orisSel, columns]);
+  }, [enZoomIum, iumSel, particulasDelIumSel, orisSel, columns]);
+
+  // Click en un nodo: si es un IUM de la vista de conjunto, hace zoom.
+  // Si no, delega al manejo normal (partícula/Oris) del padre.
+  function handleSelectNode(nodeId: string) {
+    if (!enZoomIum && nodeId.startsWith("ium-")) {
+      setIumSelId(nodeId.slice("ium-".length));
+      return;
+    }
+    onSelectNode(nodeId);
+  }
 
   return (
     <>
       {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Oris cargados en Supabase todavía.</EmptyRow> : null}
       {!route.loading && oris.length > 0 ? (
         <>
-          <ChipSelector
-            items={oris}
-            active={orisSel}
-            getKey={(o) => o.id}
-            getLabel={(o) => o.nombre}
-            onSelect={(o) => setOrisSelId(o.id)}
-          />
+          {enZoomIum ? (
+            <button
+              type="button"
+              onClick={() => setIumSelId(null)}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-primary/15 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/60 hover:border-primary/30 hover:text-primary/85"
+            >
+              <ChevronRight className="rotate-180" size={12} />
+              Volver a {orisSel?.nombre ?? "Oris"}
+            </button>
+          ) : (
+            <ChipSelector
+              items={oris}
+              active={orisSel}
+              getKey={(o) => o.id}
+              getLabel={(o) => o.nombre}
+              onSelect={(o) => {
+                setOrisSelId(o.id);
+                setIumSelId(null);
+              }}
+            />
+          )}
           <div className="mt-3 rounded-2xl border border-primary/10 p-3">
             <StructureCanvas
               columns={columns}
               edges={edges}
-              selectedNodeId={selectedNodeId ?? (orisSel ? `oris-${orisSel.id}` : null)}
+              selectedNodeId={
+                enZoomIum
+                  ? (iumSel ? `ium-${iumSel.id}` : null)
+                  : (selectedNodeId ?? (orisSel ? `oris-${orisSel.id}` : null))
+              }
               onHoverNode={setHoverId}
-              onSelectNode={onSelectNode}
+              onSelectNode={handleSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
             />
           </div>
@@ -429,19 +502,32 @@ function RutaAlquimiaCanvas({
 
   const columns: CanvasColumn[] = useMemo(() => {
     if (!elementoSel) return [];
-    const particulaNodes = capaSel
-      ? particulasDeCapaSel.map((p, i) => ({
-          id: `particula-${capaSel}-${i}`,
-          label: p.nombre,
-          sublabel: p.formula,
-          visual: <ParticulaVisual formula={p.formula} size={40} />,
-        }))
-      : [];
+    if (capaSel) {
+      // Vista con zoom: Partículas de la capa (nivel 1) → esa capa (nivel 2),
+      // mismo patrón que la vista con zoom de Física (Partículas del Ium → Ium).
+      const particulaNodesZoom = particulasDeCapaSel.map((p, i) => ({
+        id: `particula-${capaSel}-${i}`,
+        label: p.nombre,
+        sublabel: p.formula,
+        visual: <ParticulaVisual formula={p.formula} size={40} />,
+      }));
+      const capaZoomLabel = capas.find((c) => c.capa === capaSel)?.label ?? capaSel;
+      const capaNodeZoom = {
+        id: `capa-${capaSel}`,
+        label: capaZoomLabel,
+        sublabel: "Capa seleccionada",
+        tone: "accent" as const,
+      };
+      return [
+        { id: "particulas", label: "Partícula química", nodes: particulaNodesZoom },
+        { id: "capa", label: "Capa", nodes: [capaNodeZoom] },
+      ];
+    }
     const capaNodes = capas.map((c) => ({
       id: `capa-${c.capa}`,
       label: c.label,
       sublabel: c.total > 0 ? c.resumen : "vacía",
-      tone: capaSel === c.capa ? ("accent" as const) : ("default" as const),
+      tone: "default" as const,
     }));
     const elementoNode = {
       id: `elemento-${elementoSel.id}`,
@@ -450,7 +536,6 @@ function RutaAlquimiaCanvas({
       tone: "accent" as const,
     };
     return [
-      { id: "particulas", label: "Partícula química", nodes: particulaNodes },
       { id: "capas", label: "Capa", nodes: capaNodes },
       { id: "elemento", label: "Elemento", nodes: [elementoNode] },
     ];
@@ -458,21 +543,36 @@ function RutaAlquimiaCanvas({
 
   const edges: CanvasEdge[] = useMemo(() => {
     if (!elementoSel) return [];
+    if (capaSel) {
+      // Cada partícula de la capa se conecta a esa capa — trazabilidad 1:1.
+      return particulasDeCapaSel.map((_, i) => ({
+        fromNodeId: `particula-${capaSel}-${i}`,
+        toNodeId: `capa-${capaSel}`,
+        weight: 0.5,
+      }));
+    }
     const out: CanvasEdge[] = [];
     for (const c of capas) {
       if (c.total > 0) {
         out.push({ fromNodeId: `capa-${c.capa}`, toNodeId: `elemento-${elementoSel.id}`, weight: 0.6 });
       }
     }
-    if (capaSel) {
-      columns
-        .find((col) => col.id === "particulas")
-        ?.nodes.forEach((n) => {
-          out.push({ fromNodeId: n.id, toNodeId: `capa-${capaSel}`, weight: 0.4 });
-        });
-    }
     return out;
-  }, [elementoSel, capas, capaSel, columns]);
+  }, [elementoSel, capas, capaSel, particulasDeCapaSel]);
+
+  // Click en un nodo: si es una capa de la vista de conjunto, hace zoom
+  // (selecciona esa capa, mismo estado capaSel que ya manejaba el hook).
+  // Si no, delega al manejo normal (partícula/Elemento) del padre.
+  function handleSelectNode(nodeId: string) {
+    if (nodeId.startsWith("capa-")) {
+      const capa = nodeId.slice("capa-".length) as typeof capaSel;
+      const capaData = capas.find((c) => c.capa === capa);
+      if (!capaData || capaData.total === 0) return;
+      setCapaSel(capaSel === capa ? null : capa);
+      return;
+    }
+    onSelectNode(nodeId);
+  }
 
   return (
     <>
@@ -489,29 +589,45 @@ function RutaAlquimiaCanvas({
               setCapaSel(null);
             }}
           />
-          <div className="mt-3 flex flex-wrap gap-2">
-            {capas.map((c) => (
-              <button
-                key={c.capa}
-                type="button"
-                onClick={() => setCapaSel(capaSel === c.capa ? null : c.capa)}
-                className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${
-                  capaSel === c.capa
-                    ? "border-primary/40 text-primary/85"
-                    : "border-primary/10 text-primary/45 hover:border-primary/25"
-                }`}
-              >
-                {c.label} · {c.total > 0 ? c.resumen : "vacía"}
-              </button>
-            ))}
-          </div>
+          {capaSel ? (
+            <button
+              type="button"
+              onClick={() => setCapaSel(null)}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-primary/15 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/60 hover:border-primary/30 hover:text-primary/85"
+            >
+              <ChevronRight className="rotate-180" size={12} />
+              Volver a {elementoSel?.nombre ?? "Elemento"}
+            </button>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {capas.map((c) => (
+                <button
+                  key={c.capa}
+                  type="button"
+                  onClick={() => setCapaSel(c.capa)}
+                  disabled={c.total === 0}
+                  className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                    c.total === 0
+                      ? "cursor-not-allowed border-primary/5 text-primary/25"
+                      : "border-primary/10 text-primary/45 hover:border-primary/25"
+                  }`}
+                >
+                  {c.label} · {c.total > 0 ? c.resumen : "vacía"}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="mt-3 rounded-2xl border border-primary/10 p-3">
             <StructureCanvas
               columns={columns}
               edges={edges}
-              selectedNodeId={selectedNodeId ?? (elementoSel ? `elemento-${elementoSel.id}` : null)}
+              selectedNodeId={
+                capaSel
+                  ? `capa-${capaSel}`
+                  : (selectedNodeId ?? (elementoSel ? `elemento-${elementoSel.id}` : null))
+              }
               onHoverNode={setHoverId}
-              onSelectNode={onSelectNode}
+              onSelectNode={handleSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
             />
           </div>
@@ -535,22 +651,32 @@ function RutasSection() {
 
   useEffect(() => {
     setNodoSelId(null);
-  }, [perspectiva, fisicaRoute.orisSel?.id, alquimiaRoute.elementoSel?.id, alquimiaRoute.capaSel]);
+  }, [
+    perspectiva,
+    fisicaRoute.orisSel?.id,
+    fisicaRoute.iumSel?.id,
+    alquimiaRoute.elementoSel?.id,
+    alquimiaRoute.capaSel,
+  ]);
 
   // Partícula clickeada dentro del canvas activo, si el nodo seleccionado
   // es de nivel "partícula" — usa las mismas listas ya expandidas por el
-  // hook de ruta (particulasDelOrisSel / particulasDeCapaSel), sin volver
-  // a consultar nada.
+  // hook de ruta (particulasDelOrisSel / particulasDelIumSel en zoom /
+  // particulasDeCapaSel), sin volver a consultar nada.
   const particulaClickeada = useMemo(() => {
     if (!nodoSelId || !nodoSelId.startsWith("particula-")) return null;
     if (perspectiva === "fisica") {
+      if (nodoSelId.startsWith("particula-ium-")) {
+        const idx = Number(nodoSelId.slice("particula-ium-".length));
+        return fisicaRoute.particulasDelIumSel[idx] ?? null;
+      }
       const idx = Number(nodoSelId.slice("particula-".length));
       return fisicaRoute.particulasDelOrisSel[idx] ?? null;
     }
     // Formato alquimia: `particula-${capa}-${i}`
     const idx = Number(nodoSelId.slice(nodoSelId.lastIndexOf("-") + 1));
     return alquimiaRoute.particulasDeCapaSel[idx] ?? null;
-  }, [nodoSelId, perspectiva, fisicaRoute.particulasDelOrisSel, alquimiaRoute.particulasDeCapaSel]);
+  }, [nodoSelId, perspectiva, fisicaRoute.particulasDelOrisSel, fisicaRoute.particulasDelIumSel, alquimiaRoute.particulasDeCapaSel]);
 
   // Inspector: solo presentacional — el shape se arma acá a partir de datos
   // ya resueltos por el hook de ruta activo, sin calcular nada nuevo.
