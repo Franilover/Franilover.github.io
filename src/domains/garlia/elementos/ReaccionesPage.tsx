@@ -252,53 +252,66 @@ export function ReaccionPanelFlotante({
           </button>
         </div>
 
-        {/* Contenido: consume + produce + balance + notas */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-5">
-          <div className="mx-auto max-w-4xl space-y-4">
-            <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-              <h3 className="mb-3 text-sm font-semibold text-primary">Consume</h3>
-              <SelectorConsumeProduce
-                label="Consume"
-                items={(reaccion.consume ?? []) as ItemProceso[]}
-                onChange={(consume) => onActualizar(reaccion.id, { consume })}
-                elementos={elementos}
-                compuestos={compuestos}
-                onAbrirItem={onAbrirItem}
-              />
-            </section>
+        {/* Contenido: consume + produce + balance + notas, en 2 columnas
+            para coherencia con Elemento/Compuesto — no una pila vertical. */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
+          <div className="grid grid-cols-2 gap-3 items-start">
+            <div className="flex flex-col gap-2 min-w-0">
+              <div className="flex flex-col gap-1.5 min-w-0 p-2">
+                <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                  Consume
+                </span>
+                <SelectorConsumeProduce
+                  label="Consume"
+                  items={(reaccion.consume ?? []) as ItemProceso[]}
+                  onChange={(consume) => onActualizar(reaccion.id, { consume })}
+                  elementos={elementos}
+                  compuestos={compuestos}
+                  onAbrirItem={onAbrirItem}
+                />
+              </div>
 
-            <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-              <h3 className="mb-3 text-sm font-semibold text-primary">Produce</h3>
-              <SelectorConsumeProduce
-                label="Produce"
-                items={(reaccion.produce ?? []) as ItemProceso[]}
-                onChange={(produce) => onActualizar(reaccion.id, { produce })}
-                elementos={elementos}
-                compuestos={compuestos}
-                onAbrirItem={onAbrirItem}
-              />
-            </section>
+              <div className="flex flex-col gap-1.5 min-w-0 p-2">
+                <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                  Produce
+                </span>
+                <SelectorConsumeProduce
+                  label="Produce"
+                  items={(reaccion.produce ?? []) as ItemProceso[]}
+                  onChange={(produce) => onActualizar(reaccion.id, { produce })}
+                  elementos={elementos}
+                  compuestos={compuestos}
+                  onAbrirItem={onAbrirItem}
+                />
+              </div>
+            </div>
 
-            <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-              <h3 className="mb-3 text-sm font-semibold text-primary">Balance</h3>
-              <BalanceProcesoPanel
-                consume={(reaccion.consume ?? []) as ItemProceso[]}
-                produce={(reaccion.produce ?? []) as ItemProceso[]}
-                compuestos={compuestos}
-                elementos={elementos}
-                onAutocompletar={(produce) => onActualizar(reaccion.id, { produce })}
-              />
-            </section>
+            <div className="flex flex-col gap-2 min-w-0">
+              <div className="flex flex-col gap-1.5 min-w-0 p-2">
+                <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                  Balance
+                </span>
+                <BalanceProcesoPanel
+                  consume={(reaccion.consume ?? []) as ItemProceso[]}
+                  produce={(reaccion.produce ?? []) as ItemProceso[]}
+                  compuestos={compuestos}
+                  elementos={elementos}
+                  onAutocompletar={(produce) => onActualizar(reaccion.id, { produce })}
+                />
+              </div>
 
-            <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-              <h3 className="mb-2 text-sm font-semibold text-primary">Descripción</h3>
-              <textarea
-                className="w-full min-h-[6rem] bg-transparent px-0 py-1 text-sm leading-relaxed text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-                placeholder="Condiciones, notas, contexto de esta reacción…"
-                value={reaccion.descripcion ?? ""}
-                onChange={(e) => onActualizar(reaccion.id, { descripcion: e.target.value })}
-              />
-            </section>
+              <div className="flex flex-col gap-1.5 min-w-0 p-2">
+                <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                  Descripción
+                </span>
+                <textarea
+                  className="w-full min-h-[5rem] bg-transparent px-0 py-1 text-micro leading-relaxed text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+                  placeholder="Condiciones, notas, contexto de esta reacción…"
+                  value={reaccion.descripcion ?? ""}
+                  onChange={(e) => onActualizar(reaccion.id, { descripcion: e.target.value })}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

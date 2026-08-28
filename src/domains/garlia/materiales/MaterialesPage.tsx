@@ -45,48 +45,6 @@ function formatValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function PropertyRow({ label, value }: { label: string; value: unknown }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-primary/10 py-2 last:border-b-0">
-      <span className="text-sm text-primary/55">{label}</span>
-      <span className="text-sm font-medium text-primary">{formatValue(value)}</span>
-    </div>
-  );
-}
-
-/**
- * Mismo bloque PropiedadesFisicasGenerico que usan Estructura y (mediante
- * su misma fórmula) Elemento/Compuesto — grid de tarjetas con
- * InfoFormulasPopover y barra de proporción, en vez de una lista plana de
- * filas. El badge de fuente_fisica se muestra aparte, arriba del grid: es
- * un dato propio de Material (de dónde salió el conjunto de valores —
- * composición y/o estructura), no una propiedad física en sí — mezclarlo
- * dentro del grid genérico rompería el contrato compartido con Estructura.
- */
-function MaterialProperties({ material }: { material: Material }) {
-  const propiedades = material.propiedades_calculadas ?? {};
-  // fuente_fisica es por-material, no por-propiedad individual: Supabase la
-  // entrega una vez para todo el material (ver "Fuente física única",
-  // orden 206).
-  const fuente = etiquetaFuenteFisica(propiedades.fuente_fisica);
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      {fuente && (
-        <div className="flex justify-end">
-          <span
-            title="Origen de estos valores: composición química y/o estructura física del material"
-            className="shrink-0 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-micro font-semibold text-primary/60"
-          >
-            {fuente}
-          </span>
-        </div>
-      )}
-      <PropiedadesFisicasGenerico propiedades={propiedades} columnas={3} />
-    </div>
-  );
-}
-
 /** Etiquetas legibles para los ejes del Perfil Reactivo Emergente V2. */
 const EJES_PERFIL_REACTIVO = [
   ["afinidad_reactiva", "Afinidad reactiva"],
@@ -112,34 +70,38 @@ function MaterialPerfilReactivo({ materialId }: { materialId: string }) {
   const { item, loading } = usePerfilReactivoMaterial(materialId);
 
   return (
-    <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary/50" />
-        <div>
-          <h3 className="text-sm font-semibold text-primary">Perfil reactivo emergente</h3>
-          <p className="mt-1 text-xs text-primary/45">Derivado de microestructura · V2 · solo lectura</p>
-        </div>
+    <div className="flex flex-col gap-1.5 min-w-0 p-2">
+      <div className="flex items-center gap-1.5">
+        <Sparkles size={11} className="text-primary/40 shrink-0" />
+        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+          Perfil reactivo
+        </span>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 py-5 text-sm text-primary/45">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando perfil reactivo…
+        <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
+          <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
         </div>
       ) : !item || item.estado !== "derivado_microestructura" || !item.perfil ? (
-        <p className="py-2 text-sm text-primary/40">
-          Información insuficiente: este material no tiene desglose microscópico
-          suficiente para derivar un perfil reactivo todavía.
+        <p className="py-1 text-micro text-primary/30">
+          Información insuficiente: sin desglose microscópico suficiente todavía.
         </p>
       ) : (
-        <div>
-          {EJES_PERFIL_REACTIVO.filter(([key]) => item.perfil?.[key] !== undefined).map(
-            ([key, label]) => (
-              <PropertyRow key={key} label={label} value={item.perfil?.[key]} />
-            ),
-          )}
+        <div className="grid grid-cols-2 gap-1.5">
+          {EJES_PERFIL_REACTIVO.filter(([key]) => item.perfil?.[key] !== undefined).map(([key, label]) => (
+            <div
+              key={key}
+              className="flex items-center justify-between gap-1 min-w-0 rounded-md border border-primary/10 px-2 py-1.5"
+            >
+              <span className="text-micro font-bold text-primary/50 truncate">{label}</span>
+              <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
+                {formatValue(item.perfil?.[key])}
+              </span>
+            </div>
+          ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -150,16 +112,128 @@ function MaterialDetail({ material }: { material: Material }) {
   const { items: estructurasCatalogo } = useEstructuras();
 
   return (
-    <div className="space-y-4">
-      <header className="border-b border-primary/10 pb-4">
-        <div className="flex items-start gap-3"><div className="mt-0.5 rounded-lg border border-primary/15 bg-primary/5 p-2"><Box className="h-5 w-5 text-primary/70" /></div><div className="min-w-0 flex-1"><h2 className="text-xl font-semibold text-primary">{material.nombre}</h2><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-primary/45"><span>{material.tipo_material}</span><span>·</span><span>{material.estado_calculo || "sin estado"}</span></div></div></div>
-        {material.descripcion && <p className="mt-4 text-sm leading-relaxed text-primary/60">{material.descripcion}</p>}
+    <div className="flex flex-col gap-3">
+      <header className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5 text-micro text-primary/40">
+            <span className="rounded px-1.5 py-0.5 bg-primary/5 font-bold">{material.tipo_material}</span>
+            <span className="rounded px-1.5 py-0.5 bg-primary/5 font-bold">
+              {material.estado_calculo || "sin estado"}
+            </span>
+          </div>
+          {material.descripcion && (
+            <p className="mt-1.5 text-xs leading-relaxed text-primary/55">{material.descripcion}</p>
+          )}
+        </div>
       </header>
-      <MaterialProperties material={material} />
-      <MaterialPerfilReactivo materialId={material.id} />
-      <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4"><h3 className="text-sm font-semibold text-primary">Componentes</h3><p className="mt-1 text-xs text-primary/45">Composición normalizada del material</p>{loadingComponentes ? <div className="flex items-center gap-2 py-5 text-sm text-primary/45"><Loader2 className="h-4 w-4 animate-spin" /> Cargando componentes…</div> : componentes.length === 0 ? <p className="py-4 text-sm text-primary/40">Este material no tiene componentes registrados.</p> : <div className="mt-3 space-y-2">{componentes.map((componente) => { const compuesto = componente.componente_tipo === "compuesto" ? compuestos.find((item) => item.id === componente.componente_id) : null; return <div key={componente.id} className="rounded-lg border border-primary/10 px-3 py-2"><div className="flex items-center justify-between gap-3"><span className="text-sm text-primary">{compuesto?.nombre ?? `${componente.componente_tipo} · ${componente.componente_id.slice(0, 8)}`}</span><span className="text-xs text-primary/50">{formatValue(componente.cantidad)}{componente.unidad ? ` ${componente.unidad}` : ""}</span></div>{(componente.rol || componente.proporcion_min !== null || componente.proporcion_max !== null) && <div className="mt-1 flex flex-wrap gap-2 text-xs text-primary/40">{componente.rol && <span>{componente.rol}</span>}{componente.proporcion_min !== null && <span>mín. {formatValue(componente.proporcion_min)}</span>}{componente.proporcion_max !== null && <span>máx. {formatValue(componente.proporcion_max)}</span>}</div>}</div>; })}</div>}</section>
-      <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4"><h3 className="text-sm font-semibold text-primary">Estructuras</h3><p className="mt-1 text-xs text-primary/45">Estructuras físicas utilizadas por el material</p>{loadingEstructuras ? <div className="flex items-center gap-2 py-5 text-sm text-primary/45"><Loader2 className="h-4 w-4 animate-spin" /> Cargando estructuras…</div> : estructuras.length === 0 ? <p className="py-4 text-sm text-primary/40">No hay estructuras asociadas.</p> : <div className="mt-3 space-y-2">{estructuras.map((relacion) => { const estructura = estructurasCatalogo.find((item) => item.id === relacion.estructura_id); return <div key={relacion.id} className="flex items-center justify-between rounded-lg border border-primary/10 px-3 py-2"><span className="text-sm text-primary">{estructura?.nombre ?? relacion.estructura_id.slice(0, 8)}</span><span className="text-xs text-primary/50">× {formatValue(relacion.cantidad)}</span></div>; })}</div>}</section>
-      {material.notas && <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4"><h3 className="text-sm font-semibold text-primary">Notas</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-primary/55">{material.notas}</p></section>}
+
+      <div className="grid grid-cols-2 gap-3 items-start">
+        <div className="flex flex-col gap-2 min-w-0">
+          {(() => {
+            const propiedades = material.propiedades_calculadas ?? {};
+            const fuente = etiquetaFuenteFisica(propiedades.fuente_fisica as string | undefined);
+            return (
+              <>
+                {fuente && (
+                  <div className="flex justify-end">
+                    <span
+                      title="Origen de estos valores: composición química y/o estructura física del material"
+                      className="shrink-0 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-micro font-semibold text-primary/60"
+                    >
+                      {fuente}
+                    </span>
+                  </div>
+                )}
+                <PropiedadesFisicasGenerico propiedades={propiedades} columnas={2} />
+              </>
+            );
+          })()}
+          <MaterialPerfilReactivo materialId={material.id} />
+        </div>
+
+        <div className="flex flex-col gap-2 min-w-0">
+          <div className="flex flex-col gap-1.5 min-w-0 p-2">
+            <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Componentes
+            </span>
+            {loadingComponentes ? (
+              <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
+                <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
+              </div>
+            ) : componentes.length === 0 ? (
+              <p className="py-1 text-micro text-primary/30">Sin componentes registrados.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {componentes.map((componente) => {
+                  const compuesto =
+                    componente.componente_tipo === "compuesto"
+                      ? compuestos.find((item) => item.id === componente.componente_id)
+                      : null;
+                  return (
+                    <div key={componente.id} className="rounded-md border border-primary/10 px-2 py-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-micro font-bold text-primary/70 truncate">
+                          {compuesto?.nombre ?? `${componente.componente_tipo} · ${componente.componente_id.slice(0, 8)}`}
+                        </span>
+                        <span className="text-micro text-primary/45 shrink-0">
+                          {formatValue(componente.cantidad)}
+                          {componente.unidad ? ` ${componente.unidad}` : ""}
+                        </span>
+                      </div>
+                      {(componente.rol || componente.proporcion_min !== null || componente.proporcion_max !== null) && (
+                        <div className="mt-0.5 flex flex-wrap gap-1.5 text-micro text-primary/35">
+                          {componente.rol && <span>{componente.rol}</span>}
+                          {componente.proporcion_min !== null && <span>mín. {formatValue(componente.proporcion_min)}</span>}
+                          {componente.proporcion_max !== null && <span>máx. {formatValue(componente.proporcion_max)}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-0 p-2">
+            <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Estructuras
+            </span>
+            {loadingEstructuras ? (
+              <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
+                <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
+              </div>
+            ) : estructuras.length === 0 ? (
+              <p className="py-1 text-micro text-primary/30">Sin estructuras asociadas.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {estructuras.map((relacion) => {
+                  const estructura = estructurasCatalogo.find((item) => item.id === relacion.estructura_id);
+                  return (
+                    <div
+                      key={relacion.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-primary/10 px-2 py-1"
+                    >
+                      <span className="text-micro font-bold text-primary/70 truncate">
+                        {estructura?.nombre ?? relacion.estructura_id.slice(0, 8)}
+                      </span>
+                      <span className="text-micro text-primary/45 shrink-0">× {formatValue(relacion.cantidad)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {material.notas && (
+            <div className="flex flex-col gap-1.5 min-w-0 p-2">
+              <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                Notas
+              </span>
+              <p className="whitespace-pre-wrap text-micro leading-relaxed text-primary/50">{material.notas}</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -259,7 +333,7 @@ function MaterialEditorFlotante({ material, onClose }: { material: Material; onC
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-5">
+        <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
           <MaterialDetail material={material} />
         </div>
       </div>

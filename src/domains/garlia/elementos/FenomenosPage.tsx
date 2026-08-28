@@ -24,86 +24,86 @@ function FenomenoDetail({ fenomeno }: { fenomeno: Fenomeno }) {
   const { items: elementos } = useElementos();
 
   return (
-    <div className="space-y-4">
-      <header className="border-b border-primary/10 pb-4">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 rounded-lg border border-primary/15 bg-primary/5 p-2">
-            <Sparkles className="h-5 w-5 text-primary/70" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold text-primary">{fenomeno.nombre}</h2>
-            {fenomeno.simbolo && (
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-primary/45">
-                <span>{fenomeno.simbolo}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+    <div className="flex flex-col gap-3">
+      {fenomeno.simbolo && (
+        <header className="flex items-start gap-2">
+          <span className="rounded px-1.5 py-0.5 bg-primary/5 text-micro font-bold text-primary/40">
+            {fenomeno.simbolo}
+          </span>
+        </header>
+      )}
 
-      <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-        <h3 className="text-sm font-semibold text-primary">Procesos</h3>
-        <p className="mt-1 text-xs text-primary/45">Procesos que intervienen en este fenómeno</p>
-        {loadingProcesos ? (
-          <div className="flex items-center gap-2 py-5 text-sm text-primary/45">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando procesos…
-          </div>
-        ) : relacionesProcesos.length === 0 ? (
-          <p className="py-4 text-sm text-primary/40">Este fenómeno no tiene procesos asociados.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {relacionesProcesos.map((relacion) => {
-              const proceso = procesos.find((item) => item.id === relacion.proceso_id);
-              return (
-                <div
-                  key={relacion.id}
-                  className="flex items-center justify-between rounded-lg border border-primary/10 px-3 py-2"
-                >
-                  <span className="text-sm text-primary">
-                    {proceso?.nombre ?? relacion.proceso_id.slice(0, 8)}
-                  </span>
-                  {relacion.rol && <span className="text-xs text-primary/50">{relacion.rol}</span>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-        <h3 className="text-sm font-semibold text-primary">Elementos</h3>
-        <p className="mt-1 text-xs text-primary/45">Elementos involucrados en este fenómeno</p>
-        {loadingElementos ? (
-          <div className="flex items-center gap-2 py-5 text-sm text-primary/45">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando elementos…
-          </div>
-        ) : relacionesElementos.length === 0 ? (
-          <p className="py-4 text-sm text-primary/40">Este fenómeno no tiene elementos asociados.</p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {relacionesElementos.map((relacion) => {
-              const elemento = elementos.find((item) => item.id === relacion.elemento_id);
-              return (
-                <div key={relacion.id} className="rounded-lg border border-primary/10 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-primary">
-                      {elemento?.nombre ?? relacion.elemento_id.slice(0, 8)}
+      <div className="grid grid-cols-2 gap-3 items-start">
+        <div className="flex flex-col gap-1.5 min-w-0 p-2">
+          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            Procesos
+          </span>
+          <p className="text-micro text-primary/35 -mt-1">Procesos que intervienen en este fenómeno</p>
+          {loadingProcesos ? (
+            <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
+              <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
+            </div>
+          ) : relacionesProcesos.length === 0 ? (
+            <p className="py-1 text-micro text-primary/30">Sin procesos asociados.</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {relacionesProcesos.map((relacion) => {
+                const proceso = procesos.find((item) => item.id === relacion.proceso_id);
+                return (
+                  <div
+                    key={relacion.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-primary/10 px-2 py-1"
+                  >
+                    <span className="text-micro font-bold text-primary/70 truncate">
+                      {proceso?.nombre ?? relacion.proceso_id.slice(0, 8)}
                     </span>
-                    <span className="text-xs text-primary/50">× {formatValue(relacion.cantidad)}</span>
+                    {relacion.rol && <span className="text-micro text-primary/45 shrink-0">{relacion.rol}</span>}
                   </div>
-                  {relacion.rol && <div className="mt-1 text-xs text-primary/40">{relacion.rol}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5 min-w-0 p-2">
+          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            Elementos
+          </span>
+          <p className="text-micro text-primary/35 -mt-1">Elementos involucrados en este fenómeno</p>
+          {loadingElementos ? (
+            <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
+              <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
+            </div>
+          ) : relacionesElementos.length === 0 ? (
+            <p className="py-1 text-micro text-primary/30">Sin elementos asociados.</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {relacionesElementos.map((relacion) => {
+                const elemento = elementos.find((item) => item.id === relacion.elemento_id);
+                return (
+                  <div key={relacion.id} className="rounded-md border border-primary/10 px-2 py-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-micro font-bold text-primary/70 truncate">
+                        {elemento?.nombre ?? relacion.elemento_id.slice(0, 8)}
+                      </span>
+                      <span className="text-micro text-primary/45 shrink-0">× {formatValue(relacion.cantidad)}</span>
+                    </div>
+                    {relacion.rol && <div className="mt-0.5 text-micro text-primary/35">{relacion.rol}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       {fenomeno.notas && (
-        <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-          <h3 className="text-sm font-semibold text-primary">Notas</h3>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-primary/55">{fenomeno.notas}</p>
-        </section>
+        <div className="flex flex-col gap-1.5 min-w-0 p-2">
+          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            Notas
+          </span>
+          <p className="whitespace-pre-wrap text-micro leading-relaxed text-primary/50">{fenomeno.notas}</p>
+        </div>
       )}
     </div>
   );
@@ -171,10 +171,8 @@ function Editor({ fenomeno, onClose }: { fenomeno: Fenomeno; onClose: () => void
             <X size={16} />
           </button>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
-          <div className="mx-auto max-w-4xl">
-            <FenomenoDetail fenomeno={fenomeno} />
-          </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
+          <FenomenoDetail fenomeno={fenomeno} />
         </div>
       </div>
     </div>,

@@ -15,30 +15,6 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-/** Misma fila label/valor que usan Elemento/Compuesto/Material para sus
- *  secciones de solo lectura. */
-function PropertyRow({ label, value }: { label: string; value: unknown }) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b border-primary/10 py-2 last:border-b-0">
-      <span className="shrink-0 text-sm text-primary/55">{label}</span>
-      <span className="text-right text-sm font-medium leading-relaxed text-primary">{formatValue(value)}</span>
-    </div>
-  );
-}
-
-/** Bloque de texto largo (párrafo), para campos como entrada/transformación/
- *  salida que suelen ser oraciones en vez de valores cortos — evita
- *  aplastarlos en una fila de dos columnas. */
-function TextBlock({ label, value }: { label: string; value: string | null }) {
-  if (!value) return null;
-  return (
-    <div className="border-b border-primary/10 py-2 last:border-b-0">
-      <p className="mb-1 text-sm text-primary/55">{label}</p>
-      <p className="text-sm leading-relaxed text-primary">{value}</p>
-    </div>
-  );
-}
-
 function ProcesoDetail({ proceso }: { proceso: Proceso }) {
   const { items: relaciones, loading: loadingRelaciones } = useProcesoReacciones(proceso.id);
   const { items: reacciones } = useReacciones();
@@ -54,90 +30,111 @@ function ProcesoDetail({ proceso }: { proceso: Proceso }) {
   const recetaVisible = receta.filter(([, , value]) => value);
 
   return (
-    <div className="space-y-4">
-      <header className="border-b border-primary/10 pb-4">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 rounded-lg border border-primary/15 bg-primary/5 p-2">
-            <Activity className="h-5 w-5 text-primary/70" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold text-primary">{proceso.nombre}</h2>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-primary/45">
-              <span>{proceso.tipo || "sin tipo"}</span>
-            </div>
-          </div>
+    <div className="flex flex-col gap-3">
+      <header className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          {proceso.tipo && (
+            <span className="inline-block rounded px-1.5 py-0.5 bg-primary/5 text-micro font-bold text-primary/40">
+              {proceso.tipo}
+            </span>
+          )}
+          {proceso.descripcion && (
+            <p className="mt-1.5 text-xs leading-relaxed text-primary/55">{proceso.descripcion}</p>
+          )}
         </div>
-        {proceso.descripcion && (
-          <p className="mt-4 text-sm leading-relaxed text-primary/60">{proceso.descripcion}</p>
-        )}
       </header>
 
-      {recetaVisible.length > 0 && (
-        <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-primary">Receta del proceso</h3>
-            <p className="mt-1 text-xs text-primary/45">Entrada → transformación → salida</p>
-          </div>
-          <div>
-            {recetaVisible.map(([key, label, value]) =>
-              key === "regla_clave" ? (
-                <PropertyRow key={key} label={label} value={value} />
-              ) : (
-                <TextBlock key={key} label={label} value={value} />
-              ),
+      <div className="grid grid-cols-2 gap-3 items-start">
+        <div className="flex flex-col gap-2 min-w-0">
+          {recetaVisible.length > 0 && (
+            <div className="flex flex-col gap-1.5 min-w-0 p-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                  Receta del proceso
+                </span>
+              </div>
+              <p className="text-micro text-primary/35 -mt-1">Entrada → transformación → salida</p>
+              <div className="flex flex-col gap-1">
+                {recetaVisible.map(([key, label, value]) =>
+                  key === "regla_clave" ? (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between gap-2 rounded-md border border-primary/10 px-2 py-1"
+                    >
+                      <span className="text-micro font-bold text-primary/50 truncate">{label}</span>
+                      <span className="text-micro font-black text-primary/70 text-right">{formatValue(value)}</span>
+                    </div>
+                  ) : (
+                    <div key={key} className="rounded-md border border-primary/10 px-2 py-1">
+                      <span className="text-micro font-bold text-primary/45">{label}</span>
+                      <p className="mt-0.5 text-micro leading-relaxed text-primary/65">{value}</p>
+                    </div>
+                  ),
+                )}
+              </div>
+            </div>
+          )}
+
+          {proceso.condiciones && (
+            <div className="flex flex-col gap-1.5 min-w-0 p-2">
+              <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                Condiciones
+              </span>
+              <p className="whitespace-pre-wrap text-micro leading-relaxed text-primary/55">
+                {proceso.condiciones}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 min-w-0">
+          <div className="flex flex-col gap-1.5 min-w-0 p-2">
+            <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Reacciones
+            </span>
+            <p className="text-micro text-primary/35 -mt-1">
+              Opcional: transformación material específica asociada a este proceso, si existe.
+            </p>
+            {loadingRelaciones ? (
+              <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
+                <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
+              </div>
+            ) : relaciones.length === 0 ? (
+              <p className="py-1 text-micro text-primary/30">
+                Sin reacción asociada — no todo proceso tiene una, y eso no es un dato faltante.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {relaciones.map((relacion) => {
+                  const reaccion = reacciones.find((item) => item.id === relacion.reaccion_id);
+                  return (
+                    <div key={relacion.id} className="rounded-md border border-primary/10 px-2 py-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-micro font-bold text-primary/70 truncate">
+                          {reaccion?.nombre ?? relacion.reaccion_id.slice(0, 8)}
+                        </span>
+                        {relacion.orden !== null && (
+                          <span className="text-micro text-primary/40 shrink-0">#{relacion.orden}</span>
+                        )}
+                      </div>
+                      {relacion.rol && <div className="mt-0.5 text-micro text-primary/35">{relacion.rol}</div>}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
-        </section>
-      )}
 
-      {proceso.condiciones && (
-        <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-          <h3 className="text-sm font-semibold text-primary">Condiciones</h3>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-primary/60">{proceso.condiciones}</p>
-        </section>
-      )}
-
-      <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-        <h3 className="text-sm font-semibold text-primary">Reacciones</h3>
-        <p className="mt-1 text-xs text-primary/45">
-          Opcional: transformación material específica asociada a este proceso, si existe.
-        </p>
-        {loadingRelaciones ? (
-          <div className="flex items-center gap-2 py-5 text-sm text-primary/45">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando reacciones…
-          </div>
-        ) : relaciones.length === 0 ? (
-          <p className="py-4 text-sm text-primary/40">
-            Sin reacción asociada — no todo proceso tiene una, y eso no es un dato faltante.
-          </p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {relaciones.map((relacion) => {
-              const reaccion = reacciones.find((item) => item.id === relacion.reaccion_id);
-              return (
-                <div key={relacion.id} className="rounded-lg border border-primary/10 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-primary">
-                      {reaccion?.nombre ?? relacion.reaccion_id.slice(0, 8)}
-                    </span>
-                    {relacion.orden !== null && (
-                      <span className="text-xs text-primary/50">#{relacion.orden}</span>
-                    )}
-                  </div>
-                  {relacion.rol && <div className="mt-1 text-xs text-primary/40">{relacion.rol}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {proceso.notas && (
-        <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-          <h3 className="text-sm font-semibold text-primary">Notas</h3>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-primary/55">{proceso.notas}</p>
-        </section>
-      )}
+          {proceso.notas && (
+            <div className="flex flex-col gap-1.5 min-w-0 p-2">
+              <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                Notas
+              </span>
+              <p className="whitespace-pre-wrap text-micro leading-relaxed text-primary/50">{proceso.notas}</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -204,10 +201,8 @@ function Editor({ proceso, onClose }: { proceso: Proceso; onClose: () => void })
             <X size={16} />
           </button>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
-          <div className="mx-auto max-w-4xl">
-            <ProcesoDetail proceso={proceso} />
-          </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
+          <ProcesoDetail proceso={proceso} />
         </div>
       </div>
     </div>,
