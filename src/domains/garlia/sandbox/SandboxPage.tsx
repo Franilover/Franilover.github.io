@@ -13,6 +13,17 @@
  *   3. copia sus propiedades iniciales al Sandbox,
  *   4. conserva entidad_origen_id,
  *   5. deja al motor de Supabase modificar estado_actual.
+ *
+ * Rediseño de UI (sobre la versión con Card/Badge/color-mix):
+ * Se alinea al lenguaje visual del resto del dominio (ver MaterialesPage,
+ * AuditoriaSection): texto pequeño (text-micro/text-xs), opacidades
+ * Tailwind sobre --primary (text-primary/NN) en vez de color-mix inline
+ * por ítem, sin cajas de color de fondo por fila, sin badges/iconos
+ * decorativos que no aportan información nueva. Las opacidades Tailwind
+ * heredan el valor de --primary del tema activo (claro u oscuro), así que
+ * no hay contraste roto en tema oscuro como pasaba con los `color-mix`
+ * fijos calculados sobre un --primary que a veces es claro y a veces
+ * oscuro según el tema.
  */
 
 import {
@@ -21,7 +32,6 @@ import {
   Plus,
   RotateCcw,
   SkipForward,
-  Zap,
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
@@ -33,13 +43,8 @@ import type {
   Elemento,
 } from "@/domains/garlia/elementos/types";
 
-
-
 import { Btn } from "@/ui/Buttons";
-import { Badge, EmptyState, Loading } from "@/ui/Feedback";
-import { Card, PageHeader } from "@/ui/Layout";
 import { Input, Select } from "@/ui/Inputs";
-import { Text } from "@/ui/Tipografia";
 
 import {
   useCrearSandbox,
@@ -49,19 +54,9 @@ import {
 
 type TipoCatalogo = "elemento" | "compuesto";
 
-function EtiquetaSeccion({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function EtiquetaSeccion({ children }: { children: React.ReactNode }) {
   return (
-    <p
-      className="text-micro font-black uppercase tracking-[0.2em] mb-3"
-      style={{
-        color:
-          "color-mix(in srgb, var(--primary) 45%, transparent)",
-      }}
-    >
+    <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/30 mb-2">
       {children}
     </p>
   );
@@ -151,23 +146,19 @@ function estadoInicialDeCompuesto(
   }
 
   if (compuesto.estado_estructura != null) {
-    propiedades.estado_estructura =
-      compuesto.estado_estructura;
+    propiedades.estado_estructura = compuesto.estado_estructura;
   }
 
   if (compuesto.formula_canonica != null) {
-    propiedades.formula_canonica =
-      compuesto.formula_canonica;
+    propiedades.formula_canonica = compuesto.formula_canonica;
   }
 
   if (compuesto.clasificacion != null) {
-    propiedades.clasificacion =
-      compuesto.clasificacion;
+    propiedades.clasificacion = compuesto.clasificacion;
   }
 
   if (compuesto.tipo_estructura != null) {
-    propiedades.tipo_estructura =
-      compuesto.tipo_estructura;
+    propiedades.tipo_estructura = compuesto.tipo_estructura;
   }
 
   if (compuesto.estado != null) {
@@ -186,9 +177,7 @@ function formatearValor(valor: unknown): string {
   }
 
   if (typeof valor === "number") {
-    return Number.isInteger(valor)
-      ? String(valor)
-      : valor.toFixed(3);
+    return Number.isInteger(valor) ? String(valor) : valor.toFixed(3);
   }
 
   if (typeof valor === "boolean") {
@@ -206,27 +195,41 @@ function PropiedadPreview({
   value: unknown;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-1.5">
-      <span
-        className="text-micro font-bold"
-        style={{
-          color:
-            "color-mix(in srgb, var(--primary) 55%, transparent)",
-        }}
-      >
+    <div className="flex items-center justify-between gap-3 py-1">
+      <span className="text-micro font-bold text-primary/45 truncate">
         {label}
       </span>
-
-      <span className="text-micro font-black text-primary tabular-nums">
+      <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
         {formatearValor(value)}
       </span>
     </div>
   );
 }
 
+/** Encabezado de bloque interno (Entidades / Event log): label + conteo,
+ *  mismo patrón discreto que el resto del dominio (ver MaterialPerfilReactivo,
+ *  bloque "Componentes" en MaterialesPage) — sin Card ni Badge alrededor. */
+function BloqueHeader({
+  label,
+  count,
+}: {
+  label: string;
+  count: number;
+}) {
+  return (
+    <div className="flex items-center justify-between mb-1.5">
+      <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+        {label}
+      </span>
+      <span className="text-micro font-bold text-primary/35 tabular-nums">
+        {count}
+      </span>
+    </div>
+  );
+}
+
 export function SandboxPage() {
-  const [simulacionId, setSimulacionId] =
-    useState<string | null>(null);
+  const [simulacionId, setSimulacionId] = useState<string | null>(null);
 
   const [nombreNuevo, setNombreNuevo] = useState("");
 
@@ -254,30 +257,19 @@ export function SandboxPage() {
     agregarEntidadDesdeCatalogo,
   } = useSandbox(simulacionId);
 
-  const {
-    items: elementos,
-    loading: cargandoElementos,
-  } = useElementos();
+  const { items: elementos, loading: cargandoElementos } = useElementos();
 
-  const {
-    items: compuestos,
-    loading: cargandoCompuestos,
-  } = useCompuestos();
+  const { items: compuestos, loading: cargandoCompuestos } = useCompuestos();
 
-  const [tipoCatalogo, setTipoCatalogo] =
-    useState<TipoCatalogo>("elemento");
+  const [tipoCatalogo, setTipoCatalogo] = useState<TipoCatalogo>("elemento");
 
-  const [catalogoSeleccionado, setCatalogoSeleccionado] =
-    useState("");
+  const [catalogoSeleccionado, setCatalogoSeleccionado] = useState("");
 
-  const [agregandoEntidad, setAgregandoEntidad] =
-    useState(false);
+  const [agregandoEntidad, setAgregandoEntidad] = useState(false);
 
-  const [entidadSeleccionada, setEntidadSeleccionada] =
-    useState("");
+  const [entidadSeleccionada, setEntidadSeleccionada] = useState("");
 
-  const [eventoSeleccionado, setEventoSeleccionado] =
-    useState("");
+  const [eventoSeleccionado, setEventoSeleccionado] = useState("");
 
   async function handleCrear() {
     if (!nombreNuevo.trim()) return;
@@ -299,24 +291,17 @@ export function SandboxPage() {
     if (tipoCatalogo === "elemento") {
       return (
         elementos.find(
-          (elemento) =>
-            elemento.id === catalogoSeleccionado,
+          (elemento) => elemento.id === catalogoSeleccionado,
         ) ?? null
       );
     }
 
     return (
       compuestos.find(
-        (compuesto) =>
-          compuesto.id === catalogoSeleccionado,
+        (compuesto) => compuesto.id === catalogoSeleccionado,
       ) ?? null
     );
-  }, [
-    tipoCatalogo,
-    catalogoSeleccionado,
-    elementos,
-    compuestos,
-  ]);
+  }, [tipoCatalogo, catalogoSeleccionado, elementos, compuestos]);
 
   const estadoInicialSeleccionado = useMemo(() => {
     if (!entidadCatalogoSeleccionada) {
@@ -332,30 +317,21 @@ export function SandboxPage() {
     return estadoInicialDeCompuesto(
       entidadCatalogoSeleccionada as Compuesto,
     );
-  }, [
-    tipoCatalogo,
-    entidadCatalogoSeleccionada,
-  ]);
+  }, [tipoCatalogo, entidadCatalogoSeleccionada]);
 
   async function handleAgregarDesdeCatalogo() {
-    if (
-      !entidadCatalogoSeleccionada ||
-      !estadoInicialSeleccionado
-    ) {
+    if (!entidadCatalogoSeleccionada || !estadoInicialSeleccionado) {
       return;
     }
 
     setAgregandoEntidad(true);
 
     try {
-      const id =
-        await agregarEntidadDesdeCatalogo({
-          entidadTipo: tipoCatalogo,
-          entidadOrigenId:
-            entidadCatalogoSeleccionada.id,
-          estadoInicial:
-            estadoInicialSeleccionado,
-        });
+      const id = await agregarEntidadDesdeCatalogo({
+        entidadTipo: tipoCatalogo,
+        entidadOrigenId: entidadCatalogoSeleccionada.id,
+        estadoInicial: estadoInicialSeleccionado,
+      });
 
       if (id) {
         setCatalogoSeleccionado("");
@@ -365,49 +341,33 @@ export function SandboxPage() {
     }
   }
 
-  function cambiarTipoCatalogo(
-    tipo: TipoCatalogo,
-  ) {
+  function cambiarTipoCatalogo(tipo: TipoCatalogo) {
     setTipoCatalogo(tipo);
     setCatalogoSeleccionado("");
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <PageHeader
-        icon={<Zap size={20} />}
-        subtitle="Entorno experimental aislado — el motor de reglas vive en Supabase"
-        title="Sandbox"
-      />
+    <div className="max-w-6xl mx-auto px-3 pb-4 pt-2">
+      <div className="mb-5">
+        <h1 className="text-sm font-black text-primary">Sandbox</h1>
+        <p className="mt-0.5 text-micro text-primary/40">
+          Entorno experimental aislado — el motor de reglas vive en Supabase
+        </p>
+      </div>
 
       {error && (
-        <div
-          className="mb-6 px-4 py-3 rounded-[var(--radius-btn)] text-micro font-bold"
-          style={{
-            background:
-              "color-mix(in srgb, var(--primary) 10%, transparent)",
-            border:
-              "var(--border-width) solid color-mix(in srgb, var(--primary) 25%, transparent)",
-            color: "var(--primary)",
-          }}
-        >
+        <div className="mb-4 px-3 py-2 rounded-md border border-primary/15 text-micro font-bold text-primary/70">
           {error}
         </div>
       )}
 
-      <Card className="mb-6" padding="md">
+      <div className="mb-5 pb-5 border-b border-primary/10">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <EtiquetaSeccion>
-              Cargar existente
-            </EtiquetaSeccion>
+            <EtiquetaSeccion>Cargar existente</EtiquetaSeccion>
 
             <Select
-              onChange={(e) =>
-                setSimulacionId(
-                  e.target.value || null,
-                )
-              }
+              onChange={(e) => setSimulacionId(e.target.value || null)}
               options={[
                 {
                   value: "",
@@ -425,20 +385,13 @@ export function SandboxPage() {
           </div>
 
           <div>
-            <EtiquetaSeccion>
-              Crear nueva
-            </EtiquetaSeccion>
+            <EtiquetaSeccion>Crear nueva</EtiquetaSeccion>
 
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-2">
               <div className="flex-1">
                 <Input
-                  onChange={(e) =>
-                    setNombreNuevo(e.target.value)
-                  }
-                  onKeyDown={(e) =>
-                    e.key === "Enter" &&
-                    handleCrear()
-                  }
+                  onChange={(e) => setNombreNuevo(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCrear()}
                   placeholder="Nombre del sandbox"
                   value={nombreNuevo}
                 />
@@ -448,6 +401,7 @@ export function SandboxPage() {
                 icon={<Plus size={14} />}
                 loading={creando}
                 onClick={handleCrear}
+                size="sm"
               >
                 Crear
               </Btn>
@@ -456,57 +410,40 @@ export function SandboxPage() {
         </div>
 
         {simulacionId && (
-          <p
-            className="mt-3 text-micro font-bold"
-            style={{
-              color:
-                "color-mix(in srgb, var(--primary) 35%, transparent)",
-            }}
-          >
+          <p className="mt-2 text-micro text-primary/35">
             simulacion_id activo ·{" "}
-            <code className="font-mono">
-              {simulacionId}
-            </code>
+            <code className="font-mono">{simulacionId}</code>
           </p>
         )}
-      </Card>
+      </div>
 
       {!simulacionId && (
-        <EmptyState
-          icon={<Zap size={28} />}
-          label="Crea o carga un sandbox para empezar"
-        />
+        <p className="py-5 text-center text-micro text-primary/35">
+          Crea o carga un sandbox para empezar
+        </p>
       )}
 
       {simulacionId && loading && (
-        <Loading
-          fullScreen={false}
-          text="Cargando sandbox..."
-        />
+        <p className="py-5 text-center text-micro text-primary/35">
+          Cargando sandbox...
+        </p>
       )}
 
       {simulacionId && simulacion && (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-6 items-start">
-          <div className="flex flex-col gap-6">
-            <Card padding="md">
-              <div className="flex items-center justify-between mb-5">
+          <div className="flex flex-col gap-5">
+            <div className="pb-5 border-b border-primary/10">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <EtiquetaSeccion>
-                    tiempo_simulado
-                  </EtiquetaSeccion>
-
-                  <Text
-                    as="p"
-                    className="text-primary font-black"
-                    variant="xl"
-                  >
+                  <EtiquetaSeccion>tiempo_simulado</EtiquetaSeccion>
+                  <span className="text-lg font-black text-primary tabular-nums">
                     {simulacion.tiempo_simulado}
-                  </Text>
+                  </span>
                 </div>
 
-                <Badge active>
+                <span className="text-micro font-bold text-primary/45 uppercase tracking-wide">
                   {simulacion.estado}
-                </Badge>
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -550,29 +487,19 @@ export function SandboxPage() {
                   Reset
                 </Btn>
               </div>
-            </Card>
+            </div>
 
-            {/* ─────────────────────────────────────────────
-                CATÁLOGO → SANDBOX
-            ────────────────────────────────────────────── */}
-            <Card padding="md">
-              <EtiquetaSeccion>
-                Agregar desde catálogo
-              </EtiquetaSeccion>
+            {/* CATÁLOGO → SANDBOX */}
+            <div className="pb-5 border-b border-primary/10">
+              <EtiquetaSeccion>Agregar desde catálogo</EtiquetaSeccion>
 
-              <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="grid grid-cols-2 gap-2 mb-3">
                 <Btn
                   size="sm"
                   variant={
-                    tipoCatalogo === "elemento"
-                      ? "primary"
-                      : "outline"
+                    tipoCatalogo === "elemento" ? "primary" : "outline"
                   }
-                  onClick={() =>
-                    cambiarTipoCatalogo(
-                      "elemento",
-                    )
-                  }
+                  onClick={() => cambiarTipoCatalogo("elemento")}
                 >
                   Elemento
                 </Btn>
@@ -580,31 +507,17 @@ export function SandboxPage() {
                 <Btn
                   size="sm"
                   variant={
-                    tipoCatalogo === "compuesto"
-                      ? "primary"
-                      : "outline"
+                    tipoCatalogo === "compuesto" ? "primary" : "outline"
                   }
-                  onClick={() =>
-                    cambiarTipoCatalogo(
-                      "compuesto",
-                    )
-                  }
+                  onClick={() => cambiarTipoCatalogo("compuesto")}
                 >
                   Compuesto
                 </Btn>
               </div>
 
               <Select
-                label={
-                  tipoCatalogo === "elemento"
-                    ? "Elemento"
-                    : "Compuesto"
-                }
-                onChange={(e) =>
-                  setCatalogoSeleccionado(
-                    e.target.value,
-                  )
-                }
+                label={tipoCatalogo === "elemento" ? "Elemento" : "Compuesto"}
+                onChange={(e) => setCatalogoSeleccionado(e.target.value)}
                 options={[
                   {
                     value: "",
@@ -623,175 +536,97 @@ export function SandboxPage() {
                         value: elemento.id,
                         label: `${elemento.simbolo} — ${elemento.nombre}`,
                       }))
-                    : compuestos.map(
-                        (compuesto) => ({
-                          value: compuesto.id,
-                          label: `${compuesto.simbolo ? `${compuesto.simbolo} — ` : ""}${compuesto.nombre}`,
-                        }),
-                      )),
+                    : compuestos.map((compuesto) => ({
+                        value: compuesto.id,
+                        label: `${compuesto.simbolo ? `${compuesto.simbolo} — ` : ""}${compuesto.nombre}`,
+                      }))),
                 ]}
                 value={catalogoSeleccionado}
               />
 
               {entidadCatalogoSeleccionada && (
-                <div
-                  className="mt-4 rounded-[var(--radius-btn)] p-3"
-                  style={{
-                    background:
-                      "color-mix(in srgb, var(--primary) 5%, transparent)",
-                    border:
-                      "var(--border-width) solid color-mix(in srgb, var(--primary) 10%, transparent)",
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <Text
-                        as="p"
-                        className="text-primary font-black"
-                        variant="sm"
-                      >
-                        {entidadCatalogoSeleccionada.nombre}
-                      </Text>
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-black text-primary truncate">
+                      {entidadCatalogoSeleccionada.nombre}
+                    </span>
 
-                      <span
-                        className="text-micro font-bold"
-                        style={{
-                          color:
-                            "color-mix(in srgb, var(--primary) 45%, transparent)",
-                        }}
-                      >
-                        {tipoCatalogo}
-                        {" · "}
-                        {entidadCatalogoSeleccionada.id.slice(
-                          0,
-                          8,
-                        )}
-                      </span>
-                    </div>
-
-                    <Badge>
-                      catálogo
-                    </Badge>
+                    <span className="text-micro font-bold text-primary/40 shrink-0">
+                      {tipoCatalogo} ·{" "}
+                      {entidadCatalogoSeleccionada.id.slice(0, 8)}
+                    </span>
                   </div>
 
-                  {tipoCatalogo ===
-                    "elemento" && (
-                    <div>
-                      {(() => {
-                        const el =
-                          entidadCatalogoSeleccionada as Elemento;
+                  {tipoCatalogo === "elemento" &&
+                    (() => {
+                      const el = entidadCatalogoSeleccionada as Elemento;
 
-                        return (
-                          <>
-                            <PropiedadPreview
-                              label="Masa"
-                              value={
-                                el.masa_base
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Estabilidad"
-                              value={
-                                el.estabilidad
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Rigidez"
-                              value={
-                                el.rigidez
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Flexibilidad"
-                              value={
-                                el.flexibilidad
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Capacidad de enlace"
-                              value={
-                                el.capacidad_enlace
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Régimen"
-                              value={
-                                el.regimen_estructural
-                              }
-                            />
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
+                      return (
+                        <div>
+                          <PropiedadPreview label="Masa" value={el.masa_base} />
+                          <PropiedadPreview
+                            label="Estabilidad"
+                            value={el.estabilidad}
+                          />
+                          <PropiedadPreview
+                            label="Rigidez"
+                            value={el.rigidez}
+                          />
+                          <PropiedadPreview
+                            label="Flexibilidad"
+                            value={el.flexibilidad}
+                          />
+                          <PropiedadPreview
+                            label="Capacidad de enlace"
+                            value={el.capacidad_enlace}
+                          />
+                          <PropiedadPreview
+                            label="Régimen"
+                            value={el.regimen_estructural}
+                          />
+                        </div>
+                      );
+                    })()}
 
-                  {tipoCatalogo ===
-                    "compuesto" && (
-                    <div>
-                      {(() => {
-                        const compuesto =
-                          entidadCatalogoSeleccionada as Compuesto;
+                  {tipoCatalogo === "compuesto" &&
+                    (() => {
+                      const compuesto =
+                        entidadCatalogoSeleccionada as Compuesto;
 
-                        return (
-                          <>
-                            <PropiedadPreview
-                              label="Masa"
-                              value={
-                                compuesto.masa
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Carga"
-                              value={
-                                compuesto.carga
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Estabilidad"
-                              value={
-                                compuesto.estabilidad
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Rigidez"
-                              value={
-                                compuesto.rigidez
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Flexibilidad"
-                              value={
-                                compuesto.flexibilidad
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Compatibilidad"
-                              value={
-                                compuesto.compatibilidad
-                              }
-                            />
-                            <PropiedadPreview
-                              label="Energía de enlace"
-                              value={
-                                compuesto.energia_enlace
-                              }
-                            />
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
+                      return (
+                        <div>
+                          <PropiedadPreview label="Masa" value={compuesto.masa} />
+                          <PropiedadPreview label="Carga" value={compuesto.carga} />
+                          <PropiedadPreview
+                            label="Estabilidad"
+                            value={compuesto.estabilidad}
+                          />
+                          <PropiedadPreview
+                            label="Rigidez"
+                            value={compuesto.rigidez}
+                          />
+                          <PropiedadPreview
+                            label="Flexibilidad"
+                            value={compuesto.flexibilidad}
+                          />
+                          <PropiedadPreview
+                            label="Compatibilidad"
+                            value={compuesto.compatibilidad}
+                          />
+                          <PropiedadPreview
+                            label="Energía de enlace"
+                            value={compuesto.energia_enlace}
+                          />
+                        </div>
+                      );
+                    })()}
 
                   <Btn
-                    className="mt-4 w-full"
-                    disabled={
-                      !entidadCatalogoSeleccionada
-                    }
+                    className="mt-3 w-full"
+                    disabled={!entidadCatalogoSeleccionada}
                     icon={<Plus size={14} />}
                     loading={agregandoEntidad}
-                    onClick={
-                      handleAgregarDesdeCatalogo
-                    }
+                    onClick={handleAgregarDesdeCatalogo}
                     size="sm"
                     variant="primary"
                   >
@@ -799,29 +634,18 @@ export function SandboxPage() {
                   </Btn>
                 </div>
               )}
-            </Card>
+            </div>
 
-            {/* ─────────────────────────────────────────────
-                DISPARAR EVENTO
-            ────────────────────────────────────────────── */}
-            <Card padding="md">
-              <EtiquetaSeccion>
-                Disparar evento
-              </EtiquetaSeccion>
+            {/* DISPARAR EVENTO */}
+            <div>
+              <EtiquetaSeccion>Disparar evento</EtiquetaSeccion>
 
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-2">
                 <Select
                   label="Entidad"
-                  onChange={(e) =>
-                    setEntidadSeleccionada(
-                      e.target.value,
-                    )
-                  }
+                  onChange={(e) => setEntidadSeleccionada(e.target.value)}
                   options={[
-                    {
-                      value: "",
-                      label: "—",
-                    },
+                    { value: "", label: "—" },
                     ...entidades.map((e) => ({
                       value: e.id,
                       label: e.entidad_tipo,
@@ -832,200 +656,107 @@ export function SandboxPage() {
 
                 <Select
                   label="Evento"
-                  onChange={(e) =>
-                    setEventoSeleccionado(
-                      e.target.value,
-                    )
-                  }
+                  onChange={(e) => setEventoSeleccionado(e.target.value)}
                   options={[
-                    {
-                      value: "",
-                      label: "—",
-                    },
-                    ...catalogoEventos.map(
-                      (ev) => ({
-                        value: ev.id,
-                        label: String(
-                          ev.nombre ?? ev.id,
-                        ),
-                      }),
-                    ),
+                    { value: "", label: "—" },
+                    ...catalogoEventos.map((ev) => ({
+                      value: ev.id,
+                      label: String(ev.nombre ?? ev.id),
+                    })),
                   ]}
                   value={eventoSeleccionado}
                 />
               </div>
 
               <Btn
-                className="mt-4 w-full"
-                disabled={
-                  !entidadSeleccionada ||
-                  !eventoSeleccionado
-                }
-                icon={<Zap size={14} />}
+                className="mt-3 w-full"
+                disabled={!entidadSeleccionada || !eventoSeleccionado}
                 onClick={() =>
                   dispararEvento({
-                    eventoId:
-                      eventoSeleccionado,
-                    entidadId:
-                      entidadSeleccionada,
+                    eventoId: eventoSeleccionado,
+                    entidadId: entidadSeleccionada,
                   })
                 }
                 size="sm"
               >
                 Encolar evento
               </Btn>
-            </Card>
+            </div>
           </div>
 
-          {/* ─────────────────────────────────────────────
-              ESTADO EN VIVO
-          ────────────────────────────────────────────── */}
-          <div className="flex flex-col gap-6">
-            <Card padding="md">
-              <div className="flex items-center justify-between mb-3">
-                <EtiquetaSeccion>
-                  Entidades
-                </EtiquetaSeccion>
-
-                <span
-                  className="text-micro font-black tabular-nums"
-                  style={{
-                    color:
-                      "color-mix(in srgb, var(--primary) 35%, transparent)",
-                  }}
-                >
-                  {entidades.length}
-                </span>
-              </div>
+          {/* ESTADO EN VIVO */}
+          <div className="flex flex-col gap-5">
+            <div className="pb-5 border-b border-primary/10 lg:border-b-0">
+              <BloqueHeader label="Entidades" count={entidades.length} />
 
               {entidades.length === 0 ? (
-                <EmptyState label="Sin entidades todavía" />
+                <p className="py-2 text-micro text-primary/30">
+                  Sin entidades todavía
+                </p>
               ) : (
-                <div
-                  className="flex flex-col divide-y"
-                  style={{
-                    borderColor:
-                      "color-mix(in srgb, var(--primary) 8%, transparent)",
-                  }}
-                >
+                <div className="flex flex-col divide-y divide-primary/8">
                   {entidades.map((e) => (
-                    <div
-                      className="py-3 first:pt-0 last:pb-0"
-                      key={e.id}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <Text
-                          as="p"
-                          className="text-primary font-black"
-                          variant="sm"
-                        >
+                    <div className="py-2.5 first:pt-0 last:pb-0" key={e.id}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black text-primary">
                           {e.entidad_tipo}
-                        </Text>
+                        </span>
 
-                        <Badge>
-                          {e.entidad_origen_id
-                            ? "catálogo"
-                            : "manual"}
-                        </Badge>
+                        <span className="text-micro font-bold text-primary/35 shrink-0">
+                          {e.entidad_origen_id ? "catálogo" : "manual"}
+                        </span>
                       </div>
 
                       {e.entidad_origen_id && (
-                        <p
-                          className="mt-1 text-micro font-bold"
-                          style={{
-                            color:
-                              "color-mix(in srgb, var(--primary) 35%, transparent)",
-                          }}
-                        >
+                        <p className="mt-0.5 text-micro text-primary/30">
                           origen ·{" "}
                           <code className="font-mono">
-                            {e.entidad_origen_id.slice(
-                              0,
-                              8,
-                            )}
+                            {e.entidad_origen_id.slice(0, 8)}
                           </code>
                         </p>
                       )}
 
-                      <pre
-                        className="mt-2 text-micro overflow-x-auto rounded-[var(--radius-btn)] p-2 leading-relaxed"
-                        style={{
-                          color:
-                            "color-mix(in srgb, var(--primary) 60%, transparent)",
-                          background:
-                            "color-mix(in srgb, var(--primary) 5%, transparent)",
-                        }}
-                      >
-                        {JSON.stringify(
-                          e.estado_actual,
-                          null,
-                          2,
-                        )}
+                      <pre className="mt-1.5 text-micro text-primary/50 overflow-x-auto leading-relaxed">
+                        {JSON.stringify(e.estado_actual, null, 2)}
                       </pre>
                     </div>
                   ))}
                 </div>
               )}
-            </Card>
+            </div>
 
-            <Card padding="md">
-              <div className="flex items-center justify-between mb-3">
-                <EtiquetaSeccion>
-                  Event log
-                </EtiquetaSeccion>
-
-                <span
-                  className="text-micro font-black tabular-nums"
-                  style={{
-                    color:
-                      "color-mix(in srgb, var(--primary) 35%, transparent)",
-                  }}
-                >
-                  {eventos.length}
-                </span>
-              </div>
+            <div>
+              <BloqueHeader label="Event log" count={eventos.length} />
 
               {eventos.length === 0 ? (
-                <EmptyState label="Sin eventos todavía" />
+                <p className="py-2 text-micro text-primary/30">
+                  Sin eventos todavía
+                </p>
               ) : (
-                <div
-                  className="flex flex-col divide-y"
-                  style={{
-                    borderColor:
-                      "color-mix(in srgb, var(--primary) 8%, transparent)",
-                  }}
-                >
+                <div className="flex flex-col divide-y divide-primary/8">
                   {eventos.map((ev) => (
                     <div
-                      className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+                      className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
                       key={ev.id}
                     >
-                      <span
-                        className="text-micro font-bold truncate"
-                        style={{
-                          color:
-                            "color-mix(in srgb, var(--primary) 70%, transparent)",
-                        }}
-                      >
-                        t={ev.tiempo_programado} ·{" "}
-                        {ev.evento_id.slice(0, 8)}
+                      <span className="text-micro font-bold text-primary/60 truncate">
+                        t={ev.tiempo_programado} · {ev.evento_id.slice(0, 8)}
                       </span>
 
-                      <Badge
-                        variant={
-                          ev.estado ===
-                          "procesado"
-                            ? "success"
-                            : "default"
-                        }
+                      <span
+                        className={`text-micro font-bold shrink-0 ${
+                          ev.estado === "procesado"
+                            ? "text-primary/70"
+                            : "text-primary/35"
+                        }`}
                       >
                         {ev.estado}
-                      </Badge>
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
-            </Card>
+            </div>
           </div>
         </div>
       )}
