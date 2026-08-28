@@ -733,37 +733,58 @@ function RutasSection() {
   }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute]);
 
   // Trace: ruta ya resuelta, en el mismo orden que el modelo real — nunca
-  // fusiona Física y Alquimia en una sola secuencia.
+  // fusiona Física y Alquimia en una sola secuencia. Si hay una partícula
+  // clickeada (o un Ium en zoom), el Trace la refleja en vez de asumir
+  // siempre la primera — para no mostrarle al usuario una procedencia
+  // distinta de lo que ve seleccionado en el canvas/Inspector.
   const traceSteps: TraceStep[] = useMemo(() => {
     if (perspectiva === "fisica") {
       const o = fisicaRoute.orisSel;
+      const ium = fisicaRoute.iumSel;
+      const particulaTrace =
+        particulaClickeada ??
+        (ium ? fisicaRoute.particulasDelIumSel[0] : fisicaRoute.particulasDelOrisSel[0]) ??
+        null;
+      const iumTrace =
+        ium ??
+        (o
+          ? (() => {
+              const primerIumId = Object.keys(o.iums_composicion)[0];
+              return primerIumId ? fisicaRoute.iumPorId[primerIumId] : null;
+            })()
+          : null);
       return [
         {
           id: "t-particula",
           levelLabel: "Partícula (A/T/S)",
-          title: fisicaRoute.particulasDelOrisSel[0]?.nombre ?? null,
-          subtitle: fisicaRoute.particulasDelOrisSel[0]?.formula ?? undefined,
+          title: particulaTrace?.nombre ?? null,
+          subtitle: particulaTrace?.formula ?? undefined,
         },
         {
           id: "t-ium",
           levelLabel: "IUM",
-          title: o ? Object.keys(o.iums_composicion)[0] ? (fisicaRoute.iumPorId[Object.keys(o.iums_composicion)[0]]?.nombre ?? null) : null : null,
+          title: iumTrace?.nombre ?? null,
         },
         { id: "t-oris", levelLabel: "Oris", title: o?.nombre ?? null, subtitle: o?.dominio ?? undefined },
       ];
     }
     const e = alquimiaRoute.elementoSel;
-    const capaConDatos = alquimiaRoute.capas.find((c) => c.total > 0);
+    const capaSel = alquimiaRoute.capaSel;
+    const capaConDatos = capaSel
+      ? alquimiaRoute.capas.find((c) => c.capa === capaSel)
+      : alquimiaRoute.capas.find((c) => c.total > 0);
+    const particulaTrace = particulaClickeada ?? alquimiaRoute.particulasDeCapaSel[0] ?? null;
     return [
       {
         id: "t-particula",
         levelLabel: "Partícula química",
-        title: alquimiaRoute.particulasDeCapaSel[0]?.nombre ?? (capaConDatos ? capaConDatos.resumen.split(" ")[0] ?? null : null),
+        title: particulaTrace?.nombre ?? (capaConDatos && !particulaTrace ? capaConDatos.resumen.split(" ")[0] ?? null : null),
+        subtitle: particulaTrace?.formula ?? undefined,
       },
       { id: "t-capa", levelLabel: "Capa", title: capaConDatos?.label ?? null },
       { id: "t-elemento", levelLabel: "Elemento", title: e ? `${e.simbolo} · ${e.nombre}` : null },
     ];
-  }, [perspectiva, fisicaRoute, alquimiaRoute]);
+  }, [perspectiva, fisicaRoute, alquimiaRoute, particulaClickeada]);
 
   return (
     <>

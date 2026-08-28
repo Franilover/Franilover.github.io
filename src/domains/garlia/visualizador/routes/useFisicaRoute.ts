@@ -36,6 +36,12 @@ import {
 export interface FisicaRouteState {
   loading: boolean;
   empty: boolean;
+  /** Siempre null hoy: useIums()/useOrisConIums() (fisica/useFisica.ts,
+   *  fisica/useOrisConIums.ts) no propagan el error de useSupabaseData
+   *  hacia afuera — es un patrón compartido por esos hooks y por otros
+   *  consumidores fuera de visualizador/ (FisicaPage, etc.), así que no
+   *  se corrige acá para no arriesgar romper esas 12+ secciones. Riesgo
+   *  documentado, no resuelto — ver auditoría VIS-01. */
   error: null;
 
   iums: Ium[];

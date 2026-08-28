@@ -48,6 +48,11 @@ export interface CapaResumen {
 export interface AlquimiaRouteState {
   loading: boolean;
   empty: boolean;
+  /** Siempre null hoy: useElementos() (elementos/useElementos.ts) no
+   *  propaga el error de useSupabaseData hacia afuera — mismo patrón
+   *  compartido con otros consumidores fuera de visualizador/
+   *  (ElementosPage, etc.), no se corrige acá para no arriesgar romper
+   *  esas secciones. Riesgo documentado, no resuelto — ver auditoría VIS-01. */
   error: null;
 
   elementos: Elemento[];
