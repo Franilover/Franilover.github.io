@@ -12,14 +12,13 @@
  * scroll (en vez de tabs que muestran una sección a la vez).
  */
 
-import { Atom, Download, GitCompare, Loader2, Plus, Save, Trash2, Upload, X } from "lucide-react";
+import { Atom, Download, Loader2, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { supabase } from "@/infra/supabase/supabase";
 import { SaveIndicator } from "@/domains/garlia/_shared/UIComponents";
 
-import { ComparadorElementosModal } from "./ComparadorElementos";
 import { CompuestosPage } from "./CompuestosPage";
 import { MaterialesPage } from "../materiales/MaterialesPage";
 
@@ -568,7 +567,6 @@ export function ElementosPage({
       setEliminandoVarios(false);
     }
   }
-  const [comparadorAbierto, setComparadorAbierto] = useState(false);
   const inputArchivoRef = useRef<HTMLInputElement>(null);
   const [importando, setImportando] = useState(false);
   const [mensajeImportacion, setMensajeImportacion] = useState<string | null>(null);
@@ -750,22 +748,7 @@ export function ElementosPage({
     [elementos, activoId],
   );
 
-  const [filtroFamilia, setFiltroFamilia] = useState<ElementFamily | "todas">("todas");
-  const elementosFiltrados = useMemo(
-    () =>
-      filtroFamilia === "todas"
-        ? elementos
-        : elementos.filter((el) => el.familia === filtroFamilia),
-    [elementos, filtroFamilia],
-  );
-
-  // Vista "Lista" (orden por número atómico, como hoy) vs "Tabla periódica"
-  // (agrupada por columnas de déficit/superávit de capa externa).
-  const [vista, setVista] = useState<"lista" | "periodica">("lista");
-  const gruposPeriodicos = useMemo(
-    () => (vista === "periodica" ? agruparComoTablaPeriodica(elementosFiltrados) : []),
-    [vista, elementosFiltrados],
-  );
+  const elementosFiltrados = elementos;
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
@@ -775,61 +758,7 @@ export function ElementosPage({
           <p className="text-micro font-black uppercase tracking-widest">Elementos</p>
         </div>
         <div className="flex relative">
-      <div className="flex-1 p-3 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div />
-          <div className="shrink-0 flex items-center gap-1.5">
-            <div className="flex items-center rounded-md border border-primary/15 overflow-hidden">
-              {(
-                [
-                  { key: "lista" as const, label: "Lista" },
-                  { key: "periodica" as const, label: "Tabla periódica" },
-                ]
-              ).map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setVista(key)}
-                  title={
-                    key === "periodica"
-                      ? "Agrupar por columnas según déficit/superávit de capa externa, como grupos de la tabla periódica real"
-                      : "Orden simple por número atómico"
-                  }
-                  className={`px-2 py-1 text-micro font-black uppercase tracking-wide transition-all cursor-pointer ${
-                    vista === key
-                      ? "bg-primary/10 text-primary"
-                      : "text-primary/40 hover:text-primary/70 hover:bg-primary/5"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <select
-              value={filtroFamilia}
-              onChange={(e) => setFiltroFamilia(e.target.value as ElementFamily | "todas")}
-              title="Filtrar por familia"
-              className="bg-primary/5 rounded-md pl-2 pr-1 py-1 text-micro font-black uppercase tracking-wide text-primary/60 outline-none border border-primary/15 hover:border-primary/35 focus:border-primary/40 transition-all cursor-pointer"
-            >
-              <option value="todas">Todas las familias</option>
-              {ELEMENT_FAMILIES.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={elementos.length < 2}
-              onClick={() => setComparadorAbierto(true)}
-              title="Comparar 2-3 elementos lado a lado"
-              className="flex items-center justify-center p-1.5 rounded-md border border-primary/15 text-primary/50 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              <GitCompare size={14} />
-            </button>
-          </div>
-        </div>
-
+        <div className="flex-1 p-3 flex flex-col gap-3">
         {seleccionMultiple.size > 0 && (
           <div className="text-micro font-black uppercase tracking-wide bg-primary/10 border border-primary/20 rounded-md px-2 py-1.5 flex items-center justify-between gap-2">
             <span className="text-primary/70">
@@ -880,35 +809,6 @@ export function ElementosPage({
         ) : elementos.length === 0 ? (
           <div className="py-6 text-micro text-primary/25 text-center">
             Todavía no hay elementos cargados.
-          </div>
-        ) : elementosFiltrados.length === 0 ? (
-          <div className="py-6 text-micro text-primary/25 text-center">
-            Ningún elemento en la familia "{filtroFamilia}".
-          </div>
-        ) : vista === "periodica" ? (
-          <div className="flex flex-col gap-3">
-            {gruposPeriodicos.map(({ familia, elementos: elsDeFamilia }) => (
-              <div key={familia} className="flex flex-col gap-1">
-                <p className="flex items-center gap-1.5 text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-                  <span className="w-2 h-2 rounded-full shrink-0 border border-primary/30" />
-                  {familia} · {elsDeFamilia.length} elemento{elsDeFamilia.length === 1 ? "" : "s"}
-                </p>
-                <div
-                  className="grid gap-1"
-                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(68px, 1fr))" }}
-                >
-                  {elsDeFamilia.map((el) => (
-                    <ElementoCasilla
-                      key={el.id}
-                      elemento={el}
-                      seleccionado={el.id === activoId}
-                      enSeleccionMultiple={seleccionMultiple.has(el.id)}
-                      onClick={(e) => handleClickCasilla(el.id, e)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
           </div>
         ) : (
           <div
@@ -1041,14 +941,6 @@ export function ElementosPage({
           },
         ]}
       />
-
-
-      {comparadorAbierto && (
-        <ComparadorElementosModal
-          elementos={elementos}
-          onCerrar={() => setComparadorAbierto(false)}
-        />
-      )}
     </div>
   );
 }
