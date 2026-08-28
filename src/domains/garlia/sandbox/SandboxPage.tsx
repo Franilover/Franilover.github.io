@@ -50,6 +50,10 @@ import {
   useListaSandboxes,
   useSandbox,
 } from "./useSandbox";
+import type {
+  EstadoActualEntidad,
+  EstadoTemporalEntidad,
+} from "./types";
 
 type TipoCatalogo = "elemento" | "compuesto";
 
@@ -288,6 +292,187 @@ function PropiedadPreview({
       <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
         {formatearValor(value)}
       </span>
+    </div>
+  );
+}
+
+/** Etiqueta legible para claves snake_case comunes de estado_actual. Claves
+ *  no listadas se muestran tal cual, mismo criterio que ETIQUETAS_METRICA en
+ *  GridPropiedadesCalculadas.tsx. */
+const ETIQUETAS_PROPIEDAD: Record<string, string> = {
+  masa: "Masa",
+  masa_base: "Masa base",
+  carga: "Carga",
+  temperatura: "Temperatura",
+  rigidez: "Rigidez",
+  dureza: "Dureza",
+  estabilidad: "Estabilidad",
+  flexibilidad: "Flexibilidad",
+  compatibilidad: "Compatibilidad",
+  conductividad: "Conductividad",
+  transparencia: "Transparencia",
+  energia_enlace: "Energía de enlace",
+  numero_atomico: "Número atómico",
+  es_noble: "Es noble",
+  es_catalizador: "Es catalizador",
+  capacidad_enlace: "Capacidad de enlace",
+  saturacion_enlace: "Saturación de enlace",
+  regimen_estructural: "Régimen estructural",
+  dinamismo_particular: "Dinamismo particular",
+  valencia_estructural: "Valencia estructural",
+  polaridad_estructural: "Polaridad estructural",
+  capacidad_transformacion: "Capacidad de transformación",
+  tipo_compuesto: "Tipo de compuesto",
+  estado_estructura: "Estado de estructura",
+  formula_canonica: "Fórmula canónica",
+  clasificacion: "Clasificación",
+  tipo_estructura: "Tipo de estructura",
+  estado: "Estado",
+  nucleo: "Núcleo",
+  media: "Media",
+  externa: "Externa",
+};
+
+function etiquetaPropiedad(clave: string): string {
+  return ETIQUETAS_PROPIEDAD[clave] ?? clave;
+}
+
+/** Una tarjeta del grid — mismo look que GridPropiedadesCalculadas
+ *  (bg-primary/5, borde, label chico arriba, valor abajo). Si el valor es
+ *  un objeto anidado (nucleo/media/externa en Elemento), se listan sus
+ *  claves internas en vez de "[object Object]". */
+function TarjetaPropiedad({ label, value }: { label: string; value: unknown }) {
+  const esObjeto =
+    value !== null && typeof value === "object" && !Array.isArray(value);
+
+  return (
+    <div className="flex flex-col gap-0.5 bg-primary/5 rounded-md px-2 py-1.5 border border-primary/10 min-w-0">
+      <span className="text-[10px] font-black uppercase tracking-widest text-primary/35 truncate">
+        {label}
+      </span>
+
+      {esObjeto ? (
+        <div className="flex flex-col gap-0.5 mt-0.5">
+          {Object.entries(value as Record<string, unknown>).map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between gap-2">
+              <span className="text-micro font-bold text-primary/45 truncate">
+                {k}
+              </span>
+              <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
+                {formatearValor(v)}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <span className="text-micro font-black text-primary/80 truncate">
+          {formatearValor(value)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Grid de "estados" activos de una entidad (ardiendo, envenenado, etc.) —
+ *  cada estado es su propio jsonb con activo/intensidad/expiración/datos,
+ *  distinto shape de "propiedades" así que tiene su propia tarjeta. */
+function TarjetaEstado({
+  nombre,
+  estado,
+}: {
+  nombre: string;
+  estado: EstadoTemporalEntidad;
+}) {
+  const datosEntradas = Object.entries(estado.datos ?? {});
+
+  return (
+    <div className="flex flex-col gap-1 bg-primary/5 rounded-md px-2 py-1.5 border border-primary/10 min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-micro font-black text-primary/80 truncate">
+          {nombre}
+        </span>
+        <span
+          className={`text-[10px] font-black uppercase tracking-widest shrink-0 ${
+            estado.activo ? "text-primary/60" : "text-primary/30"
+          }`}
+        >
+          {estado.activo ? "activo" : "inactivo"}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-micro text-primary/45">
+        <span>
+          inicio {formatearValor(estado.iniciado_en)}
+        </span>
+        <span>
+          expira {formatearValor(estado.expira_en)}
+        </span>
+        {estado.intensidad !== null && (
+          <span>intensidad {formatearValor(estado.intensidad)}</span>
+        )}
+      </div>
+
+      {datosEntradas.length > 0 && (
+        <div className="flex flex-col gap-0.5 pt-1 mt-0.5 border-t border-primary/10">
+          {datosEntradas.map(([k, v]) => (
+            <div key={k} className="flex items-center justify-between gap-2">
+              <span className="text-micro font-bold text-primary/45 truncate">
+                {k}
+              </span>
+              <span className="text-micro font-black text-primary/70 truncate">
+                {formatearValor(v)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Render de estado_actual de una SandboxEntidad como grid de tarjetas
+ *  (mismo lenguaje visual que GridPropiedadesCalculadas / Propiedades
+ *  físicas del editor de Elementos), en vez del JSON crudo con <pre>. */
+function EstadoEntidadGrid({ estado }: { estado: EstadoActualEntidad }) {
+  const propiedadesEntradas = Object.entries(estado.propiedades ?? {}).filter(
+    ([, v]) => v !== null && v !== undefined,
+  );
+  const estadosEntradas = Object.entries(estado.estados ?? {});
+
+  if (propiedadesEntradas.length === 0 && estadosEntradas.length === 0) {
+    return <p className="text-micro text-primary/25 italic py-1">Sin propiedades.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {propiedadesEntradas.length > 0 && (
+        <div className="grid grid-cols-2 gap-1.5">
+          {propiedadesEntradas.map(([clave, valor]) => (
+            <TarjetaPropiedad
+              key={clave}
+              label={etiquetaPropiedad(clave)}
+              value={valor}
+            />
+          ))}
+        </div>
+      )}
+
+      {estadosEntradas.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[10px] font-black uppercase tracking-widest text-primary/30">
+            Estados
+          </span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {estadosEntradas.map(([nombre, estadoTemporal]) => (
+              <TarjetaEstado
+                key={nombre}
+                nombre={nombre}
+                estado={estadoTemporal}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -802,9 +987,9 @@ export function SandboxPage() {
                         </p>
                       )}
 
-                      <pre className="mt-1.5 text-micro text-primary/50 overflow-x-auto leading-relaxed">
-                        {JSON.stringify(e.estado_actual, null, 2)}
-                      </pre>
+                      <div className="mt-1.5">
+                        <EstadoEntidadGrid estado={e.estado_actual} />
+                      </div>
                     </div>
                   ))}
                 </div>
