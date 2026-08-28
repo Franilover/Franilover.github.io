@@ -27,6 +27,7 @@ import {
 
 import {
   contarLetrasDeOris,
+  particulasDeIum,
   particulasDeOris,
   type FilaIum,
 } from "@/domains/garlia/fisica/types";
@@ -63,7 +64,7 @@ import { TraceView, type TraceStep } from "./TraceView";
 import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
-import { ParticulaVisual } from "@/domains/garlia/fisica/ParticulaVisual";
+import { ParticulaVisual, IumVisual, contarLetras } from "@/domains/garlia/fisica/ParticulaVisual";
 
 type SectionKey =
   | "rutas"
@@ -331,6 +332,11 @@ function RutaFisicaCanvas({
       visual: <ParticulaVisual formula={p.formula} size={40} />,
     }));
     // Nivel 2: los IUMs reales que componen el Oris (desde iums_composicion).
+    // Cada IUM se pinta con IumVisual (centro + partículas propias en
+    // anillo) — mismo componente ya construido en fisica/ParticulaVisual.tsx
+    // para diferenciarlo visualmente de un nodo genérico ("núcleo
+    // energético/cristalino" según la especificación visual maestra), sin
+    // calcular nada nuevo: particulasDeIum ya expande la composición real.
     const iumNodes = Object.entries(orisSel.iums_composicion)
       .filter(([, cantidad]) => cantidad > 0)
       .map(([iumId]) => {
@@ -339,6 +345,7 @@ function RutaFisicaCanvas({
           id: `ium-${iumId}`,
           label: ium?.nombre ?? "IUM",
           sublabel: `${orisSel.iums_composicion[iumId]}×`,
+          visual: ium ? <IumVisual particulas={particulasDeIum(ium)} size={44} /> : undefined,
         };
       });
     // Nivel 3: el Oris seleccionado.
@@ -514,19 +521,6 @@ function RutaAlquimiaCanvas({
   );
 }
 
-/** Conteo A/T/S de una sola partícula a partir de su fórmula real (ej.
- *  "ATS", "AA") — mismo criterio letra-por-letra que contarLetrasDeComposicion,
- *  aplicado a una fórmula ya resuelta en vez de a una lista de composición.
- *  No es una regla nueva: es leer los mismos 3 caracteres que ya se
- *  muestran como sublabel del nodo. */
-function contarLetrasDeFormula(formula: string): { A: number; T: number; S: number } {
-  const out = { A: 0, T: 0, S: 0 };
-  for (const c of formula) {
-    if (c === "A" || c === "T" || c === "S") out[c] += 1;
-  }
-  return out;
-}
-
 function RutasSection() {
   const [perspectiva, setPerspectiva] = useState<Perspectiva>("fisica");
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -565,7 +559,7 @@ function RutasSection() {
   // (sección "A/T/S es información contextual, no geometría principal").
   const inspectorEntity: InspectorEntity | null = useMemo(() => {
     if (particulaClickeada) {
-      const letras = contarLetrasDeFormula(particulaClickeada.formula);
+      const letras = contarLetras(particulaClickeada.formula);
       return {
         eyebrow: "Partícula",
         title: particulaClickeada.nombre,
