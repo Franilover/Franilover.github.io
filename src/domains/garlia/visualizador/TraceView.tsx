@@ -52,10 +52,8 @@ export function TraceView({
               type={onSelectStep ? "button" : undefined}
               onClick={onSelectStep ? () => onSelectStep(step.id) : undefined}
               className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                isActive
-                  ? "border-primary/40 bg-primary/10"
-                  : "border-primary/10 bg-primary/[0.02]"
-              } ${onSelectStep ? "hover:border-primary/30 hover:bg-primary/8 cursor-pointer" : ""}`}
+                isActive ? "border-primary/40" : "border-primary/10"
+              } ${onSelectStep ? "hover:border-primary/30 cursor-pointer" : ""}`}
             >
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary/35">
                 {step.levelLabel}

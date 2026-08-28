@@ -224,8 +224,8 @@ function ChipSelector<T>({
             onClick={() => onSelect(item)}
             className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition-colors ${
               selected
-                ? "border-primary/40 bg-primary/15 text-primary/90"
-                : "border-primary/10 bg-primary/[0.025] text-primary/50 hover:border-primary/25 hover:text-primary/75"
+                ? "border-primary/40 text-primary/90"
+                : "border-primary/10 text-primary/50 hover:border-primary/25 hover:text-primary/75"
             }`}
           >
             {getLabel(item)}
@@ -385,7 +385,7 @@ function RutaFisicaCanvas({
             getLabel={(o) => o.nombre}
             onSelect={(o) => setOrisSelId(o.id)}
           />
-          <div className="mt-4 rounded-2xl border border-primary/10 p-5">
+          <div className="mt-3 rounded-2xl border border-primary/10 p-3">
             <StructureCanvas
               columns={columns}
               edges={edges}
@@ -481,7 +481,7 @@ function RutaAlquimiaCanvas({
                 onClick={() => setCapaSel(capaSel === c.capa ? null : c.capa)}
                 className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${
                   capaSel === c.capa
-                    ? "border-primary/40 bg-primary/12 text-primary/85"
+                    ? "border-primary/40 text-primary/85"
                     : "border-primary/10 text-primary/45 hover:border-primary/25"
                 }`}
               >
@@ -489,7 +489,7 @@ function RutaAlquimiaCanvas({
               </button>
             ))}
           </div>
-          <div className="mt-4 rounded-2xl border border-primary/10 p-5">
+          <div className="mt-3 rounded-2xl border border-primary/10 p-3">
             <StructureCanvas
               columns={columns}
               edges={edges}
@@ -700,13 +700,10 @@ function VisualizadorPage() {
 
   return (
     <main className="min-h-screen bg-[var(--bg-main)] text-primary">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-5 border-b border-primary/10 pb-4">
-          <h1 className="text-lg font-black tracking-tight text-primary/90">Visualizador</h1>
-        </div>
+      <div className="mx-auto max-w-[1500px] px-3 py-4 sm:px-4 lg:px-5">
 
         <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="rounded-2xl border border-primary/10 bg-primary/[0.02] p-2 lg:sticky lg:top-4 lg:self-start">
+          <aside className="rounded-2xl border border-primary/10 p-2 lg:sticky lg:top-4 lg:self-start">
             <p className="px-3 pb-2 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/30">Explorar</p>
             <nav className="space-y-1">
               {navItems.map((item) => {
@@ -716,7 +713,7 @@ function VisualizadorPage() {
                     key={item.key}
                     type="button"
                     onClick={() => setActive(item.key)}
-                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-black transition-colors ${selected ? "bg-primary/10 text-primary/90" : "text-primary/45 hover:bg-primary/5 hover:text-primary/70"}`}
+                    className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-black transition-colors ${selected ? "border-primary/25 text-primary/90" : "border-transparent text-primary/45 hover:border-primary/10 hover:text-primary/70"}`}
                   >
                     {item.icon}
                     <span>{item.label}</span>

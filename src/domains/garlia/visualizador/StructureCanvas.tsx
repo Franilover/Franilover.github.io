@@ -121,11 +121,12 @@ export function StructureCanvas({
   }
 
   return (
-    <div className={`w-full overflow-x-auto ${className ?? ""}`}>
+    <div className={`w-full ${className ?? ""}`} style={{ aspectRatio: `${width} / ${height}` }}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        width={width}
-        height={height}
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
         className="block"
         role="img"
         aria-label="Diagrama de estructura"
@@ -196,12 +197,6 @@ export function StructureCanvas({
                 : emphasized
                   ? "color-mix(in srgb, var(--primary) 55%, transparent)"
                   : "color-mix(in srgb, var(--primary) 14%, transparent)";
-            const toneFill =
-              node.tone === "accent"
-                ? "color-mix(in srgb, var(--primary) 12%, transparent)"
-                : emphasized
-                  ? "color-mix(in srgb, var(--primary) 7%, transparent)"
-                  : "color-mix(in srgb, var(--primary) 2.5%, transparent)";
             return (
               <g
                 key={node.id}
@@ -217,9 +212,9 @@ export function StructureCanvas({
                   rx={14}
                   strokeWidth={isSelected ? 2 : 1.25}
                   style={{
-                    fill: toneFill,
+                    fill: "transparent",
                     stroke: toneBorder,
-                    transition: "fill 150ms ease, stroke 150ms ease",
+                    transition: "stroke 150ms ease",
                   }}
                 />
                 {node.visual ? (
