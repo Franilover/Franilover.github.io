@@ -47,7 +47,7 @@ function ComposicionEstructuraBloque({ estructuraId }: { estructuraId: string })
           {items.map((item) => (
             <div
               key={item.vinculo_id}
-              className="flex items-center justify-between gap-2 rounded-md border border-primary/10 px-2 py-1"
+              className="flex items-center justify-between gap-2 px-2 py-1"
             >
               <span className="text-micro font-bold text-primary/70 truncate">{item.compuesto.nombre}</span>
               <span className="text-micro text-primary/45 shrink-0">

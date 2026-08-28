@@ -276,7 +276,18 @@ export function ElementoEditor({
               </div>
             </div>
 
-            <div className="grid grid-cols-[minmax(6.5rem,auto)_auto] gap-2 items-stretch justify-start">
+            <div className="grid grid-cols-[auto_minmax(6.5rem,auto)] gap-2 items-stretch justify-start">
+              {/* Visualización tipo átomo real: núcleo + capas orbitales,
+                  con las partículas propias del mundo (Masa, Cinética,
+                  Voluntad…) en vez de protones/neutrones/electrones
+                  genéricos. Va primero (izquierda) para que la barra
+                  vertical de partículas quede a la derecha del gráfico.
+                  Columna "auto" (no "1fr"): el gráfico es cuadrado y se ata
+                  a la altura de la pila de partículas de al lado
+                  (aspect-square h-full, por defecto en AtomoVisual sin
+                  className angosto). */}
+              <AtomoVisual elemento={local} />
+
               <div className="flex flex-col gap-2 shrink-0">
                 {(["nucleo", "media", "externa"] as LayerName[]).map((layer, i) => (
                   <div
@@ -316,18 +327,6 @@ export function ElementoEditor({
                   </div>
                 ))}
               </div>
-
-              {/* Visualización tipo átomo real: núcleo + capas orbitales,
-                  con las partículas propias del mundo (Masa, Cinética,
-                  Voluntad…) en vez de protones/neutrones/electrones
-                  genéricos. Columna "auto" (no "1fr"): el gráfico es
-                  cuadrado y se ata a la altura de la pila de partículas de
-                  al lado (aspect-square h-full, por defecto en
-                  AtomoVisual sin className angosto) — no necesita reclamar
-                  el ancho extra que sobra, y ese espacio ahora lo gana la
-                  columna de partículas para mostrar el nombre completo sin
-                  cortarse. */}
-              <AtomoVisual elemento={local} />
             </div>
           </div>
         </div>

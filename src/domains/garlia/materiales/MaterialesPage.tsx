@@ -91,7 +91,7 @@ function MaterialPerfilReactivo({ materialId }: { materialId: string }) {
           {EJES_PERFIL_REACTIVO.filter(([key]) => item.perfil?.[key] !== undefined).map(([key, label]) => (
             <div
               key={key}
-              className="flex items-center justify-between gap-1 min-w-0 rounded-md border border-primary/10 px-2 py-1.5"
+              className="flex items-center justify-between gap-1 min-w-0 px-2 py-1.5"
             >
               <span className="text-micro font-bold text-primary/50 truncate">{label}</span>
               <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
@@ -170,7 +170,7 @@ function MaterialDetail({ material }: { material: Material }) {
                       ? compuestos.find((item) => item.id === componente.componente_id)
                       : null;
                   return (
-                    <div key={componente.id} className="rounded-md border border-primary/10 px-2 py-1">
+                    <div key={componente.id} className="px-2 py-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-micro font-bold text-primary/70 truncate">
                           {compuesto?.nombre ?? `${componente.componente_tipo} · ${componente.componente_id.slice(0, 8)}`}

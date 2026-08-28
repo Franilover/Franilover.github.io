@@ -324,7 +324,7 @@ function ComposicionRealBloque({
           return (
             <div
               key={p.id}
-              className="flex flex-col gap-1 rounded-md border border-primary/10 px-2 py-1.5"
+              className="flex flex-col gap-1 px-2 py-1.5"
             >
               <button
                 type="button"
@@ -415,7 +415,7 @@ function EstabilidadDetalleBloque({
           <div
             key={f.label}
             title={f.descripcion}
-            className="flex items-center justify-between gap-1 rounded-md border border-primary/10 px-2 py-1.5"
+            className="flex items-center justify-between gap-1 px-2 py-1.5"
           >
             <span className="text-micro font-bold text-primary/50 truncate">{f.label}</span>
             <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
@@ -483,7 +483,7 @@ function EnlacesCompuestoBloque({
         {enlaces.map((e) => (
           <div
             key={e.id}
-            className="flex flex-col gap-0.5 rounded-md border border-primary/10 px-2 py-1"
+            className="flex flex-col gap-0.5 px-2 py-1"
           >
             <span className="text-micro font-bold text-primary/70 truncate">
               <button
