@@ -33,7 +33,7 @@ import {
   RotateCcw,
   SkipForward,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
@@ -41,7 +41,14 @@ import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import type {
   Compuesto,
   Elemento,
+  PropiedadCalculada,
 } from "@/domains/garlia/elementos/types";
+import {
+  propiedadesCalculadasDeElemento,
+  propiedadesCalculadasDeCompuesto,
+} from "@/domains/garlia/elementos/types";
+
+import { PropertyControlGrid } from "@/domains/garlia/_shared/PropertyControl";
 
 import { Input, Select } from "@/ui/Inputs";
 
@@ -574,21 +581,67 @@ export function SandboxPage() {
     );
   }, [tipoCatalogo, catalogoSeleccionado, elementos, compuestos]);
 
-  const estadoInicialSeleccionado = useMemo(() => {
+  // estado_inicial es editable ANTES de que la entidad exista en Sandbox —
+  // es solo un objeto en memoria del navegador todavía, no ha tocado
+  // agregar_entidad_sandbox. Una vez creada la entidad, el motor manda:
+  // este componente nunca vuelve a escribir sobre estado_actual.
+  const [estadoInicialSeleccionado, setEstadoInicialSeleccionado] =
+    useState<Record<string, unknown> | null>(null);
+
+  // Re-siembra estado_inicial cada vez que cambia la selección de catálogo
+  // (o el tipo elemento/compuesto). Si el usuario ya había tocado un
+  // slider/input para ESTA selección, ese ajuste se conserva mientras no
+  // cambie la selección — cambiar de elemento reinicia desde el catálogo.
+  useEffect(() => {
     if (!entidadCatalogoSeleccionada) {
-      return null;
+      setEstadoInicialSeleccionado(null);
+      return;
     }
 
-    if (tipoCatalogo === "elemento") {
-      return estadoInicialDeElemento(
-        entidadCatalogoSeleccionada as Elemento,
-      );
-    }
-
-    return estadoInicialDeCompuesto(
-      entidadCatalogoSeleccionada as Compuesto,
+    setEstadoInicialSeleccionado(
+      tipoCatalogo === "elemento"
+        ? estadoInicialDeElemento(entidadCatalogoSeleccionada as Elemento)
+        : estadoInicialDeCompuesto(entidadCatalogoSeleccionada as Compuesto),
     );
-  }, [tipoCatalogo, entidadCatalogoSeleccionada]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipoCatalogo, entidadCatalogoSeleccionada?.id]);
+
+  // PropiedadCalculada[] del catálogo (con `proporcion` cuando aplica) —
+  // fuente de verdad de qué es índice [0,1] vs magnitud abierta. El valor
+  // mostrado/editado viene de estadoInicialSeleccionado (lo que de verdad
+  // se va a enviar), no directo del catálogo, para que los sliders reflejen
+  // ediciones del usuario ya hechas.
+  const propiedadesEditables = useMemo<PropiedadCalculada[]>(() => {
+    if (!entidadCatalogoSeleccionada || !estadoInicialSeleccionado) return [];
+
+    const base =
+      tipoCatalogo === "elemento"
+        ? propiedadesCalculadasDeElemento(entidadCatalogoSeleccionada as Elemento)
+        : propiedadesCalculadasDeCompuesto(entidadCatalogoSeleccionada as Compuesto);
+
+    const propiedadesInicial = (estadoInicialSeleccionado.propiedades ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    return base.map((p) => {
+      const editado = propiedadesInicial[p.clave];
+      if (typeof editado !== "number") return p;
+      return {
+        ...p,
+        valor: Number.isInteger(editado) ? String(editado) : editado.toFixed(p.proporcion !== undefined ? 2 : 3),
+      };
+    });
+  }, [tipoCatalogo, entidadCatalogoSeleccionada, estadoInicialSeleccionado]);
+
+  function handleEditarPropiedadInicial(clave: string, nuevoValor: number) {
+    setEstadoInicialSeleccionado((actual) => {
+      if (!actual) return actual;
+      const propiedades = { ...((actual.propiedades ?? {}) as Record<string, unknown>) };
+      propiedades[clave] = nuevoValor;
+      return { ...actual, propiedades };
+    });
+  }
 
   async function handleAgregarDesdeCatalogo() {
     if (!entidadCatalogoSeleccionada || !estadoInicialSeleccionado) {
@@ -904,69 +957,25 @@ export function SandboxPage() {
                     </span>
                   </div>
 
-                  {tipoCatalogo === "elemento" &&
-                    (() => {
-                      const el = entidadCatalogoSeleccionada as Elemento;
-
-                      return (
-                        <div>
-                          <PropiedadPreview label="Masa" value={el.masa_base} />
-                          <PropiedadPreview
-                            label="Estabilidad"
-                            value={el.estabilidad}
-                          />
-                          <PropiedadPreview
-                            label="Rigidez"
-                            value={el.rigidez}
-                          />
-                          <PropiedadPreview
-                            label="Flexibilidad"
-                            value={el.flexibilidad}
-                          />
-                          <PropiedadPreview
-                            label="Capacidad de enlace"
-                            value={el.capacidad_enlace}
-                          />
-                          <PropiedadPreview
-                            label="Régimen"
-                            value={el.regimen_estructural}
-                          />
-                        </div>
-                      );
-                    })()}
-
-                  {tipoCatalogo === "compuesto" &&
-                    (() => {
-                      const compuesto =
-                        entidadCatalogoSeleccionada as Compuesto;
-
-                      return (
-                        <div>
-                          <PropiedadPreview label="Masa" value={compuesto.masa} />
-                          <PropiedadPreview label="Carga" value={compuesto.carga} />
-                          <PropiedadPreview
-                            label="Estabilidad"
-                            value={compuesto.estabilidad}
-                          />
-                          <PropiedadPreview
-                            label="Rigidez"
-                            value={compuesto.rigidez}
-                          />
-                          <PropiedadPreview
-                            label="Flexibilidad"
-                            value={compuesto.flexibilidad}
-                          />
-                          <PropiedadPreview
-                            label="Compatibilidad"
-                            value={compuesto.compatibilidad}
-                          />
-                          <PropiedadPreview
-                            label="Energía de enlace"
-                            value={compuesto.energia_enlace}
-                          />
-                        </div>
-                      );
-                    })()}
+                  {/* Editable: esto es estado_inicial en memoria, todavía no
+                      existe en Sandbox. Índices [0,1] → slider (arrastrable,
+                      ver decisión de equipo); magnitudes abiertas (masa,
+                      energía de enlace...) → input numérico sin rango
+                      inventado. El discriminador es `proporcion`, no el
+                      nombre de la propiedad — mismo dato que ya usa
+                      TarjetaPropiedadesFisicas. */}
+                  {propiedadesEditables.length > 0 && (
+                    <div className="mt-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary/30 block mb-1.5">
+                        Estado inicial (editable antes de crear)
+                      </span>
+                      <PropertyControlGrid
+                        propiedades={propiedadesEditables}
+                        onChangeClave={handleEditarPropiedadInicial}
+                        columnas={2}
+                      />
+                    </div>
+                  )}
 
                   <SandboxBtn
                     className="mt-3 w-full"
