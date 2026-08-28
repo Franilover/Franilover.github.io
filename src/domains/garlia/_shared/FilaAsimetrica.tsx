@@ -65,14 +65,9 @@ export function FilaAsimetrica({ bloques }: { bloques: Bloque[] }) {
     // porque Tailwind purga clases armadas por template string en runtime.
     const colsClase = columnas === 2 ? "md:grid-cols-2" : "md:grid-cols-3";
     return (
-      <div className={`grid grid-cols-1 ${colsClase} border-t border-primary/10`}>
-        {bloques.map((bloque, i) => (
-          <div
-            key={bloque.key}
-            className={`min-w-0 border-b md:border-b-0 border-primary/10 ${
-              i < bloques.length - 1 ? "md:border-r" : ""
-            }`}
-          >
+      <div className={`grid grid-cols-1 ${colsClase}`}>
+        {bloques.map((bloque) => (
+          <div key={bloque.key} className="min-w-0">
             <Cabecera titulo={bloque.titulo} />
             {bloque.contenido}
           </div>
@@ -85,17 +80,14 @@ export function FilaAsimetrica({ bloques }: { bloques: Bloque[] }) {
   const chicos = bloques.filter((_, i) => i !== idxGrande);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 border-t border-primary/10">
-      <div className="min-w-0 md:col-span-2 border-b md:border-b-0 md:border-r border-primary/10">
+    <div className="grid grid-cols-1 md:grid-cols-3">
+      <div className="min-w-0 md:col-span-2">
         <Cabecera titulo={grande.titulo} />
         {grande.contenido}
       </div>
       <div className="min-w-0 flex flex-col">
-        {chicos.map((bloque, i) => (
-          <div
-            key={bloque.key}
-            className={i < chicos.length - 1 ? "border-b border-primary/10" : ""}
-          >
+        {chicos.map((bloque) => (
+          <div key={bloque.key}>
             <Cabecera titulo={bloque.titulo} />
             {bloque.contenido}
           </div>
