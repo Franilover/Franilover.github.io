@@ -4,6 +4,7 @@ import {
   Box,
   ChevronRight,
   Loader2,
+  Sparkles,
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -15,7 +16,25 @@ import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import { useMaterialComponentes } from "./useMaterialComponentes";
 import { useMaterialEstructuras } from "./useMaterialEstructuras";
 import { useMateriales } from "./useMateriales";
+import { usePerfilReactivoMaterial } from "./usePerfilReactivoMaterial";
 import type { Material } from "./types";
+
+/** Etiqueta legible para el origen de una propiedad física (ver
+ *  documentacion_sistema "Fuente por propiedad en Material v187", orden
+ *  421). No es un cálculo: es texto de presentación 1:1 sobre el valor
+ *  que Supabase ya entrega en propiedades_calculadas.fuente_fisica. */
+function etiquetaFuenteFisica(fuente: string | undefined): string | null {
+  switch (fuente) {
+    case "composicion":
+      return "por composición";
+    case "estructura":
+      return "por estructura";
+    case "estructura_y_composicion":
+      return "estructura + composición";
+    default:
+      return fuente ?? null;
+  }
+}
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "—";
@@ -42,11 +61,84 @@ function MaterialProperties({ material }: { material: Material }) {
     ["dureza", "Dureza"], ["conductividad", "Conductividad"], ["transparencia", "Transparencia"],
   ] as const;
   const visibles = knownProperties.filter(([key]) => propiedades[key] !== undefined);
+  // fuente_fisica es por-material, no por-propiedad individual: Supabase la
+  // entrega una vez para todo el material (ver "Fuente física única",
+  // orden 206). Se muestra como contexto del bloque completo.
+  const fuente = etiquetaFuenteFisica(propiedades.fuente_fisica);
 
   return (
     <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-      <div className="mb-3"><h3 className="text-sm font-semibold text-primary">Propiedades físicas</h3><p className="mt-1 text-xs text-primary/45">Calculadas por Supabase · solo lectura</p></div>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-primary">Propiedades físicas</h3>
+          <p className="mt-1 text-xs text-primary/45">Calculadas por Supabase · solo lectura</p>
+        </div>
+        {fuente && (
+          <span
+            title="Origen de estos valores: composición química y/o estructura física del material"
+            className="shrink-0 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-micro font-semibold text-primary/60"
+          >
+            {fuente}
+          </span>
+        )}
+      </div>
       {visibles.length === 0 ? <p className="text-sm text-primary/40">No hay propiedades calculadas disponibles.</p> : <div>{visibles.map(([key, label]) => <PropertyRow key={key} label={label} value={propiedades[key]} />)}</div>}
+    </section>
+  );
+}
+
+/** Etiquetas legibles para los ejes del Perfil Reactivo Emergente V2. */
+const EJES_PERFIL_REACTIVO = [
+  ["afinidad_reactiva", "Afinidad reactiva"],
+  ["dinamismo_reactivo", "Dinamismo reactivo"],
+  ["estabilidad_reactiva", "Estabilidad reactiva"],
+  ["conductividad_reactiva", "Conductividad reactiva"],
+  ["actividad_catalitica_reactiva", "Actividad catalítica"],
+  ["potencial_transicion_reactivo", "Potencial de transición"],
+  ["potencial_transformacion_reactiva", "Potencial de transformación"],
+] as const;
+
+/**
+ * Perfil Reactivo Emergente V2 (documentacion_sistema, orden 1101).
+ *
+ * No es una lista de etiquetas manuales tipo "inflamable/explosivo": son
+ * ejes derivados de la microestructura del material, pensados para ser
+ * consumidos por condiciones de procesos/reacciones/fenómenos. Cuando el
+ * material no tiene desglose microscópico suficiente, el estado es
+ * "insuficiente_informacion" y NO se muestra un perfil inventado — eso es
+ * información propia del canon, no un vacío de UI.
+ */
+function MaterialPerfilReactivo({ materialId }: { materialId: string }) {
+  const { item, loading } = usePerfilReactivoMaterial(materialId);
+
+  return (
+    <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary/50" />
+        <div>
+          <h3 className="text-sm font-semibold text-primary">Perfil reactivo emergente</h3>
+          <p className="mt-1 text-xs text-primary/45">Derivado de microestructura · V2 · solo lectura</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-5 text-sm text-primary/45">
+          <Loader2 className="h-4 w-4 animate-spin" /> Cargando perfil reactivo…
+        </div>
+      ) : !item || item.estado !== "derivado_microestructura" || !item.perfil ? (
+        <p className="py-2 text-sm text-primary/40">
+          Información insuficiente: este material no tiene desglose microscópico
+          suficiente para derivar un perfil reactivo todavía.
+        </p>
+      ) : (
+        <div>
+          {EJES_PERFIL_REACTIVO.filter(([key]) => item.perfil?.[key] !== undefined).map(
+            ([key, label]) => (
+              <PropertyRow key={key} label={label} value={item.perfil?.[key]} />
+            ),
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -64,6 +156,7 @@ function MaterialDetail({ material }: { material: Material }) {
         {material.descripcion && <p className="mt-4 text-sm leading-relaxed text-primary/60">{material.descripcion}</p>}
       </header>
       <MaterialProperties material={material} />
+      <MaterialPerfilReactivo materialId={material.id} />
       <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4"><h3 className="text-sm font-semibold text-primary">Componentes</h3><p className="mt-1 text-xs text-primary/45">Composición normalizada del material</p>{loadingComponentes ? <div className="flex items-center gap-2 py-5 text-sm text-primary/45"><Loader2 className="h-4 w-4 animate-spin" /> Cargando componentes…</div> : componentes.length === 0 ? <p className="py-4 text-sm text-primary/40">Este material no tiene componentes registrados.</p> : <div className="mt-3 space-y-2">{componentes.map((componente) => { const compuesto = componente.componente_tipo === "compuesto" ? compuestos.find((item) => item.id === componente.componente_id) : null; return <div key={componente.id} className="rounded-lg border border-primary/10 px-3 py-2"><div className="flex items-center justify-between gap-3"><span className="text-sm text-primary">{compuesto?.nombre ?? `${componente.componente_tipo} · ${componente.componente_id.slice(0, 8)}`}</span><span className="text-xs text-primary/50">{formatValue(componente.cantidad)}{componente.unidad ? ` ${componente.unidad}` : ""}</span></div>{(componente.rol || componente.proporcion_min !== null || componente.proporcion_max !== null) && <div className="mt-1 flex flex-wrap gap-2 text-xs text-primary/40">{componente.rol && <span>{componente.rol}</span>}{componente.proporcion_min !== null && <span>mín. {formatValue(componente.proporcion_min)}</span>}{componente.proporcion_max !== null && <span>máx. {formatValue(componente.proporcion_max)}</span>}</div>}</div>; })}</div>}</section>
       <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4"><h3 className="text-sm font-semibold text-primary">Estructuras</h3><p className="mt-1 text-xs text-primary/45">Estructuras físicas utilizadas por el material</p>{loadingEstructuras ? <div className="flex items-center gap-2 py-5 text-sm text-primary/45"><Loader2 className="h-4 w-4 animate-spin" /> Cargando estructuras…</div> : estructuras.length === 0 ? <p className="py-4 text-sm text-primary/40">No hay estructuras asociadas.</p> : <div className="mt-3 space-y-2">{estructuras.map((relacion) => { const estructura = estructurasCatalogo.find((item) => item.id === relacion.estructura_id); return <div key={relacion.id} className="flex items-center justify-between rounded-lg border border-primary/10 px-3 py-2"><span className="text-sm text-primary">{estructura?.nombre ?? relacion.estructura_id.slice(0, 8)}</span><span className="text-xs text-primary/50">× {formatValue(relacion.cantidad)}</span></div>; })}</div>}</section>
       {material.notas && <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4"><h3 className="text-sm font-semibold text-primary">Notas</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-primary/55">{material.notas}</p></section>}

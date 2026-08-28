@@ -28,6 +28,7 @@ import type { WikiEntity } from "@/ui/Markdown/commandItems";
 import { RichEditor } from "@/editor/lexical";
 import { ComboSelector } from "@/ui/ComboSelector";
 import { PanelReglasDnd } from "@/domains/garlia/items/PanelReglasDnd";
+import { PanelFisicaObjeto } from "@/domains/garlia/items/PanelFisicaObjeto";
 import { PickerImagenItemBtn } from "@/domains/garlia/items/PickerImagenItemBtn";
 import { SelectorGrupoUnico } from "@/domains/garlia/items/SelectorGrupoUnico";
 import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCatalogo";
@@ -333,6 +334,18 @@ export function EditorItem({
                     ? (id) => onNavigateCriatura(id)
                     : undefined
                 }
+              />
+
+              {/* Física del objeto (Modelo físico canónico v218) — solo
+                  lectura. item_materiales es la fuente principal;
+                  compuesto_id es solo compatibilidad secundaria y nunca se
+                  suma. No se recalcula nada acá: todo viene de
+                  items.propiedades_fisicas ya derivado por Supabase. */}
+              <PanelFisicaObjeto
+                itemId={item.id}
+                propiedadesFisicas={form.propiedades_fisicas}
+                estadoFisico={form.estado_fisico}
+                geometriaFisica={form.geometria_fisica}
               />
 
               {/* Formaciones — partes materiales del ítem (mango, hoja,
