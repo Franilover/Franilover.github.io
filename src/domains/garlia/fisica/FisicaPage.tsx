@@ -523,7 +523,7 @@ export function BloqueFisicaMinerales({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 p-2.5">
       {/* Granos y Vetas — catálogo global de composición, mismo patrón que
           CatalogoTejidosBiologia en Biología: dos grids navegables con
           editor propio, arriba de Formaciones (que se arman a partir de
