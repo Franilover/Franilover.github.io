@@ -196,7 +196,7 @@ export function ReaccionPanelFlotante({
       }}
     >
       <div
-        className="w-full max-w-xl max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+        className="w-full h-full max-w-6xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
         style={{
           background: "var(--bg-main)",
           border: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
@@ -247,47 +247,52 @@ export function ReaccionPanelFlotante({
         </div>
 
         {/* Contenido: consume + produce + balance + notas */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-4">
-          <div>
-            <SelectorConsumeProduce
-              label="Consume"
-              items={(reaccion.consume ?? []) as ItemProceso[]}
-              onChange={(consume) => onActualizar(reaccion.id, { consume })}
-              elementos={elementos}
-              compuestos={compuestos}
-              onAbrirItem={onAbrirItem}
-            />
-          </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-5">
+          <div className="mx-auto max-w-4xl space-y-4">
+            <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
+              <h3 className="mb-3 text-sm font-semibold text-primary">Consume</h3>
+              <SelectorConsumeProduce
+                label="Consume"
+                items={(reaccion.consume ?? []) as ItemProceso[]}
+                onChange={(consume) => onActualizar(reaccion.id, { consume })}
+                elementos={elementos}
+                compuestos={compuestos}
+                onAbrirItem={onAbrirItem}
+              />
+            </section>
 
-          <div>
-            <SelectorConsumeProduce
-              label="Produce"
-              items={(reaccion.produce ?? []) as ItemProceso[]}
-              onChange={(produce) => onActualizar(reaccion.id, { produce })}
-              elementos={elementos}
-              compuestos={compuestos}
-              onAbrirItem={onAbrirItem}
-            />
-          </div>
+            <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
+              <h3 className="mb-3 text-sm font-semibold text-primary">Produce</h3>
+              <SelectorConsumeProduce
+                label="Produce"
+                items={(reaccion.produce ?? []) as ItemProceso[]}
+                onChange={(produce) => onActualizar(reaccion.id, { produce })}
+                elementos={elementos}
+                compuestos={compuestos}
+                onAbrirItem={onAbrirItem}
+              />
+            </section>
 
-          <BalanceProcesoPanel
-            consume={(reaccion.consume ?? []) as ItemProceso[]}
-            produce={(reaccion.produce ?? []) as ItemProceso[]}
-            compuestos={compuestos}
-            elementos={elementos}
-            onAutocompletar={(produce) => onActualizar(reaccion.id, { produce })}
-          />
+            <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
+              <h3 className="mb-3 text-sm font-semibold text-primary">Balance</h3>
+              <BalanceProcesoPanel
+                consume={(reaccion.consume ?? []) as ItemProceso[]}
+                produce={(reaccion.produce ?? []) as ItemProceso[]}
+                compuestos={compuestos}
+                elementos={elementos}
+                onAutocompletar={(produce) => onActualizar(reaccion.id, { produce })}
+              />
+            </section>
 
-          <div>
-            <p className="text-micro font-black uppercase tracking-widest text-primary/40 mb-1.5">
-              Descripción
-            </p>
-            <textarea
-              className="w-full min-h-[6rem] bg-transparent px-0 py-1 text-xs text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
-              placeholder="Condiciones, notas, contexto de esta reacción…"
-              value={reaccion.descripcion ?? ""}
-              onChange={(e) => onActualizar(reaccion.id, { descripcion: e.target.value })}
-            />
+            <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
+              <h3 className="mb-2 text-sm font-semibold text-primary">Descripción</h3>
+              <textarea
+                className="w-full min-h-[6rem] bg-transparent px-0 py-1 text-sm leading-relaxed text-primary/70 resize-none outline-none transition-colors placeholder:text-primary/25"
+                placeholder="Condiciones, notas, contexto de esta reacción…"
+                value={reaccion.descripcion ?? ""}
+                onChange={(e) => onActualizar(reaccion.id, { descripcion: e.target.value })}
+              />
+            </section>
           </div>
         </div>
       </div>

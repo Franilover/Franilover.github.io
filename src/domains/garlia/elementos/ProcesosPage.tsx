@@ -189,7 +189,7 @@ function Editor({ proceso, onClose }: { proceso: Proceso; onClose: () => void })
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-black text-primary">{proceso.nombre}</p>
-            <p className="text-micro text-primary/35">Proceso</p>
+            <p className="text-micro text-primary/35">Proceso · solo lectura</p>
           </div>
           <button
             type="button"

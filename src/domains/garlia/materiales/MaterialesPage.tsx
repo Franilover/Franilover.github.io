@@ -10,6 +10,7 @@ import {
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { PropiedadesFisicasGenerico } from "@/domains/garlia/_shared/GridPropiedadesCalculadas";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 
@@ -53,37 +54,36 @@ function PropertyRow({ label, value }: { label: string; value: unknown }) {
   );
 }
 
+/**
+ * Mismo bloque PropiedadesFisicasGenerico que usan Estructura y (mediante
+ * su misma fórmula) Elemento/Compuesto — grid de tarjetas con
+ * InfoFormulasPopover y barra de proporción, en vez de una lista plana de
+ * filas. El badge de fuente_fisica se muestra aparte, arriba del grid: es
+ * un dato propio de Material (de dónde salió el conjunto de valores —
+ * composición y/o estructura), no una propiedad física en sí — mezclarlo
+ * dentro del grid genérico rompería el contrato compartido con Estructura.
+ */
 function MaterialProperties({ material }: { material: Material }) {
   const propiedades = material.propiedades_calculadas ?? {};
-  const knownProperties = [
-    ["masa", "Masa"], ["carga", "Carga"], ["rigidez", "Rigidez"],
-    ["estabilidad", "Estabilidad"], ["flexibilidad", "Flexibilidad"],
-    ["dureza", "Dureza"], ["conductividad", "Conductividad"], ["transparencia", "Transparencia"],
-  ] as const;
-  const visibles = knownProperties.filter(([key]) => propiedades[key] !== undefined);
   // fuente_fisica es por-material, no por-propiedad individual: Supabase la
   // entrega una vez para todo el material (ver "Fuente física única",
-  // orden 206). Se muestra como contexto del bloque completo.
+  // orden 206).
   const fuente = etiquetaFuenteFisica(propiedades.fuente_fisica);
 
   return (
-    <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-primary">Propiedades físicas</h3>
-          <p className="mt-1 text-xs text-primary/45">Calculadas por Supabase · solo lectura</p>
-        </div>
-        {fuente && (
+    <div className="flex flex-col gap-1.5">
+      {fuente && (
+        <div className="flex justify-end">
           <span
             title="Origen de estos valores: composición química y/o estructura física del material"
             className="shrink-0 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-micro font-semibold text-primary/60"
           >
             {fuente}
           </span>
-        )}
-      </div>
-      {visibles.length === 0 ? <p className="text-sm text-primary/40">No hay propiedades calculadas disponibles.</p> : <div>{visibles.map(([key, label]) => <PropertyRow key={key} label={label} value={propiedades[key]} />)}</div>}
-    </section>
+        </div>
+      )}
+      <PropiedadesFisicasGenerico propiedades={propiedades} columnas={3} />
+    </div>
   );
 }
 

@@ -160,7 +160,7 @@ function Editor({ fenomeno, onClose }: { fenomeno: Fenomeno; onClose: () => void
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-black text-primary">{fenomeno.nombre}</p>
-            <p className="text-micro text-primary/35">Fenómeno</p>
+            <p className="text-micro text-primary/35">Fenómeno · solo lectura</p>
           </div>
           <button
             type="button"
