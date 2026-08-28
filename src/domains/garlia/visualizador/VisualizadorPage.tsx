@@ -56,7 +56,18 @@ import {
   type ParticulaCompleta,
 } from "./useVisualizadorData";
 
+// ─── Vertical slice: lenguaje visual reutilizable + rutas Física/Alquimia ──
+// Nueva sección "rutas" (no toca las 12 secciones existentes arriba).
+import { StructureCanvas, type CanvasColumn, type CanvasEdge } from "./StructureCanvas";
+import { Inspector, type InspectorEntity } from "./Inspector";
+import { TraceView, type TraceStep } from "./TraceView";
+import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
+import { useFisicaRoute } from "./routes/useFisicaRoute";
+import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
+import { ParticulaVisual } from "@/domains/garlia/fisica/ParticulaVisual";
+
 type SectionKey =
+  | "rutas"
   | "micro"
   | "ats"
   | "formula"
@@ -71,6 +82,7 @@ type SectionKey =
   | "process";
 
 const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
+  { key: "rutas", label: "Rutas: Física / Alquimia", icon: <GitBranch size={15} /> },
   { key: "micro", label: "Micro → Macro", icon: <Layers3 size={15} /> },
   { key: "ats", label: "A / T / S", icon: <Orbit size={15} /> },
   { key: "formula", label: "Fórmulas", icon: <Gauge size={15} /> },
@@ -289,8 +301,320 @@ function TarjetaValoresDerivados({
   );
 }
 
+// ─── Sección "Rutas" — vertical slice: Física vs Alquimia ──────────────────
+// Deliberadamente separada de VisualizadorPage: encapsula sus propios hooks
+// de ruta (useFisicaRoute/useAlquimiaRoute) para no mezclar su estado con
+// las 12 secciones existentes. No calcula nada — solo arma nodos/edges/trace
+// a partir de lo que los hooks de ruta ya resolvieron.
+
+function RutaFisicaCanvas({
+  route,
+  hoverId,
+  setHoverId,
+}: {
+  route: ReturnType<typeof useFisicaRoute>;
+  hoverId: string | null;
+  setHoverId: (id: string | null) => void;
+}) {
+  const { oris, orisSel, setOrisSelId, iumPorId, particulasDelOrisSel } = route;
+
+  const columns: CanvasColumn[] = useMemo(() => {
+    if (!orisSel) return [];
+    // Nivel 1: partículas reales expandidas del Oris (vía sus IUMs).
+    const particulaNodes = particulasDelOrisSel.slice(0, 12).map((p, i) => ({
+      id: `particula-${i}`,
+      label: p.nombre,
+      sublabel: p.formula,
+      visual: <ParticulaVisual formula={p.formula} size={40} />,
+    }));
+    // Nivel 2: los IUMs reales que componen el Oris (desde iums_composicion).
+    const iumNodes = Object.entries(orisSel.iums_composicion)
+      .filter(([, cantidad]) => cantidad > 0)
+      .map(([iumId]) => {
+        const ium = iumPorId[iumId];
+        return {
+          id: `ium-${iumId}`,
+          label: ium?.nombre ?? "IUM",
+          sublabel: `${orisSel.iums_composicion[iumId]}×`,
+        };
+      });
+    // Nivel 3: el Oris seleccionado.
+    const orisNode = {
+      id: `oris-${orisSel.id}`,
+      label: orisSel.nombre,
+      sublabel: orisSel.dominio,
+      tone: "accent" as const,
+    };
+    return [
+      { id: "particulas", label: "Partículas (A/T/S)", nodes: particulaNodes },
+      { id: "iums", label: "IUM", nodes: iumNodes },
+      { id: "oris", label: "Oris", nodes: [orisNode] },
+    ];
+  }, [orisSel, iumPorId, particulasDelOrisSel]);
+
+  const edges: CanvasEdge[] = useMemo(() => {
+    if (!orisSel) return [];
+    const out: CanvasEdge[] = [];
+    const iumIds = Object.keys(orisSel.iums_composicion).filter((id) => orisSel.iums_composicion[id] > 0);
+    // Cada IUM se conecta al nodo Oris.
+    for (const iumId of iumIds) {
+      out.push({ fromNodeId: `ium-${iumId}`, toNodeId: `oris-${orisSel.id}`, weight: 0.6 });
+    }
+    // Las partículas no tienen id individual estable por IUM en el shape
+    // expandido (particulasDeOris no lo trae) — se conectan visualmente al
+    // primer IUM disponible como referencia de nivel, sin inventar un
+    // mapeo partícula→IUM que el dato no ofrece.
+    if (iumIds.length > 0) {
+      columns
+        .find((c) => c.id === "particulas")
+        ?.nodes.forEach((n) => {
+          out.push({ fromNodeId: n.id, toNodeId: `ium-${iumIds[0]}`, weight: 0.25 });
+        });
+    }
+    return out;
+  }, [orisSel, columns]);
+
+  return (
+    <>
+      {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Oris cargados en Supabase todavía.</EmptyRow> : null}
+      {!route.loading && oris.length > 0 ? (
+        <>
+          <ChipSelector
+            items={oris}
+            active={orisSel}
+            getKey={(o) => o.id}
+            getLabel={(o) => o.nombre}
+            onSelect={(o) => setOrisSelId(o.id)}
+          />
+          <div className="mt-4 rounded-2xl border border-primary/10 p-2">
+            <StructureCanvas
+              columns={columns}
+              edges={edges}
+              selectedNodeId={orisSel ? `oris-${orisSel.id}` : null}
+              onHoverNode={setHoverId}
+              highlightedNodeIds={hoverId ? [hoverId] : []}
+            />
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function RutaAlquimiaCanvas({
+  route,
+  hoverId,
+  setHoverId,
+}: {
+  route: ReturnType<typeof useAlquimiaRoute>;
+  hoverId: string | null;
+  setHoverId: (id: string | null) => void;
+}) {
+  const { elementos, elementoSel, setElementoSelId, capas, capaSel, setCapaSel, particulasDeCapaSel } = route;
+
+  const columns: CanvasColumn[] = useMemo(() => {
+    if (!elementoSel) return [];
+    const particulaNodes = capaSel
+      ? particulasDeCapaSel.map((p, i) => ({
+          id: `particula-${capaSel}-${i}`,
+          label: p.nombre,
+          sublabel: p.formula,
+          visual: <ParticulaVisual formula={p.formula} size={40} />,
+        }))
+      : [];
+    const capaNodes = capas.map((c) => ({
+      id: `capa-${c.capa}`,
+      label: c.label,
+      sublabel: c.total > 0 ? c.resumen : "vacía",
+      tone: capaSel === c.capa ? ("accent" as const) : ("default" as const),
+    }));
+    const elementoNode = {
+      id: `elemento-${elementoSel.id}`,
+      label: elementoSel.nombre,
+      sublabel: elementoSel.simbolo,
+      tone: "accent" as const,
+    };
+    return [
+      { id: "particulas", label: "Partícula química", nodes: particulaNodes },
+      { id: "capas", label: "Capa", nodes: capaNodes },
+      { id: "elemento", label: "Elemento", nodes: [elementoNode] },
+    ];
+  }, [elementoSel, capas, capaSel, particulasDeCapaSel]);
+
+  const edges: CanvasEdge[] = useMemo(() => {
+    if (!elementoSel) return [];
+    const out: CanvasEdge[] = [];
+    for (const c of capas) {
+      if (c.total > 0) {
+        out.push({ fromNodeId: `capa-${c.capa}`, toNodeId: `elemento-${elementoSel.id}`, weight: 0.6 });
+      }
+    }
+    if (capaSel) {
+      columns
+        .find((col) => col.id === "particulas")
+        ?.nodes.forEach((n) => {
+          out.push({ fromNodeId: n.id, toNodeId: `capa-${capaSel}`, weight: 0.4 });
+        });
+    }
+    return out;
+  }, [elementoSel, capas, capaSel, columns]);
+
+  return (
+    <>
+      {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Elementos cargados en Supabase todavía.</EmptyRow> : null}
+      {!route.loading && elementos.length > 0 ? (
+        <>
+          <ChipSelector
+            items={elementos}
+            active={elementoSel}
+            getKey={(e) => e.id}
+            getLabel={(e) => `${e.simbolo} · ${e.nombre}`}
+            onSelect={(e) => {
+              setElementoSelId(e.id);
+              setCapaSel(null);
+            }}
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {capas.map((c) => (
+              <button
+                key={c.capa}
+                type="button"
+                onClick={() => setCapaSel(capaSel === c.capa ? null : c.capa)}
+                className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                  capaSel === c.capa
+                    ? "border-primary/40 bg-primary/12 text-primary/85"
+                    : "border-primary/10 text-primary/45 hover:border-primary/25"
+                }`}
+              >
+                {c.label} · {c.total > 0 ? c.resumen : "vacía"}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 rounded-2xl border border-primary/10 p-2">
+            <StructureCanvas
+              columns={columns}
+              edges={edges}
+              selectedNodeId={elementoSel ? `elemento-${elementoSel.id}` : null}
+              onHoverNode={setHoverId}
+              highlightedNodeIds={hoverId ? [hoverId] : []}
+            />
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function RutasSection() {
+  const [perspectiva, setPerspectiva] = useState<Perspectiva>("fisica");
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
+  const fisicaRoute = useFisicaRoute();
+  const alquimiaRoute = useAlquimiaRoute();
+
+  // Inspector: solo presentacional — el shape se arma acá a partir de datos
+  // ya resueltos por el hook de ruta activo, sin calcular nada nuevo.
+  const inspectorEntity: InspectorEntity | null = useMemo(() => {
+    if (perspectiva === "fisica") {
+      const o = fisicaRoute.orisSel;
+      if (!o) return null;
+      return {
+        eyebrow: "Oris",
+        title: o.nombre,
+        subtitle: `${o.familia} · ${o.dominio}`,
+        note: o.descripcion ?? null,
+        fields: [
+          { label: "Fórmula", value: o.formula },
+          { label: "A", value: fisicaRoute.letrasOrisSel.A },
+          { label: "T", value: fisicaRoute.letrasOrisSel.T },
+          { label: "S", value: fisicaRoute.letrasOrisSel.S },
+          { label: "IUMs distintos", value: Object.keys(o.iums_composicion).length },
+        ],
+      };
+    }
+    const e = alquimiaRoute.elementoSel;
+    if (!e) return null;
+    return {
+      eyebrow: "Elemento",
+      title: `${e.simbolo} · ${e.nombre}`,
+      subtitle: e.familia,
+      note: e.notas ?? null,
+      fields: [
+        { label: "N° atómico", value: e.numero_atomico },
+        { label: "Núcleo", value: alquimiaRoute.capas.find((c) => c.capa === "nucleo")?.resumen },
+        { label: "Media", value: alquimiaRoute.capas.find((c) => c.capa === "media")?.resumen },
+        { label: "Externa", value: alquimiaRoute.capas.find((c) => c.capa === "externa")?.resumen },
+        { label: "Es noble", value: e.es_noble ? "Sí" : "No" },
+      ],
+    };
+  }, [perspectiva, fisicaRoute, alquimiaRoute]);
+
+  // Trace: ruta ya resuelta, en el mismo orden que el modelo real — nunca
+  // fusiona Física y Alquimia en una sola secuencia.
+  const traceSteps: TraceStep[] = useMemo(() => {
+    if (perspectiva === "fisica") {
+      const o = fisicaRoute.orisSel;
+      return [
+        {
+          id: "t-particula",
+          levelLabel: "Partícula (A/T/S)",
+          title: fisicaRoute.particulasDelOrisSel[0]?.nombre ?? null,
+          subtitle: fisicaRoute.particulasDelOrisSel[0]?.formula ?? undefined,
+        },
+        {
+          id: "t-ium",
+          levelLabel: "IUM",
+          title: o ? Object.keys(o.iums_composicion)[0] ? (fisicaRoute.iumPorId[Object.keys(o.iums_composicion)[0]]?.nombre ?? null) : null : null,
+        },
+        { id: "t-oris", levelLabel: "Oris", title: o?.nombre ?? null, subtitle: o?.dominio ?? undefined },
+      ];
+    }
+    const e = alquimiaRoute.elementoSel;
+    const capaConDatos = alquimiaRoute.capas.find((c) => c.total > 0);
+    return [
+      {
+        id: "t-particula",
+        levelLabel: "Partícula química",
+        title: alquimiaRoute.particulasDeCapaSel[0]?.nombre ?? (capaConDatos ? capaConDatos.resumen.split(" ")[0] ?? null : null),
+      },
+      { id: "t-capa", levelLabel: "Capa", title: capaConDatos?.label ?? null },
+      { id: "t-elemento", levelLabel: "Elemento", title: e ? `${e.simbolo} · ${e.nombre}` : null },
+    ];
+  }, [perspectiva, fisicaRoute, alquimiaRoute]);
+
+  return (
+    <>
+      <SectionTitle
+        eyebrow="Lenguaje visual"
+        title="Dos rutas, no una sola cadena"
+        description="Física (Partícula → IUM → Oris) y Alquimia (Partícula → Capa → Elemento) comparten el vocabulario de 11 Partículas de Química, pero son rutas distintas del sistema real — nunca se muestran fusionadas."
+      />
+
+      <PerspectivaSwitcher value={perspectiva} onChange={setPerspectiva} />
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <div>
+          {perspectiva === "fisica" ? (
+            <RutaFisicaCanvas route={fisicaRoute} hoverId={hoverId} setHoverId={setHoverId} />
+          ) : (
+            <RutaAlquimiaCanvas route={alquimiaRoute} hoverId={hoverId} setHoverId={setHoverId} />
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <Inspector entity={inspectorEntity} emptyLabel="Seleccioná un Oris o un Elemento para inspeccionarlo." />
+          <div className="rounded-2xl border border-primary/10 p-4">
+            <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-primary/40">Trace</p>
+            <TraceView steps={traceSteps} />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function VisualizadorPage() {
-  const [active, setActive] = useState<SectionKey>("micro");
+  const [active, setActive] = useState<SectionKey>("rutas");
 
   // ─── Fuentes de datos reales ────────────────────────────────────────────
   const { items: particulasBase } = useParticulasBase();
@@ -428,6 +752,8 @@ function VisualizadorPage() {
           </aside>
 
           <section className="min-w-0">
+            {active === "rutas" ? <RutasSection /> : null}
+
             {active === "micro" ? (
               <>
                 <SectionTitle
