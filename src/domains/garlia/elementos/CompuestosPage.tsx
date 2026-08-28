@@ -261,7 +261,7 @@ function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: Propi
   if (conValor.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+    <div className="flex flex-col gap-1.5 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Propiedades físicas
@@ -343,7 +343,7 @@ function ComposicionRealBloque({
   if (!tieneAlguna) return null;
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+    <div className="flex flex-col gap-1.5 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Composición real
@@ -434,7 +434,7 @@ function EstabilidadDetalleBloque({
   ];
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+    <div className="flex flex-col gap-1.5 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Estabilidad — detalle
@@ -508,7 +508,7 @@ function EnlacesCompuestoBloque({
   };
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+    <div className="flex flex-col gap-1.5 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Enlaces

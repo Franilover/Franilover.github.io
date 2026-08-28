@@ -384,7 +384,7 @@ function SitiosEnlaceBloque({
   ];
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-primary/10 p-2">
+    <div className="flex flex-col gap-1.5 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Sitios de enlace
@@ -445,7 +445,7 @@ function PropiedadesFisicasBloque({ propiedades }: { propiedades: PropiedadCalcu
   if (conValor.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1.5 min-w-0 rounded-lg border border-primary/10 p-2">
+    <div className="flex flex-col gap-1.5 min-w-0 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Propiedades físicas
