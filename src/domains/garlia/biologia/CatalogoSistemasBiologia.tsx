@@ -125,9 +125,12 @@ export function CatalogoSistemasBiologia({ organos, loadingOrganos, onAbrirOrgan
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-wrap gap-4">
       {/* ── Sistemas ───────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2">
+      <div
+        className="flex flex-col gap-2 min-w-[220px]"
+        style={{ flexGrow: Math.max(sistemas.items.length, 1), flexBasis: 0 }}
+      >
         <div className="flex items-center justify-between">
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Sistemas · {sistemas.items.length}
@@ -173,7 +176,10 @@ export function CatalogoSistemasBiologia({ organos, loadingOrganos, onAbrirOrgan
       </div>
 
       {/* ── Organismos ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2 border-t border-primary/10 pt-4">
+      <div
+        className="flex flex-col gap-2 min-w-[220px]"
+        style={{ flexGrow: Math.max(organismos.items.length, 1), flexBasis: 0 }}
+      >
         <div className="flex items-center justify-between">
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Organismos · {organismos.items.length}

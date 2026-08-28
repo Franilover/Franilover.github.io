@@ -23,6 +23,10 @@ import { GridCatalogoGrupo } from "@/domains/garlia/_shared/GridCatalogoGrupo";
 import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useOrganos } from "@/domains/garlia/elementos/useOrganos";
+import { useCelulas } from "@/domains/garlia/elementos/useCelulas";
+import { useTejidos } from "@/domains/garlia/elementos/useTejidos";
+import { useSistemas } from "@/domains/garlia/elementos/useSistemas";
+import { useOrganismos } from "@/domains/garlia/elementos/useOrganismos";
 import { CompuestoPanelFlotante } from "@/domains/garlia/elementos/CompuestosPage";
 import type { Organo } from "@/domains/garlia/elementos/types";
 
@@ -145,6 +149,16 @@ export function BiologiaCatalogos({ onSelectCriatura }: Props) {
   const { items: compuestosCatalogo, setItems: setCompuestosCatalogo, loading: loadingCompuestos } = useCompuestosConElementos();
   const { items: elementosCatalogo } = useElementos();
 
+  // ── Conteos para decidir el ancho proporcional de cada columna acá
+  // abajo (mismo patrón que FilaAsimetrica/TodasLasBasesView) — no se usa
+  // el resto de lo que devuelven estos hooks acá, cada subcatálogo sigue
+  // haciendo su propio fetch/render vía CatalogoTejidosBiologia/
+  // CatalogoSistemasBiologia.
+  const { items: celulasParaConteo } = useCelulas();
+  const { items: tejidosParaConteo } = useTejidos();
+  const { items: sistemasParaConteo } = useSistemas();
+  const { items: organismosParaConteo } = useOrganismos();
+
   // Click en un Compuesto de matriz (Tejido) o en un Compuesto de la
   // composición de una Célula abre acá su editor completo — mismo patrón
   // que FloraEditor.tsx (setItemAbierto({ tipo: "compuesto", id })).
@@ -161,8 +175,14 @@ export function BiologiaCatalogos({ onSelectCriatura }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-4 min-h-0">
-      <div className="p-2.5">
+    <div className="flex flex-wrap gap-4 min-h-0">
+      <div
+        className="p-2.5 min-w-[220px]"
+        style={{
+          flexGrow: Math.max(celulasParaConteo.length + tejidosParaConteo.length, 1),
+          flexBasis: 0,
+        }}
+      >
         <CatalogoTejidosBiologia
           compuestos={compuestosCatalogo}
           loadingCompuestos={loadingCompuestos}
@@ -171,14 +191,23 @@ export function BiologiaCatalogos({ onSelectCriatura }: Props) {
         />
       </div>
 
-      <div className="p-2.5 border-t border-primary/10 pt-4">
+      <div
+        className="p-2.5 min-w-[220px]"
+        style={{
+          flexGrow: Math.max(sistemasParaConteo.length + organismosParaConteo.length, 1),
+          flexBasis: 0,
+        }}
+      >
         <CatalogoSistemasBiologia
           organos={catalogoOrganos}
           onAbrirOrgano={(id) => setOrganoAAbrirId(id)}
         />
       </div>
 
-      <div className="p-2.5 border-t border-primary/10 pt-4">
+      <div
+        className="p-2.5 min-w-[220px]"
+        style={{ flexGrow: Math.max(catalogoOrganos.length, 1), flexBasis: 0 }}
+      >
         <GridCatalogoGrupo
           modo="grupo"
           titulo="Órganos"

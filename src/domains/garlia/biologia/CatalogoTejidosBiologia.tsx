@@ -78,9 +78,12 @@ export function CatalogoTejidosBiologia({
   const tejidoActivo = tejidos.items.find((t) => t.id === tejidoSeleccionadoId) ?? null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-wrap gap-4">
       {/* ── Células ────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2">
+      <div
+        className="flex flex-col gap-2 min-w-[220px]"
+        style={{ flexGrow: Math.max(celulas.items.length, 1), flexBasis: 0 }}
+      >
         <div className="flex items-center justify-between">
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Células · {celulas.items.length}
@@ -149,7 +152,10 @@ export function CatalogoTejidosBiologia({
       </div>
 
       {/* ── Tejidos ────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2 border-t border-primary/10 pt-4">
+      <div
+        className="flex flex-col gap-2 min-w-[220px]"
+        style={{ flexGrow: Math.max(tejidos.items.length, 1), flexBasis: 0 }}
+      >
         <div className="flex items-center justify-between">
           <p className="text-micro font-black uppercase tracking-[0.2em] text-primary/50">
             Tejidos · {tejidos.items.length}
