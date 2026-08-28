@@ -18,8 +18,8 @@
  *   - Con 2 bloques, el otro simplemente ocupa el 1/3 restante (no hay
  *     nada más para apilar).
  *
- * "Muchos más" = al menos el doble que la suma de los demás (umbral simple
- * y legible, no una fórmula de proporciones). Cuando hay empate entre dos
+ * "Muchos más" = al menos 1.5x la suma de los demás (umbral simple y
+ * legible, no una fórmula de proporciones). Cuando hay empate entre dos
  * candidatos a "grande", se prioriza el primero (izquierda) para mantener
  * el orden visual estable en vez de saltar entre layouts al cambiar un
  * ítem cerca del umbral.
@@ -34,7 +34,7 @@ interface Bloque {
   contenido: React.ReactNode;
 }
 
-const UMBRAL_DOMINANCIA = 2;
+const UMBRAL_DOMINANCIA = 1.5;
 
 function elegirBloqueGrande(bloques: Bloque[]): number | null {
   if (bloques.length !== 2 && bloques.length !== 3) return null;
