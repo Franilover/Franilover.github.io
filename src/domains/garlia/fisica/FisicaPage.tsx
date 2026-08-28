@@ -385,12 +385,26 @@ function TodasLasBasesView({
     <div className="shrink-0 flex flex-col">
       <div className="p-2.5 flex flex-col gap-4">
         {/* Partícula Base / Partículas / Iums / Oris / Subsistemas — una
-            sola fila de 5 columnas (antes iban apiladas verticalmente,
-            una sección completa por catálogo). Cada columna conserva su
-            título+contador y su propio mini-grid de tarjetas. */}
-        <div className="grid grid-cols-5 gap-3 items-start">
+            sola fila, con el ancho de cada columna proporcional a su
+            cantidad de ítems (flex-grow = total, con un piso de 1 para
+            que ninguna quede en cero). Antes cada columna se llevaba un
+            quinto fijo del ancho sea cual sea su tamaño real, y con
+            cantidades muy dispares (3, 11, 11, 9, 2) las columnas cortas
+            (Partícula Base, Subsistemas) dejaban un hueco vacío enorme
+            debajo de sus 2-3 tarjetas mientras Partículas/Iums, con 11
+            cada una, se quedaban angostas y muy altas. Ahora, además,
+            cada tarjeta es una pill compacta en flex-wrap (mismo lenguaje
+            visual que Compuestos/Estructuras/Materiales) en vez de una
+            tarjeta ancha apilada verticalmente, así que una columna con
+            pocos ítems reparte en una o dos líneas cortas en vez de
+            ocupar todo el alto disponible en una lista de 1 columna. */}
+        <div className="flex flex-wrap gap-3 items-start">
           {catalogos.map(({ key, titulo, filas }) => (
-            <div key={key} className="flex flex-col gap-2 min-w-0">
+            <div
+              key={key}
+              className="flex flex-col gap-2 min-w-[180px]"
+              style={{ flexGrow: Math.max(filas.length, 1), flexBasis: 0 }}
+            >
               <div className="flex items-center justify-between gap-1.5 text-primary/50 pb-1.5 border-b border-primary/10">
                 <BasesRowTitle titulo={titulo} cantidad={filas.length} mostrarInfo={key === "particulas"} />
                 {key === "subsistemas" && (
@@ -434,7 +448,7 @@ function TodasLasBasesView({
                   Sin {titulo.toLowerCase()} todavía
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-2 items-start">
+                <div className="flex flex-wrap gap-1">
                   {filas.map((f, i) => {
                     const original = key === "oris" ? oris[i] : key === "subsistemas" ? subsistemas[i] : null;
                     return (
@@ -633,13 +647,14 @@ function BasesItemCard({
         ref={botonRef}
         type="button"
         onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}
-        className={`w-full flex items-center px-2.5 py-2 rounded-lg border text-left transition-all cursor-pointer ${
+        title={fila.nombre}
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-micro font-bold tracking-wide transition-colors truncate max-w-full ${
           anchor
-            ? "border-primary/30 bg-primary/5"
-            : "border-primary/10 bg-primary/[0.02] hover:border-primary/25 hover:bg-primary/5"
+            ? "text-primary border border-primary/40 ring-2 ring-primary/30"
+            : "hover:bg-primary/10 text-primary/70 border border-primary/15"
         }`}
       >
-        <span className="text-micro font-black text-primary truncate">{fila.nombre}</span>
+        <span className="truncate">{fila.nombre}</span>
       </button>
       {esOris ? (
         <PopoverFlotante anchor={anchor} onClose={() => setAnchor(null)} width={560} maxHeight={520}>

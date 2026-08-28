@@ -4,10 +4,9 @@ import {
   Box,
   ChevronRight,
   Loader2,
-  Search,
   X,
 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
@@ -178,12 +177,30 @@ function MaterialEditorFlotante({ material, onClose }: { material: Material; onC
 
 export function MaterialesPage() {
   const { items: materiales, loading } = useMateriales();
-  const [busqueda, setBusqueda] = useState("");
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
-  const filtrados = useMemo(() => { const query = busqueda.trim().toLowerCase(); if (!query) return materiales; return materiales.filter((material) => material.nombre.toLowerCase().includes(query) || material.tipo_material.toLowerCase().includes(query) || material.descripcion?.toLowerCase().includes(query)); }, [materiales, busqueda]);
   const seleccionado = materiales.find((material) => material.id === seleccionadoId) ?? null;
 
-  return <div className="relative flex min-h-0 flex-col"><header className="flex shrink-0 items-center justify-between gap-4 px-4 py-3"><div><h2 className="text-sm font-semibold text-primary">Materiales</h2><p className="mt-0.5 text-xs text-primary/40">{materiales.length} materiales</p></div><div className="relative w-56 max-w-[45vw]"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-primary/30" /><input value={busqueda} onChange={(event) => setBusqueda(event.target.value)} placeholder="Buscar…" className="w-full rounded-full border border-primary/10 bg-primary/[0.02] py-1.5 pl-8 pr-3 text-xs text-primary outline-none placeholder:text-primary/30 focus:border-primary/25" /></div></header><div className="px-4 pb-4">{loading ? <div className="flex items-center gap-2 py-6 text-xs text-primary/40"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando materiales…</div> : filtrados.length === 0 ? <div className="py-6 text-center text-xs text-primary/35">No se encontraron materiales.</div> : <div className="flex flex-wrap gap-1">{filtrados.map((material) => <MaterialPill key={material.id} material={material} selected={material.id === seleccionadoId} onClick={() => setSeleccionadoId(material.id)} />)}</div>}</div>{seleccionado && <MaterialEditorFlotante material={seleccionado} onClose={() => setSeleccionadoId(null)} />}</div>;
+  return (
+    <div className="px-3 pb-4 pt-2">
+      {loading ? (
+        <p className="py-5 text-center text-micro text-primary/35">Cargando…</p>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {materiales.map((material) => (
+            <MaterialPill
+              key={material.id}
+              material={material}
+              selected={material.id === seleccionadoId}
+              onClick={() => setSeleccionadoId(material.id)}
+            />
+          ))}
+        </div>
+      )}
+      {seleccionado && (
+        <MaterialEditorFlotante material={seleccionado} onClose={() => setSeleccionadoId(null)} />
+      )}
+    </div>
+  );
 }
 
 export default MaterialesPage;
