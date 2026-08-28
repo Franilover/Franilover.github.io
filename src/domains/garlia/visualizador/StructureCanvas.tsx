@@ -55,11 +55,11 @@ export interface StructureCanvasProps {
   className?: string;
 }
 
-const NODE_W = 128;
-const NODE_H = 92;
-const COL_GAP = 96;
-const ROW_GAP = 20;
-const PAD = 32;
+const NODE_W = 152;
+const NODE_H = 108;
+const COL_GAP = 120;
+const ROW_GAP = 28;
+const PAD = 40;
 
 interface LaidOutNode extends CanvasNode {
   colIndex: number;
@@ -223,29 +223,29 @@ export function StructureCanvas({
                   }}
                 />
                 {node.visual ? (
-                  <foreignObject x={8} y={6} width={NODE_W - 16} height={NODE_H - 34}>
+                  <foreignObject x={10} y={10} width={NODE_W - 20} height={NODE_H - 42}>
                     <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
                   </foreignObject>
                 ) : null}
                 <text
                   x={NODE_W / 2}
-                  y={NODE_H - (node.sublabel ? 22 : 12)}
+                  y={NODE_H - (node.sublabel ? 26 : 14)}
                   textAnchor="middle"
-                  fontSize={11}
+                  fontSize={12}
                   fontWeight={900}
                   style={{ fill: "color-mix(in srgb, var(--primary) 85%, transparent)" }}
                 >
-                  {node.label.length > 16 ? `${node.label.slice(0, 15)}…` : node.label}
+                  {node.label.length > 18 ? `${node.label.slice(0, 17)}…` : node.label}
                 </text>
                 {node.sublabel ? (
                   <text
                     x={NODE_W / 2}
-                    y={NODE_H - 8}
+                    y={NODE_H - 10}
                     textAnchor="middle"
-                    fontSize={9}
+                    fontSize={10}
                     style={{ fill: "color-mix(in srgb, var(--primary) 40%, transparent)" }}
                   >
-                    {node.sublabel.length > 20 ? `${node.sublabel.slice(0, 19)}…` : node.sublabel}
+                    {node.sublabel.length > 22 ? `${node.sublabel.slice(0, 21)}…` : node.sublabel}
                   </text>
                 ) : null}
               </g>

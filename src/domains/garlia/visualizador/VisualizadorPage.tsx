@@ -9,7 +9,6 @@ import {
   FlaskConical,
   Gauge,
   GitBranch,
-  Info,
   Layers3,
   Orbit,
   Radio,
@@ -386,7 +385,7 @@ function RutaFisicaCanvas({
             getLabel={(o) => o.nombre}
             onSelect={(o) => setOrisSelId(o.id)}
           />
-          <div className="mt-4 rounded-2xl border border-primary/10 p-2">
+          <div className="mt-4 rounded-2xl border border-primary/10 p-5">
             <StructureCanvas
               columns={columns}
               edges={edges}
@@ -490,7 +489,7 @@ function RutaAlquimiaCanvas({
               </button>
             ))}
           </div>
-          <div className="mt-4 rounded-2xl border border-primary/10 p-2">
+          <div className="mt-4 rounded-2xl border border-primary/10 p-5">
             <StructureCanvas
               columns={columns}
               edges={edges}
@@ -584,11 +583,7 @@ function RutasSection() {
 
   return (
     <>
-      <SectionTitle
-        eyebrow="Lenguaje visual"
-        title="Dos rutas, no una sola cadena"
-        description="Física (Partícula → IUM → Oris) y Alquimia (Partícula → Capa → Elemento) comparten el vocabulario de 11 Partículas de Química, pero son rutas distintas del sistema real — nunca se muestran fusionadas."
-      />
+      <h2 className="mb-3 text-sm font-black text-primary/85">Rutas</h2>
 
       <PerspectivaSwitcher value={perspectiva} onChange={setPerspectiva} />
 
@@ -706,19 +701,8 @@ function VisualizadorPage() {
   return (
     <main className="min-h-screen bg-[var(--bg-main)] text-primary">
       <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-col gap-3 border-b border-primary/10 pb-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-primary/35">Laboratorio visual</p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-primary/90">Visualizador</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-primary/50">
-              Explora cómo se relacionan partículas, materiales, estructuras, procesos y fenómenos — con datos reales
-              del mundo, directo desde Supabase. Elige cualquier entidad de cada catálogo para ver su ficha completa.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusPill>V2 · datos reales</StatusPill>
-            <StatusPill>sin lógica física local</StatusPill>
-          </div>
+        <div className="mb-5 border-b border-primary/10 pb-4">
+          <h1 className="text-lg font-black tracking-tight text-primary/90">Visualizador</h1>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
@@ -740,15 +724,6 @@ function VisualizadorPage() {
                 );
               })}
             </nav>
-            <div className="mt-3 rounded-xl border border-primary/10 bg-primary/5 p-3">
-              <div className="flex items-start gap-2">
-                <Info className="mt-0.5 shrink-0 text-primary/40" size={14} />
-                <p className="text-[10px] leading-4 text-primary/45">
-                  Todos los valores de esta vista vienen de Supabase (catálogos reales del mundo). Las fórmulas se
-                  muestran tal cual las entrega el backend, nunca inventadas en el frontend.
-                </p>
-              </div>
-            </div>
           </aside>
 
           <section className="min-w-0">
@@ -1439,20 +1414,6 @@ function VisualizadorPage() {
               </>
             ) : null}
 
-            <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-primary/10 bg-primary/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-black text-primary/75">Conectado a Supabase</p>
-                <p className="mt-1 text-[10px] text-primary/40">
-                  Los 12 módulos de este visualizador leen directo de las tablas reales del mundo (particulas, iums,
-                  oris, materiales, estructuras, compuestos, procesos, runas, propiedades_derivadas). Ninguna fórmula ni
-                  valor numérico se inventa en el frontend.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusPill>Supabase → visualizador</StatusPill>
-                <StatusPill>sin reglas duplicadas</StatusPill>
-              </div>
-            </div>
           </section>
         </div>
       </div>
