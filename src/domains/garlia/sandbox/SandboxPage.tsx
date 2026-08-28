@@ -43,7 +43,6 @@ import type {
   Elemento,
 } from "@/domains/garlia/elementos/types";
 
-import { Btn } from "@/ui/Buttons";
 import { Input, Select } from "@/ui/Inputs";
 
 import {
@@ -53,6 +52,93 @@ import {
 } from "./useSandbox";
 
 type TipoCatalogo = "elemento" | "compuesto";
+
+type SandboxBtnVariant = "primary" | "outline" | "danger" | "ghost";
+
+/**
+ * Botón nativo local, solo para Sandbox.
+ *
+ * Reemplaza a `Btn` de `@/ui/Buttons` porque esa variante compartida
+ * pierde contraste en tema oscuro: sus estados "primary"/"outline"/"danger"
+ * no fijan explícitamente el color de texto, así que heredan valores que
+ * en oscuro terminan siendo texto oscuro sobre fondo oscuro (o texto claro
+ * sobre fondo claro), y quedan ilegibles.
+ *
+ * Acá cada variante fija texto Y fondo de forma explícita con las mismas
+ * variables del tema (--primary, --bg-main) que usa el resto del sitio,
+ * así el contraste es correcto sin importar el tema activo:
+ *   - primary: fondo --primary sólido, texto --bg-main (invertido, nunca
+ *     "texto claro fijo" que se rompe en tema claro).
+ *   - outline: borde --primary, texto --primary, sin fondo.
+ *   - danger: mismo patrón que primary pero con rojo fijo (no depende del
+ *     tema, una acción destructiva debe verse igual en claro y oscuro).
+ *   - ghost: solo texto, para acciones secundarias tipo "Encolar evento".
+ */
+function SandboxBtn({
+  children,
+  icon,
+  onClick,
+  disabled,
+  loading,
+  variant = "ghost",
+  size = "md",
+  className = "",
+  type = "button",
+}: {
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  variant?: SandboxBtnVariant;
+  size?: "sm" | "md";
+  className?: string;
+  type?: "button" | "submit";
+}) {
+  const isDisabled = disabled || loading;
+
+  const base =
+    "inline-flex items-center justify-center gap-1.5 rounded-md font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+
+  const sizing = size === "sm" ? "px-2.5 py-1.5 text-micro" : "px-3 py-2 text-xs";
+
+  const variantStyle: Record<SandboxBtnVariant, React.CSSProperties> = {
+    primary: {
+      background: "var(--primary)",
+      color: "var(--bg-main)",
+    },
+    outline: {
+      background: "transparent",
+      color: "var(--primary)",
+      border: "1px solid var(--primary)",
+    },
+    danger: {
+      background: "#dc2626",
+      color: "#ffffff",
+    },
+    ghost: {
+      background: "color-mix(in srgb, var(--primary) 10%, transparent)",
+      color: "var(--primary)",
+    },
+  };
+
+  return (
+    <button
+      className={`${base} ${sizing} ${className}`}
+      disabled={isDisabled}
+      onClick={onClick}
+      style={variantStyle[variant]}
+      type={type}
+    >
+      {loading ? (
+        <span className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+      ) : (
+        icon
+      )}
+      {children}
+    </button>
+  );
+}
 
 function EtiquetaSeccion({ children }: { children: React.ReactNode }) {
   return (
@@ -397,14 +483,14 @@ export function SandboxPage() {
                 />
               </div>
 
-              <Btn
+              <SandboxBtn
                 icon={<Plus size={14} />}
                 loading={creando}
                 onClick={handleCrear}
                 size="sm"
               >
                 Crear
-              </Btn>
+              </SandboxBtn>
             </div>
           </div>
         </div>
@@ -447,7 +533,7 @@ export function SandboxPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <Btn
+                <SandboxBtn
                   icon={<Play size={14} />}
                   loading={ejecutandoAccion}
                   onClick={play}
@@ -455,9 +541,9 @@ export function SandboxPage() {
                   variant="primary"
                 >
                   Play
-                </Btn>
+                </SandboxBtn>
 
-                <Btn
+                <SandboxBtn
                   icon={<Pause size={14} />}
                   loading={ejecutandoAccion}
                   onClick={pause}
@@ -465,9 +551,9 @@ export function SandboxPage() {
                   variant="outline"
                 >
                   Pause
-                </Btn>
+                </SandboxBtn>
 
-                <Btn
+                <SandboxBtn
                   icon={<SkipForward size={14} />}
                   loading={ejecutandoAccion}
                   onClick={() => step(1)}
@@ -475,9 +561,9 @@ export function SandboxPage() {
                   variant="outline"
                 >
                   Step
-                </Btn>
+                </SandboxBtn>
 
-                <Btn
+                <SandboxBtn
                   icon={<RotateCcw size={14} />}
                   loading={ejecutandoAccion}
                   onClick={reset}
@@ -485,7 +571,7 @@ export function SandboxPage() {
                   variant="danger"
                 >
                   Reset
-                </Btn>
+                </SandboxBtn>
               </div>
             </div>
 
@@ -494,7 +580,7 @@ export function SandboxPage() {
               <EtiquetaSeccion>Agregar desde catálogo</EtiquetaSeccion>
 
               <div className="grid grid-cols-2 gap-2 mb-3">
-                <Btn
+                <SandboxBtn
                   size="sm"
                   variant={
                     tipoCatalogo === "elemento" ? "primary" : "outline"
@@ -502,9 +588,9 @@ export function SandboxPage() {
                   onClick={() => cambiarTipoCatalogo("elemento")}
                 >
                   Elemento
-                </Btn>
+                </SandboxBtn>
 
-                <Btn
+                <SandboxBtn
                   size="sm"
                   variant={
                     tipoCatalogo === "compuesto" ? "primary" : "outline"
@@ -512,7 +598,7 @@ export function SandboxPage() {
                   onClick={() => cambiarTipoCatalogo("compuesto")}
                 >
                   Compuesto
-                </Btn>
+                </SandboxBtn>
               </div>
 
               <Select
@@ -621,7 +707,7 @@ export function SandboxPage() {
                       );
                     })()}
 
-                  <Btn
+                  <SandboxBtn
                     className="mt-3 w-full"
                     disabled={!entidadCatalogoSeleccionada}
                     icon={<Plus size={14} />}
@@ -631,7 +717,7 @@ export function SandboxPage() {
                     variant="primary"
                   >
                     Copiar al Sandbox
-                  </Btn>
+                  </SandboxBtn>
                 </div>
               )}
             </div>
@@ -668,7 +754,7 @@ export function SandboxPage() {
                 />
               </div>
 
-              <Btn
+              <SandboxBtn
                 className="mt-3 w-full"
                 disabled={!entidadSeleccionada || !eventoSeleccionado}
                 onClick={() =>
@@ -680,7 +766,7 @@ export function SandboxPage() {
                 size="sm"
               >
                 Encolar evento
-              </Btn>
+              </SandboxBtn>
             </div>
           </div>
 
