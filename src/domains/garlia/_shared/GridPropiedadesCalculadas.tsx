@@ -190,7 +190,7 @@ export function TarjetaPropiedadesFisicas({
           <div
             key={p.clave}
             title={p.descripcion}
-            className="flex flex-col gap-1 min-w-0 rounded-md border border-primary/10 px-2 py-1.5"
+            className="flex flex-col gap-1 min-w-0 px-2 py-1.5"
           >
             <div className="flex items-center justify-between gap-1 min-w-0">
               <span className="text-micro font-bold text-primary/50 truncate">{p.label}</span>
