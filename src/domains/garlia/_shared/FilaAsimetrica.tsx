@@ -49,7 +49,7 @@ function elegirBloqueGrande(bloques: Bloque[]): number | null {
 
 function Cabecera({ titulo }: { titulo: string }) {
   return (
-    <div className="px-3 pt-3 text-primary/40">
+    <div className="px-3 pt-3 text-primary/40 text-center">
       <p className="text-micro font-black uppercase tracking-widest">{titulo}</p>
     </div>
   );
