@@ -139,6 +139,15 @@ const DEXIE_TABLES = new Set([
   "compuesto_enlaces",
   "enlace_sitios",
   "elemento_sitios_enlace",
+  // ─── v40: Estructuras (Química) y Materiales — pegaban directo a Supabase
+  // sin cache local (nunca entraron a DEXIE_TABLES). Mismo patrón cache-first
+  // que el resto: solo lectura, calculadas en Supabase — no entran en
+  // OFFLINE_WRITABLE.
+  "estructuras",
+  "estructura_compuestos",
+  "materiales",
+  "material_componentes",
+  "material_estructuras",
 ]);
 
 const OFFLINE_WRITABLE = new Set([

@@ -1836,6 +1836,22 @@ class AgendaFraniDB extends Dexie {
       enlace_sitios: "id",
       elemento_sitios_enlace: "id, elemento_id, numero_sitio",
     });
+
+    // ─── v40: Estructuras (Química) y Materiales — EstructurasPage y
+    // MaterialesPage pegaban directo a Supabase en cada apertura, sin cache
+    // Dexie ni timeout (useEstructuras.ts / useMateriales.ts /
+    // useMaterialEstructuras.ts, antes de este barrido). Mismo patrón
+    // cache-first que el resto: se pinta lo que ya está en Dexie al
+    // instante y se revalida contra Supabase en segundo plano. Son datos
+    // calculados/derivados en Supabase (solo lectura desde el frontend) —
+    // no entran en OFFLINE_WRITABLE.
+    this.version(40).stores({
+      estructuras: "id, nombre, created_at",
+      estructura_compuestos: "id, estructura_id, compuesto_id, created_at",
+      materiales: "id, nombre, tipo_material, material_padre_id, orden, created_at",
+      material_componentes: "id, material_id, componente_tipo, componente_id, created_at",
+      material_estructuras: "id, material_id, estructura_id, created_at",
+    });
   }
 }
 
