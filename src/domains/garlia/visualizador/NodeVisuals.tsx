@@ -62,10 +62,13 @@ function sectorPath(cx: number, cy: number, r: number, anguloIni: number, angulo
 }
 
 /**
- * Punto 4 del docx: "Cada partícula tiene identidad". Casilla circular
- * partida en tercios (120° cada uno), uno por letra A/T/S de la fórmula —
- * la misma idea de "casilla de tabla periódica" pedida en la especificación,
- * reconstruida acá para no depender de fisica/.
+ * Punto 4 del docx: "Cada partícula tiene identidad" — el diagrama
+ * muestra siempre ○ (círculo simple, un solo tono) con el nombre encima y
+ * el código A/T/S (ej. "TAA") como texto debajo, NUNCA un círculo partido
+ * en sectores de color por letra — esa idea de "gajos" no aparece en
+ * ninguna parte del documento maestro; era el diseño de
+ * fisica/ParticulaVisual.tsx reciclado bajo otro nombre. Acá se reconstruye
+ * literalmente lo que el docx dibuja: un punto ○ y su código como texto.
  */
 export function ParticulaNodo({
   formula,
@@ -76,62 +79,31 @@ export function ParticulaNodo({
   size?: number;
   className?: string;
 }) {
-  const letras = formula
-    .toUpperCase()
-    .split("")
-    .filter(esLetraATS) as LetraATS[];
-
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 2;
-  const fontSize = size * 0.22;
+  const fontSize = size * 0.34;
 
   return (
     <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className={className} role="img" aria-label={`Partícula ${formula}`}>
-      {letras.length <= 1 ? (
-        <>
-          <circle
-            cx={cx}
-            cy={cy}
-            r={r}
-            strokeWidth={2}
-            style={{
-              fill: letras[0] ? LETRA_COLOR[letras[0]].bg : "color-mix(in srgb, var(--primary) 10%, transparent)",
-              stroke: letras[0] ? LETRA_COLOR[letras[0]].border : "var(--primary)",
-            }}
-          />
-          {letras[0] && (
-            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={fontSize} fontWeight={900} style={{ fill: LETRA_COLOR[letras[0]].fg }}>
-              {letras[0]}
-            </text>
-          )}
-        </>
-      ) : (
-        letras.map((letra, i) => {
-          const anguloTercio = (Math.PI * 2) / 3;
-          const anguloIni = -Math.PI / 2 + i * anguloTercio;
-          const anguloFin = anguloIni + anguloTercio;
-          const anguloMedio = (anguloIni + anguloFin) / 2;
-          const color = LETRA_COLOR[letra];
-          const labelR = r * 0.6;
-          return (
-            <g key={i}>
-              <path d={sectorPath(cx, cy, r, anguloIni, anguloFin)} strokeWidth={1.5} style={{ fill: color.bg, stroke: color.border }} />
-              <text
-                x={cx + labelR * Math.cos(anguloMedio)}
-                y={cy + labelR * Math.sin(anguloMedio)}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={fontSize}
-                fontWeight={900}
-                style={{ fill: color.fg }}
-              >
-                {letra}
-              </text>
-            </g>
-          );
-        })
-      )}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        strokeWidth={2}
+        style={{ fill: "color-mix(in srgb, var(--primary) 12%, transparent)", stroke: "var(--primary)" }}
+      />
+      <text
+        x={cx}
+        y={cy}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={fontSize}
+        fontWeight={900}
+        style={{ fill: "color-mix(in srgb, var(--primary) 85%, transparent)" }}
+      >
+        ○
+      </text>
     </svg>
   );
 }
@@ -173,52 +145,16 @@ export function CentroGravedadNodo({
             const angulo = (i / particulas.length) * Math.PI * 2 - Math.PI / 2;
             const px = cx + Math.cos(angulo) * orbitR;
             const py = cy + Math.sin(angulo) * orbitR;
-            const letras = p.formula
-              .toUpperCase()
-              .split("")
-              .filter(esLetraATS) as LetraATS[];
-            const anguloTercio = (Math.PI * 2) / 3;
-            const miniFont = particleR * 0.62;
             return (
               <g key={`${p.nombre}-${i}`}>
                 <title>{`${p.nombre} (${p.formula})`}</title>
-                {letras.length <= 1 ? (
-                  <circle
-                    cx={px}
-                    cy={py}
-                    r={particleR}
-                    strokeWidth={1}
-                    style={{
-                      fill: letras[0] ? LETRA_COLOR[letras[0]].bg : "color-mix(in srgb, var(--primary) 10%, transparent)",
-                      stroke: letras[0] ? LETRA_COLOR[letras[0]].border : "var(--primary)",
-                    }}
-                  />
-                ) : (
-                  letras.map((letra, j) => {
-                    const aIni = -Math.PI / 2 + j * anguloTercio;
-                    const aFin = aIni + anguloTercio;
-                    const aMedio = (aIni + aFin) / 2;
-                    const color = LETRA_COLOR[letra];
-                    const labelR = particleR * 0.55;
-                    return (
-                      <g key={j}>
-                        <path d={sectorPath(px, py, particleR, aIni, aFin)} strokeWidth={1} style={{ fill: color.bg, stroke: color.border }} />
-                        <text
-                          x={px + labelR * Math.cos(aMedio)}
-                          y={py + labelR * Math.sin(aMedio)}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          fontSize={miniFont}
-                          fontWeight={900}
-                          style={{ fill: color.fg }}
-                        >
-                          {letra}
-                        </text>
-                      </g>
-                    );
-                  })
-                )}
-                <circle cx={px} cy={py} r={particleR} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} />
+                <circle
+                  cx={px}
+                  cy={py}
+                  r={particleR}
+                  strokeWidth={1}
+                  style={{ fill: "color-mix(in srgb, var(--primary) 12%, transparent)", stroke: "var(--primary)" }}
+                />
               </g>
             );
           })}

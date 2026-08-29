@@ -147,21 +147,47 @@ export function StructureCanvas({
       if (e.weight !== undefined) weightByFromId.set(e.fromNodeId, e.weight);
     });
 
-    const maxRingNodes = Math.max(1, ...orbitLevels.map((lvl) => lvl.nodes.length));
-    const outerRingRadius = RING_0_R + Math.max(0, maxRingNodes - 6) * 6; // más nodos, un poco más de aire
+    // Radio mínimo para que `n` nodos, cada uno de diámetro ~2r + margen,
+    // quepan en su propia circunferencia sin superponerse: arco disponible
+    // por nodo = 2π·radius / n ≥ nodeDiameter + gap.
+    const nodeDiameter = (ORBIT_R / 2.9) * 2;
+    const nodeGap = 18;
+    const minRadiusForNodes = (n: number) => (n * (nodeDiameter + nodeGap)) / (2 * Math.PI);
+
+    // Radios por anillo: se construyen de ADENTRO hacia AFUERA (el anillo
+    // más cercano al centro primero) para que cada uno reciba el radio
+    // mínimo que sus propios nodos necesitan, sin heredar un radio ajeno
+    // que podría ser insuficiente (bug: antes todos los anillos derivaban
+    // su radio de uno solo "outerRingRadius" calculado con el anillo de
+    // MÁS nodos, así que un anillo interno con muchos nodos podía terminar
+    // con radio menor al que le tocaba y sus nodos se superponían).
+    const ringRadii: number[] = new Array(orbitLevels.length);
+    let previousRadius = CENTER_R + 40; // primer anillo (el más interno) empieza fuera del centro
+    for (let ringIndex = orbitLevels.length - 1; ringIndex >= 0; ringIndex--) {
+      const nodeCount = orbitLevels[ringIndex].nodes.length;
+      const minRadius = Math.max(RING_0_R - (orbitLevels.length - 1 - ringIndex) * RING_GAP, minRadiusForNodes(nodeCount));
+      const radius = Math.max(minRadius, previousRadius + RING_GAP);
+      ringRadii[ringIndex] = radius;
+      previousRadius = radius;
+    }
+    const outerRingRadius = ringRadii.length > 0 ? ringRadii[0] : 0;
 
     orbitLevels.forEach((level, ringIndex) => {
       // ringIndex 0 = nivel más externo (ej. Partículas); a mayor índice,
       // más cerca del centro (ej. IUM justo antes del Oris).
-      const baseRadius = outerRingRadius - ringIndex * RING_GAP;
+      const baseRadius = ringRadii[ringIndex];
       const nodeCount = level.nodes.length;
       level.nodes.forEach((node, i) => {
         // Distancia real: si hay peso definido para ESTE nodo (edge saliente
         // con weight), nodos con más peso quedan más cerca del centro dentro
         // de su propio anillo (contribución = cercanía). Sin dato, todos a
         // la misma distancia — ninguna magnitud se inventa (regla del diseño).
+        // El jitter nunca reduce el radio por debajo del mínimo sin
+        // superposición del propio anillo (antes podía acercar demasiado
+        // y volver a solapar nodos vecinos).
         const w = weightByFromId.get(node.id);
-        const radialJitter = w !== undefined ? (1 - Math.max(0, Math.min(1, w))) * 34 : 0;
+        const maxJitter = Math.min(34, Math.max(0, baseRadius - minRadiusForNodes(nodeCount)));
+        const radialJitter = w !== undefined ? (1 - Math.max(0, Math.min(1, w))) * maxJitter : 0;
         const angle = (2 * Math.PI * i) / nodeCount - Math.PI / 2;
         nodesById.set(node.id, {
           ...node,
@@ -187,8 +213,15 @@ export function StructureCanvas({
       });
     }
 
+    // Margen: el nodo más externo necesita espacio no solo para su propio
+    // círculo, sino para el texto que dibuja DEBAJO de él (label + sublabel,
+    // hasta y = r + 33). Antes el margen era una fracción fija de ORBIT_R
+    // que no crecía con outerRingRadius, así que al aumentar el radio para
+    // evitar superposición (fix anterior), el nodo/texto del borde exterior
+    // quedaba recortado por el viewBox — por eso "algunos no se muestran".
+    const nodeOuterMargin = ORBIT_R / 2.9 + 40; // radio del nodo + espacio para 2 líneas de texto
     const maxRadius = orbitLevels.length > 0 ? outerRingRadius : 0;
-    const totalSize = PAD * 2 + maxRadius * 2 + ORBIT_R * 1.3;
+    const totalSize = PAD * 2 + maxRadius * 2 + nodeOuterMargin * 2;
 
     // Coordenadas absolutas centradas en el canvas.
     const cx = totalSize / 2;
