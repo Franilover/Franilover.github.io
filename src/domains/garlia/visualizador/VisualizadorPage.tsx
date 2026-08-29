@@ -104,7 +104,7 @@ const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
 
 function StatusPill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/50">
+    <span className="inline-flex items-center rounded-full border border-primary/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/50">
       {children}
     </span>
   );
@@ -127,8 +127,8 @@ function FlowNode({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={`min-w-[128px] rounded-xl border px-4 py-4 text-left transition-colors ${
-        tone === "accent" ? "border-primary/30 bg-primary/10" : "border-primary/10 bg-primary/[0.025]"
-      } ${onClick ? "hover:border-primary/30 hover:bg-primary/10 cursor-pointer" : ""}`}
+        tone === "accent" ? "border-primary/30" : "border-primary/10"
+      } ${onClick ? "hover:border-primary/30 cursor-pointer" : ""}`}
     >
       <p className="text-sm font-black text-primary/80">{title}</p>
       {subtitle ? <p className="mt-1.5 text-[11px] leading-4 text-primary/40">{subtitle}</p> : null}
@@ -149,7 +149,7 @@ function MiniBarChart({ values }: { values: { label: string; value: number }[] }
             <span>{item.label}</span>
             <span>{item.value.toFixed(2)}</span>
           </div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-primary/8">
+          <div className="h-2.5 overflow-hidden rounded-full">
             <div
               className="h-full rounded-full bg-primary/60"
               style={{ width: `${Math.max(0, Math.min(1, item.value)) * 100}%` }}
@@ -172,7 +172,7 @@ function BarraDivergente({ label, value, max }: { label: string; value: number; 
         <span>{label}</span>
         <span className="tabular-nums">{value}</span>
       </div>
-      <div className="relative h-2.5 overflow-hidden rounded-full bg-primary/8">
+      <div className="relative h-2.5 overflow-hidden rounded-full">
         <div className="absolute left-1/2 top-0 h-full w-px bg-primary/20" />
         {pct >= 0 ? (
           <div
@@ -232,7 +232,7 @@ function ChipSelector<T>({
 
 function LoadingRow() {
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-primary/10 bg-primary/[0.02] p-5 text-xs font-bold text-primary/35">
+    <div className="flex items-center gap-2.5 rounded-xl border border-primary/10 p-5 text-xs font-bold text-primary/35">
       <span className="h-2 w-2 animate-pulse rounded-full bg-primary/40" />
       Cargando datos reales desde Supabase…
     </div>
@@ -241,7 +241,7 @@ function LoadingRow() {
 
 function EmptyRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-primary/15 bg-primary/[0.015] p-5 text-xs leading-5 text-primary/40">
+    <div className="rounded-xl border border-dashed border-primary/15 p-5 text-xs leading-5 text-primary/40">
       {children}
     </div>
   );
@@ -275,7 +275,7 @@ function TarjetaValoresDerivados({
       {items.map((v) => (
         <div
           key={v.id}
-          className="rounded-xl border border-primary/10 bg-primary/[0.025] p-4"
+          className="rounded-xl border border-primary/10 p-4"
           title={v.propiedad.descripcion ?? undefined}
         >
           <div className="flex items-start justify-between gap-2">
@@ -461,7 +461,7 @@ function RutaFisicaCanvas({
               }}
             />
           )}
-          <div className="mt-5 rounded-2xl bg-primary/[0.02] p-5">
+          <div className="mt-5 rounded-2xl p-5">
             <StructureCanvas
               columns={columns}
               edges={edges}
@@ -613,7 +613,7 @@ function RutaAlquimiaCanvas({
               ))}
             </div>
           )}
-          <div className="mt-5 rounded-2xl bg-primary/[0.02] p-5">
+          <div className="mt-5 rounded-2xl p-5">
             <StructureCanvas
               columns={columns}
               edges={edges}
@@ -845,7 +845,7 @@ function RutasSection() {
 
         <div className="space-y-4">
           <Inspector entity={inspectorEntity} emptyLabel="Seleccioná un Oris o un Elemento para inspeccionarlo." />
-          <div className="rounded-2xl bg-primary/[0.02] p-5">
+          <div className="rounded-2xl p-5">
             <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-primary/40">Trace</p>
             <TraceView steps={traceSteps} />
           </div>
@@ -974,7 +974,7 @@ function VisualizadorPage() {
 
             {active === "micro" ? (
               <>
-                <div className="overflow-x-auto rounded-2xl bg-primary/[0.02] p-5">
+                <div className="overflow-x-auto rounded-2xl p-5">
                   <div className="flex min-w-[820px] items-center gap-2">
                     <FlowNode title="Partículas Base" subtitle={`${particulasBase.length} · A / T / S`} />
                     <Arrow />
@@ -989,7 +989,7 @@ function VisualizadorPage() {
                 </div>
 
                 <div className="mt-8 grid gap-7 xl:grid-cols-[1.15fr_0.85fr]">
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-xs font-black text-primary/80">Elige un Oris</p>
@@ -1010,14 +1010,14 @@ function VisualizadorPage() {
                     )}
 
                     {orisSel ? (
-                      <div className="mt-4 rounded-xl border border-primary/10 bg-primary/[0.025] p-4">
+                      <div className="mt-4 rounded-xl border border-primary/10 p-4">
                         <p className="text-xs font-black text-primary/80">{orisSel.nombre}</p>
                         <p className="mt-1 text-[11px] text-primary/45">
                           {orisSel.dominio} · {orisSel.familia} · {orisSel.formula}
                         </p>
                         <div className="mt-3 grid grid-cols-3 gap-3 text-center">
                           {(["A", "T", "S"] as const).map((letra) => (
-                            <div key={letra} className="rounded-lg border border-primary/10 bg-primary/5 p-3">
+                            <div key={letra} className="rounded-lg border border-primary/10 p-3">
                               <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{letra}</p>
                               <p className="mt-1 text-lg font-black text-primary/75">{oriSelLetras[letra]}</p>
                             </div>
@@ -1028,7 +1028,7 @@ function VisualizadorPage() {
                             {oriSelParticulas.map((p, i) => (
                               <span
                                 key={`${p.nombre}-${i}`}
-                                className="rounded-full border border-primary/10 bg-primary/5 px-2.5 py-1.5 text-[11px] font-bold text-primary/55"
+                                className="rounded-full border border-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary/55"
                               >
                                 {p.nombre} · {p.formula}
                               </span>
@@ -1039,7 +1039,7 @@ function VisualizadorPage() {
                     ) : null}
                   </div>
 
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Procedencia</p>
                     <div className="mt-5 space-y-2.5 text-xs">
                       {[
@@ -1049,7 +1049,7 @@ function VisualizadorPage() {
                         "Oris (composición de IUMs)",
                       ].map((item, index) => (
                         <div key={item} className="flex items-center gap-2">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/8 text-[10px] font-black text-primary/50">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-black text-primary/50">
                             {index + 1}
                           </span>
                           <span className="font-bold text-primary/55">{item}</span>
@@ -1068,7 +1068,7 @@ function VisualizadorPage() {
             {active === "ats" ? (
               <>
                 <div className="grid gap-7 lg:grid-cols-[0.9fr_1.1fr]">
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     {loadingParticulas ? (
                       <LoadingRow />
                     ) : (
@@ -1082,7 +1082,7 @@ function VisualizadorPage() {
                     )}
                     {particulaSel ? (
                       <div className="mx-auto mt-5 flex max-w-xs flex-col items-center">
-                        <div className="rounded-full border border-primary/15 bg-primary/5 px-8 py-5 text-center">
+                        <div className="rounded-full border border-primary/15 px-8 py-5 text-center">
                           <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Partícula</p>
                           <p className="mt-1 text-2xl font-black text-primary/85">{particulaSel.nombre}</p>
                           <p className="mt-1 text-xs font-bold text-primary/40">{particulaSel.formula}</p>
@@ -1092,7 +1092,7 @@ function VisualizadorPage() {
                           {(["A", "T", "S"] as const).map((letra) => {
                             const count = particulaSel.formula.split("").filter((c) => c === letra).length;
                             return (
-                              <div key={letra} className="rounded-xl border border-primary/10 bg-primary/[0.025] p-4">
+                              <div key={letra} className="rounded-xl border border-primary/10 p-4">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{letra}</p>
                                 <p className="mt-1 text-lg font-black text-primary/75">{count}</p>
                               </div>
@@ -1107,7 +1107,7 @@ function VisualizadorPage() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Ejes fundamentales</p>
                     <p className="text-[10px] text-primary/35">Valores reales de particulas.ejes_fundamentales</p>
                     {particulaSel?.ejes_fundamentales ? (
@@ -1141,7 +1141,7 @@ function VisualizadorPage() {
             {active === "formula" ? (
               <>
                 <div className="grid gap-7 lg:grid-cols-2">
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Densidad</p>
                     <p className="mt-1 text-[10px] text-primary/35">
                       Calculadora interactiva usando la fórmula real: {densidad?.formula ?? "rho=M/V"}
@@ -1175,7 +1175,7 @@ function VisualizadorPage() {
                         </div>
                       </label>
                     </div>
-                    <div className="mt-8 rounded-2xl bg-primary/5 p-6 text-center">
+                    <div className="mt-8 rounded-2xl p-6 text-center">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/35">Resultado</p>
                       <p className="mt-2 text-3xl font-black tabular-nums text-primary/85">
                         {Number.isFinite(densidadCalculada) ? densidadCalculada.toLocaleString("es-CL") : "—"}
@@ -1188,7 +1188,7 @@ function VisualizadorPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-black text-primary/80">Catálogo real</p>
                       <StatusPill>{propiedadesDerivadas.length} propiedades</StatusPill>
@@ -1204,7 +1204,7 @@ function VisualizadorPage() {
                               key={p.id}
                               type="button"
                               onClick={() => setPropiedadFormulaSel(selected ? null : p)}
-                              className={`w-full rounded-xl border p-3 text-left transition-colors ${selected ? "border-primary/30 bg-primary/10" : "border-primary/10 bg-primary/[0.025] hover:border-primary/20"}`}
+                              className={`w-full rounded-xl border p-3 text-left transition-colors ${selected ? "border-primary/30" : "border-primary/10 hover:border-primary/20"}`}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[11px] font-black text-primary/80">{p.nombre}</p>
@@ -1241,7 +1241,7 @@ function VisualizadorPage() {
                   />
                 )}
                 <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.8fr]">
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">
                       Perfil físico {materialSel ? `· ${materialSel.nombre}` : ""}
                     </p>
@@ -1253,7 +1253,7 @@ function VisualizadorPage() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Metadatos</p>
                     <div className="mt-4 grid grid-cols-2 gap-2.5">
                       <StatusPill>{materialSel?.tipo_material ?? "—"}</StatusPill>
@@ -1268,7 +1268,7 @@ function VisualizadorPage() {
                   </div>
                 </div>
 
-                <div className="mt-8 rounded-2xl bg-primary/[0.02] p-7">
+                <div className="mt-8 rounded-2xl p-7">
                   <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
                   <p className="mt-1 text-[10px] text-primary/35">valores_propiedades_derivadas para este material</p>
                   <div className="mt-4">
@@ -1292,7 +1292,7 @@ function VisualizadorPage() {
                   />
                 )}
                 <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.8fr]">
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">
                       Propiedades {estructuraSel ? `· ${estructuraSel.nombre}` : ""}
                     </p>
@@ -1304,7 +1304,7 @@ function VisualizadorPage() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Función</p>
                     <div className="mt-3 space-y-2">
                       <StatusPill>{estructuraSel?.tipo ?? "sin tipo"}</StatusPill>
@@ -1317,7 +1317,7 @@ function VisualizadorPage() {
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-8 rounded-2xl bg-primary/[0.02] p-7">
+                <div className="mt-8 rounded-2xl p-7">
                   <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
                   <div className="mt-4">
                     <TarjetaValoresDerivados
@@ -1347,7 +1347,7 @@ function VisualizadorPage() {
                   <p className="mt-1.5 text-[10px] text-primary/30">Mostrando los primeros 60 de {compuestos.length} compuestos.</p>
                 ) : null}
                 <div className="mt-8 grid gap-7 lg:grid-cols-2">
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">
                       Perfil reactivo {compuestoSel ? `· ${compuestoSel.nombre}` : ""}
                     </p>
@@ -1363,7 +1363,7 @@ function VisualizadorPage() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Ficha</p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {compuestoSel?.tipo_compuesto ? <StatusPill>{compuestoSel.tipo_compuesto}</StatusPill> : null}
@@ -1375,7 +1375,7 @@ function VisualizadorPage() {
                         .filter((p) => p.valor !== null && p.proporcion === undefined)
                         .slice(0, 6)
                         .map((p) => (
-                          <div key={p.clave} className="rounded-lg border border-primary/10 bg-primary/5 p-3">
+                          <div key={p.clave} className="rounded-lg border border-primary/10 p-3">
                             <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{p.label}</p>
                             <p className="mt-1 font-black text-primary/75">{p.valor}</p>
                           </div>
@@ -1383,7 +1383,7 @@ function VisualizadorPage() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-8 rounded-2xl bg-primary/[0.02] p-7">
+                <div className="mt-8 rounded-2xl p-7">
                   <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
                   <div className="mt-4">
                     <TarjetaValoresDerivados tipo="compuesto" entidadId={compuestoSel?.id ?? null} entidadNombre={compuestoSel?.nombre} />
@@ -1397,7 +1397,7 @@ function VisualizadorPage() {
                 {loadingCompuestos ? (
                   <LoadingRow />
                 ) : (
-                  <div className="rounded-2xl bg-primary/[0.02] p-5">
+                  <div className="rounded-2xl p-5">
                     <MiniBarChart
                       values={compuestos
                         .filter((c) => typeof c.energia_enlace === "number")
@@ -1409,7 +1409,7 @@ function VisualizadorPage() {
                     />
                   </div>
                 )}
-                <div className="mt-8 rounded-2xl bg-primary/[0.02] p-6 text-xs leading-5 text-primary/45">
+                <div className="mt-8 rounded-2xl p-6 text-xs leading-5 text-primary/45">
                   Barra normalizada a un techo visual de 5 solo para comparar proporciones — el valor real de{" "}
                   <span className="font-black text-primary/60">energia_enlace</span> no está acotado a [0,1]; usa la
                   ficha del compuesto en la pestaña Química para el número exacto.
@@ -1440,14 +1440,14 @@ function VisualizadorPage() {
 
             {active === "information" ? (
               <>
-                <div className="flex flex-wrap items-center gap-2 overflow-x-auto rounded-2xl bg-primary/[0.02] p-7">
+                <div className="flex flex-wrap items-center gap-2 overflow-x-auto rounded-2xl p-7">
                   <FlowNode title="Fuente" subtitle="mensaje + intensidad" />
                   <Arrow />
                   <FlowNode title="Propagación" subtitle="distancia" />
                   <Arrow />
                   <FlowNode title="Receptor" subtitle="intensidad · fidelidad" tone="accent" />
                 </div>
-                <div className="mt-8 rounded-2xl bg-primary/[0.02] p-6 text-xs leading-5 text-primary/45">
+                <div className="mt-8 rounded-2xl p-6 text-xs leading-5 text-primary/45">
                   Diagrama conceptual — a diferencia de las otras 11 secciones, no hay una tabla "información"/"señal" en
                   Supabase todavía. No se inventan valores numéricos acá.
                 </div>
@@ -1468,7 +1468,7 @@ function VisualizadorPage() {
                   />
                 )}
                 <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.9fr]">
-                  <div className="overflow-x-auto rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="overflow-x-auto rounded-2xl p-7">
                     <div className="flex min-w-[620px] items-center gap-2">
                       <FlowNode title="Partículas" subtitle="A/T/S" />
                       <Arrow />
@@ -1482,7 +1482,7 @@ function VisualizadorPage() {
                       <FlowNode title="Éterium" subtitle={orisSel?.familia} />
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Equilibrio A/T/S</p>
                     <div className="mt-5">
                       <MiniBarChart
@@ -1518,7 +1518,7 @@ function VisualizadorPage() {
                   />
                 )}
                 <div className="mt-8 grid gap-7 lg:grid-cols-[0.85fr_1.15fr]">
-                  <div className="flex min-h-[260px] items-center justify-center rounded-2xl bg-primary/[0.02] p-6">
+                  <div className="flex min-h-[260px] items-center justify-center rounded-2xl p-6">
                     {runaSel?.patron_trazos && runaSel.patron_trazos.length > 0 ? (
                       <div className="h-44 w-44">
                         <RunaThumbnail patronTrazos={runaSel.patron_trazos} />
@@ -1527,7 +1527,7 @@ function VisualizadorPage() {
                       <EmptyRow>Esta runa no tiene patrón de trazos guardado todavía.</EmptyRow>
                     )}
                   </div>
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-black text-primary/80">{runaSel?.nombre ?? "Runa"}</p>
                       <StatusPill>{runaSel?.patron_trazos?.length ?? 0} trazos</StatusPill>
@@ -1571,7 +1571,7 @@ function VisualizadorPage() {
                     onSelect={setProcesoSel}
                   />
                 )}
-                <div className="mt-8 overflow-x-auto rounded-2xl bg-primary/[0.02] p-7">
+                <div className="mt-8 overflow-x-auto rounded-2xl p-7">
                   <div className="flex min-w-[760px] items-center gap-2">
                     <FlowNode title="Entrada" subtitle={procesoSel?.entrada ?? "—"} />
                     <Arrow />
@@ -1581,11 +1581,11 @@ function VisualizadorPage() {
                   </div>
                 </div>
                 <div className="mt-8 grid gap-7 lg:grid-cols-2">
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Condiciones</p>
                     <p className="mt-2 text-xs leading-5 text-primary/50">{procesoSel?.condiciones || "Sin condiciones registradas."}</p>
                   </div>
-                  <div className="rounded-2xl bg-primary/[0.02] p-7">
+                  <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Regla clave / conservación</p>
                     <p className="mt-2 text-xs leading-5 text-primary/50">{procesoSel?.regla_clave || "—"}</p>
                     {procesoSel?.conservacion ? (
