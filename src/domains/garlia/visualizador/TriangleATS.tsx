@@ -76,6 +76,31 @@ function posicionEnTriangulo(letras: LetrasATS): { x: number; y: number } {
   };
 }
 
+/** Agrupa posiciones que caen (redondeadas) en el mismo punto y las separa
+ *  en un pequeño círculo alrededor del punto real, para que dos entidades
+ *  con la MISMA proporción A/T/S (ej. "TTT" y "TTTTTT", o dos partículas
+ *  distintas con igual mezcla relativa) no se dibujen exactamente
+ *  superpuestas. Es un ajuste puramente visual sobre el resultado de
+ *  posicionEnTriangulo — no cambia la posición conceptual real de ninguna,
+ *  solo evita que una tape a la otra en pantalla. El primer elemento de
+ *  cada grupo se queda en el punto exacto (sin offset); desde el segundo
+ *  en adelante se reparten en anillo. */
+function separarSolapados<T extends { x: number; y: number }>(
+  puntos: T[],
+  radioBase: number,
+): T[] {
+  const grupos = new Map<string, number>();
+  return puntos.map((p) => {
+    const key = `${Math.round(p.x)}-${Math.round(p.y)}`;
+    const n = grupos.get(key) ?? 0;
+    grupos.set(key, n + 1);
+    if (n === 0) return p;
+    const angle = ((n - 1) * Math.PI * 2) / 6 - Math.PI / 2;
+    const radio = radioBase + Math.floor((n - 1) / 6) * radioBase * 0.9;
+    return { ...p, x: p.x + Math.cos(angle) * radio, y: p.y + Math.sin(angle) * radio };
+  });
+}
+
 /** Punto 6 del docx: "gradiente espacial — un campo sutil que sugiere tres
  *  regiones de influencia, sin implicar un campo físico real". Tres
  *  gradientes radiales suaves centrados en cada vértice, mezclándose hacia
@@ -124,30 +149,25 @@ export function TriangleATS({
 }: TriangleATSProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
 
-  const posiciones = useMemo(
-    () => new Map(entidades.map((e) => [e.id, posicionEnTriangulo(e.letras)])),
-    [entidades],
-  );
+  const posiciones = useMemo(() => {
+    const base = entidades.map((e) => ({ id: e.id, ...posicionEnTriangulo(e.letras) }));
+    // Radio de separación mayor que el de los componentes (más abajo): acá
+    // hay texto (label) además del núcleo, así que necesitan más aire para
+    // no quedar el texto de una entidad pisando el círculo de la otra.
+    const separadas = separarSolapados(base, 16);
+    return new Map(separadas.map((p) => [p.id, { x: p.x, y: p.y }]));
+  }, [entidades]);
 
   const activo = entidades.find((e) => e.id === (hoverId ?? selectedId)) ?? null;
   const posComponentes = useMemo(() => {
     if (!activo?.componentes?.length) return [];
     // Punto 4 del docx: cada partícula/componente puede tener su propia
-    // posición — se reusa la misma transformación baricéntrica, con un
-    // pequeño jitter determinístico (por índice) solo quando dos
-    // componentes caen exactamente en el mismo punto, para que no se
-    // tapen entre sí. El jitter es puramente visual, no altera qué A/T/S
-    // real tiene cada componente.
-    const vistos = new Map<string, number>();
-    return activo.componentes.map((c) => {
-      const base = posicionEnTriangulo(c.letras);
-      const key = `${Math.round(base.x)}-${Math.round(base.y)}`;
-      const n = vistos.get(key) ?? 0;
-      vistos.set(key, n + 1);
-      const angle = (n * Math.PI * 2) / 7;
-      const jitter = n === 0 ? 0 : 6 + n * 2;
-      return { ...c, x: base.x + Math.cos(angle) * jitter, y: base.y + Math.sin(angle) * jitter };
-    });
+    // posición — se reusa la misma transformación baricéntrica, y el mismo
+    // criterio de separación que las entidades principales (radio menor,
+    // acá solo hay un puntito sin texto propio).
+    const base = activo.componentes.map((c, i) => ({ idx: i, ...posicionEnTriangulo(c.letras) }));
+    const separadas = separarSolapados(base, 7);
+    return activo.componentes.map((c, i) => ({ ...c, x: separadas[i].x, y: separadas[i].y }));
   }, [activo]);
 
   return (
@@ -193,8 +213,18 @@ export function TriangleATS({
 
       {/* Núcleo (◎) de cada entidad — punto 3 del docx: "no un punto plano,
           presencia visual". Aura sutil alrededor cuando la entidad tiene
-          distribución (componentes) conocida. */}
-      {entidades.map((e) => {
+          distribución (componentes) conocida. Orden de dibujo: la entidad
+          activa (hover o seleccionada) siempre se pinta AL FINAL — así
+          queda por encima de sus vecinas cercanas en vez de que la que
+          casualmente está más adelante en la lista tape a la que el
+          usuario está mirando. */}
+      {[...entidades]
+        .sort((a, b) => {
+          const aActiva = a.id === hoverId || a.id === selectedId ? 1 : 0;
+          const bActiva = b.id === hoverId || b.id === selectedId ? 1 : 0;
+          return aActiva - bActiva;
+        })
+        .map((e) => {
         const pos = posiciones.get(e.id)!;
         const isSelected = selectedId === e.id;
         const isHovered = hoverId === e.id;
