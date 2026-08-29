@@ -71,7 +71,7 @@ import { TriangleATS, type EntidadATS } from "./TriangleATS";
 // reusarlo en la tab Rutas en vez de ParticulaNodo (el círculo sin letras
 // que se creó de cero para VIS-01). Mismo dato de entrada (formula), solo
 // cambia qué SVG dibuja.
-import { ParticulaVisual } from "@/domains/garlia/fisica/ParticulaVisual";
+import { ParticulaVisual, IumVisual } from "@/domains/garlia/fisica/ParticulaVisual";
 
 type SectionKey =
   | "rutas"
@@ -390,7 +390,7 @@ function RutaFisicaCanvas({
         label: iumSel.nombre,
         sublabel: "Ium seleccionado",
         tone: "accent" as const,
-        visual: <CentroGravedadNodo particulas={particulasDelIumSel} size={52} />,
+        visual: <IumVisual particulas={particulasDelIumSel} size={52} />,
       };
       return [
         { id: "particulas", label: "Partículas del Ium", nodes: particulaNodesZoom },
@@ -423,10 +423,10 @@ function RutaFisicaCanvas({
       }
     }
     // Nivel 2: los IUMs reales que componen el Oris (desde iums_composicion).
-    // Cada IUM se pinta con CentroGravedadNodo (núcleo ✦ + partículas
-    // propias en anillo), forma propia del visualizador — no la reutiliza
-    // de fisica/. particulasDeIum sigue siendo cálculo de datos, no visual,
-    // así que se reusa tal cual: ya expande la composición real.
+    // Cada IUM se pinta con IumVisual (componente "de afuera" de fisica/,
+    // pedido explícito de reusarlo acá en vez de CentroGravedadNodo).
+    // particulasDeIum sigue siendo cálculo de datos, no visual, así que se
+    // reusa tal cual: ya expande la composición real.
     const iumNodes = Object.entries(orisSel.iums_composicion)
       .filter(([, cantidad]) => cantidad > 0)
       .map(([iumId]) => {
@@ -435,12 +435,14 @@ function RutaFisicaCanvas({
           id: `ium-${iumId}`,
           label: ium?.nombre ?? "IUM",
           sublabel: `${orisSel.iums_composicion[iumId]}×`,
-          visual: ium ? <CentroGravedadNodo particulas={particulasDeIum(ium)} size={44} /> : undefined,
+          visual: ium ? <IumVisual particulas={particulasDeIum(ium)} size={44} /> : undefined,
         };
       });
-    // Nivel 3: el Oris seleccionado — mismo tratamiento de centro de
-    // gravedad que un IUM (un Oris es, en el modelo, una bolsa de IUMs que
-    // a su vez son bolsas de partículas), con sus partículas ya expandidas.
+    // Nivel 3: el Oris seleccionado — mismo tratamiento que un IUM (un
+    // Oris es, en el modelo, una bolsa de IUMs que a su vez son bolsas de
+    // partículas), con sus partículas ya expandidas. Mismo componente
+    // IumVisual — el diseño "de afuera" no distingue IUM de Oris, ambos
+    // son "una bolsa de partículas" con el mismo tratamiento visual.
     const orisNode = {
       id: `oris-${orisSel.id}`,
       label: orisSel.nombre,
@@ -450,7 +452,7 @@ function RutaFisicaCanvas({
       // vea más grande. Aprovecha el nuevo CENTER_R=48 del canvas
       // (diámetro útil ~88px tras el padding interno del foreignObject)
       // sin recortarse, y queda claramente por encima del IUM (44).
-      visual: <CentroGravedadNodo particulas={particulasDelOrisSel} size={84} />,
+      visual: <IumVisual particulas={particulasDelOrisSel} size={84} />,
     };
     return [
       { id: "particulas", label: "Partículas (A/T/S)", nodes: particulaNodes },
@@ -784,7 +786,7 @@ function RutasSection() {
           eyebrow: "IUM",
           title: ium.nombre,
           subtitle: `${fisicaRoute.particulasDelIumSel.length} partícula(s)`,
-          visual: <CentroGravedadNodo particulas={fisicaRoute.particulasDelIumSel} size={40} />,
+          visual: <IumVisual particulas={fisicaRoute.particulasDelIumSel} size={40} />,
           fields: [
             { label: "A", value: fisicaRoute.letrasIumSel.A },
             { label: "T", value: fisicaRoute.letrasIumSel.T },
