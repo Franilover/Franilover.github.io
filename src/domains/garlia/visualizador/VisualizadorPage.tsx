@@ -107,7 +107,7 @@ function SectionTitle({ eyebrow, title, description }: { eyebrow: string; title:
     <div className="mb-7">
       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/35">{eyebrow}</p>
       <h1 className="mt-2 text-2xl font-black tracking-tight text-primary/90">{title}</h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-primary/50">{description}</p>
+      <p className="mt-2 max-w-5xl text-sm leading-6 text-primary/50">{description}</p>
     </div>
   );
 }
@@ -959,7 +959,7 @@ function VisualizadorPage() {
 
   return (
     <main className="min-h-screen bg-[var(--bg-main)] text-primary">
-      <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-10">
+      <div className="w-full px-3 py-8">
 
         <div className="grid gap-7 lg:grid-cols-[236px_minmax(0,1fr)]">
           <aside className="rounded-2xl bg-primary/[0.02] p-3 lg:sticky lg:top-6 lg:self-start">
