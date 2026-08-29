@@ -21,9 +21,10 @@
  * transformación (T,A,S)→(x,y) sí es "matemática y puramente gráfica"
  * (docx, mismo punto), así que vive acá, no en el motor.
  *
- * No es lo mismo que ParticulaNodo (VIS-01, punto 4: partícula = "○" con
- * identidad de color). Este es otro visualizador: un mapa donde CUALQUIER
- * entidad (partícula, IUM u Oris) se posiciona según su propio A/T/S.
+ * No es lo mismo que ParticulaVisual (fisica/, reusado en VIS-01/Rutas
+ * desde este mismo proyecto: tercios de color con la letra dentro). Este
+ * es otro visualizador: un mapa donde CUALQUIER entidad (partícula, IUM u
+ * Oris) se posiciona según su propio A/T/S.
  */
 
 import React, { useMemo, useState } from "react";

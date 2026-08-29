@@ -64,8 +64,14 @@ import { TraceView, type TraceStep } from "./TraceView";
 import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
-import { ParticulaNodo, CentroGravedadNodo, ElementoNodo, contarLetrasNodo } from "./NodeVisuals";
+import { CentroGravedadNodo, ElementoNodo, contarLetrasNodo } from "./NodeVisuals";
 import { TriangleATS, type EntidadATS } from "./TriangleATS";
+// Componente "de afuera" del visualizador (fisica/), el diseño original de
+// Partícula con letras dentro de tercios de color — pedido explícito de
+// reusarlo en la tab Rutas en vez de ParticulaNodo (el círculo sin letras
+// que se creó de cero para VIS-01). Mismo dato de entrada (formula), solo
+// cambia qué SVG dibuja.
+import { ParticulaVisual } from "@/domains/garlia/fisica/ParticulaVisual";
 
 type SectionKey =
   | "rutas"
@@ -377,7 +383,7 @@ function RutaFisicaCanvas({
         id: `particula-ium-${i}`,
         label: p.nombre,
         sublabel: p.formula,
-        visual: <ParticulaNodo formula={p.formula} size={40} />,
+        visual: <ParticulaVisual formula={p.formula} size={40} />,
       }));
       const iumNodeZoom = {
         id: `ium-${iumSel.id}`,
@@ -410,7 +416,7 @@ function RutaFisicaCanvas({
             id: `particula-${iumId}-${particulaNodes.length}`,
             label: p.nombre,
             sublabel: p.formula,
-            visual: <ParticulaNodo formula={p.formula} size={40} />,
+            visual: <ParticulaVisual formula={p.formula} size={40} />,
             iumId,
           });
         }
@@ -566,7 +572,7 @@ function RutaAlquimiaCanvas({
         id: `particula-${capaSel}-${i}`,
         label: p.nombre,
         sublabel: p.formula,
-        visual: <ParticulaNodo formula={p.formula} size={40} />,
+        visual: <ParticulaVisual formula={p.formula} size={40} />,
       }));
       const capaZoomLabel = capas.find((c) => c.capa === capaSel)?.label ?? capaSel;
       const capaNodeZoom = {
@@ -759,7 +765,7 @@ function RutasSection() {
         eyebrow: "Partícula",
         title: particulaClickeada.nombre,
         subtitle: particulaClickeada.formula,
-        visual: <ParticulaNodo formula={particulaClickeada.formula} size={40} />,
+        visual: <ParticulaVisual formula={particulaClickeada.formula} size={40} />,
         fields: [
           { label: "A (antítesis)", value: letras.A },
           { label: "T (tesis)", value: letras.T },
@@ -989,7 +995,7 @@ function VisualizadorPage() {
         label: p.nombre,
         sublabel: p.formula,
         // Mismo conteo real que ya usa contarLetrasNodo (NodeVisuals) para
-        // el color dominante de ParticulaNodo — no se reinventa la regla.
+        // el color dominante de ParticulaVisual — no se reinventa la regla.
         letras: contarLetrasNodo(p.formula),
       }));
     }
