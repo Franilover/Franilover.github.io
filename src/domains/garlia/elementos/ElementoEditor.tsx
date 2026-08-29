@@ -25,6 +25,7 @@ import { type SaveStatus } from "@/ui/saveStatus";
 
 import { InfoFormulasPopover } from "./InfoFormulasPopover";
 import { TarjetaPropiedadesFisicas } from "../_shared/GridPropiedadesCalculadas";
+import { ParticulaVisual } from "../fisica/ParticulaVisual";
 
 import {
   calcularParticulaDominante,
@@ -33,7 +34,6 @@ import {
 import {
   LAYER_LABEL,
   LAYER_PARTICLES,
-  PARTICLE_INITIAL,
   PARTICLE_TYPES,
   capacidadExterna,
   layerTotal,
@@ -449,49 +449,13 @@ function PropiedadesFisicasBloque({ propiedades }: { propiedades: PropiedadCalcu
 // protones/neutrones) y dos anillos orbitales para "media" y "externa"
 // (equivalente a las capas de electrones), cada uno con las partículas
 // propias del mundo (Masa, Cinética, Voluntad, etc.) girando alrededor en
-// vez de electrones genéricos. Cada tipo de partícula recibe un color
-// determinístico derivado de --primary/--accent (sin paleta hardcodeada),
-// así distintos tipos se distinguen entre sí de forma consistente.
-const PARTICLE_HUE_MIX = PARTICLE_TYPES.reduce<Record<string, number>>((acc, p, i) => {
-  acc[p] = Math.round((i / PARTICLE_TYPES.length) * 100);
-  return acc;
-}, {});
-
-// Mismos colores que fisica/ParticulaVisual.tsx (LETRA_COLOR) — fg claro
-// pensado para leerse sobre el tema sepia oscuro de los admins, en vez de
-// los tonos oscuros que tenía antes (pensados para fondo claro y que se
-// leían mal). Bordes sólidos del mismo color de la letra (no un aro
-// genérico), que es lo que da el look nítido de Iums/Partículas.
-const LETRA_ATS_COLOR: Record<"A" | "T" | "S", { bg: string; border: string; fg: string }> = {
-  A: { bg: "color-mix(in srgb, #22c55e 18%, transparent)", border: "#22c55e", fg: "#d9f2df" },
-  T: { bg: "color-mix(in srgb, #ef4444 18%, transparent)", border: "#ef4444", fg: "#f9d9d9" },
-  S: { bg: "color-mix(in srgb, #3b82f6 18%, transparent)", border: "#3b82f6", fg: "#d9e6fb" },
-};
-
-function sectorPathAtomo(cx: number, cy: number, r: number, anguloIni: number, anguloFin: number): string {
-  const x1 = cx + r * Math.cos(anguloIni);
-  const y1 = cy + r * Math.sin(anguloIni);
-  const x2 = cx + r * Math.cos(anguloFin);
-  const y2 = cy + r * Math.sin(anguloFin);
-  const largo = anguloFin - anguloIni > Math.PI ? 1 : 0;
-  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largo} 1 ${x2} ${y2} Z`;
-}
-
-function colorDeParticula(particula: ParticleType): { fg: string; bg: string; border: string } {
-  // Alterna entre --primary y --accent según la posición del tipo en
-  // PARTICLE_TYPES, variando el porcentaje de mezcla — 100% dinámico
-  // (deriva de las variables de tema, nunca un hex fijo). Fondo sólido y
-  // fuerte (no transparente) + texto con --btn-text (misma variable que ya
-  // usa el resto de la app para texto de alto contraste sobre bg-primary
-  // sólido), así las letras siempre se leen sin importar el tema activo.
-  const base = PARTICLE_TYPES.indexOf(particula) % 2 === 0 ? "--primary" : "--accent";
-  const mix = 60 + (PARTICLE_HUE_MIX[particula] % 30);
-  return {
-    fg: "var(--btn-text)",
-    bg: `color-mix(in srgb, var(${base}) ${mix}%, var(--bg-main))`,
-    border: `color-mix(in srgb, var(${base}) 90%, black)`,
-  };
-}
+// vez de electrones genéricos.
+//
+// Cada partícula se dibuja reusando ParticulaVisual (fisica/ParticulaVisual)
+// tal cual — el mismo componente que usa el visor de Física y IumVisual —
+// en vez de una copia propia de sectores/colores. Así el diseño (trazo,
+// tipografía, paleta sepia) se edita en un solo lugar y queda idéntico en
+// Elementos, Compuestos, Partículas e Iums.
 
 /** Une todas las ocurrencias de una capa en una lista plana de partículas
  * individuales (ej. {Masa: 2} → ["Masa", "Masa"]) para poder distribuirlas
@@ -531,10 +495,8 @@ export function AtomoVisual({
    *  quedar chica por depender de una altura fija. */
   className?: string;
 }) {
-  // Antes era alternable (botón "Aa"/"∆" flotante) entre "inicial" (letra)
-  // y "ats" (gráfico de tercios A/T/S). A pedido, se saca el toggle y se
-  // deja siempre en modo gráfico.
-  const modo: "inicial" | "ats" = "ats";
+  // El toggle letra/gráfico ("Aa"/"∆") se sacó a pedido: siempre se ve el
+  // gráfico (círculos de Partícula reales, vía ParticulaVisual).
   const nucleares = useMemo(() => particulasDeCapa(elemento.nucleo), [elemento.nucleo]);
   const capaMedia = useMemo(() => particulasDeCapa(elemento.media), [elemento.media]);
   const capaExterna = useMemo(() => particulasDeCapa(elemento.externa), [elemento.externa]);
@@ -566,62 +528,24 @@ export function AtomoVisual({
   const nucleoCount = Math.max(nucleares.length, 1);
   const nucleoParticleRadius = Math.max(5, Math.min(11, 16 - nucleoCount * 0.7));
   const nucleoOrbitRadius = nucleoCount === 1 ? 0 : Math.max(12, Math.min(26, 10 + nucleoCount * 1.6));
-  const nucleoFontSize = Math.max(4, nucleoParticleRadius * 0.85);
 
   const particleRadius = { nucleo: nucleoParticleRadius, orbita: 10 };
-  const fontSize = { nucleo: nucleoFontSize, orbita: 8.5 };
 
   function posicionEnOrbita(i: number, total: number, radio: number) {
     const angulo = (i / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
     return { x: cx + Math.cos(angulo) * radio, y: cy + Math.sin(angulo) * radio };
   }
 
-  /** Dibuja el contenido de un círculo de partícula según el modo activo:
-   *  "inicial" = círculo sólido con la letra corta (M, C, P...); "ats" =
-   *  3 tercios A/T/S en miniatura, igual que ParticulaVisual en Física. */
-  function contenidoParticula(particula: ParticleType, r: number, font: number) {
-    if (modo === "inicial") {
-      const color = colorDeParticula(particula);
-      return (
-        <>
-          <circle r={r} strokeWidth={1.5} style={{ fill: color.bg, stroke: color.border }} />
-          <text textAnchor="middle" dominantBaseline="central" fontSize={font} fontWeight={900} style={{ fill: color.fg }}>
-            {PARTICLE_INITIAL[particula]}
-          </text>
-        </>
-      );
-    }
+  /** Dibuja el círculo de una partícula reusando ParticulaVisual (mismo
+   *  componente que Física/Iums) vía foreignObject, para que se vea
+   *  idéntica en todos lados — mismo trazo, misma paleta sepia, misma
+   *  tipografía — sin duplicar la lógica de sectores/colores acá. */
+  function contenidoParticula(particula: ParticleType, r: number) {
     const formula = formulaPorNombre[particula] ?? "";
-    const letras = formula.split("").filter((c): c is "A" | "T" | "S" => c === "A" || c === "T" || c === "S");
-    const anguloTercio = (Math.PI * 2) / 3;
-    const miniFont = r * 0.85;
-    const labelR = r * 0.55;
     return (
-      <>
-        {letras.map((letra, j) => {
-          const aIni = -Math.PI / 2 + j * anguloTercio;
-          const aFin = aIni + anguloTercio;
-          const aMedio = (aIni + aFin) / 2;
-          const color = LETRA_ATS_COLOR[letra];
-          return (
-            <g key={j}>
-              <path d={sectorPathAtomo(0, 0, r, aIni, aFin)} strokeWidth={1.5} style={{ fill: color.bg, stroke: color.border }} />
-              <text
-                x={labelR * Math.cos(aMedio)}
-                y={labelR * Math.sin(aMedio)}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={miniFont}
-                fontWeight={900}
-                style={{ fill: color.fg }}
-              >
-                {letra}
-              </text>
-            </g>
-          );
-        })}
-        <circle r={r} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} opacity={0.001} />
-      </>
+      <foreignObject x={-r} y={-r} width={r * 2} height={r * 2}>
+        <ParticulaVisual formula={formula} size={r * 2} />
+      </foreignObject>
     );
   }
 
@@ -665,7 +589,7 @@ export function AtomoVisual({
               return (
                 <g key={`${particula}-${i}`} transform={`translate(${pos.x}, ${pos.y})`}>
                   <title>{particula}</title>
-                  {contenidoParticula(particula, particleRadius.nucleo, fontSize.nucleo)}
+                  {contenidoParticula(particula, particleRadius.nucleo)}
                 </g>
               );
             })
@@ -684,7 +608,7 @@ export function AtomoVisual({
             return (
               <g key={`${layer}-${particula}-${i}`} transform={`translate(${pos.x}, ${pos.y})`}>
                 <title>{particula}</title>
-                {contenidoParticula(particula, particleRadius.orbita, fontSize.orbita)}
+                {contenidoParticula(particula, particleRadius.orbita)}
               </g>
             );
           }),

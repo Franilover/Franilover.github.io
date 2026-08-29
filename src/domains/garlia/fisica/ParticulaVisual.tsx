@@ -26,14 +26,13 @@ import { PARTICULA_INITIAL } from "./types";
 export type LetraATS = "A" | "T" | "S";
 
 export const LETRA_COLOR: Record<LetraATS, { bg: string; border: string; fg: string }> = {
-  // Solo se tocó `fg` (color de letra): antes verde/rojo/azul oscuros
-  // (pensados para fondo claro), que se leían mal sobre el tema "sepia"
-  // oscuro (café antiguo) que usan los admins. `bg`/`border` quedan
-  // igual que antes — no se rediseña el fondo, solo el contraste de la
-  // letra sobre él.
-  A: { bg: "color-mix(in srgb, #22c55e 18%, transparent)", border: "#22c55e", fg: "#d9f2df" },
-  T: { bg: "color-mix(in srgb, #ef4444 18%, transparent)", border: "#ef4444", fg: "#f9d9d9" },
-  S: { bg: "color-mix(in srgb, #3b82f6 18%, transparent)", border: "#3b82f6", fg: "#d9e6fb" },
+  // Paleta sepia/café con distintos valores (claro/medio/oscuro) en vez de
+  // verde/rojo/azul — mismo tono de familia, cada letra se distingue por
+  // luminosidad y no por matiz. fg claro para leerse sobre el tema sepia
+  // oscuro de los admins.
+  A: { bg: "color-mix(in srgb, #c9a06a 20%, transparent)", border: "#c9a06a", fg: "#f3e6d3" },
+  T: { bg: "color-mix(in srgb, #8a5a34 22%, transparent)", border: "#8a5a34", fg: "#f0dfc9" },
+  S: { bg: "color-mix(in srgb, #4e3320 24%, transparent)", border: "#4e3320", fg: "#e8d5bd" },
 };
 
 export const LETRA_NOMBRE: Record<LetraATS, string> = {
@@ -89,7 +88,7 @@ export function ParticulaVisual({
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 2;
-  const fontSize = size * 0.22;
+  const fontSize = size * 0.16;
 
   return (
     <svg
@@ -181,7 +180,7 @@ export function LetrasVisual({
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 2;
-  const fontSize = size * 0.13;
+  const fontSize = size * 0.1;
 
   if (total === 0) {
     return (
@@ -344,12 +343,12 @@ export function IumVisual({
               const py = cy + Math.sin(angulo) * orbitR;
 
               if (modo === "inicial") {
-                // Modo iniciales: círculo sólido de un color por Partícula
-                // (derivado de --primary/--accent) con su letra corta.
+                // Modo iniciales: mismo criterio sepia que el resto — valores
+                // (claro/medio/oscuro) en vez de matices distintos por tipo.
                 const idx = Object.keys(PARTICULA_INITIAL).indexOf(p.nombre);
-                const base = idx % 2 === 0 ? "--primary" : "--accent";
-                const mix = 55 + ((idx * 11) % 30);
-                const initFont = particleR * 0.85;
+                const tonos = ["#c9a06a", "#8a5a34", "#4e3320"];
+                const tono = tonos[idx % tonos.length];
+                const initFont = particleR * 0.6;
                 return (
                   <g key={`${p.nombre}-${i}`}>
                     <title>{p.nombre}</title>
@@ -359,8 +358,8 @@ export function IumVisual({
                       r={particleR}
                       strokeWidth={1.5}
                       style={{
-                        fill: `color-mix(in srgb, var(${base}) ${mix}%, var(--bg-main))`,
-                        stroke: `color-mix(in srgb, var(${base}) 90%, black)`,
+                        fill: `color-mix(in srgb, ${tono} 55%, var(--bg-main))`,
+                        stroke: `color-mix(in srgb, ${tono} 90%, black)`,
                       }}
                     />
                     <text
@@ -370,7 +369,7 @@ export function IumVisual({
                       dominantBaseline="central"
                       fontSize={initFont}
                       fontWeight={900}
-                      style={{ fill: "var(--btn-text)" }}
+                      style={{ fill: "#f3e6d3" }}
                     >
                       {PARTICULA_INITIAL[p.nombre] ?? p.nombre[0]}
                     </text>
