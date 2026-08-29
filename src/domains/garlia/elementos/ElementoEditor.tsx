@@ -457,10 +457,15 @@ const PARTICLE_HUE_MIX = PARTICLE_TYPES.reduce<Record<string, number>>((acc, p, 
   return acc;
 }, {});
 
+// Mismos colores que fisica/ParticulaVisual.tsx (LETRA_COLOR) — fg claro
+// pensado para leerse sobre el tema sepia oscuro de los admins, en vez de
+// los tonos oscuros que tenía antes (pensados para fondo claro y que se
+// leían mal). Bordes sólidos del mismo color de la letra (no un aro
+// genérico), que es lo que da el look nítido de Iums/Partículas.
 const LETRA_ATS_COLOR: Record<"A" | "T" | "S", { bg: string; border: string; fg: string }> = {
-  A: { bg: "color-mix(in srgb, #22c55e 18%, transparent)", border: "#22c55e", fg: "#15803d" },
-  T: { bg: "color-mix(in srgb, #ef4444 18%, transparent)", border: "#ef4444", fg: "#b91c1c" },
-  S: { bg: "color-mix(in srgb, #3b82f6 18%, transparent)", border: "#3b82f6", fg: "#1d4ed8" },
+  A: { bg: "color-mix(in srgb, #22c55e 18%, transparent)", border: "#22c55e", fg: "#d9f2df" },
+  T: { bg: "color-mix(in srgb, #ef4444 18%, transparent)", border: "#ef4444", fg: "#f9d9d9" },
+  S: { bg: "color-mix(in srgb, #3b82f6 18%, transparent)", border: "#3b82f6", fg: "#d9e6fb" },
 };
 
 function sectorPathAtomo(cx: number, cy: number, r: number, anguloIni: number, anguloFin: number): string {
@@ -526,7 +531,10 @@ export function AtomoVisual({
    *  quedar chica por depender de una altura fija. */
   className?: string;
 }) {
-  const [modo, setModo] = useState<"inicial" | "ats">("inicial");
+  // Antes era alternable (botón "Aa"/"∆" flotante) entre "inicial" (letra)
+  // y "ats" (gráfico de tercios A/T/S). A pedido, se saca el toggle y se
+  // deja siempre en modo gráfico.
+  const modo: "inicial" | "ats" = "ats";
   const nucleares = useMemo(() => particulasDeCapa(elemento.nucleo), [elemento.nucleo]);
   const capaMedia = useMemo(() => particulasDeCapa(elemento.media), [elemento.media]);
   const capaExterna = useMemo(() => particulasDeCapa(elemento.externa), [elemento.externa]);
@@ -546,8 +554,6 @@ export function AtomoVisual({
     return out;
   }, [particulasDb]);
 
-  const hayParticulas = nucleares.length + capaMedia.length + capaExterna.length > 0;
-
   const size = 200;
   const cx = size / 2;
   const cy = size / 2;
@@ -558,12 +564,12 @@ export function AtomoVisual({
   // solaparse. Escala en base a la cantidad, con piso y techo para que
   // ni quede gigante con 1 partícula ni ilegible con muchas.
   const nucleoCount = Math.max(nucleares.length, 1);
-  const nucleoParticleRadius = Math.max(4, Math.min(10, 15 - nucleoCount * 0.7));
+  const nucleoParticleRadius = Math.max(5, Math.min(11, 16 - nucleoCount * 0.7));
   const nucleoOrbitRadius = nucleoCount === 1 ? 0 : Math.max(12, Math.min(26, 10 + nucleoCount * 1.6));
-  const nucleoFontSize = Math.max(3.5, nucleoParticleRadius * 0.75);
+  const nucleoFontSize = Math.max(4, nucleoParticleRadius * 0.85);
 
-  const particleRadius = { nucleo: nucleoParticleRadius, orbita: 9 };
-  const fontSize = { nucleo: nucleoFontSize, orbita: 7 };
+  const particleRadius = { nucleo: nucleoParticleRadius, orbita: 10 };
+  const fontSize = { nucleo: nucleoFontSize, orbita: 8.5 };
 
   function posicionEnOrbita(i: number, total: number, radio: number) {
     const angulo = (i / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
@@ -588,7 +594,7 @@ export function AtomoVisual({
     const formula = formulaPorNombre[particula] ?? "";
     const letras = formula.split("").filter((c): c is "A" | "T" | "S" => c === "A" || c === "T" || c === "S");
     const anguloTercio = (Math.PI * 2) / 3;
-    const miniFont = r * 0.62;
+    const miniFont = r * 0.85;
     const labelR = r * 0.55;
     return (
       <>
@@ -599,7 +605,7 @@ export function AtomoVisual({
           const color = LETRA_ATS_COLOR[letra];
           return (
             <g key={j}>
-              <path d={sectorPathAtomo(0, 0, r, aIni, aFin)} strokeWidth={1} style={{ fill: color.bg, stroke: color.border }} />
+              <path d={sectorPathAtomo(0, 0, r, aIni, aFin)} strokeWidth={1.5} style={{ fill: color.bg, stroke: color.border }} />
               <text
                 x={labelR * Math.cos(aMedio)}
                 y={labelR * Math.sin(aMedio)}
@@ -614,7 +620,7 @@ export function AtomoVisual({
             </g>
           );
         })}
-        <circle r={r} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} />
+        <circle r={r} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} opacity={0.001} />
       </>
     );
   }
@@ -626,26 +632,6 @@ export function AtomoVisual({
       }`}
       title="Representación del átomo: núcleo + capas orbitales con las partículas propias del mundo"
     >
-      {hayParticulas && (
-        <button
-          type="button"
-          onClick={() => setModo((m) => (m === "inicial" ? "ats" : "inicial"))}
-          title={modo === "inicial" ? "Mostrar letras A/T/S" : "Mostrar iniciales de las Partículas"}
-          className="absolute bottom-1 right-1 z-10 flex items-center justify-center rounded-full border shadow-sm cursor-pointer transition-transform hover:scale-110"
-          style={{
-            width: 22,
-            height: 22,
-            fontSize: 10,
-            fontWeight: 900,
-            background: "var(--primary)",
-            color: "var(--btn-text)",
-            borderColor: "color-mix(in srgb, var(--primary) 90%, black)",
-          }}
-        >
-          {modo === "inicial" ? "∆" : "Aa"}
-        </button>
-      )}
-
       <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full max-w-full max-h-full">
         {/* Órbitas: solo el trazo, sin relleno */}
         {(["media", "externa"] as const).map((layer) => (
