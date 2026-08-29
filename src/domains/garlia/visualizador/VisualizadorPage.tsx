@@ -383,7 +383,8 @@ function RutaFisicaCanvas({
         id: `particula-ium-${i}`,
         label: p.nombre,
         sublabel: p.formula,
-        visual: <ParticulaVisual formula={p.formula} size={40} />,
+        hideBorder: true,
+        visual: <ParticulaVisual formula={p.formula} size={52} />,
       }));
       const iumNodeZoom = {
         id: `ium-${iumSel.id}`,
@@ -410,7 +411,7 @@ function RutaFisicaCanvas({
     // iums_composicion, igual que hace particulasDeOris internamente, pero
     // sin perder el iumId en el camino — mismo dato, sin agregar cálculo
     // nuevo de dominio.
-    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string }[] = [];
+    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string; iumRep: number; hideBorder: boolean }[] = [];
     for (const [iumId, cantidadIum] of Object.entries(orisSel.iums_composicion)) {
       const ium = iumPorId[iumId];
       if (!ium || !cantidadIum) continue;
@@ -421,8 +422,15 @@ function RutaFisicaCanvas({
             id: `particula-${iumId}-${particulaNodes.length}`,
             label: p.nombre,
             sublabel: p.formula,
-            visual: <ParticulaVisual formula={p.formula} size={40} />,
+            hideBorder: true,
+            visual: <ParticulaVisual formula={p.formula} size={52} />,
             iumId,
+            // Instancia real del IUM a la que pertenece esta partícula —
+            // antes se perdía este dato y todos los edges terminaban
+            // apuntando a la instancia "-0" del IUM aunque hubiera 2+
+            // instancias iguales (ej. 2× Fluxor). Con esto cada partícula
+            // se conecta a SU propia instancia real.
+            iumRep: rep,
           });
         }
       }
@@ -497,22 +505,22 @@ function RutaFisicaCanvas({
       ?.nodes.forEach((n) => {
         out.push({ fromNodeId: n.id, toNodeId: `oris-${orisSel.id}`, weight: 0.6 });
       });
-    // Cada partícula se conecta a SU propio IUM real — antes todas se
-    // conectaban al primer IUM disponible (particulasDeOris no traía el
-    // mapeo), dejando sin líneas a cualquier otro IUM del Oris. El id de
-    // cada nodo de partícula ahora es `particula-{iumId}-{n}`, así que el
-    // IUM de origen se lee directamente del id sin recalcular nada. Como
-    // ahora un mismo iumId puede tener varias instancias (`ium-{iumId}-0`,
-    // `ium-{iumId}-1`, ...) y no hay dato de a cuál instancia pertenece
-    // cada partícula individual, se conecta a la PRIMERA instancia de ese
-    // IUM (agrupación visual razonable, sin inventar un mapeo 1:1 que no
-    // existe en los datos).
+    // Cada partícula se conecta a SU propio IUM real, y a su instancia
+    // real cuando el IUM está repetido — antes todas las partículas de un
+    // mismo iumId se conectaban a la instancia "ium-{iumId}-0" sin importar
+    // cuántas instancias hubiera (ej. con 2× Fluxor, las partículas de
+    // AMBAS instancias terminaban con líneas hacia la primera nomás). El
+    // id de cada nodo de partícula sigue siendo `particula-{iumId}-{n}`
+    // (se conserva por compatibilidad con el resto del código que lo
+    // parsea), pero ahora se lee `iumRep` directo del nodo — dato real
+    // calculado al armar particulaNodes, no inferido del id.
     columns
       .find((c) => c.id === "particulas")
       ?.nodes.forEach((n) => {
-        const sinPrefijo = n.id.slice("particula-".length);
-        const iumId = sinPrefijo.slice(0, sinPrefijo.lastIndexOf("-"));
-        if (iumId) out.push({ fromNodeId: n.id, toNodeId: `ium-${iumId}-0`, weight: 0.25 });
+        const conRep = n as typeof n & { iumId?: string; iumRep?: number };
+        if (conRep.iumId !== undefined && conRep.iumRep !== undefined) {
+          out.push({ fromNodeId: n.id, toNodeId: `ium-${conRep.iumId}-${conRep.iumRep}`, weight: 0.25 });
+        }
       });
     return out;
   }, [enZoomIum, iumSel, particulasDelIumSel, orisSel, columns]);

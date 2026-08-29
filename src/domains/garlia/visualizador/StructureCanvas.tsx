@@ -192,6 +192,14 @@ export function StructureCanvas({
       // más cerca del centro (ej. IUM justo antes del Oris).
       const baseRadius = ringRadii[ringIndex];
       const nodeCount = level.nodes.length;
+      // Offset angular por anillo: todos los anillos arrancaban en el
+      // mismo ángulo base (-π/2), así que un nodo del anillo N quedaba
+      // exactamente "en línea" (mismo radio angular) que uno del anillo
+      // N-1 — ej. el primer IUM siempre alineado con la primera partícula.
+      // Se desfasa cada anillo medio paso angular respecto al anterior
+      // (mitad del hueco entre nodos de ESTE anillo), así los nodos caen
+      // en los huecos que dejan los del anillo vecino en vez de en línea.
+      const angleOffset = ringIndex % 2 === 0 ? 0 : Math.PI / nodeCount;
       level.nodes.forEach((node, i) => {
         // Distancia real: si hay peso definido para ESTE nodo (edge saliente
         // con weight), nodos con más peso quedan más cerca del centro dentro
@@ -203,7 +211,7 @@ export function StructureCanvas({
         const w = weightByFromId.get(node.id);
         const maxJitter = Math.min(34, Math.max(0, baseRadius - minRadiusForNodes(nodeCount)));
         const radialJitter = w !== undefined ? (1 - Math.max(0, Math.min(1, w))) * maxJitter : 0;
-        const angle = (2 * Math.PI * i) / nodeCount - Math.PI / 2;
+        const angle = (2 * Math.PI * i) / nodeCount - Math.PI / 2 + angleOffset;
         nodesById.set(node.id, {
           ...node,
           ringIndex,
