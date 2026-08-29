@@ -35,7 +35,7 @@ export function PerspectivaSwitcher({
   onChange: (p: Perspectiva) => void;
 }) {
   return (
-    <div className="inline-flex rounded-2xl border border-primary/10 p-1">
+    <div className="inline-flex rounded-2xl border border-primary/10 p-1.5">
       {OPCIONES.map((op) => {
         const active = value === op.key;
         return (
@@ -43,7 +43,7 @@ export function PerspectivaSwitcher({
             key={op.key}
             type="button"
             onClick={() => onChange(op.key)}
-            className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors ${
+            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
               active ? "border border-primary/25" : "border border-transparent hover:border-primary/15"
             }`}
           >
@@ -56,7 +56,7 @@ export function PerspectivaSwitcher({
               >
                 {op.label}
               </span>
-              <span className="block text-[10px] text-primary/40">{op.ruta}</span>
+              <span className="mt-0.5 block text-[11px] text-primary/40">{op.ruta}</span>
             </span>
           </button>
         );

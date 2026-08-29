@@ -34,7 +34,7 @@ export function TraceView({
 }) {
   if (steps.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-primary/12 p-4 text-center text-[11px] text-primary/35">
+      <div className="rounded-xl border border-dashed border-primary/12 p-5 text-center text-xs leading-5 text-primary/35">
         Sin traza disponible.
       </div>
     );
@@ -51,24 +51,24 @@ export function TraceView({
             <Comp
               type={onSelectStep ? "button" : undefined}
               onClick={onSelectStep ? () => onSelectStep(step.id) : undefined}
-              className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+              className={`rounded-xl border px-4 py-3.5 text-left transition-colors ${
                 isActive ? "border-primary/40" : "border-primary/10"
               } ${onSelectStep ? "hover:border-primary/30 cursor-pointer" : ""}`}
             >
               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary/35">
                 {step.levelLabel}
               </p>
-              <p className={`mt-0.5 text-xs font-black ${hasData ? "text-primary/85" : "text-primary/30"}`}>
+              <p className={`mt-1 text-xs font-black ${hasData ? "text-primary/85" : "text-primary/30"}`}>
                 {hasData ? step.title : "Sin dato"}
               </p>
               {step.subtitle ? (
-                <p className="mt-0.5 text-[10px] text-primary/45">{step.subtitle}</p>
+                <p className="mt-1 text-[11px] text-primary/45">{step.subtitle}</p>
               ) : null}
             </Comp>
             {i < steps.length - 1 ? (
-              <div className="flex justify-center py-0.5">
+              <div className="flex justify-center py-1">
                 <ChevronDown
-                  size={14}
+                  size={16}
                   className={direction === "down" ? "text-primary/25" : "text-primary/25 rotate-180"}
                 />
               </div>

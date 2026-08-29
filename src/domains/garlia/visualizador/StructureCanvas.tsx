@@ -55,11 +55,11 @@ export interface StructureCanvasProps {
   className?: string;
 }
 
-const NODE_W = 152;
-const NODE_H = 108;
-const COL_GAP = 120;
-const ROW_GAP = 28;
-const PAD = 40;
+const NODE_W = 164;
+const NODE_H = 120;
+const COL_GAP = 132;
+const ROW_GAP = 36;
+const PAD = 48;
 
 interface LaidOutNode extends CanvasNode {
   colIndex: number;
@@ -136,9 +136,9 @@ export function StructureCanvas({
           <text
             key={col.id}
             x={PAD + i * (NODE_W + COL_GAP) + NODE_W / 2}
-            y={16}
+            y={22}
             textAnchor="middle"
-            fontSize={10}
+            fontSize={11}
             fontWeight={900}
             letterSpacing="0.14em"
             style={{ fill: "color-mix(in srgb, var(--primary) 40%, transparent)", textTransform: "uppercase" }}
@@ -209,7 +209,7 @@ export function StructureCanvas({
                 <rect
                   width={NODE_W}
                   height={NODE_H}
-                  rx={14}
+                  rx={16}
                   strokeWidth={isSelected ? 2 : 1.25}
                   style={{
                     fill: "transparent",
@@ -218,15 +218,15 @@ export function StructureCanvas({
                   }}
                 />
                 {node.visual ? (
-                  <foreignObject x={10} y={10} width={NODE_W - 20} height={NODE_H - 42}>
+                  <foreignObject x={12} y={12} width={NODE_W - 24} height={NODE_H - 48}>
                     <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
                   </foreignObject>
                 ) : null}
                 <text
                   x={NODE_W / 2}
-                  y={NODE_H - (node.sublabel ? 26 : 14)}
+                  y={NODE_H - (node.sublabel ? 30 : 16)}
                   textAnchor="middle"
-                  fontSize={12}
+                  fontSize={13}
                   fontWeight={900}
                   style={{ fill: "color-mix(in srgb, var(--primary) 85%, transparent)" }}
                 >
@@ -236,9 +236,9 @@ export function StructureCanvas({
                 {node.sublabel ? (
                   <text
                     x={NODE_W / 2}
-                    y={NODE_H - 10}
+                    y={NODE_H - 12}
                     textAnchor="middle"
-                    fontSize={10}
+                    fontSize={11}
                     style={{ fill: "color-mix(in srgb, var(--primary) 40%, transparent)" }}
                   >
                     {node.sublabel.length > 22 ? <title>{node.sublabel}</title> : null}

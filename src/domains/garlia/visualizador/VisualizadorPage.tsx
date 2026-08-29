@@ -97,21 +97,24 @@ const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
   { key: "process", label: "Proceso", icon: <Workflow size={15} /> },
 ];
 
-// ─── UI primitives (mismos que V1, sin cambios visuales) ──────────────────
+// ─── UI primitives — pass de densidad: mismo lenguaje visual, más aire.
+// Todos estos se reutilizan decenas de veces en las 13 secciones, así que
+// ajustarlos acá sube la respiración de todo el visualizador de una vez,
+// sin tener que tocar cada sección individualmente.
 
 function SectionTitle({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
   return (
-    <div className="mb-5">
+    <div className="mb-7">
       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/35">{eyebrow}</p>
-      <h1 className="mt-1 text-xl font-black tracking-tight text-primary/90">{title}</h1>
-      <p className="mt-1 max-w-3xl text-xs leading-5 text-primary/50">{description}</p>
+      <h1 className="mt-2 text-2xl font-black tracking-tight text-primary/90">{title}</h1>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-primary/50">{description}</p>
     </div>
   );
 }
 
 function StatusPill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-primary/10 bg-primary/5 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-primary/50">
+    <span className="inline-flex items-center rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/50">
       {children}
     </span>
   );
@@ -133,30 +136,30 @@ function FlowNode({
     <Comp
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`min-w-[112px] rounded-xl border px-3 py-3 text-left transition-colors ${
+      className={`min-w-[128px] rounded-xl border px-4 py-4 text-left transition-colors ${
         tone === "accent" ? "border-primary/30 bg-primary/10" : "border-primary/10 bg-primary/[0.025]"
       } ${onClick ? "hover:border-primary/30 hover:bg-primary/10 cursor-pointer" : ""}`}
     >
-      <p className="text-xs font-black text-primary/80">{title}</p>
-      {subtitle ? <p className="mt-1 text-[10px] leading-4 text-primary/40">{subtitle}</p> : null}
+      <p className="text-sm font-black text-primary/80">{title}</p>
+      {subtitle ? <p className="mt-1.5 text-[11px] leading-4 text-primary/40">{subtitle}</p> : null}
     </Comp>
   );
 }
 
 function Arrow() {
-  return <ChevronRight className="shrink-0 text-primary/25" size={18} />;
+  return <ChevronRight className="shrink-0 text-primary/25" size={20} />;
 }
 
 function MiniBarChart({ values }: { values: { label: string; value: number }[] }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {values.map((item) => (
         <div key={item.label}>
-          <div className="mb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-primary/45">
+          <div className="mb-1.5 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-primary/45">
             <span>{item.label}</span>
             <span>{item.value.toFixed(2)}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-primary/8">
+          <div className="h-2.5 overflow-hidden rounded-full bg-primary/8">
             <div
               className="h-full rounded-full bg-primary/60"
               style={{ width: `${Math.max(0, Math.min(1, item.value)) * 100}%` }}
@@ -175,11 +178,11 @@ function BarraDivergente({ label, value, max }: { label: string; value: number; 
   const pct = max > 0 ? Math.max(-1, Math.min(1, value / max)) : 0;
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-primary/45">
+      <div className="mb-1.5 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-primary/45">
         <span>{label}</span>
         <span className="tabular-nums">{value}</span>
       </div>
-      <div className="relative h-2 overflow-hidden rounded-full bg-primary/8">
+      <div className="relative h-2.5 overflow-hidden rounded-full bg-primary/8">
         <div className="absolute left-1/2 top-0 h-full w-px bg-primary/20" />
         {pct >= 0 ? (
           <div
@@ -215,7 +218,7 @@ function ChipSelector<T>({
   onSelect: (item: T) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {items.map((item) => {
         const selected = active ? getKey(active) === getKey(item) : false;
         return (
@@ -223,7 +226,7 @@ function ChipSelector<T>({
             key={getKey(item)}
             type="button"
             onClick={() => onSelect(item)}
-            className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition-colors ${
+            className={`rounded-full border px-3.5 py-2 text-xs font-black transition-colors ${
               selected
                 ? "border-primary/40 text-primary/90"
                 : "border-primary/10 text-primary/50 hover:border-primary/25 hover:text-primary/75"
@@ -239,7 +242,7 @@ function ChipSelector<T>({
 
 function LoadingRow() {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-primary/10 bg-primary/[0.02] p-4 text-xs font-bold text-primary/35">
+    <div className="flex items-center gap-2.5 rounded-xl border border-primary/10 bg-primary/[0.02] p-5 text-xs font-bold text-primary/35">
       <span className="h-2 w-2 animate-pulse rounded-full bg-primary/40" />
       Cargando datos reales desde Supabase…
     </div>
@@ -248,11 +251,12 @@ function LoadingRow() {
 
 function EmptyRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-primary/15 bg-primary/[0.015] p-4 text-xs text-primary/40">
+    <div className="rounded-xl border border-dashed border-primary/15 bg-primary/[0.015] p-5 text-xs leading-5 text-primary/40">
       {children}
     </div>
   );
 }
+
 
 // ─── Valores derivados reales: tarjeta reusable para Material/Estructura/Compuesto ──
 
@@ -277,11 +281,11 @@ function TarjetaValoresDerivados({
     );
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2">
       {items.map((v) => (
         <div
           key={v.id}
-          className="rounded-xl border border-primary/10 bg-primary/[0.025] p-3"
+          className="rounded-xl border border-primary/10 bg-primary/[0.025] p-4"
           title={v.propiedad.descripcion ?? undefined}
         >
           <div className="flex items-start justify-between gap-2">
@@ -291,7 +295,7 @@ function TarjetaValoresDerivados({
             </span>
           </div>
           {v.propiedad.formula ? (
-            <p className="mt-2 truncate text-[11px] font-bold text-primary/55" title={v.propiedad.formula}>
+            <p className="mt-2.5 truncate text-xs font-bold text-primary/55" title={v.propiedad.formula}>
               {v.propiedad.formula}
             </p>
           ) : null}
@@ -467,7 +471,7 @@ function RutaFisicaCanvas({
               }}
             />
           )}
-          <div className="mt-3 rounded-2xl border border-primary/10 p-3">
+          <div className="mt-5 rounded-2xl border border-primary/10 p-4">
             <StructureCanvas
               columns={columns}
               edges={edges}
@@ -619,7 +623,7 @@ function RutaAlquimiaCanvas({
               ))}
             </div>
           )}
-          <div className="mt-3 rounded-2xl border border-primary/10 p-3">
+          <div className="mt-5 rounded-2xl border border-primary/10 p-4">
             <StructureCanvas
               columns={columns}
               edges={edges}
@@ -826,11 +830,11 @@ function RutasSection() {
 
   return (
     <>
-      <h2 className="mb-3 text-sm font-black text-primary/85">Rutas</h2>
+      <h2 className="mb-4 text-base font-black text-primary/85">Rutas</h2>
 
       <PerspectivaSwitcher value={perspectiva} onChange={setPerspectiva} />
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div>
           {perspectiva === "fisica" ? (
             <RutaFisicaCanvas
@@ -851,10 +855,10 @@ function RutasSection() {
           )}
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <Inspector entity={inspectorEntity} emptyLabel="Seleccioná un Oris o un Elemento para inspeccionarlo." />
-          <div className="rounded-2xl border border-primary/10 p-4">
-            <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-primary/40">Trace</p>
+          <div className="rounded-2xl border border-primary/10 p-6">
+            <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-primary/40">Trace</p>
             <TraceView steps={traceSteps} />
           </div>
         </div>
@@ -955,12 +959,12 @@ function VisualizadorPage() {
 
   return (
     <main className="min-h-screen bg-[var(--bg-main)] text-primary">
-      <div className="mx-auto max-w-[1500px] px-3 py-4 sm:px-4 lg:px-5">
+      <div className="mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-10">
 
-        <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="rounded-2xl border border-primary/10 p-2 lg:sticky lg:top-4 lg:self-start">
-            <p className="px-3 pb-2 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/30">Explorar</p>
-            <nav className="space-y-1">
+        <div className="grid gap-7 lg:grid-cols-[236px_minmax(0,1fr)]">
+          <aside className="rounded-2xl border border-primary/10 p-3 lg:sticky lg:top-6 lg:self-start">
+            <p className="px-3 pb-3 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/30">Explorar</p>
+            <nav className="space-y-1.5">
               {navItems.map((item) => {
                 const selected = item.key === active;
                 return (
@@ -968,7 +972,7 @@ function VisualizadorPage() {
                     key={item.key}
                     type="button"
                     onClick={() => setActive(item.key)}
-                    className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-black transition-colors ${selected ? "border-primary/25 text-primary/90" : "border-transparent text-primary/45 hover:border-primary/10 hover:text-primary/70"}`}
+                    className={`flex w-full items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-xs font-black transition-colors ${selected ? "border-primary/25 text-primary/90" : "border-transparent text-primary/45 hover:border-primary/10 hover:text-primary/70"}`}
                   >
                     {item.icon}
                     <span>{item.label}</span>
@@ -1002,8 +1006,8 @@ function VisualizadorPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-                  <div className="rounded-2xl border border-primary/10 p-4">
+                <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
                         <p className="text-xs font-black text-primary/80">Elige un Oris</p>
@@ -1024,14 +1028,14 @@ function VisualizadorPage() {
                     )}
 
                     {orisSel ? (
-                      <div className="mt-4 rounded-xl border border-primary/10 bg-primary/[0.025] p-3">
+                      <div className="mt-4 rounded-xl border border-primary/10 bg-primary/[0.025] p-4">
                         <p className="text-xs font-black text-primary/80">{orisSel.nombre}</p>
                         <p className="mt-1 text-[11px] text-primary/45">
                           {orisSel.dominio} · {orisSel.familia} · {orisSel.formula}
                         </p>
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                        <div className="mt-3 grid grid-cols-3 gap-3 text-center">
                           {(["A", "T", "S"] as const).map((letra) => (
-                            <div key={letra} className="rounded-lg border border-primary/10 bg-primary/5 p-2">
+                            <div key={letra} className="rounded-lg border border-primary/10 bg-primary/5 p-3">
                               <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{letra}</p>
                               <p className="mt-1 text-lg font-black text-primary/75">{oriSelLetras[letra]}</p>
                             </div>
@@ -1042,7 +1046,7 @@ function VisualizadorPage() {
                             {oriSelParticulas.map((p, i) => (
                               <span
                                 key={`${p.nombre}-${i}`}
-                                className="rounded-full border border-primary/10 bg-primary/5 px-2 py-1 text-[10px] font-bold text-primary/55"
+                                className="rounded-full border border-primary/10 bg-primary/5 px-2.5 py-1.5 text-[11px] font-bold text-primary/55"
                               >
                                 {p.nombre} · {p.formula}
                               </span>
@@ -1053,9 +1057,9 @@ function VisualizadorPage() {
                     ) : null}
                   </div>
 
-                  <div className="rounded-2xl border border-primary/10 p-4">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Procedencia</p>
-                    <div className="mt-4 space-y-2 text-xs">
+                    <div className="mt-5 space-y-2.5 text-xs">
                       {[
                         "Partícula Base (letra A/T/S)",
                         "Partícula (fórmula de 3 letras)",
@@ -1063,7 +1067,7 @@ function VisualizadorPage() {
                         "Oris (composición de IUMs)",
                       ].map((item, index) => (
                         <div key={item} className="flex items-center gap-2">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/8 text-[10px] font-black text-primary/50">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/8 text-[10px] font-black text-primary/50">
                             {index + 1}
                           </span>
                           <span className="font-bold text-primary/55">{item}</span>
@@ -1086,8 +1090,8 @@ function VisualizadorPage() {
                   title="Equilibrio A / T / S"
                   description="Las 11 Partículas reales, su fórmula de 3 letras y sus 6 ejes fundamentales reales (no un índice inventado)."
                 />
-                <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     {loadingParticulas ? (
                       <LoadingRow />
                     ) : (
@@ -1107,11 +1111,11 @@ function VisualizadorPage() {
                           <p className="mt-1 text-xs font-bold text-primary/40">{particulaSel.formula}</p>
                         </div>
                         <div className="my-3 h-8 border-l border-dashed border-primary/20" />
-                        <div className="grid w-full grid-cols-3 gap-2 text-center">
+                        <div className="grid w-full grid-cols-3 gap-3 text-center">
                           {(["A", "T", "S"] as const).map((letra) => {
                             const count = particulaSel.formula.split("").filter((c) => c === letra).length;
                             return (
-                              <div key={letra} className="rounded-xl border border-primary/10 bg-primary/[0.025] p-3">
+                              <div key={letra} className="rounded-xl border border-primary/10 bg-primary/[0.025] p-4">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{letra}</p>
                                 <p className="mt-1 text-lg font-black text-primary/75">{count}</p>
                               </div>
@@ -1126,7 +1130,7 @@ function VisualizadorPage() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Ejes fundamentales</p>
                     <p className="text-[10px] text-primary/35">Valores reales de particulas.ejes_fundamentales</p>
                     {particulaSel?.ejes_fundamentales ? (
@@ -1164,14 +1168,14 @@ function VisualizadorPage() {
                   title="Fórmulas que se pueden ver"
                   description={`Catálogo real de ${propiedadesDerivadas.length} propiedades derivadas — fórmula y dependencias tal cual las define Supabase.`}
                 />
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Densidad</p>
                     <p className="mt-1 text-[10px] text-primary/35">
                       Calculadora interactiva usando la fórmula real: {densidad?.formula ?? "rho=M/V"}
                     </p>
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      <label className="rounded-xl border border-primary/10 p-3">
+                      <label className="rounded-xl border border-primary/10 p-4">
                         <span className="text-[10px] font-black uppercase tracking-widest text-primary/35">Masa</span>
                         <div className="mt-2 flex items-center gap-2">
                           <input
@@ -1184,7 +1188,7 @@ function VisualizadorPage() {
                           <span className="text-xs font-bold text-primary/35">kg</span>
                         </div>
                       </label>
-                      <label className="rounded-xl border border-primary/10 p-3">
+                      <label className="rounded-xl border border-primary/10 p-4">
                         <span className="text-[10px] font-black uppercase tracking-widest text-primary/35">Volumen</span>
                         <div className="mt-2 flex items-center gap-2">
                           <input
@@ -1199,7 +1203,7 @@ function VisualizadorPage() {
                         </div>
                       </label>
                     </div>
-                    <div className="mt-4 rounded-2xl border border-primary/10 bg-primary/5 p-4 text-center">
+                    <div className="mt-6 rounded-2xl border border-primary/10 bg-primary/5 p-5 text-center">
                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/35">Resultado</p>
                       <p className="mt-2 text-3xl font-black tabular-nums text-primary/85">
                         {Number.isFinite(densidadCalculada) ? densidadCalculada.toLocaleString("es-CL") : "—"}
@@ -1212,7 +1216,7 @@ function VisualizadorPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-black text-primary/80">Catálogo real</p>
                       <StatusPill>{propiedadesDerivadas.length} propiedades</StatusPill>
@@ -1269,8 +1273,8 @@ function VisualizadorPage() {
                     onSelect={setMaterialSel}
                   />
                 )}
-                <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">
                       Perfil físico {materialSel ? `· ${materialSel.nombre}` : ""}
                     </p>
@@ -1282,9 +1286,9 @@ function VisualizadorPage() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Metadatos</p>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="mt-4 grid grid-cols-2 gap-2.5">
                       <StatusPill>{materialSel?.tipo_material ?? "—"}</StatusPill>
                       <StatusPill>{materialSel?.estado_calculo ?? "sin calcular"}</StatusPill>
                       {materialSel?.propiedades_calculadas?.fuente_fisica ? (
@@ -1297,7 +1301,7 @@ function VisualizadorPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-primary/10 p-5">
+                <div className="mt-6 rounded-2xl border border-primary/10 p-6">
                   <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
                   <p className="mt-1 text-[10px] text-primary/35">valores_propiedades_derivadas para este material</p>
                   <div className="mt-4">
@@ -1325,8 +1329,8 @@ function VisualizadorPage() {
                     onSelect={setEstructuraSel}
                   />
                 )}
-                <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">
                       Propiedades {estructuraSel ? `· ${estructuraSel.nombre}` : ""}
                     </p>
@@ -1338,7 +1342,7 @@ function VisualizadorPage() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Función</p>
                     <div className="mt-3 space-y-2">
                       <StatusPill>{estructuraSel?.tipo ?? "sin tipo"}</StatusPill>
@@ -1351,7 +1355,7 @@ function VisualizadorPage() {
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-4 rounded-2xl border border-primary/10 p-5">
+                <div className="mt-6 rounded-2xl border border-primary/10 p-6">
                   <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
                   <div className="mt-4">
                     <TarjetaValoresDerivados
@@ -1385,8 +1389,8 @@ function VisualizadorPage() {
                 {compuestos.length > 60 ? (
                   <p className="mt-1.5 text-[10px] text-primary/30">Mostrando los primeros 60 de {compuestos.length} compuestos.</p>
                 ) : null}
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">
                       Perfil reactivo {compuestoSel ? `· ${compuestoSel.nombre}` : ""}
                     </p>
@@ -1402,27 +1406,27 @@ function VisualizadorPage() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Ficha</p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {compuestoSel?.tipo_compuesto ? <StatusPill>{compuestoSel.tipo_compuesto}</StatusPill> : null}
                       {compuestoSel?.clasificacion ? <StatusPill>{compuestoSel.clasificacion}</StatusPill> : null}
                       {compuestoSel?.estado ? <StatusPill>{compuestoSel.estado}</StatusPill> : null}
                     </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="mt-4 grid grid-cols-2 gap-2.5 text-xs">
                       {compuestoPropiedades
                         .filter((p) => p.valor !== null && p.proporcion === undefined)
                         .slice(0, 6)
                         .map((p) => (
-                          <div key={p.clave} className="rounded-lg border border-primary/10 bg-primary/5 p-2">
-                            <p className="font-black uppercase tracking-widest text-primary/35">{p.label}</p>
-                            <p className="mt-0.5 font-black text-primary/75">{p.valor}</p>
+                          <div key={p.clave} className="rounded-lg border border-primary/10 bg-primary/5 p-3">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{p.label}</p>
+                            <p className="mt-1 font-black text-primary/75">{p.valor}</p>
                           </div>
                         ))}
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 rounded-2xl border border-primary/10 p-5">
+                <div className="mt-6 rounded-2xl border border-primary/10 p-6">
                   <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
                   <div className="mt-4">
                     <TarjetaValoresDerivados tipo="compuesto" entidadId={compuestoSel?.id ?? null} entidadNombre={compuestoSel?.nombre} />
@@ -1453,7 +1457,7 @@ function VisualizadorPage() {
                     />
                   </div>
                 )}
-                <div className="mt-4 rounded-2xl border border-primary/10 p-4 text-xs leading-5 text-primary/45">
+                <div className="mt-6 rounded-2xl border border-primary/10 p-5 text-xs leading-5 text-primary/45">
                   Barra normalizada a un techo visual de 5 solo para comparar proporciones — el valor real de{" "}
                   <span className="font-black text-primary/60">energia_enlace</span> no está acotado a [0,1]; usa la
                   ficha del compuesto en la pestaña Química para el número exacto.
@@ -1494,14 +1498,14 @@ function VisualizadorPage() {
                   title="Señal, intensidad y fidelidad"
                   description="Esta capa aún no tiene tabla propia en Supabase (a diferencia del resto de secciones) — se muestra como diagrama conceptual, marcado explícitamente como tal."
                 />
-                <div className="flex flex-wrap items-center gap-2 overflow-x-auto rounded-2xl border border-primary/10 p-5">
+                <div className="flex flex-wrap items-center gap-2 overflow-x-auto rounded-2xl border border-primary/10 p-6">
                   <FlowNode title="Fuente" subtitle="mensaje + intensidad" />
                   <Arrow />
                   <FlowNode title="Propagación" subtitle="distancia" />
                   <Arrow />
                   <FlowNode title="Receptor" subtitle="intensidad · fidelidad" tone="accent" />
                 </div>
-                <div className="mt-4 rounded-2xl border border-primary/10 p-4 text-xs leading-5 text-primary/45">
+                <div className="mt-6 rounded-2xl border border-primary/10 p-5 text-xs leading-5 text-primary/45">
                   Diagrama conceptual — a diferencia de las otras 11 secciones, no hay una tabla "información"/"señal" en
                   Supabase todavía. No se inventan valores numéricos acá.
                 </div>
@@ -1526,8 +1530,8 @@ function VisualizadorPage() {
                     onSelect={setOrisSel}
                   />
                 )}
-                <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
-                  <div className="overflow-x-auto rounded-2xl border border-primary/10 p-5">
+                <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+                  <div className="overflow-x-auto rounded-2xl border border-primary/10 p-6">
                     <div className="flex min-w-[620px] items-center gap-2">
                       <FlowNode title="Partículas" subtitle="A/T/S" />
                       <Arrow />
@@ -1541,7 +1545,7 @@ function VisualizadorPage() {
                       <FlowNode title="Éterium" subtitle={orisSel?.familia} />
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Equilibrio A/T/S</p>
                     <div className="mt-5">
                       <MiniBarChart
@@ -1581,7 +1585,7 @@ function VisualizadorPage() {
                     onSelect={setRunaSel}
                   />
                 )}
-                <div className="mt-4 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+                <div className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
                   <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-primary/10 bg-primary/[0.02] p-5">
                     {runaSel?.patron_trazos && runaSel.patron_trazos.length > 0 ? (
                       <div className="h-44 w-44">
@@ -1591,18 +1595,18 @@ function VisualizadorPage() {
                       <EmptyRow>Esta runa no tiene patrón de trazos guardado todavía.</EmptyRow>
                     )}
                   </div>
-                  <div className="rounded-2xl border border-primary/10 p-5">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-black text-primary/80">{runaSel?.nombre ?? "Runa"}</p>
                       <StatusPill>{runaSel?.patron_trazos?.length ?? 0} trazos</StatusPill>
                     </div>
                     <div className="mt-5 space-y-3 text-xs text-primary/60">
-                      <div className="rounded-xl border border-primary/10 p-3">
+                      <div className="rounded-xl border border-primary/10 p-4">
                         <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Explicación</p>
                         <p className="mt-1 leading-5">{runaSel?.explicacion || "Sin explicación registrada todavía."}</p>
                       </div>
                       {runaSel?.explicacion_por_rango && Object.keys(runaSel.explicacion_por_rango).length > 0 ? (
-                        <div className="rounded-xl border border-primary/10 p-3">
+                        <div className="rounded-xl border border-primary/10 p-4">
                           <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">
                             Feedback progresivo por precisión
                           </p>
@@ -1640,7 +1644,7 @@ function VisualizadorPage() {
                     onSelect={setProcesoSel}
                   />
                 )}
-                <div className="mt-4 overflow-x-auto rounded-2xl border border-primary/10 p-5">
+                <div className="mt-6 overflow-x-auto rounded-2xl border border-primary/10 p-6">
                   <div className="flex min-w-[760px] items-center gap-2">
                     <FlowNode title="Entrada" subtitle={procesoSel?.entrada ?? "—"} />
                     <Arrow />
@@ -1649,12 +1653,12 @@ function VisualizadorPage() {
                     <FlowNode title="Salida" subtitle={procesoSel?.salida ?? "—"} />
                   </div>
                 </div>
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-primary/10 p-4">
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Condiciones</p>
                     <p className="mt-2 text-xs leading-5 text-primary/50">{procesoSel?.condiciones || "Sin condiciones registradas."}</p>
                   </div>
-                  <div className="rounded-2xl border border-primary/10 p-4">
+                  <div className="rounded-2xl border border-primary/10 p-6">
                     <p className="text-xs font-black text-primary/80">Regla clave / conservación</p>
                     <p className="mt-2 text-xs leading-5 text-primary/50">{procesoSel?.regla_clave || "—"}</p>
                     {procesoSel?.conservacion ? (
