@@ -35,6 +35,13 @@ export function useOrisConIums() {
     loading: loadingFilas,
   } = useSupabaseData<OrisIumRow>(ORIS_IUMS_CONFIG.tabla, {
     select: ORIS_IUMS_CONFIG.select,
+    // Sin order explícito, Postgres/PostgREST no garantiza el mismo orden
+    // entre requests — cada refetch podía reordenar los IUMs de un Oris y,
+    // como StructureCanvas posiciona por índice de fila, eso se veía como
+    // parpadeo/reordenamiento visual. oris_iums no tiene columna "orden"
+    // (no es un catálogo con orden narrativo), así que se usa "id" (uuid)
+    // solo para fijar un criterio estable, no para dar significado al orden.
+    order: { campo: "id" },
   });
 
   const composicionPorOris = useMemo(() => {

@@ -230,6 +230,7 @@ export function StructureCanvas({
                   fontWeight={900}
                   style={{ fill: "color-mix(in srgb, var(--primary) 85%, transparent)" }}
                 >
+                  {node.label.length > 18 ? <title>{node.label}</title> : null}
                   {node.label.length > 18 ? `${node.label.slice(0, 17)}…` : node.label}
                 </text>
                 {node.sublabel ? (
@@ -240,6 +241,7 @@ export function StructureCanvas({
                     fontSize={10}
                     style={{ fill: "color-mix(in srgb, var(--primary) 40%, transparent)" }}
                   >
+                    {node.sublabel.length > 22 ? <title>{node.sublabel}</title> : null}
                     {node.sublabel.length > 22 ? `${node.sublabel.slice(0, 21)}…` : node.sublabel}
                   </text>
                 ) : null}

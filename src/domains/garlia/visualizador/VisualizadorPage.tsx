@@ -360,7 +360,9 @@ function RutaFisicaCanvas({
     }
     if (!orisSel) return [];
     // Nivel 1: partículas reales expandidas del Oris (vía sus IUMs).
-    const particulaNodes = particulasDelOrisSel.slice(0, 12).map((p, i) => ({
+    // Antes cortaba en las primeras 12 (slice(0, 12)), lo que ocultaba
+    // partículas reales sin avisar — se muestran todas.
+    const particulaNodes = particulasDelOrisSel.map((p, i) => ({
       id: `particula-${i}`,
       label: p.nombre,
       sublabel: p.formula,
@@ -699,6 +701,24 @@ function RutasSection() {
       };
     }
     if (perspectiva === "fisica") {
+      // IUM en zoom tiene prioridad sobre el Oris de fondo: es la entidad
+      // que el usuario efectivamente clickeó y quiere inspeccionar. Antes
+      // el click en un IUM nunca llegaba acá (ver handleSelectNode en
+      // RutaFisicaCanvas) y el Inspector seguía mostrando el Oris.
+      const ium = fisicaRoute.iumSel;
+      if (ium) {
+        return {
+          eyebrow: "IUM",
+          title: ium.nombre,
+          subtitle: `${fisicaRoute.particulasDelIumSel.length} partícula(s)`,
+          visual: <IumVisual particulas={fisicaRoute.particulasDelIumSel} size={40} />,
+          fields: [
+            { label: "A", value: fisicaRoute.letrasIumSel.A },
+            { label: "T", value: fisicaRoute.letrasIumSel.T },
+            { label: "S", value: fisicaRoute.letrasIumSel.S },
+          ],
+        };
+      }
       const o = fisicaRoute.orisSel;
       if (!o) return null;
       return {
@@ -712,6 +732,24 @@ function RutasSection() {
           { label: "T", value: fisicaRoute.letrasOrisSel.T },
           { label: "S", value: fisicaRoute.letrasOrisSel.S },
           { label: "IUMs distintos", value: Object.keys(o.iums_composicion).length },
+        ],
+      };
+    }
+    // Capa en zoom tiene prioridad sobre el Elemento de fondo, mismo
+    // criterio que IUM sobre Oris en Física: es la entidad que el usuario
+    // efectivamente clickeó. Antes el click en una capa nunca llegaba acá
+    // (ver handleSelectNode en RutaAlquimiaCanvas) y el Inspector seguía
+    // mostrando el Elemento.
+    const capa = alquimiaRoute.capaSel;
+    if (capa) {
+      const capaData = alquimiaRoute.capas.find((c) => c.capa === capa);
+      return {
+        eyebrow: "Capa",
+        title: capaData?.label ?? capa,
+        subtitle: alquimiaRoute.elementoSel?.nombre,
+        fields: [
+          { label: "Partículas", value: alquimiaRoute.particulasDeCapaSel.length },
+          { label: "Composición", value: capaData?.resumen ?? "—" },
         ],
       };
     }
