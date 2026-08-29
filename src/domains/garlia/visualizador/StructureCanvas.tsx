@@ -81,6 +81,11 @@ export interface StructureCanvasProps {
    *  perspectivas. Default 1 (comportamiento actual, sin cambios). Ej. 1.4
    *  agranda un 40% los círculos de esta instancia del canvas nomás. */
   nodeScale?: number;
+  /** Multiplicador ADICIONAL solo para el nodo central (se compone con
+   *  nodeScale). Default 1. Permite que el centro (ej. Oris) se vea aún
+   *  más grande que los nodos orbitantes (ej. IUM) sin agrandar estos
+   *  últimos también. */
+  centerScaleExtra?: number;
 }
 
 const CENTER_R = 48; // radio del nodo central (el "centro de gravedad"). Subido
@@ -123,6 +128,7 @@ export function StructureCanvas({
   highlightedNodeIds = [],
   className,
   nodeScale = 1,
+  centerScaleExtra = 1,
 }: StructureCanvasProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
 
@@ -130,7 +136,9 @@ export function StructureCanvas({
   // base compartida por todas las perspectivas; nodeScale permite que
   // Rutas (u otra vista puntual) pida círculos más grandes sin afectar
   // Alquimia/Elementos/otras vistas que no pasan la prop (quedan en 1).
-  const centerR = CENTER_R * nodeScale;
+  // centerScaleExtra se compone solo sobre el centro (ej. Oris), para que
+  // pueda verse aún más grande que los orbitantes (ej. IUM) sin tocarlos.
+  const centerR = CENTER_R * nodeScale * centerScaleExtra;
   const orbitNodeR = (ORBIT_R / 2.9) * nodeScale;
 
   // ─── Identidad del "centro" actual: el diseño pide que la animación de
@@ -181,15 +189,13 @@ export function StructureCanvas({
     // quepan en su propia circunferencia sin superponerse: arco disponible
     // por nodo = 2π·radius / n ≥ nodeDiameter + gap.
     const nodeDiameter = orbitNodeR * 2;
-    // Gap subido de 18 → 42 → proporcional al radio del nodo: con pocos
-    // nodos por anillo (típico en el Oris, que suele tener 2-4 IUMs) el
-    // radio mínimo resultante era casi el mismo que el diámetro del nodo,
-    // así que los IUM terminaban muy pegados entre sí — se leían como un
-    // grupo borroso en vez de nodos individuales y distinguibles. Un gap
-    // fijo en px no escalaba cuando nodeScale agrandó los nodos (ej. en
-    // Rutas), así que ahora es proporcional al radio real del nodo en
-    // este canvas — la separación crece junto con el tamaño del círculo.
-    const nodeGap = Math.max(42, orbitNodeR * 1.1);
+    // Gap subido de 18 → 42 → orbitNodeR·1.1 → orbitNodeR·1.8: seguían
+    // superponiéndose los IUM dentro del Oris con nodos más grandes
+    // (Rutas). Un gap fijo en px no escalaba cuando nodeScale agrandó los
+    // nodos, así que ahora es proporcional al radio real del nodo en este
+    // canvas — la separación crece junto con el tamaño del círculo, con
+    // margen de sobra para que dos círculos vecinos no lleguen a tocarse.
+    const nodeGap = Math.max(42, orbitNodeR * 1.8);
     const minRadiusForNodes = (n: number) => (n * (nodeDiameter + nodeGap)) / (2 * Math.PI);
 
     // Radios por anillo: se construyen de ADENTRO hacia AFUERA (el anillo

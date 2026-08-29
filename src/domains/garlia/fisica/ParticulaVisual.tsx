@@ -395,9 +395,6 @@ export function IumVisual({
                 </g>
               );
             })}
-
-            {/* Centro: punto de anclaje visual, igual que el núcleo de AtomoVisual. */}
-            <circle cx={cx} cy={cy} r={size * 0.05} style={{ fill: "color-mix(in srgb, var(--primary) 25%, transparent)" }} />
           </>
 
         )}
