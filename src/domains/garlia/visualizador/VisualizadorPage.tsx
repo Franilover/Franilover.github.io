@@ -64,7 +64,7 @@ import { TraceView, type TraceStep } from "./TraceView";
 import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
-import { CapaNodo, CentroGravedadNodo, ElementoNodo, contarLetrasNodo } from "./NodeVisuals";
+import { CentroGravedadNodo, ElementoNodo, contarLetrasNodo } from "./NodeVisuals";
 import { TriangleATS, type EntidadATS } from "./TriangleATS";
 // Componente "de afuera" del visualizador (fisica/), el diseño original de
 // Partícula con letras dentro de tercios de color — pedido explícito de
@@ -383,14 +383,20 @@ function RutaFisicaCanvas({
         id: `particula-ium-${i}`,
         label: p.nombre,
         sublabel: p.formula,
-        visual: <ParticulaVisual formula={p.formula} size={40} />,
+        hideBorder: true,
+        visual: <ParticulaVisual formula={p.formula} size={78} />,
       }));
       const iumNodeZoom = {
         id: `ium-${iumSel.id}`,
         label: iumSel.nombre,
         sublabel: "Ium seleccionado",
         tone: "accent" as const,
-        visual: <IumVisual particulas={particulasDelIumSel} size={52} />,
+        // Sin borde de nodo (pedido explícito para Rutas) + sin el botón
+        // de alternar modo. Al no recortarse contra el trazo del círculo
+        // ni el margen del foreignObject, el size interno sube de 52→64
+        // para aprovechar el espacio ganado.
+        hideBorder: true,
+        visual: <IumVisual particulas={particulasDelIumSel} size={120} showToggle={false} />,
       };
       return [
         { id: "particulas", label: "Partículas del Ium", nodes: particulaNodesZoom },
@@ -405,39 +411,60 @@ function RutaFisicaCanvas({
     // iums_composicion, igual que hace particulasDeOris internamente, pero
     // sin perder el iumId en el camino — mismo dato, sin agregar cálculo
     // nuevo de dominio.
-    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string }[] = [];
+    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string; iumRep: number; particulaIdxEnIum: number; totalParticulasEnIum: number; hideBorder: boolean }[] = [];
     for (const [iumId, cantidadIum] of Object.entries(orisSel.iums_composicion)) {
       const ium = iumPorId[iumId];
       if (!ium || !cantidadIum) continue;
       const particulasDelIum = particulasDeIum(ium);
       for (let rep = 0; rep < cantidadIum; rep++) {
-        for (const p of particulasDelIum) {
+        particulasDelIum.forEach((p, particulaIdxEnIum) => {
           particulaNodes.push({
             id: `particula-${iumId}-${particulaNodes.length}`,
             label: p.nombre,
             sublabel: p.formula,
-            visual: <ParticulaVisual formula={p.formula} size={40} />,
+            hideBorder: true,
+            visual: <ParticulaVisual formula={p.formula} size={78} />,
             iumId,
+            // Instancia real del IUM a la que pertenece esta partícula —
+            // antes se perdía este dato y todos los edges terminaban
+            // apuntando a la instancia "-0" del IUM aunque hubiera 2+
+            // instancias iguales (ej. 2× Fluxor). Con esto cada partícula
+            // se conecta a SU propia instancia real.
+            iumRep: rep,
+            // Posición de esta partícula DENTRO del anillo interno de su
+            // propio IumVisual (mismo orden que particulasDeIum, que es
+            // el mismo array que IumVisual recibe y recorre) — se usa
+            // para que el edge apunte a la partícula exacta dentro del
+            // círculo del IUM, no al centro del IUM.
+            particulaIdxEnIum,
+            totalParticulasEnIum: particulasDelIum.length,
           });
-        }
+        });
       }
     }
     // Nivel 2: los IUMs reales que componen el Oris (desde iums_composicion).
+    // Antes: un solo nodo por IUM con sublabel "N×" agrupando la cantidad.
+    // Ahora, mismo criterio que el nivel de Partículas: se expande una
+    // instancia por unidad (ej. 3× Fluxor → 3 nodos "Fluxor" separados),
+    // así se ven todas las unidades alrededor igual que las partículas.
     // Cada IUM se pinta con IumVisual (componente "de afuera" de fisica/,
     // pedido explícito de reusarlo acá en vez de CentroGravedadNodo).
     // particulasDeIum sigue siendo cálculo de datos, no visual, así que se
     // reusa tal cual: ya expande la composición real.
-    const iumNodes = Object.entries(orisSel.iums_composicion)
-      .filter(([, cantidad]) => cantidad > 0)
-      .map(([iumId]) => {
-        const ium = iumPorId[iumId];
-        return {
-          id: `ium-${iumId}`,
-          label: ium?.nombre ?? "IUM",
-          sublabel: `${orisSel.iums_composicion[iumId]}×`,
-          visual: ium ? <IumVisual particulas={particulasDeIum(ium)} size={44} /> : undefined,
-        };
-      });
+    const iumNodes: { id: string; label: string; sublabel?: string; hideBorder: boolean; visual: React.ReactNode }[] = [];
+    for (const [iumId, cantidad] of Object.entries(orisSel.iums_composicion)) {
+      const ium = iumPorId[iumId];
+      if (!ium || !cantidad) continue;
+      const particulasDelIumActual = particulasDeIum(ium);
+      for (let rep = 0; rep < cantidad; rep++) {
+        iumNodes.push({
+          id: `ium-${iumId}-${rep}`,
+          label: ium.nombre,
+          hideBorder: true,
+          visual: <IumVisual particulas={particulasDelIumActual} size={108} showToggle={false} />,
+        });
+      }
+    }
     // Nivel 3: el Oris seleccionado — mismo tratamiento que un IUM (un
     // Oris es, en el modelo, una bolsa de IUMs que a su vez son bolsas de
     // partículas), con sus partículas ya expandidas. Mismo componente
@@ -448,11 +475,14 @@ function RutaFisicaCanvas({
       label: orisSel.nombre,
       sublabel: orisSel.dominio,
       tone: "accent" as const,
-      // Subido de 68 → 84: pedido explícito de que la esfera del Oris se
-      // vea más grande. Aprovecha el nuevo CENTER_R=48 del canvas
-      // (diámetro útil ~88px tras el padding interno del foreignObject)
-      // sin recortarse, y queda claramente por encima del IUM (44).
-      visual: <IumVisual particulas={particulasDelOrisSel} size={84} />,
+      // Subido de 68 → 84 → 96 → 144 → 180: pedido explícito de que la
+      // esfera del Oris se vea AÚN más grande que el IUM. El radio real
+      // del nodo central (centerR) también sube proporcionalmente vía
+      // centerScale más abajo, para que el círculo real crezca junto con
+      // el size interno (si no, el size interno crece pero se sigue
+      // viendo del mismo tamaño en pantalla, recortado al radio del nodo).
+      hideBorder: true,
+      visual: <IumVisual particulas={particulasDelOrisSel} size={180} showToggle={false} />,
     };
     return [
       { id: "particulas", label: "Partículas (A/T/S)", nodes: particulaNodes },
@@ -461,44 +491,20 @@ function RutaFisicaCanvas({
     ];
   }, [enZoomIum, iumSel, particulasDelIumSel, orisSel, iumPorId, particulasDelOrisSel]);
 
-  const edges: CanvasEdge[] = useMemo(() => {
-    if (enZoomIum && iumSel) {
-      // Cada partícula del Ium se conecta al Ium — trazabilidad real 1:1,
-      // a diferencia de la vista de conjunto (donde particulasDeOris no
-      // trae mapeo partícula→IUM individual).
-      return particulasDelIumSel.map((_, i) => ({
-        fromNodeId: `particula-ium-${i}`,
-        toNodeId: `ium-${iumSel.id}`,
-        weight: 0.5,
-      }));
-    }
-    if (!orisSel) return [];
-    const out: CanvasEdge[] = [];
-    const iumIds = Object.keys(orisSel.iums_composicion).filter((id) => orisSel.iums_composicion[id] > 0);
-    // Cada IUM se conecta al nodo Oris.
-    for (const iumId of iumIds) {
-      out.push({ fromNodeId: `ium-${iumId}`, toNodeId: `oris-${orisSel.id}`, weight: 0.6 });
-    }
-    // Cada partícula se conecta a SU propio IUM real — antes todas se
-    // conectaban al primer IUM disponible (particulasDeOris no traía el
-    // mapeo), dejando sin líneas a cualquier otro IUM del Oris. El id de
-    // cada nodo de partícula ahora es `particula-{iumId}-{n}`, así que el
-    // IUM de origen se lee directamente del id sin recalcular nada.
-    columns
-      .find((c) => c.id === "particulas")
-      ?.nodes.forEach((n) => {
-        const sinPrefijo = n.id.slice("particula-".length);
-        const iumId = sinPrefijo.slice(0, sinPrefijo.lastIndexOf("-"));
-        if (iumId) out.push({ fromNodeId: n.id, toNodeId: `ium-${iumId}`, weight: 0.25 });
-      });
-    return out;
-  }, [enZoomIum, iumSel, particulasDelIumSel, orisSel, columns]);
+  // Sin líneas en esta vista (a pedido): ni partícula→IUM ni IUM→Oris. El
+  // anillo orbital y la jerarquía visual (Partículas → IUM → Oris) ya
+  // comunican la pertenencia sin necesidad de trazos.
+  const edges: CanvasEdge[] = useMemo(() => [], []);
 
   // Click en un nodo: si es un IUM de la vista de conjunto, hace zoom.
-  // Si no, delega al manejo normal (partícula/Oris) del padre.
+  // El id real es `ium-{iumId}-{rep}` (una instancia expandida) — el
+  // zoom es por IUM (no por instancia), así que se descarta el sufijo
+  // "-{rep}" y se queda solo con el iumId real.
   function handleSelectNode(nodeId: string) {
     if (!enZoomIum && nodeId.startsWith("ium-")) {
-      setIumSelId(nodeId.slice("ium-".length));
+      const sinPrefijo = nodeId.slice("ium-".length);
+      const iumId = sinPrefijo.slice(0, sinPrefijo.lastIndexOf("-"));
+      setIumSelId(iumId || sinPrefijo);
       return;
     }
     onSelectNode(nodeId);
@@ -542,6 +548,15 @@ function RutaFisicaCanvas({
               onHoverNode={setHoverId}
               onSelectNode={handleSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
+              // Pedido explícito: en Rutas los círculos de Partícula/IUM/Oris
+              // se ven más grandes que en el resto de perspectivas — 1.5×
+              // solo para esta instancia del canvas (Alquimia y otras vistas
+              // no pasan nodeScale, quedan en el tamaño base = 1).
+              nodeScale={1.5}
+              // El Oris (centro) además se ve AÚN más grande que los IUM
+              // orbitantes — 1.4× extra compuesto sobre el nodeScale de
+              // arriba, solo aplica al nodo central.
+              centerScaleExtra={1.4}
             />
           </div>
         </>
@@ -597,12 +612,6 @@ function RutaAlquimiaCanvas({
       label: c.label,
       sublabel: c.total > 0 ? c.resumen : "vacía",
       tone: "default" as const,
-      // Antes sin visual (solo texto): ahora cada capa aprovecha el mismo
-      // círculo de identidad de ParticulaNodo — núcleo con la letra
-      // dominante + anillo partido según la composición A/T/S real de
-      // TODAS las Partículas de química de esa capa, no el pastel
-      // genérico de 3 gajos que ya usa ElementoNodo para el Elemento.
-      visual: <CapaNodo particulas={c.particulasExpandidas} size={40} />,
     }));
     const elementoNode = {
       id: `elemento-${elementoSel.id}`,
@@ -658,7 +667,7 @@ function RutaAlquimiaCanvas({
       {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Elementos cargados en Supabase todavía.</EmptyRow> : null}
       {!route.loading && elementos.length > 0 ? (
         <>
-          <SelectDropdown
+          <ChipSelector
             items={elementos}
             active={elementoSel}
             getKey={(e) => e.id}
@@ -667,7 +676,6 @@ function RutaAlquimiaCanvas({
               setElementoSelId(e.id);
               setCapaSel(null);
             }}
-            placeholder="Seleccioná un elemento…"
           />
           {capaSel ? (
             <button
@@ -831,9 +839,6 @@ function RutasSection() {
         eyebrow: "Capa",
         title: capaData?.label ?? capa,
         subtitle: alquimiaRoute.elementoSel?.nombre,
-        // Mismo círculo que ya se ve en el canvas de conjunto (CapaNodo):
-        // antes el Inspector de una Capa era solo texto, sin gráfico.
-        visual: <CapaNodo particulas={alquimiaRoute.particulasDeCapaSel} size={40} />,
         fields: [
           { label: "Partículas", value: alquimiaRoute.particulasDeCapaSel.length },
           { label: "Composición", value: capaData?.resumen ?? "—" },

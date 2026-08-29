@@ -57,20 +57,6 @@ export function contarLetrasNodo(formula: string): Record<LetraATS, number> {
   return out;
 }
 
-/** Suma varios conteos de letras en uno solo (ej. todas las Partículas de
- *  química de una capa de Elemento). Usado por CapaNodo para agregar la
- *  composición real de la capa antes de pasarla al mismo dibujo que usa
- *  ParticulaNodo. */
-export function sumarConteosNodo(...conteos: Record<LetraATS, number>[]): Record<LetraATS, number> {
-  const out: Record<LetraATS, number> = { A: 0, T: 0, S: 0 };
-  for (const c of conteos) {
-    out.A += c.A;
-    out.T += c.T;
-    out.S += c.S;
-  }
-  return out;
-}
-
 function sectorPath(cx: number, cy: number, r: number, anguloIni: number, anguloFin: number): string {
   const x1 = cx + r * Math.cos(anguloIni);
   const y1 = cy + r * Math.sin(anguloIni);
@@ -106,44 +92,6 @@ export function ParticulaNodo({
     .split("")
     .filter(esLetraATS) as LetraATS[];
   const conteo = contarLetrasNodo(formula);
-
-  return (
-    <NucleoConAnilloNodo
-      conteo={conteo}
-      // El anillo de una Partícula "SAT" son sus 3 letras reales en el
-      // orden en que aparecen en la fórmula (no tercios agregados por
-      // cantidad) — se pasan como sectores unitarios explícitos para no
-      // perder ese orden al reusar el mismo dibujo desde CapaNodo.
-      sectores={letras.length > 1 ? letras.map((l) => ({ letra: l, peso: 1 })) : []}
-      size={size}
-      className={className}
-      ariaLabel={`Partícula ${formula}`}
-    />
-  );
-}
-
-/**
- * Dibujo compartido "núcleo con color dominante + anillo de composición
- * real" — el mismo lenguaje visual que ya se usaba solo para Partículas
- * A/T/S individuales (ParticulaNodo), ahora extraído para que también lo
- * use CapaNodo con un conteo agregado de muchas Partículas en vez de una
- * fórmula de una sola Partícula. `sectores` son los gajos del anillo en
- * el orden/peso que corresponda; si viene vacío, el anillo se reparte
- * proporcional a `conteo` (caso agregado de una capa).
- */
-function NucleoConAnilloNodo({
-  conteo,
-  sectores,
-  size,
-  className,
-  ariaLabel,
-}: {
-  conteo: Record<LetraATS, number>;
-  sectores: { letra: LetraATS; peso: number }[];
-  size: number;
-  className?: string;
-  ariaLabel: string;
-}) {
   const total = conteo.A + conteo.T + conteo.S;
 
   const cx = size / 2;
@@ -152,43 +100,33 @@ function NucleoConAnilloNodo({
   const ringWidth = Math.max(2, size * 0.1);
   const innerR = r - ringWidth;
 
-  // Letra dominante: la de mayor conteo total, para el color del núcleo.
-  // Empate → se usa la primera letra con conteo > 0 en orden A/T/S.
-  const orden: LetraATS[] = ["A", "T", "S"];
-  let dominante: LetraATS = orden.find((l) => conteo[l] > 0) ?? "A";
-  orden.forEach((l) => {
+  // Letra dominante: la más frecuente en la fórmula, para el color de
+  // fondo del núcleo. Empate → se usa la primera letra de la fórmula.
+  let dominante: LetraATS = letras[0] ?? "A";
+  (["A", "T", "S"] as LetraATS[]).forEach((l) => {
     if (conteo[l] > conteo[dominante]) dominante = l;
   });
   const colorDominante = LETRA_COLOR[dominante];
 
-  // Gajos del anillo: si se pasaron sectores explícitos (Partícula única),
-  // se usan tal cual; si no (capa agregada), se derivan de `conteo`
-  // proporcional al peso real de cada letra — mismo criterio que
-  // LetrasVisual, pero dibujado como anillo delgado en vez de pastel
-  // completo, para que capa y partícula compartan el mismo lenguaje.
-  const gajos = sectores.length > 0 ? sectores : orden.filter((l) => conteo[l] > 0).map((l) => ({ letra: l, peso: conteo[l] }));
-  const pesoTotal = gajos.reduce((acc, g) => acc + g.peso, 0);
-
   let anguloActual = -Math.PI / 2;
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className={className} role="img" aria-label={ariaLabel}>
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className={className} role="img" aria-label={`Partícula ${formula}`}>
       {/* Núcleo: color de la letra dominante — distingue de un vistazo si
-          la composición es mayormente Antítesis/Tesis/Síntesis. */}
+          la partícula es mayormente Antítesis/Tesis/Síntesis. */}
       <circle cx={cx} cy={cy} r={innerR} strokeWidth={1.5} style={{ fill: colorDominante.bg, stroke: colorDominante.border }} />
 
-      {/* Anillo exterior: partido según la composición REAL (no tercios
-          iguales por defecto) — ej. "TTT" es un anillo enteramente rojo,
-          "SAT" son 3 tercios de colores distintos, y una capa con 5A+2T
-          es un anillo de ~71%/29%. */}
+      {/* Anillo exterior: partido según la composición REAL de la fórmula
+          (no tercios iguales por defecto) — ej. "TTT" es un anillo
+          enteramente rojo, "SAT" son 3 tercios de colores distintos. */}
       {total > 0 &&
-        gajos.length > 1 &&
-        gajos.map((g, i) => {
-          const anguloSector = (g.peso / pesoTotal) * Math.PI * 2;
+        letras.map((letra, i) => {
+          if (letras.length <= 1) return null; // 1 sola letra: el núcleo ya la muestra, el anillo sería redundante
+          const anguloSector = (Math.PI * 2) / letras.length;
           const anguloIni = anguloActual;
           const anguloFin = anguloActual + anguloSector;
           anguloActual = anguloFin;
-          const color = LETRA_COLOR[g.letra];
+          const color = LETRA_COLOR[letra];
           return <path key={i} d={ringSectorPath(cx, cy, r, innerR, anguloIni, anguloFin)} strokeWidth={0.75} style={{ fill: color.bg, stroke: color.border }} />;
         })}
 
@@ -207,40 +145,6 @@ function ringSectorPath(cx: number, cy: number, rOuter: number, rInner: number, 
   const [x4, y4] = p(rInner, anguloIni);
   const largo = anguloFin - anguloIni > Math.PI ? 1 : 0;
   return `M ${x1} ${y1} A ${rOuter} ${rOuter} 0 ${largo} 1 ${x2} ${y2} L ${x3} ${y3} A ${rInner} ${rInner} 0 ${largo} 0 ${x4} ${y4} Z`;
-}
-
-/**
- * Capa de un Elemento (núcleo / media / externa): antes sin forma propia
- * (solo texto en el canvas y en el Inspector) mientras que las Partículas
- * ya tenían su círculo de identidad (ParticulaNodo). Reusa exactamente el
- * mismo dibujo — núcleo con color de la letra dominante + anillo partido
- * según la composición real — pero alimentado por el conteo A/T/S
- * agregado de TODAS las Partículas de química de esa capa (sumarConteosNodo
- * sobre sus fórmulas reales vía contarLetrasNodo), no por una fórmula de
- * una sola Partícula. Una capa vacía se ve como el mismo círculo hueco que
- * ya usa ParticulaNodo para una fórmula sin letras.
- */
-export function CapaNodo({
-  particulas,
-  size = 40,
-  className,
-}: {
-  /** Partículas de química reales de esta capa, ya expandidas (una entrada
-   *  por unidad), cada una con su fórmula A/T/S real. */
-  particulas: { formula: string }[];
-  size?: number;
-  className?: string;
-}) {
-  const conteo = sumarConteosNodo(...particulas.map((p) => contarLetrasNodo(p.formula)));
-  return (
-    <NucleoConAnilloNodo
-      conteo={conteo}
-      sectores={[]}
-      size={size}
-      className={className}
-      ariaLabel={`Capa (${particulas.length} partícula(s))`}
-    />
-  );
 }
 
 /**
