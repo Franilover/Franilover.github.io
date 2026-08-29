@@ -64,7 +64,7 @@ import { TraceView, type TraceStep } from "./TraceView";
 import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
-import { ParticulaVisual, IumVisual, contarLetras } from "@/domains/garlia/fisica/ParticulaVisual";
+import { ParticulaNodo, CentroGravedadNodo, ElementoNodo, contarLetrasNodo } from "./NodeVisuals";
 
 type SectionKey =
   | "rutas"
@@ -376,14 +376,14 @@ function RutaFisicaCanvas({
         id: `particula-ium-${i}`,
         label: p.nombre,
         sublabel: p.formula,
-        visual: <ParticulaVisual formula={p.formula} size={40} />,
+        visual: <ParticulaNodo formula={p.formula} size={40} />,
       }));
       const iumNodeZoom = {
         id: `ium-${iumSel.id}`,
         label: iumSel.nombre,
         sublabel: "Ium seleccionado",
         tone: "accent" as const,
-        visual: <IumVisual particulas={particulasDelIumSel} size={52} />,
+        visual: <CentroGravedadNodo particulas={particulasDelIumSel} size={52} />,
       };
       return [
         { id: "particulas", label: "Partículas del Ium", nodes: particulaNodesZoom },
@@ -398,14 +398,13 @@ function RutaFisicaCanvas({
       id: `particula-${i}`,
       label: p.nombre,
       sublabel: p.formula,
-      visual: <ParticulaVisual formula={p.formula} size={40} />,
+      visual: <ParticulaNodo formula={p.formula} size={40} />,
     }));
     // Nivel 2: los IUMs reales que componen el Oris (desde iums_composicion).
-    // Cada IUM se pinta con IumVisual (centro + partículas propias en
-    // anillo) — mismo componente ya construido en fisica/ParticulaVisual.tsx
-    // para diferenciarlo visualmente de un nodo genérico ("núcleo
-    // energético/cristalino" según la especificación visual maestra), sin
-    // calcular nada nuevo: particulasDeIum ya expande la composición real.
+    // Cada IUM se pinta con CentroGravedadNodo (núcleo ✦ + partículas
+    // propias en anillo), forma propia del visualizador — no la reutiliza
+    // de fisica/. particulasDeIum sigue siendo cálculo de datos, no visual,
+    // así que se reusa tal cual: ya expande la composición real.
     const iumNodes = Object.entries(orisSel.iums_composicion)
       .filter(([, cantidad]) => cantidad > 0)
       .map(([iumId]) => {
@@ -414,15 +413,18 @@ function RutaFisicaCanvas({
           id: `ium-${iumId}`,
           label: ium?.nombre ?? "IUM",
           sublabel: `${orisSel.iums_composicion[iumId]}×`,
-          visual: ium ? <IumVisual particulas={particulasDeIum(ium)} size={44} /> : undefined,
+          visual: ium ? <CentroGravedadNodo particulas={particulasDeIum(ium)} size={44} /> : undefined,
         };
       });
-    // Nivel 3: el Oris seleccionado.
+    // Nivel 3: el Oris seleccionado — mismo tratamiento de centro de
+    // gravedad que un IUM (un Oris es, en el modelo, una bolsa de IUMs que
+    // a su vez son bolsas de partículas), con sus partículas ya expandidas.
     const orisNode = {
       id: `oris-${orisSel.id}`,
       label: orisSel.nombre,
       sublabel: orisSel.dominio,
       tone: "accent" as const,
+      visual: <CentroGravedadNodo particulas={particulasDelOrisSel} size={56} />,
     };
     return [
       { id: "particulas", label: "Partículas (A/T/S)", nodes: particulaNodes },
@@ -543,7 +545,7 @@ function RutaAlquimiaCanvas({
         id: `particula-${capaSel}-${i}`,
         label: p.nombre,
         sublabel: p.formula,
-        visual: <ParticulaVisual formula={p.formula} size={40} />,
+        visual: <ParticulaNodo formula={p.formula} size={40} />,
       }));
       const capaZoomLabel = capas.find((c) => c.capa === capaSel)?.label ?? capaSel;
       const capaNodeZoom = {
@@ -551,6 +553,10 @@ function RutaAlquimiaCanvas({
         label: capaZoomLabel,
         sublabel: "Capa seleccionada",
         tone: "accent" as const,
+        // Una capa individual en zoom cumple el mismo rol de "centro" que
+        // un IUM en zoom (punto 2 del docx aplicado por consistencia): sus
+        // propias partículas son lo que la compone.
+        visual: <CentroGravedadNodo particulas={particulasDeCapaSel} size={52} />,
       };
       return [
         { id: "particulas", label: "Partícula química", nodes: particulaNodesZoom },
@@ -568,6 +574,10 @@ function RutaAlquimiaCanvas({
       label: elementoSel.nombre,
       sublabel: elementoSel.simbolo,
       tone: "accent" as const,
+      // Punto 9 del docx: la composición microscópica (totales reales por
+      // capa, ya calculados por el hook — layerTotal) alimenta la forma.
+      // Sin inventar reparto: una capa con total 0 no ocupa gajo.
+      visual: <ElementoNodo capas={capas.map((c) => ({ capa: c.capa, total: c.total }))} size={64} />,
     };
     return [
       { id: "capas", label: "Capa", nodes: capaNodes },
@@ -719,12 +729,12 @@ function RutasSection() {
   // (sección "A/T/S es información contextual, no geometría principal").
   const inspectorEntity: InspectorEntity | null = useMemo(() => {
     if (particulaClickeada) {
-      const letras = contarLetras(particulaClickeada.formula);
+      const letras = contarLetrasNodo(particulaClickeada.formula);
       return {
         eyebrow: "Partícula",
         title: particulaClickeada.nombre,
         subtitle: particulaClickeada.formula,
-        visual: <ParticulaVisual formula={particulaClickeada.formula} size={40} />,
+        visual: <ParticulaNodo formula={particulaClickeada.formula} size={40} />,
         fields: [
           { label: "A (antítesis)", value: letras.A },
           { label: "T (tesis)", value: letras.T },
@@ -743,7 +753,7 @@ function RutasSection() {
           eyebrow: "IUM",
           title: ium.nombre,
           subtitle: `${fisicaRoute.particulasDelIumSel.length} partícula(s)`,
-          visual: <IumVisual particulas={fisicaRoute.particulasDelIumSel} size={40} />,
+          visual: <CentroGravedadNodo particulas={fisicaRoute.particulasDelIumSel} size={40} />,
           fields: [
             { label: "A", value: fisicaRoute.letrasIumSel.A },
             { label: "T", value: fisicaRoute.letrasIumSel.T },
@@ -758,6 +768,7 @@ function RutasSection() {
         title: o.nombre,
         subtitle: `${o.familia} · ${o.dominio}`,
         note: o.descripcion ?? null,
+        visual: <CentroGravedadNodo particulas={fisicaRoute.particulasDelOrisSel} size={40} />,
         fields: [
           { label: "Fórmula", value: o.formula },
           { label: "A", value: fisicaRoute.letrasOrisSel.A },
@@ -792,6 +803,7 @@ function RutasSection() {
       title: `${e.simbolo} · ${e.nombre}`,
       subtitle: e.familia,
       note: e.notas ?? null,
+      visual: <ElementoNodo capas={alquimiaRoute.capas.map((c) => ({ capa: c.capa, total: c.total }))} size={40} />,
       fields: [
         { label: "N° atómico", value: e.numero_atomico },
         { label: "Núcleo", value: alquimiaRoute.capas.find((c) => c.capa === "nucleo")?.resumen },
