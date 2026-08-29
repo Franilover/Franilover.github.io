@@ -959,9 +959,9 @@ function VisualizadorPage() {
 
   return (
     <main className="min-h-screen bg-[var(--bg-main)] text-primary">
-      <div className="w-full px-3 py-8">
+      <div className="w-full py-8">
 
-        <div className="grid gap-7 lg:grid-cols-[236px_minmax(0,1fr)]">
+        <div className="grid gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
           <aside className="rounded-2xl bg-primary/[0.02] p-3 lg:sticky lg:top-6 lg:self-start">
             <p className="px-3 pb-3 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/30">Explorar</p>
             <nav className="space-y-1.5">
