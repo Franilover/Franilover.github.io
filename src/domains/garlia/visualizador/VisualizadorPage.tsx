@@ -64,7 +64,14 @@ import { TraceView, type TraceStep } from "./TraceView";
 import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
-import { CentroGravedadNodo, ElementoNodo, contarLetrasNodo } from "./NodeVisuals";
+import { contarLetrasNodo } from "./NodeVisuals";
+// AtomoVisual: el gráfico REAL y completo de un Elemento (núcleo + capa
+// media + capa externa como órbitas concéntricas, con sus partículas
+// reales distribuidas y toggle inicial/ATS propio) — ya existía en
+// elementos/ElementoEditor.tsx. Se trae acá tal cual, mismo criterio que
+// ParticulaVisual/IumVisual desde fisica/: reusar el visor real en vez de
+// mantener un dibujo propio (ElementoNodo) en NodeVisuals.tsx.
+import { AtomoVisual, type PerfilConCapas } from "@/domains/garlia/elementos/ElementoEditor";
 import { TriangleATS, type EntidadATS } from "./TriangleATS";
 // Componente "de afuera" del visualizador (fisica/), el diseño original de
 // Partícula con letras dentro de tercios de color — pedido explícito de
@@ -592,15 +599,18 @@ function RutaAlquimiaCanvas({
         visual: <ParticulaVisual formula={p.formula} size={40} />,
       }));
       const capaZoomLabel = capas.find((c) => c.capa === capaSel)?.label ?? capaSel;
+      // Mismo componente que dibuja el Elemento completo (AtomoVisual),
+      // pero recibiendo solo la capa activa poblada — las otras dos
+      // quedan sin datos (undefined) para que AtomoVisual no dibuje
+      // partículas que no corresponden a esta capa en zoom.
+      const perfilSoloEstaCapa: PerfilConCapas = { [capaSel]: capas.find((c) => c.capa === capaSel)?.particulas };
       const capaNodeZoom = {
         id: `capa-${capaSel}`,
         label: capaZoomLabel,
         sublabel: "Capa seleccionada",
         tone: "accent" as const,
-        // Una capa individual en zoom cumple el mismo rol de "centro" que
-        // un IUM en zoom (punto 2 del docx aplicado por consistencia): sus
-        // propias partículas son lo que la compone.
-        visual: <CentroGravedadNodo particulas={particulasDeCapaSel} size={52} />,
+        hideBorder: true,
+        visual: <AtomoVisual elemento={perfilSoloEstaCapa} className="w-full aspect-square h-auto" />,
       };
       return [
         { id: "particulas", label: "Partícula química", nodes: particulaNodesZoom },
@@ -618,10 +628,12 @@ function RutaAlquimiaCanvas({
       label: elementoSel.nombre,
       sublabel: elementoSel.simbolo,
       tone: "accent" as const,
-      // Punto 9 del docx: la composición microscópica (totales reales por
-      // capa, ya calculados por el hook — layerTotal) alimenta la forma.
-      // Sin inventar reparto: una capa con total 0 no ocupa gajo.
-      visual: <ElementoNodo capas={capas.map((c) => ({ capa: c.capa, total: c.total }))} size={64} />,
+      // AtomoVisual real (elementos/ElementoEditor.tsx): núcleo + capa
+      // media + capa externa como órbitas concéntricas, con las
+      // partículas reales de elementoSel — mismo componente que ya se usa
+      // en el editor de Elementos, en vez del rombo de 3 gajos (ElementoNodo).
+      hideBorder: true,
+      visual: <AtomoVisual elemento={elementoSel} className="w-full aspect-square h-auto" />,
     };
     return [
       { id: "capas", label: "Capa", nodes: capaNodes },
@@ -852,7 +864,7 @@ function RutasSection() {
       title: `${e.simbolo} · ${e.nombre}`,
       subtitle: e.familia,
       note: e.notas ?? null,
-      visual: <ElementoNodo capas={alquimiaRoute.capas.map((c) => ({ capa: c.capa, total: c.total }))} size={40} />,
+      visual: <AtomoVisual elemento={e} className="w-full aspect-square h-auto" />,
       fields: [
         { label: "N° atómico", value: e.numero_atomico },
         { label: "Núcleo", value: alquimiaRoute.capas.find((c) => c.capa === "nucleo")?.resumen },
