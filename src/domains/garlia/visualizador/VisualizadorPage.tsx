@@ -13,6 +13,7 @@ import {
   Orbit,
   Radio,
   Sparkles,
+  Waypoints,
   Workflow,
   Zap,
 } from "lucide-react";
@@ -44,7 +45,7 @@ import {
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useProcesos } from "@/domains/garlia/elementos/useProcesos";
-import { propiedadesCalculadasDeCompuesto } from "@/domains/garlia/elementos/types";
+import { propiedadesCalculadasDeCompuesto, type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
 
 import { RunaThumbnail } from "@/domains/garlia/runas/RunaThumbnail";
 
@@ -65,6 +66,13 @@ import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
 import { useCompuestoRoute } from "./routes/useCompuestoRoute";
+import {
+  useCompatibilidadRoute,
+  type EstadoCompatibilidad,
+  type NodoCompatibilidad,
+  type VecinoCompatibilidad,
+} from "./routes/useCompatibilidadRoute";
+import { CompatibilidadNetwork } from "./CompatibilidadNetwork";
 import { contarLetrasNodo } from "./NodeVisuals";
 // AtomoVisual: el gráfico REAL y completo de un Elemento (núcleo + capa
 // media + capa externa como órbitas concéntricas, con sus partículas
@@ -88,6 +96,7 @@ type SectionKey =
   | "formula"
   | "material"
   | "structure"
+  | "compatibilidad"
   | "reactivity"
   | "energy"
   | "electric"
@@ -103,6 +112,7 @@ const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
   { key: "formula", label: "Fórmulas", icon: <Gauge size={15} /> },
   { key: "material", label: "Material", icon: <Atom size={15} /> },
   { key: "structure", label: "Estructura", icon: <GitBranch size={15} /> },
+  { key: "compatibilidad", label: "Compatibilidad", icon: <Waypoints size={15} /> },
   { key: "reactivity", label: "Reactividad", icon: <FlaskConical size={15} /> },
   { key: "energy", label: "Energía", icon: <BarChart3 size={15} /> },
   { key: "electric", label: "Electricidad", icon: <Zap size={15} /> },
@@ -1004,6 +1014,361 @@ function RutaCompuestoCanvas({
   );
 }
 
+// ─── Sección "Compatibilidad" — VIS-04, tab propia en la sidebar ──────────
+// Deliberadamente FUERA de "Rutas": el docx (Parte 5, punto 1) marca que
+// VIS-04 tiene identidad visual propia, distinta de la cadena
+// jerárquica que ya cubren Física/Alquimia/Química (VIS-01/02/03) — acá no
+// hay un "resultado final" que emerge, hay un espacio de posibilidades
+// alrededor de una entidad ya existente. Mismo criterio de encapsulación
+// que RutasSection: hook propio (useCompatibilidadRoute), sin mezclar
+// estado con las demás secciones.
+
+/** Pastilla de estado compatible/posible/incompatible — mismo lenguaje que
+ *  usa CompatibilidadNetwork para las líneas (sólida/punteada/sin línea),
+ *  reflejado acá en texto para quien no distinga el trazo a simple vista. */
+function EstadoCompatPill({ estado }: { estado: EstadoCompatibilidad }) {
+  const LABEL: Record<EstadoCompatibilidad, string> = {
+    compatible: "Compatible",
+    posible: "Posible",
+    incompatible: "Incompatible",
+  };
+  const CLASE: Record<EstadoCompatibilidad, string> = {
+    compatible: "border-primary/45 text-primary/90",
+    posible: "border-primary/20 text-primary/55",
+    incompatible: "border-primary/10 text-primary/30",
+  };
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${CLASE[estado]}`}>
+      {LABEL[estado]}
+    </span>
+  );
+}
+
+/** Visual de un nodo del mapa — Elemento usa AtomoVisual real (mismo
+ *  componente que Química/Alquimia); Compuesto usa el mismo símbolo
+ *  circular con iniciales que ya define RutaCompuestoCanvas para el nodo
+ *  "compuesto emergente" (no existe un visual de Compuesto dedicado
+ *  todavía — se reusa el mismo criterio, no se inventa uno nuevo). */
+function NodoCompatVisual({ nodo }: { nodo: NodoCompatibilidad }) {
+  if (nodo.tipo === "elemento") {
+    return <AtomoVisual elemento={nodo.entidad as Elemento} className="w-full aspect-square h-auto" />;
+  }
+  const c = nodo.entidad as Compuesto;
+  return (
+    <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-primary/40 bg-[color-mix(in_srgb,var(--primary)_6%,transparent)]">
+      <span className="text-sm font-black text-primary/85">
+        {c.simbolo ?? c.nombre.slice(0, 3).toUpperCase()}
+      </span>
+    </div>
+  );
+}
+
+/** Panel "¿por qué?" (docx punto 7) — aparece al seleccionar un vecino.
+ *  Nunca inventa una explicación: si el motor no la dio (afinidad null
+ *  porque hay Estado Noble de por medio, o cancelación sin aportes), se
+ *  muestra igual el motivo textual que evaluarVecino ya resolvió — nunca
+ *  un texto genérico distinto del que realmente calculó el motor. */
+function PanelPorQue({ vecino }: { vecino: VecinoCompatibilidad }) {
+  return (
+    <div className="rounded-2xl p-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/35">¿Por qué?</p>
+        <EstadoCompatPill estado={vecino.estado} />
+      </div>
+      <p className="mt-2 text-xs font-black text-primary/85">{vecino.nodo.label}</p>
+      <p className="mt-3 text-xs leading-5 text-primary/55">{vecino.motivo}</p>
+      {vecino.afinidad && vecino.afinidad.aportes.length > 0 ? (
+        <div className="mt-4 space-y-1 border-t border-primary/10 pt-3">
+          <p className="text-[9px] font-black uppercase tracking-widest text-primary/35">Aportes</p>
+          {vecino.afinidad.aportes.slice(0, 4).map((a, i) => (
+            <p key={i} className="text-[11px] text-primary/50">
+              {a.particula} · {a.cantidad}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Matriz secundaria (docx punto 20) — solo se calcula/renderiza si
+ *  vistaGlobal está activa (route ya guarda esa condición: paresGlobales
+ *  viene vacío si vistaGlobal es false, evitando el costo O(n²) sin uso). */
+function MatrizCompatibilidad({
+  route,
+  onSaltarAlGrafo,
+}: {
+  route: ReturnType<typeof useCompatibilidadRoute>;
+  onSaltarAlGrafo: (aId: string, bId: string) => void;
+}) {
+  const catalogo = route.catalogoActivo;
+  if (catalogo.length > 24) {
+    return (
+      <div className="mt-4 rounded-2xl border border-dashed border-primary/12 p-6 text-center text-xs leading-5 text-primary/35">
+        Catálogo demasiado grande para matriz ({catalogo.length} entidades) — usá el grafo de vecinos para explorar.
+      </div>
+    );
+  }
+  const estadoDe = (aId: string, bId: string): EstadoCompatibilidad | null => {
+    const par = route.paresGlobales.find(
+      (p) =>
+        (p.a.nodeId === aId && p.b.nodeId === bId) || (p.a.nodeId === bId && p.b.nodeId === aId),
+    );
+    return par?.estado ?? null;
+  };
+  return (
+    <div className="mt-4 overflow-x-auto rounded-2xl p-5">
+      <table className="w-full border-collapse text-[10px]">
+        <thead>
+          <tr>
+            <th className="p-1" />
+            {catalogo.map((n) => (
+              <th key={n.nodeId} className="p-1 text-center font-black uppercase tracking-wide text-primary/40">
+                {n.sublabel ?? n.label.slice(0, 3)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {catalogo.map((fila) => (
+            <tr key={fila.nodeId}>
+              <td className="p-1 pr-2 text-right font-black uppercase tracking-wide text-primary/40">
+                {fila.sublabel ?? fila.label.slice(0, 3)}
+              </td>
+              {catalogo.map((col) => {
+                if (col.nodeId === fila.nodeId) return <td key={col.nodeId} className="p-1 text-center text-primary/15">·</td>;
+                const estado = estadoDe(fila.nodeId, col.nodeId);
+                const COLOR: Record<EstadoCompatibilidad, string> = {
+                  compatible: "bg-primary/50",
+                  posible: "bg-primary/20",
+                  incompatible: "bg-primary/5",
+                };
+                return (
+                  <td key={col.nodeId} className="p-1 text-center">
+                    <button
+                      type="button"
+                      title={`${fila.label} × ${col.label}${estado ? ` · ${estado}` : ""}`}
+                      onClick={() => onSaltarAlGrafo(fila.nodeId, col.nodeId)}
+                      className={`h-4 w-4 rounded-sm ${estado ? COLOR[estado] : "bg-transparent"} transition-transform hover:scale-125`}
+                    />
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CompatibilidadSection() {
+  const route = useCompatibilidadRoute();
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [nodoSelId, setNodoSelId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNodoSelId(null);
+  }, [route.centro?.nodeId, route.tipoActivo]);
+
+  const vecinoSel = useMemo(
+    () => (nodoSelId ? route.vecinos.find((v) => v.nodo.nodeId === nodoSelId) ?? null : null),
+    [nodoSelId, route.vecinos],
+  );
+
+  function handleSelectVecino(nodeId: string) {
+    setNodoSelId(nodeId);
+    route.setComparandoConId(null);
+  }
+
+  function handleSaltarAlGrafo(aId: string, bId: string) {
+    route.setVistaGlobal(false);
+    route.setCentroId(aId);
+    setNodoSelId(bId);
+  }
+
+  return (
+    <>
+      {route.loading ? (
+        <LoadingRow />
+      ) : route.empty ? (
+        <EmptyRow>No hay {route.tipoActivo === "elemento" ? "Elementos" : "Compuestos"} cargados en Supabase todavía.</EmptyRow>
+      ) : null}
+
+      {!route.loading && route.catalogoActivo.length > 0 && route.centro ? (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              {/* Tipo de entidad — el docx no distingue "VIS-04 de
+                  Elementos" de "VIS-04 de Compuestos", el usuario elige
+                  la escala (mismo mapa de posibilidades, distinto catálogo). */}
+              <div className="flex gap-1.5">
+                {(["elemento", "compuesto"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => route.setTipoActivo(t)}
+                    className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                      route.tipoActivo === t
+                        ? "border-primary/40 text-primary/90"
+                        : "border-primary/10 text-primary/45 hover:border-primary/25 hover:text-primary/70"
+                    }`}
+                  >
+                    {t === "elemento" ? "Elementos" : "Compuestos"}
+                  </button>
+                ))}
+              </div>
+              <SelectDropdown
+                items={route.catalogoActivo}
+                active={route.centro}
+                getKey={(n) => n.nodeId}
+                getLabel={(n) => (n.sublabel ? `${n.sublabel} · ${n.label}` : n.label)}
+                onSelect={(n) => route.setCentroId(n.nodeId)}
+                placeholder="Seleccioná una entidad…"
+              />
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => route.setVistaGlobal(!route.vistaGlobal)}
+                className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                  route.vistaGlobal
+                    ? "border-primary/40 text-primary/90"
+                    : "border-primary/15 text-primary/55 hover:border-primary/30 hover:text-primary/85"
+                }`}
+              >
+                {route.vistaGlobal ? "Vista de vecinos" : "Vista global"}
+              </button>
+            </div>
+          </div>
+
+          {/* Breadcrumb / historial (docx punto 14/15) — reutiliza el
+              mismo lenguaje de "volver a X" que Rutas ya usa para IUM. */}
+          {route.historial.length > 0 ? (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary/40">
+              {route.historial.map((paso) => (
+                <React.Fragment key={paso.nodeId}>
+                  <button
+                    type="button"
+                    onClick={() => route.retrocederA(paso.nodeId)}
+                    className="hover:text-primary/70 transition-colors"
+                  >
+                    {paso.label}
+                  </button>
+                  <ChevronRight size={11} className="text-primary/25" />
+                </React.Fragment>
+              ))}
+              <span className="text-primary/80">{route.centro.label}</span>
+            </div>
+          ) : null}
+
+          {route.vistaGlobal ? (
+            <MatrizCompatibilidad route={route} onSaltarAlGrafo={handleSaltarAlGrafo} />
+          ) : (
+            <>
+              <div className="mt-5 grid gap-5 lg:grid-cols-[2.4fr_1fr]">
+                <div className="rounded-2xl p-5">
+                  <CompatibilidadNetwork
+                    centro={route.centro}
+                    vecinos={route.vecinos}
+                    renderVisual={(n) => <NodoCompatVisual nodo={n} />}
+                    selectedNodeId={nodoSelId}
+                    onHoverNode={setHoverId}
+                    onSelectNode={(id) => {
+                      if (id === route.centro?.nodeId) return;
+                      // Click en un vecino selecciona (fija el panel
+                      // "¿por qué?"); la EXPANSIÓN progresiva (volverlo
+                      // centro) queda para el botón explícito de abajo,
+                      // para no perder el estado seleccionado con un solo
+                      // click accidental (docx no obliga a fusionar ambas
+                      // acciones en un mismo gesto).
+                      handleSelectVecino(id);
+                    }}
+                    highlightedNodeIds={hoverId ? [hoverId] : []}
+                    soloRutaHaciaId={route.soloRutaHaciaId}
+                  />
+                  {route.vecinos.length === 0 ? (
+                    <EmptyRow>Este catálogo tiene una sola entidad todavía — no hay vecinos que comparar.</EmptyRow>
+                  ) : null}
+                </div>
+
+                <div className="space-y-4">
+                  {vecinoSel ? (
+                    <>
+                      <PanelPorQue vecino={vecinoSel} />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => route.navegarA(vecinoSel.nodo.nodeId)}
+                          className="rounded-full border border-primary/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/55 transition-colors hover:border-primary/30 hover:text-primary/85"
+                        >
+                          Explorar {vecinoSel.nodo.label}
+                        </button>
+                        {vecinoSel.estado !== "incompatible" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              route.setComparandoConId(
+                                route.comparandoConId === vecinoSel.nodo.nodeId ? null : vecinoSel.nodo.nodeId,
+                              )
+                            }
+                            className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                              route.comparandoConId === vecinoSel.nodo.nodeId
+                                ? "border-primary/40 text-primary/90"
+                                : "border-primary/15 text-primary/55 hover:border-primary/30 hover:text-primary/85"
+                            }`}
+                          >
+                            Comparar
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            route.setSoloRutaHaciaId(
+                              route.soloRutaHaciaId === vecinoSel.nodo.nodeId ? null : vecinoSel.nodo.nodeId,
+                            )
+                          }
+                          className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                            route.soloRutaHaciaId === vecinoSel.nodo.nodeId
+                              ? "border-primary/40 text-primary/90"
+                              : "border-primary/15 text-primary/55 hover:border-primary/30 hover:text-primary/85"
+                          }`}
+                        >
+                          Solo ruta
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex min-h-[160px] items-center justify-center rounded-2xl border border-dashed border-primary/12 p-6 text-center text-xs leading-5 text-primary/35">
+                      Seleccioná un vecino del mapa para ver por qué es compatible, posible o incompatible.
+                    </div>
+                  )}
+
+                  {/* Comparación (docx punto 11) — dos entidades lado a
+                      lado, cada una con SU propia lista de vecinos real,
+                      nunca una vista fusionada. */}
+                  {route.comparandoConId && route.comparacion ? (
+                    <div className="rounded-2xl p-5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/35">
+                        {route.centro.label} vs {route.comparacion.nodo.label}
+                      </p>
+                      <p className="mt-3 text-[11px] leading-5 text-primary/50">
+                        {route.vecinos.filter((v) => v.estado === "compatible").length} compatible(s) ·{" "}
+                        {route.vecinos.filter((v) => v.estado === "posible").length} posible(s) desde{" "}
+                        {route.centro.label}.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function RutasSection() {
   const [perspectiva, setPerspectiva] = useState<Perspectiva>("fisica");
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -1491,6 +1856,8 @@ function VisualizadorPage() {
 
           <section className="min-w-0">
             {active === "rutas" ? <RutasSection /> : null}
+
+            {active === "compatibilidad" ? <CompatibilidadSection /> : null}
 
             {active === "micro" ? (
               <>
