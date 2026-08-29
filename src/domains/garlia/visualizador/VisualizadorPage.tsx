@@ -390,7 +390,12 @@ function RutaFisicaCanvas({
         label: iumSel.nombre,
         sublabel: "Ium seleccionado",
         tone: "accent" as const,
-        visual: <IumVisual particulas={particulasDelIumSel} size={52} />,
+        // Sin borde de nodo (pedido explícito para Rutas) + sin el botón
+        // de alternar modo. Al no recortarse contra el trazo del círculo
+        // ni el margen del foreignObject, el size interno sube de 52→64
+        // para aprovechar el espacio ganado.
+        hideBorder: true,
+        visual: <IumVisual particulas={particulasDelIumSel} size={64} showToggle={false} />,
       };
       return [
         { id: "particulas", label: "Partículas del Ium", nodes: particulaNodesZoom },
@@ -435,7 +440,8 @@ function RutaFisicaCanvas({
           id: `ium-${iumId}`,
           label: ium?.nombre ?? "IUM",
           sublabel: `${orisSel.iums_composicion[iumId]}×`,
-          visual: ium ? <IumVisual particulas={particulasDeIum(ium)} size={44} /> : undefined,
+          hideBorder: true,
+          visual: ium ? <IumVisual particulas={particulasDeIum(ium)} size={56} showToggle={false} /> : undefined,
         };
       });
     // Nivel 3: el Oris seleccionado — mismo tratamiento que un IUM (un
@@ -448,11 +454,12 @@ function RutaFisicaCanvas({
       label: orisSel.nombre,
       sublabel: orisSel.dominio,
       tone: "accent" as const,
-      // Subido de 68 → 84: pedido explícito de que la esfera del Oris se
-      // vea más grande. Aprovecha el nuevo CENTER_R=48 del canvas
-      // (diámetro útil ~88px tras el padding interno del foreignObject)
-      // sin recortarse, y queda claramente por encima del IUM (44).
-      visual: <IumVisual particulas={particulasDelOrisSel} size={84} />,
+      // Subido de 68 → 84 → 96: pedido explícito de que la esfera del
+      // Oris se vea más grande, y ahora sin borde (hideBorder) usa todo
+      // el CENTER_R=48 (diámetro útil ~96px) sin el margen que antes
+      // dejaba lugar al trazo del círculo. Sigue por encima del IUM (56).
+      hideBorder: true,
+      visual: <IumVisual particulas={particulasDelOrisSel} size={96} showToggle={false} />,
     };
     return [
       { id: "particulas", label: "Partículas (A/T/S)", nodes: particulaNodes },

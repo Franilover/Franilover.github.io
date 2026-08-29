@@ -38,6 +38,10 @@ export interface CanvasNode {
   visual?: React.ReactNode;
   /** Tono semántico opcional (el llamador decide qué significa "accent"). */
   tone?: "default" | "accent" | "muted";
+  /** Si es true, no dibuja el círculo de borde/fondo del nodo (orbitante o
+   *  central) y el `visual` interno aprovecha todo el espacio disponible.
+   *  Default false — no cambia el comportamiento de los usos existentes. */
+  hideBorder?: boolean;
 }
 
 export interface CanvasColumn {
@@ -376,15 +380,27 @@ export function StructureCanvas({
                     transition: transitionAll,
                   }}
                 >
-                  <circle
-                    r={r}
-                    strokeWidth={isSelected ? 2 : 1.25}
-                    style={{ fill: "var(--bg-main)", stroke: toneBorder, transition: "stroke 150ms ease" }}
-                  />
+                  {!node.hideBorder && (
+                    <circle
+                      r={r}
+                      strokeWidth={isSelected ? 2 : 1.25}
+                      style={{ fill: "var(--bg-main)", stroke: toneBorder, transition: "stroke 150ms ease" }}
+                    />
+                  )}
                   {node.visual ? (
-                    <foreignObject x={-r + 6} y={-r + 6} width={(r - 6) * 2} height={(r - 6) * 2}>
-                      <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
-                    </foreignObject>
+                    node.hideBorder ? (
+                      // Sin borde: el foreignObject aprovecha todo el radio
+                      // orbital (sin el margen de 6px que antes dejaba lugar
+                      // al trazo del círculo), así el gráfico interno se ve
+                      // más grande.
+                      <foreignObject x={-r} y={-r} width={r * 2} height={r * 2}>
+                        <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
+                      </foreignObject>
+                    ) : (
+                      <foreignObject x={-r + 6} y={-r + 6} width={(r - 6) * 2} height={(r - 6) * 2}>
+                        <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
+                      </foreignObject>
+                    )
                   ) : null}
                   <text
                     y={r + 15}
@@ -439,19 +455,29 @@ export function StructureCanvas({
                     "transform 220ms cubic-bezier(0.34, 1.2, 0.64, 1), opacity 200ms ease",
                 }}
               >
-                <circle
-                  r={CENTER_R}
-                  strokeWidth={isSelected ? 2.5 : 1.5}
-                  style={{
-                    fill: "color-mix(in srgb, var(--primary) 5%, transparent)",
-                    stroke: emphasized ? "var(--primary)" : "color-mix(in srgb, var(--primary) 45%, transparent)",
-                    transition: "stroke 150ms ease",
-                  }}
-                />
+                {!node.hideBorder && (
+                  <circle
+                    r={CENTER_R}
+                    strokeWidth={isSelected ? 2.5 : 1.5}
+                    style={{
+                      fill: "color-mix(in srgb, var(--primary) 5%, transparent)",
+                      stroke: emphasized ? "var(--primary)" : "color-mix(in srgb, var(--primary) 45%, transparent)",
+                      transition: "stroke 150ms ease",
+                    }}
+                  />
+                )}
                 {node.visual ? (
-                  <foreignObject x={-CENTER_R + 8} y={-CENTER_R + 8} width={(CENTER_R - 8) * 2} height={(CENTER_R - 8) * 2}>
-                    <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
-                  </foreignObject>
+                  node.hideBorder ? (
+                    // Sin borde: aprovecha todo el CENTER_R (antes se
+                    // recortaba 8px de margen para dejar lugar al trazo).
+                    <foreignObject x={-CENTER_R} y={-CENTER_R} width={CENTER_R * 2} height={CENTER_R * 2}>
+                      <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
+                    </foreignObject>
+                  ) : (
+                    <foreignObject x={-CENTER_R + 8} y={-CENTER_R + 8} width={(CENTER_R - 8) * 2} height={(CENTER_R - 8) * 2}>
+                      <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
+                    </foreignObject>
+                  )
                 ) : null}
                 <text
                   y={CENTER_R + 18}

@@ -267,12 +267,16 @@ export function IumVisual({
   particulas,
   size = 160,
   className,
+  showToggle = true,
 }: {
   /** Partículas componentes ya expandidas (una entrada por unidad), con su
    *  fórmula A/T/S, ej. Fluxor → [{ nombre: "Cinética", formula: "TTT" }, { nombre: "Cinética", formula: "TTT" }, { nombre: "Masa", formula: "AAA" }]. */
   particulas: { nombre: string; formula: string }[];
   size?: number;
   className?: string;
+  /** Si es false, no renderiza el botón flotante de alternar modo (ats/inicial).
+   *  Default true — no cambia el comportamiento de los usos existentes. */
+  showToggle?: boolean;
 }) {
   const [modo, setModo] = useState<"ats" | "inicial">("ats");
   const cx = size / 2;
@@ -282,7 +286,7 @@ export function IumVisual({
 
   return (
     <div className={`relative inline-block ${className ?? ""}`} style={{ width: size, height: size }}>
-      {particulas.length > 0 && (
+      {showToggle && particulas.length > 0 && (
         <button
           type="button"
           onClick={() => setModo((m) => (m === "ats" ? "inicial" : "ats"))}
