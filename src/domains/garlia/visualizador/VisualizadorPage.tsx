@@ -64,6 +64,7 @@ import { TraceView, type TraceStep } from "./TraceView";
 import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
+import { useCompuestoRoute } from "./routes/useCompuestoRoute";
 import { contarLetrasNodo } from "./NodeVisuals";
 // AtomoVisual: el gráfico REAL y completo de un Elemento (núcleo + capa
 // media + capa externa como órbitas concéntricas, con sus partículas
@@ -637,6 +638,180 @@ function RutaAlquimiaCanvas({
   );
 }
 
+// VIS-03 — Elementos → Sitios → Compatibilidad → Enlaces → Estructura →
+// Compuesto (docx Parte 4). Mismo criterio que RutaFisicaCanvas/
+// RutaAlquimiaCanvas: solo arma columnas/edges a partir de lo que
+// useCompuestoRoute ya resolvió, sin decidir compatibilidad ni estructura
+// acá — "el frontend no decide que sea compatible; el motor entrega el
+// resultado" (docx punto 5).
+function RutaCompuestoCanvas({
+  route,
+  hoverId,
+  setHoverId,
+  selectedNodeId,
+  onSelectNode,
+}: {
+  route: ReturnType<typeof useCompuestoRoute>;
+  hoverId: string | null;
+  setHoverId: (id: string | null) => void;
+  selectedNodeId: string | null;
+  onSelectNode: (id: string) => void;
+}) {
+  const { compuestoSel, componentes, enlaces } = route;
+
+  // Nivel 1: un nodo por unidad de Elemento en la composición real (ej.
+  // A×2, B×1, C×3 → 6 nodos), mismo criterio de expansión 1-instancia-por-
+  // unidad que usa RutaFisicaCanvas para Partículas/IUM — así cada enlace
+  // real de compuesto_enlaces (que apunta a un elemento_a_id/elemento_b_id
+  // puntual, no "a la fórmula en general") tiene un nodo propio al que
+  // llegar, sin inventar cuál instancia es cuál cuando hay cantidad > 1.
+  const elementoNodos = useMemo(() => {
+    const nodos: { id: string; elementoId: string; label: string; sublabel?: string }[] = [];
+    for (const { elemento, cantidad } of componentes) {
+      for (let rep = 0; rep < cantidad; rep++) {
+        nodos.push({
+          id: `elemento-${elemento.id}-${rep}`,
+          elementoId: elemento.id,
+          label: elemento.nombre,
+          sublabel: elemento.simbolo,
+        });
+      }
+    }
+    return nodos;
+  }, [componentes]);
+
+  // Enlaces reales → edges entre la PRIMERA instancia disponible de cada
+  // elemento involucrado. compuesto_enlaces no distingue instancia cuando
+  // cantidad > 1 (guarda elemento_a_id/elemento_b_id, no un índice de
+  // repetición) — se conecta a la primera instancia como representante en
+  // vez de inventar a cuál de las N corresponde, y se documenta acá mismo
+  // en vez de en un comentario disperso: no es una limitación del canvas,
+  // es que ese dato no existe en la fila real.
+  const primeraInstanciaPorElemento = useMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const n of elementoNodos) {
+      if (!mapa.has(n.elementoId)) mapa.set(n.elementoId, n.id);
+    }
+    return mapa;
+  }, [elementoNodos]);
+
+  const columns: CanvasColumn[] = useMemo(() => {
+    if (!compuestoSel) return [];
+    const nodosElementos = elementoNodos.map((n) => ({
+      id: n.id,
+      label: n.label,
+      sublabel: n.sublabel,
+      hideBorder: true,
+      visual: (
+        <AtomoVisual
+          elemento={componentes.find((c) => c.elemento.id === n.elementoId)!.elemento}
+          className="w-full aspect-square h-auto"
+        />
+      ),
+    }));
+    const compuestoNodo = {
+      id: `compuesto-${compuestoSel.id}`,
+      label: compuestoSel.nombre,
+      sublabel: compuestoSel.simbolo ?? compuestoSel.tipo_compuesto ?? undefined,
+      tone: "accent" as const,
+      hideBorder: true,
+      // Sin un "MoleculaVisual" propio: el compuesto emergente se
+      // representa por ahora con su símbolo/nombre (mismo criterio del
+      // docx punto 23 — "identidad visual reutilizada", el compuesto es
+      // ◇/estructura contenedora, no una esfera de elemento) mientras no
+      // exista un visual dedicado para esta capa.
+      visual: (
+        <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-primary/40 bg-[color-mix(in_srgb,var(--primary)_6%,transparent)]">
+          <span className="text-lg font-black text-primary/85">
+            {compuestoSel.simbolo ?? compuestoSel.nombre.slice(0, 3).toUpperCase()}
+          </span>
+        </div>
+      ),
+    };
+    return [
+      { id: "elementos", label: "Elementos", nodes: nodosElementos },
+      { id: "compuesto", label: "Compuesto", nodes: [compuestoNodo] },
+    ];
+  }, [compuestoSel, elementoNodos, componentes]);
+
+  // Edges reales: un enlace de compuesto_enlaces por par de elementos
+  // conectados, con weight = intensidad real (docx punto 6: "la línea
+  // cambia visualmente [con] mayor intensidad" según el enlace real, no
+  // una línea pareja). Sin enlaces (compuesto sin compuesto_enlaces
+  // todavía), no se dibuja ninguna línea — nunca se asume conexión.
+  const edges: CanvasEdge[] = useMemo(() => {
+    if (!compuestoSel) return [];
+    const out: CanvasEdge[] = [];
+    for (const enlace of enlaces) {
+      const nodoA = primeraInstanciaPorElemento.get(enlace.elemento_a_id);
+      const nodoB = primeraInstanciaPorElemento.get(enlace.elemento_b_id);
+      if (!nodoA || !nodoB) continue;
+      out.push({
+        fromNodeId: nodoA,
+        toNodeId: nodoB,
+        weight: enlace.intensidad ?? undefined,
+      });
+    }
+    return out;
+  }, [compuestoSel, enlaces, primeraInstanciaPorElemento]);
+
+  return (
+    <>
+      {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Compuestos cargados en Supabase todavía.</EmptyRow> : null}
+      {!route.loading && route.compuestos.length > 0 ? (
+        <>
+          <SelectDropdown
+            items={route.compuestos}
+            active={compuestoSel}
+            getKey={(c) => c.id}
+            getLabel={(c) => (c.simbolo ? `${c.simbolo} · ${c.nombre}` : c.nombre)}
+            onSelect={(c) => route.setCompuestoSelId(c.id)}
+            placeholder="Seleccioná un compuesto…"
+          />
+          <div className="mt-5 rounded-2xl p-5">
+            <StructureCanvas
+              columns={columns}
+              edges={edges}
+              selectedNodeId={
+                selectedNodeId ?? (compuestoSel ? `compuesto-${compuestoSel.id}` : null)
+              }
+              onHoverNode={(id) => {
+                setHoverId(id);
+                // Foco de sitios (docx punto 3/18): al pasar el mouse
+                // sobre un nodo Elemento, se activa la consulta de sus
+                // sitios reales — al salir, se limpia (no queda "pegado").
+                if (id?.startsWith("elemento-")) {
+                  const nodo = elementoNodos.find((n) => n.id === id);
+                  route.setElementoFocoId(nodo?.elementoId ?? null);
+                } else if (!id) {
+                  route.setElementoFocoId(null);
+                }
+              }}
+              onSelectNode={onSelectNode}
+              highlightedNodeIds={hoverId ? [hoverId] : []}
+              centerScaleExtra={1.3}
+            />
+          </div>
+          {compuestoSel && !route.loadingEnlaces && enlaces.length === 0 ? (
+            <p className="mt-3 text-[11px] text-primary/40">
+              Este compuesto todavía no tiene enlaces calculados en Supabase — se muestran solo
+              los elementos de su composición, sin conexiones.
+            </p>
+          ) : null}
+          {route.estructuraId ? (
+            <p className="mt-3 text-[11px] text-primary/40">
+              Estructura real asociada: <span className="text-primary/60">{route.estructuraNombre}</span>
+              {route.compuestosDeLaEstructura.length > 1
+                ? ` (compartida con ${route.compuestosDeLaEstructura.length - 1} compuesto(s) más)`
+                : null}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function RutasSection() {
   const [perspectiva, setPerspectiva] = useState<Perspectiva>("fisica");
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -648,6 +823,7 @@ function RutasSection() {
 
   const fisicaRoute = useFisicaRoute();
   const alquimiaRoute = useAlquimiaRoute();
+  const compuestoRoute = useCompuestoRoute();
 
   useEffect(() => {
     setNodoSelId(null);
@@ -656,6 +832,7 @@ function RutasSection() {
     fisicaRoute.orisSel?.id,
     fisicaRoute.iumSel?.id,
     alquimiaRoute.elementoSel?.id,
+    compuestoRoute.compuestoSel?.id,
   ]);
 
   // Partícula clickeada dentro del canvas activo, si el nodo seleccionado
@@ -680,6 +857,17 @@ function RutasSection() {
     const idx = Number(nodoSelId.slice(nodoSelId.lastIndexOf("-") + 1));
     return alquimiaRoute.particulasDeCapaSel[idx] ?? null;
   }, [nodoSelId, perspectiva, fisicaRoute.particulasDelOrisSel, fisicaRoute.particulasDelIumSel, alquimiaRoute.particulasDeCapaSel]);
+
+  // Elemento clickeado dentro del canvas de Química (nodo `elemento-{id}-{rep}`,
+  // ver RutaCompuestoCanvas) — distinto de particulaClickeada porque acá el
+  // nodo referencia directamente un Elemento del catálogo, no una partícula
+  // expandida por conteo.
+  const elementoQuimicaClickeado = useMemo(() => {
+    if (perspectiva !== "quimica" || !nodoSelId || !nodoSelId.startsWith("elemento-")) return null;
+    const sinPrefijo = nodoSelId.slice("elemento-".length);
+    const elementoId = sinPrefijo.slice(0, sinPrefijo.lastIndexOf("-"));
+    return compuestoRoute.componentes.find((c) => c.elemento.id === elementoId)?.elemento ?? null;
+  }, [perspectiva, nodoSelId, compuestoRoute.componentes]);
 
   // Inspector: solo presentacional — el shape se arma acá a partir de datos
   // ya resueltos por el hook de ruta activo, sin calcular nada nuevo.
@@ -741,23 +929,65 @@ function RutasSection() {
     // Elemento: mismo criterio que el Oris en Física (línea de arriba) —
     // el Inspector no repite el gráfico que ya se ve en el canvas central
     // (AtomoVisual), solo texto/campos.
-    const e = alquimiaRoute.elementoSel;
-    if (!e) return null;
+    if (perspectiva === "alquimia") {
+      const e = alquimiaRoute.elementoSel;
+      if (!e) return null;
+      return {
+        eyebrow: "Elemento",
+        title: `${e.simbolo} · ${e.nombre}`,
+        subtitle: e.familia,
+        note: e.notas ?? null,
+        fields: [
+          { label: "N° atómico", value: e.numero_atomico },
+          { label: "Es noble", value: e.es_noble ? "Sí" : "No" },
+        ],
+      };
+    }
+    // Química (VIS-03): el Elemento clickeado tiene prioridad sobre el
+    // Compuesto de fondo — muestra sus sitios de enlace reales (docx punto
+    // 18 "Click sobre un sitio"), no solo identidad básica.
+    if (elementoQuimicaClickeado) {
+      const e = elementoQuimicaClickeado;
+      const sitios = compuestoRoute.sitiosDelElementoFoco;
+      return {
+        eyebrow: "Elemento",
+        title: `${e.simbolo} · ${e.nombre}`,
+        subtitle: e.familia,
+        note: e.notas ?? null,
+        fields: [
+          { label: "N° atómico", value: e.numero_atomico },
+          {
+            label: "Sitios de enlace",
+            value: compuestoRoute.loadingSitios ? "cargando…" : sitios.length,
+          },
+          {
+            label: "Capacidad de enlace",
+            value: e.capacidad_enlace !== null && e.capacidad_enlace !== undefined ? e.capacidad_enlace.toFixed(3) : null,
+          },
+        ],
+      };
+    }
+    const c = compuestoRoute.compuestoSel;
+    if (!c) return null;
+    const props = propiedadesCalculadasDeCompuesto(c).filter(
+      (p) => ["estabilidad", "rigidez", "flexibilidad"].includes(p.clave),
+    );
     return {
-      eyebrow: "Elemento",
-      title: `${e.simbolo} · ${e.nombre}`,
-      subtitle: e.familia,
-      note: e.notas ?? null,
+      eyebrow: "Compuesto",
+      title: c.simbolo ? `${c.simbolo} · ${c.nombre}` : c.nombre,
+      subtitle: c.tipo_compuesto ?? undefined,
+      note: c.notas ?? null,
       fields: [
-        { label: "N° atómico", value: e.numero_atomico },
-        { label: "Es noble", value: e.es_noble ? "Sí" : "No" },
+        { label: "Elementos distintos", value: compuestoRoute.componentes.length },
+        { label: "Enlaces reales", value: compuestoRoute.loadingEnlaces ? "cargando…" : compuestoRoute.enlaces.length },
+        ...props.map((p) => ({ label: p.label, value: p.valor })),
       ],
     };
-  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute]);
+  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute, elementoQuimicaClickeado, compuestoRoute]);
 
   // Trace: ruta ya resuelta, en el mismo orden que el modelo real — nunca
-  // fusiona Física y Alquimia en una sola secuencia. Si hay una partícula
-  // clickeada (o un Ium en zoom), el Trace la refleja en vez de asumir
+  // fusiona Física, Alquimia y Química en una sola secuencia. Si hay una
+  // partícula/elemento clickeado, el Trace lo refleja en vez de asumir
   // siempre la primera — para no mostrarle al usuario una procedencia
   // distinta de lo que ve seleccionado en el canvas/Inspector.
   const traceSteps: TraceStep[] = useMemo(() => {
@@ -791,23 +1021,59 @@ function RutasSection() {
         { id: "t-oris", levelLabel: "Oris", title: o?.nombre ?? null, subtitle: o?.dominio ?? undefined },
       ];
     }
-    const e = alquimiaRoute.elementoSel;
-    const capaSel = alquimiaRoute.capaSel;
-    const capaConDatos = capaSel
-      ? alquimiaRoute.capas.find((c) => c.capa === capaSel)
-      : alquimiaRoute.capas.find((c) => c.total > 0);
-    const particulaTrace = particulaClickeada ?? alquimiaRoute.particulasDeCapaSel[0] ?? null;
+    if (perspectiva === "alquimia") {
+      const e = alquimiaRoute.elementoSel;
+      const capaSel = alquimiaRoute.capaSel;
+      const capaConDatos = capaSel
+        ? alquimiaRoute.capas.find((c) => c.capa === capaSel)
+        : alquimiaRoute.capas.find((c) => c.total > 0);
+      const particulaTrace = particulaClickeada ?? alquimiaRoute.particulasDeCapaSel[0] ?? null;
+      return [
+        {
+          id: "t-particula",
+          levelLabel: "Partícula química",
+          title: particulaTrace?.nombre ?? (capaConDatos && !particulaTrace ? capaConDatos.resumen.split(" ")[0] ?? null : null),
+          subtitle: particulaTrace?.formula ?? undefined,
+        },
+        { id: "t-capa", levelLabel: "Capa", title: capaConDatos?.label ?? null },
+        { id: "t-elemento", levelLabel: "Elemento", title: e ? `${e.simbolo} · ${e.nombre}` : null },
+      ];
+    }
+    // Química (VIS-03): la ruta completa del docx (24. VIS-03 definitivo —
+    // Elemento → Sitios → Compatibilidad → Enlace → Estructura → Compuesto).
+    // Compatibilidad no tiene traza propia hoy (no hay un hook que resuelva
+    // sitio_compatibilidad por par de sitios seleccionados en el canvas) —
+    // se muestra "—" en vez de inventar un valor, mismo criterio que
+    // TraceView ya soporta (title: null → "Sin dato").
+    const elFoco = elementoQuimicaClickeado ?? compuestoRoute.componentes[0]?.elemento ?? null;
+    const primerEnlace = compuestoRoute.enlaces[0] ?? null;
     return [
+      { id: "t-elemento", levelLabel: "Elemento", title: elFoco ? `${elFoco.simbolo} · ${elFoco.nombre}` : null },
       {
-        id: "t-particula",
-        levelLabel: "Partícula química",
-        title: particulaTrace?.nombre ?? (capaConDatos && !particulaTrace ? capaConDatos.resumen.split(" ")[0] ?? null : null),
-        subtitle: particulaTrace?.formula ?? undefined,
+        id: "t-sitios",
+        levelLabel: "Sitios",
+        title: elementoQuimicaClickeado
+          ? `${compuestoRoute.sitiosDelElementoFoco.length} sitio(s)`
+          : null,
       },
-      { id: "t-capa", levelLabel: "Capa", title: capaConDatos?.label ?? null },
-      { id: "t-elemento", levelLabel: "Elemento", title: e ? `${e.simbolo} · ${e.nombre}` : null },
+      { id: "t-compatibilidad", levelLabel: "Compatibilidad", title: null },
+      {
+        id: "t-enlace",
+        levelLabel: "Enlace",
+        title: primerEnlace ? `Intensidad ${primerEnlace.intensidad?.toFixed(2) ?? "—"}` : null,
+      },
+      {
+        id: "t-estructura",
+        levelLabel: "Estructura",
+        title: compuestoRoute.estructuraNombre,
+      },
+      {
+        id: "t-compuesto",
+        levelLabel: "Compuesto",
+        title: compuestoRoute.compuestoSel?.nombre ?? null,
+      },
     ];
-  }, [perspectiva, fisicaRoute, alquimiaRoute, particulaClickeada]);
+  }, [perspectiva, fisicaRoute, alquimiaRoute, compuestoRoute, particulaClickeada, elementoQuimicaClickeado]);
 
   return (
     <>
@@ -823,9 +1089,17 @@ function RutasSection() {
               selectedNodeId={nodoSelId}
               onSelectNode={setNodoSelId}
             />
-          ) : (
+          ) : perspectiva === "alquimia" ? (
             <RutaAlquimiaCanvas
               route={alquimiaRoute}
+              hoverId={hoverId}
+              setHoverId={setHoverId}
+              selectedNodeId={nodoSelId}
+              onSelectNode={setNodoSelId}
+            />
+          ) : (
+            <RutaCompuestoCanvas
+              route={compuestoRoute}
               hoverId={hoverId}
               setHoverId={setHoverId}
               selectedNodeId={nodoSelId}
@@ -842,7 +1116,7 @@ function RutasSection() {
         <div className="space-y-4 lg:max-w-[280px]">
           <Inspector
             entity={inspectorEntity}
-            emptyLabel="Seleccioná un Oris o un Elemento para inspeccionarlo."
+            emptyLabel="Seleccioná un Oris, un Elemento o un Compuesto para inspeccionarlo."
             bordered={false}
           />
           <div className="rounded-2xl p-5">
