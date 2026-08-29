@@ -43,6 +43,11 @@ export interface CapaResumen {
   particulas: ParticleMap;
   total: number;
   resumen: string;
+  /** Partículas de química de esta capa ya expandidas (una entrada por
+   *  unidad) con su fórmula A/T/S real — para CapaNodo, mismo criterio que
+   *  particulasDeCapaSel pero disponible para las 3 capas a la vez, no
+   *  solo la capa en zoom. */
+  particulasExpandidas: { nombre: ParticleType; formula: string }[];
 }
 
 export interface AlquimiaRouteState {
@@ -73,6 +78,20 @@ export interface AlquimiaRouteState {
 
 const NOMBRES_CAPA: LayerName[] = ["nucleo", "media", "externa"];
 
+/** Expande un ParticleMap de una capa a una entrada por unidad con su
+ *  fórmula A/T/S real — misma lógica que particulasDeCapaSel pero
+ *  reutilizable para cualquier capa, no solo la seleccionada. */
+function expandirParticulasCapa(mapa: ParticleMap, capa: LayerName): { nombre: ParticleType; formula: string }[] {
+  const out: { nombre: ParticleType; formula: string }[] = [];
+  for (const tipo of LAYER_PARTICLES[capa]) {
+    const cantidad = mapa[tipo] ?? 0;
+    const formula = PARTICULA_QUIMICA_FORMULA[tipo];
+    if (!cantidad || !formula) continue;
+    for (let i = 0; i < cantidad; i++) out.push({ nombre: tipo, formula });
+  }
+  return out;
+}
+
 export function useAlquimiaRoute(): AlquimiaRouteState {
   const { items: elementos, loading } = useElementos();
 
@@ -97,21 +116,14 @@ export function useAlquimiaRoute(): AlquimiaRouteState {
         particulas,
         total: layerTotal(particulas),
         resumen: formatLayer(particulas),
+        particulasExpandidas: expandirParticulasCapa(particulas, capa),
       };
     });
   }, [elementoSel]);
 
   const particulasDeCapaSel = useMemo(() => {
     if (!elementoSel || !capaSel) return [];
-    const mapa = elementoSel[capaSel] ?? {};
-    const out: { nombre: ParticleType; formula: string }[] = [];
-    for (const tipo of LAYER_PARTICLES[capaSel]) {
-      const cantidad = mapa[tipo] ?? 0;
-      const formula = PARTICULA_QUIMICA_FORMULA[tipo];
-      if (!cantidad || !formula) continue;
-      for (let i = 0; i < cantidad; i++) out.push({ nombre: tipo, formula });
-    }
-    return out;
+    return expandirParticulasCapa(elementoSel[capaSel] ?? {}, capaSel);
   }, [elementoSel, capaSel]);
 
   return {
