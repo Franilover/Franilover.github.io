@@ -181,13 +181,15 @@ export function StructureCanvas({
     // quepan en su propia circunferencia sin superponerse: arco disponible
     // por nodo = 2π·radius / n ≥ nodeDiameter + gap.
     const nodeDiameter = orbitNodeR * 2;
-    // Gap subido de 18 → 42: con pocos nodos por anillo (típico en el
-    // Oris, que suele tener 2-4 IUMs) el radio mínimo resultante era casi
-    // el mismo que el diámetro del nodo, así que los IUM terminaban muy
-    // pegados entre sí — se leían como un grupo borroso en vez de nodos
-    // individuales y distinguibles. Con más separación angular cada IUM
-    // queda claramente aislado del vecino.
-    const nodeGap = 42;
+    // Gap subido de 18 → 42 → proporcional al radio del nodo: con pocos
+    // nodos por anillo (típico en el Oris, que suele tener 2-4 IUMs) el
+    // radio mínimo resultante era casi el mismo que el diámetro del nodo,
+    // así que los IUM terminaban muy pegados entre sí — se leían como un
+    // grupo borroso en vez de nodos individuales y distinguibles. Un gap
+    // fijo en px no escalaba cuando nodeScale agrandó los nodos (ej. en
+    // Rutas), así que ahora es proporcional al radio real del nodo en
+    // este canvas — la separación crece junto con el tamaño del círculo.
+    const nodeGap = Math.max(42, orbitNodeR * 1.1);
     const minRadiusForNodes = (n: number) => (n * (nodeDiameter + nodeGap)) / (2 * Math.PI);
 
     // Radios por anillo: se construyen de ADENTRO hacia AFUERA (el anillo

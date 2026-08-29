@@ -395,7 +395,7 @@ function RutaFisicaCanvas({
         // ni el margen del foreignObject, el size interno sube de 52→64
         // para aprovechar el espacio ganado.
         hideBorder: true,
-        visual: <IumVisual particulas={particulasDelIumSel} size={96} showToggle={false} />,
+        visual: <IumVisual particulas={particulasDelIumSel} size={120} showToggle={false} />,
       };
       return [
         { id: "particulas", label: "Partículas del Ium", nodes: particulaNodesZoom },
@@ -459,7 +459,7 @@ function RutaFisicaCanvas({
           id: `ium-${iumId}-${rep}`,
           label: ium.nombre,
           hideBorder: true,
-          visual: <IumVisual particulas={particulasDelIumActual} size={84} showToggle={false} />,
+          visual: <IumVisual particulas={particulasDelIumActual} size={108} showToggle={false} />,
         });
       }
     }
@@ -491,22 +491,14 @@ function RutaFisicaCanvas({
 
   const edges: CanvasEdge[] = useMemo(() => {
     if (enZoomIum && iumSel) {
-      // Cada partícula del Ium se conecta al Ium — trazabilidad real 1:1,
-      // a diferencia de la vista de conjunto (donde particulasDeOris no
-      // trae mapeo partícula→IUM individual). Apunta a la posición exacta
-      // de esa partícula dentro del círculo del Ium (mismo ángulo que usa
-      // IumVisual para dibujarla: idx/total·2π - π/2), no al centro.
-      const total = particulasDelIumSel.length;
-      return particulasDelIumSel.map((_, i) => ({
-        fromNodeId: `particula-ium-${i}`,
-        toNodeId: `ium-${iumSel.id}`,
-        weight: 0.5,
-        toPoint: { angle: (i / total) * Math.PI * 2 - Math.PI / 2, radiusRatio: 0.34 },
-      }));
+      // Antes: cada partícula del Ium se conectaba con una línea al Ium.
+      // Quitado a pedido — con muchas partículas se veía muy cargado de
+      // líneas; el zoom ya deja claro qué partículas pertenecen a este
+      // Ium sin necesidad de trazar cada una.
+      return [];
     }
     if (!orisSel) return [];
     const out: CanvasEdge[] = [];
-    const iumIds = Object.keys(orisSel.iums_composicion).filter((id) => orisSel.iums_composicion[id] > 0);
     // Cada instancia de IUM (nodo `ium-{iumId}-{rep}`) se conecta al nodo
     // Oris. Antes había un solo nodo por IUM (agrupado); ahora que se
     // expande una instancia por unidad, se recorren los nodos reales de
@@ -516,37 +508,11 @@ function RutaFisicaCanvas({
       ?.nodes.forEach((n) => {
         out.push({ fromNodeId: n.id, toNodeId: `oris-${orisSel.id}`, weight: 0.6 });
       });
-    // Cada partícula se conecta a SU propio IUM real, a su instancia real
-    // cuando el IUM está repetido, y a la posición exacta de esa partícula
-    // DENTRO del círculo del IUM (no al centro) — mismo ángulo que usa
-    // IumVisual internamente para dibujarla: angle = (idx/total)·2π - π/2,
-    // a un radio relativo de 0.34 del nodo (mismo orbitR/size que usa
-    // IumVisual). Antes todas las partículas de un mismo iumId se
-    // conectaban a la instancia "ium-{iumId}-0" y al centro del nodo sin
-    // importar cuántas instancias/partículas hubiera.
-    columns
-      .find((c) => c.id === "particulas")
-      ?.nodes.forEach((n) => {
-        const conRep = n as typeof n & {
-          iumId?: string;
-          iumRep?: number;
-          particulaIdxEnIum?: number;
-          totalParticulasEnIum?: number;
-        };
-        if (conRep.iumId !== undefined && conRep.iumRep !== undefined) {
-          const total = conRep.totalParticulasEnIum ?? 1;
-          const idx = conRep.particulaIdxEnIum ?? 0;
-          const angle = (idx / total) * Math.PI * 2 - Math.PI / 2;
-          out.push({
-            fromNodeId: n.id,
-            toNodeId: `ium-${conRep.iumId}-${conRep.iumRep}`,
-            weight: 0.25,
-            toPoint: { angle, radiusRatio: 0.34 },
-          });
-        }
-      });
+    // Antes: cada partícula se conectaba con una línea a su IUM real
+    // (instancia y posición exacta incluidas). Quitado a pedido — solo
+    // quedan las líneas IUM→Oris.
     return out;
-  }, [enZoomIum, iumSel, particulasDelIumSel, orisSel, columns]);
+  }, [enZoomIum, iumSel, orisSel, columns]);
 
   // Click en un nodo: si es un IUM de la vista de conjunto, hace zoom.
   // El id real es `ium-{iumId}-{rep}` (una instancia expandida) — el
