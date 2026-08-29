@@ -102,16 +102,6 @@ const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
 // ajustarlos acá sube la respiración de todo el visualizador de una vez,
 // sin tener que tocar cada sección individualmente.
 
-function SectionTitle({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return (
-    <div className="mb-7">
-      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary/35">{eyebrow}</p>
-      <h1 className="mt-2 text-2xl font-black tracking-tight text-primary/90">{title}</h1>
-      <p className="mt-2 max-w-5xl text-sm leading-6 text-primary/50">{description}</p>
-    </div>
-  );
-}
-
 function StatusPill({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/50">
@@ -830,8 +820,6 @@ function RutasSection() {
 
   return (
     <>
-      <h2 className="mb-4 text-base font-black text-primary/85">Rutas</h2>
-
       <PerspectivaSwitcher value={perspectiva} onChange={setPerspectiva} />
 
       <div className="mt-8 grid gap-7 lg:grid-cols-[1.5fr_1fr]">
@@ -987,11 +975,6 @@ function VisualizadorPage() {
 
             {active === "micro" ? (
               <>
-                <SectionTitle
-                  eyebrow="Genealogía"
-                  title="De lo pequeño al fenómeno"
-                  description="Cadena real Partículas Base → Partículas → IUMs → Oris. Elige un Oris para ver de qué IUMs y partículas está hecho realmente."
-                />
                 <div className="overflow-x-auto rounded-2xl bg-primary/[0.02] p-5">
                   <div className="flex min-w-[820px] items-center gap-2">
                     <FlowNode title="Partículas Base" subtitle={`${particulasBase.length} · A / T / S`} />
@@ -1085,11 +1068,6 @@ function VisualizadorPage() {
 
             {active === "ats" ? (
               <>
-                <SectionTitle
-                  eyebrow="Fundamento"
-                  title="Equilibrio A / T / S"
-                  description="Las 11 Partículas reales, su fórmula de 3 letras y sus 6 ejes fundamentales reales (no un índice inventado)."
-                />
                 <div className="grid gap-7 lg:grid-cols-[0.9fr_1.1fr]">
                   <div className="rounded-2xl bg-primary/[0.02] p-7">
                     {loadingParticulas ? (
@@ -1163,11 +1141,6 @@ function VisualizadorPage() {
 
             {active === "formula" ? (
               <>
-                <SectionTitle
-                  eyebrow="Matemática del mundo"
-                  title="Fórmulas que se pueden ver"
-                  description={`Catálogo real de ${propiedadesDerivadas.length} propiedades derivadas — fórmula y dependencias tal cual las define Supabase.`}
-                />
                 <div className="grid gap-7 lg:grid-cols-2">
                   <div className="rounded-2xl bg-primary/[0.02] p-7">
                     <p className="text-xs font-black text-primary/80">Densidad</p>
@@ -1257,11 +1230,6 @@ function VisualizadorPage() {
 
             {active === "material" ? (
               <>
-                <SectionTitle
-                  eyebrow="Materia"
-                  title="Perfil de un material"
-                  description={`Selector real de los ${materiales.length} materiales del mundo, con sus propiedades calculadas por Supabase.`}
-                />
                 {loadingMateriales ? (
                   <LoadingRow />
                 ) : (
@@ -1313,11 +1281,6 @@ function VisualizadorPage() {
 
             {active === "structure" ? (
               <>
-                <SectionTitle
-                  eyebrow="Arquitectura"
-                  title="Cómo una estructura cambia el comportamiento"
-                  description={`Selector real de las ${estructuras.length} estructuras del mundo, con sus propiedades calculadas.`}
-                />
                 {loadingEstructuras ? (
                   <LoadingRow />
                 ) : (
@@ -1370,11 +1333,6 @@ function VisualizadorPage() {
 
             {active === "reactivity" ? (
               <>
-                <SectionTitle
-                  eyebrow="Reactividad"
-                  title="De composición a procesos posibles"
-                  description={`Selector real de los ${compuestos.length} compuestos del mundo, con sus propiedades reactivas calculadas.`}
-                />
                 {loadingCompuestos ? (
                   <LoadingRow />
                 ) : (
@@ -1437,11 +1395,6 @@ function VisualizadorPage() {
 
             {active === "energy" ? (
               <>
-                <SectionTitle
-                  eyebrow="Dinámica"
-                  title="Energía de enlace por compuesto"
-                  description="Comparación real de energía de enlace entre los compuestos cargados — mismo campo que usa CompuestoEditor, sin datos de demostración."
-                />
                 {loadingCompuestos ? (
                   <LoadingRow />
                 ) : (
@@ -1467,11 +1420,6 @@ function VisualizadorPage() {
 
             {active === "electric" ? (
               <>
-                <SectionTitle
-                  eyebrow="Carga"
-                  title="Carga neta real por compuesto"
-                  description="Compara la carga real almacenada en Supabase (compuestos.carga) entre los compuestos disponibles."
-                />
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   {compuestos
                     .filter((c) => typeof c.carga === "number" && c.carga !== 0)
@@ -1493,11 +1441,6 @@ function VisualizadorPage() {
 
             {active === "information" ? (
               <>
-                <SectionTitle
-                  eyebrow="Información"
-                  title="Señal, intensidad y fidelidad"
-                  description="Esta capa aún no tiene tabla propia en Supabase (a diferencia del resto de secciones) — se muestra como diagrama conceptual, marcado explícitamente como tal."
-                />
                 <div className="flex flex-wrap items-center gap-2 overflow-x-auto rounded-2xl bg-primary/[0.02] p-7">
                   <FlowNode title="Fuente" subtitle="mensaje + intensidad" />
                   <Arrow />
@@ -1514,11 +1457,6 @@ function VisualizadorPage() {
 
             {active === "oris" ? (
               <>
-                <SectionTitle
-                  eyebrow="Capa funcional"
-                  title="Oris / Éterium"
-                  description={`Los ${oris.length} Oris reales, su fórmula de IUMs, dominio y familia — leídos directo de la tabla "oris" + "oris_iums".`}
-                />
                 {loadingOris ? (
                   <LoadingRow />
                 ) : (
@@ -1569,11 +1507,6 @@ function VisualizadorPage() {
 
             {active === "runas" ? (
               <>
-                <SectionTitle
-                  eyebrow="Semántica"
-                  title="Runas como operadores"
-                  description={`Las ${runas.length} runas reales del sistema, dibujadas a partir de su patrón de trazos real (patron_trazos), no un ícono genérico.`}
-                />
                 {loadingRunas ? (
                   <LoadingRow />
                 ) : (
@@ -1628,11 +1561,6 @@ function VisualizadorPage() {
 
             {active === "process" ? (
               <>
-                <SectionTitle
-                  eyebrow="Causalidad"
-                  title="Proceso → mecanismo → efecto"
-                  description={`Selector real de los ${procesos.length} procesos del mundo, con su cadena entrada → transformación → salida.`}
-                />
                 {loadingProcesos ? (
                   <LoadingRow />
                 ) : (
