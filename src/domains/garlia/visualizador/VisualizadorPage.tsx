@@ -71,7 +71,7 @@ import { contarLetrasNodo } from "./NodeVisuals";
 // elementos/ElementoEditor.tsx. Se trae acá tal cual, mismo criterio que
 // ParticulaVisual/IumVisual desde fisica/: reusar el visor real en vez de
 // mantener un dibujo propio (ElementoNodo) en NodeVisuals.tsx.
-import { AtomoVisual, type PerfilConCapas } from "@/domains/garlia/elementos/ElementoEditor";
+import { AtomoVisual } from "@/domains/garlia/elementos/ElementoEditor";
 import { TriangleATS, type EntidadATS } from "./TriangleATS";
 // Componente "de afuera" del visualizador (fisica/), el diseño original de
 // Partícula con letras dentro de tercios de color — pedido explícito de
@@ -585,38 +585,14 @@ function RutaAlquimiaCanvas({
   selectedNodeId: string | null;
   onSelectNode: (id: string) => void;
 }) {
-  const { elementos, elementoSel, setElementoSelId, capas, capaSel, setCapaSel, particulasDeCapaSel } = route;
+  const { elementos, elementoSel, setElementoSelId, capas } = route;
 
   const columns: CanvasColumn[] = useMemo(() => {
     if (!elementoSel) return [];
-    if (capaSel) {
-      // Vista con zoom: Partículas de la capa (nivel 1) → esa capa (nivel 2),
-      // mismo patrón que la vista con zoom de Física (Partículas del Ium → Ium).
-      const particulaNodesZoom = particulasDeCapaSel.map((p, i) => ({
-        id: `particula-${capaSel}-${i}`,
-        label: p.nombre,
-        sublabel: p.formula,
-        visual: <ParticulaVisual formula={p.formula} size={40} />,
-      }));
-      const capaZoomLabel = capas.find((c) => c.capa === capaSel)?.label ?? capaSel;
-      // Mismo componente que dibuja el Elemento completo (AtomoVisual),
-      // pero recibiendo solo la capa activa poblada — las otras dos
-      // quedan sin datos (undefined) para que AtomoVisual no dibuje
-      // partículas que no corresponden a esta capa en zoom.
-      const perfilSoloEstaCapa: PerfilConCapas = { [capaSel]: capas.find((c) => c.capa === capaSel)?.particulas };
-      const capaNodeZoom = {
-        id: `capa-${capaSel}`,
-        label: capaZoomLabel,
-        sublabel: "Capa seleccionada",
-        tone: "accent" as const,
-        hideBorder: true,
-        visual: <AtomoVisual elemento={perfilSoloEstaCapa} className="w-full aspect-square h-auto" />,
-      };
-      return [
-        { id: "particulas", label: "Partícula química", nodes: particulaNodesZoom },
-        { id: "capa", label: "Capa", nodes: [capaNodeZoom] },
-      ];
-    }
+    // Sin zoom de capa: el propio AtomoVisual ya distingue núcleo/media/
+    // externa dentro de un solo gráfico (órbitas concéntricas), así que
+    // hacer zoom a una capa individual + mostrar sus partículas sueltas al
+    // lado terminaba duplicando la misma información dos veces.
     const capaNodes = capas.map((c) => ({
       id: `capa-${c.capa}`,
       label: c.label,
@@ -639,18 +615,10 @@ function RutaAlquimiaCanvas({
       { id: "capas", label: "Capa", nodes: capaNodes },
       { id: "elemento", label: "Elemento", nodes: [elementoNode] },
     ];
-  }, [elementoSel, capas, capaSel, particulasDeCapaSel]);
+  }, [elementoSel, capas]);
 
   const edges: CanvasEdge[] = useMemo(() => {
     if (!elementoSel) return [];
-    if (capaSel) {
-      // Cada partícula de la capa se conecta a esa capa — trazabilidad 1:1.
-      return particulasDeCapaSel.map((_, i) => ({
-        fromNodeId: `particula-${capaSel}-${i}`,
-        toNodeId: `capa-${capaSel}`,
-        weight: 0.5,
-      }));
-    }
     const out: CanvasEdge[] = [];
     for (const c of capas) {
       if (c.total > 0) {
@@ -658,21 +626,7 @@ function RutaAlquimiaCanvas({
       }
     }
     return out;
-  }, [elementoSel, capas, capaSel, particulasDeCapaSel]);
-
-  // Click en un nodo: si es una capa de la vista de conjunto, hace zoom
-  // (selecciona esa capa, mismo estado capaSel que ya manejaba el hook).
-  // Si no, delega al manejo normal (partícula/Elemento) del padre.
-  function handleSelectNode(nodeId: string) {
-    if (nodeId.startsWith("capa-")) {
-      const capa = nodeId.slice("capa-".length) as typeof capaSel;
-      const capaData = capas.find((c) => c.capa === capa);
-      if (!capaData || capaData.total === 0) return;
-      setCapaSel(capaSel === capa ? null : capa);
-      return;
-    }
-    onSelectNode(nodeId);
-  }
+  }, [elementoSel, capas]);
 
   return (
     <>
@@ -684,51 +638,28 @@ function RutaAlquimiaCanvas({
             active={elementoSel}
             getKey={(e) => e.id}
             getLabel={(e) => `${e.simbolo} · ${e.nombre}`}
-            onSelect={(e) => {
-              setElementoSelId(e.id);
-              setCapaSel(null);
-            }}
+            onSelect={(e) => setElementoSelId(e.id)}
             placeholder="Seleccioná un elemento…"
           />
-          {capaSel ? (
-            <button
-              type="button"
-              onClick={() => setCapaSel(null)}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-primary/15 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/60 hover:border-primary/30 hover:text-primary/85"
-            >
-              <ChevronRight className="rotate-180" size={12} />
-              Volver a {elementoSel?.nombre ?? "Elemento"}
-            </button>
-          ) : (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {capas.map((c) => (
-                <button
-                  key={c.capa}
-                  type="button"
-                  onClick={() => setCapaSel(c.capa)}
-                  disabled={c.total === 0}
-                  className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${
-                    c.total === 0
-                      ? "cursor-not-allowed border-primary/5 text-primary/25"
-                      : "border-primary/10 text-primary/45 hover:border-primary/25"
-                  }`}
-                >
-                  {c.label} · {c.total > 0 ? c.resumen : "vacía"}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {capas.map((c) => (
+              <div
+                key={c.capa}
+                className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                  c.total === 0 ? "border-primary/5 text-primary/25" : "border-primary/10 text-primary/45"
+                }`}
+              >
+                {c.label} · {c.total > 0 ? c.resumen : "vacía"}
+              </div>
+            ))}
+          </div>
           <div className="mt-5 rounded-2xl p-5">
             <StructureCanvas
               columns={columns}
               edges={edges}
-              selectedNodeId={
-                capaSel
-                  ? `capa-${capaSel}`
-                  : (selectedNodeId ?? (elementoSel ? `elemento-${elementoSel.id}` : null))
-              }
+              selectedNodeId={selectedNodeId ?? (elementoSel ? `elemento-${elementoSel.id}` : null)}
               onHoverNode={setHoverId}
-              onSelectNode={handleSelectNode}
+              onSelectNode={onSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
             />
           </div>
@@ -757,7 +688,6 @@ function RutasSection() {
     fisicaRoute.orisSel?.id,
     fisicaRoute.iumSel?.id,
     alquimiaRoute.elementoSel?.id,
-    alquimiaRoute.capaSel,
   ]);
 
   // Partícula clickeada dentro del canvas activo, si el nodo seleccionado
@@ -841,23 +771,8 @@ function RutasSection() {
       };
     }
     // Capa en zoom tiene prioridad sobre el Elemento de fondo, mismo
-    // criterio que IUM sobre Oris en Física: es la entidad que el usuario
-    // efectivamente clickeó. Antes el click en una capa nunca llegaba acá
-    // (ver handleSelectNode en RutaAlquimiaCanvas) y el Inspector seguía
-    // mostrando el Elemento.
-    const capa = alquimiaRoute.capaSel;
-    if (capa) {
-      const capaData = alquimiaRoute.capas.find((c) => c.capa === capa);
-      return {
-        eyebrow: "Capa",
-        title: capaData?.label ?? capa,
-        subtitle: alquimiaRoute.elementoSel?.nombre,
-        fields: [
-          { label: "Partículas", value: alquimiaRoute.particulasDeCapaSel.length },
-          { label: "Composición", value: capaData?.resumen ?? "—" },
-        ],
-      };
-    }
+    // Sin zoom de capa: siempre se muestra el Elemento completo con su
+    // AtomoVisual (núcleo/media/externa distinguibles en un solo gráfico).
     const e = alquimiaRoute.elementoSel;
     if (!e) return null;
     return {
