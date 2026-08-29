@@ -13,7 +13,6 @@
  */
 
 import React from "react";
-import { Atom, Sparkles } from "lucide-react";
 
 export type Perspectiva = "fisica" | "alquimia";
 
@@ -21,10 +20,9 @@ const OPCIONES: {
   key: Perspectiva;
   label: string;
   ruta: string;
-  icon: React.ReactNode;
 }[] = [
-  { key: "fisica", label: "Física", ruta: "Partícula → IUM → Oris", icon: <Sparkles size={14} /> },
-  { key: "alquimia", label: "Alquimia", ruta: "Partícula → Capa → Elemento", icon: <Atom size={14} /> },
+  { key: "fisica", label: "Física", ruta: "Partícula → IUM → Oris" },
+  { key: "alquimia", label: "Alquimia", ruta: "Partícula → Capa → Elemento" },
 ];
 
 export function PerspectivaSwitcher({
@@ -35,7 +33,7 @@ export function PerspectivaSwitcher({
   onChange: (p: Perspectiva) => void;
 }) {
   return (
-    <div className="inline-flex rounded-2xl border border-primary/10 p-1.5">
+    <div className="flex w-full">
       {OPCIONES.map((op) => {
         const active = value === op.key;
         return (
@@ -43,11 +41,8 @@ export function PerspectivaSwitcher({
             key={op.key}
             type="button"
             onClick={() => onChange(op.key)}
-            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
-              active ? "border border-primary/25" : "border border-transparent hover:border-primary/15"
-            }`}
+            className="flex flex-1 items-center gap-3 px-4 py-1.5 text-left transition-colors"
           >
-            <span className={active ? "text-primary/80" : "text-primary/40"}>{op.icon}</span>
             <span>
               <span
                 className={`block text-[10px] font-black uppercase tracking-widest ${
