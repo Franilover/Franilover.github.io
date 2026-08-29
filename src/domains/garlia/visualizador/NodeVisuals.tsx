@@ -62,13 +62,16 @@ function sectorPath(cx: number, cy: number, r: number, anguloIni: number, angulo
 }
 
 /**
- * Punto 4 del docx: "Cada partícula tiene identidad" — el diagrama
- * muestra siempre ○ (círculo simple, un solo tono) con el nombre encima y
- * el código A/T/S (ej. "TAA") como texto debajo, NUNCA un círculo partido
- * en sectores de color por letra — esa idea de "gajos" no aparece en
- * ninguna parte del documento maestro; era el diseño de
- * fisica/ParticulaVisual.tsx reciclado bajo otro nombre. Acá se reconstruye
- * literalmente lo que el docx dibuja: un punto ○ y su código como texto.
+ * Punto 4 del docx: "Cada partícula tiene identidad". El boceto del
+ * documento usa "○" como notación genérica de "esto es una partícula" en
+ * el diagrama ASCII — no significa que todas deban renderizarse
+ * literalmente idénticas. La identidad real de cada partícula (más allá
+ * de su nombre/código, que ya se muestran como texto en StructureCanvas)
+ * es su composición A/T/S — así que el propio círculo la refleja: color
+ * dominante según qué letra pesa más en la fórmula, y un pequeño anillo
+ * partido en tercios reales (no siempre 3 iguales) que muestra la mezcla
+ * exacta de A/T/S de ESA partícula. Dos partículas con fórmula distinta
+ * (ej. "TTT" vs "AAA" vs "SAT") ahora se ven visiblemente distintas.
  */
 export function ParticulaNodo({
   formula,
@@ -79,33 +82,64 @@ export function ParticulaNodo({
   size?: number;
   className?: string;
 }) {
+  const letras = formula
+    .toUpperCase()
+    .split("")
+    .filter(esLetraATS) as LetraATS[];
+  const conteo = contarLetrasNodo(formula);
+  const total = conteo.A + conteo.T + conteo.S;
+
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 2;
-  const fontSize = size * 0.34;
+  const ringWidth = Math.max(2, size * 0.1);
+  const innerR = r - ringWidth;
+
+  // Letra dominante: la más frecuente en la fórmula, para el color de
+  // fondo del núcleo. Empate → se usa la primera letra de la fórmula.
+  let dominante: LetraATS = letras[0] ?? "A";
+  (["A", "T", "S"] as LetraATS[]).forEach((l) => {
+    if (conteo[l] > conteo[dominante]) dominante = l;
+  });
+  const colorDominante = LETRA_COLOR[dominante];
+
+  let anguloActual = -Math.PI / 2;
 
   return (
     <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className={className} role="img" aria-label={`Partícula ${formula}`}>
-      <circle
-        cx={cx}
-        cy={cy}
-        r={r}
-        strokeWidth={2}
-        style={{ fill: "color-mix(in srgb, var(--primary) 12%, transparent)", stroke: "var(--primary)" }}
-      />
-      <text
-        x={cx}
-        y={cy}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={fontSize}
-        fontWeight={900}
-        style={{ fill: "color-mix(in srgb, var(--primary) 85%, transparent)" }}
-      >
-        ○
-      </text>
+      {/* Núcleo: color de la letra dominante — distingue de un vistazo si
+          la partícula es mayormente Antítesis/Tesis/Síntesis. */}
+      <circle cx={cx} cy={cy} r={innerR} strokeWidth={1.5} style={{ fill: colorDominante.bg, stroke: colorDominante.border }} />
+
+      {/* Anillo exterior: partido según la composición REAL de la fórmula
+          (no tercios iguales por defecto) — ej. "TTT" es un anillo
+          enteramente rojo, "SAT" son 3 tercios de colores distintos. */}
+      {total > 0 &&
+        letras.map((letra, i) => {
+          if (letras.length <= 1) return null; // 1 sola letra: el núcleo ya la muestra, el anillo sería redundante
+          const anguloSector = (Math.PI * 2) / letras.length;
+          const anguloIni = anguloActual;
+          const anguloFin = anguloActual + anguloSector;
+          anguloActual = anguloFin;
+          const color = LETRA_COLOR[letra];
+          return <path key={i} d={ringSectorPath(cx, cy, r, innerR, anguloIni, anguloFin)} strokeWidth={0.75} style={{ fill: color.bg, stroke: color.border }} />;
+        })}
+
+      <circle cx={cx} cy={cy} r={r} fill="none" strokeWidth={1.5} style={{ stroke: "color-mix(in srgb, var(--primary) 55%, transparent)" }} />
     </svg>
   );
+}
+
+/** Path de un sector de anillo (entre radio interno y externo), para el
+ *  borde de composición A/T/S de ParticulaNodo. */
+function ringSectorPath(cx: number, cy: number, rOuter: number, rInner: number, anguloIni: number, anguloFin: number): string {
+  const p = (r: number, a: number) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  const [x1, y1] = p(rOuter, anguloIni);
+  const [x2, y2] = p(rOuter, anguloFin);
+  const [x3, y3] = p(rInner, anguloFin);
+  const [x4, y4] = p(rInner, anguloIni);
+  const largo = anguloFin - anguloIni > Math.PI ? 1 : 0;
+  return `M ${x1} ${y1} A ${rOuter} ${rOuter} 0 ${largo} 1 ${x2} ${y2} L ${x3} ${y3} A ${rInner} ${rInner} 0 ${largo} 0 ${x4} ${y4} Z`;
 }
 
 /**
@@ -145,16 +179,19 @@ export function CentroGravedadNodo({
             const angulo = (i / particulas.length) * Math.PI * 2 - Math.PI / 2;
             const px = cx + Math.cos(angulo) * orbitR;
             const py = cy + Math.sin(angulo) * orbitR;
+            // Misma identidad visual que ParticulaNodo: color según la
+            // letra dominante de SU fórmula real, no un mismo tono fijo
+            // para todas (antes eran indistinguibles entre sí).
+            const conteo = contarLetrasNodo(p.formula);
+            let dominante: LetraATS = "A";
+            (["A", "T", "S"] as LetraATS[]).forEach((l) => {
+              if (conteo[l] > conteo[dominante]) dominante = l;
+            });
+            const color = LETRA_COLOR[dominante];
             return (
               <g key={`${p.nombre}-${i}`}>
                 <title>{`${p.nombre} (${p.formula})`}</title>
-                <circle
-                  cx={px}
-                  cy={py}
-                  r={particleR}
-                  strokeWidth={1}
-                  style={{ fill: "color-mix(in srgb, var(--primary) 12%, transparent)", stroke: "var(--primary)" }}
-                />
+                <circle cx={px} cy={py} r={particleR} strokeWidth={1} style={{ fill: color.bg, stroke: color.border }} />
               </g>
             );
           })}
