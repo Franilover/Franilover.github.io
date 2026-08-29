@@ -373,46 +373,20 @@ export function IumVisual({
                 );
               }
 
-              const letras = p.formula
-                .toUpperCase()
-                .split("")
-                .filter(esLetraATS) as LetraATS[];
-              // 3 tercios en miniatura, mismo criterio que ParticulaVisual: cada
-              // letra de la fórmula ocupa su propio sector de 120°, con su
-              // letra sola (no las 3 juntas) para que quepa en el círculo chico.
-              const anguloTercio = (Math.PI * 2) / 3;
-              const miniFont = particleR * 0.62;
+              // Antes: sectores de 120° dibujados a mano acá mismo (mini
+              // versión propia de ParticulaVisual, con menos nitidez —
+              // stroke más fino, sin el circulito de máscara antialiasing
+              // que usa el visor de Partículas real). Ahora se reusa
+              // ParticulaVisual tal cual (mismo componente que el visor de
+              // Partículas), vía foreignObject, para que cada Partícula
+              // dentro del Ium se vea idéntica a como se ve en su propio
+              // visor — mismo trazo, mismo criterio de sectores/letra única.
               return (
                 <g key={`${p.nombre}-${i}`}>
                   <title>{`${p.nombre} (${p.formula})`}</title>
-                  {letras.map((letra, j) => {
-                    const aIni = -Math.PI / 2 + j * anguloTercio;
-                    const aFin = aIni + anguloTercio;
-                    const aMedio = (aIni + aFin) / 2;
-                    const color = LETRA_COLOR[letra];
-                    const labelR = particleR * 0.55;
-                    return (
-                      <g key={j}>
-                        <path
-                          d={sectorPath(px, py, particleR, aIni, aFin)}
-                          strokeWidth={1}
-                          style={{ fill: color.bg, stroke: color.border }}
-                        />
-                        <text
-                          x={px + labelR * Math.cos(aMedio)}
-                          y={py + labelR * Math.sin(aMedio)}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          fontSize={miniFont}
-                          fontWeight={900}
-                          style={{ fill: color.fg }}
-                        >
-                          {letra}
-                        </text>
-                      </g>
-                    );
-                  })}
-                  <circle cx={px} cy={py} r={particleR} fill="none" strokeWidth={1} style={{ stroke: "var(--bg-main)" }} />
+                  <foreignObject x={px - particleR} y={py - particleR} width={particleR * 2} height={particleR * 2}>
+                    <ParticulaVisual formula={p.formula} size={particleR * 2} />
+                  </foreignObject>
                 </g>
               );
             })}
@@ -420,6 +394,7 @@ export function IumVisual({
             {/* Centro: punto de anclaje visual, igual que el núcleo de AtomoVisual. */}
             <circle cx={cx} cy={cy} r={size * 0.05} style={{ fill: "color-mix(in srgb, var(--primary) 25%, transparent)" }} />
           </>
+
         )}
       </svg>
     </div>
