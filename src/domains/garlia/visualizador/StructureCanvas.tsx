@@ -86,6 +86,14 @@ export interface StructureCanvasProps {
    *  más grande que los nodos orbitantes (ej. IUM) sin agrandar estos
    *  últimos también. */
   centerScaleExtra?: number;
+  /** Al cambiar este valor, se repite la animación de construcción
+   *  (scattered→converging→forming→emerging→stable) aunque el centro
+   *  (columns[last].nodes[0].id) sea el mismo — para un botón explícito
+   *  tipo "REPRODUCIR FORMACIÓN" (docx VIS-03 punto 19) que el llamador
+   *  dispara sin cambiar de entidad. Ignorado si no se pasa (default
+   *  undefined, comportamiento actual sin cambios: solo se anima al
+   *  cambiar de centro real). */
+  replayToken?: string | number;
 }
 
 const CENTER_R = 48; // radio del nodo central (el "centro de gravedad"). Subido
@@ -129,6 +137,7 @@ export function StructureCanvas({
   className,
   nodeScale = 1,
   centerScaleExtra = 1,
+  replayToken,
 }: StructureCanvasProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
 
@@ -166,7 +175,7 @@ export function StructureCanvas({
     // array de columns con el mismo centro (evita reiniciar la animación
     // en cada render por referencias nuevas de objetos).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centerId]);
+  }, [centerId, replayToken]);
 
   const { laidOut, size, ringCount } = useMemo(() => {
     const nodesById = new Map<string, LaidOutNode>();

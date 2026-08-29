@@ -644,6 +644,161 @@ function RutaAlquimiaCanvas({
 // useCompuestoRoute ya resolvió, sin decidir compatibilidad ni estructura
 // acá — "el frontend no decide que sea compatible; el motor entrega el
 // resultado" (docx punto 5).
+/** Modo de vista dentro de VIS-03 — docx puntos 11/12: "Modo Ciencia" (panel
+ *  de datos completo: elementos/sitios/enlaces/estructura en crudo) vs
+ *  "Modo Exploración" (hover/click naturales sobre el canvas, sin panel de
+ *  datos de fondo). "El panel nunca debe ser más importante que la
+ *  estructura visual" — por eso Ciencia agrega un panel ADEMÁS del canvas,
+ *  nunca lo reemplaza. */
+type ModoVisComp = "exploracion" | "ciencia";
+
+function ModoCompSwitcher({ value, onChange }: { value: ModoVisComp; onChange: (m: ModoVisComp) => void }) {
+  const opciones: { key: ModoVisComp; label: string }[] = [
+    { key: "exploracion", label: "Exploración" },
+    { key: "ciencia", label: "Ciencia" },
+  ];
+  return (
+    <div className="flex gap-1.5">
+      {opciones.map((op) => (
+        <button
+          key={op.key}
+          type="button"
+          onClick={() => onChange(op.key)}
+          className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+            value === op.key
+              ? "border-primary/40 text-primary/90"
+              : "border-primary/10 text-primary/45 hover:border-primary/25 hover:text-primary/70"
+          }`}
+        >
+          {op.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Panel "Modo Ciencia" (docx punto 11) — Elementos/Sitios/Enlaces/Estructura
+ *  en crudo, todo lectura directa de lo que route ya resolvió. Se agrega
+ *  DEBAJO del canvas, nunca lo reemplaza (regla explícita del docx). */
+function PanelModoCiencia({ route }: { route: ReturnType<typeof useCompuestoRoute> }) {
+  const { compuestoSel, componentes, enlaces, elementoFocoId, sitiosDelElementoFoco, estructuraNombre } = route;
+  if (!compuestoSel) return null;
+  const elementoFoco = componentes.find((c) => c.elemento.id === elementoFocoId)?.elemento ?? null;
+  return (
+    <div className="mt-4 grid gap-4 rounded-2xl border border-primary/10 p-5 sm:grid-cols-4">
+      <div>
+        <p className="text-[9px] font-black uppercase tracking-widest text-primary/35">Elementos</p>
+        <ul className="mt-2 space-y-1 text-xs text-primary/70">
+          {componentes.map((c) => (
+            <li key={c.elemento.id}>
+              {c.elemento.simbolo} · {c.elemento.nombre} ×{c.cantidad}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <p className="text-[9px] font-black uppercase tracking-widest text-primary/35">Sitios</p>
+        {!elementoFoco ? (
+          <p className="mt-2 text-xs text-primary/35">Pasá el cursor sobre un elemento.</p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-xs text-primary/70">
+            {sitiosDelElementoFoco.length === 0 ? (
+              <li className="text-primary/35">Sin sitios calculados.</li>
+            ) : (
+              sitiosDelElementoFoco.map((s) => (
+                <li key={s.id}>
+                  #{s.numero_sitio ?? "—"} · {s.tipo} · afinidad {s.afinidad?.toFixed(2) ?? "—"}
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
+      <div>
+        <p className="text-[9px] font-black uppercase tracking-widest text-primary/35">Enlaces</p>
+        <ul className="mt-2 space-y-1 text-xs text-primary/70">
+          {enlaces.length === 0 ? (
+            <li className="text-primary/35">Sin enlaces calculados.</li>
+          ) : (
+            enlaces.map((e) => (
+              <li key={e.id}>
+                intensidad {e.intensidad?.toFixed(2) ?? "—"} · estabilidad {e.estabilidad?.toFixed(2) ?? "—"}
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
+      <div>
+        <p className="text-[9px] font-black uppercase tracking-widest text-primary/35">Estructura</p>
+        <p className="mt-2 text-xs text-primary/70">{estructuraNombre ?? "Sin estructura formalizada."}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Comparación de compuestos (docx punto 22): dos StructureCanvas lado a
+ *  lado, cada uno con su propia composición/estructura/propiedades reales
+ *  — nunca una sola vista fusionada, para no sugerir una relación entre
+ *  ambos que el motor no calculó. */
+function PanelComparacion({
+  route,
+  compuestoBId,
+  setCompuestoBId,
+}: {
+  route: ReturnType<typeof useCompuestoRoute>;
+  compuestoBId: string | null;
+  setCompuestoBId: (id: string | null) => void;
+}) {
+  const compuestoB = compuestoBId ? route.compuestos.find((c) => c.id === compuestoBId) ?? null : null;
+  const propsA = route.compuestoSel ? propiedadesCalculadasDeCompuesto(route.compuestoSel) : [];
+  const propsB = compuestoB ? propiedadesCalculadasDeCompuesto(compuestoB) : [];
+  const clavesComparadas = ["estabilidad", "rigidez", "flexibilidad", "dureza"];
+
+  return (
+    <div className="mt-4 rounded-2xl border border-primary/10 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] font-black uppercase tracking-widest text-primary/40">
+          Comparar con
+        </p>
+        <SelectDropdown
+          items={route.compuestos.filter((c) => c.id !== route.compuestoSel?.id)}
+          active={compuestoB}
+          getKey={(c) => c.id}
+          getLabel={(c) => (c.simbolo ? `${c.simbolo} · ${c.nombre}` : c.nombre)}
+          onSelect={(c) => setCompuestoBId(c.id)}
+          placeholder="Elegí un segundo compuesto…"
+        />
+      </div>
+      {!compuestoB ? null : (
+        <div className="mt-4 grid grid-cols-2 gap-6">
+          {[
+            { c: route.compuestoSel, props: propsA },
+            { c: compuestoB, props: propsB },
+          ].map(({ c, props }, i) => (
+            <div key={i}>
+              <p className="text-xs font-black text-primary/85">{c?.nombre}</p>
+              <p className="mt-0.5 text-[11px] text-primary/45">
+                {c?.componentes?.length ?? 0} elemento(s) · {c?.tipo_compuesto ?? "sin clasificar"}
+              </p>
+              <div className="mt-3 space-y-2">
+                {clavesComparadas.map((clave) => {
+                  const p = props.find((pp) => pp.clave === clave);
+                  return (
+                    <div key={clave} className="flex items-center justify-between text-xs">
+                      <span className="text-primary/40">{p?.label ?? clave}</span>
+                      <span className="text-primary/70">{p?.valor ?? "—"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RutaCompuestoCanvas({
   route,
   hoverId,
@@ -658,6 +813,14 @@ function RutaCompuestoCanvas({
   onSelectNode: (id: string) => void;
 }) {
   const { compuestoSel, componentes, enlaces } = route;
+
+  const [modo, setModo] = useState<ModoVisComp>("exploracion");
+  const [comparando, setComparando] = useState(false);
+  const [compuestoBId, setCompuestoBId] = useState<string | null>(null);
+  // Token de reproducción (docx punto 19: botón [ REPRODUCIR FORMACIÓN ]).
+  // Cambiar este valor re-dispara la animación de fases del canvas aunque
+  // el compuesto activo sea el mismo — ver replayToken en StructureCanvas.
+  const [replayToken, setReplayToken] = useState(0);
 
   // Nivel 1: un nodo por unidad de Elemento en la composición real (ej.
   // A×2, B×1, C×3 → 6 nodos), mismo criterio de expansión 1-instancia-por-
@@ -760,14 +923,38 @@ function RutaCompuestoCanvas({
       {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Compuestos cargados en Supabase todavía.</EmptyRow> : null}
       {!route.loading && route.compuestos.length > 0 ? (
         <>
-          <SelectDropdown
-            items={route.compuestos}
-            active={compuestoSel}
-            getKey={(c) => c.id}
-            getLabel={(c) => (c.simbolo ? `${c.simbolo} · ${c.nombre}` : c.nombre)}
-            onSelect={(c) => route.setCompuestoSelId(c.id)}
-            placeholder="Seleccioná un compuesto…"
-          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SelectDropdown
+              items={route.compuestos}
+              active={compuestoSel}
+              getKey={(c) => c.id}
+              getLabel={(c) => (c.simbolo ? `${c.simbolo} · ${c.nombre}` : c.nombre)}
+              onSelect={(c) => route.setCompuestoSelId(c.id)}
+              placeholder="Seleccioná un compuesto…"
+            />
+            <div className="flex items-center gap-2.5">
+              <ModoCompSwitcher value={modo} onChange={setModo} />
+              <button
+                type="button"
+                onClick={() => setReplayToken((t) => t + 1)}
+                className="rounded-full border border-primary/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-primary/55 transition-colors hover:border-primary/30 hover:text-primary/85"
+                title="Reproducir formación"
+              >
+                ▶ Reproducir formación
+              </button>
+              <button
+                type="button"
+                onClick={() => setComparando((v) => !v)}
+                className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                  comparando
+                    ? "border-primary/40 text-primary/90"
+                    : "border-primary/15 text-primary/55 hover:border-primary/30 hover:text-primary/85"
+                }`}
+              >
+                Comparar
+              </button>
+            </div>
+          </div>
           <div className="mt-5 rounded-2xl p-5">
             <StructureCanvas
               columns={columns}
@@ -790,6 +977,7 @@ function RutaCompuestoCanvas({
               onSelectNode={onSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
               centerScaleExtra={1.3}
+              replayToken={replayToken}
             />
           </div>
           {compuestoSel && !route.loadingEnlaces && enlaces.length === 0 ? (
@@ -805,6 +993,10 @@ function RutaCompuestoCanvas({
                 ? ` (compartida con ${route.compuestosDeLaEstructura.length - 1} compuesto(s) más)`
                 : null}
             </p>
+          ) : null}
+          {modo === "ciencia" ? <PanelModoCiencia route={route} /> : null}
+          {comparando ? (
+            <PanelComparacion route={route} compuestoBId={compuestoBId} setCompuestoBId={setCompuestoBId} />
           ) : null}
         </>
       ) : null}
