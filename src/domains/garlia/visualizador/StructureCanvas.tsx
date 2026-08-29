@@ -3,21 +3,31 @@
 /**
  * StructureCanvas.tsx
  * ───────────────────────────────────────────────────────────────────────────
- * Canvas de nodos + conexiones, genérico y sin conocimiento de dominio.
+ * Canvas orbital genérico, sin conocimiento de dominio — implementa el
+ * diseño aprobado de VIS-01 ("Partículas → IUM → Elemento", documento
+ * maestro del Visualizador, Parte 2):
  *
- * No sabe qué es un IUM, un Oris, un Elemento ni una Partícula. Recibe:
- *   - una lista de "columnas" (niveles), cada una con sus nodos ya resueltos
- *     (id, label, sublabel, contenido visual opcional);
- *   - una lista de conexiones entre nodos (por id).
- * y se limita a: posicionar en columnas, dibujar las conexiones, manejar
- * hover/click, y emitir eventos hacia quien lo use (onHoverNode, onSelectNode).
+ *   - El último nivel de `columns` es el "centro de gravedad" (un único
+ *     nodo, normalmente tone="accent"): IUM, Oris, capa o Elemento según
+ *     quién llame. Todo lo demás no está "conectado en fila" — orbita
+ *     alrededor de ese centro.
+ *   - Los niveles intermedios se dibujan como anillos concéntricos: cada
+ *     nivel es un anillo, más cerca del centro cuanto más "profundo"
+ *     jerárquicamente. Dentro de un mismo anillo, la distancia real al
+ *     centro puede variar según edge.weight (contribución/peso), pero
+ *     SOLO si ese dato viene definido — si no, todos los nodos del anillo
+ *     quedan a la misma distancia (ninguna magnitud se inventa).
+ *   - Al cambiar el centro (nueva selección raíz), se reproduce una
+ *     animación de construcción en fases: partículas separadas → convergen
+ *     → se forma el nivel intermedio → el centro emerge → estado estable.
+ *     Ocurre una sola vez por cambio de centro, no en loop.
  *
- * Pensado para reutilizarse en: Microestructura, A/T/S, Composición,
- * Compatibilidad, Materiales, Biología, Sandbox, etc. — cualquier vista que
- * sea "nodos organizados en niveles + conexiones con significado".
+ * No sabe qué es un IUM, un Oris, un Elemento ni una Partícula. Sigue
+ * recibiendo columnas + edges ya resueltos por el llamador y se limita a
+ * layout, animación, hover/click y eventos (onHoverNode, onSelectNode).
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export interface CanvasNode {
   id: string;
@@ -40,7 +50,8 @@ export interface CanvasEdge {
   fromNodeId: string;
   toNodeId: string;
   /** Intensidad visual 0..1 (grosor/opacidad) — el llamador decide su
-   *  significado (ej. proporción, cantidad). Sin dato, se dibuja neutra. */
+   *  significado (ej. proporción, cantidad). Sin dato, se dibuja neutra
+   *  y a distancia orbital neutra (no se infiere ninguna magnitud). */
   weight?: number;
 }
 
@@ -55,17 +66,31 @@ export interface StructureCanvasProps {
   className?: string;
 }
 
-const NODE_W = 164;
-const NODE_H = 120;
-const COL_GAP = 132;
-const ROW_GAP = 36;
-const PAD = 48;
+const CENTER_R = 34; // radio del nodo central (el "centro de gravedad")
+const ORBIT_R = 118; // radio de referencia del nodo orbitante
+const RING_GAP = 128; // separación entre anillos concéntricos
+const RING_0_R = 130; // radio del primer anillo (el más externo/profundo)
+const PAD = 40;
 
 interface LaidOutNode extends CanvasNode {
-  colIndex: number;
+  ringIndex: number; // 0 = anillo más externo, ringCount-1 = más interno (el previo al centro)
+  isCenter: boolean;
+  angle: number; // radianes
+  radius: number; // distancia real al centro en este layout
   x: number;
   y: number;
 }
+
+/** Fases de la animación de construcción (sección 3 del diseño VIS-01).
+ *  Ocurre una vez por cada nuevo "centro" — no hay loop. */
+type BuildPhase = "scattered" | "converging" | "forming" | "emerging" | "stable";
+const PHASE_SEQUENCE: { phase: BuildPhase; durationMs: number }[] = [
+  { phase: "scattered", durationMs: 60 },
+  { phase: "converging", durationMs: 520 },
+  { phase: "forming", durationMs: 360 },
+  { phase: "emerging", durationMs: 320 },
+  { phase: "stable", durationMs: 0 },
+];
 
 export function StructureCanvas({
   columns,
@@ -78,32 +103,103 @@ export function StructureCanvas({
 }: StructureCanvasProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
 
-  const { laidOut, width, height } = useMemo(() => {
-    const nodesById = new Map<string, LaidOutNode>();
-    let maxRows = 1;
-    columns.forEach((col) => {
-      maxRows = Math.max(maxRows, col.nodes.length);
-    });
-    const totalHeight = PAD * 2 + maxRows * NODE_H + (maxRows - 1) * ROW_GAP;
+  // ─── Identidad del "centro" actual: el diseño pide que la animación de
+  // construcción se repita cuando cambia QUÉ está emergiendo (nuevo Oris,
+  // nuevo Elemento, nuevo Ium al hacer zoom...), no en cada render.
+  const centerId = columns.length > 0 ? columns[columns.length - 1]?.nodes[0]?.id ?? null : null;
 
-    columns.forEach((col, colIndex) => {
-      const colHeight = col.nodes.length * NODE_H + (col.nodes.length - 1) * ROW_GAP;
-      const startY = PAD + (totalHeight - PAD * 2 - colHeight) / 2;
-      col.nodes.forEach((node, rowIndex) => {
+  const [phase, setPhase] = useState<BuildPhase>("stable");
+  const phaseTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    phaseTimers.current.forEach(clearTimeout);
+    phaseTimers.current = [];
+    if (!centerId) return;
+    let elapsed = 0;
+    PHASE_SEQUENCE.forEach(({ phase: p, durationMs }) => {
+      const t = setTimeout(() => setPhase(p), elapsed);
+      phaseTimers.current.push(t);
+      elapsed += durationMs;
+    });
+    return () => {
+      phaseTimers.current.forEach(clearTimeout);
+    };
+    // Se re-dispara solo cuando cambia el centro real, no en cada nuevo
+    // array de columns con el mismo centro (evita reiniciar la animación
+    // en cada render por referencias nuevas de objetos).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centerId]);
+
+  const { laidOut, size, ringCount } = useMemo(() => {
+    const nodesById = new Map<string, LaidOutNode>();
+    if (columns.length === 0) {
+      return { laidOut: nodesById, size: 320, ringCount: 0 };
+    }
+
+    // Último nivel = centro de gravedad. Todo lo anterior son anillos,
+    // del más profundo (índice 0, el más externo) al más cercano al centro.
+    const orbitLevels = columns.slice(0, -1);
+    const centerLevel = columns[columns.length - 1];
+    const centerNode = centerLevel?.nodes[0];
+
+    const weightByFromId = new Map<string, number>();
+    edges.forEach((e) => {
+      if (e.weight !== undefined) weightByFromId.set(e.fromNodeId, e.weight);
+    });
+
+    const maxRingNodes = Math.max(1, ...orbitLevels.map((lvl) => lvl.nodes.length));
+    const outerRingRadius = RING_0_R + Math.max(0, maxRingNodes - 6) * 6; // más nodos, un poco más de aire
+
+    orbitLevels.forEach((level, ringIndex) => {
+      // ringIndex 0 = nivel más externo (ej. Partículas); a mayor índice,
+      // más cerca del centro (ej. IUM justo antes del Oris).
+      const baseRadius = outerRingRadius - ringIndex * RING_GAP;
+      const nodeCount = level.nodes.length;
+      level.nodes.forEach((node, i) => {
+        // Distancia real: si hay peso definido para ESTE nodo (edge saliente
+        // con weight), nodos con más peso quedan más cerca del centro dentro
+        // de su propio anillo (contribución = cercanía). Sin dato, todos a
+        // la misma distancia — ninguna magnitud se inventa (regla del diseño).
+        const w = weightByFromId.get(node.id);
+        const radialJitter = w !== undefined ? (1 - Math.max(0, Math.min(1, w))) * 34 : 0;
+        const angle = (2 * Math.PI * i) / nodeCount - Math.PI / 2;
         nodesById.set(node.id, {
           ...node,
-          colIndex,
-          x: PAD + colIndex * (NODE_W + COL_GAP),
-          y: startY + rowIndex * (NODE_H + ROW_GAP),
+          ringIndex,
+          isCenter: false,
+          angle,
+          radius: baseRadius + radialJitter,
+          x: 0,
+          y: 0,
         });
       });
     });
 
-    const totalWidth =
-      PAD * 2 + columns.length * NODE_W + Math.max(0, columns.length - 1) * COL_GAP;
+    if (centerNode) {
+      nodesById.set(centerNode.id, {
+        ...centerNode,
+        ringIndex: orbitLevels.length,
+        isCenter: true,
+        angle: 0,
+        radius: 0,
+        x: 0,
+        y: 0,
+      });
+    }
 
-    return { laidOut: nodesById, width: totalWidth, height: totalHeight };
-  }, [columns]);
+    const maxRadius = orbitLevels.length > 0 ? outerRingRadius : 0;
+    const totalSize = PAD * 2 + maxRadius * 2 + ORBIT_R * 1.3;
+
+    // Coordenadas absolutas centradas en el canvas.
+    const cx = totalSize / 2;
+    const cy = totalSize / 2;
+    nodesById.forEach((n) => {
+      n.x = cx + Math.cos(n.angle) * n.radius;
+      n.y = cy + Math.sin(n.angle) * n.radius;
+    });
+
+    return { laidOut: nodesById, size: totalSize, ringCount: orbitLevels.length };
+  }, [columns, edges]);
 
   const activeHoverId = hoverId;
   const highlightSet = useMemo(() => new Set(highlightedNodeIds), [highlightedNodeIds]);
@@ -120,44 +216,56 @@ export function StructureCanvas({
     onSelectNode?.(id);
   }
 
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // Progreso 0..1 de la animación de construcción, usado para interpolar
+  // radio (convergencia) y opacidad (emergencia) de forma continua en vez
+  // de saltos discretos entre fases.
+  const scatterScale = phase === "scattered" ? 1.9 : 1;
+  const centerScale = phase === "scattered" || phase === "converging" ? 0 : phase === "forming" ? 0.6 : 1;
+  const centerOpacity = phase === "scattered" || phase === "converging" ? 0 : phase === "forming" ? 0.5 : 1;
+  const orbitOpacity = phase === "scattered" ? 0.35 : 1;
+  const transitionAll = "transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease";
+
   return (
-    <div className={`w-full ${className ?? ""}`} style={{ aspectRatio: `${width} / ${height}` }}>
+    <div className={`w-full ${className ?? ""}`} style={{ aspectRatio: "1 / 1", maxWidth: size }}>
       <svg
-        viewBox={`0 0 ${width} ${height}`}
+        viewBox={`0 0 ${size} ${size}`}
         width="100%"
         height="100%"
         preserveAspectRatio="xMidYMid meet"
         className="block"
         role="img"
-        aria-label="Diagrama de estructura"
+        aria-label="Diagrama orbital de estructura"
       >
-        {/* Columnas: etiqueta de nivel arriba */}
-        {columns.map((col, i) => (
-          <text
-            key={col.id}
-            x={PAD + i * (NODE_W + COL_GAP) + NODE_W / 2}
-            y={22}
-            textAnchor="middle"
-            fontSize={11}
-            fontWeight={900}
-            letterSpacing="0.14em"
-            style={{ fill: "color-mix(in srgb, var(--primary) 40%, transparent)", textTransform: "uppercase" }}
-          >
-            {col.label}
-          </text>
-        ))}
+        {/* Anillos de referencia — sutiles, solo para dar sensación de
+            órbita real, no representan una magnitud física. */}
+        {ringCount > 0
+          ? Array.from(new Set([...laidOut.values()].filter((n) => !n.isCenter).map((n) => Math.round(n.radius)))).map(
+              (r) => (
+                <circle
+                  key={`ring-${r}`}
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill="none"
+                  style={{
+                    stroke: "color-mix(in srgb, var(--primary) 6%, transparent)",
+                    strokeWidth: 1,
+                  }}
+                />
+              ),
+            )
+          : null}
 
-        {/* Conexiones — debajo de los nodos */}
+        {/* Conexiones — cada partícula/nodo orbitante hacia su destino,
+            debajo de los nodos. */}
         <g>
           {edges.map((edge, i) => {
             const from = laidOut.get(edge.fromNodeId);
             const to = laidOut.get(edge.toNodeId);
             if (!from || !to) return null;
-            const x1 = from.x + NODE_W;
-            const y1 = from.y + NODE_H / 2;
-            const x2 = to.x;
-            const y2 = to.y + NODE_H / 2;
-            const midX = (x1 + x2) / 2;
             const isActive =
               activeHoverId === edge.fromNodeId ||
               activeHoverId === edge.toNodeId ||
@@ -166,89 +274,165 @@ export function StructureCanvas({
               highlightSet.has(edge.fromNodeId) ||
               highlightSet.has(edge.toNodeId);
             const weight = edge.weight ?? 0.5;
-            const strokeWidth = 1 + Math.max(0, Math.min(1, weight)) * 2.5;
+            const strokeWidth = 1 + Math.max(0, Math.min(1, weight)) * 2;
+            // Durante "scattered" las líneas nacen invisibles para que la
+            // conexión se sienta como un hilo que "tira" de la partícula
+            // hacia el centro, no como un elemento que aparece de golpe.
+            const lineOpacity = (phase === "scattered" ? 0 : 1) * (isActive ? 1 : activeHoverId || selectedNodeId ? 0.3 : 0.85);
             return (
-              <path
+              <line
                 key={`${edge.fromNodeId}-${edge.toNodeId}-${i}`}
-                d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
-                fill="none"
+                x1={from.x}
+                y1={from.y}
+                x2={to.x}
+                y2={to.y}
                 strokeWidth={strokeWidth}
                 style={{
                   stroke: isActive
                     ? "color-mix(in srgb, var(--primary) 65%, transparent)"
-                    : "color-mix(in srgb, var(--primary) 16%, transparent)",
-                  transition: "stroke 150ms ease",
+                    : "color-mix(in srgb, var(--primary) 18%, transparent)",
+                  opacity: lineOpacity,
+                  transition: "stroke 150ms ease, opacity 380ms ease",
                 }}
               />
             );
           })}
         </g>
 
-        {/* Nodos */}
+        {/* Nodos orbitantes */}
         <g>
-          {[...laidOut.values()].map((node) => {
+          {[...laidOut.values()]
+            .filter((n) => !n.isCenter)
+            .map((node) => {
+              const isSelected = selectedNodeId === node.id;
+              const isHovered = activeHoverId === node.id;
+              const isHighlighted = highlightSet.has(node.id);
+              const emphasized = isSelected || isHovered || isHighlighted;
+              const dim = Boolean(activeHoverId || selectedNodeId) && !emphasized;
+              const toneBorder = emphasized
+                ? "color-mix(in srgb, var(--primary) 60%, transparent)"
+                : "color-mix(in srgb, var(--primary) 16%, transparent)";
+              // Posición animada: en "scattered" el nodo se dibuja más
+              // lejos de su radio final, y converge suavemente vía CSS
+              // transition al pasar a "converging"/"stable".
+              const animRadius = node.radius * (phase === "scattered" ? scatterScale : 1);
+              const nx = cx + Math.cos(node.angle) * animRadius;
+              const ny = cy + Math.sin(node.angle) * animRadius;
+              const r = ORBIT_R / 2.9;
+              return (
+                <g
+                  key={node.id}
+                  transform={`translate(${nx}, ${ny})`}
+                  onMouseEnter={() => handleEnter(node.id)}
+                  onMouseLeave={handleLeave}
+                  onClick={() => handleClick(node.id)}
+                  style={{
+                    cursor: "pointer",
+                    opacity: orbitOpacity * (dim ? 0.3 : 1),
+                    transition: transitionAll,
+                  }}
+                >
+                  <circle
+                    r={r}
+                    strokeWidth={isSelected ? 2 : 1.25}
+                    style={{ fill: "var(--bg-main)", stroke: toneBorder, transition: "stroke 150ms ease" }}
+                  />
+                  {node.visual ? (
+                    <foreignObject x={-r + 6} y={-r + 6} width={(r - 6) * 2} height={(r - 6) * 2}>
+                      <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
+                    </foreignObject>
+                  ) : null}
+                  <text
+                    y={r + 15}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fontWeight={900}
+                    style={{ fill: "color-mix(in srgb, var(--primary) 82%, transparent)" }}
+                  >
+                    {node.label.length > 16 ? <title>{node.label}</title> : null}
+                    {node.label.length > 16 ? `${node.label.slice(0, 15)}…` : node.label}
+                  </text>
+                  {node.sublabel ? (
+                    <text
+                      y={r + 29}
+                      textAnchor="middle"
+                      fontSize={9.5}
+                      style={{ fill: "color-mix(in srgb, var(--primary) 38%, transparent)" }}
+                    >
+                      {node.sublabel.length > 20 ? <title>{node.sublabel}</title> : null}
+                      {node.sublabel.length > 20 ? `${node.sublabel.slice(0, 19)}…` : node.sublabel}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+        </g>
+
+        {/* Centro de gravedad — el nodo hacia el que todo converge (IUM,
+            Oris, capa o Elemento, según quién llame). Emerge después de
+            que los orbitantes convergen (fases "forming"/"emerging"),
+            con una pequeña expansión visual, no una explosión. */}
+        {[...laidOut.values()]
+          .filter((n) => n.isCenter)
+          .map((node) => {
             const isSelected = selectedNodeId === node.id;
             const isHovered = activeHoverId === node.id;
             const isHighlighted = highlightSet.has(node.id);
             const emphasized = isSelected || isHovered || isHighlighted;
-            const toneBorder =
-              node.tone === "accent"
-                ? "var(--primary)"
-                : emphasized
-                  ? "color-mix(in srgb, var(--primary) 55%, transparent)"
-                  : "color-mix(in srgb, var(--primary) 14%, transparent)";
+            const scale = centerScale * (phase === "emerging" ? 1.08 : 1);
             return (
               <g
                 key={node.id}
-                transform={`translate(${node.x}, ${node.y})`}
+                transform={`translate(${cx}, ${cy}) scale(${scale})`}
                 onMouseEnter={() => handleEnter(node.id)}
                 onMouseLeave={handleLeave}
                 onClick={() => handleClick(node.id)}
-                style={{ cursor: "pointer" }}
+                style={{
+                  cursor: "pointer",
+                  opacity: centerOpacity,
+                  transformOrigin: "center",
+                  transition:
+                    "transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 420ms ease",
+                }}
               >
-                <rect
-                  width={NODE_W}
-                  height={NODE_H}
-                  rx={16}
-                  strokeWidth={isSelected ? 2 : 1.25}
+                <circle
+                  r={CENTER_R}
+                  strokeWidth={isSelected ? 2.5 : 1.5}
                   style={{
-                    fill: "transparent",
-                    stroke: toneBorder,
+                    fill: "color-mix(in srgb, var(--primary) 5%, transparent)",
+                    stroke: emphasized ? "var(--primary)" : "color-mix(in srgb, var(--primary) 45%, transparent)",
                     transition: "stroke 150ms ease",
                   }}
                 />
                 {node.visual ? (
-                  <foreignObject x={12} y={12} width={NODE_W - 24} height={NODE_H - 48}>
+                  <foreignObject x={-CENTER_R + 8} y={-CENTER_R + 8} width={(CENTER_R - 8) * 2} height={(CENTER_R - 8) * 2}>
                     <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
                   </foreignObject>
                 ) : null}
                 <text
-                  x={NODE_W / 2}
-                  y={NODE_H - (node.sublabel ? 30 : 16)}
+                  y={CENTER_R + 18}
                   textAnchor="middle"
                   fontSize={13}
                   fontWeight={900}
-                  style={{ fill: "color-mix(in srgb, var(--primary) 85%, transparent)" }}
+                  style={{ fill: "color-mix(in srgb, var(--primary) 90%, transparent)" }}
                 >
-                  {node.label.length > 18 ? <title>{node.label}</title> : null}
-                  {node.label.length > 18 ? `${node.label.slice(0, 17)}…` : node.label}
+                  {node.label.length > 20 ? <title>{node.label}</title> : null}
+                  {node.label.length > 20 ? `${node.label.slice(0, 19)}…` : node.label}
                 </text>
                 {node.sublabel ? (
                   <text
-                    x={NODE_W / 2}
-                    y={NODE_H - 12}
+                    y={CENTER_R + 33}
                     textAnchor="middle"
-                    fontSize={11}
-                    style={{ fill: "color-mix(in srgb, var(--primary) 40%, transparent)" }}
+                    fontSize={10.5}
+                    style={{ fill: "color-mix(in srgb, var(--primary) 42%, transparent)" }}
                   >
-                    {node.sublabel.length > 22 ? <title>{node.sublabel}</title> : null}
-                    {node.sublabel.length > 22 ? `${node.sublabel.slice(0, 21)}…` : node.sublabel}
+                    {node.sublabel.length > 24 ? <title>{node.sublabel}</title> : null}
+                    {node.sublabel.length > 24 ? `${node.sublabel.slice(0, 23)}…` : node.sublabel}
                   </text>
                 ) : null}
               </g>
             );
           })}
-        </g>
       </svg>
     </div>
   );
