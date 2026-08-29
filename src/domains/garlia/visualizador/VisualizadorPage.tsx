@@ -439,12 +439,11 @@ function RutaFisicaCanvas({
       label: orisSel.nombre,
       sublabel: orisSel.dominio,
       tone: "accent" as const,
-      // Subido de 56 → 68: el Oris es el centro de gravedad "final" de la
-      // ruta física (IUM → Oris) y debe leerse claramente como el nodo
-      // más importante del canvas, más grande que los IUM (44) que orbitan
-      // alrededor de él. 68 aprovecha el nuevo CENTER_R=40 del canvas
-      // (diámetro útil ~64px tras el padding interno) sin recortarse.
-      visual: <CentroGravedadNodo particulas={particulasDelOrisSel} size={68} />,
+      // Subido de 68 → 84: pedido explícito de que la esfera del Oris se
+      // vea más grande. Aprovecha el nuevo CENTER_R=48 del canvas
+      // (diámetro útil ~88px tras el padding interno del foreignObject)
+      // sin recortarse, y queda claramente por encima del IUM (44).
+      visual: <CentroGravedadNodo particulas={particulasDelOrisSel} size={84} />,
     };
     return [
       { id: "particulas", label: "Partículas (A/T/S)", nodes: particulaNodes },
@@ -795,8 +794,8 @@ function RutasSection() {
         note: o.descripcion ?? null,
         // Mismo criterio que en el canvas: el Oris se dibuja más grande
         // que el IUM (que queda en 40, arriba) para que el Inspector
-        // refleje la misma jerarquía visual.
-        visual: <CentroGravedadNodo particulas={fisicaRoute.particulasDelOrisSel} size={52} />,
+        // refleje la misma jerarquía visual. Subido junto con el canvas.
+        visual: <CentroGravedadNodo particulas={fisicaRoute.particulasDelOrisSel} size={60} />,
         fields: [
           { label: "Fórmula", value: o.formula },
           { label: "A", value: fisicaRoute.letrasOrisSel.A },
@@ -900,7 +899,7 @@ function RutasSection() {
     <>
       <PerspectivaSwitcher value={perspectiva} onChange={setPerspectiva} />
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-[2.2fr_1fr]">
+      <div className="mt-8 grid gap-5 lg:grid-cols-[2.8fr_0.72fr]">
         <div>
           {perspectiva === "fisica" ? (
             <RutaFisicaCanvas
@@ -921,7 +920,12 @@ function RutasSection() {
           )}
         </div>
 
-        <div className="space-y-4">
+        {/* Angostado: de 1fr (≈lg:grid-cols-[2.2fr_1fr]) a 0.72fr
+            (lg:grid-cols-[2.8fr_0.72fr]) — pedido explícito de darle más
+            protagonismo horizontal al canvas. max-w evita que este panel
+            se estire de más en pantallas muy anchas, ya que el fr solo
+            reparte el espacio disponible pero no pone techo. */}
+        <div className="space-y-4 lg:max-w-[280px]">
           <Inspector entity={inspectorEntity} emptyLabel="Seleccioná un Oris o un Elemento para inspeccionarlo." />
           <div className="rounded-2xl p-5">
             <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-primary/40">Trace</p>

@@ -66,10 +66,12 @@ export interface StructureCanvasProps {
   className?: string;
 }
 
-const CENTER_R = 40; // radio del nodo central (el "centro de gravedad"). Subido
-// de 34 → 40 para dar más espacio interno al visual del centro (ej. el
-// nodo Oris ahora se dibuja más grande, ver VisualizadorPage) sin que se
-// recorte contra el borde del círculo contenedor.
+const CENTER_R = 48; // radio del nodo central (el "centro de gravedad"). Subido
+// de 40 → 48: pedido explícito de que la esfera del Oris se vea más
+// grande — sigue siendo el mismo contenedor que usan IUM/Elemento/capas
+// en otras perspectivas, pero da más margen para que el visual interno
+// (ver size={} en VisualizadorPage) crezca sin recortarse contra el
+// borde del círculo.
 const ORBIT_R = 118; // radio de referencia del nodo orbitante
 const RING_GAP = 128; // separación entre anillos concéntricos
 const RING_0_R = 130; // radio del primer anillo (el más externo/profundo)
@@ -154,7 +156,13 @@ export function StructureCanvas({
     // quepan en su propia circunferencia sin superponerse: arco disponible
     // por nodo = 2π·radius / n ≥ nodeDiameter + gap.
     const nodeDiameter = (ORBIT_R / 2.9) * 2;
-    const nodeGap = 18;
+    // Gap subido de 18 → 42: con pocos nodos por anillo (típico en el
+    // Oris, que suele tener 2-4 IUMs) el radio mínimo resultante era casi
+    // el mismo que el diámetro del nodo, así que los IUM terminaban muy
+    // pegados entre sí — se leían como un grupo borroso en vez de nodos
+    // individuales y distinguibles. Con más separación angular cada IUM
+    // queda claramente aislado del vecino.
+    const nodeGap = 42;
     const minRadiusForNodes = (n: number) => (n * (nodeDiameter + nodeGap)) / (2 * Math.PI);
 
     // Radios por anillo: se construyen de ADENTRO hacia AFUERA (el anillo
