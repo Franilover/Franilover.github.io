@@ -679,7 +679,7 @@ function RutaAlquimiaCanvas({
       {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Elementos cargados en Supabase todavía.</EmptyRow> : null}
       {!route.loading && elementos.length > 0 ? (
         <>
-          <ChipSelector
+          <SelectDropdown
             items={elementos}
             active={elementoSel}
             getKey={(e) => e.id}
@@ -688,6 +688,7 @@ function RutaAlquimiaCanvas({
               setElementoSelId(e.id);
               setCapaSel(null);
             }}
+            placeholder="Seleccioná un elemento…"
           />
           {capaSel ? (
             <button
