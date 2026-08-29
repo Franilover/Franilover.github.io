@@ -585,48 +585,25 @@ function RutaAlquimiaCanvas({
   selectedNodeId: string | null;
   onSelectNode: (id: string) => void;
 }) {
-  const { elementos, elementoSel, setElementoSelId, capas } = route;
+  const { elementos, elementoSel, setElementoSelId } = route;
 
   const columns: CanvasColumn[] = useMemo(() => {
     if (!elementoSel) return [];
-    // Sin zoom de capa: el propio AtomoVisual ya distingue núcleo/media/
-    // externa dentro de un solo gráfico (órbitas concéntricas), así que
-    // hacer zoom a una capa individual + mostrar sus partículas sueltas al
-    // lado terminaba duplicando la misma información dos veces.
-    const capaNodes = capas.map((c) => ({
-      id: `capa-${c.capa}`,
-      label: c.label,
-      sublabel: c.total > 0 ? c.resumen : "vacía",
-      tone: "default" as const,
-    }));
+    // Una sola columna: el Elemento con su AtomoVisual. Se sacó la columna
+    // "Capa" (núcleo/media/externa) con sus edges hacia el centro — el
+    // propio AtomoVisual ya dibuja esas 3 capas como órbitas concéntricas
+    // puertas adentro, así que los nodos + líneas de afuera repetían la
+    // misma información en dos lenguajes visuales distintos a la vez.
     const elementoNode = {
       id: `elemento-${elementoSel.id}`,
       label: elementoSel.nombre,
       sublabel: elementoSel.simbolo,
       tone: "accent" as const,
-      // AtomoVisual real (elementos/ElementoEditor.tsx): núcleo + capa
-      // media + capa externa como órbitas concéntricas, con las
-      // partículas reales de elementoSel — mismo componente que ya se usa
-      // en el editor de Elementos, en vez del rombo de 3 gajos (ElementoNodo).
       hideBorder: true,
       visual: <AtomoVisual elemento={elementoSel} className="w-full aspect-square h-auto" />,
     };
-    return [
-      { id: "capas", label: "Capa", nodes: capaNodes },
-      { id: "elemento", label: "Elemento", nodes: [elementoNode] },
-    ];
-  }, [elementoSel, capas]);
-
-  const edges: CanvasEdge[] = useMemo(() => {
-    if (!elementoSel) return [];
-    const out: CanvasEdge[] = [];
-    for (const c of capas) {
-      if (c.total > 0) {
-        out.push({ fromNodeId: `capa-${c.capa}`, toNodeId: `elemento-${elementoSel.id}`, weight: 0.6 });
-      }
-    }
-    return out;
-  }, [elementoSel, capas]);
+    return [{ id: "elemento", label: "Elemento", nodes: [elementoNode] }];
+  }, [elementoSel]);
 
   return (
     <>
@@ -641,26 +618,17 @@ function RutaAlquimiaCanvas({
             onSelect={(e) => setElementoSelId(e.id)}
             placeholder="Seleccioná un elemento…"
           />
-          <div className="mt-3 flex flex-wrap gap-2">
-            {capas.map((c) => (
-              <div
-                key={c.capa}
-                className={`rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
-                  c.total === 0 ? "border-primary/5 text-primary/25" : "border-primary/10 text-primary/45"
-                }`}
-              >
-                {c.label} · {c.total > 0 ? c.resumen : "vacía"}
-              </div>
-            ))}
-          </div>
           <div className="mt-5 rounded-2xl p-5">
             <StructureCanvas
               columns={columns}
-              edges={edges}
+              edges={[]}
               selectedNodeId={selectedNodeId ?? (elementoSel ? `elemento-${elementoSel.id}` : null)}
               onHoverNode={setHoverId}
               onSelectNode={onSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
+              // Sin orbitantes alrededor: el nodo central puede verse más
+              // grande, mismo patrón que el Oris en Física (centerScaleExtra).
+              centerScaleExtra={1.6}
             />
           </div>
         </>
@@ -770,9 +738,9 @@ function RutasSection() {
         ],
       };
     }
-    // Capa en zoom tiene prioridad sobre el Elemento de fondo, mismo
-    // Sin zoom de capa: siempre se muestra el Elemento completo con su
-    // AtomoVisual (núcleo/media/externa distinguibles en un solo gráfico).
+    // Elemento: mismo criterio que el Oris en Física (línea de arriba) —
+    // el Inspector no repite el gráfico que ya se ve en el canvas central
+    // (AtomoVisual), solo texto/campos.
     const e = alquimiaRoute.elementoSel;
     if (!e) return null;
     return {
@@ -780,12 +748,8 @@ function RutasSection() {
       title: `${e.simbolo} · ${e.nombre}`,
       subtitle: e.familia,
       note: e.notas ?? null,
-      visual: <AtomoVisual elemento={e} className="w-full aspect-square h-auto" />,
       fields: [
         { label: "N° atómico", value: e.numero_atomico },
-        { label: "Núcleo", value: alquimiaRoute.capas.find((c) => c.capa === "nucleo")?.resumen },
-        { label: "Media", value: alquimiaRoute.capas.find((c) => c.capa === "media")?.resumen },
-        { label: "Externa", value: alquimiaRoute.capas.find((c) => c.capa === "externa")?.resumen },
         { label: "Es noble", value: e.es_noble ? "Sí" : "No" },
       ],
     };
