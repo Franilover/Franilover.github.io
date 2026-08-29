@@ -366,6 +366,29 @@ export function StructureCanvas({
               toX = to.x + Math.cos(edge.toPoint.angle) * dist;
               toY = to.y + Math.sin(edge.toPoint.angle) * dist;
             }
+            // Recorte de ambos extremos al borde del círculo de su propio
+            // nodo, para que la línea NUNCA atraviese el dibujo de la
+            // Partícula/IUM/Oris de origen ni de destino — antes nacía y
+            // moría en el centro exacto de cada nodo, cruzando por encima
+            // del gráfico interno. Se calcula sobre la línea real
+            // (from → toX/toY, ya con el toPoint aplicado si corresponde)
+            // y se retrae cada punta `nodeRadius` px hacia el otro extremo.
+            const dx = toX - from.x;
+            const dy = toY - from.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const ux = dx / dist;
+            const uy = dy / dist;
+            const fromRadius = from.isCenter ? centerR : orbitNodeR;
+            const toRadius = to.isCenter ? centerR : orbitNodeR;
+            // Si el segmento es más corto que la suma de ambos radios (nodos
+            // casi superpuestos), no se invierte la línea — se deja un
+            // segmento mínimo en el punto medio en vez de cruzar al revés.
+            const clampedFromRadius = Math.min(fromRadius, dist / 2);
+            const clampedToRadius = Math.min(toRadius, dist / 2);
+            const x1 = from.x + ux * clampedFromRadius;
+            const y1 = from.y + uy * clampedFromRadius;
+            const x2 = toX - ux * clampedToRadius;
+            const y2 = toY - uy * clampedToRadius;
             // Durante "scattered" las líneas nacen invisibles para que la
             // conexión se sienta como un hilo que "tira" de la partícula
             // hacia el centro, no como un elemento que aparece de golpe.
@@ -373,10 +396,10 @@ export function StructureCanvas({
             return (
               <line
                 key={`${edge.fromNodeId}-${edge.toNodeId}-${i}`}
-                x1={from.x}
-                y1={from.y}
-                x2={toX}
-                y2={toY}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
                 strokeWidth={strokeWidth}
                 style={{
                   stroke: isActive

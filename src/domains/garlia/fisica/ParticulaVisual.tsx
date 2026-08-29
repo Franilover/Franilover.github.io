@@ -26,13 +26,14 @@ import { PARTICULA_INITIAL } from "./types";
 export type LetraATS = "A" | "T" | "S";
 
 export const LETRA_COLOR: Record<LetraATS, { bg: string; border: string; fg: string }> = {
-  // Antes 18% de mezcla (casi transparente): sobre fondos variados el
-  // relleno se perdía y las letras quedaban con poco contraste. Subido a
-  // 85% para un fondo prácticamente plano/sólido que resalte la letra
-  // (fg) con claridad, sin perder el tinte semántico por letra.
-  A: { bg: "color-mix(in srgb, #22c55e 85%, white)", border: "#22c55e", fg: "#ffffff" },
-  T: { bg: "color-mix(in srgb, #ef4444 85%, white)", border: "#ef4444", fg: "#ffffff" },
-  S: { bg: "color-mix(in srgb, #3b82f6 85%, white)", border: "#3b82f6", fg: "#ffffff" },
+  // Solo se tocó `fg` (color de letra): antes verde/rojo/azul oscuros
+  // (pensados para fondo claro), que se leían mal sobre el tema "sepia"
+  // oscuro (café antiguo) que usan los admins. `bg`/`border` quedan
+  // igual que antes — no se rediseña el fondo, solo el contraste de la
+  // letra sobre él.
+  A: { bg: "color-mix(in srgb, #22c55e 18%, transparent)", border: "#22c55e", fg: "#d9f2df" },
+  T: { bg: "color-mix(in srgb, #ef4444 18%, transparent)", border: "#ef4444", fg: "#f9d9d9" },
+  S: { bg: "color-mix(in srgb, #3b82f6 18%, transparent)", border: "#3b82f6", fg: "#d9e6fb" },
 };
 
 export const LETRA_NOMBRE: Record<LetraATS, string> = {

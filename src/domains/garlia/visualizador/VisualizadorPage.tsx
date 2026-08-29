@@ -383,7 +383,6 @@ function RutaFisicaCanvas({
         id: `particula-ium-${i}`,
         label: p.nombre,
         sublabel: p.formula,
-        hideBorder: true,
         visual: <ParticulaVisual formula={p.formula} size={78} />,
       }));
       const iumNodeZoom = {
@@ -411,7 +410,7 @@ function RutaFisicaCanvas({
     // iums_composicion, igual que hace particulasDeOris internamente, pero
     // sin perder el iumId en el camino — mismo dato, sin agregar cálculo
     // nuevo de dominio.
-    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string; iumRep: number; particulaIdxEnIum: number; totalParticulasEnIum: number; hideBorder: boolean }[] = [];
+    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string; iumRep: number; particulaIdxEnIum: number; totalParticulasEnIum: number }[] = [];
     for (const [iumId, cantidadIum] of Object.entries(orisSel.iums_composicion)) {
       const ium = iumPorId[iumId];
       if (!ium || !cantidadIum) continue;
@@ -422,7 +421,6 @@ function RutaFisicaCanvas({
             id: `particula-${iumId}-${particulaNodes.length}`,
             label: p.nombre,
             sublabel: p.formula,
-            hideBorder: true,
             visual: <ParticulaVisual formula={p.formula} size={78} />,
             iumId,
             // Instancia real del IUM a la que pertenece esta partícula —
