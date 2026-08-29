@@ -82,9 +82,9 @@ type SectionKey =
   | "process";
 
 const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
-  { key: "rutas", label: "Rutas: Física / Alquimia", icon: <GitBranch size={15} /> },
-  { key: "micro", label: "Micro → Macro", icon: <Layers3 size={15} /> },
-  { key: "ats", label: "A / T / S", icon: <Orbit size={15} /> },
+  { key: "rutas", label: "Rutas", icon: <GitBranch size={15} /> },
+  { key: "micro", label: "Micro", icon: <Layers3 size={15} /> },
+  { key: "ats", label: "ATS", icon: <Orbit size={15} /> },
   { key: "formula", label: "Fórmulas", icon: <Gauge size={15} /> },
   { key: "material", label: "Material", icon: <Atom size={15} /> },
   { key: "structure", label: "Estructura", icon: <GitBranch size={15} /> },
@@ -92,7 +92,7 @@ const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
   { key: "energy", label: "Energía", icon: <BarChart3 size={15} /> },
   { key: "electric", label: "Electricidad", icon: <Zap size={15} /> },
   { key: "information", label: "Información", icon: <Radio size={15} /> },
-  { key: "oris", label: "Oris / Éterium", icon: <Sparkles size={15} /> },
+  { key: "oris", label: "Oris", icon: <Sparkles size={15} /> },
   { key: "runas", label: "Runas", icon: <CircleDot size={15} /> },
   { key: "process", label: "Proceso", icon: <Workflow size={15} /> },
 ];
@@ -951,7 +951,6 @@ function VisualizadorPage() {
 
         <div className="grid gap-2 lg:grid-cols-[150px_minmax(0,1fr)]">
           <aside className="p-0 lg:sticky lg:top-6 lg:self-start">
-            <p className="pb-3 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/30">Explorar</p>
             <nav className="space-y-1.5">
               {navItems.map((item) => {
                 const selected = item.key === active;
