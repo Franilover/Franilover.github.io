@@ -384,7 +384,7 @@ function RutaFisicaCanvas({
         label: p.nombre,
         sublabel: p.formula,
         hideBorder: true,
-        visual: <ParticulaVisual formula={p.formula} size={52} />,
+        visual: <ParticulaVisual formula={p.formula} size={78} />,
       }));
       const iumNodeZoom = {
         id: `ium-${iumSel.id}`,
@@ -396,7 +396,7 @@ function RutaFisicaCanvas({
         // ni el margen del foreignObject, el size interno sube de 52→64
         // para aprovechar el espacio ganado.
         hideBorder: true,
-        visual: <IumVisual particulas={particulasDelIumSel} size={64} showToggle={false} />,
+        visual: <IumVisual particulas={particulasDelIumSel} size={96} showToggle={false} />,
       };
       return [
         { id: "particulas", label: "Partículas del Ium", nodes: particulaNodesZoom },
@@ -411,19 +411,19 @@ function RutaFisicaCanvas({
     // iums_composicion, igual que hace particulasDeOris internamente, pero
     // sin perder el iumId en el camino — mismo dato, sin agregar cálculo
     // nuevo de dominio.
-    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string; iumRep: number; hideBorder: boolean }[] = [];
+    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string; iumRep: number; particulaIdxEnIum: number; totalParticulasEnIum: number; hideBorder: boolean }[] = [];
     for (const [iumId, cantidadIum] of Object.entries(orisSel.iums_composicion)) {
       const ium = iumPorId[iumId];
       if (!ium || !cantidadIum) continue;
       const particulasDelIum = particulasDeIum(ium);
       for (let rep = 0; rep < cantidadIum; rep++) {
-        for (const p of particulasDelIum) {
+        particulasDelIum.forEach((p, particulaIdxEnIum) => {
           particulaNodes.push({
             id: `particula-${iumId}-${particulaNodes.length}`,
             label: p.nombre,
             sublabel: p.formula,
             hideBorder: true,
-            visual: <ParticulaVisual formula={p.formula} size={52} />,
+            visual: <ParticulaVisual formula={p.formula} size={78} />,
             iumId,
             // Instancia real del IUM a la que pertenece esta partícula —
             // antes se perdía este dato y todos los edges terminaban
@@ -431,8 +431,15 @@ function RutaFisicaCanvas({
             // instancias iguales (ej. 2× Fluxor). Con esto cada partícula
             // se conecta a SU propia instancia real.
             iumRep: rep,
+            // Posición de esta partícula DENTRO del anillo interno de su
+            // propio IumVisual (mismo orden que particulasDeIum, que es
+            // el mismo array que IumVisual recibe y recorre) — se usa
+            // para que el edge apunte a la partícula exacta dentro del
+            // círculo del IUM, no al centro del IUM.
+            particulaIdxEnIum,
+            totalParticulasEnIum: particulasDelIum.length,
           });
-        }
+        });
       }
     }
     // Nivel 2: los IUMs reales que componen el Oris (desde iums_composicion).
@@ -454,7 +461,7 @@ function RutaFisicaCanvas({
           id: `ium-${iumId}-${rep}`,
           label: ium.nombre,
           hideBorder: true,
-          visual: <IumVisual particulas={particulasDelIumActual} size={56} showToggle={false} />,
+          visual: <IumVisual particulas={particulasDelIumActual} size={84} showToggle={false} />,
         });
       }
     }
@@ -468,12 +475,14 @@ function RutaFisicaCanvas({
       label: orisSel.nombre,
       sublabel: orisSel.dominio,
       tone: "accent" as const,
-      // Subido de 68 → 84 → 96: pedido explícito de que la esfera del
-      // Oris se vea más grande, y ahora sin borde (hideBorder) usa todo
-      // el CENTER_R=48 (diámetro útil ~96px) sin el margen que antes
-      // dejaba lugar al trazo del círculo. Sigue por encima del IUM (56).
+      // Subido de 68 → 84 → 96 → 144: pedido explícito de que la esfera
+      // del Oris se vea AÚN más grande que el IUM. Con nodeScale={1.5} en
+      // el StructureCanvas de esta vista, el radio real del nodo central
+      // pasa de 48 a 72px (144px de diámetro útil sin borde), así que el
+      // size interno sube a la par para mantener nitidez. Sigue
+      // claramente por encima del IUM (84).
       hideBorder: true,
-      visual: <IumVisual particulas={particulasDelOrisSel} size={96} showToggle={false} />,
+      visual: <IumVisual particulas={particulasDelOrisSel} size={144} showToggle={false} />,
     };
     return [
       { id: "particulas", label: "Partículas (A/T/S)", nodes: particulaNodes },
@@ -486,11 +495,15 @@ function RutaFisicaCanvas({
     if (enZoomIum && iumSel) {
       // Cada partícula del Ium se conecta al Ium — trazabilidad real 1:1,
       // a diferencia de la vista de conjunto (donde particulasDeOris no
-      // trae mapeo partícula→IUM individual).
+      // trae mapeo partícula→IUM individual). Apunta a la posición exacta
+      // de esa partícula dentro del círculo del Ium (mismo ángulo que usa
+      // IumVisual para dibujarla: idx/total·2π - π/2), no al centro.
+      const total = particulasDelIumSel.length;
       return particulasDelIumSel.map((_, i) => ({
         fromNodeId: `particula-ium-${i}`,
         toNodeId: `ium-${iumSel.id}`,
         weight: 0.5,
+        toPoint: { angle: (i / total) * Math.PI * 2 - Math.PI / 2, radiusRatio: 0.34 },
       }));
     }
     if (!orisSel) return [];
@@ -505,21 +518,33 @@ function RutaFisicaCanvas({
       ?.nodes.forEach((n) => {
         out.push({ fromNodeId: n.id, toNodeId: `oris-${orisSel.id}`, weight: 0.6 });
       });
-    // Cada partícula se conecta a SU propio IUM real, y a su instancia
-    // real cuando el IUM está repetido — antes todas las partículas de un
-    // mismo iumId se conectaban a la instancia "ium-{iumId}-0" sin importar
-    // cuántas instancias hubiera (ej. con 2× Fluxor, las partículas de
-    // AMBAS instancias terminaban con líneas hacia la primera nomás). El
-    // id de cada nodo de partícula sigue siendo `particula-{iumId}-{n}`
-    // (se conserva por compatibilidad con el resto del código que lo
-    // parsea), pero ahora se lee `iumRep` directo del nodo — dato real
-    // calculado al armar particulaNodes, no inferido del id.
+    // Cada partícula se conecta a SU propio IUM real, a su instancia real
+    // cuando el IUM está repetido, y a la posición exacta de esa partícula
+    // DENTRO del círculo del IUM (no al centro) — mismo ángulo que usa
+    // IumVisual internamente para dibujarla: angle = (idx/total)·2π - π/2,
+    // a un radio relativo de 0.34 del nodo (mismo orbitR/size que usa
+    // IumVisual). Antes todas las partículas de un mismo iumId se
+    // conectaban a la instancia "ium-{iumId}-0" y al centro del nodo sin
+    // importar cuántas instancias/partículas hubiera.
     columns
       .find((c) => c.id === "particulas")
       ?.nodes.forEach((n) => {
-        const conRep = n as typeof n & { iumId?: string; iumRep?: number };
+        const conRep = n as typeof n & {
+          iumId?: string;
+          iumRep?: number;
+          particulaIdxEnIum?: number;
+          totalParticulasEnIum?: number;
+        };
         if (conRep.iumId !== undefined && conRep.iumRep !== undefined) {
-          out.push({ fromNodeId: n.id, toNodeId: `ium-${conRep.iumId}-${conRep.iumRep}`, weight: 0.25 });
+          const total = conRep.totalParticulasEnIum ?? 1;
+          const idx = conRep.particulaIdxEnIum ?? 0;
+          const angle = (idx / total) * Math.PI * 2 - Math.PI / 2;
+          out.push({
+            fromNodeId: n.id,
+            toNodeId: `ium-${conRep.iumId}-${conRep.iumRep}`,
+            weight: 0.25,
+            toPoint: { angle, radiusRatio: 0.34 },
+          });
         }
       });
     return out;
@@ -577,6 +602,11 @@ function RutaFisicaCanvas({
               onHoverNode={setHoverId}
               onSelectNode={handleSelectNode}
               highlightedNodeIds={hoverId ? [hoverId] : []}
+              // Pedido explícito: en Rutas los círculos de Partícula/IUM/Oris
+              // se ven más grandes que en el resto de perspectivas — 1.5×
+              // solo para esta instancia del canvas (Alquimia y otras vistas
+              // no pasan nodeScale, quedan en el tamaño base = 1).
+              nodeScale={1.5}
             />
           </div>
         </>

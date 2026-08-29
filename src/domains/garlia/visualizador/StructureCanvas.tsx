@@ -57,6 +57,14 @@ export interface CanvasEdge {
    *  significado (ej. proporción, cantidad). Sin dato, se dibuja neutra
    *  y a distancia orbital neutra (no se infiere ninguna magnitud). */
   weight?: number;
+  /** Punto exacto dentro del nodo destino al que debe llegar la línea, en
+   *  vez del centro del nodo — ej. la posición de una Partícula específica
+   *  dibujada dentro del círculo de su IUM (mismo layout orbital que usa
+   *  IumVisual internamente). `angle` en radianes (mismo sistema que el
+   *  ángulo de layout: 0 = derecha, -π/2 = arriba), `radiusRatio` 0..1
+   *  como fracción del radio del nodo destino (0 = centro, 1 = borde). Sin
+   *  este dato, la línea llega al centro del nodo (comportamiento actual). */
+  toPoint?: { angle: number; radiusRatio: number };
 }
 
 export interface StructureCanvasProps {
@@ -68,6 +76,11 @@ export interface StructureCanvasProps {
   /** Nodo(s) a resaltar externamente (ej. desde TraceView) sin necesidad de click. */
   highlightedNodeIds?: string[];
   className?: string;
+  /** Multiplicador del tamaño de los círculos de nodo (central y
+   *  orbitantes), sin tocar CENTER_R/ORBIT_R globales que usan el resto de
+   *  perspectivas. Default 1 (comportamiento actual, sin cambios). Ej. 1.4
+   *  agranda un 40% los círculos de esta instancia del canvas nomás. */
+  nodeScale?: number;
 }
 
 const CENTER_R = 48; // radio del nodo central (el "centro de gravedad"). Subido
@@ -109,8 +122,16 @@ export function StructureCanvas({
   onSelectNode,
   highlightedNodeIds = [],
   className,
+  nodeScale = 1,
 }: StructureCanvasProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
+
+  // Radios reales de esta instancia del canvas: CENTER_R/ORBIT_R son la
+  // base compartida por todas las perspectivas; nodeScale permite que
+  // Rutas (u otra vista puntual) pida círculos más grandes sin afectar
+  // Alquimia/Elementos/otras vistas que no pasan la prop (quedan en 1).
+  const centerR = CENTER_R * nodeScale;
+  const orbitNodeR = (ORBIT_R / 2.9) * nodeScale;
 
   // ─── Identidad del "centro" actual: el diseño pide que la animación de
   // construcción se repita cuando cambia QUÉ está emergiendo (nuevo Oris,
@@ -159,7 +180,7 @@ export function StructureCanvas({
     // Radio mínimo para que `n` nodos, cada uno de diámetro ~2r + margen,
     // quepan en su propia circunferencia sin superponerse: arco disponible
     // por nodo = 2π·radius / n ≥ nodeDiameter + gap.
-    const nodeDiameter = (ORBIT_R / 2.9) * 2;
+    const nodeDiameter = orbitNodeR * 2;
     // Gap subido de 18 → 42: con pocos nodos por anillo (típico en el
     // Oris, que suele tener 2-4 IUMs) el radio mínimo resultante era casi
     // el mismo que el diámetro del nodo, así que los IUM terminaban muy
@@ -177,7 +198,7 @@ export function StructureCanvas({
     // MÁS nodos, así que un anillo interno con muchos nodos podía terminar
     // con radio menor al que le tocaba y sus nodos se superponían).
     const ringRadii: number[] = new Array(orbitLevels.length);
-    let previousRadius = CENTER_R + 40; // primer anillo (el más interno) empieza fuera del centro
+    let previousRadius = centerR + 40; // primer anillo (el más interno) empieza fuera del centro
     for (let ringIndex = orbitLevels.length - 1; ringIndex >= 0; ringIndex--) {
       const nodeCount = orbitLevels[ringIndex].nodes.length;
       const minRadius = Math.max(RING_0_R - (orbitLevels.length - 1 - ringIndex) * RING_GAP, minRadiusForNodes(nodeCount));
@@ -242,7 +263,7 @@ export function StructureCanvas({
     // que no crecía con outerRingRadius, así que al aumentar el radio para
     // evitar superposición (fix anterior), el nodo/texto del borde exterior
     // quedaba recortado por el viewBox — por eso "algunos no se muestran".
-    const nodeOuterMargin = ORBIT_R / 2.9 + 40; // radio del nodo + espacio para 2 líneas de texto
+    const nodeOuterMargin = orbitNodeR + 40; // radio del nodo + espacio para 2 líneas de texto
     const maxRadius = orbitLevels.length > 0 ? outerRingRadius : 0;
     const totalSize = PAD * 2 + maxRadius * 2 + nodeOuterMargin * 2;
 
@@ -255,7 +276,7 @@ export function StructureCanvas({
     });
 
     return { laidOut: nodesById, size: totalSize, ringCount: orbitLevels.length };
-  }, [columns, edges]);
+  }, [columns, edges, centerR, orbitNodeR]);
 
   const activeHoverId = hoverId;
   const highlightSet = useMemo(() => new Set(highlightedNodeIds), [highlightedNodeIds]);
@@ -331,6 +352,20 @@ export function StructureCanvas({
               highlightSet.has(edge.toNodeId);
             const weight = edge.weight ?? 0.5;
             const strokeWidth = 1 + Math.max(0, Math.min(1, weight)) * 2;
+            // Punto de llegada real: por defecto el centro del nodo destino
+            // (to.x, to.y). Si el edge trae `toPoint`, se apunta en cambio a
+            // una posición específica DENTRO del nodo destino (ej. la
+            // Partícula exacta dibujada dentro de su círculo de IUM), usando
+            // el mismo radio que ese nodo tiene en este layout (central o
+            // orbitante) para que el punto caiga sobre el dibujo real.
+            let toX = to.x;
+            let toY = to.y;
+            if (edge.toPoint) {
+              const nodeRadius = to.isCenter ? centerR : orbitNodeR;
+              const dist = nodeRadius * edge.toPoint.radiusRatio;
+              toX = to.x + Math.cos(edge.toPoint.angle) * dist;
+              toY = to.y + Math.sin(edge.toPoint.angle) * dist;
+            }
             // Durante "scattered" las líneas nacen invisibles para que la
             // conexión se sienta como un hilo que "tira" de la partícula
             // hacia el centro, no como un elemento que aparece de golpe.
@@ -340,8 +375,8 @@ export function StructureCanvas({
                 key={`${edge.fromNodeId}-${edge.toNodeId}-${i}`}
                 x1={from.x}
                 y1={from.y}
-                x2={to.x}
-                y2={to.y}
+                x2={toX}
+                y2={toY}
                 strokeWidth={strokeWidth}
                 style={{
                   stroke: isActive
@@ -374,7 +409,7 @@ export function StructureCanvas({
               const animRadius = node.radius * (phase === "scattered" ? scatterScale : 1);
               const nx = cx + Math.cos(node.angle) * animRadius;
               const ny = cy + Math.sin(node.angle) * animRadius;
-              const r = ORBIT_R / 2.9;
+              const r = orbitNodeR;
               return (
                 <g
                   key={node.id}
@@ -465,7 +500,7 @@ export function StructureCanvas({
               >
                 {!node.hideBorder && (
                   <circle
-                    r={CENTER_R}
+                    r={centerR}
                     strokeWidth={isSelected ? 2.5 : 1.5}
                     style={{
                       fill: "color-mix(in srgb, var(--primary) 5%, transparent)",
@@ -476,19 +511,19 @@ export function StructureCanvas({
                 )}
                 {node.visual ? (
                   node.hideBorder ? (
-                    // Sin borde: aprovecha todo el CENTER_R (antes se
+                    // Sin borde: aprovecha todo el centerR (antes se
                     // recortaba 8px de margen para dejar lugar al trazo).
-                    <foreignObject x={-CENTER_R} y={-CENTER_R} width={CENTER_R * 2} height={CENTER_R * 2}>
+                    <foreignObject x={-centerR} y={-centerR} width={centerR * 2} height={centerR * 2}>
                       <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
                     </foreignObject>
                   ) : (
-                    <foreignObject x={-CENTER_R + 8} y={-CENTER_R + 8} width={(CENTER_R - 8) * 2} height={(CENTER_R - 8) * 2}>
+                    <foreignObject x={-centerR + 8} y={-centerR + 8} width={(centerR - 8) * 2} height={(centerR - 8) * 2}>
                       <div className="flex h-full w-full items-center justify-center">{node.visual}</div>
                     </foreignObject>
                   )
                 ) : null}
                 <text
-                  y={CENTER_R + 18}
+                  y={centerR + 18}
                   textAnchor="middle"
                   fontSize={13}
                   fontWeight={900}
@@ -499,7 +534,7 @@ export function StructureCanvas({
                 </text>
                 {node.sublabel ? (
                   <text
-                    y={CENTER_R + 33}
+                    y={centerR + 33}
                     textAnchor="middle"
                     fontSize={10.5}
                     style={{ fill: "color-mix(in srgb, var(--primary) 42%, transparent)" }}
