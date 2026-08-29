@@ -799,10 +799,8 @@ function RutasSection() {
         title: o.nombre,
         subtitle: `${o.familia} · ${o.dominio}`,
         note: o.descripcion ?? null,
-        // Mismo criterio que en el canvas: el Oris se dibuja más grande
-        // que el IUM (que queda en 40, arriba) para que el Inspector
-        // refleje la misma jerarquía visual. Subido junto con el canvas.
-        visual: <CentroGravedadNodo particulas={fisicaRoute.particulasDelOrisSel} size={60} />,
+        // Gráfico quitado a pedido — el Inspector del Oris en Rutas ahora
+        // es solo texto (título/subtítulo/campos), sin el CentroGravedadNodo.
         fields: [
           { label: "Fórmula", value: o.formula },
           { label: "A", value: fisicaRoute.letrasOrisSel.A },
@@ -933,9 +931,12 @@ function RutasSection() {
             se estire de más en pantallas muy anchas, ya que el fr solo
             reparte el espacio disponible pero no pone techo. */}
         <div className="space-y-4 lg:max-w-[280px]">
-          <Inspector entity={inspectorEntity} emptyLabel="Seleccioná un Oris o un Elemento para inspeccionarlo." />
+          <Inspector
+            entity={inspectorEntity}
+            emptyLabel="Seleccioná un Oris o un Elemento para inspeccionarlo."
+            bordered={false}
+          />
           <div className="rounded-2xl p-5">
-            <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-primary/40">Trace</p>
             <TraceView steps={traceSteps} />
           </div>
         </div>

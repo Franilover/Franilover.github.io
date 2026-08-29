@@ -46,9 +46,15 @@ export function InspectorHoverCard({ entity }: { entity: InspectorEntity }) {
 export function Inspector({
   entity,
   emptyLabel = "Seleccioná un elemento para inspeccionarlo.",
+  bordered = true,
 }: {
   entity: InspectorEntity | null;
   emptyLabel?: string;
+  /** Borde del panel contenedor. Default true (comportamiento previo) —
+   *  se puede desactivar por llamador (ej. Rutas, pedido explícito de
+   *  quitar el borde del bloque del Oris) sin afectar a los demás usos de
+   *  este componente compartido. */
+  bordered?: boolean;
 }) {
   if (!entity) {
     return (
@@ -59,7 +65,7 @@ export function Inspector({
   }
 
   return (
-    <div className="rounded-2xl border border-primary/10 p-5">
+    <div className={`rounded-2xl p-5 ${bordered ? "border border-primary/10" : ""}`}>
       {entity.eyebrow ? (
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/35">{entity.eyebrow}</p>
       ) : null}
