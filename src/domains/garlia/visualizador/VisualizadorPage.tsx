@@ -428,22 +428,28 @@ function RutaFisicaCanvas({
       }
     }
     // Nivel 2: los IUMs reales que componen el Oris (desde iums_composicion).
+    // Antes: un solo nodo por IUM con sublabel "N×" agrupando la cantidad.
+    // Ahora, mismo criterio que el nivel de Partículas: se expande una
+    // instancia por unidad (ej. 3× Fluxor → 3 nodos "Fluxor" separados),
+    // así se ven todas las unidades alrededor igual que las partículas.
     // Cada IUM se pinta con IumVisual (componente "de afuera" de fisica/,
     // pedido explícito de reusarlo acá en vez de CentroGravedadNodo).
     // particulasDeIum sigue siendo cálculo de datos, no visual, así que se
     // reusa tal cual: ya expande la composición real.
-    const iumNodes = Object.entries(orisSel.iums_composicion)
-      .filter(([, cantidad]) => cantidad > 0)
-      .map(([iumId]) => {
-        const ium = iumPorId[iumId];
-        return {
-          id: `ium-${iumId}`,
-          label: ium?.nombre ?? "IUM",
-          sublabel: `${orisSel.iums_composicion[iumId]}×`,
+    const iumNodes: { id: string; label: string; sublabel?: string; hideBorder: boolean; visual: React.ReactNode }[] = [];
+    for (const [iumId, cantidad] of Object.entries(orisSel.iums_composicion)) {
+      const ium = iumPorId[iumId];
+      if (!ium || !cantidad) continue;
+      const particulasDelIumActual = particulasDeIum(ium);
+      for (let rep = 0; rep < cantidad; rep++) {
+        iumNodes.push({
+          id: `ium-${iumId}-${rep}`,
+          label: ium.nombre,
           hideBorder: true,
-          visual: ium ? <IumVisual particulas={particulasDeIum(ium)} size={56} showToggle={false} /> : undefined,
-        };
-      });
+          visual: <IumVisual particulas={particulasDelIumActual} size={56} showToggle={false} />,
+        });
+      }
+    }
     // Nivel 3: el Oris seleccionado — mismo tratamiento que un IUM (un
     // Oris es, en el modelo, una bolsa de IUMs que a su vez son bolsas de
     // partículas), con sus partículas ya expandidas. Mismo componente
@@ -482,30 +488,44 @@ function RutaFisicaCanvas({
     if (!orisSel) return [];
     const out: CanvasEdge[] = [];
     const iumIds = Object.keys(orisSel.iums_composicion).filter((id) => orisSel.iums_composicion[id] > 0);
-    // Cada IUM se conecta al nodo Oris.
-    for (const iumId of iumIds) {
-      out.push({ fromNodeId: `ium-${iumId}`, toNodeId: `oris-${orisSel.id}`, weight: 0.6 });
-    }
+    // Cada instancia de IUM (nodo `ium-{iumId}-{rep}`) se conecta al nodo
+    // Oris. Antes había un solo nodo por IUM (agrupado); ahora que se
+    // expande una instancia por unidad, se recorren los nodos reales de
+    // la columna "iums" en vez de un edge fijo por iumId.
+    columns
+      .find((c) => c.id === "iums")
+      ?.nodes.forEach((n) => {
+        out.push({ fromNodeId: n.id, toNodeId: `oris-${orisSel.id}`, weight: 0.6 });
+      });
     // Cada partícula se conecta a SU propio IUM real — antes todas se
     // conectaban al primer IUM disponible (particulasDeOris no traía el
     // mapeo), dejando sin líneas a cualquier otro IUM del Oris. El id de
     // cada nodo de partícula ahora es `particula-{iumId}-{n}`, así que el
-    // IUM de origen se lee directamente del id sin recalcular nada.
+    // IUM de origen se lee directamente del id sin recalcular nada. Como
+    // ahora un mismo iumId puede tener varias instancias (`ium-{iumId}-0`,
+    // `ium-{iumId}-1`, ...) y no hay dato de a cuál instancia pertenece
+    // cada partícula individual, se conecta a la PRIMERA instancia de ese
+    // IUM (agrupación visual razonable, sin inventar un mapeo 1:1 que no
+    // existe en los datos).
     columns
       .find((c) => c.id === "particulas")
       ?.nodes.forEach((n) => {
         const sinPrefijo = n.id.slice("particula-".length);
         const iumId = sinPrefijo.slice(0, sinPrefijo.lastIndexOf("-"));
-        if (iumId) out.push({ fromNodeId: n.id, toNodeId: `ium-${iumId}`, weight: 0.25 });
+        if (iumId) out.push({ fromNodeId: n.id, toNodeId: `ium-${iumId}-0`, weight: 0.25 });
       });
     return out;
   }, [enZoomIum, iumSel, particulasDelIumSel, orisSel, columns]);
 
   // Click en un nodo: si es un IUM de la vista de conjunto, hace zoom.
-  // Si no, delega al manejo normal (partícula/Oris) del padre.
+  // El id real es `ium-{iumId}-{rep}` (una instancia expandida) — el
+  // zoom es por IUM (no por instancia), así que se descarta el sufijo
+  // "-{rep}" y se queda solo con el iumId real.
   function handleSelectNode(nodeId: string) {
     if (!enZoomIum && nodeId.startsWith("ium-")) {
-      setIumSelId(nodeId.slice("ium-".length));
+      const sinPrefijo = nodeId.slice("ium-".length);
+      const iumId = sinPrefijo.slice(0, sinPrefijo.lastIndexOf("-"));
+      setIumSelId(iumId || sinPrefijo);
       return;
     }
     onSelectNode(nodeId);
