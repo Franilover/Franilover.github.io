@@ -391,15 +391,30 @@ function RutaFisicaCanvas({
       ];
     }
     if (!orisSel) return [];
-    // Nivel 1: partículas reales expandidas del Oris (vía sus IUMs).
-    // Antes cortaba en las primeras 12 (slice(0, 12)), lo que ocultaba
-    // partículas reales sin avisar — se muestran todas.
-    const particulaNodes = particulasDelOrisSel.map((p, i) => ({
-      id: `particula-${i}`,
-      label: p.nombre,
-      sublabel: p.formula,
-      visual: <ParticulaNodo formula={p.formula} size={40} />,
-    }));
+    // Nivel 1: partículas reales expandidas del Oris, CONSERVANDO de qué
+    // IUM viene cada una (antes se usaba particulasDelOrisSel, que aplana
+    // todo en un array sin recordar el origen — por eso todas terminaban
+    // conectadas al primer IUM). Se reconstruye acá mismo iterando
+    // iums_composicion, igual que hace particulasDeOris internamente, pero
+    // sin perder el iumId en el camino — mismo dato, sin agregar cálculo
+    // nuevo de dominio.
+    const particulaNodes: { id: string; label: string; sublabel: string; visual: React.ReactNode; iumId: string }[] = [];
+    for (const [iumId, cantidadIum] of Object.entries(orisSel.iums_composicion)) {
+      const ium = iumPorId[iumId];
+      if (!ium || !cantidadIum) continue;
+      const particulasDelIum = particulasDeIum(ium);
+      for (let rep = 0; rep < cantidadIum; rep++) {
+        for (const p of particulasDelIum) {
+          particulaNodes.push({
+            id: `particula-${iumId}-${particulaNodes.length}`,
+            label: p.nombre,
+            sublabel: p.formula,
+            visual: <ParticulaNodo formula={p.formula} size={40} />,
+            iumId,
+          });
+        }
+      }
+    }
     // Nivel 2: los IUMs reales que componen el Oris (desde iums_composicion).
     // Cada IUM se pinta con CentroGravedadNodo (núcleo ✦ + partículas
     // propias en anillo), forma propia del visualizador — no la reutiliza
@@ -451,17 +466,18 @@ function RutaFisicaCanvas({
     for (const iumId of iumIds) {
       out.push({ fromNodeId: `ium-${iumId}`, toNodeId: `oris-${orisSel.id}`, weight: 0.6 });
     }
-    // Las partículas no tienen id individual estable por IUM en el shape
-    // expandido (particulasDeOris no lo trae) — se conectan visualmente al
-    // primer IUM disponible como referencia de nivel, sin inventar un
-    // mapeo partícula→IUM que el dato no ofrece.
-    if (iumIds.length > 0) {
-      columns
-        .find((c) => c.id === "particulas")
-        ?.nodes.forEach((n) => {
-          out.push({ fromNodeId: n.id, toNodeId: `ium-${iumIds[0]}`, weight: 0.25 });
-        });
-    }
+    // Cada partícula se conecta a SU propio IUM real — antes todas se
+    // conectaban al primer IUM disponible (particulasDeOris no traía el
+    // mapeo), dejando sin líneas a cualquier otro IUM del Oris. El id de
+    // cada nodo de partícula ahora es `particula-{iumId}-{n}`, así que el
+    // IUM de origen se lee directamente del id sin recalcular nada.
+    columns
+      .find((c) => c.id === "particulas")
+      ?.nodes.forEach((n) => {
+        const sinPrefijo = n.id.slice("particula-".length);
+        const iumId = sinPrefijo.slice(0, sinPrefijo.lastIndexOf("-"));
+        if (iumId) out.push({ fromNodeId: n.id, toNodeId: `ium-${iumId}`, weight: 0.25 });
+      });
     return out;
   }, [enZoomIum, iumSel, particulasDelIumSel, orisSel, columns]);
 
@@ -714,7 +730,11 @@ function RutasSection() {
         const idx = Number(nodoSelId.slice("particula-ium-".length));
         return fisicaRoute.particulasDelIumSel[idx] ?? null;
       }
-      const idx = Number(nodoSelId.slice("particula-".length));
+      // Formato vista de conjunto: `particula-{iumId}-{i}` — el índice es
+      // siempre lo que sigue al ÚLTIMO guión, igual que en Alquimia más
+      // abajo (antes asumía que todo tras "particula-" era el índice, lo
+      // cual dejó de ser cierto al incluir el iumId real en el id).
+      const idx = Number(nodoSelId.slice(nodoSelId.lastIndexOf("-") + 1));
       return fisicaRoute.particulasDelOrisSel[idx] ?? null;
     }
     // Formato alquimia: `particula-${capa}-${i}`

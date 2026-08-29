@@ -85,10 +85,10 @@ interface LaidOutNode extends CanvasNode {
  *  Ocurre una vez por cada nuevo "centro" — no hay loop. */
 type BuildPhase = "scattered" | "converging" | "forming" | "emerging" | "stable";
 const PHASE_SEQUENCE: { phase: BuildPhase; durationMs: number }[] = [
-  { phase: "scattered", durationMs: 60 },
-  { phase: "converging", durationMs: 520 },
-  { phase: "forming", durationMs: 360 },
-  { phase: "emerging", durationMs: 320 },
+  { phase: "scattered", durationMs: 30 },
+  { phase: "converging", durationMs: 220 },
+  { phase: "forming", durationMs: 150 },
+  { phase: "emerging", durationMs: 140 },
   { phase: "stable", durationMs: 0 },
 ];
 
@@ -259,7 +259,7 @@ export function StructureCanvas({
   const centerScale = phase === "scattered" || phase === "converging" ? 0 : phase === "forming" ? 0.6 : 1;
   const centerOpacity = phase === "scattered" || phase === "converging" ? 0 : phase === "forming" ? 0.5 : 1;
   const orbitOpacity = phase === "scattered" ? 0.35 : 1;
-  const transitionAll = "transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease";
+  const transitionAll = "transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease";
 
   return (
     <div className={`w-full ${className ?? ""}`} style={{ aspectRatio: "1 / 1", maxWidth: size }}>
@@ -425,7 +425,7 @@ export function StructureCanvas({
                   opacity: centerOpacity,
                   transformOrigin: "center",
                   transition:
-                    "transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 420ms ease",
+                    "transform 220ms cubic-bezier(0.34, 1.2, 0.64, 1), opacity 200ms ease",
                 }}
               >
                 <circle
