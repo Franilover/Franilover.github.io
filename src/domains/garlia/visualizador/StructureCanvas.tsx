@@ -66,7 +66,10 @@ export interface StructureCanvasProps {
   className?: string;
 }
 
-const CENTER_R = 34; // radio del nodo central (el "centro de gravedad")
+const CENTER_R = 40; // radio del nodo central (el "centro de gravedad"). Subido
+// de 34 → 40 para dar más espacio interno al visual del centro (ej. el
+// nodo Oris ahora se dibuja más grande, ver VisualizadorPage) sin que se
+// recorte contra el borde del círculo contenedor.
 const ORBIT_R = 118; // radio de referencia del nodo orbitante
 const RING_GAP = 128; // separación entre anillos concéntricos
 const RING_0_R = 130; // radio del primer anillo (el más externo/profundo)

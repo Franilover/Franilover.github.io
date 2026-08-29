@@ -18,7 +18,7 @@
  * StructureCanvas/Inspector/TraceView necesitan para pintarlo.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useIums } from "@/domains/garlia/fisica/useFisica";
 import { useOrisConIums } from "@/domains/garlia/fisica/useOrisConIums";
@@ -70,10 +70,34 @@ export function useFisicaRoute(): FisicaRouteState {
   const { items: iums, loading: loadingIums } = useIums();
   const { items: oris, loading: loadingOris } = useOrisConIums();
 
+  // orisSelId ahora SIEMPRE se fija a un id concreto en cuanto hay datos
+  // (ver efecto abajo), nunca se deja en null "de forma permanente" salvo
+  // mientras oris todavía no cargó. Esto es lo que corrige el bug de
+  // "cambia de Oris solo": antes, mientras el usuario no clickeaba un
+  // chip, orisSel se recalculaba en CADA render como oris[0] — así que
+  // cualquier refetch/remount que reemplazara el array `oris` por una
+  // nueva referencia (aunque el contenido lógico fuera el mismo) podía
+  // hacer que, momentáneamente, oris[0] no fuera el mismo Oris que el
+  // usuario venía viendo (ej. mientras Dexie/offline sync repobla la
+  // lista en varios pasos). Al fijar el id explícitamente una sola vez
+  // (con `useEffect`, no en cada render), la selección deja de depender
+  // de la identidad del array en renders posteriores.
   const [orisSelId, setOrisSelId] = useState<string | null>(null);
   const [iumSelId, setIumSelId] = useState<string | null>(null);
 
   const loading = loadingIums || loadingOris;
+
+  useEffect(() => {
+    if (oris.length === 0) return;
+    const sigueExistiendo = orisSelId !== null && oris.some((o) => o.id === orisSelId);
+    if (!sigueExistiendo) {
+      // Cubre dos casos con la misma regla: (1) todavía no hay selección
+      // (orisSelId null) y (2) el Oris que el usuario tenía elegido fue
+      // eliminado/dejó de venir en la lista — en ambos, se fija de forma
+      // explícita al primero disponible, UNA vez, no en cada render.
+      setOrisSelId(oris[0].id);
+    }
+  }, [oris, orisSelId]);
 
   const iumPorId = useMemo(() => {
     const mapa: Record<string, FilaIum> = {};
@@ -82,7 +106,7 @@ export function useFisicaRoute(): FisicaRouteState {
   }, [iums]);
 
   const orisSel = useMemo(
-    () => (orisSelId ? oris.find((o) => o.id === orisSelId) ?? null : oris[0] ?? null),
+    () => oris.find((o) => o.id === orisSelId) ?? null,
     [oris, orisSelId],
   );
 

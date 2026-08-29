@@ -439,7 +439,12 @@ function RutaFisicaCanvas({
       label: orisSel.nombre,
       sublabel: orisSel.dominio,
       tone: "accent" as const,
-      visual: <CentroGravedadNodo particulas={particulasDelOrisSel} size={56} />,
+      // Subido de 56 → 68: el Oris es el centro de gravedad "final" de la
+      // ruta física (IUM → Oris) y debe leerse claramente como el nodo
+      // más importante del canvas, más grande que los IUM (44) que orbitan
+      // alrededor de él. 68 aprovecha el nuevo CENTER_R=40 del canvas
+      // (diámetro útil ~64px tras el padding interno) sin recortarse.
+      visual: <CentroGravedadNodo particulas={particulasDelOrisSel} size={68} />,
     };
     return [
       { id: "particulas", label: "Partículas (A/T/S)", nodes: particulaNodes },
@@ -788,7 +793,10 @@ function RutasSection() {
         title: o.nombre,
         subtitle: `${o.familia} · ${o.dominio}`,
         note: o.descripcion ?? null,
-        visual: <CentroGravedadNodo particulas={fisicaRoute.particulasDelOrisSel} size={40} />,
+        // Mismo criterio que en el canvas: el Oris se dibuja más grande
+        // que el IUM (que queda en 40, arriba) para que el Inspector
+        // refleje la misma jerarquía visual.
+        visual: <CentroGravedadNodo particulas={fisicaRoute.particulasDelOrisSel} size={52} />,
         fields: [
           { label: "Fórmula", value: o.formula },
           { label: "A", value: fisicaRoute.letrasOrisSel.A },

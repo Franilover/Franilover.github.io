@@ -34,9 +34,14 @@ import React from "react";
 export type LetraATS = "A" | "T" | "S";
 
 export const LETRA_COLOR: Record<LetraATS, { bg: string; border: string; fg: string }> = {
-  A: { bg: "color-mix(in srgb, #22c55e 18%, transparent)", border: "#22c55e", fg: "#15803d" },
-  T: { bg: "color-mix(in srgb, #ef4444 18%, transparent)", border: "#ef4444", fg: "#b91c1c" },
-  S: { bg: "color-mix(in srgb, #3b82f6 18%, transparent)", border: "#3b82f6", fg: "#1d4ed8" },
+  // Fondo subido de 18% → 32% de mezcla: el relleno de las partículas y
+  // del anillo A/T/S se veía demasiado tenue/lavado, sobre todo en el
+  // nodo Oris (CentroGravedadNodo), que además ahora es más grande y esa
+  // debilidad se notaba más. El borde queda al 100% del color puro, sin
+  // cambios, para no perder el contraste que ya funcionaba bien.
+  A: { bg: "color-mix(in srgb, #22c55e 32%, transparent)", border: "#22c55e", fg: "#15803d" },
+  T: { bg: "color-mix(in srgb, #ef4444 32%, transparent)", border: "#ef4444", fg: "#b91c1c" },
+  S: { bg: "color-mix(in srgb, #3b82f6 32%, transparent)", border: "#3b82f6", fg: "#1d4ed8" },
 };
 
 function esLetraATS(c: string): c is LetraATS {
@@ -168,12 +173,14 @@ export function CentroGravedadNodo({
   return (
     <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className={className} role="img" aria-label="Centro de gravedad">
       {particulas.length === 0 ? (
-        <circle cx={cx} cy={cy} r={orbitR} fill="none" strokeWidth={1.5} style={{ stroke: "color-mix(in srgb, var(--primary) 20%, transparent)" }} />
+        <circle cx={cx} cy={cy} r={orbitR} fill="none" strokeWidth={1.5} style={{ stroke: "color-mix(in srgb, var(--primary) 32%, transparent)" }} />
       ) : (
         <>
-          {/* Anillo orbital de referencia, muy sutil (punto 5 del docx: la
-              posición es visual, no una geometría física real). */}
-          <circle cx={cx} cy={cy} r={orbitR} fill="none" strokeWidth={1} style={{ stroke: "color-mix(in srgb, var(--primary) 12%, transparent)" }} />
+          {/* Anillo orbital de referencia. Sigue siendo sutil a propósito
+              (punto 5 del docx: la posición es visual, no una geometría
+              física real) pero subido de 12% → 22% — al tamaño más grande
+              del nodo Oris, el anillo casi no se distinguía del fondo. */}
+          <circle cx={cx} cy={cy} r={orbitR} fill="none" strokeWidth={1} style={{ stroke: "color-mix(in srgb, var(--primary) 22%, transparent)" }} />
 
           {particulas.map((p, i) => {
             const angulo = (i / particulas.length) * Math.PI * 2 - Math.PI / 2;
