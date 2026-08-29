@@ -59,7 +59,7 @@ export function Inspector({
   }
 
   return (
-    <div className="rounded-2xl border border-primary/10 p-6">
+    <div className="rounded-2xl border border-primary/10 p-5">
       {entity.eyebrow ? (
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/35">{entity.eyebrow}</p>
       ) : null}

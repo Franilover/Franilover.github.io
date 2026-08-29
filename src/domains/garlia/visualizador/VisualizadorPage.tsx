@@ -822,7 +822,7 @@ function RutasSection() {
     <>
       <PerspectivaSwitcher value={perspectiva} onChange={setPerspectiva} />
 
-      <div className="mt-8 grid gap-7 lg:grid-cols-[1.5fr_1fr]">
+      <div className="mt-8 grid gap-5 lg:grid-cols-[2.2fr_1fr]">
         <div>
           {perspectiva === "fisica" ? (
             <RutaFisicaCanvas
@@ -843,9 +843,9 @@ function RutasSection() {
           )}
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           <Inspector entity={inspectorEntity} emptyLabel="Seleccioná un Oris o un Elemento para inspeccionarlo." />
-          <div className="rounded-2xl bg-primary/[0.02] p-7">
+          <div className="rounded-2xl bg-primary/[0.02] p-5">
             <p className="mb-4 text-[10px] font-black uppercase tracking-widest text-primary/40">Trace</p>
             <TraceView steps={traceSteps} />
           </div>
@@ -949,9 +949,9 @@ function VisualizadorPage() {
     <main className="min-h-screen bg-[var(--bg-main)] text-primary">
       <div className="w-full py-8">
 
-        <div className="grid gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
-          <aside className="rounded-2xl bg-primary/[0.02] p-3 lg:sticky lg:top-6 lg:self-start">
-            <p className="px-3 pb-3 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/30">Explorar</p>
+        <div className="grid gap-2 lg:grid-cols-[150px_minmax(0,1fr)]">
+          <aside className="p-0 lg:sticky lg:top-6 lg:self-start">
+            <p className="pb-3 pt-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/30">Explorar</p>
             <nav className="space-y-1.5">
               {navItems.map((item) => {
                 const selected = item.key === active;
@@ -960,7 +960,7 @@ function VisualizadorPage() {
                     key={item.key}
                     type="button"
                     onClick={() => setActive(item.key)}
-                    className={`flex w-full items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-xs font-black transition-colors ${selected ? "border-primary/25 text-primary/90" : "border-transparent text-primary/45 hover:border-primary/10 hover:text-primary/70"}`}
+                    className={`flex w-full items-center gap-2 py-2 text-left text-xs transition-colors ${selected ? "font-black text-primary/90" : "font-medium text-primary/45 hover:text-primary/70"}`}
                   >
                     {item.icon}
                     <span>{item.label}</span>
