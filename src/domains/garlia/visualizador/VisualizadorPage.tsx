@@ -230,6 +230,44 @@ function ChipSelector<T>({
   );
 }
 
+function SelectDropdown<T>({
+  items,
+  active,
+  getKey,
+  getLabel,
+  onSelect,
+  placeholder = "Seleccioná un elemento…",
+}: {
+  items: T[];
+  active: T | null;
+  getKey: (item: T) => string;
+  getLabel: (item: T) => string;
+  onSelect: (item: T) => void;
+  placeholder?: string;
+}) {
+  return (
+    <select
+      value={active ? getKey(active) : ""}
+      onChange={(e) => {
+        const found = items.find((item) => getKey(item) === e.target.value);
+        if (found) onSelect(found);
+      }}
+      className="w-full max-w-sm rounded-lg border border-primary/15 bg-transparent px-3.5 py-2.5 text-xs font-black text-primary/85 outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
+    >
+      {!active ? (
+        <option value="" disabled>
+          {placeholder}
+        </option>
+      ) : null}
+      {items.map((item) => (
+        <option key={getKey(item)} value={getKey(item)} className="bg-[var(--bg-main)] text-primary">
+          {getLabel(item)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function LoadingRow() {
   return (
     <div className="flex items-center gap-2.5 rounded-xl border border-primary/10 p-5 text-xs font-bold text-primary/35">
@@ -1232,12 +1270,13 @@ function VisualizadorPage() {
                 {loadingMateriales ? (
                   <LoadingRow />
                 ) : (
-                  <ChipSelector
+                  <SelectDropdown
                     items={materiales}
                     active={materialSel}
                     getKey={(m) => m.id}
                     getLabel={(m) => m.nombre}
                     onSelect={setMaterialSel}
+                    placeholder="Seleccioná un material…"
                   />
                 )}
                 <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.8fr]">
@@ -1283,12 +1322,13 @@ function VisualizadorPage() {
                 {loadingEstructuras ? (
                   <LoadingRow />
                 ) : (
-                  <ChipSelector
+                  <SelectDropdown
                     items={estructuras}
                     active={estructuraSel}
                     getKey={(e) => e.id}
                     getLabel={(e) => e.nombre}
                     onSelect={setEstructuraSel}
+                    placeholder="Seleccioná una estructura…"
                   />
                 )}
                 <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.8fr]">
@@ -1335,17 +1375,15 @@ function VisualizadorPage() {
                 {loadingCompuestos ? (
                   <LoadingRow />
                 ) : (
-                  <ChipSelector
-                    items={compuestos.slice(0, 60)}
+                  <SelectDropdown
+                    items={compuestos}
                     active={compuestoSel}
                     getKey={(c) => c.id}
                     getLabel={(c) => c.nombre}
                     onSelect={setCompuestoSel}
+                    placeholder="Seleccioná un compuesto…"
                   />
                 )}
-                {compuestos.length > 60 ? (
-                  <p className="mt-1.5 text-[10px] text-primary/30">Mostrando los primeros 60 de {compuestos.length} compuestos.</p>
-                ) : null}
                 <div className="mt-8 grid gap-7 lg:grid-cols-2">
                   <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">
@@ -1563,12 +1601,13 @@ function VisualizadorPage() {
                 {loadingProcesos ? (
                   <LoadingRow />
                 ) : (
-                  <ChipSelector
+                  <SelectDropdown
                     items={procesos}
                     active={procesoSel}
                     getKey={(p) => p.id}
                     getLabel={(p) => p.nombre}
                     onSelect={setProcesoSel}
+                    placeholder="Seleccioná un proceso…"
                   />
                 )}
                 <div className="mt-8 overflow-x-auto rounded-2xl p-7">
