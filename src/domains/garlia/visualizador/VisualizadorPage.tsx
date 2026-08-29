@@ -26,6 +26,7 @@ import {
 // Nada de física/química se calcula acá: solo se lee y se presenta.
 
 import {
+  contarLetrasDeIum,
   contarLetrasDeOris,
   particulasDeIum,
   particulasDeOris,
@@ -53,7 +54,6 @@ import {
   useRunasCatalogo,
   useValoresDerivadosDeEntidad,
   type EntidadTipoDerivada,
-  type ParticulaCompleta,
 } from "./useVisualizadorData";
 
 // ─── Vertical slice: lenguaje visual reutilizable + rutas Física/Alquimia ──
@@ -65,6 +65,7 @@ import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
 import { ParticulaNodo, CentroGravedadNodo, ElementoNodo, contarLetrasNodo } from "./NodeVisuals";
+import { TriangleATS, type EntidadATS } from "./TriangleATS";
 
 type SectionKey =
   | "rutas"
@@ -967,7 +968,6 @@ function VisualizadorPage() {
   }, [iums]);
 
   // ─── Selecciones activas por sección ────────────────────────────────────
-  const [particulaSel, setParticulaSel] = useState<ParticulaCompleta | null>(null);
   const [orisSel, setOrisSel] = useState<(typeof oris)[number] | null>(null);
   const [materialSel, setMaterialSel] = useState<(typeof materiales)[number] | null>(null);
   const [estructuraSel, setEstructuraSel] = useState<(typeof estructuras)[number] | null>(null);
@@ -975,9 +975,65 @@ function VisualizadorPage() {
   const [procesoSel, setProcesoSel] = useState<(typeof procesos)[number] | null>(null);
   const [runaSel, setRunaSel] = useState<(typeof runas)[number] | null>(null);
 
+  // ─── VIS-02: nivel de zoom semántico del mapa A/T/S (docx punto 14 —
+  // "partículas / IUMs / Oris, todas vistas en el mismo espacio
+  // conceptual"). El triángulo en sí no cambia; solo qué conjunto de
+  // entidades se proyecta en él.
+  const [nivelATS, setNivelATS] = useState<"particulas" | "ium" | "oris">("particulas");
+  const [atsSelId, setAtsSelId] = useState<string | null>(null);
+
+  const entidadesATS: EntidadATS[] = useMemo(() => {
+    if (nivelATS === "particulas") {
+      return particulas.map((p) => ({
+        id: p.id,
+        label: p.nombre,
+        sublabel: p.formula,
+        // Mismo conteo real que ya usa contarLetrasNodo (NodeVisuals) para
+        // el color dominante de ParticulaNodo — no se reinventa la regla.
+        letras: contarLetrasNodo(p.formula),
+      }));
+    }
+    if (nivelATS === "ium") {
+      return iums.map((i) => {
+        const fila = iumPorId[i.id];
+        return {
+          id: i.id,
+          label: i.nombre,
+          sublabel: `${fila ? particulasDeIum(fila).length : 0} partícula(s)`,
+          letras: fila ? contarLetrasDeIum(fila) : { A: 0, T: 0, S: 0 },
+          componentes: fila
+            ? particulasDeIum(fila).map((p) => ({ label: p.nombre, letras: contarLetrasNodo(p.formula) }))
+            : [],
+        };
+      });
+    }
+    return oris.map((o) => ({
+      id: o.id,
+      label: o.nombre,
+      sublabel: o.dominio,
+      letras: contarLetrasDeOris(o.iums_composicion, iumPorId),
+      componentes: particulasDeOris(o.iums_composicion, iumPorId).map((p) => ({
+        label: p.nombre,
+        letras: contarLetrasNodo(p.formula),
+      })),
+    }));
+  }, [nivelATS, particulas, iums, oris, iumPorId]);
+
+  // Selección por defecto y saneo si el nivel cambia y el id activo ya no
+  // existe en el nuevo conjunto — mismo patrón que el resto de selecciones
+  // de esta página (useEffect, nunca recalculado "en frío" en cada render).
   useEffect(() => {
-    if (!particulaSel && particulas.length > 0) setParticulaSel(particulas[0]);
-  }, [particulas, particulaSel]);
+    if (entidadesATS.length === 0) {
+      if (atsSelId !== null) setAtsSelId(null);
+      return;
+    }
+    if (!atsSelId || !entidadesATS.some((e) => e.id === atsSelId)) {
+      setAtsSelId(entidadesATS[0].id);
+    }
+  }, [entidadesATS, atsSelId]);
+
+  const atsEntidadActiva = entidadesATS.find((e) => e.id === atsSelId) ?? null;
+
   useEffect(() => {
     if (!orisSel && oris.length > 0) setOrisSel(oris[0]);
   }, [oris, orisSel]);
@@ -1149,72 +1205,115 @@ function VisualizadorPage() {
 
             {active === "ats" ? (
               <>
-                <div className="grid gap-7 lg:grid-cols-[0.9fr_1.1fr]">
+                {/* VIS-02 — Espacio Tesis/Antítesis/Síntesis. El triángulo
+                    es el protagonista de la sección (docx: "el
+                    protagonista es el espacio que existe dentro de él"),
+                    con el selector de partícula anterior movido a un panel
+                    lateral de detalle en vez de encabezar la sección. */}
+                <div className="mb-5 flex flex-wrap items-center gap-2">
+                  {(
+                    [
+                      ["particulas", "Partículas"],
+                      ["ium", "IUM"],
+                      ["oris", "Oris"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setNivelATS(key)}
+                      className={`rounded-full border px-4 py-1.5 text-[11px] font-black uppercase tracking-widest transition-colors ${
+                        nivelATS === key
+                          ? "border-primary/60 bg-primary/10 text-primary/90"
+                          : "border-primary/12 text-primary/40 hover:border-primary/25"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <span className="ml-1 text-[10px] text-primary/35">
+                    Zoom semántico — mismo espacio conceptual, distinto nivel.
+                  </span>
+                </div>
+
+                <div className="grid gap-7 lg:grid-cols-[1.35fr_0.65fr]">
                   <div className="rounded-2xl p-7">
-                    {loadingParticulas ? (
+                    {(nivelATS === "particulas" && loadingParticulas) || (nivelATS === "oris" && loadingOris) ? (
                       <LoadingRow />
+                    ) : entidadesATS.length === 0 ? (
+                      <EmptyRow>Sin entidades para este nivel.</EmptyRow>
                     ) : (
-                      <ChipSelector
-                        items={particulas}
-                        active={particulaSel}
-                        getKey={(p) => p.id}
-                        getLabel={(p) => p.nombre}
-                        onSelect={setParticulaSel}
+                      <TriangleATS
+                        entidades={entidadesATS}
+                        selectedId={atsSelId}
+                        onSelect={setAtsSelId}
+                        modoCiencia
                       />
                     )}
-                    {particulaSel ? (
-                      <div className="mx-auto mt-5 flex max-w-xs flex-col items-center">
-                        <div className="rounded-full border border-primary/15 px-8 py-5 text-center">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Partícula</p>
-                          <p className="mt-1 text-2xl font-black text-primary/85">{particulaSel.nombre}</p>
-                          <p className="mt-1 text-xs font-bold text-primary/40">{particulaSel.formula}</p>
-                        </div>
-                        <div className="my-3 h-8 border-l border-dashed border-primary/20" />
-                        <div className="grid w-full grid-cols-3 gap-3 text-center">
-                          {(["A", "T", "S"] as const).map((letra) => {
-                            const count = particulaSel.formula.split("").filter((c) => c === letra).length;
-                            return (
+                  </div>
+
+                  <div className="space-y-5">
+                    <div className="rounded-2xl p-7">
+                      {atsEntidadActiva ? (
+                        <div className="flex flex-col items-center text-center">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">
+                            {nivelATS === "particulas" ? "Partícula" : nivelATS === "ium" ? "IUM" : "Oris"}
+                          </p>
+                          <p className="mt-1 text-2xl font-black text-primary/85">{atsEntidadActiva.label}</p>
+                          {atsEntidadActiva.sublabel ? (
+                            <p className="mt-1 text-xs font-bold text-primary/40">{atsEntidadActiva.sublabel}</p>
+                          ) : null}
+                          <div className="my-3 h-6 border-l border-dashed border-primary/20" />
+                          <div className="grid w-full grid-cols-3 gap-3 text-center">
+                            {(["A", "T", "S"] as const).map((letra) => (
                               <div key={letra} className="rounded-xl border border-primary/10 p-4">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{letra}</p>
-                                <p className="mt-1 text-lg font-black text-primary/75">{count}</p>
+                                <p className="mt-1 text-lg font-black text-primary/75">{atsEntidadActiva.letras[letra]}</p>
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
+                          {atsEntidadActiva.componentes?.length ? (
+                            <p className="mt-3 text-[11px] font-bold text-primary/40">
+                              {atsEntidadActiva.componentes.length} componente(s) superpuesto(s) en el mapa
+                            </p>
+                          ) : null}
                         </div>
-                        {particulaSel.vector_neto !== null && particulaSel.vector_neto !== undefined ? (
-                          <p className="mt-3 text-[11px] font-bold text-primary/40">
-                            Vector neto: <span className="text-primary/70">{particulaSel.vector_neto}</span>
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="rounded-2xl p-7">
-                    <p className="text-xs font-black text-primary/80">Ejes fundamentales</p>
-                    <p className="text-[10px] text-primary/35">Valores reales de particulas.ejes_fundamentales</p>
-                    {particulaSel?.ejes_fundamentales ? (
-                      <div className="mt-4 space-y-4">
-                        {(
-                          [
-                            ["dinamica", "Dinámica"],
-                            ["coherencia", "Coherencia"],
-                            ["estabilidad", "Estabilidad"],
-                            ["informacion", "Información"],
-                            ["interaccion", "Interacción"],
-                            ["transformacion", "Transformación"],
-                          ] as const
-                        ).map(([clave, label]) => {
-                          const valores = particulas
-                            .map((p) => p.ejes_fundamentales?.[clave])
-                            .filter((v): v is number => typeof v === "number");
-                          const max = Math.max(1, ...valores.map((v) => Math.abs(v)));
-                          const v = particulaSel.ejes_fundamentales?.[clave] ?? 0;
-                          return <BarraDivergente key={clave} label={label} value={v} max={max} />;
-                        })}
-                      </div>
-                    ) : (
-                      <EmptyRow>Sin ejes fundamentales para esta partícula.</EmptyRow>
-                    )}
+                      ) : (
+                        <EmptyRow>Elegí una entidad en el mapa.</EmptyRow>
+                      )}
+                    </div>
+
+                    <div className="rounded-2xl p-7">
+                      <p className="text-xs font-black text-primary/80">Ejes fundamentales</p>
+                      <p className="text-[10px] text-primary/35">Valores reales de particulas.ejes_fundamentales</p>
+                      {nivelATS !== "particulas" ? (
+                        <EmptyRow>Solo disponible a nivel Partículas.</EmptyRow>
+                      ) : (() => {
+                        const p = particulas.find((x) => x.id === atsSelId) ?? null;
+                        return p?.ejes_fundamentales ? (
+                          <div className="mt-4 space-y-4">
+                            {(
+                              [
+                                ["dinamica", "Dinámica"],
+                                ["coherencia", "Coherencia"],
+                                ["estabilidad", "Estabilidad"],
+                                ["informacion", "Información"],
+                                ["interaccion", "Interacción"],
+                                ["transformacion", "Transformación"],
+                              ] as const
+                            ).map(([clave, label]) => {
+                              const valores = particulas
+                                .map((pp) => pp.ejes_fundamentales?.[clave])
+                                .filter((v): v is number => typeof v === "number");
+                              const max = Math.max(1, ...valores.map((v) => Math.abs(v)));
+                              const v = p.ejes_fundamentales?.[clave] ?? 0;
+                              return <BarraDivergente key={clave} label={label} value={v} max={max} />;
+                            })}
+                          </div>
+                        ) : (
+                          <EmptyRow>Sin ejes fundamentales para esta partícula.</EmptyRow>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
               </>
