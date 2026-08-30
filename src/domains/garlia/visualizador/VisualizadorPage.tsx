@@ -138,53 +138,80 @@ type NavGroup = {
   items: { key: SectionKey; label: string; visId: string; icon: React.ReactNode; implementado: boolean }[];
 };
 
-// Agrupación acordada: 7 grupos temáticos de sidebar, cruzados contra las
-// categorías reales de visualizador_estado en Supabase. VIS-09 queda en
-// Dinámica (así está categorizado en Supabase); Biología va visible al
-// final, sin colapsar, aunque su desarrollo esté pospuesto.
+// ─── Rediseño de sidebar por DOMINIO (pedido explícito): en vez de agrupar
+// por categoría del docx (Constitución/Relaciones/Propiedades Físicas/...),
+// se agrupa por la ENTIDAD real sobre la que opera cada sección — así
+// "Energía de Enlace"/"Compatibilidad→Enlace"/"El Enlace" quedan juntas
+// bajo "Enlace" en vez de repartidas en 3 categorías distintas.
+//
+// El criterio de a qué dominio pertenece cada item es el DATO real que
+// consume esa sección (verificado leyendo cada bloque `active === "..."`),
+// no lo que sugiere el label:
+//   - "Perfil Reactivo" y "Carga Eléctrica" leen `compuestos` (compuesto.
+//     carga, propiedades_calculadas de Compuesto) → van en Compuestos, NO
+//     en Enlace, aunque conceptualmente hablen de electricidad/reactividad.
+//   - "Perfil físico de Material" y "Material → Estructura" son las únicas
+//     que leen `materiales` → Materiales.
+//   - Interacción/Proceso/Comparación no pertenecen a una sola entidad
+//     (cruzan varias) → dominio "General / Dinámica" a propósito.
+//
+// Oris/Runas/Física, Atlas/Sandbox y Biología quedan IGUAL que antes (fuera
+// de este rediseño) — se decide después a qué nivel entran.
 const navGroups: NavGroup[] = [
   {
-    group: "Constitución",
+    group: "ATS",
     items: [
-      { key: "oris_ruta", label: "Oris", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
-      { key: "elementos_ruta", label: "Elementos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
-      { key: "compuestos_ruta", label: "Compuestos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
       { key: "ats", label: "Triángulo A/T/S", visId: "VIS-02", icon: <Orbit size={15} />, implementado: true },
     ],
   },
   {
-    group: "Relaciones",
+    group: "Elementos",
+    items: [
+      { key: "elementos_ruta", label: "Elementos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
+    ],
+  },
+  {
+    group: "Compuestos",
+    items: [
+      { key: "compuestos_ruta", label: "Compuestos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
+      { key: "reactivity", label: "Perfil Reactivo", visId: "VIS-22", icon: <FlaskConical size={15} />, implementado: true },
+      { key: "electric", label: "Carga Eléctrica", visId: "VIS-24", icon: <Zap size={15} />, implementado: true },
+    ],
+  },
+  {
+    group: "Materiales",
+    items: [
+      { key: "material", label: "Perfil físico de Material", visId: "VIS-21", icon: <Gauge size={15} />, implementado: true },
+      { key: "structure", label: "Material → Estructura", visId: "VIS-10", icon: <Atom size={15} />, implementado: true },
+    ],
+  },
+  {
+    group: "Enlace",
     items: [
       { key: "compatibilidad", label: "Compatibilidad → Enlace", visId: "VIS-04", icon: <Waypoints size={15} />, implementado: true },
       { key: "elEnlace", label: "El Enlace", visId: "VIS-19", icon: <Waypoints size={15} />, implementado: true },
+      { key: "energy", label: "Energía de Enlace", visId: "VIS-23", icon: <BarChart3 size={15} />, implementado: true },
     ],
   },
   {
-    group: "Propiedades Físicas",
-    items: [
-      { key: "structure", label: "Material → Estructura", visId: "VIS-10", icon: <Atom size={15} />, implementado: true },
-      { key: "material", label: "Perfil físico de Material", visId: "VIS-21", icon: <Gauge size={15} />, implementado: true },
-      { key: "reactivity", label: "Perfil Reactivo", visId: "VIS-22", icon: <FlaskConical size={15} />, implementado: true },
-      { key: "comparacion", label: "Comparación", visId: "VIS-18", icon: <BarChart3 size={15} />, implementado: false },
-    ],
-  },
-  {
-    group: "Dinámica",
+    group: "General / Dinámica",
     items: [
       { key: "interaccion", label: "Interacción", visId: "VIS-05", icon: <Play size={15} />, implementado: true },
       { key: "process", label: "Proceso: Entrada→Transf.→Salida", visId: "VIS-25", icon: <Workflow size={15} />, implementado: true },
-      { key: "energy", label: "Energía de Enlace", visId: "VIS-23", icon: <BarChart3 size={15} />, implementado: true },
-      { key: "electric", label: "Carga Eléctrica", visId: "VIS-24", icon: <Zap size={15} />, implementado: true },
+      { key: "comparacion", label: "Comparación", visId: "VIS-18", icon: <BarChart3 size={15} />, implementado: false },
       // Propagación (VIS-06) y Tiempo (VIS-16) están activos en Supabase pero
-      // sin sección propia en este archivo todavía — placeholder, no se inventa UI.
+      // sin sección propia todavía — placeholder, no se inventa UI.
       { key: "propagacion", label: "Propagación", visId: "VIS-06", icon: <Radio size={15} />, implementado: false },
       { key: "tiempo", label: "Tiempo", visId: "VIS-16", icon: <Radio size={15} />, implementado: false },
       { key: "information", label: "Información (sin dato)", visId: "VIS-PENDIENTE-INFO", icon: <Radio size={15} />, implementado: false },
     ],
   },
+  // ─── Sin tocar todavía (fuera de este rediseño por dominio, pendiente de
+  // decidir a qué nivel entran — ver conversación) ──────────────────────────
   {
     group: "Oris / Runas",
     items: [
+      { key: "oris_ruta", label: "Oris (ruta física)", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
       { key: "oris", label: "Oris", visId: "VIS-08", icon: <Sparkles size={15} />, implementado: true },
       { key: "runas", label: "Runa → Mecanismo → Fenómeno", visId: "VIS-09", icon: <CircleDot size={15} />, implementado: true },
     ],
@@ -2515,6 +2542,12 @@ function MaterialEstructuraSection({
 
 function VisualizadorPage() {
   const [active, setActive] = useState<SectionKey>("oris_ruta");
+  // Acordeón de la sidebar: qué dominio está expandido. Arranca expandiendo
+  // el grupo que contiene la sección activa por defecto, para que "oris_ruta"
+  // no quede huérfano con todo colapsado al cargar la página.
+  const [grupoExpandido, setGrupoExpandido] = useState<string | null>(
+    () => navGroups.find((g) => g.items.some((i) => i.key === "oris_ruta"))?.group ?? navGroups[0]?.group ?? null,
+  );
 
   // ─── Fuentes de datos reales ────────────────────────────────────────────
   const { items: particulas, loading: loadingParticulas } = useParticulasCompletas();
@@ -2657,32 +2690,48 @@ function VisualizadorPage() {
 
         <div className="grid gap-2 lg:grid-cols-[150px_minmax(0,1fr)]">
           <aside className="p-0 lg:sticky lg:top-6 lg:self-start">
-            <nav className="space-y-4">
-              {navGroups.map((grupo) => (
-                <div key={grupo.group}>
-                  <p className="mb-1.5 px-0 text-[9px] font-black uppercase tracking-widest text-primary/30">
-                    {grupo.group}
-                  </p>
-                  <div className="space-y-1.5">
-                    {grupo.items.map((item) => {
-                      const selected = item.key === active;
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() => setActive(item.key)}
-                          className={`flex w-full items-center gap-2 py-2 text-left text-xs transition-colors ${selected ? "font-black text-primary/90" : "font-medium text-primary/45 hover:text-primary/70"} ${item.implementado ? "" : "opacity-60"}`}
-                          title={item.visId}
-                        >
-                          {item.icon}
-                          <span>{item.label}</span>
-                          {!item.implementado ? <span className="ml-auto text-[9px] text-primary/25">pronto</span> : null}
-                        </button>
-                      );
-                    })}
+            <nav className="space-y-1">
+              {navGroups.map((grupo) => {
+                const expandido = grupoExpandido === grupo.group;
+                const grupoActivo = grupo.items.some((i) => i.key === active);
+                return (
+                  <div key={grupo.group}>
+                    <button
+                      type="button"
+                      onClick={() => setGrupoExpandido(expandido ? null : grupo.group)}
+                      className={`flex w-full items-center justify-between gap-2 py-2 text-left text-[10px] font-black uppercase tracking-widest transition-colors ${
+                        grupoActivo ? "text-primary/70" : "text-primary/30 hover:text-primary/55"
+                      }`}
+                    >
+                      <span>{grupo.group}</span>
+                      <ChevronRight
+                        size={12}
+                        className={`shrink-0 transition-transform ${expandido ? "rotate-90" : ""}`}
+                      />
+                    </button>
+                    {expandido ? (
+                      <div className="mb-2 space-y-1.5 pl-1">
+                        {grupo.items.map((item) => {
+                          const selected = item.key === active;
+                          return (
+                            <button
+                              key={item.key}
+                              type="button"
+                              onClick={() => setActive(item.key)}
+                              className={`flex w-full items-center gap-2 py-2 text-left text-xs transition-colors ${selected ? "font-black text-primary/90" : "font-medium text-primary/45 hover:text-primary/70"} ${item.implementado ? "" : "opacity-60"}`}
+                              title={item.visId}
+                            >
+                              {item.icon}
+                              <span>{item.label}</span>
+                              {!item.implementado ? <span className="ml-auto text-[9px] text-primary/25">pronto</span> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </nav>
           </aside>
 
