@@ -66,7 +66,7 @@ import {
 import { StructureCanvas, type CanvasColumn, type CanvasEdge } from "./StructureCanvas";
 import { Inspector, type InspectorEntity } from "./Inspector";
 import { TraceView, type TraceStep } from "./TraceView";
-import { PerspectivaSwitcher, type Perspectiva } from "./PerspectivaSwitcher";
+import { type Perspectiva } from "./PerspectivaSwitcher";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
 import { useCompuestoRoute } from "./routes/useCompuestoRoute";
@@ -101,7 +101,9 @@ import { ParticulaVisual, IumVisual } from "@/domains/garlia/fisica/ParticulaVis
 // hasta que se diseñen. Nada se inventa: nombre y VIS-id vienen 1:1 de Supabase.
 type SectionKey =
   // ya implementadas
-  | "rutas"
+  | "oris_ruta"
+  | "elementos_ruta"
+  | "compuestos_ruta"
   | "ats"
   | "formula"
   | "material"
@@ -140,7 +142,9 @@ const navGroups: NavGroup[] = [
   {
     group: "Constitución",
     items: [
-      { key: "rutas", label: "Física/Alquimia", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
+      { key: "oris_ruta", label: "Oris", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
+      { key: "elementos_ruta", label: "Elementos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
+      { key: "compuestos_ruta", label: "Compuestos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
       { key: "ats", label: "Triángulo A/T/S", visId: "VIS-02", icon: <Orbit size={15} />, implementado: true },
     ],
   },
@@ -1668,8 +1672,7 @@ function InteraccionSection() {
   );
 }
 
-function RutasSection() {
-  const [perspectiva, setPerspectiva] = useState<Perspectiva>("fisica");
+function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
   const [hoverId, setHoverId] = useState<string | null>(null);
   // Nodo fijado por click dentro del canvas — distinto del Oris/Elemento
   // elegido en el ChipSelector. Se limpia al cambiar de contexto (Oris,
@@ -1933,9 +1936,7 @@ function RutasSection() {
 
   return (
     <>
-      <PerspectivaSwitcher value={perspectiva} onChange={setPerspectiva} />
-
-      <div className="mt-8 grid gap-5 lg:grid-cols-[2.8fr_0.72fr]">
+      <div className="grid gap-5 lg:grid-cols-[2.8fr_0.72fr]">
         <div>
           {perspectiva === "fisica" ? (
             <RutaFisicaCanvas
@@ -1985,7 +1986,7 @@ function RutasSection() {
 }
 
 function VisualizadorPage() {
-  const [active, setActive] = useState<SectionKey>("rutas");
+  const [active, setActive] = useState<SectionKey>("oris_ruta");
 
   // ─── Fuentes de datos reales ────────────────────────────────────────────
   const { items: particulas, loading: loadingParticulas } = useParticulasCompletas();
@@ -2159,7 +2160,11 @@ function VisualizadorPage() {
           </aside>
 
           <section className="min-w-0">
-            {active === "rutas" ? <RutasSection /> : null}
+            {active === "oris_ruta" ? <RutasSection perspectiva="fisica" /> : null}
+
+            {active === "elementos_ruta" ? <RutasSection perspectiva="alquimia" /> : null}
+
+            {active === "compuestos_ruta" ? <RutasSection perspectiva="quimica" /> : null}
 
             {active === "compatibilidad" ? <CompatibilidadSection /> : null}
 
