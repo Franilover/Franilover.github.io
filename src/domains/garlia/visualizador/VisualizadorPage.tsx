@@ -1088,12 +1088,18 @@ function RutaCompuestoCanvas({
   setHoverId,
   selectedNodeId,
   onSelectNode,
+  rangoCargaCompuestos,
 }: {
   route: ReturnType<typeof useCompuestoRoute>;
   hoverId: string | null;
   setHoverId: (id: string | null) => void;
   selectedNodeId: string | null;
   onSelectNode: (id: string) => void;
+  /** Rango real de carga entre todos los compuestos del catálogo, para el
+   *  MedidorCargaElectrica de acá abajo — calculado una sola vez en
+   *  RutasSection (mismo criterio que rangoEnergiaEnlaceCompuestos) y
+   *  pasado como prop en vez de recalcularlo en este componente. */
+  rangoCargaCompuestos: { min: number; max: number } | null;
 }) {
   const { compuestoSel, componentes, enlaces } = route;
 
@@ -1185,6 +1191,30 @@ function RutaCompuestoCanvas({
   // intensidad, pero se decidió no trazar conexiones en este canvas).
   const edges: CanvasEdge[] = useMemo(() => [], []);
 
+  // Perfil reactivo + magnitudes libres del compuesto activo (ex sección
+  // "Perfil Reactivo", retirada del nav) — se calculan acá, junto al resto
+  // del canvas de Compuestos, en vez de en un panel aparte: mismos datos
+  // (propiedadesCalculadasDeCompuesto), nada nuevo.
+  const compuestoPropiedades = useMemo(
+    () => (compuestoSel ? propiedadesCalculadasDeCompuesto(compuestoSel) : []),
+    [compuestoSel],
+  );
+  const ejesReactivos = useMemo(
+    () =>
+      compuestoPropiedades
+        .filter((p) => p.proporcion !== undefined)
+        .map((p) => ({ label: p.label, value: p.proporcion ?? 0 })),
+    [compuestoPropiedades],
+  );
+  const magnitudesLibres = useMemo(
+    () =>
+      ["masa", "volumen", "densidad", "energia_enlace"]
+        .map((clave) => compuestoPropiedades.find((p) => p.clave === clave))
+        .filter((p): p is NonNullable<typeof p> => p !== undefined && p.valor !== null)
+        .map((p) => ({ label: p.label, valor: p.valor as string })),
+    [compuestoPropiedades],
+  );
+
   return (
     <>
       {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Compuestos cargados en Supabase todavía.</EmptyRow> : null}
@@ -1261,6 +1291,58 @@ function RutaCompuestoCanvas({
                 : null}
             </p>
           ) : null}
+
+          {/* Perfil reactivo + magnitudes + Ficha + Valores derivados
+              reales (ex sección "Perfil Reactivo" del nav, retirada a
+              pedido explícito) — viven acá, debajo del gráfico del
+              compuesto, en vez de en un panel angosto aparte. El gráfico
+              mantiene prioridad visual (va primero, ocupa la fila propia)
+              pero de forma leve: el bloque de abajo usa el mismo ancho
+              completo del canvas (2.8fr) para no dejar espacio en blanco,
+              acomodando radar + las 4 magnitudes en una sola fila cuando
+              hay lugar, y cae a una columna en pantallas angostas. */}
+          {compuestoSel ? (
+            <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+              <div className="rounded-2xl p-5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">
+                  Perfil reactivo
+                </p>
+                <div className="mt-4">
+                  {ejesReactivos.length === 0 ? (
+                    <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
+                  ) : ejesReactivos.length < 3 ? (
+                    <MiniBarChart values={ejesReactivos} />
+                  ) : (
+                    <RadarPerfilReactivo values={ejesReactivos} />
+                  )}
+                </div>
+                {compuestoSel.carga != null ? (
+                  <div className="mt-5 border-t border-primary/10 pt-4">
+                    <MedidorCargaElectrica valor={compuestoSel.carga} rango={rangoCargaCompuestos} />
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col gap-5">
+                {magnitudesLibres.length > 0 ? (
+                  <div className="rounded-2xl p-5">
+                    <FilaStatCards items={magnitudesLibres} />
+                  </div>
+                ) : null}
+                <div className="flex-1 rounded-2xl p-5">
+                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
+                  <div className="mt-4">
+                    <TarjetaValoresDerivados
+                      tipo="compuesto"
+                      entidadId={compuestoSel.id}
+                      entidadNombre={compuestoSel.nombre}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {modo === "ciencia" ? <PanelModoCiencia route={route} /> : null}
           {comparando ? (
             <PanelComparacion route={route} compuestoBId={compuestoBId} setCompuestoBId={setCompuestoBId} />
@@ -2017,27 +2099,19 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
     }
     const c = compuestoRoute.compuestoSel;
     if (!c) return null;
-    const todasLasProps = propiedadesCalculadasDeCompuesto(c);
-    const props = todasLasProps.filter((p) => ["estabilidad", "rigidez", "flexibilidad"].includes(p.clave));
-    // Perfil reactivo (radar/carga/magnitudes libres, ex sección "Perfil
-    // Reactivo" retirada del nav — pedido explícito) + Ficha + Valores
-    // derivados reales (ex bloques del panel de contenido de esa misma
-    // sección) ahora viven todos acá, dentro del Inspector del Compuesto
-    // seleccionado en "Compuestos". Nada se recalcula: mismos datos
-    // (propiedadesCalculadasDeCompuesto) y mismos componentes visuales.
-    const ejesReactivos = todasLasProps
-      .filter((p) => p.proporcion !== undefined)
-      .map((p) => ({ label: p.label, value: p.proporcion ?? 0 }));
-    const magnitudesLibres = ["masa", "volumen", "densidad", "energia_enlace"]
-      .map((clave) => todasLasProps.find((p) => p.clave === clave))
-      .filter((p): p is NonNullable<typeof p> => p !== undefined && p.valor !== null)
-      .map((p) => ({ label: p.label, valor: p.valor as string }));
-    const fichaProps = todasLasProps
-      .filter((p) => p.valor !== null && p.proporcion === undefined && p.clave !== "carga")
-      .slice(0, 6);
+    const props = propiedadesCalculadasDeCompuesto(c).filter(
+      (p) => ["estabilidad", "rigidez", "flexibilidad"].includes(p.clave),
+    );
     // energia_enlace (columna real de "compuestos", misma fuente que VIS-23
     // "Energía de Enlace" en la sidebar) — no se muestra si el compuesto no
     // la tiene calculada, no se inventa un cero.
+    //
+    // Perfil reactivo / carga / magnitudes libres / Ficha / Valores
+    // derivados reales YA NO viven acá (pedido explícito): se movieron
+    // dentro del canvas de "Compuestos" (RutaCompuestoCanvas, debajo del
+    // StructureCanvas), que tiene el ancho real (2.8fr) para acomodarlos
+    // sin dejar huecos — este Inspector angosto (280px) vuelve a ser solo
+    // identidad + campos cortos, como el resto de las entidades de Rutas.
     return {
       eyebrow: "Compuesto",
       title: c.simbolo ? `${c.simbolo} · ${c.nombre}` : c.nombre,
@@ -2052,67 +2126,8 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
         { label: "Enlaces reales", value: compuestoRoute.loadingEnlaces ? "cargando…" : compuestoRoute.enlaces.length },
         ...props.map((p) => ({ label: p.label, value: p.valor })),
       ],
-      extra: (
-        <div className="space-y-5">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Perfil reactivo</p>
-            <div className="mt-3">
-              {ejesReactivos.length === 0 ? (
-                <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
-              ) : ejesReactivos.length < 3 ? (
-                <MiniBarChart values={ejesReactivos} />
-              ) : (
-                <RadarPerfilReactivo values={ejesReactivos} />
-              )}
-            </div>
-          </div>
-          {c.carga != null ? (
-            <div className="border-t border-primary/10 pt-4">
-              <MedidorCargaElectrica valor={c.carga} rango={rangoCargaCompuestos} />
-            </div>
-          ) : null}
-          {magnitudesLibres.length > 0 ? (
-            <div className="border-t border-primary/10 pt-4">
-              <FilaStatCards items={magnitudesLibres} />
-            </div>
-          ) : null}
-          <div className="border-t border-primary/10 pt-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Ficha</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {c.tipo_compuesto ? <StatusPill>{c.tipo_compuesto}</StatusPill> : null}
-              {c.clasificacion ? <StatusPill>{c.clasificacion}</StatusPill> : null}
-              {c.estado ? <StatusPill>{c.estado}</StatusPill> : null}
-            </div>
-            {fichaProps.length > 0 ? (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {fichaProps.map((p) => (
-                  <div key={p.clave} className="rounded-lg border border-primary/10 p-2.5">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-primary/35">{p.label}</p>
-                    <p className="mt-1 text-xs font-black text-primary/75">{p.valor}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-          <div className="border-t border-primary/10 pt-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Valores derivados reales</p>
-            <div className="mt-3">
-              <TarjetaValoresDerivados tipo="compuesto" entidadId={c.id} entidadNombre={c.nombre} />
-            </div>
-          </div>
-        </div>
-      ),
     };
-  }, [
-    particulaClickeada,
-    perspectiva,
-    fisicaRoute,
-    alquimiaRoute,
-    elementoQuimicaClickeado,
-    compuestoRoute,
-    rangoEnergiaEnlaceCompuestos,
-    rangoCargaCompuestos,
-  ]);
+  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute, elementoQuimicaClickeado, compuestoRoute, rangoEnergiaEnlaceCompuestos]);
 
   // Trace: ruta ya resuelta, en el mismo orden que el modelo real — nunca
   // fusiona Física, Alquimia y Química en una sola secuencia. Si hay una
@@ -2231,6 +2246,7 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
               setHoverId={setHoverId}
               selectedNodeId={nodoSelId}
               onSelectNode={setNodoSelId}
+              rangoCargaCompuestos={rangoCargaCompuestos}
             />
           )}
         </div>
