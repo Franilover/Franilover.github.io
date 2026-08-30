@@ -40,6 +40,7 @@ import type { EstadoCompatibilidad, NodoCompatibilidad, VecinoCompatibilidad } f
 const CENTER_R = 46;
 const NEIGHBOR_R = 30;
 const PAD = 48;
+const RING_GAP = 88; // separación entre anillos concéntricos cuando hay más de uno
 
 export interface CompatibilidadNetworkProps {
   centro: NodoCompatibilidad;
@@ -85,22 +86,68 @@ export function CompatibilidadNetwork({
   const [hoverId, setHoverId] = useState<string | null>(null);
   const activeHoverId = hoverId;
 
-  const size = 620;
+  // Antes: un solo anillo de radio fijo (size/2 - PAD - NEIGHBOR_R) con los
+  // vecinos repartidos en ángulo uniforme — a partir de ~25 vecinos el arco
+  // disponible por nodo quedaba más chico que su propio diámetro y se
+  // superponían. Ahora: se reparten en tantos anillos concéntricos como
+  // hagan falta para que cada uno tenga espacio suficiente (mismo criterio
+  // que StructureCanvas usa para sus anillos orbitales), y el tamaño total
+  // del canvas crece con la cantidad de anillos en vez de quedar fijo.
+  const { laidOut, size, ringRadii } = useMemo(() => {
+    const innerRingR = Math.max(180, 620 / 2 - PAD - NEIGHBOR_R);
+    const nodeDiameter = NEIGHBOR_R * 2;
+    const nodeGap = 14;
+    // Capacidad de nodos que entran, sin superponerse, en un anillo de
+    // radio r: arco disponible por nodo = 2π·r / n ≥ diámetro + gap.
+    const capacidadDeAnillo = (r: number) => Math.max(1, Math.floor((2 * Math.PI * r) / (nodeDiameter + nodeGap)));
+
+    // Arma anillos de afuera hacia adentro... en realidad los llenamos de
+    // adentro hacia afuera: el primer anillo (más cercano al centro) recibe
+    // hasta su capacidad, el resto se reparte en anillos sucesivos más
+    // externos, cada uno con más radio (y por lo tanto más capacidad).
+    const anillos: { radio: number; vecinos: VecinoCompatibilidad[] }[] = [];
+    let restantes = [...vecinos];
+    let radioActual = innerRingR;
+    let ringIndex = 0;
+    while (restantes.length > 0) {
+      const radio = radioActual + ringIndex * RING_GAP;
+      const capacidad = capacidadDeAnillo(radio);
+      const paraEsteAnillo = restantes.slice(0, capacidad);
+      restantes = restantes.slice(capacidad);
+      anillos.push({ radio, vecinos: paraEsteAnillo });
+      ringIndex += 1;
+      // Salvaguarda: con capacidad 0 (no debería pasar, hay piso de 1)
+      // cortamos para no loopear infinito.
+      if (capacidad <= 0) break;
+    }
+
+    const maxRingRadius = anillos.length > 0 ? anillos[anillos.length - 1].radio : innerRingR;
+    const totalSize = (maxRingRadius + NEIGHBOR_R + PAD + 24) * 2; // +24: espacio para el label debajo del nodo
+    const centerX = totalSize / 2;
+    const centerY = totalSize / 2;
+
+    const out: { vecino: VecinoCompatibilidad; angle: number; x: number; y: number }[] = [];
+    anillos.forEach(({ radio, vecinos: vs }, idx) => {
+      // Desfasa cada anillo medio paso angular respecto al anterior, mismo
+      // criterio que StructureCanvas, para que los nodos de un anillo no
+      // queden "en línea" exacta con los del anillo vecino.
+      const angleOffset = idx % 2 === 0 ? 0 : Math.PI / Math.max(1, vs.length);
+      vs.forEach((v, i) => {
+        const angle = (i / Math.max(1, vs.length)) * Math.PI * 2 - Math.PI / 2 + angleOffset;
+        out.push({
+          vecino: v,
+          angle,
+          x: centerX + Math.cos(angle) * radio,
+          y: centerY + Math.sin(angle) * radio,
+        });
+      });
+    });
+
+    return { laidOut: out, size: totalSize, ringRadii: anillos.map((a) => a.radio) };
+  }, [vecinos]);
+
   const cx = size / 2;
   const cy = size / 2;
-  const ringR = size / 2 - PAD - NEIGHBOR_R;
-
-  const laidOut = useMemo(() => {
-    return vecinos.map((v, i) => {
-      const angle = (i / Math.max(1, vecinos.length)) * Math.PI * 2 - Math.PI / 2;
-      return {
-        vecino: v,
-        angle,
-        x: cx + Math.cos(angle) * ringR,
-        y: cy + Math.sin(angle) * ringR,
-      };
-    });
-  }, [vecinos, cx, cy, ringR]);
 
   const highlightSet = new Set(highlightedNodeIds);
 
@@ -127,15 +174,19 @@ export function CompatibilidadNetwork({
         role="img"
         aria-label="Mapa de compatibilidad"
       >
-        {/* Anillo de referencia — igual criterio sutil que el resto del
-            Visualizador (StructureCanvas usa el mismo tono al 6%). */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={ringR}
-          fill="none"
-          style={{ stroke: "color-mix(in srgb, var(--primary) 6%, transparent)", strokeWidth: 1 }}
-        />
+        {/* Anillo(s) de referencia — uno por cada anillo de vecinos, igual
+            criterio sutil que el resto del Visualizador (StructureCanvas
+            usa el mismo tono al 6%). */}
+        {ringRadii.map((r) => (
+          <circle
+            key={r}
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            style={{ stroke: "color-mix(in srgb, var(--primary) 6%, transparent)", strokeWidth: 1 }}
+          />
+        ))}
 
         {/* Líneas — solo para compatible/posible (punto 6: incompatible no
             dibuja línea). Se dibujan antes que los nodos para quedar debajo. */}
