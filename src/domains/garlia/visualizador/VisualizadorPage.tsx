@@ -52,7 +52,7 @@ import {
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import { useEstructuraComposicion } from "@/domains/garlia/elementos/useEstructuraComposicion";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
-import { propiedadesCalculadasDeCompuesto, type Compuesto, type Elemento, type Estructura } from "@/domains/garlia/elementos/types";
+import { propiedadesCalculadasDeCompuesto, propiedadesCalculadasDeElemento, type Compuesto, type Elemento, type Estructura } from "@/domains/garlia/elementos/types";
 import { useProcesos } from "@/domains/garlia/elementos/useProcesos";
 
 import { RunaThumbnail } from "@/domains/garlia/runas/RunaThumbnail";
@@ -939,6 +939,45 @@ function RutaAlquimiaCanvas({
     return [{ id: "elemento", label: "Elemento", nodes: [elementoNode] }];
   }, [elementoSel]);
 
+  // Rango real de carga (carga_q) entre TODOS los elementos del catálogo —
+  // mismo criterio que rangoCargaCompuestos en RutaCompuestoCanvas: el
+  // MedidorCargaElectrica se escala contra el min/max real, nunca contra
+  // un techo inventado. Confirmado en Supabase: las 67 filas de "elementos"
+  // tienen carga_q calculado (rango real -6..5 a la fecha de este cambio).
+  const rangoCargaElementos = useMemo(() => {
+    const valores = elementos.map((e) => e.carga_q).filter((v): v is number => v != null);
+    if (valores.length === 0) return null;
+    return { min: Math.min(...valores), max: Math.max(...valores) };
+  }, [elementos]);
+
+  // Perfil reactivo + magnitudes libres del Elemento activo — mismo
+  // criterio que RutaCompuestoCanvas (propiedadesCalculadasDeElemento ya
+  // existe en elementos/types.ts, mismo shape que
+  // propiedadesCalculadasDeCompuesto, nada nuevo se calcula acá). No hay
+  // "Valores derivados reales" (VIS-25) para Elemento: la tabla
+  // valores_propiedades_derivadas en Supabase solo tiene filas con
+  // entidad_tipo compuesto/material/estructura — no se inventa esa
+  // sección para no mostrar un bloque vacío o con datos falsos.
+  const elementoPropiedades = useMemo(
+    () => (elementoSel ? propiedadesCalculadasDeElemento(elementoSel) : []),
+    [elementoSel],
+  );
+  const ejesReactivosElemento = useMemo(
+    () =>
+      elementoPropiedades
+        .filter((p) => p.proporcion !== undefined)
+        .map((p) => ({ label: p.label, value: p.proporcion ?? 0 })),
+    [elementoPropiedades],
+  );
+  const magnitudesLibresElemento = useMemo(
+    () =>
+      ["masa_base", "volumen_base"]
+        .map((clave) => elementoPropiedades.find((p) => p.clave === clave))
+        .filter((p): p is NonNullable<typeof p> => p !== undefined && p.valor !== null)
+        .map((p) => ({ label: p.label, valor: p.valor as string })),
+    [elementoPropiedades],
+  );
+
   return (
     <>
       {route.loading ? <LoadingRow /> : route.empty ? <EmptyRow>No hay Elementos cargados en Supabase todavía.</EmptyRow> : null}
@@ -952,26 +991,58 @@ function RutaAlquimiaCanvas({
             onSelect={(e) => setElementoSelId(e.id)}
             placeholder="Seleccioná un elemento…"
           />
-          <div className="mt-5 rounded-2xl p-5">
-            <StructureCanvas
-              columns={columns}
-              edges={[]}
-              selectedNodeId={selectedNodeId ?? (elementoSel ? `elemento-${elementoSel.id}` : null)}
-              onHoverNode={setHoverId}
-              onSelectNode={onSelectNode}
-              highlightedNodeIds={hoverId ? [hoverId] : []}
-              // Sin orbitantes alrededor: el nodo central puede verse más
-              // grande, mismo patrón que el Oris en Física (centerScaleExtra).
-              // Subido de 1.6 a 2.2 — junto con fillWidth (canvas a todo el
-              // ancho disponible), el átomo llena mejor el espacio en vez de
-              // verse como un punto chico rodeado de mucho vacío.
-              centerScaleExtra={2.2}
-              // Sin anillos, el tamaño interno calculado (size) queda chico
-              // y no tiene relación con el espacio real del layout — se deja
-              // que el canvas ocupe todo el ancho disponible del contenedor
-              // en vez de limitarse a ese valor fijo.
-              fillWidth
-            />
+          {/* Mismo diseño de dos columnas que RutaCompuestoCanvas (pedido
+              explícito): gráfico a la izquierda, Perfil reactivo + Carga
+              eléctrica + magnitudes libres a la derecha. */}
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+            <div className="rounded-2xl p-4">
+              <StructureCanvas
+                columns={columns}
+                edges={[]}
+                selectedNodeId={selectedNodeId ?? (elementoSel ? `elemento-${elementoSel.id}` : null)}
+                onHoverNode={setHoverId}
+                onSelectNode={onSelectNode}
+                highlightedNodeIds={hoverId ? [hoverId] : []}
+                // Sin orbitantes alrededor: el nodo central puede verse más
+                // grande, mismo patrón que el Oris en Física (centerScaleExtra).
+                // Subido de 1.6 a 2.2 — junto con fillWidth (canvas a todo el
+                // ancho disponible), el átomo llena mejor el espacio en vez de
+                // verse como un punto chico rodeado de mucho vacío.
+                centerScaleExtra={2.2}
+                // Sin anillos, el tamaño interno calculado (size) queda chico
+                // y no tiene relación con el espacio real del layout — se deja
+                // que el canvas ocupe todo el ancho disponible del contenedor
+                // en vez de limitarse a ese valor fijo.
+                fillWidth
+              />
+            </div>
+
+            {elementoSel ? (
+              <div className="rounded-2xl p-5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">
+                  Perfil reactivo
+                </p>
+                <div className="mt-4">
+                  {ejesReactivosElemento.length === 0 ? (
+                    <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
+                  ) : ejesReactivosElemento.length < 3 ? (
+                    <MiniBarChart values={ejesReactivosElemento} />
+                  ) : (
+                    <RadarPerfilReactivo values={ejesReactivosElemento} />
+                  )}
+                </div>
+                {elementoSel.carga_q != null ? (
+                  <div className="mt-5 border-t border-primary/10 pt-4">
+                    <MedidorCargaElectrica valor={elementoSel.carga_q} rango={rangoCargaElementos} />
+                  </div>
+                ) : null}
+                {magnitudesLibresElemento.length > 0 ? (
+                  <div className="mt-5 border-t border-primary/10 pt-4">
+                    <FilaStatCards items={magnitudesLibresElemento} compact stacked />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </>
       ) : null}
