@@ -190,7 +190,7 @@ export function useCompuestoRoute(): CompuestoRouteState {
   );
 
   return {
-    loading: loadingCompuestos || loadingElementos || loadingEstructuras || loadingVinculos,
+    loading: loadingCompuestos || loadingElementos || loadingEstructuras || loadingVinculos || loadingEnlaces,
     empty: !loadingCompuestos && compuestos.length === 0,
     error: null,
     compuestos,

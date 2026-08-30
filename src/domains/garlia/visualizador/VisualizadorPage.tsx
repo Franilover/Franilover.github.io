@@ -2300,7 +2300,9 @@ function EnlaceSection() {
                     {e.estabilidad != null ? <BarraBloques label="Estabilidad" value={e.estabilidad} /> : null}
                     {e.reversibilidad != null ? <BarraBloques label="Reversibilidad" value={e.reversibilidad} /> : null}
                     {e.confianza != null ? <BarraBloques label="Confianza" value={e.confianza} /> : null}
-                    {anatomiaValues(e).length === 0 ? (
+                    {route.loadingEnlaces ? (
+                      <LoadingRow />
+                    ) : anatomiaValues(e).length === 0 ? (
                       <EmptyRow>Sin datos de anatomía calculados todavía para este enlace.</EmptyRow>
                     ) : null}
                   </div>
