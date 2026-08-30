@@ -9,7 +9,6 @@ import {
   FlaskConical,
   Gauge,
   GitBranch,
-  Info,
   Layers3,
   Orbit,
   Pause,
@@ -47,7 +46,9 @@ import type { Material } from "@/domains/garlia/materiales/types";
 import {
   PropiedadesFisicasGenerico,
   propiedadesCalculadasGenerico,
+  TarjetaPropiedadesFisicas,
 } from "@/domains/garlia/_shared/GridPropiedadesCalculadas";
+import type { PropiedadCalculada } from "@/domains/garlia/elementos/types";
 
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import { useEstructuraComposicion } from "@/domains/garlia/elementos/useEstructuraComposicion";
@@ -304,16 +305,11 @@ function MiniBarChart({ values }: { values: { label: string; value: number }[] }
   );
 }
 
-/** Radar/spider chart para el Perfil reactivo (VIS-24 rediseño): reemplaza
- *  el MiniBarChart lineal por un polígono sobre N ejes, con los puntos
- *  conectados entre sí. `value` debe venir pre-normalizado 0..1 por quien
- *  llama (acá con `proporcion` ya 0..1; en Valores derivados, normalizado
- *  contra el rango_min/rango_max real de cada propiedad) — el componente
- *  en sí no sabe de dónde salió el 0..1, solo dibuja. Todo el layout se
- *  calcula en JS puro (trig) pero se renderiza como SVG estático — nada de
- *  manipulación del DOM vía createElementNS, que es frágil en el
- *  visualizador embebido. Mínimo 3 ejes para que el polígono tenga
- *  sentido; con menos, el caller debe usar MiniBarChart en su lugar. */
+/** @deprecated Radar/spider chart usado antes por Perfil reactivo y Valores
+ *  derivados reales — reemplazado por el diseño simple de tarjetas
+ *  (TarjetaPropiedadesFisicas, compartido con Elemento/Compuesto/Material/
+ *  Estructura). Se deja sin usar por si se necesita revertir; eliminar si
+ *  no vuelve a usarse. */
 function RadarPerfilReactivo({ values }: { values: { label: string; value: number }[] }) {
   const cx = 340;
   const cy = 260;
@@ -566,33 +562,27 @@ function EmptyRow({ children }: { children: React.ReactNode }) {
 // vía title nativo — sin inventar el cálculo, solo mostrando lo que ya
 // trae Supabase en propiedades_derivadas.formula.
 
-function IconoFormula({ formula }: { formula: string | null }) {
-  if (!formula) return null;
-  return (
-    <span
-      title={formula}
-      className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-primary/25 text-primary/45 hover:border-primary/45 hover:text-primary/70"
-    >
-      <Info size={10} strokeWidth={2.5} />
-    </span>
-  );
-}
-
+/**
+ * VIS-25 (rediseño): mismo diseño simple que Propiedades físicas
+ * (TarjetaPropiedadesFisicas) en vez del radar — una línea por propiedad,
+ * label a la izquierda y valor a la derecha, con barra de proporción
+ * cuando la propiedad trae rango_min/rango_max real. Convierte
+ * ValorDerivadoEntidad[] a PropiedadCalculada[] (mismo shape que usan
+ * Elemento/Compuesto/Material/Estructura) y delega el render a la tarjeta
+ * compartida — un solo lugar define este lenguaje visual en todo el app.
+ */
 function TarjetaValoresDerivados({
   tipo,
   entidadId,
   entidadNombre,
+  columnas = 2,
 }: {
   tipo: EntidadTipoDerivada;
   entidadId: string | null;
   entidadNombre?: string;
+  columnas?: 2 | 3 | 4 | 5;
 }) {
   const { items, loading } = useValoresDerivadosDeEntidad(tipo, entidadId);
-  // El gráfico (radar/mini-bar) queda siempre visible — solo las líneas y
-  // bloques de números de abajo se ocultan por defecto, detrás de un
-  // ícono "i" (pedido explícito): menos ruido numérico a primera vista,
-  // sin perder el gráfico que ya resume la forma del dato.
-  const [mostrarDetalle, setMostrarDetalle] = useState(false);
 
   if (!entidadId) return <EmptyRow>Selecciona una entidad para ver sus propiedades derivadas reales.</EmptyRow>;
   if (loading) return <LoadingRow />;
@@ -603,82 +593,23 @@ function TarjetaValoresDerivados({
       </EmptyRow>
     );
 
-  const conRango = items.filter(
-    (v) => v.propiedad.rango_min !== null && v.propiedad.rango_max !== null && (v.propiedad.rango_max as number) > (v.propiedad.rango_min as number),
-  );
-  const sinRango = items.filter((v) => !conRango.includes(v));
-
-  const ejesRadar = conRango.map((v) => {
-    const min = v.propiedad.rango_min as number;
-    const max = v.propiedad.rango_max as number;
-    return { label: v.propiedad.nombre, value: Math.max(0, Math.min(1, (v.valor - min) / (max - min))) };
+  const propiedades: PropiedadCalculada[] = items.map((v) => {
+    const min = v.propiedad.rango_min;
+    const max = v.propiedad.rango_max;
+    const conRango = min !== null && max !== null && (max as number) > (min as number);
+    return {
+      clave: v.propiedad.clave,
+      label: v.propiedad.nombre,
+      valor: v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }),
+      proporcion: conRango
+        ? Math.max(0, Math.min(1, (v.valor - (min as number)) / ((max as number) - (min as number))))
+        : undefined,
+      descripcion: v.propiedad.descripcion ?? "",
+      formula: v.propiedad.formula ?? undefined,
+    };
   });
 
-  return (
-    <div className="space-y-4">
-      {conRango.length >= 3 ? (
-        <RadarPerfilReactivo values={ejesRadar} />
-      ) : conRango.length > 0 ? (
-        <MiniBarChart values={ejesRadar} />
-      ) : null}
-
-      <button
-        type="button"
-        onClick={() => setMostrarDetalle((v) => !v)}
-        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary/35 hover:text-primary/55"
-      >
-        Valores en detalle
-        <span
-          className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
-            mostrarDetalle
-              ? "border-primary/45 text-primary/70"
-              : "border-primary/25 text-primary/45 hover:border-primary/45 hover:text-primary/70"
-          }`}
-          title={mostrarDetalle ? "Ocultar valores" : "Ver valores"}
-        >
-          <Info size={10} strokeWidth={2.5} />
-        </span>
-      </button>
-
-      {mostrarDetalle ? (
-        <div className="space-y-6">
-          {conRango.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {conRango.map((v) => (
-                <div key={v.id} className="flex items-center justify-between gap-2 rounded-lg bg-primary/[0.04] px-3 py-2">
-                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-primary/60">
-                    {v.propiedad.nombre}
-                    <IconoFormula formula={v.propiedad.formula} />
-                  </span>
-                  <span className="shrink-0 text-xs font-black tabular-nums text-primary/85">
-                    {v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {sinRango.length > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {sinRango.map((v) => (
-                <div key={v.id} className="rounded-xl border border-primary/10 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary/35">
-                      {v.propiedad.nombre}
-                      <IconoFormula formula={v.propiedad.formula} />
-                    </span>
-                    <span className="shrink-0 text-sm font-black tabular-nums text-primary/85">
-                      {Number.isFinite(v.valor) ? v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }) : "—"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
+  return <TarjetaPropiedadesFisicas propiedades={propiedades} columnas={columnas} />;
 }
 
 // ─── Sección "Rutas" — vertical slice: Física vs Alquimia ──────────────────
@@ -962,13 +893,6 @@ function RutaAlquimiaCanvas({
     () => (elementoSel ? propiedadesCalculadasDeElemento(elementoSel) : []),
     [elementoSel],
   );
-  const ejesReactivosElemento = useMemo(
-    () =>
-      elementoPropiedades
-        .filter((p) => p.proporcion !== undefined)
-        .map((p) => ({ label: p.label, value: p.proporcion ?? 0 })),
-    [elementoPropiedades],
-  );
   const magnitudesLibresElemento = useMemo(
     () =>
       ["masa_base", "volumen_base"]
@@ -1023,12 +947,13 @@ function RutaAlquimiaCanvas({
                   Perfil reactivo
                 </p>
                 <div className="mt-4">
-                  {ejesReactivosElemento.length === 0 ? (
+                  {elementoPropiedades.filter((p) => p.proporcion !== undefined).length === 0 ? (
                     <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
-                  ) : ejesReactivosElemento.length < 3 ? (
-                    <MiniBarChart values={ejesReactivosElemento} />
                   ) : (
-                    <RadarPerfilReactivo values={ejesReactivosElemento} />
+                    <TarjetaPropiedadesFisicas
+                      propiedades={elementoPropiedades.filter((p) => p.proporcion !== undefined)}
+                      columnas={2}
+                    />
                   )}
                 </div>
                 {elementoSel.carga_q != null ? (
@@ -1328,13 +1253,6 @@ function RutaCompuestoCanvas({
     () => (compuestoSel ? propiedadesCalculadasDeCompuesto(compuestoSel) : []),
     [compuestoSel],
   );
-  const ejesReactivos = useMemo(
-    () =>
-      compuestoPropiedades
-        .filter((p) => p.proporcion !== undefined)
-        .map((p) => ({ label: p.label, value: p.proporcion ?? 0 })),
-    [compuestoPropiedades],
-  );
   const magnitudesLibres = useMemo(
     () =>
       ["masa", "volumen", "densidad", "energia_enlace"]
@@ -1460,12 +1378,13 @@ function RutaCompuestoCanvas({
                     Perfil reactivo
                   </p>
                   <div className="mt-4">
-                    {ejesReactivos.length === 0 ? (
+                    {compuestoPropiedades.filter((p) => p.proporcion !== undefined).length === 0 ? (
                       <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
-                    ) : ejesReactivos.length < 3 ? (
-                      <MiniBarChart values={ejesReactivos} />
                     ) : (
-                      <RadarPerfilReactivo values={ejesReactivos} />
+                      <TarjetaPropiedadesFisicas
+                        propiedades={compuestoPropiedades.filter((p) => p.proporcion !== undefined)}
+                        columnas={2}
+                      />
                     )}
                   </div>
                   {compuestoSel.carga != null ? (
