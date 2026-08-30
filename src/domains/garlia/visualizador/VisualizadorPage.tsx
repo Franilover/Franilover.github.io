@@ -41,15 +41,19 @@ import { useOrisConIums } from "@/domains/garlia/fisica/useOrisConIums";
 import { useIums } from "@/domains/garlia/fisica/useFisica";
 
 import { useMateriales } from "@/domains/garlia/materiales/useMateriales";
+import { useMaterialComponentes } from "@/domains/garlia/materiales/useMaterialComponentes";
+import { useMaterialEstructuras } from "@/domains/garlia/materiales/useMaterialEstructuras";
+import type { Material } from "@/domains/garlia/materiales/types";
 import {
   PropiedadesFisicasGenerico,
   propiedadesCalculadasGenerico,
 } from "@/domains/garlia/_shared/GridPropiedadesCalculadas";
 
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
+import { useEstructuraComposicion } from "@/domains/garlia/elementos/useEstructuraComposicion";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { propiedadesCalculadasDeCompuesto, type Compuesto, type Elemento, type Estructura } from "@/domains/garlia/elementos/types";
 import { useProcesos } from "@/domains/garlia/elementos/useProcesos";
-import { propiedadesCalculadasDeCompuesto, type Compuesto, type Elemento } from "@/domains/garlia/elementos/types";
 
 import { RunaThumbnail } from "@/domains/garlia/runas/RunaThumbnail";
 
@@ -2310,6 +2314,205 @@ function EnlaceSection() {
   );
 }
 
+/**
+ * MaterialEstructuraSection — VIS-10 "Material → Estructura".
+ * ───────────────────────────────────────────────────────────────────────────
+ * Reemplaza la versión anterior, que solo listaba el catálogo suelto de
+ * Estructuras sin mostrar ningún Material — pese a que el nombre de la
+ * sección (y el VIS-10 del docx) es justo esa relación.
+ *
+ * Cadena real verificada en Supabase (proyecto Franiloverart): cada
+ * Material tiene como máximo 1 fila en material_componentes (su Compuesto
+ * base) y como máximo 1 fila en material_estructuras (su Estructura), y esa
+ * Estructura puede tener 0..N Compuestos propios vía estructura_compuestos
+ * (ej. "Amazium" → material_componentes: ninguno · material_estructuras →
+ * "Cristal de Amazium" → estructura_compuestos → "Ámbar Solar"). No es un
+ * árbol ramificado grande — es una cadena de 3 pasos, por eso el layout es
+ * un flujo de columnas (FlowNode + Arrow), no el canvas orbital.
+ *
+ * Vacíos reales, no genéricos: de las 35 Estructuras del catálogo, 23 no
+ * están referenciadas por ningún Material (huérfanas desde este lado) y
+ * solo 15 de esas 35 tienen al menos un Compuesto propio en
+ * estructura_compuestos — ambos casos se muestran como EmptyRow explícito,
+ * nunca se ocultan ni se completan con un valor inventado.
+ */
+function MaterialEstructuraSection({
+  materiales,
+  loadingMateriales,
+  materialSel,
+  setMaterialSel,
+  compuestos,
+  estructuras,
+}: {
+  materiales: Material[];
+  loadingMateriales: boolean;
+  materialSel: Material | null;
+  setMaterialSel: (m: Material | null) => void;
+  compuestos: Compuesto[];
+  estructuras: Estructura[];
+}) {
+  const { items: componentesDelMaterial, loading: loadingComponentes } = useMaterialComponentes(
+    materialSel?.id ?? null,
+  );
+  const { items: estructurasDelMaterial, loading: loadingEstructurasMaterial } = useMaterialEstructuras(
+    materialSel?.id ?? null,
+  );
+
+  // Un Material tiene a lo sumo 1 Estructura real (ver nota arriba) — se
+  // toma la primera si existiera más de una en vez de listar todas, mismo
+  // criterio de "no hay ambigüedad real hoy, no se inventa selector".
+  const estructuraVinculo = estructurasDelMaterial[0] ?? null;
+  const estructuraDelMaterial = useMemo(
+    () => (estructuraVinculo ? estructuras.find((e) => e.id === estructuraVinculo.estructura_id) ?? null : null),
+    [estructuraVinculo, estructuras],
+  );
+
+  const { items: compuestosDeEstructura, loading: loadingCompuestosEstructura } = useEstructuraComposicion(
+    estructuraDelMaterial?.id ?? null,
+  );
+
+  const compuestoBase = useMemo(() => {
+    const vinculo = componentesDelMaterial.find((c) => c.componente_tipo === "compuesto");
+    if (!vinculo) return null;
+    const compuesto = compuestos.find((c) => c.id === vinculo.componente_id) ?? null;
+    return compuesto ? { vinculo, compuesto } : null;
+  }, [componentesDelMaterial, compuestos]);
+
+  const loadingColMedia = loadingComponentes || loadingEstructurasMaterial;
+
+  return (
+    <>
+      {loadingMateriales ? (
+        <LoadingRow />
+      ) : (
+        <SelectDropdown
+          items={materiales}
+          active={materialSel}
+          getKey={(m) => m.id}
+          getLabel={(m) => m.nombre}
+          onSelect={setMaterialSel}
+          placeholder="Seleccioná un material…"
+        />
+      )}
+
+      {!materialSel ? (
+        <div className="mt-8">
+          <EmptyRow>Seleccioná un material para ver de qué está hecho.</EmptyRow>
+        </div>
+      ) : (
+        <>
+          {/* Flujo: Material → (Compuesto base / Estructura) → Compuestos de la Estructura */}
+          <div className="mt-8 overflow-x-auto rounded-2xl p-6">
+            <div className="flex min-w-max items-stretch gap-3">
+              <FlowNode title={materialSel.nombre} subtitle={materialSel.tipo_material} tone="accent" />
+              <Arrow />
+
+              <div className="flex flex-col justify-center gap-2.5">
+                {loadingColMedia ? (
+                  <LoadingRow />
+                ) : (
+                  <>
+                    {compuestoBase ? (
+                      <FlowNode
+                        title={compuestoBase.compuesto.nombre}
+                        subtitle={`compuesto base${compuestoBase.vinculo.rol ? ` · ${compuestoBase.vinculo.rol}` : ""}`}
+                      />
+                    ) : null}
+                    {estructuraDelMaterial ? (
+                      <FlowNode
+                        title={estructuraDelMaterial.nombre}
+                        subtitle={`estructura${estructuraVinculo?.rol ? ` · ${estructuraVinculo.rol}` : ""}`}
+                      />
+                    ) : null}
+                    {!compuestoBase && !estructuraDelMaterial ? (
+                      <EmptyRow>Este material no tiene compuesto base ni estructura vinculados todavía.</EmptyRow>
+                    ) : null}
+                  </>
+                )}
+              </div>
+
+              {estructuraDelMaterial ? (
+                <>
+                  <Arrow />
+                  <div className="flex flex-col justify-center gap-2.5">
+                    {loadingCompuestosEstructura ? (
+                      <LoadingRow />
+                    ) : compuestosDeEstructura.length === 0 ? (
+                      <EmptyRow>
+                        &quot;{estructuraDelMaterial.nombre}&quot; todavía no tiene compuestos propios registrados
+                        (estructura_compuestos vacío).
+                      </EmptyRow>
+                    ) : (
+                      compuestosDeEstructura.map((c) => (
+                        <FlowNode
+                          key={c.vinculo_id}
+                          title={c.compuesto.nombre}
+                          subtitle={[c.rol, c.proporcion != null ? `proporción ${c.proporcion}` : null]
+                            .filter(Boolean)
+                            .join(" · ") || undefined}
+                        />
+                      ))
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Propiedades físicas del material activo (mismo panel que ya
+              existía, ahora en contexto de la cadena completa). */}
+          <div className="mt-6 grid gap-7 lg:grid-cols-[1fr_0.8fr]">
+            <div className="rounded-2xl p-7">
+              <p className="text-xs font-black text-primary/80">Propiedades físicas · {materialSel.nombre}</p>
+              <div className="mt-5">
+                {materialSel.propiedades_calculadas ? (
+                  <PropiedadesFisicasGenerico propiedades={materialSel.propiedades_calculadas} columnas={2} />
+                ) : (
+                  <EmptyRow>Sin propiedades calculadas todavía para este material.</EmptyRow>
+                )}
+              </div>
+            </div>
+            <div className="rounded-2xl p-7">
+              <p className="text-xs font-black text-primary/80">Ficha</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StatusPill>{materialSel.tipo_material}</StatusPill>
+                <StatusPill>{materialSel.estado_calculo ?? "sin calcular"}</StatusPill>
+                {materialSel.propiedades_calculadas?.fuente_fisica ? (
+                  <StatusPill>{String(materialSel.propiedades_calculadas.fuente_fisica)}</StatusPill>
+                ) : null}
+              </div>
+              {materialSel.descripcion ? (
+                <p className="mt-4 text-xs leading-5 text-primary/45">{materialSel.descripcion}</p>
+              ) : null}
+              {materialSel.notas ? (
+                <p className="mt-3 text-xs leading-5 text-primary/35">{materialSel.notas}</p>
+              ) : null}
+            </div>
+          </div>
+
+          {estructuraDelMaterial?.propiedades_calculadas ? (
+            <div className="mt-6 rounded-2xl p-7">
+              <p className="text-xs font-black text-primary/80">
+                Propiedades físicas de la estructura · {estructuraDelMaterial.nombre}
+              </p>
+              <div className="mt-5">
+                <PropiedadesFisicasGenerico propiedades={estructuraDelMaterial.propiedades_calculadas} columnas={2} />
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-6 rounded-2xl p-7">
+            <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
+            <div className="mt-4">
+              <TarjetaValoresDerivados tipo="material" entidadId={materialSel.id} entidadNombre={materialSel.nombre} />
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 function VisualizadorPage() {
   const [active, setActive] = useState<SectionKey>("oris_ruta");
 
@@ -2341,7 +2544,9 @@ function VisualizadorPage() {
   // ─── Selecciones activas por sección ────────────────────────────────────
   const [orisSel, setOrisSel] = useState<(typeof oris)[number] | null>(null);
   const [materialSel, setMaterialSel] = useState<(typeof materiales)[number] | null>(null);
-  const [estructuraSel, setEstructuraSel] = useState<(typeof estructuras)[number] | null>(null);
+  // Nota: "estructuraSel" (selector suelto del catálogo de Estructuras) se
+  // retiró — VIS-10 ahora selecciona por Material (materialSel) y resuelve
+  // la Estructura vinculada desde ahí (ver MaterialEstructuraSection).
   const [compuestoSel, setCompuestoSel] = useState<(typeof compuestos)[number] | null>(null);
   const [procesoSel, setProcesoSel] = useState<(typeof procesos)[number] | null>(null);
   const [runaSel, setRunaSel] = useState<(typeof runas)[number] | null>(null);
@@ -2411,9 +2616,6 @@ function VisualizadorPage() {
   useEffect(() => {
     if (!materialSel && materiales.length > 0) setMaterialSel(materiales[0]);
   }, [materiales, materialSel]);
-  useEffect(() => {
-    if (!estructuraSel && estructuras.length > 0) setEstructuraSel(estructuras[0]);
-  }, [estructuras, estructuraSel]);
   useEffect(() => {
     if (!compuestoSel && compuestos.length > 0) setCompuestoSel(compuestos[0]);
   }, [compuestos, compuestoSel]);
@@ -2749,56 +2951,14 @@ function VisualizadorPage() {
             ) : null}
 
             {active === "structure" ? (
-              <>
-                {loadingEstructuras ? (
-                  <LoadingRow />
-                ) : (
-                  <SelectDropdown
-                    items={estructuras}
-                    active={estructuraSel}
-                    getKey={(e) => e.id}
-                    getLabel={(e) => e.nombre}
-                    onSelect={setEstructuraSel}
-                    placeholder="Seleccioná una estructura…"
-                  />
-                )}
-                <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.8fr]">
-                  <div className="rounded-2xl p-7">
-                    <p className="text-xs font-black text-primary/80">
-                      Propiedades {estructuraSel ? `· ${estructuraSel.nombre}` : ""}
-                    </p>
-                    <div className="mt-5">
-                      {estructuraSel?.propiedades_calculadas ? (
-                        <PropiedadesFisicasGenerico propiedades={estructuraSel.propiedades_calculadas} columnas={2} />
-                      ) : (
-                        <EmptyRow>Sin propiedades calculadas todavía para esta estructura.</EmptyRow>
-                      )}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl p-7">
-                    <p className="text-xs font-black text-primary/80">Función</p>
-                    <div className="mt-3 space-y-2">
-                      <StatusPill>{estructuraSel?.tipo ?? "sin tipo"}</StatusPill>
-                    </div>
-                    {estructuraSel?.funcion ? (
-                      <p className="mt-4 text-xs leading-5 text-primary/45">{estructuraSel.funcion}</p>
-                    ) : null}
-                    {estructuraSel?.descripcion ? (
-                      <p className="mt-3 text-xs leading-5 text-primary/40">{estructuraSel.descripcion}</p>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="mt-8 rounded-2xl p-7">
-                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
-                  <div className="mt-4">
-                    <TarjetaValoresDerivados
-                      tipo="estructura"
-                      entidadId={estructuraSel?.id ?? null}
-                      entidadNombre={estructuraSel?.nombre}
-                    />
-                  </div>
-                </div>
-              </>
+              <MaterialEstructuraSection
+                materiales={materiales}
+                loadingMateriales={loadingMateriales}
+                materialSel={materialSel}
+                setMaterialSel={setMaterialSel}
+                compuestos={compuestos}
+                estructuras={estructuras}
+              />
             ) : null}
 
             {active === "reactivity" ? (
