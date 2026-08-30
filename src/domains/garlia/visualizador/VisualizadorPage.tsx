@@ -3069,7 +3069,7 @@ function VisualizadorPage() {
     <main className="min-h-screen bg-[var(--bg-main)] text-primary">
       <div className="w-full py-8">
 
-        <div className="grid gap-2 lg:grid-cols-[150px_minmax(0,1fr)]">
+        <div className={`grid gap-2 ${active === "reactivity" ? "lg:grid-cols-[280px_minmax(0,1fr)]" : "lg:grid-cols-[150px_minmax(0,1fr)]"}`}>
           <aside className="p-0 lg:sticky lg:top-6 lg:self-start">
             <nav className="space-y-1">
               {navGroups.map((grupo) => {
@@ -3114,6 +3114,45 @@ function VisualizadorPage() {
                 );
               })}
             </nav>
+
+            {/* Perfil reactivo movido al sidebar (pedido explícito): vive
+                acá y no en el panel de contenido porque el usuario quiere
+                verlo siempre a la vista mientras navega Ficha/Valores
+                derivados del mismo compuesto, no como una vista aparte.
+                Solo se ensancha y muestra el radar cuando active ===
+                "reactivity" — el resto de las secciones no tienen
+                compuestoSel, así que no tiene sentido mostrar un radar
+                vacío ahí. */}
+            {active === "reactivity" ? (
+              <div className="mt-6 border-t border-primary/10 pt-5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">
+                  Perfil reactivo{compuestoSel ? ` · ${compuestoSel.nombre}` : ""}
+                </p>
+                <div className="mt-4">
+                  {(() => {
+                    const ejesReactivos = compuestoPropiedades
+                      .filter((p) => p.proporcion !== undefined)
+                      .map((p) => ({ label: p.label, value: p.proporcion ?? 0 }));
+                    if (ejesReactivos.length === 0) return <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>;
+                    if (ejesReactivos.length < 3) return <MiniBarChart values={ejesReactivos} />;
+                    return <RadarPerfilReactivo values={ejesReactivos} />;
+                  })()}
+                </div>
+                {compuestoSel?.carga != null ? (
+                  <div className="mt-6 border-t border-primary/10 pt-5">
+                    <MedidorCargaElectrica valor={compuestoSel.carga} rango={rangoCargaCompuestos} />
+                  </div>
+                ) : null}
+                <div className="mt-6 border-t border-primary/10 pt-5">
+                  <FilaStatCards
+                    items={["masa", "volumen", "densidad", "energia_enlace"]
+                      .map((clave) => compuestoPropiedades.find((p) => p.clave === clave))
+                      .filter((p): p is NonNullable<typeof p> => p !== undefined && p.valor !== null)
+                      .map((p) => ({ label: p.label, valor: p.valor as string }))}
+                  />
+                </div>
+              </div>
+            ) : null}
           </aside>
 
           <section className="min-w-0">
@@ -3405,68 +3444,27 @@ function VisualizadorPage() {
                     placeholder="Seleccioná un compuesto…"
                   />
                 )}
-                <div className="mt-8 grid gap-7 lg:grid-cols-2">
-                  <div className="rounded-2xl p-7">
-                    <p className="text-xs font-black text-primary/80">
-                      Perfil reactivo {compuestoSel ? `· ${compuestoSel.nombre}` : ""}
-                    </p>
-                    <div className="mt-5">
-                      {(() => {
-                        const ejesReactivos = compuestoPropiedades
-                          .filter((p) => p.proporcion !== undefined)
-                          .map((p) => ({ label: p.label, value: p.proporcion ?? 0 }));
-                        if (ejesReactivos.length === 0) return <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>;
-                        // Radar necesita ≥3 ejes para que el polígono tenga
-                        // sentido visual — con 1-2 propiedades se cae a las
-                        // barras lineales, que sí funcionan con cualquier N.
-                        if (ejesReactivos.length < 3) return <MiniBarChart values={ejesReactivos} />;
-                        return <RadarPerfilReactivo values={ejesReactivos} />;
-                      })()}
-                    </div>
-                    {/* Magnitudes libres del compuesto (Masa/Volumen/Densidad/
-                        Energía de enlace): no tienen rango 0..1 real, así que
-                        no calzan en el radar de arriba — se muestran aparte
-                        como stat cards sin barra proporcional inventada. */}
-                    <div className="mt-6 border-t border-primary/10 pt-5">
-                      <FilaStatCards
-                        items={["masa", "volumen", "densidad", "energia_enlace"]
-                          .map((clave) => compuestoPropiedades.find((p) => p.clave === clave))
-                          .filter((p): p is NonNullable<typeof p> => p !== undefined && p.valor !== null)
-                          .map((p) => ({ label: p.label, valor: p.valor as string }))}
-                      />
-                    </div>
-                    {/* Carga eléctrica (VIS-24) — vive acá, no en su propio
-                        item de sidebar (pedido explícito): es un dato fijo
-                        del compuesto ya seleccionado en este panel, no una
-                        vista propia con recorrido/comparación distintos.
-                        Antes se mostraba como texto plano "Carga: N" dentro
-                        de la grilla de Ficha (abajo) — ahora usa el mismo
-                        gauge bipolar de VIS-19/23, escalado contra el rango
-                        real de carga de todo el catálogo. */}
-                    {compuestoSel?.carga != null ? (
-                      <div className="mt-6 border-t border-primary/10 pt-5">
-                        <MedidorCargaElectrica valor={compuestoSel.carga} rango={rangoCargaCompuestos} />
-                      </div>
-                    ) : null}
+                {/* Perfil reactivo (radar, magnitudes libres, carga eléctrica)
+                    vive ahora en el sidebar ensanchado — ver el bloque debajo
+                    del <nav> más arriba en este mismo archivo. Acá solo queda
+                    Ficha y Valores derivados reales. */}
+                <div className="mt-8 rounded-2xl p-7">
+                  <p className="text-xs font-black text-primary/80">Ficha</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {compuestoSel?.tipo_compuesto ? <StatusPill>{compuestoSel.tipo_compuesto}</StatusPill> : null}
+                    {compuestoSel?.clasificacion ? <StatusPill>{compuestoSel.clasificacion}</StatusPill> : null}
+                    {compuestoSel?.estado ? <StatusPill>{compuestoSel.estado}</StatusPill> : null}
                   </div>
-                  <div className="rounded-2xl p-7">
-                    <p className="text-xs font-black text-primary/80">Ficha</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {compuestoSel?.tipo_compuesto ? <StatusPill>{compuestoSel.tipo_compuesto}</StatusPill> : null}
-                      {compuestoSel?.clasificacion ? <StatusPill>{compuestoSel.clasificacion}</StatusPill> : null}
-                      {compuestoSel?.estado ? <StatusPill>{compuestoSel.estado}</StatusPill> : null}
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2.5 text-xs">
-                      {compuestoPropiedades
-                        .filter((p) => p.valor !== null && p.proporcion === undefined && p.clave !== "carga")
-                        .slice(0, 6)
-                        .map((p) => (
-                          <div key={p.clave} className="rounded-lg border border-primary/10 p-3">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{p.label}</p>
-                            <p className="mt-1 font-black text-primary/75">{p.valor}</p>
-                          </div>
-                        ))}
-                    </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-3">
+                    {compuestoPropiedades
+                      .filter((p) => p.valor !== null && p.proporcion === undefined && p.clave !== "carga")
+                      .slice(0, 6)
+                      .map((p) => (
+                        <div key={p.clave} className="rounded-lg border border-primary/10 p-3">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{p.label}</p>
+                          <p className="mt-1 font-black text-primary/75">{p.valor}</p>
+                        </div>
+                      ))}
                   </div>
                 </div>
                 <div className="mt-8 rounded-2xl p-7">
