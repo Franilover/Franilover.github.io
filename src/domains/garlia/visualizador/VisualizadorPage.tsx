@@ -94,7 +94,13 @@ import { TriangleATS, type EntidadATS } from "./TriangleATS";
 // cambia qué SVG dibuja.
 import { ParticulaVisual, IumVisual } from "@/domains/garlia/fisica/ParticulaVisual";
 
+// SectionKey: se mantienen las 15 keys viejas (ya tienen render implementado
+// más abajo, active === "...") y se agregan keys nuevas para los VIS que
+// Supabase (visualizador_estado, fuente de verdad) ya tiene registrados pero
+// todavía no tienen sección propia — esas rinden un placeholder "próximamente"
+// hasta que se diseñen. Nada se inventa: nombre y VIS-id vienen 1:1 de Supabase.
 type SectionKey =
+  // ya implementadas
   | "rutas"
   | "micro"
   | "ats"
@@ -109,25 +115,95 @@ type SectionKey =
   | "information"
   | "oris"
   | "runas"
-  | "process";
+  | "process"
+  // pendientes de diseño (placeholder) — nombre real de Supabase
+  | "comparacion" // VIS-18
+  | "propagacion" // VIS-06
+  | "tiempo" // VIS-16
+  | "elEnlace" // VIS-19
+  | "mapaUniversal" // VIS-15
+  | "laboratorio" // VIS-17
+  | "celulasTejido" // VIS-11
+  | "tejidoOrgano" // VIS-12
+  | "organoOrganismo" // VIS-13
+  | "organismoReinoMundo"; // VIS-14
 
-const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
-  { key: "rutas", label: "Rutas", icon: <GitBranch size={15} /> },
-  { key: "micro", label: "Micro", icon: <Layers3 size={15} /> },
-  { key: "ats", label: "ATS", icon: <Orbit size={15} /> },
-  { key: "formula", label: "Fórmulas", icon: <Gauge size={15} /> },
-  { key: "material", label: "Material", icon: <Atom size={15} /> },
-  { key: "structure", label: "Estructura", icon: <GitBranch size={15} /> },
-  { key: "compatibilidad", label: "Compatibilidad", icon: <Waypoints size={15} /> },
-  { key: "interaccion", label: "Interacción", icon: <Play size={15} /> },
-  { key: "reactivity", label: "Reactividad", icon: <FlaskConical size={15} /> },
-  { key: "energy", label: "Energía", icon: <BarChart3 size={15} /> },
-  { key: "electric", label: "Electricidad", icon: <Zap size={15} /> },
-  { key: "information", label: "Información", icon: <Radio size={15} /> },
-  { key: "oris", label: "Oris", icon: <Sparkles size={15} /> },
-  { key: "runas", label: "Runas", icon: <CircleDot size={15} /> },
-  { key: "process", label: "Proceso", icon: <Workflow size={15} /> },
+type NavGroup = {
+  group: string;
+  items: { key: SectionKey; label: string; visId: string; icon: React.ReactNode; implementado: boolean }[];
+};
+
+// Agrupación acordada: 7 grupos temáticos de sidebar, cruzados contra las
+// categorías reales de visualizador_estado en Supabase. VIS-09 queda en
+// Dinámica (así está categorizado en Supabase); Biología va visible al
+// final, sin colapsar, aunque su desarrollo esté pospuesto.
+const navGroups: NavGroup[] = [
+  {
+    group: "Constitución",
+    items: [
+      { key: "rutas", label: "Física/Alquimia", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
+      { key: "ats", label: "Triángulo A/T/S", visId: "VIS-02", icon: <Orbit size={15} />, implementado: true },
+      { key: "micro", label: "Cadena Microestructura", visId: "VIS-20", icon: <Layers3 size={15} />, implementado: true },
+    ],
+  },
+  {
+    group: "Relaciones",
+    items: [
+      { key: "compatibilidad", label: "Compatibilidad → Enlace", visId: "VIS-04", icon: <Waypoints size={15} />, implementado: true },
+      { key: "elEnlace", label: "El Enlace", visId: "VIS-19", icon: <Waypoints size={15} />, implementado: false },
+    ],
+  },
+  {
+    group: "Propiedades Físicas",
+    items: [
+      { key: "formula", label: "Elemento → Compuesto", visId: "VIS-03", icon: <Gauge size={15} />, implementado: true },
+      { key: "structure", label: "Material → Estructura", visId: "VIS-10", icon: <Atom size={15} />, implementado: true },
+      { key: "material", label: "Perfil físico de Material", visId: "VIS-21", icon: <Gauge size={15} />, implementado: true },
+      { key: "reactivity", label: "Perfil Reactivo", visId: "VIS-22", icon: <FlaskConical size={15} />, implementado: true },
+      { key: "comparacion", label: "Comparación", visId: "VIS-18", icon: <BarChart3 size={15} />, implementado: false },
+    ],
+  },
+  {
+    group: "Dinámica",
+    items: [
+      { key: "interaccion", label: "Interacción", visId: "VIS-05", icon: <Play size={15} />, implementado: true },
+      { key: "process", label: "Proceso: Entrada→Transf.→Salida", visId: "VIS-25", icon: <Workflow size={15} />, implementado: true },
+      { key: "energy", label: "Energía de Enlace", visId: "VIS-23", icon: <BarChart3 size={15} />, implementado: true },
+      { key: "electric", label: "Carga Eléctrica", visId: "VIS-24", icon: <Zap size={15} />, implementado: true },
+      // Propagación (VIS-06) y Tiempo (VIS-16) están activos en Supabase pero
+      // sin sección propia en este archivo todavía — placeholder, no se inventa UI.
+      { key: "propagacion", label: "Propagación", visId: "VIS-06", icon: <Radio size={15} />, implementado: false },
+      { key: "tiempo", label: "Tiempo", visId: "VIS-16", icon: <Radio size={15} />, implementado: false },
+      { key: "information", label: "Información (sin dato)", visId: "VIS-PENDIENTE-INFO", icon: <Radio size={15} />, implementado: false },
+    ],
+  },
+  {
+    group: "Oris / Runas",
+    items: [
+      { key: "oris", label: "Oris", visId: "VIS-08", icon: <Sparkles size={15} />, implementado: true },
+      { key: "runas", label: "Runa → Mecanismo → Fenómeno", visId: "VIS-09", icon: <CircleDot size={15} />, implementado: true },
+    ],
+  },
+  {
+    group: "Atlas / Sandbox",
+    items: [
+      { key: "mapaUniversal", label: "Mapa Universal", visId: "VIS-15", icon: <GitBranch size={15} />, implementado: false },
+      { key: "laboratorio", label: "Laboratorio", visId: "VIS-17", icon: <FlaskConical size={15} />, implementado: false },
+    ],
+  },
+  {
+    group: "Biología",
+    items: [
+      { key: "celulasTejido", label: "Células → Tejido", visId: "VIS-11", icon: <Layers3 size={15} />, implementado: false },
+      { key: "tejidoOrgano", label: "Tejido → Órgano", visId: "VIS-12", icon: <Layers3 size={15} />, implementado: false },
+      { key: "organoOrganismo", label: "Órgano → Organismo", visId: "VIS-13", icon: <Layers3 size={15} />, implementado: false },
+      { key: "organismoReinoMundo", label: "Organismo → Reino → Mundo", visId: "VIS-14", icon: <Layers3 size={15} />, implementado: false },
+    ],
+  },
 ];
+
+// navItems plano: se mantiene para no romper nada que ya lo recorra tal cual.
+const navItems = navGroups.flatMap((g) => g.items);
 
 // ─── UI primitives — pass de densidad: mismo lenguaje visual, más aire.
 // Todos estos se reutilizan decenas de veces en las 13 secciones, así que
@@ -2061,21 +2137,32 @@ function VisualizadorPage() {
 
         <div className="grid gap-2 lg:grid-cols-[150px_minmax(0,1fr)]">
           <aside className="p-0 lg:sticky lg:top-6 lg:self-start">
-            <nav className="space-y-1.5">
-              {navItems.map((item) => {
-                const selected = item.key === active;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setActive(item.key)}
-                    className={`flex w-full items-center gap-2 py-2 text-left text-xs transition-colors ${selected ? "font-black text-primary/90" : "font-medium text-primary/45 hover:text-primary/70"}`}
-                  >
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
+            <nav className="space-y-4">
+              {navGroups.map((grupo) => (
+                <div key={grupo.group}>
+                  <p className="mb-1.5 px-0 text-[9px] font-black uppercase tracking-widest text-primary/30">
+                    {grupo.group}
+                  </p>
+                  <div className="space-y-1.5">
+                    {grupo.items.map((item) => {
+                      const selected = item.key === active;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => setActive(item.key)}
+                          className={`flex w-full items-center gap-2 py-2 text-left text-xs transition-colors ${selected ? "font-black text-primary/90" : "font-medium text-primary/45 hover:text-primary/70"} ${item.implementado ? "" : "opacity-60"}`}
+                          title={item.visId}
+                        >
+                          {item.icon}
+                          <span>{item.label}</span>
+                          {!item.implementado ? <span className="ml-auto text-[9px] text-primary/25">pronto</span> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </nav>
           </aside>
 
@@ -2754,6 +2841,33 @@ function VisualizadorPage() {
                 </div>
               </>
             ) : null}
+
+            {(
+              [
+                ["comparacion", "VIS-18", "Comparación"],
+                ["propagacion", "VIS-06", "Propagación"],
+                ["tiempo", "VIS-16", "Tiempo"],
+                ["elEnlace", "VIS-19", "El Enlace"],
+                ["mapaUniversal", "VIS-15", "Mapa Universal"],
+                ["laboratorio", "VIS-17", "Laboratorio"],
+                ["celulasTejido", "VIS-11", "Células → Tejido"],
+                ["tejidoOrgano", "VIS-12", "Tejido → Órgano"],
+                ["organoOrganismo", "VIS-13", "Órgano → Organismo"],
+                ["organismoReinoMundo", "VIS-14", "Organismo → Reino → Mundo"],
+              ] as const
+            ).map(([key, visId, nombre]) =>
+              active === key ? (
+                <div key={key} className="rounded-2xl p-7">
+                  <p className="text-xs font-black text-primary/80">
+                    {nombre} <span className="font-medium text-primary/35">· {visId}</span>
+                  </p>
+                  <EmptyRow>
+                    Diseño pendiente — este VIS está registrado en visualizador_estado (Supabase) pero todavía no
+                    tiene sección propia acá. Nada se inventa hasta diseñarlo.
+                  </EmptyRow>
+                </div>
+              ) : null
+            )}
 
           </section>
         </div>
