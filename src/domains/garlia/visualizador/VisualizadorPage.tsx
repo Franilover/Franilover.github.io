@@ -1311,6 +1311,7 @@ function RutaCompuestoCanvas({
                   highlightedNodeIds={hoverId ? [hoverId] : []}
                   centerScaleExtra={1.3}
                   replayToken={replayToken}
+                  disableDimming
                 />
               </div>
               {compuestoSel && !route.loadingEnlaces && enlaces.length === 0 ? (

@@ -102,6 +102,13 @@ export interface StructureCanvasProps {
    *  real disponible en el layout. Default false — no cambia el
    *  comportamiento de canvases existentes con varios anillos. */
   fillWidth?: boolean;
+  /** Si es true, los nodos orbitantes NO orbitantes NO se atenúan al 30%
+   *  cuando hay otro nodo en hover/seleccionado — todos quedan siempre a
+   *  la misma opacidad que tienen al pasar el mouse encima (emphasized).
+   *  Default false (comportamiento actual, sin cambios). Pedido explícito
+   *  para el canvas de Compuestos: los elementos no deben verse "apagados"
+   *  entre sí. */
+  disableDimming?: boolean;
 }
 
 const CENTER_R = 48; // radio del nodo central (el "centro de gravedad"). Subido
@@ -147,6 +154,7 @@ export function StructureCanvas({
   centerScaleExtra = 1,
   replayToken,
   fillWidth = false,
+  disableDimming = false,
 }: StructureCanvasProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
 
@@ -475,7 +483,7 @@ export function StructureCanvas({
               const isHovered = activeHoverId === node.id;
               const isHighlighted = highlightSet.has(node.id);
               const emphasized = isSelected || isHovered || isHighlighted;
-              const dim = Boolean(activeHoverId || selectedNodeId) && !emphasized;
+              const dim = !disableDimming && Boolean(activeHoverId || selectedNodeId) && !emphasized;
               const toneBorder = emphasized
                 ? "color-mix(in srgb, var(--primary) 60%, transparent)"
                 : "color-mix(in srgb, var(--primary) 16%, transparent)";
