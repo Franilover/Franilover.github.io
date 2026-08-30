@@ -67,6 +67,7 @@ import { StructureCanvas, type CanvasColumn, type CanvasEdge } from "./Structure
 import { Inspector, type InspectorEntity } from "./Inspector";
 import { TraceView, type TraceStep } from "./TraceView";
 import { type Perspectiva } from "./PerspectivaSwitcher";
+import { useEnlaceRoute, type EnlaceResuelto } from "./routes/useEnlaceRoute";
 import { useFisicaRoute } from "./routes/useFisicaRoute";
 import { useAlquimiaRoute } from "./routes/useAlquimiaRoute";
 import { useCompuestoRoute } from "./routes/useCompuestoRoute";
@@ -151,7 +152,7 @@ const navGroups: NavGroup[] = [
     group: "Relaciones",
     items: [
       { key: "compatibilidad", label: "Compatibilidad → Enlace", visId: "VIS-04", icon: <Waypoints size={15} />, implementado: true },
-      { key: "elEnlace", label: "El Enlace", visId: "VIS-19", icon: <Waypoints size={15} />, implementado: false },
+      { key: "elEnlace", label: "El Enlace", visId: "VIS-19", icon: <Waypoints size={15} />, implementado: true },
     ],
   },
   {
@@ -1983,6 +1984,136 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
   );
 }
 
+/**
+ * EnlaceSection — VIS-19 "El Enlace".
+ *
+ * El enlace es el protagonista: se elige un Compuesto para ubicar sus
+ * enlaces reales (compuesto_enlaces), y desde ahí un enlace puntual para
+ * inspeccionar su anatomía (A ↔ B, estado, intensidad/estabilidad/
+ * reversibilidad/confianza — todo proporcional al dato real, nunca
+ * decorativo). El resto del compuesto queda atenuado detrás, dando
+ * contexto sin competir con el enlace activo.
+ */
+function EnlaceSection() {
+  const route = useEnlaceRoute();
+  const { compuestoRoute, enlaces, enlaceSel, setEnlaceSelId, compararActivo, setCompararActivo, enlaceCompararSel, setEnlaceCompararId } = route;
+
+  const anatomiaValues = (e: EnlaceResuelto | null) => {
+    if (!e) return [];
+    const campos: { label: string; value: number | null }[] = [
+      { label: "Intensidad", value: e.intensidad },
+      { label: "Estabilidad", value: e.estabilidad },
+      { label: "Reversibilidad", value: e.reversibilidad },
+      { label: "Confianza", value: e.confianza },
+    ];
+    return campos
+      .filter((c): c is { label: string; value: number } => c.value != null)
+      .map((c) => ({ label: c.label, value: c.value }));
+  };
+
+  const labelEnlace = (e: EnlaceResuelto) =>
+    `${e.elementoA?.simbolo ?? "?"} ↔ ${e.elementoB?.simbolo ?? "?"}`;
+
+  return (
+    <div className="grid gap-7 lg:grid-cols-[0.65fr_1.35fr]">
+      {/* Selector de Compuesto + lista de sus enlaces reales */}
+      <div>
+        <p className="text-xs font-black text-primary/80">Compuesto</p>
+        <div className="mt-3">
+          {compuestoRoute.loading ? (
+            <LoadingRow />
+          ) : (
+            <SelectDropdown
+              items={compuestoRoute.compuestos}
+              active={compuestoRoute.compuestoSel}
+              getKey={(c) => c.id}
+              getLabel={(c) => c.nombre}
+              onSelect={(c) => compuestoRoute.setCompuestoSelId(c.id)}
+              placeholder="Seleccioná un compuesto…"
+            />
+          )}
+        </div>
+
+        <p className="mt-7 text-xs font-black text-primary/80">
+          Enlaces reales <span className="font-medium text-primary/35">· {enlaces.length}</span>
+        </p>
+        <div className="mt-3 space-y-1">
+          {enlaces.length === 0 ? (
+            <EmptyRow>Este compuesto no tiene enlaces instanciados todavía.</EmptyRow>
+          ) : (
+            enlaces.map((e) => {
+              const selected = enlaceSel?.id === e.id;
+              const selectedCompare = enlaceCompararSel?.id === e.id;
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={() => (compararActivo && selected ? null : compararActivo ? setEnlaceCompararId(e.id) : setEnlaceSelId(e.id))}
+                  className={`flex w-full items-center justify-between gap-2 py-2 text-left text-xs transition-colors ${
+                    selected || selectedCompare ? "font-black text-primary/90" : "font-bold text-primary/45 hover:text-primary/70"
+                  }`}
+                >
+                  <span>{labelEnlace(e)}</span>
+                  {e.estado ? <StatusPill>{e.estado}</StatusPill> : null}
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setCompararActivo(!compararActivo);
+            if (compararActivo) setEnlaceCompararId(null);
+          }}
+          className={`mt-6 text-[11px] font-black uppercase tracking-widest transition-colors ${
+            compararActivo ? "text-primary/80" : "text-primary/35 hover:text-primary/60"
+          }`}
+        >
+          {compararActivo ? "✕ Comparar enlaces" : "Comparar enlaces"}
+        </button>
+      </div>
+
+      {/* Anatomía del enlace activo (+ comparación si está activada) */}
+      <div className={`grid gap-7 ${compararActivo ? "sm:grid-cols-2" : ""}`}>
+        {[enlaceSel, ...(compararActivo ? [enlaceCompararSel] : [])].map((e, i) => (
+          <div key={e?.id ?? `vacio-${i}`}>
+            {!e ? (
+              <EmptyRow>{i === 0 ? "Seleccioná un enlace para inspeccionarlo." : "Elegí un segundo enlace para comparar."}</EmptyRow>
+            ) : (
+              <>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/35">Anatomía del enlace</p>
+                <p className="mt-2 text-2xl font-black text-primary/85">
+                  {e.elementoA?.nombre ?? "?"} <span className="text-primary/30">↔</span> {e.elementoB?.nombre ?? "?"}
+                </p>
+                <p className="mt-1 text-xs font-bold text-primary/40">
+                  {e.elementoA?.simbolo ?? "?"} ↔ {e.elementoB?.simbolo ?? "?"}
+                  {e.estado ? <span className="ml-2 text-primary/30">· {e.estado}</span> : null}
+                </p>
+
+                <div className="mt-6">
+                  {anatomiaValues(e).length > 0 ? (
+                    <MiniBarChart values={anatomiaValues(e)} />
+                  ) : (
+                    <EmptyRow>Sin datos de anatomía calculados todavía para este enlace.</EmptyRow>
+                  )}
+                </div>
+
+                {e.coste_energetico != null ? (
+                  <p className="mt-5 text-[11px] font-bold text-primary/45">
+                    Coste energético: <span className="text-primary/70">{e.coste_energetico}</span>
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function VisualizadorPage() {
   const [active, setActive] = useState<SectionKey>("oris_ruta");
 
@@ -2740,12 +2871,13 @@ function VisualizadorPage() {
               </>
             ) : null}
 
+            {active === "elEnlace" ? <EnlaceSection /> : null}
+
             {(
               [
                 ["comparacion", "VIS-18", "Comparación"],
                 ["propagacion", "VIS-06", "Propagación"],
                 ["tiempo", "VIS-16", "Tiempo"],
-                ["elEnlace", "VIS-19", "El Enlace"],
                 ["mapaUniversal", "VIS-15", "Mapa Universal"],
                 ["laboratorio", "VIS-17", "Laboratorio"],
                 ["celulasTejido", "VIS-11", "Células → Tejido"],
