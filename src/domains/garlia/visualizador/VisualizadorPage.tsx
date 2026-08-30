@@ -315,6 +315,78 @@ function MiniBarChart({ values }: { values: { label: string; value: number }[] }
   );
 }
 
+/** Radar/spider chart para el Perfil reactivo (VIS-24 rediseño): reemplaza
+ *  el MiniBarChart lineal por un polígono sobre N ejes (uno por propiedad
+ *  con `proporcion` 0..1), con los puntos conectados entre sí. Todo el
+ *  layout se calcula en JS puro (trig) pero se renderiza como SVG estático
+ *  — nada de manipulación del DOM vía createElementNS, que es frágil en
+ *  el visualizador embebido. Mínimo 3 ejes para que el polígono tenga
+ *  sentido; con menos, se cae a EmptyRow desde el caller. */
+function RadarPerfilReactivo({ values }: { values: { label: string; value: number }[] }) {
+  const cx = 340;
+  const cy = 260;
+  const R = 175;
+  const n = values.length;
+
+  const puntoEnEje = (i: number, frac: number) => {
+    const a = (2 * Math.PI * i) / n - Math.PI / 2;
+    return { x: cx + Math.cos(a) * R * frac, y: cy + Math.sin(a) * R * frac };
+  };
+
+  const anillos = [0.25, 0.5, 0.75, 1].map((frac) =>
+    Array.from({ length: n }, (_, i) => puntoEnEje(i, frac))
+      .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+      .join(" "),
+  );
+
+  const ejes = Array.from({ length: n }, (_, i) => puntoEnEje(i, 1));
+
+  const puntosValor = values.map((v, i) => puntoEnEje(i, Math.max(0, Math.min(1, v.value))));
+  const poligono = puntosValor.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+  const etiquetas = values.map((v, i) => {
+    const a = (2 * Math.PI * i) / n - Math.PI / 2;
+    const ca = Math.cos(a);
+    const lx = cx + ca * (R + 40);
+    const ly = cy + Math.sin(a) * (R + 40);
+    const anchor = Math.abs(ca) < 0.3 ? "middle" : ca > 0 ? "start" : "end";
+    return { ...v, lx, ly, anchor };
+  });
+
+  const maxLy = Math.max(...etiquetas.map((e) => e.ly)) + 20;
+  const minLy = Math.min(...etiquetas.map((e) => e.ly)) - 20;
+  const viewH = Math.max(maxLy, cy + R + 20) - Math.min(0, minLy);
+
+  return (
+    <svg width="100%" viewBox={`0 0 680 ${Math.ceil(viewH)}`} role="img">
+      <title>Perfil reactivo en radar</title>
+      <desc>
+        Gráfico de radar con {n} propiedades reactivas normalizadas de 0 a 1: {values.map((v) => `${v.label} ${v.value.toFixed(2)}`).join(", ")}
+      </desc>
+      {anillos.map((pts, idx) => (
+        <polygon key={idx} points={pts} fill="none" stroke="var(--border-strong)" strokeWidth="0.5" />
+      ))}
+      {ejes.map((p, i) => (
+        <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="var(--border-strong)" strokeWidth="0.5" />
+      ))}
+      <polygon points={poligono} fill="#7F77DD" fillOpacity="0.3" stroke="#534AB7" strokeWidth="1.5" />
+      {puntosValor.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="4" fill="#534AB7" />
+      ))}
+      {etiquetas.map((e, i) => (
+        <g key={i}>
+          <text className="th" x={e.lx} y={e.ly - 6} textAnchor={e.anchor} fill="var(--text-primary)" fontSize="14" fontWeight={500}>
+            {e.label}
+          </text>
+          <text className="ts" x={e.lx} y={e.ly + 10} textAnchor={e.anchor} fill="var(--text-secondary)" fontSize="12">
+            {e.value.toFixed(2)}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 /** Barra centrada en cero para ejes que van de -N a +N (ejes_fundamentales
  *  de Partícula). A diferencia de MiniBarChart (0..1), acá el 0 es el
  *  centro visual y positivo/negativo van a cada lado. */
@@ -464,25 +536,48 @@ function TarjetaValoresDerivados({
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {items.map((v) => (
-        <div
-          key={v.id}
-          className="rounded-xl border border-primary/10 p-4"
-          title={v.propiedad.descripcion ?? undefined}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{v.propiedad.nombre}</p>
-            <span className="shrink-0 text-sm font-black tabular-nums text-primary/85">
-              {Number.isFinite(v.valor) ? v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }) : "—"}
-            </span>
+      {items.map((v) => {
+        // Barra proporcional real: solo se dibuja si Supabase trae rango_min
+        // y rango_max para esta propiedad (nunca se inventa un rango 0..1
+        // por defecto — si no viene, se muestra el número plano nomás,
+        // igual que antes).
+        const { rango_min, rango_max } = v.propiedad;
+        const tieneRango = rango_min !== null && rango_max !== null && rango_max > rango_min;
+        const pct = tieneRango
+          ? Math.max(0, Math.min(1, (v.valor - (rango_min as number)) / ((rango_max as number) - (rango_min as number)))) * 100
+          : null;
+
+        return (
+          <div
+            key={v.id}
+            className="rounded-xl border border-primary/10 p-4"
+            title={v.propiedad.descripcion ?? undefined}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{v.propiedad.nombre}</p>
+              <span className="shrink-0 text-sm font-black tabular-nums text-primary/85">
+                {Number.isFinite(v.valor) ? v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }) : "—"}
+              </span>
+            </div>
+            {pct !== null ? (
+              <>
+                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-primary/10">
+                  <div className="h-full rounded-full bg-primary/60" style={{ width: `${pct}%` }} />
+                </div>
+                <div className="mt-1 flex justify-between text-[9px] font-bold text-primary/30">
+                  <span>{rango_min}</span>
+                  <span>{rango_max}</span>
+                </div>
+              </>
+            ) : null}
+            {v.propiedad.formula ? (
+              <p className="mt-2.5 truncate text-xs font-bold text-primary/55" title={v.propiedad.formula}>
+                {v.propiedad.formula}
+              </p>
+            ) : null}
           </div>
-          {v.propiedad.formula ? (
-            <p className="mt-2.5 truncate text-xs font-bold text-primary/55" title={v.propiedad.formula}>
-              {v.propiedad.formula}
-            </p>
-          ) : null}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -3263,15 +3358,17 @@ function VisualizadorPage() {
                       Perfil reactivo {compuestoSel ? `· ${compuestoSel.nombre}` : ""}
                     </p>
                     <div className="mt-5">
-                      {compuestoPropiedades.filter((p) => p.proporcion !== undefined).length > 0 ? (
-                        <MiniBarChart
-                          values={compuestoPropiedades
-                            .filter((p) => p.proporcion !== undefined)
-                            .map((p) => ({ label: p.label, value: p.proporcion ?? 0 }))}
-                        />
-                      ) : (
-                        <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
-                      )}
+                      {(() => {
+                        const ejesReactivos = compuestoPropiedades
+                          .filter((p) => p.proporcion !== undefined)
+                          .map((p) => ({ label: p.label, value: p.proporcion ?? 0 }));
+                        if (ejesReactivos.length === 0) return <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>;
+                        // Radar necesita ≥3 ejes para que el polígono tenga
+                        // sentido visual — con 1-2 propiedades se cae a las
+                        // barras lineales, que sí funcionan con cualquier N.
+                        if (ejesReactivos.length < 3) return <MiniBarChart values={ejesReactivos} />;
+                        return <RadarPerfilReactivo values={ejesReactivos} />;
+                      })()}
                     </div>
                     {/* Carga eléctrica (VIS-24) — vive acá, no en su propio
                         item de sidebar (pedido explícito): es un dato fijo
