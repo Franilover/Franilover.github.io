@@ -157,20 +157,10 @@ type NavGroup = {
 // de este rediseño) — se decide después a qué nivel entran.
 const navGroups: NavGroup[] = [
   {
-    group: "ATS",
+    group: "Química",
     items: [
       { key: "ats", label: "Triángulo A/T/S", visId: "VIS-02", icon: <Orbit size={15} />, implementado: true },
-    ],
-  },
-  {
-    group: "Elementos",
-    items: [
       { key: "elementos_ruta", label: "Elementos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
-    ],
-  },
-  {
-    group: "Compuestos",
-    items: [
       { key: "compuestos_ruta", label: "Compuestos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
       { key: "reactivity", label: "Perfil Reactivo", visId: "VIS-22", icon: <FlaskConical size={15} />, implementado: true },
       // "electric" (VIS-24 "Carga Eléctrica") retirado como item propio
