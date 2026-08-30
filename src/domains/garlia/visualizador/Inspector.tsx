@@ -73,8 +73,8 @@ export function Inspector({
       {entity.eyebrow ? (
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary/35">{entity.eyebrow}</p>
       ) : null}
-      <div className="mt-2 flex items-center gap-4">
-        {entity.visual ? <div className="shrink-0">{entity.visual}</div> : null}
+      <div className="mt-2">
+        {entity.visual ? <div className="mb-3">{entity.visual}</div> : null}
         <div>
           <p className="text-base font-black text-primary/90">{entity.title}</p>
           {entity.subtitle ? <p className="mt-1 text-xs text-primary/50">{entity.subtitle}</p> : null}
