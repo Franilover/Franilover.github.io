@@ -85,7 +85,10 @@ export interface SandboxSnapshot {
 
 export interface InteraccionEventoCatalogo {
   id: string; // uuid
+  clave?: string;
   nombre: string;
+  descripcion?: string | null;
+  categoria?: string | null;
   [key: string]: unknown;
 }
 
