@@ -559,6 +559,11 @@ function TarjetaValoresDerivados({
   entidadNombre?: string;
 }) {
   const { items, loading } = useValoresDerivadosDeEntidad(tipo, entidadId);
+  // El gráfico (radar/mini-bar) queda siempre visible — solo las líneas y
+  // bloques de números de abajo se ocultan por defecto, detrás de un
+  // ícono "i" (pedido explícito): menos ruido numérico a primera vista,
+  // sin perder el gráfico que ya resume la forma del dato.
+  const [mostrarDetalle, setMostrarDetalle] = useState(false);
 
   if (!entidadId) return <EmptyRow>Selecciona una entidad para ver sus propiedades derivadas reales.</EmptyRow>;
   if (loading) return <LoadingRow />;
@@ -581,44 +586,66 @@ function TarjetaValoresDerivados({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {conRango.length >= 3 ? (
         <RadarPerfilReactivo values={ejesRadar} />
       ) : conRango.length > 0 ? (
         <MiniBarChart values={ejesRadar} />
       ) : null}
 
-      {conRango.length > 0 ? (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {conRango.map((v) => (
-            <div key={v.id} className="flex items-center justify-between gap-2 rounded-lg bg-primary/[0.04] px-3 py-2">
-              <span className="flex items-center gap-1.5 text-[11px] font-bold text-primary/60">
-                {v.propiedad.nombre}
-                <IconoFormula formula={v.propiedad.formula} />
-              </span>
-              <span className="shrink-0 text-xs font-black tabular-nums text-primary/85">
-                {v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 })}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <button
+        type="button"
+        onClick={() => setMostrarDetalle((v) => !v)}
+        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary/35 hover:text-primary/55"
+      >
+        Valores en detalle
+        <span
+          className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
+            mostrarDetalle
+              ? "border-primary/45 text-primary/70"
+              : "border-primary/25 text-primary/45 hover:border-primary/45 hover:text-primary/70"
+          }`}
+          title={mostrarDetalle ? "Ocultar valores" : "Ver valores"}
+        >
+          <Info size={10} strokeWidth={2.5} />
+        </span>
+      </button>
 
-      {sinRango.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {sinRango.map((v) => (
-            <div key={v.id} className="rounded-xl border border-primary/10 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary/35">
-                  {v.propiedad.nombre}
-                  <IconoFormula formula={v.propiedad.formula} />
-                </span>
-                <span className="shrink-0 text-sm font-black tabular-nums text-primary/85">
-                  {Number.isFinite(v.valor) ? v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }) : "—"}
-                </span>
-              </div>
+      {mostrarDetalle ? (
+        <div className="space-y-6">
+          {conRango.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {conRango.map((v) => (
+                <div key={v.id} className="flex items-center justify-between gap-2 rounded-lg bg-primary/[0.04] px-3 py-2">
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold text-primary/60">
+                    {v.propiedad.nombre}
+                    <IconoFormula formula={v.propiedad.formula} />
+                  </span>
+                  <span className="shrink-0 text-xs font-black tabular-nums text-primary/85">
+                    {v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 })}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : null}
+
+          {sinRango.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {sinRango.map((v) => (
+                <div key={v.id} className="rounded-xl border border-primary/10 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary/35">
+                      {v.propiedad.nombre}
+                      <IconoFormula formula={v.propiedad.formula} />
+                    </span>
+                    <span className="shrink-0 text-sm font-black tabular-nums text-primary/85">
+                      {Number.isFinite(v.valor) ? v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }) : "—"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -1112,9 +1139,6 @@ function RutaCompuestoCanvas({
   // Cambiar este valor re-dispara la animación de fases del canvas aunque
   // el compuesto activo sea el mismo — ver replayToken en StructureCanvas.
   const [replayToken, setReplayToken] = useState(0);
-  // Valores derivados reales: colapsado por defecto (pedido explícito) —
-  // arranca oculto, se muestra recién al clickear el ícono "i".
-  const [mostrarValoresDerivados, setMostrarValoresDerivados] = useState(false);
 
   // Nivel 1: un nodo por unidad de Elemento en la composición real (ej.
   // A×2, B×1, C×3 → 6 nodos), mismo criterio de expansión 1-instancia-por-
@@ -1337,37 +1361,19 @@ function RutaCompuestoCanvas({
                   ) : null}
                 </div>
 
-                {/* Valores derivados reales: colapsado por defecto (pedido
-                    explícito) — solo título + ícono "i" clickeable; los
-                    números/radar internos de TarjetaValoresDerivados se
-                    montan recién al abrir, no se ocultan con CSS. */}
+                {/* Valores derivados reales: el gráfico queda siempre
+                    visible acá — el toggle de detalle (ícono "i") vive
+                    ahora DENTRO de TarjetaValoresDerivados, debajo de su
+                    propio radar/mini-bar, no envolviendo todo el bloque. */}
                 <div className="rounded-2xl p-5">
-                  <button
-                    type="button"
-                    onClick={() => setMostrarValoresDerivados((v) => !v)}
-                    className="flex items-center gap-1.5 text-xs font-black text-primary/80"
-                  >
-                    Valores derivados reales
-                    <span
-                      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                        mostrarValoresDerivados
-                          ? "border-primary/45 text-primary/70"
-                          : "border-primary/25 text-primary/45 hover:border-primary/45 hover:text-primary/70"
-                      }`}
-                      title={mostrarValoresDerivados ? "Ocultar valores" : "Ver valores"}
-                    >
-                      <Info size={10} strokeWidth={2.5} />
-                    </span>
-                  </button>
-                  {mostrarValoresDerivados ? (
-                    <div className="mt-4">
-                      <TarjetaValoresDerivados
-                        tipo="compuesto"
-                        entidadId={compuestoSel.id}
-                        entidadNombre={compuestoSel.nombre}
-                      />
-                    </div>
-                  ) : null}
+                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
+                  <div className="mt-4">
+                    <TarjetaValoresDerivados
+                      tipo="compuesto"
+                      entidadId={compuestoSel.id}
+                      entidadNombre={compuestoSel.nombre}
+                    />
+                  </div>
                 </div>
               </div>
             ) : null}
