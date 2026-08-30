@@ -105,7 +105,6 @@ type SectionKey =
   | "elementos_ruta"
   | "compuestos_ruta"
   | "ats"
-  | "formula"
   | "material"
   | "structure"
   | "compatibilidad"
@@ -158,7 +157,6 @@ const navGroups: NavGroup[] = [
   {
     group: "Propiedades Físicas",
     items: [
-      { key: "formula", label: "Elemento → Compuesto", visId: "VIS-03", icon: <Gauge size={15} />, implementado: true },
       { key: "structure", label: "Material → Estructura", visId: "VIS-10", icon: <Atom size={15} />, implementado: true },
       { key: "material", label: "Perfil físico de Material", visId: "VIS-21", icon: <Gauge size={15} />, implementado: true },
       { key: "reactivity", label: "Perfil Reactivo", visId: "VIS-22", icon: <FlaskConical size={15} />, implementado: true },
@@ -2286,9 +2284,57 @@ function VisualizadorPage() {
               </>
             ) : null}
 
-            {active === "formula" ? (
+            {active === "material" ? (
               <>
-                <div className="grid gap-7 lg:grid-cols-2">
+                {loadingMateriales ? (
+                  <LoadingRow />
+                ) : (
+                  <SelectDropdown
+                    items={materiales}
+                    active={materialSel}
+                    getKey={(m) => m.id}
+                    getLabel={(m) => m.nombre}
+                    onSelect={setMaterialSel}
+                    placeholder="Seleccioná un material…"
+                  />
+                )}
+                <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.8fr]">
+                  <div className="rounded-2xl p-7">
+                    <p className="text-xs font-black text-primary/80">
+                      Perfil físico {materialSel ? `· ${materialSel.nombre}` : ""}
+                    </p>
+                    <div className="mt-5">
+                      {materialPropiedades.length > 0 ? (
+                        <PropiedadesFisicasGenerico propiedades={materialSel?.propiedades_calculadas} columnas={2} />
+                      ) : (
+                        <EmptyRow>Sin propiedades calculadas todavía para este material.</EmptyRow>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl p-7">
+                    <p className="text-xs font-black text-primary/80">Metadatos</p>
+                    <div className="mt-4 grid grid-cols-2 gap-2.5">
+                      <StatusPill>{materialSel?.tipo_material ?? "—"}</StatusPill>
+                      <StatusPill>{materialSel?.estado_calculo ?? "sin calcular"}</StatusPill>
+                      {materialSel?.propiedades_calculadas?.fuente_fisica ? (
+                        <StatusPill>{String(materialSel.propiedades_calculadas.fuente_fisica)}</StatusPill>
+                      ) : null}
+                    </div>
+                    {materialSel?.descripcion ? (
+                      <p className="mt-4 text-xs leading-5 text-primary/45">{materialSel.descripcion}</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-8 rounded-2xl p-7">
+                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
+                  <p className="mt-1 text-[10px] text-primary/35">valores_propiedades_derivadas para este material</p>
+                  <div className="mt-4">
+                    <TarjetaValoresDerivados tipo="material" entidadId={materialSel?.id ?? null} entidadNombre={materialSel?.nombre} />
+                  </div>
+                </div>
+
+                <div className="mt-8 grid gap-7 lg:grid-cols-2">
                   <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Densidad</p>
                     <p className="mt-1 text-[10px] text-primary/35">
@@ -2370,58 +2416,6 @@ function VisualizadorPage() {
                         })}
                       </div>
                     )}
-                  </div>
-                </div>
-              </>
-            ) : null}
-
-            {active === "material" ? (
-              <>
-                {loadingMateriales ? (
-                  <LoadingRow />
-                ) : (
-                  <SelectDropdown
-                    items={materiales}
-                    active={materialSel}
-                    getKey={(m) => m.id}
-                    getLabel={(m) => m.nombre}
-                    onSelect={setMaterialSel}
-                    placeholder="Seleccioná un material…"
-                  />
-                )}
-                <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_0.8fr]">
-                  <div className="rounded-2xl p-7">
-                    <p className="text-xs font-black text-primary/80">
-                      Perfil físico {materialSel ? `· ${materialSel.nombre}` : ""}
-                    </p>
-                    <div className="mt-5">
-                      {materialPropiedades.length > 0 ? (
-                        <PropiedadesFisicasGenerico propiedades={materialSel?.propiedades_calculadas} columnas={2} />
-                      ) : (
-                        <EmptyRow>Sin propiedades calculadas todavía para este material.</EmptyRow>
-                      )}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl p-7">
-                    <p className="text-xs font-black text-primary/80">Metadatos</p>
-                    <div className="mt-4 grid grid-cols-2 gap-2.5">
-                      <StatusPill>{materialSel?.tipo_material ?? "—"}</StatusPill>
-                      <StatusPill>{materialSel?.estado_calculo ?? "sin calcular"}</StatusPill>
-                      {materialSel?.propiedades_calculadas?.fuente_fisica ? (
-                        <StatusPill>{String(materialSel.propiedades_calculadas.fuente_fisica)}</StatusPill>
-                      ) : null}
-                    </div>
-                    {materialSel?.descripcion ? (
-                      <p className="mt-4 text-xs leading-5 text-primary/45">{materialSel.descripcion}</p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="mt-8 rounded-2xl p-7">
-                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
-                  <p className="mt-1 text-[10px] text-primary/35">valores_propiedades_derivadas para este material</p>
-                  <div className="mt-4">
-                    <TarjetaValoresDerivados tipo="material" entidadId={materialSel?.id ?? null} entidadNombre={materialSel?.nombre} />
                   </div>
                 </div>
               </>
