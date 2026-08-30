@@ -9,6 +9,7 @@ import {
   FlaskConical,
   Gauge,
   GitBranch,
+  Info,
   Layers3,
   Orbit,
   Pause,
@@ -316,12 +317,15 @@ function MiniBarChart({ values }: { values: { label: string; value: number }[] }
 }
 
 /** Radar/spider chart para el Perfil reactivo (VIS-24 rediseño): reemplaza
- *  el MiniBarChart lineal por un polígono sobre N ejes (uno por propiedad
- *  con `proporcion` 0..1), con los puntos conectados entre sí. Todo el
- *  layout se calcula en JS puro (trig) pero se renderiza como SVG estático
- *  — nada de manipulación del DOM vía createElementNS, que es frágil en
- *  el visualizador embebido. Mínimo 3 ejes para que el polígono tenga
- *  sentido; con menos, se cae a EmptyRow desde el caller. */
+ *  el MiniBarChart lineal por un polígono sobre N ejes, con los puntos
+ *  conectados entre sí. `value` debe venir pre-normalizado 0..1 por quien
+ *  llama (acá con `proporcion` ya 0..1; en Valores derivados, normalizado
+ *  contra el rango_min/rango_max real de cada propiedad) — el componente
+ *  en sí no sabe de dónde salió el 0..1, solo dibuja. Todo el layout se
+ *  calcula en JS puro (trig) pero se renderiza como SVG estático — nada de
+ *  manipulación del DOM vía createElementNS, que es frágil en el
+ *  visualizador embebido. Mínimo 3 ejes para que el polígono tenga
+ *  sentido; con menos, el caller debe usar MiniBarChart en su lugar. */
 function RadarPerfilReactivo({ values }: { values: { label: string; value: number }[] }) {
   const cx = 340;
   const cy = 260;
@@ -358,32 +362,51 @@ function RadarPerfilReactivo({ values }: { values: { label: string; value: numbe
   const viewH = Math.max(maxLy, cy + R + 20) - Math.min(0, minLy);
 
   return (
-    <svg width="100%" viewBox={`0 0 680 ${Math.ceil(viewH)}`} role="img">
+    <svg width="100%" viewBox={`0 0 680 ${Math.ceil(viewH)}`} role="img" className="text-primary">
       <title>Perfil reactivo en radar</title>
       <desc>
         Gráfico de radar con {n} propiedades reactivas normalizadas de 0 a 1: {values.map((v) => `${v.label} ${v.value.toFixed(2)}`).join(", ")}
       </desc>
       {anillos.map((pts, idx) => (
-        <polygon key={idx} points={pts} fill="none" stroke="var(--border-strong)" strokeWidth="0.5" />
+        <polygon key={idx} points={pts} fill="none" className="stroke-primary/15" strokeWidth="0.5" />
       ))}
       {ejes.map((p, i) => (
-        <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="var(--border-strong)" strokeWidth="0.5" />
+        <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} className="stroke-primary/15" strokeWidth="0.5" />
       ))}
-      <polygon points={poligono} fill="#7F77DD" fillOpacity="0.3" stroke="#534AB7" strokeWidth="1.5" />
+      <polygon points={poligono} className="fill-primary/20 stroke-primary/70" strokeWidth="1.5" />
       {puntosValor.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="4" fill="#534AB7" />
+        <circle key={i} cx={p.x} cy={p.y} r="4" className="fill-primary/80" />
       ))}
       {etiquetas.map((e, i) => (
         <g key={i}>
-          <text className="th" x={e.lx} y={e.ly - 6} textAnchor={e.anchor} fill="var(--text-primary)" fontSize="14" fontWeight={500}>
+          <text className="th fill-primary/80" x={e.lx} y={e.ly - 6} textAnchor={e.anchor} fontSize="14" fontWeight={500}>
             {e.label}
           </text>
-          <text className="ts" x={e.lx} y={e.ly + 10} textAnchor={e.anchor} fill="var(--text-secondary)" fontSize="12">
+          <text className="ts fill-primary/45" x={e.lx} y={e.ly + 10} textAnchor={e.anchor} fontSize="12">
             {e.value.toFixed(2)}
           </text>
         </g>
       ))}
     </svg>
+  );
+}
+
+/** Fila de stat cards para magnitudes sin rango 0..1 real (Masa, Volumen,
+ *  Densidad, Energía de enlace): la propia propiedadesCalculadasDeCompuesto
+ *  las documenta como "no es un índice 0–1" — no tienen techo conceptual,
+ *  así que dibujar una barra/gauge relleno inventaría una proporción falsa.
+ *  Solo número destacado, sin relleno proporcional. */
+function FilaStatCards({ items }: { items: { label: string; valor: string }[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {items.map((it) => (
+        <div key={it.label} className="rounded-lg bg-primary/[0.04] p-4">
+          <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{it.label}</p>
+          <p className="mt-1.5 text-lg font-black text-primary/85">{it.valor}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -513,6 +536,28 @@ function EmptyRow({ children }: { children: React.ReactNode }) {
 
 
 // ─── Valores derivados reales: tarjeta reusable para Material/Estructura/Compuesto ──
+//
+// VIS-25: mismo lenguaje visual del radar de Perfil reactivo. Cada
+// propiedad con rango_min/rango_max real (nunca inventado) se normaliza
+// 0..1 contra SU PROPIO rango y entra al polígono — a diferencia de
+// Perfil reactivo, acá los rangos no son necesariamente todos 0..1, así
+// que la normalización vive acá, no en el compuesto. Las que no traen
+// rango se listan aparte como tarjetas simples (mismo criterio que las
+// magnitudes libres de FilaStatCards). El ícono "i" abre la fórmula real
+// vía title nativo — sin inventar el cálculo, solo mostrando lo que ya
+// trae Supabase en propiedades_derivadas.formula.
+
+function IconoFormula({ formula }: { formula: string | null }) {
+  if (!formula) return null;
+  return (
+    <span
+      title={formula}
+      className="inline-flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full border border-primary/25 text-primary/45 hover:border-primary/45 hover:text-primary/70"
+    >
+      <Info size={10} strokeWidth={2.5} />
+    </span>
+  );
+}
 
 function TarjetaValoresDerivados({
   tipo,
@@ -534,50 +579,58 @@ function TarjetaValoresDerivados({
       </EmptyRow>
     );
 
-  return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {items.map((v) => {
-        // Barra proporcional real: solo se dibuja si Supabase trae rango_min
-        // y rango_max para esta propiedad (nunca se inventa un rango 0..1
-        // por defecto — si no viene, se muestra el número plano nomás,
-        // igual que antes).
-        const { rango_min, rango_max } = v.propiedad;
-        const tieneRango = rango_min !== null && rango_max !== null && rango_max > rango_min;
-        const pct = tieneRango
-          ? Math.max(0, Math.min(1, (v.valor - (rango_min as number)) / ((rango_max as number) - (rango_min as number)))) * 100
-          : null;
+  const conRango = items.filter(
+    (v) => v.propiedad.rango_min !== null && v.propiedad.rango_max !== null && (v.propiedad.rango_max as number) > (v.propiedad.rango_min as number),
+  );
+  const sinRango = items.filter((v) => !conRango.includes(v));
 
-        return (
-          <div
-            key={v.id}
-            className="rounded-xl border border-primary/10 p-4"
-            title={v.propiedad.descripcion ?? undefined}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{v.propiedad.nombre}</p>
-              <span className="shrink-0 text-sm font-black tabular-nums text-primary/85">
-                {Number.isFinite(v.valor) ? v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }) : "—"}
+  const ejesRadar = conRango.map((v) => {
+    const min = v.propiedad.rango_min as number;
+    const max = v.propiedad.rango_max as number;
+    return { label: v.propiedad.nombre, value: Math.max(0, Math.min(1, (v.valor - min) / (max - min))) };
+  });
+
+  return (
+    <div className="space-y-6">
+      {conRango.length >= 3 ? (
+        <RadarPerfilReactivo values={ejesRadar} />
+      ) : conRango.length > 0 ? (
+        <MiniBarChart values={ejesRadar} />
+      ) : null}
+
+      {conRango.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {conRango.map((v) => (
+            <div key={v.id} className="flex items-center justify-between gap-2 rounded-lg bg-primary/[0.04] px-3 py-2">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-primary/60">
+                {v.propiedad.nombre}
+                <IconoFormula formula={v.propiedad.formula} />
+              </span>
+              <span className="shrink-0 text-xs font-black tabular-nums text-primary/85">
+                {v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 })}
               </span>
             </div>
-            {pct !== null ? (
-              <>
-                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-primary/10">
-                  <div className="h-full rounded-full bg-primary/60" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="mt-1 flex justify-between text-[9px] font-bold text-primary/30">
-                  <span>{rango_min}</span>
-                  <span>{rango_max}</span>
-                </div>
-              </>
-            ) : null}
-            {v.propiedad.formula ? (
-              <p className="mt-2.5 truncate text-xs font-bold text-primary/55" title={v.propiedad.formula}>
-                {v.propiedad.formula}
-              </p>
-            ) : null}
-          </div>
-        );
-      })}
+          ))}
+        </div>
+      ) : null}
+
+      {sinRango.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {sinRango.map((v) => (
+            <div key={v.id} className="rounded-xl border border-primary/10 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary/35">
+                  {v.propiedad.nombre}
+                  <IconoFormula formula={v.propiedad.formula} />
+                </span>
+                <span className="shrink-0 text-sm font-black tabular-nums text-primary/85">
+                  {Number.isFinite(v.valor) ? v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }) : "—"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3369,6 +3422,18 @@ function VisualizadorPage() {
                         if (ejesReactivos.length < 3) return <MiniBarChart values={ejesReactivos} />;
                         return <RadarPerfilReactivo values={ejesReactivos} />;
                       })()}
+                    </div>
+                    {/* Magnitudes libres del compuesto (Masa/Volumen/Densidad/
+                        Energía de enlace): no tienen rango 0..1 real, así que
+                        no calzan en el radar de arriba — se muestran aparte
+                        como stat cards sin barra proporcional inventada. */}
+                    <div className="mt-6 border-t border-primary/10 pt-5">
+                      <FilaStatCards
+                        items={["masa", "volumen", "densidad", "energia_enlace"]
+                          .map((clave) => compuestoPropiedades.find((p) => p.clave === clave))
+                          .filter((p): p is NonNullable<typeof p> => p !== undefined && p.valor !== null)
+                          .map((p) => ({ label: p.label, valor: p.valor as string }))}
+                      />
                     </div>
                     {/* Carga eléctrica (VIS-24) — vive acá, no en su propio
                         item de sidebar (pedido explícito): es un dato fijo
