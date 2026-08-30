@@ -29,6 +29,10 @@ export interface InspectorEntity {
   fields?: InspectorField[];
   /** Nota corta libre (ej. descripción, dominio). */
   note?: string | null;
+  /** Bloque libre adicional, debajo de los fields (ej. Ficha con pills,
+   *  Valores derivados reales) — el llamador decide qué renderizar; el
+   *  Inspector solo le da el espacio y el separador. */
+  extra?: React.ReactNode;
 }
 
 export function InspectorHoverCard({ entity }: { entity: InspectorEntity }) {
@@ -92,6 +96,10 @@ export function Inspector({
             </div>
           ))}
         </div>
+      ) : null}
+
+      {entity.extra ? (
+        <div className="mt-5 border-t border-primary/10 pt-4">{entity.extra}</div>
       ) : null}
     </div>
   );

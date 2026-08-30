@@ -114,7 +114,6 @@ type SectionKey =
   | "structure"
   | "compatibilidad"
   | "interaccion"
-  | "reactivity"
   | "information"
   | "oris"
   | "runas"
@@ -162,12 +161,11 @@ const navGroups: NavGroup[] = [
       { key: "ats", label: "Triángulo A/T/S", visId: "VIS-02", icon: <Orbit size={15} />, implementado: true },
       { key: "elementos_ruta", label: "Elementos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
       { key: "compuestos_ruta", label: "Compuestos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
-      { key: "reactivity", label: "Perfil Reactivo", visId: "VIS-22", icon: <FlaskConical size={15} />, implementado: true },
-      // "electric" (VIS-24 "Carga Eléctrica") retirado como item propio
-      // (pedido explícito): la carga es un dato fijo del compuesto, no una
-      // vista con recorrido/comparación propios — ahora vive dentro de
-      // Perfil Reactivo, reactiva al mismo selector de compuesto que ya
-      // tiene esa sección, en vez de duplicar un SelectDropdown aparte.
+      // "reactivity" (VIS-22 "Perfil Reactivo") y "electric" (VIS-24 "Carga
+      // Eléctrica") retirados como items propios del nav (pedido explícito):
+      // ambos leen el mismo compuesto ya seleccionado en "Compuestos", así
+      // que ahora viven directamente en el Inspector (panel de 280px) de
+      // esa vista, en vez de ser una sección aparte con su propio selector.
     ],
   },
   {
@@ -1863,6 +1861,18 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
     return { min: Math.min(...valores), max: Math.max(...valores) };
   }, [compuestoRoute.compuestos]);
 
+  // Rango real de carga entre TODOS los compuestos del catálogo — mismo
+  // criterio que rangoEnergiaEnlaceCompuestos de arriba, ahora para el
+  // MedidorCargaElectrica que vive en el Inspector de Compuestos (antes
+  // vivía en la sección "Perfil Reactivo", retirada del nav).
+  const rangoCargaCompuestos = useMemo(() => {
+    const valores = compuestoRoute.compuestos
+      .map((c) => c.carga)
+      .filter((v): v is number => v != null);
+    if (valores.length === 0) return null;
+    return { min: Math.min(...valores), max: Math.max(...valores) };
+  }, [compuestoRoute.compuestos]);
+
   useEffect(() => {
     setNodoSelId(null);
   }, [
@@ -2007,9 +2017,24 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
     }
     const c = compuestoRoute.compuestoSel;
     if (!c) return null;
-    const props = propiedadesCalculadasDeCompuesto(c).filter(
-      (p) => ["estabilidad", "rigidez", "flexibilidad"].includes(p.clave),
-    );
+    const todasLasProps = propiedadesCalculadasDeCompuesto(c);
+    const props = todasLasProps.filter((p) => ["estabilidad", "rigidez", "flexibilidad"].includes(p.clave));
+    // Perfil reactivo (radar/carga/magnitudes libres, ex sección "Perfil
+    // Reactivo" retirada del nav — pedido explícito) + Ficha + Valores
+    // derivados reales (ex bloques del panel de contenido de esa misma
+    // sección) ahora viven todos acá, dentro del Inspector del Compuesto
+    // seleccionado en "Compuestos". Nada se recalcula: mismos datos
+    // (propiedadesCalculadasDeCompuesto) y mismos componentes visuales.
+    const ejesReactivos = todasLasProps
+      .filter((p) => p.proporcion !== undefined)
+      .map((p) => ({ label: p.label, value: p.proporcion ?? 0 }));
+    const magnitudesLibres = ["masa", "volumen", "densidad", "energia_enlace"]
+      .map((clave) => todasLasProps.find((p) => p.clave === clave))
+      .filter((p): p is NonNullable<typeof p> => p !== undefined && p.valor !== null)
+      .map((p) => ({ label: p.label, valor: p.valor as string }));
+    const fichaProps = todasLasProps
+      .filter((p) => p.valor !== null && p.proporcion === undefined && p.clave !== "carga")
+      .slice(0, 6);
     // energia_enlace (columna real de "compuestos", misma fuente que VIS-23
     // "Energía de Enlace" en la sidebar) — no se muestra si el compuesto no
     // la tiene calculada, no se inventa un cero.
@@ -2027,8 +2052,67 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
         { label: "Enlaces reales", value: compuestoRoute.loadingEnlaces ? "cargando…" : compuestoRoute.enlaces.length },
         ...props.map((p) => ({ label: p.label, value: p.valor })),
       ],
+      extra: (
+        <div className="space-y-5">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Perfil reactivo</p>
+            <div className="mt-3">
+              {ejesReactivos.length === 0 ? (
+                <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
+              ) : ejesReactivos.length < 3 ? (
+                <MiniBarChart values={ejesReactivos} />
+              ) : (
+                <RadarPerfilReactivo values={ejesReactivos} />
+              )}
+            </div>
+          </div>
+          {c.carga != null ? (
+            <div className="border-t border-primary/10 pt-4">
+              <MedidorCargaElectrica valor={c.carga} rango={rangoCargaCompuestos} />
+            </div>
+          ) : null}
+          {magnitudesLibres.length > 0 ? (
+            <div className="border-t border-primary/10 pt-4">
+              <FilaStatCards items={magnitudesLibres} />
+            </div>
+          ) : null}
+          <div className="border-t border-primary/10 pt-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Ficha</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {c.tipo_compuesto ? <StatusPill>{c.tipo_compuesto}</StatusPill> : null}
+              {c.clasificacion ? <StatusPill>{c.clasificacion}</StatusPill> : null}
+              {c.estado ? <StatusPill>{c.estado}</StatusPill> : null}
+            </div>
+            {fichaProps.length > 0 ? (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {fichaProps.map((p) => (
+                  <div key={p.clave} className="rounded-lg border border-primary/10 p-2.5">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-primary/35">{p.label}</p>
+                    <p className="mt-1 text-xs font-black text-primary/75">{p.valor}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div className="border-t border-primary/10 pt-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">Valores derivados reales</p>
+            <div className="mt-3">
+              <TarjetaValoresDerivados tipo="compuesto" entidadId={c.id} entidadNombre={c.nombre} />
+            </div>
+          </div>
+        </div>
+      ),
     };
-  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute, elementoQuimicaClickeado, compuestoRoute, rangoEnergiaEnlaceCompuestos]);
+  }, [
+    particulaClickeada,
+    perspectiva,
+    fisicaRoute,
+    alquimiaRoute,
+    elementoQuimicaClickeado,
+    compuestoRoute,
+    rangoEnergiaEnlaceCompuestos,
+    rangoCargaCompuestos,
+  ]);
 
   // Trace: ruta ya resuelta, en el mismo orden que el modelo real — nunca
   // fusiona Física, Alquimia y Química en una sola secuencia. Si hay una
@@ -2925,12 +3009,6 @@ function VisualizadorPage() {
     if (valores.length === 0) return null;
     return { min: Math.min(...valores), max: Math.max(...valores) };
   }, [compuestos]);
-  const rangoCargaCompuestos = useMemo(() => {
-    const valores = compuestos.map((c) => c.carga).filter((v): v is number => v != null);
-    if (valores.length === 0) return null;
-    return { min: Math.min(...valores), max: Math.max(...valores) };
-  }, [compuestos]);
-
   const iumPorId = useMemo(() => {
     const mapa: Record<string, FilaIum> = {};
     for (const i of iums) {
@@ -2951,7 +3029,6 @@ function VisualizadorPage() {
   // Nota: "estructuraSel" (selector suelto del catálogo de Estructuras) se
   // retiró — VIS-10 ahora selecciona por Material (materialSel) y resuelve
   // la Estructura vinculada desde ahí (ver MaterialEstructuraSection).
-  const [compuestoSel, setCompuestoSel] = useState<(typeof compuestos)[number] | null>(null);
   const [procesoSel, setProcesoSel] = useState<(typeof procesos)[number] | null>(null);
   const [runaSel, setRunaSel] = useState<(typeof runas)[number] | null>(null);
 
@@ -3021,9 +3098,6 @@ function VisualizadorPage() {
     if (!materialSel && materiales.length > 0) setMaterialSel(materiales[0]);
   }, [materiales, materialSel]);
   useEffect(() => {
-    if (!compuestoSel && compuestos.length > 0) setCompuestoSel(compuestos[0]);
-  }, [compuestos, compuestoSel]);
-  useEffect(() => {
     if (!procesoSel && procesos.length > 0) setProcesoSel(procesos[0]);
   }, [procesos, procesoSel]);
   useEffect(() => {
@@ -3050,16 +3124,11 @@ function VisualizadorPage() {
     [materialSel],
   );
 
-  const compuestoPropiedades = useMemo(
-    () => (compuestoSel ? propiedadesCalculadasDeCompuesto(compuestoSel) : []),
-    [compuestoSel],
-  );
-
   return (
     <main className="min-h-screen bg-[var(--bg-main)] text-primary">
       <div className="w-full py-8">
 
-        <div className={`grid gap-2 ${active === "reactivity" ? "lg:grid-cols-[280px_minmax(0,1fr)]" : "lg:grid-cols-[150px_minmax(0,1fr)]"}`}>
+        <div className="grid gap-2 lg:grid-cols-[150px_minmax(0,1fr)]">
           <aside className="p-0 lg:sticky lg:top-6 lg:self-start">
             <nav className="space-y-1">
               {navGroups.map((grupo) => {
@@ -3104,45 +3173,6 @@ function VisualizadorPage() {
                 );
               })}
             </nav>
-
-            {/* Perfil reactivo movido al sidebar (pedido explícito): vive
-                acá y no en el panel de contenido porque el usuario quiere
-                verlo siempre a la vista mientras navega Ficha/Valores
-                derivados del mismo compuesto, no como una vista aparte.
-                Solo se ensancha y muestra el radar cuando active ===
-                "reactivity" — el resto de las secciones no tienen
-                compuestoSel, así que no tiene sentido mostrar un radar
-                vacío ahí. */}
-            {active === "reactivity" ? (
-              <div className="mt-6 border-t border-primary/10 pt-5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">
-                  Perfil reactivo{compuestoSel ? ` · ${compuestoSel.nombre}` : ""}
-                </p>
-                <div className="mt-4">
-                  {(() => {
-                    const ejesReactivos = compuestoPropiedades
-                      .filter((p) => p.proporcion !== undefined)
-                      .map((p) => ({ label: p.label, value: p.proporcion ?? 0 }));
-                    if (ejesReactivos.length === 0) return <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>;
-                    if (ejesReactivos.length < 3) return <MiniBarChart values={ejesReactivos} />;
-                    return <RadarPerfilReactivo values={ejesReactivos} />;
-                  })()}
-                </div>
-                {compuestoSel?.carga != null ? (
-                  <div className="mt-6 border-t border-primary/10 pt-5">
-                    <MedidorCargaElectrica valor={compuestoSel.carga} rango={rangoCargaCompuestos} />
-                  </div>
-                ) : null}
-                <div className="mt-6 border-t border-primary/10 pt-5">
-                  <FilaStatCards
-                    items={["masa", "volumen", "densidad", "energia_enlace"]
-                      .map((clave) => compuestoPropiedades.find((p) => p.clave === clave))
-                      .filter((p): p is NonNullable<typeof p> => p !== undefined && p.valor !== null)
-                      .map((p) => ({ label: p.label, valor: p.valor as string }))}
-                  />
-                </div>
-              </div>
-            ) : null}
           </aside>
 
           <section className="min-w-0">
@@ -3418,52 +3448,6 @@ function VisualizadorPage() {
                 compuestos={compuestos}
                 estructuras={estructuras}
               />
-            ) : null}
-
-            {active === "reactivity" ? (
-              <>
-                {loadingCompuestos ? (
-                  <LoadingRow />
-                ) : (
-                  <SelectDropdown
-                    items={compuestos}
-                    active={compuestoSel}
-                    getKey={(c) => c.id}
-                    getLabel={(c) => c.nombre}
-                    onSelect={setCompuestoSel}
-                    placeholder="Seleccioná un compuesto…"
-                  />
-                )}
-                {/* Perfil reactivo (radar, magnitudes libres, carga eléctrica)
-                    vive ahora en el sidebar ensanchado — ver el bloque debajo
-                    del <nav> más arriba en este mismo archivo. Acá solo queda
-                    Ficha y Valores derivados reales. */}
-                <div className="mt-8 rounded-2xl p-7">
-                  <p className="text-xs font-black text-primary/80">Ficha</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {compuestoSel?.tipo_compuesto ? <StatusPill>{compuestoSel.tipo_compuesto}</StatusPill> : null}
-                    {compuestoSel?.clasificacion ? <StatusPill>{compuestoSel.clasificacion}</StatusPill> : null}
-                    {compuestoSel?.estado ? <StatusPill>{compuestoSel.estado}</StatusPill> : null}
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-3">
-                    {compuestoPropiedades
-                      .filter((p) => p.valor !== null && p.proporcion === undefined && p.clave !== "carga")
-                      .slice(0, 6)
-                      .map((p) => (
-                        <div key={p.clave} className="rounded-lg border border-primary/10 p-3">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{p.label}</p>
-                          <p className="mt-1 font-black text-primary/75">{p.valor}</p>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-                <div className="mt-8 rounded-2xl p-7">
-                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
-                  <div className="mt-4">
-                    <TarjetaValoresDerivados tipo="compuesto" entidadId={compuestoSel?.id ?? null} entidadNombre={compuestoSel?.nombre} />
-                  </div>
-                </div>
-              </>
             ) : null}
 
             {active === "information" ? (
