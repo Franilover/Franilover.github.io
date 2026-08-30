@@ -304,9 +304,21 @@ export function propiedadesCalculadasDeElemento(el: Elemento): PropiedadCalculad
     { clave: "dinamismo_particular", label: "Dinamismo", valor: fmt(el.dinamismo_particular, 2), descripcion: "Magnitud combinada de dinámica/transformación/interacción — usada como base de duración de procesos.", formula: "Dinamismo = combinación de dinámica + transformación + interacción de la capa externa" },
     { clave: "valencia_estructural", label: "Valencia estructural", valor: fmt(el.valencia_estructural, 0), descripcion: "Cantidad de enlaces que puede sostener estructuralmente.", formula: "Valencia = mín(ocupación, capacidad externa − ocupación, capacidad externa / 2)" },
     { clave: "capacidad_enlace", label: "Capacidad de enlace", valor: fmt(el.capacidad_enlace), proporcion: prop(el.capacidad_enlace), descripcion: "Qué tan disponible está para formar enlaces nuevos.", formula: "Cap. de enlace = valencia / (capacidad externa / 2)" },
-    { clave: "polaridad_estructural", label: "Polaridad estructural", valor: fmt(el.polaridad_estructural), descripcion: "Desbalance direccional de su estructura de enlace.", formula: "Polaridad = |2 · saturación externa − 1|" },
     { clave: "saturacion_enlace", label: "Saturación de enlace", valor: fmt(el.saturacion_enlace), proporcion: prop(el.saturacion_enlace), descripcion: "Qué tan cerca está de agotar su capacidad de enlace.", formula: "Saturación de enlace = sitios de enlace usados / sitios de enlace disponibles" },
     { clave: "regimen_estructural", label: "Régimen estructural", valor: el.regimen_estructural ?? null, descripcion: "Clasificación estructural derivada (ej. equilibrio).", formula: "Catálisis > Transición → conservación · Catálisis = Transición → equilibrio · Transición > Catálisis → transformación" },
+
+    // ─── Sitios, afinidades y enlaces posibles (columnas reales en
+    // Supabase, pobladas en las 67 filas, que no se mostraban en ningún
+    // editor/visualizador hasta ahora — ver auditoría 2026-08-30). No se
+    // incluye disponibilidad_enlace ni capacidad_enlace_bruta: ambas están
+    // en 0 en el 100% de las filas actuales (sin implementar todavía en el
+    // motor de cálculo), mostrarlas sería ruido de ceros sin significado.
+    { clave: "afinidad_enlace", label: "Afinidad de enlace", valor: fmt(el.afinidad_enlace), proporcion: prop(el.afinidad_enlace), descripcion: "Qué tan bien conecta el elemento con otros al formar enlaces.", formula: "Afinidad de enlace = (afinidad de enlace + interacción del elemento) / 2" },
+    { clave: "disponibilidad_sitios", label: "Sitios disponibles", valor: fmt(el.disponibilidad_sitios), proporcion: prop(el.disponibilidad_sitios), descripcion: "Proporción de sitios de enlace todavía libres para nuevos enlaces." },
+    { clave: "sitios_enlace_externos", label: "Sitios de enlace externos", valor: fmt(el.sitios_enlace_externos, 0), descripcion: "Cantidad de sitios de enlace disponibles en la capa externa." },
+    { clave: "capacidad_externa_enlace", label: "Capacidad externa de enlace", valor: fmt(el.capacidad_externa_enlace), proporcion: prop(el.capacidad_externa_enlace), descripcion: "Qué tan preparada está la capa externa para sostener enlaces nuevos." },
+    { clave: "selectividad_enlace", label: "Selectividad de enlace", valor: fmt(el.selectividad_enlace), proporcion: prop(el.selectividad_enlace), descripcion: "Qué tan exigente es el elemento al aceptar enlaces nuevos." },
+    { clave: "polaridad_estructural", label: "Polaridad estructural", valor: fmt(el.polaridad_estructural), proporcion: prop(el.polaridad_estructural), descripcion: "Desbalance direccional de su estructura de enlace.", formula: "Polaridad = |2 · saturación externa − 1|" },
   ];
 }
 
