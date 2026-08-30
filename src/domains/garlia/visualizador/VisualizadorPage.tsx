@@ -1985,6 +1985,189 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
 }
 
 /**
+ * EnlaceLinea — la "anatomía del enlace" del docx (Parte 6, sección 5):
+ * una línea A═══════B cuyo grosor y opacidad son proporcionales al dato
+ * real de intensidad (0..1) — nunca decorativa. Sin dato, se dibuja en su
+ * grosor mínimo (nunca se inventa una intensidad media).
+ *
+ * La ligera onda cuando estabilidad es baja (docx sección 6: "estable" =
+ * línea recta, "inestable" ≋≋≋) se logra con un <path> ondulado en vez de
+ * una <line> recta — el grado de ondulación es proporcional a
+ * (1 - estabilidad), nunca una animación de temblor porque el docx pide
+ * explícitamente "no representar inestabilidad si el motor no tiene ese
+ * concepto" (sección 6): si no hay dato de estabilidad, se dibuja recta.
+ */
+function EnlaceLinea({
+  intensidad,
+  estabilidad,
+  labelA,
+  labelB,
+}: {
+  intensidad: number | null;
+  estabilidad: number | null;
+  labelA: string;
+  labelB: string;
+}) {
+  const grosor = 1.5 + (intensidad ?? 0) * 7; // 1.5px..8.5px
+  const amplitudOnda = estabilidad != null ? (1 - Math.max(0, Math.min(1, estabilidad))) * 10 : 0;
+  const w = 320;
+  const h = 60;
+  const midY = h / 2;
+  const path =
+    amplitudOnda > 0.5
+      ? `M 40 ${midY} Q ${w / 4} ${midY - amplitudOnda} ${w / 2} ${midY} T ${w - 40} ${midY}`
+      : `M 40 ${midY} L ${w - 40} ${midY}`;
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-sm" style={{ height: h }}>
+      <path
+        d={path}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={grosor}
+        strokeLinecap="round"
+        className="text-primary/70"
+      />
+      <circle cx={40} cy={midY} r={7} className="fill-current text-primary/85" />
+      <circle cx={w - 40} cy={midY} r={7} className="fill-current text-primary/85" />
+      <text x={40} y={midY - 16} textAnchor="middle" className="fill-current text-[11px] font-black text-primary/70">
+        {labelA}
+      </text>
+      <text x={w - 40} y={midY - 16} textAnchor="middle" className="fill-current text-[11px] font-black text-primary/70">
+        {labelB}
+      </text>
+    </svg>
+  );
+}
+
+/** Barra de bloques (docx sección 5: "INTENSIDAD ██████████████░░"), más
+ *  fiel al diseño que una barra lisa — cada bloque relleno representa un
+ *  décimo del valor 0..1 real. */
+function BarraBloques({ label, value }: { label: string; value: number }) {
+  const llenos = Math.round(Math.max(0, Math.min(1, value)) * 10);
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-primary/45">
+        <span>{label}</span>
+        <span className="tabular-nums">{value.toFixed(2)}</span>
+      </div>
+      <div className="flex gap-0.5">
+        {Array.from({ length: 10 }, (_, i) => (
+          <div key={i} className={`h-3 flex-1 rounded-sm ${i < llenos ? "bg-primary/70" : "bg-primary/10"}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * EnlaceContextoCanvas — el mismo StructureCanvas orbital de "Compuestos"
+ * (columns/edges con weight=intensidad real), pero sin los controles de
+ * UI de RutaCompuestoCanvas (selector de compuesto, modo Ciencia,
+ * Comparar) — para usarlo como panel de "contexto estructural" dentro de
+ * EnlaceSection (docx sección 10: el enlace dentro de un compuesto, resto
+ * atenuado) sin duplicar controles que EnlaceSection ya tiene los suyos.
+ * Misma lógica de armado de nodos/edges que RutaCompuestoCanvas — se
+ * repite acá en vez de exportarla porque son ~25 líneas y mantenerlas
+ * como un hook aparte agregaría una capa de indirección para un solo uso.
+ */
+function EnlaceContextoCanvas({
+  route,
+  highlightedNodeIds,
+}: {
+  route: ReturnType<typeof useCompuestoRoute>;
+  highlightedNodeIds: string[];
+}) {
+  const { compuestoSel, componentes, enlaces } = route;
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
+  const elementoNodos = useMemo(() => {
+    const nodos: { id: string; elementoId: string; label: string; sublabel?: string }[] = [];
+    for (const { elemento, cantidad } of componentes) {
+      for (let rep = 0; rep < cantidad; rep++) {
+        nodos.push({
+          id: `elemento-${elemento.id}-${rep}`,
+          elementoId: elemento.id,
+          label: elemento.nombre,
+          sublabel: elemento.simbolo,
+        });
+      }
+    }
+    return nodos;
+  }, [componentes]);
+
+  const primeraInstanciaPorElemento = useMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const n of elementoNodos) {
+      if (!mapa.has(n.elementoId)) mapa.set(n.elementoId, n.id);
+    }
+    return mapa;
+  }, [elementoNodos]);
+
+  const columns: CanvasColumn[] = useMemo(() => {
+    if (!compuestoSel) return [];
+    const nodosElementos = elementoNodos.map((n) => ({
+      id: n.id,
+      label: n.label,
+      sublabel: n.sublabel,
+      hideBorder: true,
+      visual: (
+        <AtomoVisual
+          elemento={componentes.find((c) => c.elemento.id === n.elementoId)!.elemento}
+          className="w-full aspect-square h-auto"
+        />
+      ),
+    }));
+    const compuestoNodo = {
+      id: `compuesto-${compuestoSel.id}`,
+      label: compuestoSel.nombre,
+      sublabel: compuestoSel.simbolo ?? compuestoSel.tipo_compuesto ?? undefined,
+      tone: "accent" as const,
+      hideBorder: true,
+      visual: (
+        <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-primary/40 bg-[color-mix(in_srgb,var(--primary)_6%,transparent)]">
+          <span className="text-lg font-black text-primary/85">
+            {compuestoSel.simbolo ?? compuestoSel.nombre.slice(0, 3).toUpperCase()}
+          </span>
+        </div>
+      ),
+    };
+    return [
+      { id: "elementos", label: "Elementos", nodes: nodosElementos },
+      { id: "compuesto", label: "Compuesto", nodes: [compuestoNodo] },
+    ];
+  }, [compuestoSel, elementoNodos, componentes]);
+
+  const edges: CanvasEdge[] = useMemo(() => {
+    if (!compuestoSel) return [];
+    const out: CanvasEdge[] = [];
+    for (const enlace of enlaces) {
+      const nodoA = primeraInstanciaPorElemento.get(enlace.elemento_a_id);
+      const nodoB = primeraInstanciaPorElemento.get(enlace.elemento_b_id);
+      if (!nodoA || !nodoB) continue;
+      out.push({ fromNodeId: nodoA, toNodeId: nodoB, weight: enlace.intensidad ?? undefined });
+    }
+    return out;
+  }, [compuestoSel, enlaces, primeraInstanciaPorElemento]);
+
+  if (!compuestoSel) return null;
+
+  return (
+    <div className="rounded-2xl p-5">
+      <StructureCanvas
+        columns={columns}
+        edges={edges}
+        selectedNodeId={null}
+        onHoverNode={setHoverId}
+        onSelectNode={() => {}}
+        highlightedNodeIds={hoverId ? [hoverId] : highlightedNodeIds}
+        centerScaleExtra={1.3}
+      />
+    </div>
+  );
+}
+
+/**
  * EnlaceSection — VIS-19 "El Enlace".
  *
  * El enlace es el protagonista: se elige un Compuesto para ubicar sus
@@ -1992,7 +2175,9 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
  * inspeccionar su anatomía (A ↔ B, estado, intensidad/estabilidad/
  * reversibilidad/confianza — todo proporcional al dato real, nunca
  * decorativo). El resto del compuesto queda atenuado detrás, dando
- * contexto sin competir con el enlace activo.
+ * contexto sin competir con el enlace activo (docx sección 10: "el enlace
+ * dentro de un compuesto" — reusa RutaCompuestoCanvas/StructureCanvas con
+ * highlightedNodeIds en vez de duplicar el canvas).
  */
 function EnlaceSection() {
   const route = useEnlaceRoute();
@@ -2013,6 +2198,16 @@ function EnlaceSection() {
 
   const labelEnlace = (e: EnlaceResuelto) =>
     `${e.elementoA?.simbolo ?? "?"} ↔ ${e.elementoB?.simbolo ?? "?"}`;
+
+  // Nodos del enlace activo dentro del canvas del compuesto (docx sección
+  // 10 — "el enlace dentro de un compuesto, resto atenuado"). Mismo
+  // criterio de "primera instancia" que usa RutaCompuestoCanvas
+  // internamente (compuesto_enlaces no distingue instancia cuando
+  // cantidad > 1 — no se inventa a cuál de las N corresponde).
+  const highlightedNodeIds = useMemo(() => {
+    if (!enlaceSel) return [];
+    return [`elemento-${enlaceSel.elemento_a_id}-0`, `elemento-${enlaceSel.elemento_b_id}-0`];
+  }, [enlaceSel]);
 
   return (
     <div className="grid gap-7 lg:grid-cols-[0.65fr_1.35fr]">
@@ -2076,39 +2271,62 @@ function EnlaceSection() {
       </div>
 
       {/* Anatomía del enlace activo (+ comparación si está activada) */}
-      <div className={`grid gap-7 ${compararActivo ? "sm:grid-cols-2" : ""}`}>
-        {[enlaceSel, ...(compararActivo ? [enlaceCompararSel] : [])].map((e, i) => (
-          <div key={e?.id ?? `vacio-${i}`}>
-            {!e ? (
-              <EmptyRow>{i === 0 ? "Seleccioná un enlace para inspeccionarlo." : "Elegí un segundo enlace para comparar."}</EmptyRow>
-            ) : (
-              <>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/35">Anatomía del enlace</p>
-                <p className="mt-2 text-2xl font-black text-primary/85">
-                  {e.elementoA?.nombre ?? "?"} <span className="text-primary/30">↔</span> {e.elementoB?.nombre ?? "?"}
-                </p>
-                <p className="mt-1 text-xs font-bold text-primary/40">
-                  {e.elementoA?.simbolo ?? "?"} ↔ {e.elementoB?.simbolo ?? "?"}
-                  {e.estado ? <span className="ml-2 text-primary/30">· {e.estado}</span> : null}
-                </p>
+      <div>
+        <div className={`grid gap-7 ${compararActivo ? "sm:grid-cols-2" : ""}`}>
+          {[enlaceSel, ...(compararActivo ? [enlaceCompararSel] : [])].map((e, i) => (
+            <div key={e?.id ?? `vacio-${i}`}>
+              {!e ? (
+                <EmptyRow>{i === 0 ? "Seleccioná un enlace para inspeccionarlo." : "Elegí un segundo enlace para comparar."}</EmptyRow>
+              ) : (
+                <>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/35">Anatomía del enlace</p>
 
-                <div className="mt-6">
-                  {anatomiaValues(e).length > 0 ? (
-                    <MiniBarChart values={anatomiaValues(e)} />
-                  ) : (
-                    <EmptyRow>Sin datos de anatomía calculados todavía para este enlace.</EmptyRow>
-                  )}
-                </div>
+                  <div className="mt-4">
+                    <EnlaceLinea
+                      intensidad={e.intensidad}
+                      estabilidad={e.estabilidad}
+                      labelA={e.elementoA?.simbolo ?? "?"}
+                      labelB={e.elementoB?.simbolo ?? "?"}
+                    />
+                  </div>
 
-                {e.coste_energetico != null ? (
-                  <p className="mt-5 text-[11px] font-bold text-primary/45">
-                    Coste energético: <span className="text-primary/70">{e.coste_energetico}</span>
+                  <p className="mt-2 text-lg font-black text-primary/85">
+                    {e.elementoA?.nombre ?? "?"} <span className="text-primary/30">↔</span> {e.elementoB?.nombre ?? "?"}
                   </p>
-                ) : null}
-              </>
-            )}
+                  {e.estado ? <p className="mt-1 text-xs font-bold text-primary/40">{e.estado}</p> : null}
+
+                  <div className="mt-6 space-y-4">
+                    {e.intensidad != null ? <BarraBloques label="Intensidad" value={e.intensidad} /> : null}
+                    {e.estabilidad != null ? <BarraBloques label="Estabilidad" value={e.estabilidad} /> : null}
+                    {e.reversibilidad != null ? <BarraBloques label="Reversibilidad" value={e.reversibilidad} /> : null}
+                    {e.confianza != null ? <BarraBloques label="Confianza" value={e.confianza} /> : null}
+                    {anatomiaValues(e).length === 0 ? (
+                      <EmptyRow>Sin datos de anatomía calculados todavía para este enlace.</EmptyRow>
+                    ) : null}
+                  </div>
+
+                  {e.coste_energetico != null ? (
+                    <p className="mt-5 text-[11px] font-bold text-primary/45">
+                      Coste energético: <span className="text-primary/70">{e.coste_energetico}</span>
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Contexto estructural (docx sección 10): el enlace dentro del
+            compuesto completo, resto atenuado — reusa RutaCompuestoCanvas
+            en vez de duplicar el canvas orbital. */}
+        {enlaceSel && !compararActivo ? (
+          <div className="mt-10">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/35">Contexto estructural</p>
+            <div className="mt-3">
+              <EnlaceContextoCanvas route={compuestoRoute} highlightedNodeIds={highlightedNodeIds} />
+            </div>
           </div>
-        ))}
+        ) : null}
       </div>
     </div>
   );
