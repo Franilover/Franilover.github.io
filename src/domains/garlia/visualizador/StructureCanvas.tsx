@@ -94,6 +94,14 @@ export interface StructureCanvasProps {
    *  undefined, comportamiento actual sin cambios: solo se anima al
    *  cambiar de centro real). */
   replayToken?: string | number;
+  /** Si es true, el canvas usa todo el ancho disponible del contenedor
+   *  padre (respetando aspect-ratio 1:1) en vez de limitarse al tamaño en
+   *  px calculado internamente (`maxWidth: size`). Pensado para vistas con
+   *  pocos/ningún anillo orbitante — ej. Alquimia, un solo nodo central —
+   *  donde `size` da un valor chico que no tiene relación con el espacio
+   *  real disponible en el layout. Default false — no cambia el
+   *  comportamiento de canvases existentes con varios anillos. */
+  fillWidth?: boolean;
 }
 
 const CENTER_R = 48; // radio del nodo central (el "centro de gravedad"). Subido
@@ -138,6 +146,7 @@ export function StructureCanvas({
   nodeScale = 1,
   centerScaleExtra = 1,
   replayToken,
+  fillWidth = false,
 }: StructureCanvasProps) {
   const [hoverId, setHoverId] = useState<string | null>(null);
 
@@ -282,7 +291,16 @@ export function StructureCanvas({
     // quedaba recortado por el viewBox — por eso "algunos no se muestran".
     const nodeOuterMargin = orbitNodeR + 40; // radio del nodo + espacio para 2 líneas de texto
     const maxRadius = orbitLevels.length > 0 ? outerRingRadius : 0;
-    const totalSize = PAD * 2 + maxRadius * 2 + nodeOuterMargin * 2;
+    // Cuando no hay anillos (ej. Alquimia: un solo nodo central sin
+    // orbitantes), el tamaño total se calculaba con orbitNodeR — el radio
+    // de un nodo ORBITANTE que en este caso no existe — dejando un
+    // viewBox/maxWidth fijo y chico (~240px) que no reflejaba el tamaño
+    // real del centro (que puede ser bastante más grande por
+    // centerScaleExtra) ni aprovechaba el ancho disponible del canvas.
+    // Ahora el margen exterior considera también el radio real del nodo
+    // central, para que el lienzo escale con él en vez de quedar fijo.
+    const centerOuterMargin = centerR + 40;
+    const totalSize = PAD * 2 + Math.max(maxRadius * 2 + nodeOuterMargin * 2, centerOuterMargin * 2);
 
     // Coordenadas absolutas centradas en el canvas.
     const cx = totalSize / 2;
@@ -323,7 +341,10 @@ export function StructureCanvas({
   const transitionAll = "transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease";
 
   return (
-    <div className={`w-full ${className ?? ""}`} style={{ aspectRatio: "1 / 1", maxWidth: size }}>
+    <div
+      className={`w-full ${className ?? ""}`}
+      style={{ aspectRatio: "1 / 1", maxWidth: fillWidth ? undefined : size }}
+    >
       <svg
         viewBox={`0 0 ${size} ${size}`}
         width="100%"

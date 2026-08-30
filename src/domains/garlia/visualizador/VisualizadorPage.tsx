@@ -639,7 +639,15 @@ function RutaAlquimiaCanvas({
               highlightedNodeIds={hoverId ? [hoverId] : []}
               // Sin orbitantes alrededor: el nodo central puede verse más
               // grande, mismo patrón que el Oris en Física (centerScaleExtra).
-              centerScaleExtra={1.6}
+              // Subido de 1.6 a 2.2 — junto con fillWidth (canvas a todo el
+              // ancho disponible), el átomo llena mejor el espacio en vez de
+              // verse como un punto chico rodeado de mucho vacío.
+              centerScaleExtra={2.2}
+              // Sin anillos, el tamaño interno calculado (size) queda chico
+              // y no tiene relación con el espacio real del layout — se deja
+              // que el canvas ocupe todo el ancho disponible del contenedor
+              // en vez de limitarse a ese valor fijo.
+              fillWidth
             />
           </div>
         </>
