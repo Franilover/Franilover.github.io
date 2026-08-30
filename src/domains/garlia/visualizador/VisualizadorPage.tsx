@@ -11,7 +11,11 @@ import {
   GitBranch,
   Layers3,
   Orbit,
+  Pause,
+  Play,
   Radio,
+  RotateCcw,
+  SkipForward,
   Sparkles,
   Waypoints,
   Workflow,
@@ -72,6 +76,7 @@ import {
   type NodoCompatibilidad,
   type VecinoCompatibilidad,
 } from "./routes/useCompatibilidadRoute";
+import { useInteraccionRoute } from "./routes/useInteraccionRoute";
 import { CompatibilidadNetwork } from "./CompatibilidadNetwork";
 import { contarLetrasNodo } from "./NodeVisuals";
 // AtomoVisual: el gráfico REAL y completo de un Elemento (núcleo + capa
@@ -97,6 +102,7 @@ type SectionKey =
   | "material"
   | "structure"
   | "compatibilidad"
+  | "interaccion"
   | "reactivity"
   | "energy"
   | "electric"
@@ -113,6 +119,7 @@ const navItems: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
   { key: "material", label: "Material", icon: <Atom size={15} /> },
   { key: "structure", label: "Estructura", icon: <GitBranch size={15} /> },
   { key: "compatibilidad", label: "Compatibilidad", icon: <Waypoints size={15} /> },
+  { key: "interaccion", label: "Interacción", icon: <Play size={15} /> },
   { key: "reactivity", label: "Reactividad", icon: <FlaskConical size={15} /> },
   { key: "energy", label: "Energía", icon: <BarChart3 size={15} /> },
   { key: "electric", label: "Electricidad", icon: <Zap size={15} /> },
@@ -1377,6 +1384,216 @@ function CompatibilidadSection() {
   );
 }
 
+function InteraccionSection() {
+  // VIS-05 — visualizador_estado orden 5: "¿Qué ocurre cuando dos entidades
+  // interactúan?". Envuelve el Sandbox real (sandbox/useSandbox.ts) vía
+  // useInteraccionRoute — el frontend no calcula ni simula nada acá, solo
+  // visualiza eventos/entidades/estado ya resueltos por el motor.
+  const route = useInteraccionRoute();
+
+  const timelineOrdenada = useMemo(
+    () => [...route.eventosResueltos].sort((a, b) => a.evento.tiempo_programado - b.evento.tiempo_programado),
+    [route.eventosResueltos],
+  );
+
+  const [entidadParaDisparo, setEntidadParaDisparo] = useState<string>("");
+  const [eventoParaDisparo, setEventoParaDisparo] = useState<string>("");
+
+  return (
+    <>
+      {route.loading ? (
+        <LoadingRow />
+      ) : route.empty ? (
+        <EmptyRow>
+          No hay simulaciones de Sandbox activas todavía — creá una desde la sección Sandbox para poder ver
+          interacciones acá.
+        </EmptyRow>
+      ) : null}
+
+      {!route.loading && route.simulaciones.length > 0 ? (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SelectDropdown
+              items={route.simulaciones}
+              active={route.simulaciones.find((s) => s.id === route.simulacionId) ?? null}
+              getKey={(s) => s.id}
+              getLabel={(s) => s.nombre}
+              onSelect={(s) => route.setSimulacionId(s.id)}
+              placeholder="Seleccioná una simulación…"
+            />
+            <div className="flex items-center gap-2">
+              <StatusPill>t={route.tiempoSimulado ?? "—"}</StatusPill>
+              <button
+                type="button"
+                onClick={() => route.play()}
+                disabled={route.ejecutandoAccion}
+                className="rounded-full border border-primary/15 p-2 text-primary/60 transition-colors hover:border-primary/30 hover:text-primary/90 disabled:opacity-40"
+                title="Play"
+              >
+                <Play size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => route.pause()}
+                disabled={route.ejecutandoAccion}
+                className="rounded-full border border-primary/15 p-2 text-primary/60 transition-colors hover:border-primary/30 hover:text-primary/90 disabled:opacity-40"
+                title="Pause"
+              >
+                <Pause size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => route.step()}
+                disabled={route.ejecutandoAccion}
+                className="rounded-full border border-primary/15 p-2 text-primary/60 transition-colors hover:border-primary/30 hover:text-primary/90 disabled:opacity-40"
+                title="Step"
+              >
+                <SkipForward size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => route.reset()}
+                disabled={route.ejecutandoAccion}
+                className="rounded-full border border-primary/15 p-2 text-primary/60 transition-colors hover:border-primary/30 hover:text-primary/90 disabled:opacity-40"
+                title="Reset"
+              >
+                <RotateCcw size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-5 lg:grid-cols-[2.8fr_0.72fr]">
+            <div className="space-y-5">
+              {/* Timeline (docx: "timeline, nodos causales, log") — cada
+                  evento es clickeable, fija cuál cadena se ve en el
+                  Inspector/TraceView de la derecha. */}
+              <div className="overflow-x-auto rounded-2xl p-5">
+                <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-primary/35">Timeline de eventos</p>
+                {timelineOrdenada.length === 0 ? (
+                  <EmptyRow>Esta simulación todavía no tiene eventos encolados.</EmptyRow>
+                ) : (
+                  <div className="flex min-w-[560px] flex-wrap gap-2">
+                    {timelineOrdenada.map((ev) => {
+                      const selected = route.eventoSelId === ev.evento.id;
+                      return (
+                        <button
+                          key={ev.evento.id}
+                          type="button"
+                          onClick={() => route.setEventoSelId(ev.evento.id)}
+                          className={`rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                            selected ? "border-primary/40" : "border-primary/10 hover:border-primary/25"
+                          }`}
+                        >
+                          <p className="text-[9px] font-black uppercase tracking-widest text-primary/35">
+                            t={ev.evento.tiempo_programado}
+                          </p>
+                          <p className="mt-0.5 text-xs font-black text-primary/85">
+                            {ev.catalogo?.nombre ?? ev.evento.evento_id.slice(0, 8)}
+                          </p>
+                          <p
+                            className={`mt-0.5 text-[10px] font-bold ${
+                              ev.evento.estado === "procesado" ? "text-primary/60" : "text-primary/35"
+                            }`}
+                          >
+                            {ev.evento.estado}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Cadena causal completa del evento seleccionado (docx
+                  "trace causal") — sigue evento_origen_id hacia atrás. Un
+                  solo eslabón es válido (no todo evento tiene origen). */}
+              {route.cadenaCausal.length > 1 ? (
+                <div className="rounded-2xl p-5">
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-primary/35">
+                    Cadena causal
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-primary/55">
+                    {[...route.cadenaCausal].reverse().map((ev, i, arr) => (
+                      <React.Fragment key={ev.id}>
+                        <span className={ev.id === route.eventoSel?.evento.id ? "text-primary/90" : undefined}>
+                          {route.catalogoEventos.find((c) => c.id === ev.evento_id)?.nombre ?? ev.evento_id.slice(0, 8)}
+                        </span>
+                        {i < arr.length - 1 ? <ChevronRight size={12} className="text-primary/25" /> : null}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Disparar evento (docx "click evento, inspector") — mismo
+                  RPC que ya usa SandboxPage, encolar_evento_sandbox vía
+                  route.dispararEvento. */}
+              <div className="rounded-2xl p-5">
+                <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-primary/35">
+                  Disparar evento
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                  <SelectDropdown
+                    items={route.entidades}
+                    active={route.entidades.find((e) => e.id === entidadParaDisparo) ?? null}
+                    getKey={(e) => e.id}
+                    getLabel={(e) => e.entidad_tipo}
+                    onSelect={(e) => setEntidadParaDisparo(e.id)}
+                    placeholder="Entidad…"
+                  />
+                  <SelectDropdown
+                    items={route.catalogoEventos}
+                    active={route.catalogoEventos.find((e) => e.id === eventoParaDisparo) ?? null}
+                    getKey={(e) => e.id}
+                    getLabel={(e) => e.nombre}
+                    onSelect={(e) => setEventoParaDisparo(e.id)}
+                    placeholder="Evento…"
+                  />
+                  <button
+                    type="button"
+                    disabled={!entidadParaDisparo || !eventoParaDisparo}
+                    onClick={() => {
+                      route.dispararEvento({ eventoId: eventoParaDisparo, entidadId: entidadParaDisparo });
+                      setEventoParaDisparo("");
+                    }}
+                    className="rounded-full border border-primary/15 px-3.5 py-2 text-[10px] font-black uppercase tracking-widest text-primary/55 transition-colors hover:border-primary/30 hover:text-primary/85 disabled:opacity-40"
+                  >
+                    Encolar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 lg:max-w-[280px]">
+              <div className="rounded-2xl p-5">
+                <TraceView steps={route.cadena} direction="down" />
+              </div>
+              {route.eventoSel ? (
+                <Inspector
+                  entity={{
+                    eyebrow: "Interacción",
+                    title: route.eventoSel.catalogo?.nombre ?? route.eventoSel.evento.evento_id,
+                    subtitle: route.eventoSel.catalogo?.categoria ?? undefined,
+                    note: route.eventoSel.catalogo?.descripcion ?? null,
+                    fields: [
+                      { label: "Estado", value: route.eventoSel.evento.estado },
+                      { label: "Sujeto", value: route.eventoSel.sujeto?.entidad_tipo ?? null },
+                      { label: "Objetivo", value: route.eventoSel.objetivo?.entidad_tipo ?? null },
+                      { label: "t. programado", value: route.eventoSel.evento.tiempo_programado },
+                      { label: "t. ejecutado", value: route.eventoSel.evento.ejecutado_at },
+                    ],
+                  }}
+                  bordered={false}
+                />
+              ) : null}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function RutasSection() {
   const [perspectiva, setPerspectiva] = useState<Perspectiva>("fisica");
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -1866,6 +2083,8 @@ function VisualizadorPage() {
             {active === "rutas" ? <RutasSection /> : null}
 
             {active === "compatibilidad" ? <CompatibilidadSection /> : null}
+
+            {active === "interaccion" ? <InteraccionSection /> : null}
 
             {active === "micro" ? (
               <>
