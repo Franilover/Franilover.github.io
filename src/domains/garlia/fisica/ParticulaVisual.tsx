@@ -89,6 +89,11 @@ export function ParticulaVisual({
   const cy = size / 2;
   const r = size / 2 - 2;
   const fontSize = size * 0.16;
+  // Grosor de borde relativo al tamaño (antes era un valor fijo en unidades
+  // SVG, así que a tamaños chicos —como en AtomoVisual, donde los círculos
+  // rondan 20-40px— se veía desproporcionadamente grueso comparado con los
+  // ~50-70px de IumVisual). Con piso bajo para que siga siendo visible.
+  const strokeW = Math.max(0.6, size * 0.02);
 
   return (
     <svg
@@ -105,7 +110,7 @@ export function ParticulaVisual({
             cx={cx}
             cy={cy}
             r={r}
-            strokeWidth={2}
+            strokeWidth={strokeW}
             style={{
               fill: letras[0] ? LETRA_COLOR[letras[0]].bg : "color-mix(in srgb, var(--primary) 10%, transparent)",
               stroke: letras[0] ? LETRA_COLOR[letras[0]].border : "var(--primary)",
@@ -137,7 +142,7 @@ export function ParticulaVisual({
             <g key={i}>
               <path
                 d={sectorPath(cx, cy, r, anguloIni, anguloFin)}
-                strokeWidth={1.5}
+                strokeWidth={strokeW}
                 style={{ fill: color.bg, stroke: color.border }}
               />
               <text
@@ -155,7 +160,7 @@ export function ParticulaVisual({
           );
         })
       )}
-      <circle cx={cx} cy={cy} r={r} fill="none" strokeWidth={2} style={{ stroke: "var(--bg-main)" }} opacity={0.001} />
+      <circle cx={cx} cy={cy} r={r} fill="none" strokeWidth={strokeW} style={{ stroke: "var(--bg-main)" }} opacity={0.001} />
     </svg>
   );
 }
@@ -181,6 +186,8 @@ export function LetrasVisual({
   const cy = size / 2;
   const r = size / 2 - 2;
   const fontSize = size * 0.1;
+  // Mismo criterio que ParticulaVisual: grosor relativo al tamaño, no fijo.
+  const strokeW = Math.max(0.6, size * 0.02);
 
   if (total === 0) {
     return (
@@ -189,7 +196,7 @@ export function LetrasVisual({
           cx={cx}
           cy={cy}
           r={r}
-          strokeWidth={1.5}
+          strokeWidth={strokeW}
           style={{ fill: "color-mix(in srgb, var(--primary) 4%, transparent)", stroke: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
         />
       </svg>
@@ -218,7 +225,7 @@ export function LetrasVisual({
           <g key={letra}>
             <path
               d={sectorPath(cx, cy, r, anguloIni, anguloFin)}
-              strokeWidth={1.5}
+              strokeWidth={strokeW}
               style={{ fill: color.bg, stroke: color.border }}
             />
             {mostrarLabel && (
@@ -287,6 +294,10 @@ export function IumVisual({
   const cy = size / 2;
   const orbitR = size * 0.34;
   const particleR = size * 0.155;
+  const guideStrokeW = Math.max(0.6, size * 0.01);
+  // Grosor de los círculos individuales (modo "inicial"), relativo a su
+  // propio tamaño real (particleR*2), mismo criterio que ParticulaVisual.
+  const strokeW = Math.max(0.6, particleR * 2 * 0.02);
 
   return (
     <div className={`relative inline-block ${className ?? ""}`} style={{ width: size, height: size }}>
@@ -322,7 +333,7 @@ export function IumVisual({
             cx={cx}
             cy={cy}
             r={orbitR}
-            strokeWidth={1.5}
+            strokeWidth={guideStrokeW}
             style={{ fill: "none", stroke: "color-mix(in srgb, var(--primary) 20%, transparent)" }}
           />
         ) : (
@@ -333,7 +344,7 @@ export function IumVisual({
               cy={cy}
               r={orbitR}
               fill="none"
-              strokeWidth={1}
+              strokeWidth={guideStrokeW}
               style={{ stroke: "color-mix(in srgb, var(--primary) 12%, transparent)" }}
             />
 
@@ -356,7 +367,7 @@ export function IumVisual({
                       cx={px}
                       cy={py}
                       r={particleR}
-                      strokeWidth={1.5}
+                      strokeWidth={strokeW}
                       style={{
                         fill: `color-mix(in srgb, ${tono} 55%, var(--bg-main))`,
                         stroke: `color-mix(in srgb, ${tono} 90%, black)`,
