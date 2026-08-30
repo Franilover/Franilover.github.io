@@ -52,8 +52,6 @@ import {
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import { useEstructuraComposicion } from "@/domains/garlia/elementos/useEstructuraComposicion";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
-import { CONFIG_COMPUESTO_ESTABILIDAD, type CompuestoEstabilidadRow } from "@/domains/garlia/elementos/useCompuestoEstabilidad";
-import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { propiedadesCalculadasDeCompuesto, type Compuesto, type Elemento, type Estructura } from "@/domains/garlia/elementos/types";
 import { useProcesos } from "@/domains/garlia/elementos/useProcesos";
 
@@ -1706,23 +1704,18 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
   const alquimiaRoute = useAlquimiaRoute();
   const compuestoRoute = useCompuestoRoute();
 
-  // Rango real de energia_enlaces entre TODOS los compuestos con fila
-  // calculada (compuesto_estabilidad, 77 de 90 hoy) — mismo criterio que
-  // rangoEnergia en VIS-19: el medidor se escala contra min/max reales, no
-  // un techo inventado. Ya cacheado por Dexie (useCompuestoEstabilidad del
-  // compuesto activo dispara la misma tabla), así que este fetch adicional
-  // no pega dos veces contra Supabase.
-  const { data: estabilidadTodosCompuestos } = useSupabaseData<CompuestoEstabilidadRow>(
-    CONFIG_COMPUESTO_ESTABILIDAD.tabla,
-    { select: CONFIG_COMPUESTO_ESTABILIDAD.select },
-  );
-  const rangoEnergiaCompuestos = useMemo(() => {
-    const valores = estabilidadTodosCompuestos
-      .map((r) => r.energia_enlaces)
+  // Rango real de energia_enlace entre TODOS los compuestos del catálogo
+  // (misma columna que usa VIS-23 "Energía de Enlace" — una sola fuente de
+  // verdad para esta magnitud, no se mezcla con compuesto_estabilidad, que
+  // es una tabla auxiliar distinta). El medidor se escala contra este
+  // min/max real, nunca contra un techo inventado.
+  const rangoEnergiaEnlaceCompuestos = useMemo(() => {
+    const valores = compuestoRoute.compuestos
+      .map((c) => c.energia_enlace)
       .filter((v): v is number => v != null);
     if (valores.length === 0) return null;
     return { min: Math.min(...valores), max: Math.max(...valores) };
-  }, [estabilidadTodosCompuestos]);
+  }, [compuestoRoute.compuestos]);
 
   useEffect(() => {
     setNodoSelId(null);
@@ -1871,24 +1864,25 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
     const props = propiedadesCalculadasDeCompuesto(c).filter(
       (p) => ["estabilidad", "rigidez", "flexibilidad"].includes(p.clave),
     );
-    // energia_enlaces (compuesto_estabilidad) — agregado a nivel Compuesto,
-    // distinto del coste_energetico por-enlace que ya se ve en VIS-19. Solo
-    // 77 de 90 compuestos tienen fila calculada — visual omitido, no en
-    // cero, cuando no existe (mismo criterio que el resto del panel).
-    const energia = compuestoRoute.estabilidad?.energia_enlaces ?? null;
+    // energia_enlace (columna real de "compuestos", misma fuente que VIS-23
+    // "Energía de Enlace" en la sidebar) — no se muestra si el compuesto no
+    // la tiene calculada, no se inventa un cero.
     return {
       eyebrow: "Compuesto",
       title: c.simbolo ? `${c.simbolo} · ${c.nombre}` : c.nombre,
       subtitle: c.tipo_compuesto ?? undefined,
       note: c.notas ?? null,
-      visual: energia != null ? <MedidorEnergia valor={energia} rango={rangoEnergiaCompuestos} /> : undefined,
+      visual:
+        c.energia_enlace != null ? (
+          <MedidorEnergia valor={c.energia_enlace} rango={rangoEnergiaEnlaceCompuestos} titulo="Energía de enlace" />
+        ) : undefined,
       fields: [
         { label: "Elementos distintos", value: compuestoRoute.componentes.length },
         { label: "Enlaces reales", value: compuestoRoute.loadingEnlaces ? "cargando…" : compuestoRoute.enlaces.length },
         ...props.map((p) => ({ label: p.label, value: p.valor })),
       ],
     };
-  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute, elementoQuimicaClickeado, compuestoRoute, rangoEnergiaCompuestos]);
+  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute, elementoQuimicaClickeado, compuestoRoute, rangoEnergiaEnlaceCompuestos]);
 
   // Trace: ruta ya resuelta, en el mismo orden que el modelo real — nunca
   // fusiona Física, Alquimia y Química en una sola secuencia. Si hay una
@@ -2119,9 +2113,11 @@ function BarraBloques({ label, value }: { label: string; value: number }) {
 function MedidorEnergia({
   valor,
   rango,
+  titulo = "Coste energético",
 }: {
   valor: number;
   rango: { min: number; max: number } | null;
+  titulo?: string;
 }) {
   const [min, max] = rango && rango.max > rango.min ? [rango.min, rango.max] : [0, Math.max(valor, 1)];
   const frac = Math.max(0, Math.min(1, (valor - min) / (max - min)));
@@ -2151,7 +2147,7 @@ function MedidorEnergia({
 
   return (
     <div>
-      <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-primary/45">Coste energético</p>
+      <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-primary/45">{titulo}</p>
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-[220px]">
         {/* Riel completo, tenue */}
         <path
@@ -2176,6 +2172,103 @@ function MedidorEnergia({
         <circle cx={cx} cy={cy} r={4} className="fill-current text-primary/85" />
         <text x={cx} y={cy - 22} textAnchor="middle" className="fill-current text-lg font-black text-primary/85 tabular-nums">
           {valor.toFixed(2)}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * MedidorCargaElectrica — mismo lenguaje visual que MedidorEnergia (gauge
+ * semicircular SVG), pero bipolar: carga_q/carga puede ser negativa
+ * (cancelación de carga entre elementos, ver afinidad.ts), así que el
+ * centro del arco (ángulo 90°) representa 0, no el mínimo del rango. La
+ * aguja se inclina a la izquierda para valores negativos y a la derecha
+ * para positivos — coherente con BarraDivergente, que ya usa esa misma
+ * convención centrada en cero para otras magnitudes con signo.
+ */
+function MedidorCargaElectrica({
+  valor,
+  rango,
+  titulo = "Carga eléctrica",
+}: {
+  valor: number;
+  rango: { min: number; max: number } | null;
+  titulo?: string;
+}) {
+  // Escala simétrica: el mayor valor absoluto real define el borde del
+  // arco a cada lado, así +N y -N quedan a la misma distancia del centro.
+  const tope = rango ? Math.max(Math.abs(rango.min), Math.abs(rango.max), Math.abs(valor)) : Math.max(Math.abs(valor), 1);
+  const frac = tope > 0 ? Math.max(-1, Math.min(1, valor / tope)) : 0;
+
+  const w = 200;
+  const h = 112;
+  const cx = w / 2;
+  const cy = h - 12;
+  const r = 78;
+
+  const angInicio = Math.PI; // -tope (izquierda)
+  const angCentro = Math.PI / 2; // 0 (arriba)
+  const angFin = 0; // +tope (derecha)
+  const angValor = angCentro + (angFin - angCentro) * frac; // frac>0 → hacia angFin, frac<0 → hacia angInicio
+
+  const punto = (ang: number, radio: number) => ({
+    x: cx + radio * Math.cos(ang),
+    y: cy - radio * Math.sin(ang),
+  });
+
+  const pInicio = punto(angInicio, r);
+  const pCentro = punto(angCentro, r);
+  const pFin = punto(angFin, r);
+  const pValor = punto(angValor, r);
+  const pAguja = punto(angValor, r - 14);
+
+  const arcoPositivo = frac >= 0;
+  const arcoLargo = 0; // ambos tramos (centro→valor) son siempre ≤90°, nunca necesitan large-arc
+
+  return (
+    <div>
+      <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-primary/45">{titulo}</p>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-[220px]">
+        {/* Riel completo, tenue */}
+        <path
+          d={`M ${pInicio.x} ${pInicio.y} A ${r} ${r} 0 1 1 ${pFin.x} ${pFin.y}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={10}
+          strokeLinecap="round"
+          className="text-primary/10"
+        />
+        {/* Marca de cero, en el tope del arco */}
+        <line
+          x1={pCentro.x}
+          y1={pCentro.y - 5}
+          x2={pCentro.x}
+          y2={pCentro.y + 5}
+          stroke="currentColor"
+          strokeWidth={2}
+          className="text-primary/30"
+        />
+        {/* Arco lleno desde el centro (0) hasta el valor real, a un lado u otro */}
+        {frac !== 0 ? (
+          <path
+            d={
+              arcoPositivo
+                ? `M ${pCentro.x} ${pCentro.y} A ${r} ${r} 0 ${arcoLargo} 1 ${pValor.x} ${pValor.y}`
+                : `M ${pCentro.x} ${pCentro.y} A ${r} ${r} 0 ${arcoLargo} 0 ${pValor.x} ${pValor.y}`
+            }
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={10}
+            strokeLinecap="round"
+            className={arcoPositivo ? "text-primary/75" : "text-primary/45"}
+          />
+        ) : null}
+        {/* Aguja apuntando al valor */}
+        <line x1={cx} y1={cy} x2={pAguja.x} y2={pAguja.y} stroke="currentColor" strokeWidth={2} className="text-primary/85" />
+        <circle cx={cx} cy={cy} r={4} className="fill-current text-primary/85" />
+        <text x={cx} y={cy - 22} textAnchor="middle" className="fill-current text-lg font-black text-primary/85 tabular-nums">
+          {valor > 0 ? `+${valor.toFixed(2)}` : valor.toFixed(2)}
         </text>
       </svg>
     </div>
@@ -2676,6 +2769,21 @@ function VisualizadorPage() {
   const { items: procesos, loading: loadingProcesos } = useProcesos();
   const { items: runas, loading: loadingRunas } = useRunasCatalogo();
   const { items: propiedadesDerivadas, loading: loadingPropiedadesDerivadas } = usePropiedadesDerivadas();
+
+  // Rangos reales para los gauges de VIS-23 "Energía de Enlace" y VIS-24
+  // "Carga Eléctrica" — el arco se escala contra el min/max real de todos
+  // los compuestos del catálogo, nunca contra un techo inventado (mismo
+  // criterio que rangoEnergia en VIS-19 "El Enlace").
+  const rangoEnergiaEnlaceCompuestos = useMemo(() => {
+    const valores = compuestos.map((c) => c.energia_enlace).filter((v): v is number => v != null);
+    if (valores.length === 0) return null;
+    return { min: Math.min(...valores), max: Math.max(...valores) };
+  }, [compuestos]);
+  const rangoCargaCompuestos = useMemo(() => {
+    const valores = compuestos.map((c) => c.carga).filter((v): v is number => v != null);
+    if (valores.length === 0) return null;
+    return { min: Math.min(...valores), max: Math.max(...valores) };
+  }, [compuestos]);
 
   const iumPorId = useMemo(() => {
     const mapa: Record<string, FilaIum> = {};
@@ -3192,41 +3300,41 @@ function VisualizadorPage() {
                 {loadingCompuestos ? (
                   <LoadingRow />
                 ) : (
-                  <div className="rounded-2xl p-5">
-                    <MiniBarChart
-                      values={compuestos
-                        .filter((c) => typeof c.energia_enlace === "number")
-                        .slice(0, 8)
-                        .map((c) => ({
-                          label: c.nombre,
-                          value: Math.max(0, Math.min(1, (c.energia_enlace ?? 0) / 5)),
-                        }))}
-                    />
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {compuestos
+                      .filter((c): c is typeof c & { energia_enlace: number } => typeof c.energia_enlace === "number")
+                      .slice(0, 8)
+                      .map((c) => (
+                        <div key={c.id} className="rounded-2xl p-4 text-center">
+                          <MedidorEnergia valor={c.energia_enlace} rango={rangoEnergiaEnlaceCompuestos} titulo="Energía de enlace" />
+                          <p className="mt-1 truncate text-[11px] font-black text-primary/70">{c.nombre}</p>
+                        </div>
+                      ))}
                   </div>
                 )}
-                <div className="mt-8 rounded-2xl p-6 text-xs leading-5 text-primary/45">
-                  Barra normalizada a un techo visual de 5 solo para comparar proporciones — el valor real de{" "}
-                  <span className="font-black text-primary/60">energia_enlace</span> no está acotado a [0,1]; usa la
-                  ficha del compuesto en la pestaña Química para el número exacto.
-                </div>
+                {compuestos.filter((c) => typeof c.energia_enlace === "number").length === 0 ? (
+                  <EmptyRow>Ningún compuesto tiene energia_enlace calculada todavía.</EmptyRow>
+                ) : null}
               </>
             ) : null}
 
             {active === "electric" ? (
               <>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  {compuestos
-                    .filter((c) => typeof c.carga === "number" && c.carga !== 0)
-                    .slice(0, 8)
-                    .map((c) => (
-                      <FlowNode
-                        key={c.id}
-                        title={c.nombre}
-                        subtitle={`carga ${c.carga}`}
-                        tone={(c.carga ?? 0) > 0 ? "accent" : "default"}
-                      />
-                    ))}
-                </div>
+                {loadingCompuestos ? (
+                  <LoadingRow />
+                ) : (
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {compuestos
+                      .filter((c): c is typeof c & { carga: number } => typeof c.carga === "number" && c.carga !== 0)
+                      .slice(0, 8)
+                      .map((c) => (
+                        <div key={c.id} className="rounded-2xl p-4 text-center">
+                          <MedidorCargaElectrica valor={c.carga} rango={rangoCargaCompuestos} />
+                          <p className="mt-1 truncate text-[11px] font-black text-primary/70">{c.nombre}</p>
+                        </div>
+                      ))}
+                  </div>
+                )}
                 {compuestos.filter((c) => typeof c.carga === "number" && c.carga !== 0).length === 0 ? (
                   <EmptyRow>Ningún compuesto cargado tiene carga distinta de cero todavía.</EmptyRow>
                 ) : null}
