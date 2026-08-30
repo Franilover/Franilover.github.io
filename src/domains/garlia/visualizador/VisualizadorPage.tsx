@@ -211,8 +211,14 @@ const navGroups: NavGroup[] = [
   {
     group: "Oris / Runas",
     items: [
-      { key: "oris_ruta", label: "Oris (ruta física)", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
-      { key: "oris", label: "Oris", visId: "VIS-08", icon: <Sparkles size={15} />, implementado: true },
+      // "oris" (VIS-08, flujo simple Partículas→IUMs→Oris→Éterium) quedó
+      // fuera de la sidebar a pedido explícito: "oris_ruta" (RutasSection
+      // perspectiva="fisica", la ruta física completa) es la vista mejor
+      // valorada de las dos y estaban duplicando la misma entidad Oris en
+      // el menú. El código de "oris" NO se borró (sigue en SectionKey y en
+      // su bloque `active === "oris"` más abajo) por si se retoma después
+      // — solo se sacó de navGroups para que no aparezca dos veces.
+      { key: "oris_ruta", label: "Oris", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
       { key: "runas", label: "Runa → Mecanismo → Fenómeno", visId: "VIS-09", icon: <CircleDot size={15} />, implementado: true },
     ],
   },
