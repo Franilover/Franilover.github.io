@@ -384,14 +384,16 @@ function RadarPerfilReactivo({ values }: { values: { label: string; value: numbe
  *  las documenta como "no es un índice 0–1" — no tienen techo conceptual,
  *  así que dibujar una barra/gauge relleno inventaría una proporción falsa.
  *  Solo número destacado, sin relleno proporcional. */
-function FilaStatCards({ items }: { items: { label: string; valor: string }[] }) {
+function FilaStatCards({ items, compact = false }: { items: { label: string; valor: string }[]; compact?: boolean }) {
   if (items.length === 0) return null;
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${compact ? "" : "gap-3"}`}>
       {items.map((it) => (
-        <div key={it.label} className="rounded-lg bg-primary/[0.04] p-4">
-          <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{it.label}</p>
-          <p className="mt-1.5 text-lg font-black text-primary/85">{it.valor}</p>
+        <div key={it.label} className={`rounded-lg bg-primary/[0.04] ${compact ? "p-2.5" : "p-4"}`}>
+          <p className={`font-black uppercase tracking-widest text-primary/35 ${compact ? "text-[9px]" : "text-[10px]"}`}>
+            {it.label}
+          </p>
+          <p className={`mt-1 font-black text-primary/85 ${compact ? "text-sm" : "text-lg mt-1.5"}`}>{it.valor}</p>
         </div>
       ))}
     </div>
@@ -1110,6 +1112,9 @@ function RutaCompuestoCanvas({
   // Cambiar este valor re-dispara la animación de fases del canvas aunque
   // el compuesto activo sea el mismo — ver replayToken en StructureCanvas.
   const [replayToken, setReplayToken] = useState(0);
+  // Valores derivados reales: colapsado por defecto (pedido explícito) —
+  // arranca oculto, se muestra recién al clickear el ícono "i".
+  const [mostrarValoresDerivados, setMostrarValoresDerivados] = useState(false);
 
   // Nivel 1: un nodo por unidad de Elemento en la composición real (ej.
   // A×2, B×1, C×3 → 6 nodos), mismo criterio de expansión 1-instancia-por-
@@ -1252,96 +1257,121 @@ function RutaCompuestoCanvas({
               </button>
             </div>
           </div>
-          <div className="mt-5 rounded-2xl p-5">
-            <StructureCanvas
-              columns={columns}
-              edges={edges}
-              selectedNodeId={
-                selectedNodeId ?? (compuestoSel ? `compuesto-${compuestoSel.id}` : null)
-              }
-              onHoverNode={(id) => {
-                setHoverId(id);
-                // Foco de sitios (docx punto 3/18): al pasar el mouse
-                // sobre un nodo Elemento, se activa la consulta de sus
-                // sitios reales — al salir, se limpia (no queda "pegado").
-                if (id?.startsWith("elemento-")) {
-                  const nodo = elementoNodos.find((n) => n.id === id);
-                  route.setElementoFocoId(nodo?.elementoId ?? null);
-                } else if (!id) {
-                  route.setElementoFocoId(null);
-                }
-              }}
-              onSelectNode={onSelectNode}
-              highlightedNodeIds={hoverId ? [hoverId] : []}
-              centerScaleExtra={1.3}
-              replayToken={replayToken}
-            />
-          </div>
-          {compuestoSel && !route.loadingEnlaces && enlaces.length === 0 ? (
-            <p className="mt-3 text-[11px] text-primary/40">
-              Este compuesto todavía no tiene enlaces calculados en Supabase — se muestran solo
-              los elementos de su composición, sin conexiones.
-            </p>
-          ) : null}
-          {route.estructuraId ? (
-            <p className="mt-3 text-[11px] text-primary/40">
-              Estructura real asociada: <span className="text-primary/60">{route.estructuraNombre}</span>
-              {route.compuestosDeLaEstructura.length > 1
-                ? ` (compartida con ${route.compuestosDeLaEstructura.length - 1} compuesto(s) más)`
-                : null}
-            </p>
-          ) : null}
-
-          {/* Perfil reactivo + magnitudes + Ficha + Valores derivados
-              reales (ex sección "Perfil Reactivo" del nav, retirada a
-              pedido explícito) — viven acá, debajo del gráfico del
-              compuesto, en vez de en un panel angosto aparte. El gráfico
-              mantiene prioridad visual (va primero, ocupa la fila propia)
-              pero de forma leve: el bloque de abajo usa el mismo ancho
-              completo del canvas (2.8fr) para no dejar espacio en blanco,
-              acomodando radar + las 4 magnitudes en una sola fila cuando
-              hay lugar, y cae a una columna en pantallas angostas. */}
-          {compuestoSel ? (
-            <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-              <div className="rounded-2xl p-5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">
-                  Perfil reactivo
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+            {/* Gráfico del compuesto integrado al layout (ya no es una
+                sección propia de ancho completo, a pedido explícito) —
+                comparte fila/grid con el Perfil reactivo, del mismo modo
+                que las magnitudes y Valores derivados comparten la columna
+                de al lado. */}
+            <div className="flex flex-col gap-4">
+              <div className="rounded-2xl p-4">
+                <StructureCanvas
+                  columns={columns}
+                  edges={edges}
+                  selectedNodeId={
+                    selectedNodeId ?? (compuestoSel ? `compuesto-${compuestoSel.id}` : null)
+                  }
+                  onHoverNode={(id) => {
+                    setHoverId(id);
+                    // Foco de sitios (docx punto 3/18): al pasar el mouse
+                    // sobre un nodo Elemento, se activa la consulta de sus
+                    // sitios reales — al salir, se limpia (no queda "pegado").
+                    if (id?.startsWith("elemento-")) {
+                      const nodo = elementoNodos.find((n) => n.id === id);
+                      route.setElementoFocoId(nodo?.elementoId ?? null);
+                    } else if (!id) {
+                      route.setElementoFocoId(null);
+                    }
+                  }}
+                  onSelectNode={onSelectNode}
+                  highlightedNodeIds={hoverId ? [hoverId] : []}
+                  centerScaleExtra={1.3}
+                  replayToken={replayToken}
+                />
+              </div>
+              {compuestoSel && !route.loadingEnlaces && enlaces.length === 0 ? (
+                <p className="text-[11px] text-primary/40">
+                  Este compuesto todavía no tiene enlaces calculados en Supabase — se muestran solo
+                  los elementos de su composición, sin conexiones.
                 </p>
-                <div className="mt-4">
-                  {ejesReactivos.length === 0 ? (
-                    <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
-                  ) : ejesReactivos.length < 3 ? (
-                    <MiniBarChart values={ejesReactivos} />
-                  ) : (
-                    <RadarPerfilReactivo values={ejesReactivos} />
-                  )}
+              ) : null}
+              {route.estructuraId ? (
+                <p className="text-[11px] text-primary/40">
+                  Estructura real asociada: <span className="text-primary/60">{route.estructuraNombre}</span>
+                  {route.compuestosDeLaEstructura.length > 1
+                    ? ` (compartida con ${route.compuestosDeLaEstructura.length - 1} compuesto(s) más)`
+                    : null}
+                </p>
+              ) : null}
+              {magnitudesLibres.length > 0 ? (
+                <div className="rounded-2xl p-4">
+                  <FilaStatCards items={magnitudesLibres} compact />
                 </div>
-                {compuestoSel.carga != null ? (
-                  <div className="mt-5 border-t border-primary/10 pt-4">
-                    <MedidorCargaElectrica valor={compuestoSel.carga} rango={rangoCargaCompuestos} />
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col gap-5">
-                {magnitudesLibres.length > 0 ? (
-                  <div className="rounded-2xl p-5">
-                    <FilaStatCards items={magnitudesLibres} />
-                  </div>
-                ) : null}
-                <div className="flex-1 rounded-2xl p-5">
-                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
-                  <div className="mt-4">
-                    <TarjetaValoresDerivados
-                      tipo="compuesto"
-                      entidadId={compuestoSel.id}
-                      entidadNombre={compuestoSel.nombre}
-                    />
-                  </div>
-                </div>
-              </div>
+              ) : null}
             </div>
-          ) : null}
+
+            {/* Perfil reactivo: agrandado (pedido explícito) — la columna
+                completa a su disposición en vez de compartirla con las
+                magnitudes, y RadarPerfilReactivo ya escala a 100% del
+                ancho de su contenedor (viewBox fijo, width="100%"), así
+                que darle más columna alcanza sin tocar el SVG. */}
+            {compuestoSel ? (
+              <div className="flex flex-col gap-4">
+                <div className="rounded-2xl p-5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">
+                    Perfil reactivo
+                  </p>
+                  <div className="mt-4">
+                    {ejesReactivos.length === 0 ? (
+                      <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
+                    ) : ejesReactivos.length < 3 ? (
+                      <MiniBarChart values={ejesReactivos} />
+                    ) : (
+                      <RadarPerfilReactivo values={ejesReactivos} />
+                    )}
+                  </div>
+                  {compuestoSel.carga != null ? (
+                    <div className="mt-5 border-t border-primary/10 pt-4">
+                      <MedidorCargaElectrica valor={compuestoSel.carga} rango={rangoCargaCompuestos} />
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Valores derivados reales: colapsado por defecto (pedido
+                    explícito) — solo título + ícono "i" clickeable; los
+                    números/radar internos de TarjetaValoresDerivados se
+                    montan recién al abrir, no se ocultan con CSS. */}
+                <div className="rounded-2xl p-5">
+                  <button
+                    type="button"
+                    onClick={() => setMostrarValoresDerivados((v) => !v)}
+                    className="flex items-center gap-1.5 text-xs font-black text-primary/80"
+                  >
+                    Valores derivados reales
+                    <span
+                      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                        mostrarValoresDerivados
+                          ? "border-primary/45 text-primary/70"
+                          : "border-primary/25 text-primary/45 hover:border-primary/45 hover:text-primary/70"
+                      }`}
+                      title={mostrarValoresDerivados ? "Ocultar valores" : "Ver valores"}
+                    >
+                      <Info size={10} strokeWidth={2.5} />
+                    </span>
+                  </button>
+                  {mostrarValoresDerivados ? (
+                    <div className="mt-4">
+                      <TarjetaValoresDerivados
+                        tipo="compuesto"
+                        entidadId={compuestoSel.id}
+                        entidadNombre={compuestoSel.nombre}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
 
           {modo === "ciencia" ? <PanelModoCiencia route={route} /> : null}
           {comparando ? (
