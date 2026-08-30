@@ -203,13 +203,34 @@ export function CompatibilidadNetwork({
             // no es la que va hacia él, se atenúa fuerte.
             const enSoloRuta = !soloRutaHaciaId || soloRutaHaciaId === vecino.nodo.nodeId;
 
+            // Recorte de ambas puntas al borde de su propio círculo — antes
+            // la línea nacía en el centro exacto del nodo central (cx, cy)
+            // y llegaba al centro exacto del vecino (x, y), atravesando
+            // ambos dibujos por completo. Eso impedía leer dónde "corta" la
+            // línea al llegar al círculo. Se retrae cada punta su propio
+            // radio (CENTER_R en el origen, NEIGHBOR_R en el destino,
+            // ajustado a la escala real de "emphasized") a lo largo de la
+            // misma recta, igual criterio que ya usa StructureCanvas.
+            const dx = x - cx;
+            const dy = y - cy;
+            const dist = Math.hypot(dx, dy) || 1;
+            const ux = dx / dist;
+            const uy = dy / dist;
+            const neighborR = NEIGHBOR_R * (emphasized ? 1.08 : 1);
+            const clampedFromR = Math.min(CENTER_R, dist / 2);
+            const clampedToR = Math.min(neighborR, dist / 2);
+            const x1 = cx + ux * clampedFromR;
+            const y1 = cy + uy * clampedFromR;
+            const x2 = x - ux * clampedToR;
+            const y2 = y - uy * clampedToR;
+
             return (
               <line
                 key={vecino.nodo.nodeId}
-                x1={cx}
-                y1={cy}
-                x2={x}
-                y2={y}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
                 strokeDasharray={estilo.lineDash}
                 strokeWidth={emphasized ? estilo.lineWidthActive : Math.max(1, estilo.lineWidthActive - 1)}
                 style={{
