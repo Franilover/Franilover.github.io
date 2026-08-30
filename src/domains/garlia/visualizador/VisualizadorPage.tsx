@@ -1328,9 +1328,22 @@ function RutaCompuestoCanvas({
                     : null}
                 </p>
               ) : null}
-              {magnitudesLibres.length > 0 ? (
-                <div className="rounded-2xl p-4">
-                  <FilaStatCards items={magnitudesLibres} compact />
+
+              {/* Valores derivados reales: movido debajo del gráfico del
+                  compuesto (pedido explícito) — antes vivía en la columna
+                  de al lado, junto a Perfil reactivo. El gráfico interno
+                  (radar/mini-bar) queda siempre visible; el toggle de
+                  detalle vive dentro de TarjetaValoresDerivados. */}
+              {compuestoSel ? (
+                <div className="rounded-2xl p-5">
+                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
+                  <div className="mt-4">
+                    <TarjetaValoresDerivados
+                      tipo="compuesto"
+                      entidadId={compuestoSel.id}
+                      entidadNombre={compuestoSel.nombre}
+                    />
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1362,20 +1375,14 @@ function RutaCompuestoCanvas({
                   ) : null}
                 </div>
 
-                {/* Valores derivados reales: el gráfico queda siempre
-                    visible acá — el toggle de detalle (ícono "i") vive
-                    ahora DENTRO de TarjetaValoresDerivados, debajo de su
-                    propio radar/mini-bar, no envolviendo todo el bloque. */}
-                <div className="rounded-2xl p-5">
-                  <p className="text-xs font-black text-primary/80">Valores derivados reales</p>
-                  <div className="mt-4">
-                    <TarjetaValoresDerivados
-                      tipo="compuesto"
-                      entidadId={compuestoSel.id}
-                      entidadNombre={compuestoSel.nombre}
-                    />
+                {/* Masa/Volumen/Densidad/Energía de enlace: movidas acá
+                    (pedido explícito) — antes vivían debajo del gráfico
+                    del compuesto, en la columna de al lado. */}
+                {magnitudesLibres.length > 0 ? (
+                  <div className="rounded-2xl p-4">
+                    <FilaStatCards items={magnitudesLibres} compact />
                   </div>
-                </div>
+                ) : null}
               </div>
             ) : null}
           </div>
