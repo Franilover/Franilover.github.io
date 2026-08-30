@@ -289,16 +289,44 @@ async function getDexieRow(tabla: string, id: string | number): Promise<any> {
   }
 }
 
-async function readFromDexie<T>(tabla: string): Promise<T[]> {
+async function readFromDexie<T>(
+  tabla: string,
+  order?: { campo: string; asc?: boolean },
+): Promise<T[]> {
   try {
     if (!db || !DEXIE_TABLES.has(tabla)) return [];
     const table = (db as any)[tabla];
     if (!table) return [];
     const rows = (await table.toArray()) as any[];
-    return rows.filter((r: any) => !r.deleted) as T[];
+    const vivos = rows.filter((r: any) => !r.deleted) as T[];
+    return order ? sortByOrder(vivos, order) : vivos;
   } catch {
     return [];
   }
+}
+
+// Dexie (IndexedDB) no garantiza el orden de inserción al leer con
+// toArray() — a diferencia de la query a Supabase, que sí aplica
+// `.order(campo, {ascending})`. Sin este sort, el primer render (con
+// datos de Dexie) puede mostrar el catálogo en un orden distinto al que
+// llega segundos después desde Supabase, y cualquier selección "por
+// defecto" basada en items[0] (ej. compuestoSel/elementoSel en las rutas
+// del Visualizador) salta de un item a otro sin que el usuario haya
+// tocado nada. Se ordena acá, en el mismo lugar donde se lee Dexie, para
+// que ambas fuentes queden consistentes desde el primer render.
+function sortByOrder<T>(rows: T[], order: { campo: string; asc?: boolean }): T[] {
+  const { campo, asc = true } = order;
+  const dir = asc ? 1 : -1;
+  return [...rows].sort((a: any, b: any) => {
+    const va = a?.[campo];
+    const vb = b?.[campo];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1; // nulls al final, sea cual sea la dirección
+    if (vb == null) return -1;
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  });
 }
 
 async function writeToDexie(tabla: string, rows: any[]): Promise<void> {
@@ -439,7 +467,7 @@ export function useSupabaseData<T = any>(
     const myGen = ++fetchGenRef.current;
     const isStale = () => fetchGenRef.current !== myGen || !isMounted.current;
 
-    const localData = await readFromDexie<T>(tabla);
+    const localData = await readFromDexie<T>(tabla, optionsRef.current.order);
     const hasLocalData = localData.length > 0;
     if (isStale()) return;
 
@@ -538,10 +566,16 @@ export function useSupabaseData<T = any>(
       if (res?.error) throw res.error;
 
       // Re-leer pending desde Dexie en este momento, no usar el snapshot viejo
-      const freshLocal = await readFromDexie<T>(tabla);
+      const freshLocal = await readFromDexie<T>(tabla, opts.order);
       if (isStale()) return;
 
       let merged = mergeWithPending<T>(finalData, freshLocal);
+      // mergeWithPending antepone remoto y agrega los pending al final —
+      // eso puede desordenar el resultado final respecto a `opts.order`
+      // (ej. un pending viejo terminando después de items más nuevos).
+      // Se re-ordena acá para que el resultado final sea consistente sin
+      // importar cuántos pending haya.
+      if (opts.order) merged = sortByOrder(merged, opts.order);
 
       // Preservar filas que escribimos nosotros mismos hace muy poco (ver
       // recentLocalWritesRef arriba): si el server todavía no propagó ese

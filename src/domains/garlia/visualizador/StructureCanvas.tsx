@@ -159,15 +159,31 @@ export function StructureCanvas({
   const centerR = CENTER_R * nodeScale * centerScaleExtra;
   const orbitNodeR = (ORBIT_R / 2.9) * nodeScale;
 
-  // ─── Identidad del "centro" actual: el diseño pide que la animación de
-  // construcción se repita cuando cambia QUÉ está emergiendo (nuevo Oris,
-  // nuevo Elemento, nuevo Ium al hacer zoom...), no en cada render.
+  // ─── Identidad del "centro" actual: se usa para decidir cuándo mostrar
+  // el canvas ya armado vs. animado, pero YA NO dispara la secuencia de
+  // fases por sí sola (ver fix de parpadeo abajo).
   const centerId = columns.length > 0 ? columns[columns.length - 1]?.nodes[0]?.id ?? null : null;
 
   const [phase, setPhase] = useState<BuildPhase>("stable");
   const phaseTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const isFirstReplayRef = useRef(true);
 
   useEffect(() => {
+    // FIX parpadeo de entrada: antes esta secuencia se re-disparaba cada
+    // vez que cambiaba `centerId` (nuevo Compuesto/Elemento/Enlace
+    // seleccionado), lo que hacía "parpadear" el canvas completo en cada
+    // selección — y, combinado con selecciones que cambiaban solas por
+    // el orden inconsistente de Dexie/Supabase (ver fix en
+    // useSupabaseData.ts), el usuario veía el ítem activo saltar de uno a
+    // otro sin haber tocado nada. Ahora la animación scattered→stable
+    // SOLO se dispara cuando `replayToken` cambia explícitamente (botón
+    // "Reproducir formación") — nunca de forma automática al cambiar de
+    // selección o al montar. Elementos/Compuestos/Enlace aparecen
+    // directo en su estado final ("stable").
+    if (isFirstReplayRef.current) {
+      isFirstReplayRef.current = false;
+      return;
+    }
     phaseTimers.current.forEach(clearTimeout);
     phaseTimers.current = [];
     if (!centerId) return;
@@ -180,11 +196,10 @@ export function StructureCanvas({
     return () => {
       phaseTimers.current.forEach(clearTimeout);
     };
-    // Se re-dispara solo cuando cambia el centro real, no en cada nuevo
-    // array de columns con el mismo centro (evita reiniciar la animación
-    // en cada render por referencias nuevas de objetos).
+    // Se re-dispara únicamente cuando cambia replayToken a propósito
+    // (ver arriba) — centerId ya no integra este array de deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centerId, replayToken]);
+  }, [replayToken]);
 
   const { laidOut, size, ringCount } = useMemo(() => {
     const nodesById = new Map<string, LaidOutNode>();
