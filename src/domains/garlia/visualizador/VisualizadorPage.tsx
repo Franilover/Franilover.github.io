@@ -349,7 +349,7 @@ function RadarPerfilReactivo({ values }: { values: { label: string; value: numbe
     const ca = Math.cos(a);
     const lx = cx + ca * (R + 40);
     const ly = cy + Math.sin(a) * (R + 40);
-    const anchor = Math.abs(ca) < 0.3 ? "middle" : ca > 0 ? "start" : "end";
+    const anchor: "start" | "middle" | "end" = Math.abs(ca) < 0.3 ? "middle" : ca > 0 ? "start" : "end";
     return { ...v, lx, ly, anchor };
   });
 
