@@ -19,7 +19,6 @@ import {
   Sparkles,
   Waypoints,
   Workflow,
-  Zap,
 } from "lucide-react";
 
 // V2 — conectado a datos reales de Supabase. Cada sección lee de los
@@ -115,7 +114,6 @@ type SectionKey =
   | "compatibilidad"
   | "interaccion"
   | "reactivity"
-  | "electric"
   | "information"
   | "oris"
   | "runas"
@@ -174,7 +172,11 @@ const navGroups: NavGroup[] = [
     items: [
       { key: "compuestos_ruta", label: "Compuestos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
       { key: "reactivity", label: "Perfil Reactivo", visId: "VIS-22", icon: <FlaskConical size={15} />, implementado: true },
-      { key: "electric", label: "Carga Eléctrica", visId: "VIS-24", icon: <Zap size={15} />, implementado: true },
+      // "electric" (VIS-24 "Carga Eléctrica") retirado como item propio
+      // (pedido explícito): la carga es un dato fijo del compuesto, no una
+      // vista con recorrido/comparación propios — ahora vive dentro de
+      // Perfil Reactivo, reactiva al mismo selector de compuesto que ya
+      // tiene esa sección, en vez de duplicar un SelectDropdown aparte.
     ],
   },
   {
@@ -3271,6 +3273,19 @@ function VisualizadorPage() {
                         <EmptyRow>Sin índices reactivos calculados todavía.</EmptyRow>
                       )}
                     </div>
+                    {/* Carga eléctrica (VIS-24) — vive acá, no en su propio
+                        item de sidebar (pedido explícito): es un dato fijo
+                        del compuesto ya seleccionado en este panel, no una
+                        vista propia con recorrido/comparación distintos.
+                        Antes se mostraba como texto plano "Carga: N" dentro
+                        de la grilla de Ficha (abajo) — ahora usa el mismo
+                        gauge bipolar de VIS-19/23, escalado contra el rango
+                        real de carga de todo el catálogo. */}
+                    {compuestoSel?.carga != null ? (
+                      <div className="mt-6 border-t border-primary/10 pt-5">
+                        <MedidorCargaElectrica valor={compuestoSel.carga} rango={rangoCargaCompuestos} />
+                      </div>
+                    ) : null}
                   </div>
                   <div className="rounded-2xl p-7">
                     <p className="text-xs font-black text-primary/80">Ficha</p>
@@ -3281,7 +3296,7 @@ function VisualizadorPage() {
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-2.5 text-xs">
                       {compuestoPropiedades
-                        .filter((p) => p.valor !== null && p.proporcion === undefined)
+                        .filter((p) => p.valor !== null && p.proporcion === undefined && p.clave !== "carga")
                         .slice(0, 6)
                         .map((p) => (
                           <div key={p.clave} className="rounded-lg border border-primary/10 p-3">
@@ -3298,29 +3313,6 @@ function VisualizadorPage() {
                     <TarjetaValoresDerivados tipo="compuesto" entidadId={compuestoSel?.id ?? null} entidadNombre={compuestoSel?.nombre} />
                   </div>
                 </div>
-              </>
-            ) : null}
-
-            {active === "electric" ? (
-              <>
-                {loadingCompuestos ? (
-                  <LoadingRow />
-                ) : (
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                    {compuestos
-                      .filter((c): c is typeof c & { carga: number } => typeof c.carga === "number" && c.carga !== 0)
-                      .slice(0, 8)
-                      .map((c) => (
-                        <div key={c.id} className="rounded-2xl p-4 text-center">
-                          <MedidorCargaElectrica valor={c.carga} rango={rangoCargaCompuestos} />
-                          <p className="mt-1 truncate text-[11px] font-black text-primary/70">{c.nombre}</p>
-                        </div>
-                      ))}
-                  </div>
-                )}
-                {compuestos.filter((c) => typeof c.carga === "number" && c.carga !== 0).length === 0 ? (
-                  <EmptyRow>Ningún compuesto cargado tiene carga distinta de cero todavía.</EmptyRow>
-                ) : null}
               </>
             ) : null}
 
