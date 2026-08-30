@@ -2210,7 +2210,7 @@ function EnlaceSection() {
   }, [enlaceSel]);
 
   return (
-    <div className="grid gap-7 lg:grid-cols-[0.65fr_1.35fr]">
+    <div className="grid gap-7 lg:grid-cols-[0.55fr_1.2fr_0.75fr]">
       {/* Selector de Compuesto + lista de sus enlaces reales */}
       <div>
         <p className="text-xs font-black text-primary/80">Compuesto</p>
@@ -2270,6 +2270,22 @@ function EnlaceSection() {
         </button>
       </div>
 
+      {/* Canvas central: contexto estructural del enlace activo (docx
+          sección 10) — el enlace dentro del compuesto completo, resto
+          atenuado. Reusa RutaCompuestoCanvas en vez de duplicar el canvas
+          orbital, y ahora vive como columna central propia (mismo patrón
+          sidebar/canvas/inspector que Física, Alquimia y Química). */}
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/35">Contexto estructural</p>
+        <div className="mt-3 rounded-2xl p-5">
+          {enlaceSel ? (
+            <EnlaceContextoCanvas route={compuestoRoute} highlightedNodeIds={highlightedNodeIds} />
+          ) : (
+            <EmptyRow>Seleccioná un enlace para ver su contexto en el compuesto.</EmptyRow>
+          )}
+        </div>
+      </div>
+
       {/* Anatomía del enlace activo (+ comparación si está activada) */}
       <div>
         <div className={`grid gap-7 ${compararActivo ? "sm:grid-cols-2" : ""}`}>
@@ -2317,18 +2333,6 @@ function EnlaceSection() {
             </div>
           ))}
         </div>
-
-        {/* Contexto estructural (docx sección 10): el enlace dentro del
-            compuesto completo, resto atenuado — reusa RutaCompuestoCanvas
-            en vez de duplicar el canvas orbital. */}
-        {enlaceSel && !compararActivo ? (
-          <div className="mt-10">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/35">Contexto estructural</p>
-            <div className="mt-3">
-              <EnlaceContextoCanvas route={compuestoRoute} highlightedNodeIds={highlightedNodeIds} />
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
