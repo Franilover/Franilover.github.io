@@ -52,6 +52,8 @@ import {
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import { useEstructuraComposicion } from "@/domains/garlia/elementos/useEstructuraComposicion";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
+import { CONFIG_COMPUESTO_ESTABILIDAD, type CompuestoEstabilidadRow } from "@/domains/garlia/elementos/useCompuestoEstabilidad";
+import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { propiedadesCalculadasDeCompuesto, type Compuesto, type Elemento, type Estructura } from "@/domains/garlia/elementos/types";
 import { useProcesos } from "@/domains/garlia/elementos/useProcesos";
 
@@ -1704,6 +1706,24 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
   const alquimiaRoute = useAlquimiaRoute();
   const compuestoRoute = useCompuestoRoute();
 
+  // Rango real de energia_enlaces entre TODOS los compuestos con fila
+  // calculada (compuesto_estabilidad, 77 de 90 hoy) — mismo criterio que
+  // rangoEnergia en VIS-19: el medidor se escala contra min/max reales, no
+  // un techo inventado. Ya cacheado por Dexie (useCompuestoEstabilidad del
+  // compuesto activo dispara la misma tabla), así que este fetch adicional
+  // no pega dos veces contra Supabase.
+  const { data: estabilidadTodosCompuestos } = useSupabaseData<CompuestoEstabilidadRow>(
+    CONFIG_COMPUESTO_ESTABILIDAD.tabla,
+    { select: CONFIG_COMPUESTO_ESTABILIDAD.select },
+  );
+  const rangoEnergiaCompuestos = useMemo(() => {
+    const valores = estabilidadTodosCompuestos
+      .map((r) => r.energia_enlaces)
+      .filter((v): v is number => v != null);
+    if (valores.length === 0) return null;
+    return { min: Math.min(...valores), max: Math.max(...valores) };
+  }, [estabilidadTodosCompuestos]);
+
   useEffect(() => {
     setNodoSelId(null);
   }, [
@@ -1851,18 +1871,24 @@ function RutasSection({ perspectiva }: { perspectiva: Perspectiva }) {
     const props = propiedadesCalculadasDeCompuesto(c).filter(
       (p) => ["estabilidad", "rigidez", "flexibilidad"].includes(p.clave),
     );
+    // energia_enlaces (compuesto_estabilidad) — agregado a nivel Compuesto,
+    // distinto del coste_energetico por-enlace que ya se ve en VIS-19. Solo
+    // 77 de 90 compuestos tienen fila calculada — visual omitido, no en
+    // cero, cuando no existe (mismo criterio que el resto del panel).
+    const energia = compuestoRoute.estabilidad?.energia_enlaces ?? null;
     return {
       eyebrow: "Compuesto",
       title: c.simbolo ? `${c.simbolo} · ${c.nombre}` : c.nombre,
       subtitle: c.tipo_compuesto ?? undefined,
       note: c.notas ?? null,
+      visual: energia != null ? <MedidorEnergia valor={energia} rango={rangoEnergiaCompuestos} /> : undefined,
       fields: [
         { label: "Elementos distintos", value: compuestoRoute.componentes.length },
         { label: "Enlaces reales", value: compuestoRoute.loadingEnlaces ? "cargando…" : compuestoRoute.enlaces.length },
         ...props.map((p) => ({ label: p.label, value: p.valor })),
       ],
     };
-  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute, elementoQuimicaClickeado, compuestoRoute]);
+  }, [particulaClickeada, perspectiva, fisicaRoute, alquimiaRoute, elementoQuimicaClickeado, compuestoRoute, rangoEnergiaCompuestos]);
 
   // Trace: ruta ya resuelta, en el mismo orden que el modelo real — nunca
   // fusiona Física, Alquimia y Química en una sola secuencia. Si hay una
@@ -2082,6 +2108,81 @@ function BarraBloques({ label, value }: { label: string; value: number }) {
 }
 
 /**
+ * MedidorEnergia — gauge semicircular para coste_energetico del enlace
+ * (docx sección 5: "la representación es proporcional al dato, no
+ * decorativa"). A diferencia de intensidad/estabilidad/reversibilidad/
+ * confianza, coste_energetico no viene normalizado 0..1 — por eso se
+ * escala contra el min/max real de los enlaces del compuesto activo
+ * (rango), no contra un techo inventado. Reemplaza el renglón de texto
+ * plano "Coste energético: X" que no tenía ninguna lectura visual.
+ */
+function MedidorEnergia({
+  valor,
+  rango,
+}: {
+  valor: number;
+  rango: { min: number; max: number } | null;
+}) {
+  const [min, max] = rango && rango.max > rango.min ? [rango.min, rango.max] : [0, Math.max(valor, 1)];
+  const frac = Math.max(0, Math.min(1, (valor - min) / (max - min)));
+
+  const w = 200;
+  const h = 112;
+  const cx = w / 2;
+  const cy = h - 12;
+  const r = 78;
+
+  const angInicio = Math.PI; // 180° (izquierda)
+  const angFin = 0; // 0° (derecha)
+  const angValor = angInicio + (angFin - angInicio) * frac;
+
+  const punto = (ang: number, radio: number) => ({
+    x: cx + radio * Math.cos(ang),
+    y: cy - radio * Math.sin(ang),
+  });
+
+  const pInicio = punto(angInicio, r);
+  const pFin = punto(angFin, r);
+  const pValor = punto(angValor, r);
+  const arcoLargo = angInicio - angValor > Math.PI ? 1 : 0;
+
+  // Aguja: desde el centro hasta cerca del arco.
+  const pAguja = punto(angValor, r - 14);
+
+  return (
+    <div>
+      <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-primary/45">Coste energético</p>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-[220px]">
+        {/* Riel completo, tenue */}
+        <path
+          d={`M ${pInicio.x} ${pInicio.y} A ${r} ${r} 0 1 1 ${pFin.x} ${pFin.y}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={10}
+          strokeLinecap="round"
+          className="text-primary/10"
+        />
+        {/* Arco lleno hasta el valor real */}
+        <path
+          d={`M ${pInicio.x} ${pInicio.y} A ${r} ${r} 0 ${arcoLargo} 1 ${pValor.x} ${pValor.y}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={10}
+          strokeLinecap="round"
+          className="text-primary/75"
+        />
+        {/* Aguja apuntando al valor */}
+        <line x1={cx} y1={cy} x2={pAguja.x} y2={pAguja.y} stroke="currentColor" strokeWidth={2} className="text-primary/85" />
+        <circle cx={cx} cy={cy} r={4} className="fill-current text-primary/85" />
+        <text x={cx} y={cy - 22} textAnchor="middle" className="fill-current text-lg font-black text-primary/85 tabular-nums">
+          {valor.toFixed(2)}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+/**
  * EnlaceContextoCanvas — el mismo StructureCanvas orbital de "Compuestos"
  * (columns/edges con weight=intensidad real), pero sin los controles de
  * UI de RutaCompuestoCanvas (selector de compuesto, modo Ciencia,
@@ -2212,6 +2313,16 @@ function EnlaceSection() {
   const labelEnlace = (e: EnlaceResuelto) =>
     `${e.elementoA?.simbolo ?? "?"} ↔ ${e.elementoB?.simbolo ?? "?"}`;
 
+  // Rango real de coste_energetico entre los enlaces del compuesto activo —
+  // el medidor (docx sección 5: "proporcional al dato, no decorativo") se
+  // escala contra este min/max en vez de un rango fijo inventado, porque
+  // el campo no viene normalizado 0..1 como intensidad/estabilidad.
+  const rangoEnergia = useMemo(() => {
+    const valores = enlaces.map((e) => e.coste_energetico).filter((v): v is number => v != null);
+    if (valores.length === 0) return null;
+    return { min: Math.min(...valores), max: Math.max(...valores) };
+  }, [enlaces]);
+
   // Nodos del enlace activo dentro del canvas del compuesto (docx sección
   // 10 — "el enlace dentro de un compuesto, resto atenuado"). Mismo
   // criterio de "primera instancia" que usa RutaCompuestoCanvas
@@ -2333,9 +2444,9 @@ function EnlaceSection() {
                   </div>
 
                   {e.coste_energetico != null ? (
-                    <p className="mt-5 text-[11px] font-bold text-primary/45">
-                      Coste energético: <span className="text-primary/70">{e.coste_energetico}</span>
-                    </p>
+                    <div className="mt-6">
+                      <MedidorEnergia valor={e.coste_energetico} rango={rangoEnergia} />
+                    </div>
                   ) : null}
                 </>
               )}

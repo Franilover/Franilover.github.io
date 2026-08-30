@@ -42,6 +42,7 @@ import { useMemo, useState } from "react";
 import { useCompuestosConElementos } from "@/domains/garlia/elementos/useCompuestosConElementos";
 import { useElementos } from "@/domains/garlia/elementos/useElementos";
 import { useCompuestoEnlaces, type CompuestoEnlaceRow } from "@/domains/garlia/elementos/useCompuestoEnlaces";
+import { useCompuestoEstabilidad, type CompuestoEstabilidadRow } from "@/domains/garlia/elementos/useCompuestoEstabilidad";
 import { useElementoSitiosEnlace, type ElementoSitioEnlace } from "@/domains/garlia/elementos/useElementoSitiosEnlace";
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import { useEstructuraComposicion } from "@/domains/garlia/elementos/useEstructuraComposicion";
@@ -91,6 +92,15 @@ export interface CompuestoRouteState {
    *  docx (punto 6) y la ficha de "Selección de una conexión" (punto 17). */
   enlaces: CompuestoEnlaceRow[];
   loadingEnlaces: boolean;
+
+  /** Fila agregada de compuesto_estabilidad del compuesto activo — energía
+   *  total de sus enlaces (energia_enlaces), tensión, calidad de enlaces,
+   *  complejidad estructural. Distinto de "enlaces" arriba (esto es UN
+   *  número resumen para todo el compuesto, no el detalle enlace por
+   *  enlace). null si el compuesto todavía no tiene fila calculada (77 de
+   *  90 la tienen hoy — no se inventa un valor para los 13 restantes). */
+  estabilidad: CompuestoEstabilidadRow | null;
+  loadingEstabilidad: boolean;
 
   /** Estructura real asociada al compuesto activo, si existe una fila en
    *  estructura_compuestos que lo referencia — null si el compuesto no
@@ -151,6 +161,10 @@ export function useCompuestoRoute(): CompuestoRouteState {
     compuestoSel?.id ?? null,
   );
 
+  const { item: estabilidad, loading: loadingEstabilidad } = useCompuestoEstabilidad(
+    compuestoSel?.id ?? null,
+  );
+
   // ─── Estructura real (si existe) ─────────────────────────────────────
   // useEstructuraComposicion resuelve estructura → compuestos (1 estructura,
   // N compuestos), pero acá se necesita el camino inverso (compuesto → su
@@ -203,6 +217,8 @@ export function useCompuestoRoute(): CompuestoRouteState {
     loadingSitios,
     enlaces,
     loadingEnlaces,
+    estabilidad,
+    loadingEstabilidad,
     estructuraId: estructuraDelCompuesto?.id ?? null,
     estructuraNombre: estructuraDelCompuesto?.nombre ?? null,
     compuestosDeLaEstructura,
