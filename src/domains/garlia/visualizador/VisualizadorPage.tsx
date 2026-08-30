@@ -115,7 +115,6 @@ type SectionKey =
   | "compatibilidad"
   | "interaccion"
   | "reactivity"
-  | "energy"
   | "electric"
   | "information"
   | "oris"
@@ -190,7 +189,14 @@ const navGroups: NavGroup[] = [
     items: [
       { key: "compatibilidad", label: "Compatibilidad → Enlace", visId: "VIS-04", icon: <Waypoints size={15} />, implementado: true },
       { key: "elEnlace", label: "El Enlace", visId: "VIS-19", icon: <Waypoints size={15} />, implementado: true },
-      { key: "energy", label: "Energía de Enlace", visId: "VIS-23", icon: <BarChart3 size={15} />, implementado: true },
+      // "energy" (VIS-23 "Energía de Enlace") retirado (pedido explícito):
+      // era código duplicado — mostraba MedidorEnergia sobre el mismo dato
+      // (compuestos.energia_enlace), mismo gauge y mismo rango que ya vive
+      // en la ficha "Compuesto" de la pestaña Química, sin ninguna
+      // interacción ni recorte propio que justificara una sección aparte.
+      // Ese gauge sigue ahí — este item solo repetía la misma vista para
+      // varios compuestos a la vez, cosa que el selector de Química ya
+      // permite recorriendo uno por uno.
     ],
   },
   {
@@ -3292,29 +3298,6 @@ function VisualizadorPage() {
                     <TarjetaValoresDerivados tipo="compuesto" entidadId={compuestoSel?.id ?? null} entidadNombre={compuestoSel?.nombre} />
                   </div>
                 </div>
-              </>
-            ) : null}
-
-            {active === "energy" ? (
-              <>
-                {loadingCompuestos ? (
-                  <LoadingRow />
-                ) : (
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                    {compuestos
-                      .filter((c): c is typeof c & { energia_enlace: number } => typeof c.energia_enlace === "number")
-                      .slice(0, 8)
-                      .map((c) => (
-                        <div key={c.id} className="rounded-2xl p-4 text-center">
-                          <MedidorEnergia valor={c.energia_enlace} rango={rangoEnergiaEnlaceCompuestos} titulo="Energía de enlace" />
-                          <p className="mt-1 truncate text-[11px] font-black text-primary/70">{c.nombre}</p>
-                        </div>
-                      ))}
-                  </div>
-                )}
-                {compuestos.filter((c) => typeof c.energia_enlace === "number").length === 0 ? (
-                  <EmptyRow>Ningún compuesto tiene energia_enlace calculada todavía.</EmptyRow>
-                ) : null}
               </>
             ) : null}
 
