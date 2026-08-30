@@ -999,26 +999,10 @@ function RutaCompuestoCanvas({
     ];
   }, [compuestoSel, elementoNodos, componentes]);
 
-  // Edges reales: un enlace de compuesto_enlaces por par de elementos
-  // conectados, con weight = intensidad real (docx punto 6: "la línea
-  // cambia visualmente [con] mayor intensidad" según el enlace real, no
-  // una línea pareja). Sin enlaces (compuesto sin compuesto_enlaces
-  // todavía), no se dibuja ninguna línea — nunca se asume conexión.
-  const edges: CanvasEdge[] = useMemo(() => {
-    if (!compuestoSel) return [];
-    const out: CanvasEdge[] = [];
-    for (const enlace of enlaces) {
-      const nodoA = primeraInstanciaPorElemento.get(enlace.elemento_a_id);
-      const nodoB = primeraInstanciaPorElemento.get(enlace.elemento_b_id);
-      if (!nodoA || !nodoB) continue;
-      out.push({
-        fromNodeId: nodoA,
-        toNodeId: nodoB,
-        weight: enlace.intensidad ?? undefined,
-      });
-    }
-    return out;
-  }, [compuestoSel, enlaces, primeraInstanciaPorElemento]);
+  // Edges quitados a pedido: ya no se dibujan líneas entre los elementos
+  // que rodean el nodo central del compuesto (docx sugería weight por
+  // intensidad, pero se decidió no trazar conexiones en este canvas).
+  const edges: CanvasEdge[] = useMemo(() => [], []);
 
   return (
     <>
@@ -2138,17 +2122,9 @@ function EnlaceContextoCanvas({
     ];
   }, [compuestoSel, elementoNodos, componentes]);
 
-  const edges: CanvasEdge[] = useMemo(() => {
-    if (!compuestoSel) return [];
-    const out: CanvasEdge[] = [];
-    for (const enlace of enlaces) {
-      const nodoA = primeraInstanciaPorElemento.get(enlace.elemento_a_id);
-      const nodoB = primeraInstanciaPorElemento.get(enlace.elemento_b_id);
-      if (!nodoA || !nodoB) continue;
-      out.push({ fromNodeId: nodoA, toNodeId: nodoB, weight: enlace.intensidad ?? undefined });
-    }
-    return out;
-  }, [compuestoSel, enlaces, primeraInstanciaPorElemento]);
+  // Edges quitados a pedido: mismo criterio que la sección Compuestos —
+  // no se trazan líneas entre los elementos que rodean el compuesto.
+  const edges: CanvasEdge[] = useMemo(() => [], []);
 
   if (!compuestoSel) return null;
 
