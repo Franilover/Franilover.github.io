@@ -38,7 +38,7 @@ import {
   type FilaIum,
 } from "@/domains/garlia/fisica/types";
 import { useOrisConIums } from "@/domains/garlia/fisica/useOrisConIums";
-import { useIums, useParticulasBase } from "@/domains/garlia/fisica/useFisica";
+import { useIums } from "@/domains/garlia/fisica/useFisica";
 
 import { useMateriales } from "@/domains/garlia/materiales/useMateriales";
 import {
@@ -102,7 +102,6 @@ import { ParticulaVisual, IumVisual } from "@/domains/garlia/fisica/ParticulaVis
 type SectionKey =
   // ya implementadas
   | "rutas"
-  | "micro"
   | "ats"
   | "formula"
   | "material"
@@ -143,7 +142,6 @@ const navGroups: NavGroup[] = [
     items: [
       { key: "rutas", label: "Física/Alquimia", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
       { key: "ats", label: "Triángulo A/T/S", visId: "VIS-02", icon: <Orbit size={15} />, implementado: true },
-      { key: "micro", label: "Cadena Microestructura", visId: "VIS-20", icon: <Layers3 size={15} />, implementado: true },
     ],
   },
   {
@@ -1990,7 +1988,6 @@ function VisualizadorPage() {
   const [active, setActive] = useState<SectionKey>("rutas");
 
   // ─── Fuentes de datos reales ────────────────────────────────────────────
-  const { items: particulasBase } = useParticulasBase();
   const { items: particulas, loading: loadingParticulas } = useParticulasCompletas();
   const { items: iums } = useIums();
   const { items: oris, loading: loadingOris } = useOrisConIums();
@@ -2116,11 +2113,6 @@ function VisualizadorPage() {
     return contarLetrasDeOris(orisSel.iums_composicion, iumPorId);
   }, [orisSel, iumPorId]);
 
-  const oriSelParticulas = useMemo(() => {
-    if (!orisSel) return [];
-    return particulasDeOris(orisSel.iums_composicion, iumPorId);
-  }, [orisSel, iumPorId]);
-
   const materialPropiedades = useMemo(
     () => (materialSel ? propiedadesCalculadasGenerico(materialSel.propiedades_calculadas) : []),
     [materialSel],
@@ -2172,99 +2164,6 @@ function VisualizadorPage() {
             {active === "compatibilidad" ? <CompatibilidadSection /> : null}
 
             {active === "interaccion" ? <InteraccionSection /> : null}
-
-            {active === "micro" ? (
-              <>
-                <div className="overflow-x-auto rounded-2xl p-5">
-                  <div className="flex min-w-[820px] items-center gap-2">
-                    <FlowNode title="Partículas Base" subtitle={`${particulasBase.length} · A / T / S`} />
-                    <Arrow />
-                    <FlowNode title="Partículas" subtitle={`${particulas.length} combinaciones`} />
-                    <Arrow />
-                    <FlowNode title="IUMs" subtitle={`${iums.length} configuraciones`} />
-                    <Arrow />
-                    <FlowNode title="Oris" subtitle={`${oris.length} sistemas funcionales`} tone="accent" />
-                    <Arrow />
-                    <FlowNode title="Éterium" subtitle="acoplamiento mágico" />
-                  </div>
-                </div>
-
-                <div className="mt-8 grid gap-7 xl:grid-cols-[1.15fr_0.85fr]">
-                  <div className="rounded-2xl p-7">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-black text-primary/80">Elige un Oris</p>
-                        <p className="text-[10px] text-primary/35">Composición real de IUMs y partículas</p>
-                      </div>
-                      <StatusPill>{oris.length} Oris</StatusPill>
-                    </div>
-                    {loadingOris ? (
-                      <LoadingRow />
-                    ) : (
-                      <ChipSelector
-                        items={oris}
-                        active={orisSel}
-                        getKey={(o) => o.id}
-                        getLabel={(o) => o.nombre}
-                        onSelect={setOrisSel}
-                      />
-                    )}
-
-                    {orisSel ? (
-                      <div className="mt-4 rounded-xl border border-primary/10 p-4">
-                        <p className="text-xs font-black text-primary/80">{orisSel.nombre}</p>
-                        <p className="mt-1 text-[11px] text-primary/45">
-                          {orisSel.dominio} · {orisSel.familia} · {orisSel.formula}
-                        </p>
-                        <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-                          {(["A", "T", "S"] as const).map((letra) => (
-                            <div key={letra} className="rounded-lg border border-primary/10 p-3">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-primary/35">{letra}</p>
-                              <p className="mt-1 text-lg font-black text-primary/75">{oriSelLetras[letra]}</p>
-                            </div>
-                          ))}
-                        </div>
-                        {oriSelParticulas.length > 0 ? (
-                          <div className="mt-3 flex flex-wrap gap-1.5">
-                            {oriSelParticulas.map((p, i) => (
-                              <span
-                                key={`${p.nombre}-${i}`}
-                                className="rounded-full border border-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary/55"
-                              >
-                                {p.nombre} · {p.formula}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="rounded-2xl p-7">
-                    <p className="text-xs font-black text-primary/80">Procedencia</p>
-                    <div className="mt-5 space-y-2.5 text-xs">
-                      {[
-                        "Partícula Base (letra A/T/S)",
-                        "Partícula (fórmula de 3 letras)",
-                        "IUM (composición de partículas)",
-                        "Oris (composición de IUMs)",
-                      ].map((item, index) => (
-                        <div key={item} className="flex items-center gap-2">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-black text-primary/50">
-                            {index + 1}
-                          </span>
-                          <span className="font-bold text-primary/55">{item}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-4 text-[11px] leading-5 text-primary/40">
-                      Cadena calculada en vivo con las mismas funciones (contarLetrasDeOris, particulasDeOris) que usa
-                      el editor de Física — nada se recalcula distinto acá.
-                    </p>
-                  </div>
-                </div>
-              </>
-            ) : null}
 
             {active === "ats" ? (
               <>
