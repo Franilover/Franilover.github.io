@@ -384,8 +384,37 @@ function RadarPerfilReactivo({ values }: { values: { label: string; value: numbe
  *  las documenta como "no es un índice 0–1" — no tienen techo conceptual,
  *  así que dibujar una barra/gauge relleno inventaría una proporción falsa.
  *  Solo número destacado, sin relleno proporcional. */
-function FilaStatCards({ items, compact = false }: { items: { label: string; valor: string }[]; compact?: boolean }) {
+function FilaStatCards({
+  items,
+  compact = false,
+  stacked = false,
+}: {
+  items: { label: string; valor: string }[];
+  compact?: boolean;
+  /** Si es true, los items se apilan uno debajo del otro (columna única)
+   *  en vez de la grilla 2x2/4 — pedido explícito para el bloque de
+   *  Masa/Volumen/Densidad/Energía de enlace debajo de Carga eléctrica.
+   *  Default false (comportamiento actual, grilla). */
+  stacked?: boolean;
+}) {
   if (items.length === 0) return null;
+  if (stacked) {
+    return (
+      <div className="space-y-2">
+        {items.map((it) => (
+          <div
+            key={it.label}
+            className={`flex items-center justify-between gap-3 rounded-lg bg-primary/[0.04] ${compact ? "p-2.5" : "p-4"}`}
+          >
+            <p className={`font-black uppercase tracking-widest text-primary/35 ${compact ? "text-[9px]" : "text-[10px]"}`}>
+              {it.label}
+            </p>
+            <p className={`font-black text-primary/85 ${compact ? "text-sm" : "text-lg"}`}>{it.valor}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${compact ? "" : "gap-3"}`}>
       {items.map((it) => (
@@ -1281,7 +1310,7 @@ function RutaCompuestoCanvas({
               </button>
             </div>
           </div>
-          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
             {/* Gráfico del compuesto integrado al layout (ya no es una
                 sección propia de ancho completo, a pedido explícito) —
                 comparte fila/grid con el Perfil reactivo, del mismo modo
@@ -1373,16 +1402,16 @@ function RutaCompuestoCanvas({
                       <MedidorCargaElectrica valor={compuestoSel.carga} rango={rangoCargaCompuestos} />
                     </div>
                   ) : null}
+                  {/* Masa/Volumen/Densidad/Energía de enlace: apiladas una
+                      debajo de otra, justo debajo de Carga eléctrica
+                      (pedido explícito) — misma tarjeta, ya no en un
+                      bloque aparte. */}
+                  {magnitudesLibres.length > 0 ? (
+                    <div className="mt-5 border-t border-primary/10 pt-4">
+                      <FilaStatCards items={magnitudesLibres} compact stacked />
+                    </div>
+                  ) : null}
                 </div>
-
-                {/* Masa/Volumen/Densidad/Energía de enlace: movidas acá
-                    (pedido explícito) — antes vivían debajo del gráfico
-                    del compuesto, en la columna de al lado. */}
-                {magnitudesLibres.length > 0 ? (
-                  <div className="rounded-2xl p-4">
-                    <FilaStatCards items={magnitudesLibres} compact />
-                  </div>
-                ) : null}
               </div>
             ) : null}
           </div>
