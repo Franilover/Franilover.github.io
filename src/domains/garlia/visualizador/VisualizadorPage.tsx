@@ -108,8 +108,6 @@ import { ParticulaVisual, IumVisual } from "@/domains/garlia/fisica/ParticulaVis
 type SectionKey =
   // ya implementadas
   | "oris_ruta"
-  | "elementos_ruta"
-  | "compuestos_ruta"
   | "ats"
   | "material"
   | "structure"
@@ -160,8 +158,15 @@ const navGroups: NavGroup[] = [
     group: "Química",
     items: [
       { key: "ats", label: "Triángulo A/T/S", visId: "VIS-02", icon: <Orbit size={15} />, implementado: true },
-      { key: "elementos_ruta", label: "Elementos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
-      { key: "compuestos_ruta", label: "Compuestos", visId: "VIS-01", icon: <GitBranch size={15} />, implementado: true },
+      // "elementos_ruta" (VIS-01 "Elementos") y "compuestos_ruta" (VIS-01
+      // "Compuestos") retirados del nav (pedido explícito, 2026-08-30): la
+      // edición de Elemento/Compuesto ahora se maneja enteramente desde los
+      // editores flotantes (ElementoPanelFlotante / CompuestoPanelFlotante
+      // en elementos/), así que esta vista de solo-ruta quedó redundante.
+      // El código de RutasSection perspectiva="alquimia"/"quimica" NO se
+      // borró (sigue vivo para "oris_ruta", perspectiva="fisica") — solo se
+      // sacaron estos dos items del sidebar y sus bloques `active === "..."`.
+      //
       // "reactivity" (VIS-22 "Perfil Reactivo") y "electric" (VIS-24 "Carga
       // Eléctrica") retirados como items propios del nav (pedido explícito):
       // ambos leen el mismo compuesto ya seleccionado en "Compuestos", así
@@ -3256,10 +3261,6 @@ function VisualizadorPage() {
 
           <section className="min-w-0">
             {active === "oris_ruta" ? <RutasSection perspectiva="fisica" /> : null}
-
-            {active === "elementos_ruta" ? <RutasSection perspectiva="alquimia" /> : null}
-
-            {active === "compuestos_ruta" ? <RutasSection perspectiva="quimica" /> : null}
 
             {active === "compatibilidad" ? <CompatibilidadSection /> : null}
 
