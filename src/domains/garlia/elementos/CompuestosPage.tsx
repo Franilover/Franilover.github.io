@@ -372,60 +372,33 @@ function ComposicionRealBloque({
 }
 
 /**
- * Detalle de estabilidad del compuesto (tabla "compuesto_estabilidad"):
- * tensión, calidad de enlaces y complejidad estructural, calculado a partir
- * de compuesto_enlaces — más granular que "estabilidad" (columna directa,
- * ya mostrada en PropiedadesFisicasCompuestoBloque). No todos los
- * compuestos tienen esta fila auxiliar (ver estado_proyecto), por eso
- * devuelve null silenciosamente si no existe.
+ * Traduce el detalle de estabilidad del compuesto (tabla
+ * "compuesto_estabilidad": tensión, calidad de enlaces, complejidad
+ * estructural — más granular que "estabilidad", la columna directa que ya
+ * arma propiedadesCalculadasDeCompuesto) al mismo shape PropiedadCalculada
+ * que usa TarjetaPropiedadesFisicas, para que estas filas se vean con
+ * exactamente el mismo diseño que el resto de "Propiedades físicas" en vez
+ * de un bloque aparte con su propio grid. No todos los compuestos tienen
+ * esta fila auxiliar (ver estado_proyecto), por eso devuelve [] si no
+ * existe — se funde sin dejar hueco en la tarjeta combinada.
  */
-function EstabilidadDetalleBloque({
-  detalle,
-  loading,
-}: {
-  detalle: CompuestoEstabilidadRow | null;
-  loading: boolean;
-}) {
-  if (loading || !detalle) return null;
+function propiedadesDeEstabilidadDetalle(
+  detalle: CompuestoEstabilidadRow | null,
+): PropiedadCalculada[] {
+  if (!detalle) return [];
 
-  const fmt = (v: number | null, digitos = 3) => (v === null ? "—" : v.toFixed(digitos));
+  const fmt = (v: number | null, digitos = 3) => (v === null ? null : v.toFixed(digitos));
+  const prop = (v: number | null) => (v === null ? undefined : Math.max(0, Math.min(1, v)));
 
-  const filas: { label: string; valor: string; descripcion: string }[] = [
-    { label: "Tensión", valor: fmt(detalle.tension), descripcion: "Cuánto desbalance/estrés hay entre los enlaces del compuesto." },
-    { label: "Calidad de enlaces", valor: fmt(detalle.calidad_enlaces), descripcion: "Qué tan buenos (compatibles y estables) son los enlaces formados." },
-    { label: "Complejidad estructural", valor: fmt(detalle.complejidad_estructural), descripcion: "Qué tan compleja es la estructura de enlaces del compuesto." },
-    { label: "Coste de organización", valor: fmt(detalle.coste_organizacion), descripcion: "Cuánto \"cuesta\" mantener organizada la estructura del compuesto." },
-    { label: "Confianza", valor: fmt(detalle.confianza), descripcion: "Qué tan confiable es este cálculo dado el estado actual de datos." },
+  const clasif = detalle.clasificacion ? ` (${detalle.clasificacion})` : "";
+
+  return [
+    { clave: "eb_tension", label: "Tensión", valor: fmt(detalle.tension), proporcion: prop(detalle.tension), descripcion: `Cuánto desbalance/estrés hay entre los enlaces del compuesto${clasif}.` },
+    { clave: "eb_calidad_enlaces", label: "Calidad de enlaces", valor: fmt(detalle.calidad_enlaces), proporcion: prop(detalle.calidad_enlaces), descripcion: `Qué tan buenos (compatibles y estables) son los enlaces formados${clasif}.` },
+    { clave: "eb_complejidad_estructural", label: "Complejidad estructural", valor: fmt(detalle.complejidad_estructural), proporcion: prop(detalle.complejidad_estructural), descripcion: `Qué tan compleja es la estructura de enlaces del compuesto${clasif}.` },
+    { clave: "eb_coste_organizacion", label: "Coste de organización", valor: fmt(detalle.coste_organizacion), proporcion: prop(detalle.coste_organizacion), descripcion: `Cuánto "cuesta" mantener organizada la estructura del compuesto${clasif}.` },
+    { clave: "eb_confianza", label: "Confianza", valor: fmt(detalle.confianza), proporcion: prop(detalle.confianza), descripcion: `Qué tan confiable es este cálculo dado el estado actual de datos${clasif}.` },
   ];
-
-  return (
-    <div className="flex flex-col gap-1.5 p-2">
-      <div className="flex items-center gap-1.5">
-        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-          Estabilidad — detalle
-        </span>
-        {detalle.clasificacion && (
-          <span className="text-micro font-bold text-primary/50 bg-primary/5 rounded px-1.5 py-0.5">
-            {detalle.clasificacion}
-          </span>
-        )}
-      </div>
-      <div className="grid grid-cols-3 gap-1.5">
-        {filas.map((f) => (
-          <div
-            key={f.label}
-            title={f.descripcion}
-            className="flex items-center justify-between gap-1 px-2 py-1.5"
-          >
-            <span className="text-micro font-bold text-primary/50 truncate">{f.label}</span>
-            <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
-              {f.valor}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -629,16 +602,28 @@ function CompuestoEditor({
   // por elemento (compuesto_elementos.proporcion_molar/deducida) + análisis
   // de tensión/calidad de enlaces (compuesto_estabilidad). Las 3 fuentes son
   // solo lectura, derivadas — ver propiedadesCalculadasDeCompuesto en types.ts.
-  const propiedadesFisicas = useMemo(
-    () => propiedadesCalculadasDeCompuesto(local),
-    [local],
-  );
   const { items: proporcionElementos, loading: proporcionLoading } =
     useCompuestoElementosProporcion(compuesto.id);
   const { item: estabilidadDetalle, loading: estabilidadLoading } = useCompuestoEstabilidad(
     compuesto.id,
   );
   const { items: enlacesCompuesto, loading: enlacesLoading, error: enlacesError } = useCompuestoEnlaces(compuesto.id);
+
+  // "Estabilidad — detalle" (compuesto_estabilidad) se funde acá dentro de
+  // la misma lista que alimenta PropiedadesFisicasCompuestoBloque (pedido
+  // explícito): antes era un bloque aparte (EstabilidadDetalleBloque) con su
+  // propio grid de 3 columnas; ahora sus 5 filas son PropiedadCalculada más,
+  // así que se renderizan con exactamente el mismo diseño de tarjeta que el
+  // resto de Propiedades físicas (TarjetaPropiedadesFisicas), sin bloque ni
+  // grid separados. Si el compuesto no tiene fila auxiliar todavía o sigue
+  // cargando, propiedadesDeEstabilidadDetalle devuelve [] y no se nota hueco.
+  const propiedadesFisicas = useMemo(
+    () => [
+      ...propiedadesCalculadasDeCompuesto(local),
+      ...(estabilidadLoading ? [] : propiedadesDeEstabilidadDetalle(estabilidadDetalle)),
+    ],
+    [local, estabilidadDetalle, estabilidadLoading],
+  );
 
   async function persistElemento(id: string, cambios: Partial<Elemento>) {
     try {
@@ -777,8 +762,10 @@ function CompuestoEditor({
           </div>
         )}
 
-        {/* Gráfico a la izquierda (columna fija) + Propiedades físicas y
-            Estabilidad apiladas a la derecha, una debajo de la otra.
+        {/* Gráfico a la izquierda (columna fija) + Propiedades físicas a la
+            derecha — incluye ahora también el detalle de Estabilidad
+            (compuesto_estabilidad), fundido en la misma tarjeta/diseño en
+            vez de un bloque aparte (ver propiedadesDeEstabilidadDetalle).
             Reemplaza al bloque "Usado en Item/Mineral/Flora" — informativo
             de solo lectura sobre otras entidades del catálogo, no datos
             propios de Química — y a los 4 cuadros de Reactividad/Peso/
@@ -786,10 +773,7 @@ function CompuestoEditor({
             redundantes con Propiedades físicas + Estabilidad. */}
         <div className="grid grid-cols-[minmax(11rem,14rem)_1fr] gap-3 items-start">
           <AtomoVisualCompuesto compuesto={local} elementos={elementos} />
-          <div className="flex flex-col gap-3 min-w-0">
-            <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
-            <EstabilidadDetalleBloque detalle={estabilidadDetalle} loading={estabilidadLoading} />
-          </div>
+          <PropiedadesFisicasCompuestoBloque propiedades={propiedadesFisicas} />
         </div>
 
         {/* Composición real (izquierda) · Enlaces (derecha). */}
