@@ -17,11 +17,76 @@ import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import type { PropiedadCalculada } from "@/domains/garlia/elementos/types";
 
+import { useValoresDerivadosDeEntidad } from "@/domains/garlia/visualizador/useVisualizadorData";
+
 import { useMaterialComponentes } from "./useMaterialComponentes";
 import { useMaterialEstructuras } from "./useMaterialEstructuras";
 import { useMateriales } from "./useMateriales";
 import { usePerfilReactivoMaterial } from "./usePerfilReactivoMaterial";
 import type { PerfilReactivoMaterial, Material } from "./types";
+
+/** Mismo lenguaje visual que las filas de carga/vacío del Visualizador
+ *  (VisualizadorPage.tsx LoadingRow/EmptyRow) — duplicado acá deliberadamente
+ *  en vez de importado, porque son componentes internos no exportados de esa
+ *  página y Materiales no debe acoplarse a su módulo completo. */
+function LoadingRow() {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-primary/10 p-5 text-xs font-bold text-primary/35">
+      <span className="h-2 w-2 animate-pulse rounded-full bg-primary/40" />
+      Cargando datos reales desde Supabase…
+    </div>
+  );
+}
+
+function EmptyRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-dashed border-primary/15 p-5 text-xs leading-5 text-primary/40">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * "Valores derivados reales" — fuente canónica valores_propiedades_derivadas
+ * (documentacion_sistema #280), vía useValoresDerivadosDeEntidad. Mismo
+ * componente/diseño que ya usa el Visualizador (TarjetaValoresDerivados en
+ * VisualizadorPage.tsx): una línea por propiedad con barra de proporción
+ * cuando trae rango_min/rango_max real, delegando el render a
+ * TarjetaPropiedadesFisicas — el mismo lenguaje visual que "Propiedades
+ * físicas" acá abajo. Duplicado en vez de importado por la misma razón que
+ * LoadingRow/EmptyRow: es un componente interno no exportado de
+ * VisualizadorPage.tsx.
+ */
+function TarjetaValoresDerivadosMaterial({ materialId, materialNombre }: { materialId: string | null; materialNombre?: string }) {
+  const { items, loading } = useValoresDerivadosDeEntidad("material", materialId);
+
+  if (!materialId) return <EmptyRow>Selecciona un material para ver sus propiedades derivadas reales.</EmptyRow>;
+  if (loading) return <LoadingRow />;
+  if (items.length === 0)
+    return (
+      <EmptyRow>
+        {materialNombre ?? "Este material"} no tiene valores calculados en valores_propiedades_derivadas todavía.
+      </EmptyRow>
+    );
+
+  const propiedades: PropiedadCalculada[] = items.map((v) => {
+    const min = v.propiedad.rango_min;
+    const max = v.propiedad.rango_max;
+    const conRango = min !== null && max !== null && (max as number) > (min as number);
+    return {
+      clave: v.propiedad.clave,
+      label: v.propiedad.nombre,
+      valor: v.valor.toLocaleString("es-CL", { maximumFractionDigits: 4 }),
+      proporcion: conRango
+        ? Math.max(0, Math.min(1, (v.valor - (min as number)) / ((max as number) - (min as number))))
+        : undefined,
+      descripcion: v.propiedad.descripcion ?? "",
+      formula: v.propiedad.formula ?? undefined,
+    };
+  });
+
+  return <TarjetaPropiedadesFisicas propiedades={propiedades} columnas={2} />;
+}
 
 /** Etiqueta legible para el origen de una propiedad física (ver
  *  documentacion_sistema "Fuente por propiedad en Material v187", orden
@@ -149,6 +214,13 @@ function MaterialDetail({ material }: { material: Material }) {
             </div>
           )}
           <TarjetaPropiedadesFisicas propiedades={propiedadesCombinadas} columnas={2} />
+
+          <div className="flex flex-col gap-1.5 min-w-0 p-2">
+            <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Valores derivados reales
+            </span>
+            <TarjetaValoresDerivadosMaterial materialId={material.id} materialNombre={material.nombre} />
+          </div>
         </div>
 
         <div className="flex flex-col gap-2 min-w-0">
