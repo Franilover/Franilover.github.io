@@ -319,6 +319,38 @@ export function propiedadesCalculadasDeElemento(el: Elemento): PropiedadCalculad
     { clave: "capacidad_externa_enlace", label: "Capacidad externa de enlace", valor: fmt(el.capacidad_externa_enlace), proporcion: prop(el.capacidad_externa_enlace), descripcion: "Qué tan preparada está la capa externa para sostener enlaces nuevos." },
     { clave: "selectividad_enlace", label: "Selectividad de enlace", valor: fmt(el.selectividad_enlace), proporcion: prop(el.selectividad_enlace), descripcion: "Qué tan exigente es el elemento al aceptar enlaces nuevos." },
     { clave: "polaridad_estructural", label: "Polaridad estructural", valor: fmt(el.polaridad_estructural), proporcion: prop(el.polaridad_estructural), descripcion: "Desbalance direccional de su estructura de enlace.", formula: "Polaridad = |2 · saturación externa − 1|" },
+
+    // ─── Carga, catálisis/transición y ocupación externa (columnas reales
+    // en Supabase, traídas en el select pero nunca mostradas hasta ahora —
+    // ver auditoría 2026-08-30 "qué propiedades faltan en Elemento"). Los
+    // totales primero, después el desglose por capa (núcleo/media/externa)
+    // de cada uno — mismo criterio que catalisis_total/transicion_total ya
+    // alimentan balance_ct y regimen_estructural arriba, solo que ahora
+    // también se ve el número.
+    { clave: "carga_q", label: "Carga Q", valor: fmt(el.carga_q, 2), descripcion: "Carga cuántica total del elemento, suma de las 3 capas.", formula: "Carga Q = carga_q(núcleo) + carga_q(media) + carga_q(externa)" },
+    { clave: "carga_q_norm", label: "Carga Q (normalizada)", valor: fmt(el.carga_q_norm), proporcion: prop(el.carga_q_norm), descripcion: "Carga Q normalizada a escala 0–1 para comparar entre elementos." },
+    { clave: "catalisis_total", label: "Catálisis total", valor: fmt(el.catalisis_total, 2), descripcion: "Suma de catálisis en las 3 capas — numerador de la relación R usada en régimen estructural." },
+    { clave: "transicion_total", label: "Transición total", valor: fmt(el.transicion_total, 2), descripcion: "Suma de transición en las 3 capas — denominador de la relación R usada en régimen estructural." },
+    { clave: "balance_ct", label: "Balance Catálisis/Transición", valor: fmt(el.balance_ct), descripcion: "R = Catálisis total / Transición total. Define la familia (Rígido/Intermedio/Reactivo) junto a Noble/Inerte.", formula: "R = Catálisis total / Transición total" },
+    { clave: "capacidad_externa", label: "Capacidad externa", valor: fmt(el.capacidad_externa, 0), descripcion: "Cupo total de la capa externa para partículas de Voluntad/Percepción/Transición/Catálisis." },
+    { clave: "ocupacion_externa", label: "Ocupación externa", valor: fmt(el.ocupacion_externa, 0), descripcion: "Cuánto de la capacidad externa está ocupado actualmente." },
+    { clave: "capacidad_externa_restante", label: "Capacidad externa restante", valor: fmt(el.capacidad_externa_restante, 0), descripcion: "Cupo de la capa externa que todavía queda libre." },
+    { clave: "saturacion_externa", label: "Saturación externa", valor: fmt(el.saturacion_externa), proporcion: prop(el.saturacion_externa), descripcion: "Qué tan llena está la capa externa — en 100% determina si el elemento es Noble.", formula: "Saturación externa = ocupación externa / capacidad externa" },
+
+    { clave: "nucleo_catalisis", label: "Catálisis (núcleo)", valor: fmt(el.nucleo_catalisis, 2), descripcion: "Catálisis aportada solo por la capa núcleo." },
+    { clave: "media_catalisis", label: "Catálisis (media)", valor: fmt(el.media_catalisis, 2), descripcion: "Catálisis aportada solo por la capa media." },
+    { clave: "externa_catalisis", label: "Catálisis (externa)", valor: fmt(el.externa_catalisis, 2), descripcion: "Catálisis aportada solo por la capa externa." },
+    { clave: "nucleo_transicion", label: "Transición (núcleo)", valor: fmt(el.nucleo_transicion, 2), descripcion: "Transición aportada solo por la capa núcleo." },
+    { clave: "media_transicion", label: "Transición (media)", valor: fmt(el.media_transicion, 2), descripcion: "Transición aportada solo por la capa media." },
+    { clave: "externa_transicion", label: "Transición (externa)", valor: fmt(el.externa_transicion, 2), descripcion: "Transición aportada solo por la capa externa." },
+    { clave: "nucleo_carga_q", label: "Carga Q (núcleo)", valor: fmt(el.nucleo_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa núcleo." },
+    { clave: "media_carga_q", label: "Carga Q (media)", valor: fmt(el.media_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa media." },
+    { clave: "externa_carga_q", label: "Carga Q (externa)", valor: fmt(el.externa_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa externa." },
+
+    { clave: "nucleo_particulas_totales", label: "Partículas (núcleo)", valor: fmt(el.nucleo_particulas_totales, 0), descripcion: "Cantidad total de partículas en la capa núcleo." },
+    { clave: "media_particulas_totales", label: "Partículas (media)", valor: fmt(el.media_particulas_totales, 0), descripcion: "Cantidad total de partículas en la capa media." },
+
+    { clave: "valencia_fuente", label: "Fuente de valencia", valor: el.valencia_fuente ?? null, descripcion: "De dónde se derivó la valencia estructural (qué regla/capa la determinó)." },
   ];
 }
 
@@ -449,6 +481,21 @@ export function propiedadesCalculadasDeCompuesto(c: Compuesto): PropiedadCalcula
     { clave: "tipo_compuesto", label: "Tipo", valor: c.tipo_compuesto ?? null, descripcion: "Clasificación estructural (sustancia, mezcla, aleación, material estructural).", formula: "Sin enlace definido → mezcla · con estructura de enlace válida → compuesto" },
     { clave: "clasificacion", label: "Clasificación", valor: c.clasificacion ?? null, descripcion: "Clasificación derivada más específica del compuesto." },
     { clave: "estado_estructura", label: "Estado de estructura", valor: c.estado_estructura ?? null, descripcion: "Qué tan completa/consistente está la definición estructural del compuesto." },
+
+    // ─── Columnas reales en Supabase, traídas en el select pero nunca
+    // mostradas hasta ahora (ver auditoría 2026-08-30 "qué propiedades
+    // faltan en Compuesto", mismo criterio que ya se aplicó a Elemento).
+    // Se excluyen a propósito estructura/validacion/auditoria/
+    // propiedades_emergentes: son jsonb de diagnóstico interno, no
+    // aplanables a una tarjeta simple sin decidir antes qué mostrar de
+    // cada uno.
+    { clave: "formula_canonica", label: "Fórmula canónica", valor: c.formula_canonica ?? null, descripcion: "Notación canónica de la composición del compuesto (ej. Fl2Cr)." },
+    { clave: "tipo_estructura", label: "Tipo de estructura", valor: c.tipo_estructura ?? null, descripcion: "Clasificación de la arquitectura de enlaces del compuesto." },
+    { clave: "tipo_estructura_derivada", label: "Tipo de estructura (derivada)", valor: c.tipo_estructura_derivada ?? null, descripcion: "Tipo de estructura recalculado automáticamente a partir de la composición y enlaces actuales." },
+    { clave: "topologia_enlace", label: "Topología de enlace", valor: c.topologia_enlace ?? null, descripcion: "Forma en que se organizan los enlaces entre los elementos del compuesto (ej. lineal, ramificada)." },
+    { clave: "naturaleza_semantica", label: "Naturaleza semántica", valor: c.naturaleza_semantica ?? null, descripcion: "Interpretación de qué tipo de sustancia representa el compuesto dentro del canon." },
+    { clave: "razon_clasificacion", label: "Razón de clasificación", valor: c.razon_clasificacion ?? null, descripcion: "Motivo/regla por la que Supabase asignó la Clasificación mostrada arriba." },
+    { clave: "umbral_estabilidad", label: "Umbral de estabilidad", valor: fmt(c.umbral_estabilidad), proporcion: prop(c.umbral_estabilidad), descripcion: "Estabilidad mínima requerida para que el compuesto se considere formado de manera consistente." },
   ];
 }
 

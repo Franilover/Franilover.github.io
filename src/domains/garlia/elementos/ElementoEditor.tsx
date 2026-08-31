@@ -441,7 +441,12 @@ function SitiosEnlaceBloque({
  * Compuesto.
  */
 function PropiedadesFisicasBloque({ propiedades }: { propiedades: PropiedadCalculada[] }) {
-  return <TarjetaPropiedadesFisicas propiedades={propiedades} columnas={2} />;
+  // columnas=3 (antes 2): con las columnas de carga/catálisis/transición por
+  // capa + ocupación externa sumadas (ver auditoría 2026-08-30), la lista
+  // pasó de 21 a 41 propiedades — 2 columnas dejaba una sola tira vertical
+  // larguísima. 3 reparte mejor sin apretar tanto como las 5 de Compuesto
+  // (que tiene menos texto por etiqueta).
+  return <TarjetaPropiedadesFisicas propiedades={propiedades} columnas={3} />;
 }
 
 // ─── Visualización tipo átomo real ──────────────────────────────────────

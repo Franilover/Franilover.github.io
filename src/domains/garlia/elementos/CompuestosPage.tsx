@@ -258,7 +258,11 @@ const ENLACE_COLOR: Record<TipoEnlace, string> = {
  * marcado como "derivado".
  */
 function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: PropiedadCalculada[] }) {
-  return <TarjetaPropiedadesFisicas propiedades={propiedades} columnas={5} />;
+  // columnas=4 (antes 5): con Estabilidad-detalle + las columnas de
+  // clasificación/estructura fundidas (ver auditoría 2026-08-30), varias
+  // etiquetas nuevas son largas ("Tipo de estructura (derivada)", "Razón de
+  // clasificación") — 5 columnas las apretaba demasiado.
+  return <TarjetaPropiedadesFisicas propiedades={propiedades} columnas={4} />;
 }
 
 /**
