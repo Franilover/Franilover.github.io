@@ -99,14 +99,34 @@ export function ReaccionesPage({
     [reacciones, seleccionadoId],
   );
 
-  // Si se crea una reacción nueva, abrirla automáticamente — mismo espíritu
-  // que GruposCompuestosPage.
-  const idsConocidosRef = React.useRef(new Set(reacciones.map((r) => r.id)));
+  // Si se crea una reacción nueva, abrirla automáticamente — pero solo
+  // después de que la carga inicial haya terminado de verdad (loading ===
+  // false). Antes, idsConocidosRef arrancaba con new Set(reacciones.map(...))
+  // en el primer render, cuando `reacciones` casi siempre es [] (el fetch
+  // a Supabase/Dexie todavía no resolvió) — el set arrancaba vacío, así
+  // que en cuanto llegaban los datos reales TODA la lista se veía "nueva"
+  // contra ese set vacío y `.find()` devolvía la primera fila del array
+  // (ej. la reacción más vieja, tipo "Fotosíntesis"), abriendo su panel
+  // flotante solo sin que el usuario clickeara nada — y como pasa en cada
+  // carga de la página, se veía como "siempre se abre Fotosíntesis".
+  // Usar `loading` en vez de "primer array no vacío" además cubre el caso
+  // cache-first de useSupabaseData: Dexie puede pintar una primera tanda
+  // de datos reales (de una sesión anterior) mientras loading sigue true,
+  // y esa tanda tampoco debe contarse como línea base todavía — recién
+  // cuando loading pasa a false se fija la línea base real.
+  const idsConocidosRef = React.useRef<Set<string> | null>(null);
   useEffect(() => {
-    const nueva = reacciones.find((r) => !idsConocidosRef.current.has(r.id));
+    if (loading) return;
+    if (idsConocidosRef.current === null) {
+      // Primera vez que la carga terminó: la tomamos como línea base,
+      // sin disparar apertura automática.
+      idsConocidosRef.current = new Set(reacciones.map((r) => r.id));
+      return;
+    }
+    const nueva = reacciones.find((r) => !idsConocidosRef.current!.has(r.id));
     idsConocidosRef.current = new Set(reacciones.map((r) => r.id));
     if (nueva) setSeleccionadoId(nueva.id);
-  }, [reacciones]);
+  }, [reacciones, loading]);
 
   return (
     <div className="p-3 flex flex-col gap-3">
