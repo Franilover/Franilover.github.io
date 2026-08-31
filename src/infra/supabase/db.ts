@@ -922,11 +922,39 @@ class AgendaFraniDB extends Dexie {
   v_auditoria_compuestos_derivacion!: Table<AuditoriaCompuestoDexie, string>;
   v_auditoria_elementos_derivacion!: Table<AuditoriaElementoDexie, string>;
 
+  // ─── Bug preexistente (mismo patrón que hechizos/dones/etc. arriba,
+  // detectado ahora en auditoría de v42): v39 y v40 se agregaron a
+  // .stores() pero se saltaron su declaración de propiedad Table<> en la
+  // clase — TypeScript no tipaba db.compuesto_estabilidad, db.materiales,
+  // etc. (Dexie sí las creaba bien en runtime vía .stores(), así que no
+  // rompía nada en producción, solo el tipado). Paneles afectados:
+  // Sitios de enlace/Estabilidad/Enlaces reales (editor flotante de
+  // Elemento/Compuesto) y EstructurasPage/MaterialesPage.
+  // ─── v39: paneles de abajo de ElementoEditor/CompuestoEditor ─────────────
+  compuesto_estabilidad!: Table<FilaGenericaDexie, string>;
+  compuesto_enlaces!: Table<FilaGenericaDexie, string>;
+  enlace_sitios!: Table<FilaGenericaDexie, string>;
+  elemento_sitios_enlace!: Table<FilaGenericaDexie, string>;
+  // ─── v40: Estructuras (Química) y Materiales ─────────────────────────────
+  estructuras!: Table<FilaGenericaDexie, string>;
+  estructura_compuestos!: Table<FilaGenericaDexie, string>;
+  materiales!: Table<FilaGenericaDexie, string>;
+  material_componentes!: Table<FilaGenericaDexie, string>;
+  material_estructuras!: Table<FilaGenericaDexie, string>;
+
   // ─── v41: tags de Compuestos (catálogo + relación) y vista de perfil
   // reactivo de Material — ver detalle en version(41).stores() más abajo.
   tags!: Table<FilaGenericaDexie, string>;
   compuesto_tags!: Table<FilaGenericaDexie, string>;
   v_perfil_reactivo_material!: Table<FilaGenericaDexie, string>;
+
+  // ─── v42: Célula↔Compuesto, Tejido↔Célula, Tejido↔Compuesto — tablas
+  // puente que faltaban en el barrido de composición biológica (Célula/
+  // Tejido/Órgano). Mismo patrón que organo_tejidos/sistema_organos: hook
+  // filtra por celula_id/tejido_id, ver version(42).stores() más abajo.
+  celula_compuestos!: Table<FilaGenericaDexie, string>;
+  tejido_celulas!: Table<FilaGenericaDexie, string>;
+  tejido_compuestos!: Table<FilaGenericaDexie, string>;
 
   constructor() {
     super("AgendaFranilover");
@@ -1878,6 +1906,24 @@ class AgendaFraniDB extends Dexie {
       // para no inventar un id sintético que no existe en la fuente.
       compuesto_tags: "[compuesto_id+tag_id], compuesto_id, tag_id",
       v_perfil_reactivo_material: "id, material_id",
+    });
+
+    // ─── v42: barrido de composición biológica — Célula↔Compuesto,
+    // Tejido↔Célula, Tejido↔Compuesto pegaban directo a Supabase en cada
+    // apertura del panel de Célula/Tejido (useCelulaCompuestos.ts /
+    // useTejidoCelulas.ts / useTejidoCompuestos.ts), sin cache Dexie ni
+    // timeout — con mala conexión esos paneles quedaban vacíos
+    // indefinidamente, mismo síntoma que v39. Mismo patrón cache-first:
+    // se pinta lo que ya está en Dexie al instante y se revalida contra
+    // Supabase en segundo plano. Las tres son M:N editables desde su
+    // panel (rol/proporción) — sí entran en OFFLINE_WRITABLE.
+    // celula_compuestos está @deprecated (0 filas, reemplazada por
+    // celula_estructuras) pero se cachea igual por completitud y porque
+    // useOrganoTejidos.ts la sigue usando vía CONFIG_CELULA_COMPUESTOS.
+    this.version(42).stores({
+      celula_compuestos: "id, celula_id, compuesto_id, created_at",
+      tejido_celulas: "id, tejido_id, celula_id, created_at",
+      tejido_compuestos: "id, tejido_id, compuesto_id, created_at",
     });
   }
 }

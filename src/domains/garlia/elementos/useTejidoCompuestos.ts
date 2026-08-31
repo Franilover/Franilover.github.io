@@ -7,12 +7,15 @@
  * `tejido_compuestos` (nueva, migración ago-2026). Representa material de
  * matriz/estructura del tejido que NO pasa por ninguna Célula (ej. la parte
  * mineral de la matriz ósea, a diferencia del Osteocito que sí es celular).
- * Hermano de useTejidoCelulas.ts — mismo patrón, sin caché Dexie todavía
- * (ver nota en ese archivo).
+ * Hermano de useTejidoCelulas.ts — mismo patrón.
+ *
+ * v42: cache-first vía Dexie, mismo patrón que useOrganoTejidos.ts /
+ * useSistemaOrganos.ts (tejido_compuestos ya está en DEXIE_TABLES).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
+import { db } from "@/infra/supabase/db";
 
 import {
   CONFIG_COMPUESTOS,
@@ -20,6 +23,40 @@ import {
   type Compuesto,
   type TejidoCompuesto,
 } from "@/domains/garlia/elementos/types";
+
+// ── Cache-first: leer/escribir Dexie ───────────────────────────────────────
+async function leerVinculosDeDexie(tejidoId: string): Promise<TejidoCompuesto[]> {
+  try {
+    if (!db) return [];
+    const rows = await db.tejido_compuestos
+      .where("tejido_id")
+      .equals(tejidoId)
+      .toArray();
+    return rows as unknown as TejidoCompuesto[];
+  } catch {
+    return [];
+  }
+}
+
+async function leerCompuestosDeDexie(ids: string[]): Promise<Record<string, Compuesto>> {
+  const out: Record<string, Compuesto> = {};
+  if (!db || ids.length === 0) return out;
+  try {
+    const rows = await db.compuestos.bulkGet(ids);
+    for (const r of rows) if (r) out[(r as unknown as Compuesto).id] = r as unknown as Compuesto;
+  } catch {}
+  return out;
+}
+
+async function guardarEnDexie(vinculos: TejidoCompuesto[], compuestos: Compuesto[]) {
+  try {
+    if (!db) return;
+    if (vinculos.length) await db.tejido_compuestos.bulkPut(vinculos as any[]);
+    if (compuestos.length) await db.compuestos.bulkPut(compuestos as any[]);
+  } catch (e) {
+    console.warn("[useTejidoCompuestos] no se pudo guardar en Dexie:", e);
+  }
+}
 
 export interface CompuestoDeTejido {
   vinculo_id: string;
@@ -42,8 +79,20 @@ export function useTejidoCompuestos(tejidoId: string | null) {
       setLoading(false);
       return;
     }
-    setLoading(true);
 
+    // ── Paso 1: pintar de inmediato con lo que ya haya en Dexie ──────────
+    const vinculosLocales = await leerVinculosDeDexie(tejidoId);
+    if (vinculosLocales.length > 0) {
+      setVinculos(vinculosLocales);
+      const compuestoIdsLocales = vinculosLocales.map((v) => v.compuesto_id);
+      const compuestosLocales = await leerCompuestosDeDexie(compuestoIdsLocales);
+      setCompuestos(compuestosLocales);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    // ── Paso 2: revalidar contra Supabase en segundo plano ────────────────
     const { data: vinculoData, error: vinculoError } = await supabase
       .from(CONFIG_TEJIDO_COMPUESTOS.tabla)
       .select(CONFIG_TEJIDO_COMPUESTOS.select)
@@ -51,8 +100,10 @@ export function useTejidoCompuestos(tejidoId: string | null) {
       .order("created_at", { ascending: true });
 
     if (vinculoError || !vinculoData) {
-      setVinculos([]);
-      setCompuestos({});
+      if (vinculosLocales.length === 0) {
+        setVinculos([]);
+        setCompuestos({});
+      }
       setLoading(false);
       return;
     }
@@ -62,6 +113,7 @@ export function useTejidoCompuestos(tejidoId: string | null) {
     if (compuestoIds.length === 0) {
       setCompuestos({});
       setLoading(false);
+      void guardarEnDexie(vinculoData as unknown as TejidoCompuesto[], []);
       return;
     }
 
@@ -74,6 +126,10 @@ export function useTejidoCompuestos(tejidoId: string | null) {
     for (const c of (compuestoData ?? []) as unknown as Compuesto[]) compuestosPorId[c.id] = c;
     setCompuestos(compuestosPorId);
     setLoading(false);
+    void guardarEnDexie(
+      vinculoData as unknown as TejidoCompuesto[],
+      Object.values(compuestosPorId),
+    );
   }, [tejidoId]);
 
   useEffect(() => {
@@ -114,17 +170,24 @@ export function useTejidoCompuestos(tejidoId: string | null) {
           .eq("id", compuestoId)
           .single();
         if (compuestoData) {
-          setCompuestos((prev) => ({ ...prev, [compuestoId]: compuestoData as unknown as Compuesto }));
+          const compuesto = compuestoData as unknown as Compuesto;
+          setCompuestos((prev) => ({ ...prev, [compuestoId]: compuesto }));
+          void guardarEnDexie([], [compuesto]);
         }
       }
       setVinculos((prev) => [...prev, vinculo as unknown as TejidoCompuesto]);
+      void guardarEnDexie([vinculo as unknown as TejidoCompuesto], []);
       return vinculo as unknown as TejidoCompuesto;
     },
     [tejidoId, compuestos],
   );
 
   const actualizarRol = useCallback(async (vinculoId: string, rol: string) => {
-    setVinculos((prev) => prev.map((v) => (v.id === vinculoId ? { ...v, rol } : v)));
+    setVinculos((prev) => {
+      const next = prev.map((v) => (v.id === vinculoId ? { ...v, rol } : v));
+      void guardarEnDexie(next.filter((v) => v.id === vinculoId), []);
+      return next;
+    });
     const { error } = await supabase
       .from(CONFIG_TEJIDO_COMPUESTOS.tabla)
       .update({ rol })
@@ -133,7 +196,11 @@ export function useTejidoCompuestos(tejidoId: string | null) {
   }, []);
 
   const actualizarProporcion = useCallback(async (vinculoId: string, proporcion: string) => {
-    setVinculos((prev) => prev.map((v) => (v.id === vinculoId ? { ...v, proporcion } : v)));
+    setVinculos((prev) => {
+      const next = prev.map((v) => (v.id === vinculoId ? { ...v, proporcion } : v));
+      void guardarEnDexie(next.filter((v) => v.id === vinculoId), []);
+      return next;
+    });
     const { error } = await supabase
       .from(CONFIG_TEJIDO_COMPUESTOS.tabla)
       .update({ proporcion })
@@ -143,6 +210,9 @@ export function useTejidoCompuestos(tejidoId: string | null) {
 
   const quitar = useCallback(async (vinculoId: string) => {
     setVinculos((prev) => prev.filter((v) => v.id !== vinculoId));
+    try {
+      if (db) await db.tejido_compuestos.delete(vinculoId);
+    } catch {}
     const { error } = await supabase.from(CONFIG_TEJIDO_COMPUESTOS.tabla).delete().eq("id", vinculoId);
     if (error) console.error("[useTejidoCompuestos] error quitando vínculo:", error);
   }, []);

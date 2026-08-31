@@ -156,6 +156,12 @@ const DEXIE_TABLES = new Set([
   "tags",
   "compuesto_tags",
   "v_perfil_reactivo_material",
+  // ─── v42: Célula↔Compuesto, Tejido↔Célula, Tejido↔Compuesto — tablas
+  // puente del panel de composición biológica, antes sin cache local
+  // (useCelulaCompuestos.ts / useTejidoCelulas.ts / useTejidoCompuestos.ts).
+  "celula_compuestos",
+  "tejido_celulas",
+  "tejido_compuestos",
 ]);
 
 const OFFLINE_WRITABLE = new Set([
@@ -233,6 +239,15 @@ const OFFLINE_WRITABLE = new Set([
   // "flora" (legacy) removida 2026-08-26: migrada a "organismos".
   // ─── v37: mineral_reacciones ─────────────────────────────────────────────
   "mineral_reacciones",
+  // ─── v42: Célula↔Compuesto, Tejido↔Célula, Tejido↔Compuesto — M:N
+  // editables desde su panel (rol/proporción), mismo espíritu que
+  // organo_tejidos/sistema_organos. Los hooks siguen con su propia
+  // lógica manual (no pasan por el mutate/addRow genérico de este
+  // archivo), así que esta entrada es por completitud/consumidores
+  // futuros; lo que realmente activa el cache-first es DEXIE_TABLES.
+  "celula_compuestos",
+  "tejido_celulas",
+  "tejido_compuestos",
   // NOTA v41: "compuesto_tags" a propósito NO entra acá. No tiene columna
   // "id" propia (PK compuesta real: compuesto_id+tag_id), y el flujo
   // offline genérico de este archivo (getDexieRow/makePendingRow/
