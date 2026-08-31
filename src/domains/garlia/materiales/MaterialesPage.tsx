@@ -4,21 +4,24 @@ import {
   Box,
   ChevronRight,
   Loader2,
-  Sparkles,
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { PropiedadesFisicasGenerico } from "@/domains/garlia/_shared/GridPropiedadesCalculadas";
+import {
+  propiedadesCalculadasGenerico,
+  TarjetaPropiedadesFisicas,
+} from "@/domains/garlia/_shared/GridPropiedadesCalculadas";
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
+import type { PropiedadCalculada } from "@/domains/garlia/elementos/types";
 
 import { useMaterialComponentes } from "./useMaterialComponentes";
 import { useMaterialEstructuras } from "./useMaterialEstructuras";
 import { useMateriales } from "./useMateriales";
 import { usePerfilReactivoMaterial } from "./usePerfilReactivoMaterial";
-import type { Material } from "./types";
+import type { PerfilReactivoMaterial, Material } from "./types";
 
 /** Etiqueta legible para el origen de una propiedad física (ver
  *  documentacion_sistema "Fuente por propiedad en Material v187", orden
@@ -45,64 +48,55 @@ function formatValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** Etiquetas legibles para los ejes del Perfil Reactivo Emergente V2. */
-const EJES_PERFIL_REACTIVO = [
-  ["afinidad_reactiva", "Afinidad reactiva"],
-  ["dinamismo_reactivo", "Dinamismo reactivo"],
-  ["estabilidad_reactiva", "Estabilidad reactiva"],
-  ["conductividad_reactiva", "Conductividad reactiva"],
-  ["actividad_catalitica_reactiva", "Actividad catalítica"],
-  ["potencial_transicion_reactivo", "Potencial de transición"],
-  ["potencial_transformacion_reactiva", "Potencial de transformación"],
-] as const;
+/** Ejes del Perfil Reactivo Emergente V2, con etiqueta y descripción — mismo
+ *  criterio que las listas MAGNITUDES/INDICES de propiedadesCalculadasGenerico
+ *  (elementos/types.ts / GridPropiedadesCalculadas.tsx), para que estos ejes
+ *  se muestren como PropiedadCalculada más y compartan el diseño exacto de
+ *  "Propiedades físicas" (TarjetaPropiedadesFisicas) en vez de un bloque
+ *  aparte con su propio grid. Todos son índices [0,1] → llevan barra de
+ *  proporción igual que estabilidad/rigidez/etc. */
+const EJES_PERFIL_REACTIVO: { clave: string; label: string; descripcion: string }[] = [
+  { clave: "afinidad_reactiva", label: "Afinidad reactiva", descripcion: "Qué tan bien tiende a acoplarse/reaccionar con otras sustancias." },
+  { clave: "dinamismo_reactivo", label: "Dinamismo reactivo", descripcion: "Qué tan activa/cambiante es la microestructura reactiva del material." },
+  { clave: "estabilidad_reactiva", label: "Estabilidad reactiva", descripcion: "Qué tan resistente es a iniciar o sostener una reacción." },
+  { clave: "conductividad_reactiva", label: "Conductividad reactiva", descripcion: "Facilidad para propagar una influencia reactiva a través del material." },
+  { clave: "actividad_catalitica_reactiva", label: "Actividad catalítica", descripcion: "Capacidad de acelerar/facilitar reacciones sin consumirse." },
+  { clave: "potencial_transicion_reactivo", label: "Potencial de transición", descripcion: "Qué tan propenso está el material a cambiar de estado o forma." },
+  { clave: "potencial_transformacion_reactiva", label: "Potencial de transformación", descripcion: "Qué tan propenso está el material a transformarse en algo distinto." },
+];
 
 /**
- * Perfil Reactivo Emergente V2 (documentacion_sistema, orden 1101).
+ * Traduce el Perfil Reactivo Emergente V2 (documentacion_sistema, orden
+ * 1101; fuente real: vista v_perfil_reactivo_material, ver
+ * usePerfilReactivoMaterial) al mismo shape PropiedadCalculada que usa
+ * TarjetaPropiedadesFisicas — pedido explícito: mismo diseño que
+ * "Propiedades físicas" en vez de un bloque "Perfil reactivo" aparte.
  *
  * No es una lista de etiquetas manuales tipo "inflamable/explosivo": son
- * ejes derivados de la microestructura del material, pensados para ser
- * consumidos por condiciones de procesos/reacciones/fenómenos. Cuando el
- * material no tiene desglose microscópico suficiente, el estado es
- * "insuficiente_informacion" y NO se muestra un perfil inventado — eso es
- * información propia del canon, no un vacío de UI.
+ * ejes derivados de la microestructura del material. Cuando el material no
+ * tiene desglose microscópico suficiente (estado !== "derivado_microestructura")
+ * devuelve [] — información propia del canon, no se inventa un perfil ni se
+ * fuerza a cero.
  */
-function MaterialPerfilReactivo({ materialId }: { materialId: string }) {
-  const { item, loading } = usePerfilReactivoMaterial(materialId);
+function propiedadesDePerfilReactivo(
+  item: PerfilReactivoMaterial | null,
+): PropiedadCalculada[] {
+  if (!item || item.estado !== "derivado_microestructura" || !item.perfil) return [];
 
-  return (
-    <div className="flex flex-col gap-1.5 min-w-0 p-2">
-      <div className="flex items-center gap-1.5">
-        <Sparkles size={11} className="text-primary/40 shrink-0" />
-        <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-          Perfil reactivo
-        </span>
-      </div>
+  const prop = (v: number | null | undefined) =>
+    typeof v === "number" ? Math.max(0, Math.min(1, v)) : undefined;
+  const fmt = (v: number | null | undefined) => (typeof v === "number" ? v.toFixed(3) : null);
 
-      {loading ? (
-        <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
-          <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
-        </div>
-      ) : !item || item.estado !== "derivado_microestructura" || !item.perfil ? (
-        <p className="py-1 text-micro text-primary/30">
-          Información insuficiente: sin desglose microscópico suficiente todavía.
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-1.5">
-          {EJES_PERFIL_REACTIVO.filter(([key]) => item.perfil?.[key] !== undefined).map(([key, label]) => (
-            <div
-              key={key}
-              className="flex items-center justify-between gap-1 min-w-0 px-2 py-1.5"
-            >
-              <span className="text-micro font-bold text-primary/50 truncate">{label}</span>
-              <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
-                {formatValue(item.perfil?.[key])}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  return EJES_PERFIL_REACTIVO.filter((eje) => item.perfil?.[eje.clave] !== undefined).map((eje) => {
+    const v = item.perfil?.[eje.clave] as number | undefined;
+    return {
+      clave: `pr_${eje.clave}`,
+      label: eje.label,
+      valor: fmt(v),
+      proporcion: prop(v),
+      descripcion: eje.descripcion,
+    };
+  });
 }
 
 function MaterialDetail({ material }: { material: Material }) {
@@ -110,6 +104,21 @@ function MaterialDetail({ material }: { material: Material }) {
   const { items: estructuras, loading: loadingEstructuras } = useMaterialEstructuras(material.id);
   const { items: compuestos } = useCompuestos();
   const { items: estructurasCatalogo } = useEstructuras();
+  const { item: perfilReactivo, loading: loadingPerfilReactivo } = usePerfilReactivoMaterial(material.id);
+
+  // Propiedades físicas (jsonb propiedades_calculadas, vía
+  // propiedadesCalculadasGenerico) + Perfil Reactivo Emergente V2 (vista
+  // v_perfil_reactivo_material, vía propiedadesDePerfilReactivo) fundidos en
+  // una sola lista — pedido explícito: mismo diseño de tarjeta para ambos,
+  // como ya se hizo con "Estabilidad — detalle" en CompuestoEditor. Mientras
+  // el perfil reactivo sigue cargando no se agregan sus filas todavía, para
+  // no mostrar "sin dato" un instante y después aparecer.
+  const propiedades = material.propiedades_calculadas ?? {};
+  const propiedadesCombinadas = [
+    ...propiedadesCalculadasGenerico(propiedades),
+    ...(loadingPerfilReactivo ? [] : propiedadesDePerfilReactivo(perfilReactivo)),
+  ];
+  const fuente = etiquetaFuenteFisica(propiedades.fuente_fisica as string | undefined);
 
   return (
     <div className="flex flex-col gap-3">
@@ -129,26 +138,17 @@ function MaterialDetail({ material }: { material: Material }) {
 
       <div className="grid grid-cols-2 gap-3 items-start">
         <div className="flex flex-col gap-2 min-w-0">
-          {(() => {
-            const propiedades = material.propiedades_calculadas ?? {};
-            const fuente = etiquetaFuenteFisica(propiedades.fuente_fisica as string | undefined);
-            return (
-              <>
-                {fuente && (
-                  <div className="flex justify-end">
-                    <span
-                      title="Origen de estos valores: composición química y/o estructura física del material"
-                      className="shrink-0 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-micro font-semibold text-primary/60"
-                    >
-                      {fuente}
-                    </span>
-                  </div>
-                )}
-                <PropiedadesFisicasGenerico propiedades={propiedades} columnas={2} />
-              </>
-            );
-          })()}
-          <MaterialPerfilReactivo materialId={material.id} />
+          {fuente && (
+            <div className="flex justify-end">
+              <span
+                title="Origen de estos valores: composición química y/o estructura física del material"
+                className="shrink-0 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-micro font-semibold text-primary/60"
+              >
+                {fuente}
+              </span>
+            </div>
+          )}
+          <TarjetaPropiedadesFisicas propiedades={propiedadesCombinadas} columnas={2} />
         </div>
 
         <div className="flex flex-col gap-2 min-w-0">
