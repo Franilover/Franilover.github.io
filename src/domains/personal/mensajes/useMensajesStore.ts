@@ -107,7 +107,7 @@ export const useMensajesStore = create<MensajesState>()(
         const LIMITE_MS = 30 * 24 * 60 * 60 * 1000;
         const ahora = Date.now();
         const posicionesVivas = Object.fromEntries(
-          Object.entries(state.ultimaPosicion).filter(
+          (Object.entries(state.ultimaPosicion) as [string, UltimaPosicion][]).filter(
             ([, v]) => ahora - v.actualizadoAt < LIMITE_MS,
           ),
         );

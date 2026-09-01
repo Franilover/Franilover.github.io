@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, CheckCheck, Cloud, Heart, Megaphone, MessageSquareText, Mic, NotebookPen, Paperclip, Pencil, Phone, Plus, Reply, Send, Sparkle, Trash2, Waves, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, ChevronDown, Cloud, Heart, Megaphone, MessageSquareText, Mic, NotebookPen, Paperclip, Pencil, Phone, Plus, Reply, Send, Sparkle, Trash2, Waves, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -90,6 +90,48 @@ const ANIMACIONES_KAOMOJI: { id: AnimacionBurbuja; label: string; Icono: typeof 
 ];
 
 /** className de la animación CSS (definida como keyframes globales más abajo). */
+/**
+ * Etiqueta de un separador de día tipo WhatsApp: "Hoy", "Ayer", el nombre
+ * del día si fue esta semana, o la fecha corta si fue antes. Recibe un
+ * Date ya normalizado a medianoche (ver claveDia) para comparar por día
+ * calendario, no por diferencia de 24hs exactas (evita que "ayer a las
+ * 23:59" y "hoy a las 00:01" cuenten como el mismo día).
+ */
+function etiquetaSeparadorFecha(fecha: Date): string {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const ayer = new Date(hoy);
+  ayer.setDate(ayer.getDate() - 1);
+
+  if (fecha.getTime() === hoy.getTime()) return "Hoy";
+  if (fecha.getTime() === ayer.getTime()) return "Ayer";
+
+  const diffDias = Math.round((hoy.getTime() - fecha.getTime()) / 86_400_000);
+  if (diffDias > 0 && diffDias < 7) {
+    // Esta semana: nombre del día ("Lunes", "Martes"...) — más legible que
+    // una fecha corta para algo tan reciente, igual que WhatsApp.
+    const nombre = fecha.toLocaleDateString("es-AR", { weekday: "long" });
+    return nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  }
+
+  // Más de una semana: fecha corta. Se agrega el año solo si no es el
+  // actual, para no ensuciar el separador con algo redundante la mayoría
+  // de las veces.
+  const mismoAño = fecha.getFullYear() === hoy.getFullYear();
+  return fecha.toLocaleDateString("es-AR", {
+    day: "numeric",
+    month: "long",
+    year: mismoAño ? undefined : "numeric",
+  });
+}
+
+/** Medianoche local del día de `iso`, para agrupar mensajes por día calendario. */
+function claveDia(iso: string): number {
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 function claseAnimacion(animacion: AnimacionBurbuja | null | undefined): string {
   if (animacion === "flotar") return "animate-kaomoji-flotar";
   if (animacion === "latido") return "animate-kaomoji-latido";
@@ -1341,8 +1383,47 @@ export default function DetalleConversacion() {
   };
 
   const guardarPosicion = useMensajesStore((s) => s.guardarPosicion);
+
+  // ── Botón flotante "ir al final" + contador de mensajes nuevos ──────────
+  // Mismo patrón que WhatsApp: si el usuario scrolleó hacia arriba a leer
+  // historial, un botón flotante aparece para volver al fondo de un tap, y
+  // si mientras tanto llegan mensajes del otro, se acumula un contador en
+  // vez de forzarle el scroll (eso ya lo evita el efecto de arriba, esto
+  // solo le da una forma de "ponerse al día" cuando quiera).
+  const [lejosDelFondo, setLejosDelFondo] = useState(false);
+  const [mensajesNuevosOcultos, setMensajesNuevosOcultos] = useState(0);
+  const cantidadMensajesPrevAlejadoRef = useRef(mensajes.length);
+  useEffect(() => {
+    const nuevos = mensajes.length - cantidadMensajesPrevAlejadoRef.current;
+    cantidadMensajesPrevAlejadoRef.current = mensajes.length;
+    if (nuevos <= 0) return;
+    const ultimo = mensajes[mensajes.length - 1];
+    // Solo suma al contador si el mensaje nuevo es del otro — el propio ya
+    // se sigue automáticamente al fondo por el efecto de scroll de arriba,
+    // así que nunca queda "oculto" detrás del botón.
+    if (lejosDelFondo && ultimo && ultimo.remitente_id !== user?.id) {
+      setMensajesNuevosOcultos((n) => n + nuevos);
+    }
+  }, [mensajes, lejosDelFondo, user?.id]);
+  // Al cambiar de conversación, arrancamos siempre "al fondo" (coherente
+  // con que esta pantalla siempre abre ahí) y sin contador acumulado.
+  useEffect(() => {
+    setLejosDelFondo(false);
+    setMensajesNuevosOcultos(0);
+  }, [conversacionId]);
+
+  const handleIrAlFondo = () => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    setMensajesNuevosOcultos(0);
+  };
+
   const handleScrollMensajes = (e: React.UIEvent<HTMLDivElement>) => {
     if (e.currentTarget.scrollTop < 80) void handleCargarAnteriores();
+    const contenedor = e.currentTarget;
+    const distanciaAlFondo = contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight;
+    const alejado = distanciaAlFondo > 300;
+    setLejosDelFondo(alejado);
+    if (!alejado) setMensajesNuevosOcultos(0);
   };
 
   // Al salir de la conversación (cambio de chat o desmontaje), guardamos
@@ -1622,6 +1703,18 @@ export default function DetalleConversacion() {
     return mapa;
   }, [reacciones]);
 
+  // Set de "mensajeId:emoji" para las reacciones puestas por el propio
+  // usuario — lookup O(1) para pintar el emoji propio resaltado, en vez de
+  // recorrer `reacciones` filtrando por mensaje en cada pill (lo mismo que
+  // reaccionesPorMensaje evita para el conteo agrupado).
+  const propiasReaccionesPorMensaje = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of reacciones) {
+      if (r.perfil_id === user?.id) set.add(`${r.mensaje_id}:${r.emoji}`);
+    }
+    return set;
+  }, [reacciones, user?.id]);
+
   const explosionesPorMensaje = useMemo(() => {
     const mapa = new Map<string, Record<string, number>>();
     for (const e of explosiones) {
@@ -1647,6 +1740,22 @@ export default function DetalleConversacion() {
     const mapa = new Map<string, Mensaje>();
     for (const m of mensajes) mapa.set(m.id, m);
     return mapa;
+  }, [mensajes]);
+
+  // Set de ids de mensajes que son el primero de su día calendario —
+  // adelante de esos va el separador "Hoy" / "Ayer" / etc, como WhatsApp.
+  // Se calcula una sola vez por cambio de `mensajes`, no por mensaje.
+  const idsInicioDeDia = useMemo(() => {
+    const set = new Set<string>();
+    let diaAnterior: number | null = null;
+    for (const m of mensajes) {
+      const dia = claveDia(m.created_at);
+      if (dia !== diaAnterior) {
+        set.add(m.id);
+        diaAnterior = dia;
+      }
+    }
+    return set;
   }, [mensajes]);
 
   if (!user) {
@@ -1735,6 +1844,11 @@ export default function DetalleConversacion() {
       </div>
 
       {/* ── Mensajes ── */}
+      {/* Wrapper relative solo para poder anclar el botón flotante "ir al
+          fondo" (absolute) sin alterar el contenedor de scroll en sí — ese
+          contenedor tiene lógica de layout/scroll delicada (ver comentarios
+          debajo) que no conviene tocar. */}
+      <div className="relative flex-1 min-h-0">
       {/* visibility (no display:none) para que el contenedor SÍ tenga
           layout real y scrollHeight calculable mientras el useLayoutEffect
           de arriba decide dónde poner el scroll — con display:none el
@@ -1774,9 +1888,24 @@ export default function DetalleConversacion() {
 
             const disenoBurbuja = estiloExtraBurbuja(m.estilo, esMio, m.id);
             const esKaomoji = m.estilo === "kaomoji";
+            const mostrarSeparadorFecha = idsInicioDeDia.has(m.id);
 
             return (
-              <div key={m.id} className={`flex flex-col ${esMio ? "items-end" : "items-start"} group`}>
+              <React.Fragment key={m.id}>
+                {mostrarSeparadorFecha && (
+                  <div className="flex justify-center my-2 select-none" aria-hidden="true">
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-wide px-3 py-1 rounded-full"
+                      style={{
+                        background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+                        color: "color-mix(in srgb, var(--foreground) 55%, transparent)",
+                      }}
+                    >
+                      {etiquetaSeparadorFecha(new Date(claveDia(m.created_at)))}
+                    </span>
+                  </div>
+                )}
+                <div className={`flex flex-col ${esMio ? "items-end" : "items-start"} group`}>
                 <div
                   data-mensaje-burbuja
                   className={`max-w-[75%] relative select-none md:select-text ${
@@ -2039,10 +2168,8 @@ export default function DetalleConversacion() {
                 {/* Reacciones puestas al mensaje */}
                 {Object.keys(reaccionesAgrupadas).length > 0 && (
                   <div className="flex gap-1 mt-0.5">
-                    {Object.entries(reaccionesAgrupadas).map(([emoji, cantidad]) => {
-                      const propia = reaccionesDelMensaje.some(
-                        (r) => r.perfil_id === user.id && r.emoji === emoji,
-                      );
+                    {(Object.entries(reaccionesAgrupadas) as [string, number][]).map(([emoji, cantidad]) => {
+                      const propia = propiasReaccionesPorMensaje.has(`${m.id}:${emoji}`);
                       return (
                         <button
                           key={emoji}
@@ -2072,7 +2199,7 @@ export default function DetalleConversacion() {
                     queda guardado). Click también suma otra tanda. */}
                 {Object.keys(explosionesAgrupadas).length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-0.5 max-w-[75%]">
-                    {Object.entries(explosionesAgrupadas).map(([emoji, cantidad]) => (
+                    {(Object.entries(explosionesAgrupadas) as [string, number][]).map(([emoji, cantidad]) => (
                       <button
                         key={emoji}
                         onClick={() => dispararExplosionEmoji(m.id, emoji)}
@@ -2103,6 +2230,7 @@ export default function DetalleConversacion() {
                   </span>
                 )}
               </div>
+              </React.Fragment>
             );
           })
         )}
@@ -2136,6 +2264,31 @@ export default function DetalleConversacion() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Botón flotante "ir al final" — aparece solo cuando el usuario
+          scrolleó lejos del fondo leyendo historial (ver handleScrollMensajes).
+          El contador de mensajes nuevos ocultos solo suma mensajes ajenos:
+          los propios ya se siguen automáticamente al fondo. */}
+      {lejosDelFondo && (
+        <button
+          onClick={handleIrAlFondo}
+          aria-label="Ir al último mensaje"
+          className="absolute right-4 bottom-3 flex items-center gap-1.5 pl-3 pr-2 py-2 rounded-full z-10"
+          style={{
+            background: "var(--white-custom)",
+            border: "var(--border-width) solid color-mix(in srgb, var(--primary) 20%, transparent)",
+            boxShadow: "var(--shadow-card)",
+          }}
+        >
+          {mensajesNuevosOcultos > 0 && (
+            <span className="text-micro font-bold text-primary">
+              {mensajesNuevosOcultos > 99 ? "99+" : mensajesNuevosOcultos}
+            </span>
+          )}
+          <ChevronDown className="text-primary" size={16} />
+        </button>
+      )}
       </div>
 
       {error && (
