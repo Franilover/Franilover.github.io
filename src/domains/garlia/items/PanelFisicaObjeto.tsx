@@ -1,12 +1,13 @@
 "use client";
 
-import { Loader2, Pencil, Ruler, Weight, X } from "lucide-react";
+import { Loader2, Pencil, Weight, X } from "lucide-react";
 import React, { useState } from "react";
 
 import { useMateriales } from "@/domains/garlia/materiales/useMateriales";
 
 import { useItemMateriales } from "./useItemMateriales";
 import { SelectorMaterialesItem } from "./SelectorMaterialesItem";
+import { EditorGeometriaItem } from "./EditorGeometriaItem";
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "—";
@@ -133,24 +134,21 @@ export function PanelFisicaObjeto({
         )}
       </section>
 
-      <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Ruler className="h-4 w-4 text-primary/50" />
-          <div>
-            <h3 className="text-sm font-semibold text-primary">Geometría</h3>
-            <p className="mt-1 text-xs text-primary/45">Volumen y forma declarados de la instancia</p>
-          </div>
-        </div>
-        {!geometriaFisica || Object.keys(geometriaFisica).length === 0 ? (
-          <p className="py-2 text-sm text-primary/40">Sin geometría física declarada.</p>
-        ) : (
-          <div>
-            {Object.entries(geometriaFisica).map(([key, value]) => (
-              <PropertyRow key={key} label={key} value={value} />
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Geometría — hoy el motor solo lee geometria_fisica.volumen (+
+          unidad_volumen) para compararlo contra el volumen que deriva de
+          materiales/estructura. Editable acá; el resultado de la
+          comparación (volumen_comparacion) es solo lectura, viene de
+          propiedades_fisicas. */}
+      <EditorGeometriaItem
+        geometriaFisica={geometriaFisica}
+        itemId={itemId}
+        volumenComparacion={
+          propiedades.volumen_comparacion as
+            | { estado?: string; diferencia_si?: number | null; diferencia_relativa?: number | null }
+            | undefined
+        }
+        onGuardado={onRefrescarItem}
+      />
 
       <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
         <div className="mb-3 flex items-center justify-between gap-2">

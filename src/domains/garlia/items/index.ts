@@ -19,3 +19,5 @@ export {
 export { useItemMateriales } from "./useItemMateriales";
 export { PanelFisicaObjeto } from "./PanelFisicaObjeto";
 export { SelectorMaterialesItem } from "./SelectorMaterialesItem";
+export { EditorGeometriaItem } from "./EditorGeometriaItem";
+export { useUnidadVolumen } from "./useUnidadVolumen";
