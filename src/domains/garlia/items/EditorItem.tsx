@@ -20,7 +20,7 @@
  */
 
 
-import { Bug, Dices, Layers, Package, Sparkles, X } from "lucide-react";
+import { Bug, Dices, Package, X } from "lucide-react";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
@@ -48,8 +48,6 @@ import { useVetas } from "@/domains/garlia/elementos/useVetas";
 import { PanelEditorGrano, PanelEditorVeta } from "@/domains/garlia/fisica/CatalogoVetasFisica";
 import { useEntidadVinculosGrupo } from "@/domains/garlia/_shared/useEntidadVinculosGrupo";
 import { useItemHabilidadesReaccion } from "@/domains/garlia/_shared/useItemHabilidadesReaccion";
-import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
-import { SeccionReaccionesVinculadas } from "@/domains/garlia/_shared/SeccionReaccionesVinculadas";
 
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
@@ -373,62 +371,6 @@ export function EditorItem({
                 estadoFisico={form.estado_fisico}
                 geometriaFisica={form.geometria_fisica}
                 onRefrescarItem={refrescarPropiedadesFisicas}
-              />
-
-              {/* Formaciones — partes materiales del ítem (mango, hoja,
-                  empuñadura…), cada una con su propia fórmula de
-                  compuestos. Catálogo real "formaciones", el mismo que
-                  usan las Formaciones de Minerales. */}
-              <SeccionGruposVinculados
-                titulo="Formaciones"
-                descripcion="Partes materiales del ítem, cada una con su propia fórmula de compuestos — mismo catálogo que las Formaciones de Minerales."
-                icono={Layers}
-                tipo="formacion"
-                items={estructura.items}
-                catalogo={catalogoEstructura}
-                loading={estructura.loading}
-                onCrearNuevo={async () => {
-                  const nuevo = await estructura.crearYVincular();
-                  if (nuevo) setEditandoGrupoId(nuevo.id);
-                  return nuevo;
-                }}
-                onUsarExistente={(id) => void estructura.vincularExistente(id)}
-                onDelete={(vinculoId) => void estructura.desvincular(vinculoId)}
-                onAbrirGrupo={setEditandoGrupoId}
-                onAbrirCelula={setEditandoGranoId}
-                placeholderNombre="Nombre de la formación (ej: Cuarzo)…"
-                placeholderNotas="Notas de esta formación…"
-                labelCrear="Crear formación nueva"
-                labelExistente="Usar una existente"
-                labelBuscar="Buscar formación…"
-              />
-
-              {/* Poder/Habilidad — ahora son N Reacciones del catálogo
-                  global de Química (consume/produce), vinculadas N:N igual
-                  que Estructura. Se muestran en grid de 2 columnas (2
-                  habilidades por fila). Editar una Reacción acá afecta a
-                  todo lo que la use. */}
-              <SeccionReaccionesVinculadas
-                titulo="Poder / Habilidad"
-                descripcion="Reacciones químicas que le dan su efecto a este ítem."
-                icono={Sparkles}
-                items={habilidades.items}
-                catalogo={reacciones}
-                loading={habilidades.loading}
-                compuestos={compuestos}
-                elementos={elementos}
-                onCrearNuevo={() => void habilidades.crearYVincular()}
-                onUsarExistente={(id) => void habilidades.vincularExistente(id)}
-                onUpdate={(id, updates) => {
-                  onReaccionActualizadaLocal(id, updates);
-                  void habilidades.actualizar(id, updates);
-                }}
-                onDelete={(vinculoId) => void habilidades.desvincular(vinculoId)}
-                onAbrirItem={(it) => setEditandoCompuestoId(it.tipo === "compuesto" ? it.id : null)}
-                onAbrirReaccion={setEditandoReaccionId}
-                labelCrear="Crear habilidad nueva"
-                labelExistente="Usar una existente"
-                labelBuscar="Buscar habilidad…"
               />
 
               <div className="space-y-1.5">
