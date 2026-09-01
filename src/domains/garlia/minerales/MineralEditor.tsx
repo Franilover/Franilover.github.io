@@ -22,7 +22,7 @@
  * (son genéricos, sin nada específico de planta).
  */
 
-import { Gem, Leaf, Plus } from "lucide-react";
+import { Gem, Leaf } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { RichEditor } from "@/editor/lexical";
@@ -41,7 +41,6 @@ import { PanelEditorGrano, PanelEditorVeta } from "@/domains/garlia/fisica/Catal
 import { type Compuesto, type Elemento, type Reaccion } from "@/domains/garlia/elementos/types";
 import { SelectorImagen } from "@/domains/garlia/_shared/UIComponents";
 import { EditorHeaderBar } from "@/domains/garlia/_shared/EditorHeaderBar";
-import { AfinidadEntreEntidadesPanel } from "@/domains/garlia/_shared/AfinidadEntreEntidadesPanel";
 import { SeccionReaccionVinculada } from "@/domains/garlia/_shared/SeccionReaccionVinculada";
 import { useEntidadVinculoReaccion } from "@/domains/garlia/_shared/useEntidadVinculoReaccion";
 import {
@@ -55,8 +54,6 @@ import { type Mineral, type MineralProceso } from "./types";
 import { useEcosistemas } from "@/domains/garlia/biologia/useBiologia";
 import { EcosistemaPopoverContent } from "@/domains/garlia/biologia/EcosistemaPopoverContent";
 import { PopoverFlotante } from "@/domains/garlia/_shared/PopoverFlotante";
-
-import { SeccionGruposVinculados } from "@/domains/garlia/_shared/SeccionGruposVinculados";
 
 export function MineralEditor({
   mineral: mineralProp,
@@ -142,7 +139,7 @@ export function MineralEditor({
     eliminarProceso,
   } = useMineralFormacionesProcesos(mineralProp.id, catalogoFormaciones, form);
 
-  const [tabActiva, setTabActiva] = useState<"info" | "formaciones" | "procesos">("info");
+  const [tabActiva] = useState<"info">("info");
 
   useEffect(() => {
     setForm(mineralProp);
@@ -200,56 +197,9 @@ export function MineralEditor({
               />
             </div>
 
-            {/* Columna derecha: tabs */}
+            {/* Columna derecha */}
             <div className="flex-1 min-w-0">
-              {/* ── TABS ──────────────────────────────────────────────────── */}
-              <div className="flex items-center justify-between gap-2 mb-4 border-b border-primary/10">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTabActiva("info")}
-                    className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
-                      tabActiva === "info"
-                        ? "text-primary border-b-2 border-primary"
-                        : "text-primary/50 hover:text-primary/70"
-                    }`}
-                  >
-                    Info
-                  </button>
-                  <button
-                    onClick={() => setTabActiva("formaciones")}
-                    className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
-                      tabActiva === "formaciones"
-                        ? "text-primary border-b-2 border-primary"
-                        : "text-primary/50 hover:text-primary/70"
-                    }`}
-                  >
-                    Formaciones ({formaciones.length})
-                  </button>
-                  <button
-                    onClick={() => setTabActiva("procesos")}
-                    className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
-                      tabActiva === "procesos"
-                        ? "text-primary border-b-2 border-primary"
-                        : "text-primary/50 hover:text-primary/70"
-                    }`}
-                  >
-                    Procesos ({procesos.length})
-                  </button>
-                </div>
-                {tabActiva === "procesos" && (
-                  <button
-                    onClick={() => void crearProceso()}
-                    title="Nuevo proceso"
-                    className="shrink-0 mb-1 w-7 h-7 flex items-center justify-center rounded-md text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                  >
-                    <Plus size={16} />
-                  </button>
-                )}
-              </div>
-
-              {/* ── TAB: Info ─────────────────────────────────────────────── */}
-              {tabActiva === "info" && (
-                <div className="flex gap-4 items-stretch">
+              <div className="flex gap-4 items-stretch">
                   <div className="flex-1 min-w-0">
                     <RichEditor
                       minHeight="8rem"
@@ -294,86 +244,7 @@ export function MineralEditor({
                       onToggle={handleToggleEcosistema}
                     />
                   </aside>
-                </div>
-              )}
-
-              {/* ── TAB: Formaciones ──────────────────────────────────────── */}
-              {tabActiva === "formaciones" && (
-                <div className="space-y-3">
-                  <SeccionGruposVinculados
-                    titulo="Formaciones"
-                    icono={Gem}
-                    tipo="formacion"
-                    items={formaciones}
-                    catalogo={catalogoFormaciones}
-                    loading={loadingFormacionesProcesos}
-                    onCrearNuevo={async () => {
-                      const nueva = await crearFormacion();
-                      if (nueva) setEditandoFormacionId(nueva.id);
-                      return nueva;
-                    }}
-                    onUsarExistente={(id) => void vincularFormacionExistente(id)}
-                    onDelete={(vinculoId) => void eliminarFormacion(vinculoId)}
-                    onAbrirGrupo={setEditandoFormacionId}
-                    onAbrirCelula={setEditandoGranoId}
-                    placeholderNombre="Nombre de la formación (ej: Veta, Inclusión de cuarzo)…"
-                    placeholderNotas="Notas de la formación…"
-                    labelCrear="Crear formación"
-                    labelExistente="Usar una existente"
-                    labelBuscar="Buscar formación…"
-                  />
-
-                  <AfinidadEntreEntidadesPanel
-                    entidadId={form.id}
-                    nombreEntidad={form.nombre}
-                    // TODO: Formacion ya no tiene `componentes` inline (la
-                    // fórmula vive vía Vetas/Granos→Compuesto, ver
-                    // useFormacionVetas). Este panel y
-                    // useMezclasAfinidadCatalogo siguen construidos sobre
-                    // el shape viejo y su query a Supabase ya apunta a una
-                    // tabla ("grupos_compuestos") que no existe — quedan
-                    // pendientes de reescribirse para resolver la mezcla
-                    // agregada vía la cadena real de Vetas/Granos. Se pasa
-                    // vacío acá para no romper el build mientras tanto.
-                    mezcla={[]}
-                    compuestos={compuestos}
-                    elementos={elementos}
-                  />
-                </div>
-              )}
-
-              {/* ── TAB: Procesos ────────────────────────────────────────── */}
-              {tabActiva === "procesos" && (
-                <div className="space-y-3">
-                  {loadingFormacionesProcesos ? (
-                    <p className="text-xs text-primary/40">Cargando procesos…</p>
-                  ) : procesos.length === 0 ? (
-                    <p className="text-xs text-primary/40 italic">
-                      Sin procesos. Crea uno para empezar.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6">
-                      {procesos.map((proceso) => (
-                        <div key={proceso.id} className="border-b border-primary/10">
-                          <ProcesoMineralCard
-                            proceso={proceso}
-                            onUpdate={actualizarProceso}
-                            onDelete={() => eliminarProceso(proceso.id)}
-                            compuestos={compuestos}
-                            elementos={elementos}
-                            reacciones={reacciones}
-                            onUpdateReaccion={(id, updates) => {
-                              setReacciones((prev) =>
-                                prev.map((r) => (r.id === id ? { ...r, ...updates } : r)),
-                              );
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
