@@ -18,3 +18,4 @@ export {
 } from "./types";
 export { useItemMateriales } from "./useItemMateriales";
 export { PanelFisicaObjeto } from "./PanelFisicaObjeto";
+export { SelectorMaterialesItem } from "./SelectorMaterialesItem";

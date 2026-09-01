@@ -29,6 +29,7 @@ import { RichEditor } from "@/editor/lexical";
 import { ComboSelector } from "@/ui/ComboSelector";
 import { PanelReglasDnd } from "@/domains/garlia/items/PanelReglasDnd";
 import { PanelFisicaObjeto } from "@/domains/garlia/items/PanelFisicaObjeto";
+import { itemsQueries } from "@/domains/garlia/items/queries";
 import { PickerImagenItemBtn } from "@/domains/garlia/items/PickerImagenItemBtn";
 import { SelectorGrupoUnico } from "@/domains/garlia/items/SelectorGrupoUnico";
 import { useCriaturasCatalogo } from "@/domains/garlia/criaturas/useCriaturasCatalogo";
@@ -169,6 +170,28 @@ export function EditorItem({
     setForm(item);
     setStatus("idle");
   }, [item.id]);
+
+  // ── Refrescar solo los campos derivados por el motor (propiedades_fisicas/
+  // estado_fisico) después de editar item_materiales. Supabase ya recalculó
+  // y persistió esos campos vía trigger (trg_objeto_propiedades →
+  // recalcular_objeto_propiedades, verificado contra el proyecto real) —
+  // acá solo se vuelve a pedir el item con la query real ya existente
+  // (itemsQueries.getById, misma que carga el editor la primera vez) para
+  // que PanelFisicaObjeto deje de mostrar el valor anterior. No se toca
+  // nada que el usuario esté editando en `form` en ese momento. ─────────────
+  const refrescarPropiedadesFisicas = async () => {
+    try {
+      const actualizado = await itemsQueries.getById(form.id);
+      if (!actualizado) return;
+      setForm((f: Item) => ({
+        ...f,
+        propiedades_fisicas: actualizado.propiedades_fisicas,
+        estado_fisico: actualizado.estado_fisico,
+      }));
+    } catch (err) {
+      console.error("[EditorItem] error refrescando propiedades físicas:", err);
+    }
+  };
 
   const field =
     (k: keyof Item) =>
@@ -336,16 +359,20 @@ export function EditorItem({
                 }
               />
 
-              {/* Física del objeto (Modelo físico canónico v218) — solo
-                  lectura. item_materiales es la fuente principal;
-                  compuesto_id es solo compatibilidad secundaria y nunca se
-                  suma. No se recalcula nada acá: todo viene de
-                  items.propiedades_fisicas ya derivado por Supabase. */}
+              {/* Física del objeto (Modelo físico canónico v218). La
+                  sección "Física del objeto"/"Geometría" es solo lectura:
+                  item_materiales es la fuente principal; compuesto_id es
+                  solo compatibilidad secundaria y nunca se suma. La
+                  composición de materiales sí es editable dentro de este
+                  panel (capa "Editar composición") — al cambiar algo,
+                  Supabase recalcula vía trigger y acá se vuelve a pedir el
+                  item con la misma query real que lo cargó. */}
               <PanelFisicaObjeto
                 itemId={item.id}
                 propiedadesFisicas={form.propiedades_fisicas}
                 estadoFisico={form.estado_fisico}
                 geometriaFisica={form.geometria_fisica}
+                onRefrescarItem={refrescarPropiedadesFisicas}
               />
 
               {/* Formaciones — partes materiales del ítem (mango, hoja,

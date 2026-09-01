@@ -1,11 +1,12 @@
 "use client";
 
-import { Loader2, Ruler, Weight } from "lucide-react";
-import React from "react";
+import { Loader2, Pencil, Ruler, Weight, X } from "lucide-react";
+import React, { useState } from "react";
 
 import { useMateriales } from "@/domains/garlia/materiales/useMateriales";
 
 import { useItemMateriales } from "./useItemMateriales";
+import { SelectorMaterialesItem } from "./SelectorMaterialesItem";
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "—";
@@ -44,8 +45,14 @@ const ESTADO_LABEL: Record<string, string> = {
  * Un objeto no hereda propiedades de forma pasiva: Supabase las deriva de
  * item_materiales (fuente principal) + geometria_fisica del propio objeto.
  * `items.compuesto_id` es solo compatibilidad secundaria y nunca se suma a
- * esto. Este panel es de SOLO LECTURA: no recalcula masa/densidad/etc, solo
- * muestra lo que ya viene en items.propiedades_fisicas.
+ * esto.
+ *
+ * La sección "Física del objeto" es de SOLO LECTURA: no recalcula
+ * masa/densidad/etc, solo muestra lo que ya viene en
+ * items.propiedades_fisicas. La composición (SelectorMaterialesItem, más
+ * abajo) sí es editable — pero solo edita la CAUSA (qué material, cuánta
+ * cantidad/proporción), nunca el resultado. El frontend nunca calcula
+ * propiedades físicas.
  *
  * Si el estado es "sin_materiales" o "incompleto_geometria", eso es falta
  * de datos constructivos del objeto — no un error del motor — y se muestra
@@ -56,14 +63,24 @@ export function PanelFisicaObjeto({
   propiedadesFisicas,
   estadoFisico,
   geometriaFisica,
+  onRefrescarItem,
 }: {
   itemId: string;
   propiedadesFisicas?: (Record<string, unknown> & { estado?: string; fuente_fisica?: string }) | null;
   estadoFisico?: string | null;
   geometriaFisica?: Record<string, unknown> | null;
+  /** Llamado tras agregar/editar/quitar un material. Supabase ya recalculó
+   *  y persistió items.propiedades_fisicas (trigger trg_objeto_propiedades →
+   *  recalcular_objeto_propiedades, verificado contra el proyecto real).
+   *  Este panel no lo relee solo: el padre (EditorItem) decide cómo volver
+   *  a pedir el `item` — misma query que ya usa para cargarlo la primera
+   *  vez. Sin esto, la sección de física quedaría mostrando el valor
+   *  anterior hasta recargar el editor entero. */
+  onRefrescarItem?: () => void;
 }) {
-  const { items: materialesCatalogo } = useMateriales();
+  const { items: materialesCatalogo, loading: loadingCatalogo } = useMateriales();
   const { items: composicion, loading: loadingComposicion } = useItemMateriales(itemId);
+  const [editandoComposicion, setEditandoComposicion] = useState(false);
 
   const propiedades = propiedadesFisicas ?? {};
   const estado = estadoFisico ?? (propiedades.estado as string | undefined) ?? "sin_materiales";
@@ -136,40 +153,70 @@ export function PanelFisicaObjeto({
       </section>
 
       <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-        <h3 className="text-sm font-semibold text-primary">Materiales</h3>
-        <p className="mt-1 text-xs text-primary/45">
-          Composición vía item_materiales — fuente principal de la física del objeto
-        </p>
-        {loadingComposicion ? (
-          <div className="flex items-center gap-2 py-5 text-sm text-primary/45">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando materiales…
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-primary">Materiales</h3>
+            <p className="mt-1 text-xs text-primary/45">
+              Composición declarada del objeto — origen de la física de arriba
+            </p>
           </div>
-        ) : composicion.length === 0 ? (
-          <p className="py-4 text-sm text-primary/40">
-            Este objeto no tiene materiales asociados todavía.
-          </p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {composicion.map((fila) => {
-              const material = materialesCatalogo.find((m) => m.id === fila.material_id);
-              return (
-                <div key={fila.id} className="rounded-lg border border-primary/10 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-primary">
-                      {material?.nombre ?? fila.material_id.slice(0, 8)}
-                    </span>
-                    <span className="text-xs text-primary/50">
-                      × {formatValue(fila.cantidad)}
-                      {fila.proporcion !== null ? ` · prop. ${formatValue(fila.proporcion)}` : ""}
-                    </span>
+          <button
+            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-primary/15 px-2.5 py-1 text-xs font-medium text-primary/60 hover:text-primary hover:border-primary/35 transition-all"
+            type="button"
+            onClick={() => setEditandoComposicion((v) => !v)}
+          >
+            {editandoComposicion ? (
+              <>
+                <X size={12} /> Cerrar
+              </>
+            ) : (
+              <>
+                <Pencil size={12} /> Editar composición
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Capa 1: composición declarada, solo lectura, compacta. Distinta
+            conceptualmente de "Editar composición" — esta es la lectura de
+            la causa ya guardada, no un formulario. */}
+        {!editandoComposicion && (
+          loadingComposicion ? (
+            <div className="flex items-center gap-2 py-3 text-sm text-primary/45">
+              <Loader2 className="h-4 w-4 animate-spin" /> Cargando materiales…
+            </div>
+          ) : composicion.length === 0 ? (
+            <p className="py-2 text-sm text-primary/40">
+              Este objeto no tiene materiales asociados todavía.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {composicion.map((fila) => {
+                const material = materialesCatalogo.find((m) => m.id === fila.material_id);
+                return (
+                  <div key={fila.id} className="rounded-lg border border-primary/10 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-primary">
+                        {loadingCatalogo ? "…" : material?.nombre ?? fila.material_id.slice(0, 8)}
+                      </span>
+                      <span className="text-xs text-primary/50">
+                        × {formatValue(fila.cantidad)}
+                        {fila.proporcion !== null ? ` · prop. ${formatValue(fila.proporcion)}` : ""}
+                      </span>
+                    </div>
+                    {fila.rol && <div className="mt-1 text-xs text-primary/40">{fila.rol}</div>}
                   </div>
-                  {fila.rol && (
-                    <div className="mt-1 text-xs text-primary/40">{fila.rol}</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )
+        )}
+
+        {/* Capa 2: edición — la CAUSA, nunca el resultado. Al cambiar algo
+            acá, Supabase ya recalculó vía trigger; solo avisamos al padre
+            para que vuelva a pedir el `item`. */}
+        {editandoComposicion && (
+          <SelectorMaterialesItem itemId={itemId} onComposicionCambiada={onRefrescarItem} />
         )}
       </section>
     </div>
