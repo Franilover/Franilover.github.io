@@ -65,14 +65,15 @@ export function useItemMateriales(itemId?: string | null) {
             rol: params.rol ?? null,
           },
         ])
-        .select(CONFIG_ITEM_MATERIALES.select)
+        .select()
         .single();
       if (error || !nuevo) {
         console.error("[useItemMateriales] error agregando material:", error);
         return null;
       }
-      setData((prev) => [...prev, nuevo as ItemMaterial]);
-      return nuevo as ItemMaterial;
+      const fila = nuevo as unknown as ItemMaterial;
+      setData((prev) => [...prev, fila]);
+      return fila;
     },
     [itemId, setData],
   );
