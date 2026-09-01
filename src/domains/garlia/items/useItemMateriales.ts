@@ -79,8 +79,12 @@ export function useItemMateriales(itemId?: string | null) {
   );
 
   // ── Editar cantidad/proporción/rol de una fila ya vinculada ─────────────
+  // Optimista, pero con rollback: si Supabase rechaza el cambio (ej.
+  // constraint cantidad>0 / proporcion 0..1), el estado local vuelve al
+  // valor anterior en vez de quedar mostrando algo que nunca se persistió.
   const actualizar = useCallback(
     async (id: string, cambios: Partial<Pick<ItemMaterial, "cantidad" | "proporcion" | "rol" | "material_id">>) => {
+      const anterior = data.find((row) => row.id === id);
       setData((prev) => prev.map((row) => (row.id === id ? { ...row, ...cambios } : row)));
       const { error } = await supabase
         .from(CONFIG_ITEM_MATERIALES.tabla)
@@ -88,9 +92,14 @@ export function useItemMateriales(itemId?: string | null) {
         .eq("id", id);
       if (error) {
         console.error("[useItemMateriales] error actualizando material:", error);
+        if (anterior) {
+          setData((prev) => prev.map((row) => (row.id === id ? anterior : row)));
+        }
+        return { ok: false, error };
       }
+      return { ok: true, error: null };
     },
-    [setData],
+    [data, setData],
   );
 
   // ── Quitar un material de la composición del objeto ─────────────────────
