@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Check, CheckCheck, Cloud, Heart, Megaphone, MessageSquareText, Mic, NotebookPen, Paperclip, Pencil, Phone, Plus, Reply, Send, Sparkle, Trash2, Waves, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Loading } from "@/ui";
 import { SmartImage } from "@/ui/SmartImage";
@@ -47,6 +47,7 @@ import { supabase } from "@/infra/supabase/supabase";
 import { useAuth } from "@/providers/AuthProvider";
 import { ExplosionEmoji } from "./ExplosionEmoji";
 import { formatearDuracion, useGrabadorAudio } from "./useGrabadorAudio";
+import { useMensajesStore } from "./useMensajesStore";
 
 /** Texto corto para mostrar como preview de un mensaje citado (reply). */
 function previsualizarMensaje(m: Mensaje): string {
@@ -566,7 +567,18 @@ export default function DetalleConversacion() {
     mensajesRef.current = mensajes;
   }, [mensajes]);
   const [loading, setLoading] = useState(true);
-  const [texto, setTexto] = useState("");
+  // Borrador no enviado: se hidrata del store persistido (localStorage) al
+  // abrir la conversación, así que si el usuario escribió algo, cambió de
+  // chat sin mandarlo (o cerró la app) y vuelve, el texto sigue ahí — ver
+  // useMensajesStore.
+  const setBorradorGuardado = useMensajesStore((s) => s.setBorrador);
+  const limpiarBorradorGuardado = useMensajesStore((s) => s.limpiarBorrador);
+  const [texto, setTexto] = useState(
+    () => useMensajesStore.getState().borradores[conversacionId] ?? "",
+  );
+  useEffect(() => {
+    setTexto(useMensajesStore.getState().borradores[conversacionId] ?? "");
+  }, [conversacionId]);
   const [enviando, setEnviando] = useState(false);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1244,8 +1256,22 @@ export default function DetalleConversacion() {
 
   // Avisa "escribiendo" mientras el usuario tipea, y "paró" 1.5s después de
   // la última tecla. Debounce local, no manda un broadcast por cada letra.
+  // Debounce separado del de "escribiendo…" (que es más corto, 1.5s): acá
+  // no hace falta tanta inmediatez — persistir el borrador es solo para
+  // sobrevivir un cambio de chat o un cierre de la app, no algo que otro
+  // usuario vea. 400ms alcanza para no escribir a localStorage en cada
+  // tecla sin que se note demora si se cierra la app rápido.
+  const borradorOffRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleCambioTexto = (valor: string) => {
     setTexto(valor);
+
+    if (borradorOffRef.current) clearTimeout(borradorOffRef.current);
+    if (conversacionId) {
+      borradorOffRef.current = setTimeout(() => {
+        setBorradorGuardado(conversacionId, valor);
+      }, 400);
+    }
+
     if (!conversacionId || !user) return;
 
     if (!escribiendoOffRef.current) {
@@ -1275,6 +1301,8 @@ export default function DetalleConversacion() {
       ? (animacionSeleccionada ?? ANIMACIONES_KAOMOJI[Math.floor(Math.random() * ANIMACIONES_KAOMOJI.length)].id)
       : null;
     setTexto("");
+    if (borradorOffRef.current) clearTimeout(borradorOffRef.current);
+    limpiarBorradorGuardado(conversacionId);
     setRespondiendoA(null);
     setEstiloSeleccionado(null);
     setAnimacionSeleccionada(null);
@@ -1312,9 +1340,33 @@ export default function DetalleConversacion() {
     }
   };
 
+  const guardarPosicion = useMensajesStore((s) => s.guardarPosicion);
   const handleScrollMensajes = (e: React.UIEvent<HTMLDivElement>) => {
     if (e.currentTarget.scrollTop < 80) void handleCargarAnteriores();
   };
+
+  // Al salir de la conversación (cambio de chat o desmontaje), guardamos
+  // qué tan lejos del fondo se quedó y cuál fue el último mensaje visible.
+  // No se usa para restaurar el scroll al reabrir (esta conversación
+  // siempre abre en el fondo, a propósito — ver los comentarios del efecto
+  // de scroll inicial más arriba); es una pista liviana para el futuro
+  // (ej. saber si el usuario se fue a mitad de una lectura larga) sin
+  // pelear contra ese diseño ya intencional.
+  useEffect(() => {
+    return () => {
+      const contenedor = scrollRef.current;
+      const ultimo = mensajesRef.current[mensajesRef.current.length - 1];
+      if (!contenedor || !ultimo || !conversacionId) return;
+      const proporcion =
+        contenedor.scrollHeight > contenedor.clientHeight
+          ? (contenedor.scrollTop + contenedor.clientHeight) / contenedor.scrollHeight
+          : 1;
+      guardarPosicion(conversacionId, {
+        ultimoMensajeId: ultimo.id,
+        scrollProporcion: Math.min(1, Math.max(0, proporcion)),
+      });
+    };
+  }, [conversacionId, guardarPosicion]);
 
   const handleIniciarEdicion = (m: Mensaje) => {
     setEditandoId(m.id);
@@ -1548,6 +1600,55 @@ export default function DetalleConversacion() {
     if (grabador.errorMensaje) setError(grabador.errorMensaje);
   }, [grabador.errorMensaje]);
 
+  // ── Datos derivados por mensaje, memoizados ──────────────────────────────
+  // Antes esto se recalculaba DENTRO del .map() de cada mensaje en cada
+  // render: reacciones.filter/explosiones.filter recorrían el array
+  // COMPLETO de reacciones/explosiones por cada mensaje (O(n·m)), y
+  // "esUltimoPropio" hacía mensajes.slice(idx+1).some(...) por mensaje
+  // (O(n²)) — en una conversación de varios cientos de mensajes esto se
+  // sentía en cada tecla de "escribiendo…" o cada reacción nueva, porque
+  // cualquier cambio de estado disparaba TODO ese trabajo de nuevo para
+  // TODA la lista, no solo para lo que cambió. Ahora se arma una sola vez
+  // por render (y solo se recalcula si `mensajes`/`reacciones`/
+  // `explosiones`/`otroUltimoLeido` realmente cambiaron) y el .map() de
+  // abajo solo hace lookups O(1) en estos mapas.
+  const reaccionesPorMensaje = useMemo(() => {
+    const mapa = new Map<string, Record<string, number>>();
+    for (const r of reacciones) {
+      const acc = mapa.get(r.mensaje_id) ?? {};
+      acc[r.emoji] = (acc[r.emoji] ?? 0) + 1;
+      mapa.set(r.mensaje_id, acc);
+    }
+    return mapa;
+  }, [reacciones]);
+
+  const explosionesPorMensaje = useMemo(() => {
+    const mapa = new Map<string, Record<string, number>>();
+    for (const e of explosiones) {
+      const acc = mapa.get(e.mensaje_id) ?? {};
+      acc[e.emoji] = (acc[e.emoji] ?? 0) + e.cantidad;
+      mapa.set(e.mensaje_id, acc);
+    }
+    return mapa;
+  }, [explosiones]);
+
+  // Id del último mensaje propio de toda la conversación — evita el
+  // mensajes.slice(idx+1).some(...) por mensaje (antes O(n²) en total).
+  const idUltimoMensajePropio = useMemo(() => {
+    for (let i = mensajes.length - 1; i >= 0; i--) {
+      if (mensajes[i].remitente_id === user?.id) return mensajes[i].id;
+    }
+    return null;
+  }, [mensajes, user?.id]);
+
+  // Lookup O(1) por id para resolver la burbuja citada (reply), en vez de
+  // mensajes.find(...) — O(n) por cada mensaje que cita a otro.
+  const mensajesPorId = useMemo(() => {
+    const mapa = new Map<string, Mensaje>();
+    for (const m of mensajes) mapa.set(m.id, m);
+    return mapa;
+  }, [mensajes]);
+
   if (!user) {
     return (
       <div className="min-h-screen md:min-h-0 md:h-full bg-bg-main flex items-center justify-center">
@@ -1656,28 +1757,19 @@ export default function DetalleConversacion() {
         ) : (
           mensajes.map((m, idx) => {
             const esMio = m.remitente_id === user.id;
-            const esUltimoPropio =
-              esMio && !mensajes.slice(idx + 1).some((s) => s.remitente_id === user.id);
+            const esUltimoPropio = esMio && m.id === idUltimoMensajePropio;
             const visto =
               esUltimoPropio &&
               !!otroUltimoLeido &&
               new Date(otroUltimoLeido) >= new Date(m.created_at);
-            const reaccionesDelMensaje = reacciones.filter((r) => r.mensaje_id === m.id);
-            const reaccionesAgrupadas = reaccionesDelMensaje.reduce<Record<string, number>>(
-              (acc, r) => ({ ...acc, [r.emoji]: (acc[r.emoji] ?? 0) + 1 }),
-              {},
-            );
+            const reaccionesAgrupadas = reaccionesPorMensaje.get(m.id) ?? {};
             // Explosiones persistidas de este mensaje, agrupadas por emoji
             // (sumando la cantidad de todos los que la dispararon, sin
             // importar quién) para la pill "lluvia de corazones".
-            const explosionesDelMensaje = explosiones.filter((e) => e.mensaje_id === m.id);
-            const explosionesAgrupadas = explosionesDelMensaje.reduce<Record<string, number>>(
-              (acc, e) => ({ ...acc, [e.emoji]: (acc[e.emoji] ?? 0) + e.cantidad }),
-              {},
-            );
+            const explosionesAgrupadas = explosionesPorMensaje.get(m.id) ?? {};
             const enEdicion = editandoId === m.id;
             const mensajeCitado = m.respuesta_a
-              ? mensajes.find((c) => c.id === m.respuesta_a) ?? null
+              ? mensajesPorId.get(m.respuesta_a) ?? null
               : null;
 
             const disenoBurbuja = estiloExtraBurbuja(m.estilo, esMio, m.id);

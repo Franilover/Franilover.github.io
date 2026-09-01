@@ -3,13 +3,13 @@
 import { MessageCircle, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import React, { Suspense, useEffect, useState, useRef } from "react";
+import React, { Suspense, useEffect, useState, useRef, memo } from "react";
 
 import { Loading } from "@/ui";
 import { SmartImage } from "@/ui/SmartImage";
 import { useUsuariosEnLinea } from "@/infra/realtime/useEnLinea";
 import {
-  listarConversaciones,
+  listarConversacionesConCache,
   buscarPerfiles,
   obtenerOCrearConversacion1a1,
   suscribirseAConversaciones,
@@ -18,6 +18,7 @@ import {
 } from "@/infra/call/chatEngine";
 import { supabase } from "@/infra/supabase/supabase";
 import { useAuth } from "@/providers/AuthProvider";
+import { useMensajesStore } from "./useMensajesStore";
 
 // Ruta única al detalle de una conversación, misma para web y para el APK
 // de Tauri (mensajes es contenido privado, no hay SEO en juego).
@@ -43,6 +44,82 @@ type Props = {
   className?: string;
 };
 
+/**
+ * Una fila de la lista de conversaciones, memoizada: sin esto, cada tecla
+ * en el buscador (que solo cambia `busqueda`/`resultados` en el padre) o
+ * cada tick de presencia (`idsEnLinea`) volvía a reconciliar el JSX de
+ * TODAS las conversaciones, no solo la que cambió. Con React.memo, una fila
+ * solo se vuelve a renderizar si sus propios props cambiaron.
+ */
+const ItemConversacion = memo(function ItemConversacion({
+  c,
+  activa,
+  enLinea,
+}: {
+  c: ConversacionResumen;
+  activa: boolean;
+  enLinea: boolean;
+}) {
+  return (
+    <Link
+      className="flex items-center gap-3 p-3 rounded-[var(--radius-btn)] transition-all"
+      href={rutaConversacion(c.id)}
+      style={{
+        background: activa
+          ? "color-mix(in srgb, var(--primary) 10%, transparent)"
+          : "var(--white-custom)",
+        border: `var(--border-width) solid ${
+          activa
+            ? "color-mix(in srgb, var(--primary) 25%, transparent)"
+            : "color-mix(in srgb, var(--primary) 8%, transparent)"
+        }`,
+      }}
+    >
+      <div className="relative w-11 h-11 rounded-full overflow-hidden bg-primary/10 flex-shrink-0">
+        <SmartImage
+          alt={c.otroParticipante?.username ?? c.nombre ?? "Chat"}
+          className="w-full h-full"
+          src={c.otroParticipante?.avatar_url || "/icon.jpg"}
+        />
+        {c.otroParticipante && enLinea && (
+          <span
+            className="absolute bottom-0 right-0 rounded-full"
+            style={{
+              width: 11,
+              height: 11,
+              background: "#22c55e",
+              border: "2px solid var(--bg-main)",
+            }}
+          />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-black text-sm text-primary truncate">
+            {c.es_grupo ? c.nombre : c.otroParticipante?.username ?? "Usuario"}
+          </span>
+          <span className="text-micro text-primary/30 flex-shrink-0">
+            {timeAgo(c.ultimo_mensaje_at)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <span className="text-micro text-primary/40 truncate italic">
+            {c.ultimoMensaje ?? "Sin mensajes todavía"}
+          </span>
+          {c.noLeidos > 0 && (
+            <span
+              className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-black text-[var(--btn-text)]"
+              style={{ background: "var(--primary)" }}
+            >
+              {c.noLeidos}
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+});
+
 function ListaConversacionesInner({ variante = "pagina", className = "" }: Props) {
   const { user } = useAuth() as { user: any };
   const router = useRouter();
@@ -56,8 +133,22 @@ function ListaConversacionesInner({ variante = "pagina", className = "" }: Props
       ? searchParams.get("id")
       : null;
 
-  const [conversaciones, setConversaciones] = useState<ConversacionResumen[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Snapshot instantáneo desde Zustand (localStorage, lectura sincrónica al
+  // montar): si ya visitamos /mensajes antes en este navegador, la sidebar
+  // pinta de una con la última lista conocida — sin esperar ni siquiera a
+  // Dexie. Se revalida contra Dexie y después contra Supabase en paralelo
+  // (ver listarConversacionesConCache), reemplazando este snapshot apenas
+  // hay algo más fresco.
+  const conversacionesGuardadas = useMensajesStore((s) => s.conversaciones);
+  const setConversacionesGuardadas = useMensajesStore((s) => s.setConversaciones);
+
+  const [conversaciones, setConversacionesState] = useState<ConversacionResumen[]>(
+    conversacionesGuardadas,
+  );
+  // Loading solo si no teníamos ni siquiera el snapshot de localStorage —
+  // con snapshot, mostramos esa lista ya mismo y la revalidación es
+  // transparente (no hay spinner intermedio).
+  const [loading, setLoading] = useState(conversacionesGuardadas.length === 0);
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<PerfilResumen[]>([]);
   const [buscando, setBuscando] = useState(false);
@@ -68,10 +159,22 @@ function ListaConversacionesInner({ variante = "pagina", className = "" }: Props
   // obsoletos.
   const busquedaVigenteRef = useRef(0);
 
-  const cargar = async () => {
-    const data = await listarConversaciones();
-    setConversaciones(data);
+  // Todo cambio de conversaciones pasa por acá: actualiza el estado local
+  // (para pintar) y el store persistido (para la próxima vez que se monte
+  // este componente, en esta sesión o en la siguiente).
+  const aplicarConversaciones = (data: ConversacionResumen[]) => {
+    setConversacionesState(data);
+    setConversacionesGuardadas(data);
     setLoading(false);
+  };
+
+  const cargar = async () => {
+    const { conversacionesIniciales, desdeCache } = await listarConversacionesConCache(
+      (frescas) => aplicarConversaciones(frescas),
+    );
+    if (desdeCache) aplicarConversaciones(conversacionesIniciales);
+    // Si no había nada en Dexie tampoco, seguimos mostrando lo que ya
+    // teníamos de localStorage (si algo) hasta que onRevalidado resuelva.
   };
 
   useEffect(() => {
@@ -207,68 +310,14 @@ function ListaConversacionesInner({ variante = "pagina", className = "" }: Props
         </p>
       ) : (
         <div className="flex flex-col gap-2">
-          {conversaciones.map((c) => {
-            const activa = c.id === conversacionActivaId;
-            return (
-              <Link
-                key={c.id}
-                className="flex items-center gap-3 p-3 rounded-[var(--radius-btn)] transition-all"
-                href={rutaConversacion(c.id)}
-                style={{
-                  background: activa
-                    ? "color-mix(in srgb, var(--primary) 10%, transparent)"
-                    : "var(--white-custom)",
-                  border: `var(--border-width) solid ${
-                    activa
-                      ? "color-mix(in srgb, var(--primary) 25%, transparent)"
-                      : "color-mix(in srgb, var(--primary) 8%, transparent)"
-                  }`,
-                }}
-              >
-                <div className="relative w-11 h-11 rounded-full overflow-hidden bg-primary/10 flex-shrink-0">
-                  <SmartImage
-                    alt={c.otroParticipante?.username ?? c.nombre ?? "Chat"}
-                    className="w-full h-full"
-                    src={c.otroParticipante?.avatar_url || "/icon.jpg"}
-                  />
-                  {c.otroParticipante && idsEnLinea.has(c.otroParticipante.id) && (
-                    <span
-                      className="absolute bottom-0 right-0 rounded-full"
-                      style={{
-                        width: 11,
-                        height: 11,
-                        background: "#22c55e",
-                        border: "2px solid var(--bg-main)",
-                      }}
-                    />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-black text-sm text-primary truncate">
-                      {c.es_grupo ? c.nombre : c.otroParticipante?.username ?? "Usuario"}
-                    </span>
-                    <span className="text-micro text-primary/30 flex-shrink-0">
-                      {timeAgo(c.ultimo_mensaje_at)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <span className="text-micro text-primary/40 truncate italic">
-                      {c.ultimoMensaje ?? "Sin mensajes todavía"}
-                    </span>
-                    {c.noLeidos > 0 && (
-                      <span
-                        className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-black text-[var(--btn-text)]"
-                        style={{ background: "var(--primary)" }}
-                      >
-                        {c.noLeidos}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+          {conversaciones.map((c) => (
+            <ItemConversacion
+              key={c.id}
+              c={c}
+              activa={c.id === conversacionActivaId}
+              enLinea={!!c.otroParticipante && idsEnLinea.has(c.otroParticipante.id)}
+            />
+          ))}
         </div>
       )}
     </>

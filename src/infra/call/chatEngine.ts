@@ -221,6 +221,60 @@ export async function listarConversaciones(): Promise<ConversacionResumen[]> {
     );
 }
 
+// ─── Caché local (Dexie) de la lista de conversaciones ─────────────────────
+
+async function leerConversacionesDeCache(): Promise<ConversacionResumen[]> {
+  try {
+    if (!db) return [];
+    const rows = await (db as any).conversaciones_cache.toArray();
+    return (rows as ConversacionResumen[]).sort(
+      (a, b) => new Date(b.ultimo_mensaje_at).getTime() - new Date(a.ultimo_mensaje_at).getTime(),
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function guardarConversacionesEnCache(conversaciones: ConversacionResumen[]): Promise<void> {
+  try {
+    if (!db) return;
+    // bulkPut (no clear+bulkPut): una conversación que desapareció de la
+    // respuesta fresca (caso raro, ej. se eliminó del otro lado) queda
+    // huérfana en cache hasta la próxima revalidación — preferible a un
+    // parpadeo vacío si la escritura fallara a mitad de camino.
+    await (db as any).conversaciones_cache.bulkPut(conversaciones);
+  } catch {}
+}
+
+/**
+ * Versión "cache-first" de listarConversaciones, mismo patrón que
+ * cargarMensajesConCache: devuelve primero lo que ya haya en Dexie
+ * (instantáneo) y dispara la query real en paralelo, avisando por
+ * `onRevalidado` cuando esté lista.
+ *
+ * El llamador típico (ListaConversaciones) en la práctica ya tiene algo más
+ * rápido todavía disponible de forma síncrona vía useMensajesStore
+ * (localStorage) para el primer pintado; esta función es la revalidación
+ * intermedia entre ese snapshot y la respuesta real de Supabase.
+ */
+export async function listarConversacionesConCache(
+  onRevalidado: (conversaciones: ConversacionResumen[]) => void,
+): Promise<{ conversacionesIniciales: ConversacionResumen[]; desdeCache: boolean }> {
+  const cacheadas = await leerConversacionesDeCache();
+
+  void listarConversaciones()
+    .then((frescas) => {
+      void guardarConversacionesEnCache(frescas);
+      onRevalidado(frescas);
+    })
+    .catch(() => {
+      // Si falla y no había caché, el llamador ya maneja el error mostrando
+      // el estado vacío/loading — no hay nada más que hacer acá.
+    });
+
+  return { conversacionesIniciales: cacheadas, desdeCache: cacheadas.length > 0 };
+}
+
 // ─── Mensajes ───────────────────────────────────────────────────────────────
 
 /**

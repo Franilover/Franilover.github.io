@@ -1925,6 +1925,24 @@ class AgendaFraniDB extends Dexie {
       tejido_celulas: "id, tejido_id, celula_id, created_at",
       tejido_compuestos: "id, tejido_id, compuesto_id, created_at",
     });
+
+    // ─── v43: cache offline de la LISTA de conversaciones (sidebar de
+    // Mensajes) — hasta ahora listarConversaciones() pegaba siempre directo
+    // a Supabase sin ningún fallback local, a diferencia de mensajes_cache
+    // (v31) que ya resuelve esto para el detalle de una conversación. Sin
+    // conexión (o con conexión lenta), la sidebar se quedaba en blanco con
+    // el spinner hasta que resolvía el round-trip completo. Mismo patrón
+    // cache-first que el resto: useMensajesStore (Zustand+persist) guarda
+    // además una copia sincrónica en localStorage para el primer pintado
+    // instantáneo al montar; esta tabla Dexie es la revalidación "de
+    // verdad" cuando localStorage no alcanza (primer dispositivo, storage
+    // limpiado, etc.) — ver listarConversacionesConCache en chatEngine.ts.
+    // No entra en OFFLINE_WRITABLE: es una vista derivada armada en el
+    // cliente (join de conversaciones+participantes+último mensaje), no
+    // una tabla que se edite directo.
+    this.version(43).stores({
+      conversaciones_cache: "id, ultimo_mensaje_at",
+    });
   }
 }
 
