@@ -1844,11 +1844,18 @@ export default function DetalleConversacion() {
       </div>
 
       {/* ── Mensajes ── */}
-      {/* Wrapper relative solo para poder anclar el botón flotante "ir al
-          fondo" (absolute) sin alterar el contenedor de scroll en sí — ese
-          contenedor tiene lógica de layout/scroll delicada (ver comentarios
-          debajo) que no conviene tocar. */}
-      <div className="relative flex-1 min-h-0">
+      {/* Wrapper relative + flex: necesario para que el div de scroll (hijo
+          directo, con flex-1) siga ocupando "todo el espacio restante entre
+          header y composer" como lo hacía antes de este wrapper — un div
+          "relative" sin flex ROMPE ese cálculo (el hijo flex-1 deja de
+          tener efecto), lo cual hacía que el composer quedara empujado
+          fuera de la pantalla y el scroll interno dejara de funcionar.
+          flex-1 + min-h-0 acá es lo que reserva "el espacio restante" del
+          padre (el <main> flex-col de arriba); overflow-hidden evita que
+          este wrapper mismo genere una segunda barra de scroll por fuera
+          del div interno. El botón "ir al fondo" (absolute) se ancla a
+          este wrapper, no al contenedor de scroll en sí. */}
+      <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* visibility (no display:none) para que el contenedor SÍ tenga
           layout real y scrollHeight calculable mientras el useLayoutEffect
           de arriba decide dónde poner el scroll — con display:none el
@@ -1857,7 +1864,7 @@ export default function DetalleConversacion() {
           previo al paint) se revela sin que se haya visto ningún salto. */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2"
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-2"
         style={{ visibility: scrollListo ? "visible" : "hidden" }}
         onScroll={handleScrollMensajes}
       >
