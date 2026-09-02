@@ -1,11 +1,12 @@
 "use client";
 
-import { Box, Loader2, X } from "lucide-react";
+import { Box, Link2, Loader2, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { PropiedadesFisicasGenerico } from "@/domains/garlia/_shared/GridPropiedadesCalculadas";
 
+import { esUnionExplicita, useEstructuraCapas } from "./useEstructuraCapas";
 import { useEstructuraComposicion } from "./useEstructuraComposicion";
 import { useEstructuras } from "./useEstructuras";
 import type { Estructura } from "./types";
@@ -62,6 +63,118 @@ function ComposicionEstructuraBloque({ estructuraId }: { estructuraId: string })
   );
 }
 
+/**
+ * Capas ordenadas (estructura_subcomponentes) + uniones estructurales
+ * (estructura_uniones) de la estructura — antes invisibles en el editor
+ * porque ComposicionEstructuraBloque solo leía estructura_compuestos
+ * (composición plana, sin orden ni geometría por capa). Ambas tablas son
+ * solo lectura desde acá, mismo criterio que ComposicionEstructuraBloque.
+ *
+ * geometria_id NULL se muestra explícitamente como "Sin geometría" en vez
+ * de omitirse — es información real (el vacío existe en los datos), no un
+ * campo vacío que deba ocultarse.
+ *
+ * `estado` de cada unión se muestra tal cual viene de Supabase (ej.
+ * "inferida") con una etiqueta que distingue visualmente una adyacencia
+ * inferida por orden de capas de una unión con geometría de contacto
+ * declarada explícitamente.
+ */
+function CapasYUnionesBloque({ estructuraId }: { estructuraId: string }) {
+  const { subcomponentes, uniones, loading } = useEstructuraCapas(estructuraId);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
+        <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
+      </div>
+    );
+  }
+
+  if (subcomponentes.length === 0 && uniones.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {subcomponentes.length > 0 && (
+        <div className="flex flex-col gap-1.5 min-w-0 p-2">
+          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            Capas
+          </span>
+          <div className="flex flex-col gap-1">
+            {subcomponentes.map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-2 px-2 py-1">
+                <span className="text-micro font-bold text-primary/70 truncate">
+                  {s.orden != null ? `${s.orden}. ` : ""}
+                  {s.nombre}
+                </span>
+                <span className="flex items-center gap-1.5 shrink-0 text-micro">
+                  <span className="text-primary/45">{s.rol ?? ""}</span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 font-bold ${
+                      s.geometria_id
+                        ? "bg-primary/8 text-primary/60"
+                        : "bg-amber-500/10 text-amber-500/70"
+                    }`}
+                    title={
+                      s.geometria_id
+                        ? `geometria_id: ${s.geometria_id}`
+                        : "geometria_id = NULL — sin geometría estructural explícita enlazada"
+                    }
+                  >
+                    {s.geometria_id ? "Geometría enlazada" : "Sin geometría"}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {uniones.length > 0 && (
+        <div className="flex flex-col gap-1.5 min-w-0 p-2">
+          <div className="flex items-center gap-1.5">
+            <Link2 className="h-3 w-3 text-primary/30" />
+            <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+              Uniones estructurales
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {uniones.map((u) => (
+              <div key={u.id} className="flex flex-col gap-1 px-2 py-1.5 rounded-lg bg-primary/5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-micro font-bold text-primary/70 truncate">
+                    {u.nombre_a} ── {u.tipo_unidad ?? "unión"} ── {u.nombre_b}
+                  </span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-micro font-bold shrink-0 ${
+                      esUnionExplicita(u.estado)
+                        ? "bg-emerald-500/10 text-emerald-500/70"
+                        : "bg-primary/8 text-primary/50"
+                    }`}
+                    title={
+                      esUnionExplicita(u.estado)
+                        ? "Unión con geometría de contacto declarada explícitamente"
+                        : "Unión asumida por orden de capas, sin geometría de contacto declarada"
+                    }
+                  >
+                    {u.estado ?? "sin estado"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-micro text-primary/45">
+                  {u.intensidad != null && <span>Intensidad: {u.intensidad}</span>}
+                  {u.flexibilidad != null && <span>Flexibilidad: {u.flexibilidad}</span>}
+                  {u.reversibilidad != null && <span>Reversibilidad: {u.reversibilidad}</span>}
+                  {u.area_relativa != null && <span>Área relativa: {u.area_relativa}</span>}
+                  {u.rol && <span className="italic">{u.rol}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EstructuraDetail({ estructura }: { estructura: Estructura }) {
   const propiedades = estructura.propiedades_calculadas ?? {};
   const estadoCalculo = estructura.estado_calculo ?? "pendiente";
@@ -96,6 +209,7 @@ function EstructuraDetail({ estructura }: { estructura: Estructura }) {
         </div>
         <div className="flex flex-col gap-2 min-w-0">
           <ComposicionEstructuraBloque estructuraId={estructura.id} />
+          <CapasYUnionesBloque estructuraId={estructura.id} />
           {estructura.notas && (
             <div className="flex flex-col gap-1.5 min-w-0 p-2">
               <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">

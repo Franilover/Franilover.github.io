@@ -742,6 +742,61 @@ export const CONFIG_ESTRUCTURA_COMPUESTOS = {
     "id, estructura_id, compuesto_id, cantidad, proporcion, unidad, tipo_proporcion, rol, orden, created_at",
 };
 
+/** Fila puente estructura_subcomponentes: capas/piezas internas de una
+ *  Estructura (ej. Esmalte/Dentina/Pulpa del Diente) — a diferencia de
+ *  estructura_compuestos (composición material plana, sin orden espacial
+ *  explícito), esta tabla ordena las capas por "orden" y opcionalmente
+ *  liga cada una a una geometría propia vía geometria_id. componente_tipo
+ *  indica a qué tabla apunta componente_id ("compuesto" | "estructura" |
+ *  "material"), igual que en estructura_uniones. */
+export interface EstructuraSubcomponente {
+  id: string;
+  estructura_id: string;
+  componente_tipo: "compuesto" | "estructura" | "material" | string;
+  componente_id: string;
+  cantidad: number | null;
+  proporcion: number | null;
+  rol: string | null;
+  orden: number | null;
+  geometria_id: string | null;
+  created_at: string;
+}
+
+export const CONFIG_ESTRUCTURA_SUBCOMPONENTES = {
+  tabla: "estructura_subcomponentes",
+  select:
+    "id, estructura_id, componente_tipo, componente_id, cantidad, proporcion, rol, orden, geometria_id, created_at",
+};
+
+/** Fila puente estructura_uniones: relación estructural real/inferida
+ *  ENTRE dos subcomponentes de una misma Estructura (ej. la interfaz
+ *  Esmalte↔Dentina) — no es composición sino un vínculo con intensidad/
+ *  flexibilidad/reversibilidad propias, y un estado que distingue una
+ *  unión con geometría de contacto explícita ("declarada"/"explicita")
+ *  de una simple adyacencia asumida por orden de capas ("inferida"). */
+export interface EstructuraUnion {
+  id: string;
+  estructura_id: string;
+  componente_a_tipo: "compuesto" | "estructura" | "material" | string;
+  componente_a_id: string;
+  componente_b_tipo: "compuesto" | "estructura" | "material" | string;
+  componente_b_id: string;
+  intensidad: number | null;
+  flexibilidad: number | null;
+  reversibilidad: number | null;
+  rol: string | null;
+  tipo_unidad: string | null;
+  area_relativa: number | null;
+  estado: string | null;
+  created_at: string;
+}
+
+export const CONFIG_ESTRUCTURA_UNIONES = {
+  tabla: "estructura_uniones",
+  select:
+    "id, estructura_id, componente_a_tipo, componente_a_id, componente_b_tipo, componente_b_id, intensidad, flexibilidad, reversibilidad, rol, tipo_unidad, area_relativa, estado, created_at",
+};
+
 /** Fila puente celula_estructuras: de qué Estructura(s) real(es) está hecha
  *  una Célula — reemplaza a celula_compuestos (ver abajo) como fuente de
  *  verdad desde la migración de estructuras (ago-2026): hoy 12/12 células
