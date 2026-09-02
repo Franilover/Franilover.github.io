@@ -44,8 +44,20 @@ import {
 import { ElementoPanelFlotante } from "./ElementosPage";
 import { AtomoVisual } from "./ElementoEditor";
 import { useCompuestoTags, useTagsCatalogo } from "./useTagsCompuestos";
-import { sincronizarComponentesCompuesto } from "./useCompuestosConElementos";
-import { useCompuestoEnlaces, type CompuestoEnlaceRow } from "./useCompuestoEnlaces";
+import {
+  sincronizarComponentesCompuesto,
+  agregarElementoACompuesto,
+  quitarElementoDeCompuesto,
+  actualizarCantidadElemento,
+  actualizarRolElemento,
+} from "./useCompuestosConElementos";
+import {
+  useCompuestoEnlaces,
+  useEnlaceSitiosParaPar,
+  agregarEnlaceACompuesto,
+  quitarEnlaceDeCompuesto,
+  type CompuestoEnlaceRow,
+} from "./useCompuestoEnlaces";
 import {
   useCompuestoEstabilidad,
   useCompuestoElementosProporcion,
@@ -266,27 +278,44 @@ function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: Propi
 }
 
 /**
- * Composición real del compuesto (tabla "compuesto_elementos"): a
- * diferencia de "cantidad" (ahora editada en otro lado, no en este editor),
- * acá se muestra proporcion_molar/proporcion_deducida — la proporción real
- * entre elementos que puede diferir de la cantidad simple (ej. Agua: 4:1 en
+ * Composición real del compuesto (tabla "compuesto_elementos"): muestra
+ * proporcion_molar/proporcion_deducida — la proporción real entre
+ * elementos, que puede diferir de la cantidad simple (ej. Agua: 4:1 en
  * cantidad pero 10:1 en proporcion_molar) — más las propiedades físicas de
  * cada elemento componente (masa, estabilidad, transparencia, etc., mismas
  * columnas que ElementoEditor → propiedadesCalculadasDeElemento), para ver
  * de un vistazo qué aporta cada elemento a las propiedades del compuesto de
- * arriba sin tener que abrir cada Elemento por separado. Solo lectura.
+ * arriba sin tener que abrir cada Elemento por separado.
+ *
+ * Editable: cantidad y rol de cada fila, agregar un elemento nuevo del
+ * catálogo (con cantidad+rol), quitar una fila. proporcion_molar/
+ * proporcion_deducida siguen siendo de solo lectura — las calcula Supabase
+ * a partir de cantidad, no se escriben nunca desde acá.
  */
 function ComposicionRealBloque({
+  compuestoId,
   proporciones,
   loading,
   elementos,
   onAbrirElemento,
+  onRecargar,
 }: {
+  compuestoId: string;
   proporciones: CompuestoElementoProporcion[];
   loading: boolean;
   elementos: Elemento[];
   onAbrirElemento?: (elementoId: string) => void;
+  /** Refresca proporcionElementos en el caller (CompuestoEditor) después de
+   *  cada mutación — mismo patrón que "load"/"refetch" de useSupabaseData. */
+  onRecargar: () => void;
 }) {
+  const [guardandoId, setGuardandoId] = useState<string | null>(null);
+  const [agregando, setAgregando] = useState(false);
+  const [nuevoElementoId, setNuevoElementoId] = useState("");
+  const [nuevaCantidad, setNuevaCantidad] = useState("1");
+  const [nuevoRol, setNuevoRol] = useState("");
+  const { confirm, ConfirmModal } = useConfirm();
+
   // Propiedades de todos los elementos componentes juntas, para que el
   // popover de info liste la fórmula de cada una una sola vez (no
   // repetida por elemento) — mismo criterio que PropiedadesFisicasBloque.
@@ -307,46 +336,188 @@ function ComposicionRealBloque({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proporciones, elementos]);
 
-  if (loading || proporciones.length === 0) return null;
-  const tieneAlguna = proporciones.some((p) => p.proporcion_molar !== null);
-  if (!tieneAlguna) return null;
+  const elementosDisponibles = useMemo(
+    () => elementos.filter((e) => !proporciones.some((p) => p.elemento_id === e.id)),
+    [elementos, proporciones],
+  );
+
+  async function handleCantidadBlur(elementoId: string, valor: string) {
+    const cantidad = Number(valor);
+    if (!Number.isFinite(cantidad) || cantidad <= 0) return;
+    setGuardandoId(elementoId);
+    await actualizarCantidadElemento(compuestoId, elementoId, cantidad);
+    setGuardandoId(null);
+    onRecargar();
+  }
+
+  async function handleRolBlur(elementoId: string, rol: string) {
+    setGuardandoId(elementoId);
+    await actualizarRolElemento(compuestoId, elementoId, rol.trim() || null);
+    setGuardandoId(null);
+    onRecargar();
+  }
+
+  async function handleQuitar(elementoId: string, nombre: string) {
+    const ok = await confirm({
+      title: "Quitar elemento",
+      message: `¿Quitar "${nombre}" de la composición de este compuesto?`,
+    });
+    if (!ok) return;
+    setGuardandoId(elementoId);
+    await quitarElementoDeCompuesto(compuestoId, elementoId);
+    setGuardandoId(null);
+    onRecargar();
+  }
+
+  async function handleAgregar() {
+    if (!nuevoElementoId) return;
+    const cantidad = Number(nuevaCantidad);
+    if (!Number.isFinite(cantidad) || cantidad <= 0) return;
+    setGuardandoId(nuevoElementoId);
+    await agregarElementoACompuesto(compuestoId, nuevoElementoId, cantidad);
+    if (nuevoRol.trim()) {
+      await actualizarRolElemento(compuestoId, nuevoElementoId, nuevoRol.trim());
+    }
+    setGuardandoId(null);
+    setAgregando(false);
+    setNuevoElementoId("");
+    setNuevaCantidad("1");
+    setNuevoRol("");
+    onRecargar();
+  }
+
+  if (loading) return null;
 
   return (
     <div className="flex flex-col gap-1.5 p-2">
+      <ConfirmModal />
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Composición real
         </span>
-        <InfoFormulasPopover propiedades={propiedadesParaInfo} />
+        {propiedadesParaInfo.length > 0 && <InfoFormulasPopover propiedades={propiedadesParaInfo} />}
+        <button
+          type="button"
+          onClick={() => setAgregando((v) => !v)}
+          disabled={elementosDisponibles.length === 0}
+          title="Agregar elemento a la composición"
+          className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
+        >
+          <Plus size={10} />
+        </button>
       </div>
+
+      {agregando && (
+        <div className="flex flex-col gap-1 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/5">
+          <select
+            value={nuevoElementoId}
+            onChange={(e) => setNuevoElementoId(e.target.value)}
+            className="bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+          >
+            <option value="">Elegir elemento…</option>
+            {elementosDisponibles.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.simbolo || "??"} · {e.nombre}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={0}
+              step="any"
+              value={nuevaCantidad}
+              onChange={(e) => setNuevaCantidad(e.target.value)}
+              placeholder="Cantidad"
+              className="w-16 bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+            />
+            <input
+              value={nuevoRol}
+              onChange={(e) => setNuevoRol(e.target.value)}
+              placeholder="Rol (opcional)"
+              className="flex-1 bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
+            />
+            <button
+              type="button"
+              onClick={handleAgregar}
+              disabled={!nuevoElementoId || guardandoId === nuevoElementoId}
+              className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {guardandoId === nuevoElementoId ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                <Save size={11} />
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {proporciones.length === 0 && !agregando && (
+        <p className="text-micro text-primary/25 px-2 py-1">Sin elementos en la composición.</p>
+      )}
+
       <div className="flex flex-col gap-1">
         {proporciones.map((p) => {
           const el = elementos.find((e) => e.id === p.elemento_id);
           const propiedadesElemento = el
             ? propiedadesCalculadasDeElemento(el).filter((prop) => prop.valor !== null)
             : [];
+          const ocupado = guardandoId === p.elemento_id;
           return (
             <div
               key={p.id}
-              className="flex flex-col gap-1 px-2 py-1.5"
+              className="flex flex-col gap-1 px-2 py-1.5 rounded-md border border-transparent hover:border-primary/10 hover:bg-primary/[0.03] transition-colors"
             >
-              <button
-                type="button"
-                disabled={!onAbrirElemento}
-                onClick={() => onAbrirElemento?.(p.elemento_id)}
-                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
-                className={`text-micro font-bold text-primary/70 truncate text-left ${
-                  onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
-                }`}
-              >
-                {el?.simbolo || "??"} · {el?.nombre ?? "—"}
-              </button>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span title="Proporción molar" className="text-micro tabular-nums text-primary/60">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={!onAbrirElemento}
+                  onClick={() => onAbrirElemento?.(p.elemento_id)}
+                  title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                  className={`text-micro font-bold text-primary/70 truncate text-left ${
+                    onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""
+                  }`}
+                >
+                  {el?.simbolo || "??"} · {el?.nombre ?? "—"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuitar(p.elemento_id, el?.nombre ?? p.elemento_id)}
+                  disabled={ocupado}
+                  title="Quitar de la composición"
+                  className="ml-auto shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/25 hover:text-red-400 transition-colors cursor-pointer disabled:opacity-30"
+                >
+                  {ocupado ? <Loader2 size={10} className="animate-spin" /> : <Trash2 size={10} />}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  defaultValue={p.cantidad}
+                  key={`cant-${p.id}-${p.cantidad}`}
+                  onBlur={(e) => handleCantidadBlur(p.elemento_id, e.target.value)}
+                  disabled={ocupado}
+                  title="Cantidad"
+                  className="w-14 bg-primary/5 rounded px-1.5 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+                />
+                <input
+                  defaultValue={p.rol ?? ""}
+                  key={`rol-${p.id}-${p.rol ?? ""}`}
+                  onBlur={(e) => handleRolBlur(p.elemento_id, e.target.value)}
+                  disabled={ocupado}
+                  placeholder="Rol"
+                  title="Rol"
+                  className="w-20 bg-primary/5 rounded px-1.5 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 placeholder:text-primary/25"
+                />
+                <span title="Proporción molar (calculada)" className="text-micro tabular-nums text-primary/60">
                   molar {p.proporcion_molar !== null ? p.proporcion_molar : "—"}
                 </span>
                 <span
-                  title="Proporción deducida (normalizada)"
+                  title="Proporción deducida — normalizada (calculada)"
                   className="text-micro font-black tabular-nums text-primary/70"
                 >
                   {p.proporcion_deducida !== null
@@ -354,6 +525,7 @@ function ComposicionRealBloque({
                     : "—"}
                 </span>
               </div>
+
               {propiedadesElemento.length > 0 && (
                 <div className="flex items-center gap-x-2.5 gap-y-0.5 flex-wrap pt-0.5 border-t border-primary/[0.06]">
                   {propiedadesElemento.map((prop) => (
@@ -407,31 +579,138 @@ function propiedadesDeEstabilidadDetalle(
 }
 
 /**
+ * Selector de enlace_sitios para un par de elementos ya elegido — lista
+ * SOLO los enlaces que useEnlaceSitiosParaPar resolvió como aplicables a
+ * ese par exacto (cadena enlace_sitios → site_a/b_id →
+ * elemento_sitios_enlace.elemento_id). No hay opción de crear un
+ * enlace_sitios nuevo: ese catálogo es responsabilidad de otra pantalla,
+ * fuera de este editor de compuesto.
+ */
+function SelectorEnlaceSitios({
+  elementoAId,
+  elementoBId,
+  value,
+  onChange,
+}: {
+  elementoAId: string;
+  elementoBId: string;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const { items, loading } = useEnlaceSitiosParaPar(elementoAId, elementoBId);
+  const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(2));
+
+  if (loading) {
+    return <p className="text-micro text-primary/25 px-1">Buscando enlaces aplicables…</p>;
+  }
+  if (items.length === 0) {
+    return (
+      <p className="text-micro text-primary/40 px-1">
+        Sin enlaces del catálogo aplicables a este par de elementos.
+      </p>
+    );
+  }
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+    >
+      <option value="">Elegir enlace…</option>
+      {items.map((e) => (
+        <option key={e.id} value={e.id}>
+          int {fmt(e.intensidad)} · coste {fmt(e.coste_energetico)} · estab {fmt(e.estabilidad)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
  * Enlaces reales instanciados del compuesto (tabla "compuesto_enlaces"):
  * el grafo elemento↔elemento que alimenta compuesto_estabilidad — a
  * diferencia de ese bloque (un número agregado por compuesto), acá se ve
  * cada enlace individual con su intensidad/coste/estabilidad/
- * reversibilidad. Solo lectura.
+ * reversibilidad.
+ *
+ * Editable: agregar una fila (par de elementos de la composición del
+ * compuesto + un enlace_sitios existente aplicable a ese par, ver
+ * SelectorEnlaceSitios) o quitar una fila. El catálogo enlace_sitios en sí
+ * — sus 4 números, y qué combinaciones son físicamente válidas — nunca se
+ * crea ni se edita desde acá; eso es una tabla de reglas/capacidades que
+ * vive fuera del compuesto (ver useCompuestoEnlaces.ts).
  */
 function EnlacesCompuestoBloque({
+  compuestoId,
   enlaces,
   loading,
   error,
   elementos,
+  elementosDeLaComposicion,
   onAbrirElemento,
+  onRecargar,
 }: {
+  compuestoId: string;
   enlaces: CompuestoEnlaceRow[];
   loading: boolean;
   error?: string | null;
   elementos: Elemento[];
+  /** Elementos que efectivamente están en la composición de este
+   *  compuesto (compuesto_elementos) — un enlace solo tiene sentido entre
+   *  elementos que ya son parte del compuesto, así que el selector de
+   *  "agregar enlace" se arma con esta lista, no con el catálogo entero. */
+  elementosDeLaComposicion: Elemento[];
   onAbrirElemento?: (elementoId: string) => void;
+  onRecargar: () => void;
 }) {
+  const [agregando, setAgregando] = useState(false);
+  const [elementoAId, setElementoAId] = useState("");
+  const [elementoBId, setElementoBId] = useState("");
+  const [enlaceSitiosId, setEnlaceSitiosId] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [quitandoId, setQuitandoId] = useState<string | null>(null);
+  const { confirm, ConfirmModal } = useConfirm();
+
+  const nombreEl = (id: string) => {
+    const el = elementos.find((e) => e.id === id);
+    return el ? `${el.simbolo || "??"} · ${el.nombre}` : "—";
+  };
+
+  function resetFormAgregar() {
+    setAgregando(false);
+    setElementoAId("");
+    setElementoBId("");
+    setEnlaceSitiosId("");
+  }
+
+  async function handleAgregar() {
+    if (!elementoAId || !elementoBId || !enlaceSitiosId || elementoAId === elementoBId) return;
+    setGuardando(true);
+    await agregarEnlaceACompuesto(compuestoId, elementoAId, elementoBId, enlaceSitiosId);
+    setGuardando(false);
+    resetFormAgregar();
+    onRecargar();
+  }
+
+  async function handleQuitar(enlaceId: string, aId: string, bId: string) {
+    const ok = await confirm({
+      title: "Quitar enlace",
+      message: `¿Quitar el enlace entre "${nombreEl(aId)}" y "${nombreEl(bId)}"?`,
+    });
+    if (!ok) return;
+    setQuitandoId(enlaceId);
+    await quitarEnlaceDeCompuesto(enlaceId);
+    setQuitandoId(null);
+    onRecargar();
+  }
+
   if (loading) return null;
   // Antes: `if (loading || enlaces.length === 0) return null` — un error
   // real de fetch (ver useCompuestoEnlaces) caía en el mismo return null
   // que "este compuesto no tiene enlaces", indistinguible en pantalla.
   // Ahora el error se muestra explícito; solo el caso realmente vacío
-  // (sin error, 0 filas) sigue sin renderizar nada.
+  // (sin error, 0 filas) sigue sin renderizar nada... salvo que ahora hay
+  // botón de agregar, así que ya no hace falta ocultar todo el bloque.
   if (error) {
     return (
       <div className="flex flex-col gap-1.5 rounded-lg border border-red-200 bg-red-50 p-2">
@@ -442,48 +721,130 @@ function EnlacesCompuestoBloque({
       </div>
     );
   }
-  if (enlaces.length === 0) return null;
 
   const fmt = (v: number | null) => (v === null ? "—" : v.toFixed(2));
-  const nombreEl = (id: string) => {
-    const el = elementos.find((e) => e.id === id);
-    return el ? `${el.simbolo || "??"} · ${el.nombre}` : "—";
-  };
 
   return (
     <div className="flex flex-col gap-1.5 p-2">
+      <ConfirmModal />
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Enlaces
         </span>
+        <button
+          type="button"
+          onClick={() => (agregando ? resetFormAgregar() : setAgregando(true))}
+          disabled={elementosDeLaComposicion.length < 2}
+          title="Agregar enlace entre dos elementos de la composición"
+          className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
+        >
+          <Plus size={10} />
+        </button>
       </div>
+
+      {agregando && (
+        <div className="flex flex-col gap-1 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/5">
+          <div className="grid grid-cols-2 gap-1">
+            <select
+              value={elementoAId}
+              onChange={(e) => {
+                setElementoAId(e.target.value);
+                setEnlaceSitiosId("");
+              }}
+              className="bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+            >
+              <option value="">Elemento A…</option>
+              {elementosDeLaComposicion.map((e) => (
+                <option key={e.id} value={e.id} disabled={e.id === elementoBId}>
+                  {e.simbolo || "??"} · {e.nombre}
+                </option>
+              ))}
+            </select>
+            <select
+              value={elementoBId}
+              onChange={(e) => {
+                setElementoBId(e.target.value);
+                setEnlaceSitiosId("");
+              }}
+              className="bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+            >
+              <option value="">Elemento B…</option>
+              {elementosDeLaComposicion.map((e) => (
+                <option key={e.id} value={e.id} disabled={e.id === elementoAId}>
+                  {e.simbolo || "??"} · {e.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {elementoAId && elementoBId && (
+            <SelectorEnlaceSitios
+              elementoAId={elementoAId}
+              elementoBId={elementoBId}
+              value={enlaceSitiosId}
+              onChange={setEnlaceSitiosId}
+            />
+          )}
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleAgregar}
+              disabled={!elementoAId || !elementoBId || !enlaceSitiosId || guardando}
+              className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {guardando ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {enlaces.length === 0 && !agregando && (
+        <p className="text-micro text-primary/25 px-2 py-1">Sin enlaces instanciados.</p>
+      )}
+
       <div className="flex flex-col gap-1">
         {enlaces.map((e) => (
           <div
             key={e.id}
-            className="flex flex-col gap-0.5 px-2 py-1"
+            className="flex flex-col gap-0.5 px-2 py-1 rounded-md border border-transparent hover:border-primary/10 hover:bg-primary/[0.03] transition-colors"
           >
-            <span className="text-micro font-bold text-primary/70 truncate">
+            <div className="flex items-center gap-1.5">
+              <span className="text-micro font-bold text-primary/70 truncate">
+                <button
+                  type="button"
+                  disabled={!onAbrirElemento}
+                  onClick={() => onAbrirElemento?.(e.elemento_a_id)}
+                  title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                  className={onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""}
+                >
+                  {nombreEl(e.elemento_a_id)}
+                </button>
+                {" ↔ "}
+                <button
+                  type="button"
+                  disabled={!onAbrirElemento}
+                  onClick={() => onAbrirElemento?.(e.elemento_b_id)}
+                  title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
+                  className={onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""}
+                >
+                  {nombreEl(e.elemento_b_id)}
+                </button>
+              </span>
               <button
                 type="button"
-                disabled={!onAbrirElemento}
-                onClick={() => onAbrirElemento?.(e.elemento_a_id)}
-                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
-                className={onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""}
+                onClick={() => handleQuitar(e.id, e.elemento_a_id, e.elemento_b_id)}
+                disabled={quitandoId === e.id}
+                title="Quitar este enlace"
+                className="ml-auto shrink-0 flex items-center justify-center w-5 h-5 rounded text-primary/25 hover:text-red-400 transition-colors cursor-pointer disabled:opacity-30"
               >
-                {nombreEl(e.elemento_a_id)}
+                {quitandoId === e.id ? (
+                  <Loader2 size={10} className="animate-spin" />
+                ) : (
+                  <Trash2 size={10} />
+                )}
               </button>
-              {" ↔ "}
-              <button
-                type="button"
-                disabled={!onAbrirElemento}
-                onClick={() => onAbrirElemento?.(e.elemento_b_id)}
-                title={onAbrirElemento ? "Ver/editar este elemento" : undefined}
-                className={onAbrirElemento ? "cursor-pointer hover:underline hover:text-primary" : ""}
-              >
-                {nombreEl(e.elemento_b_id)}
-              </button>
-            </span>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
               <span title="Intensidad" className="text-micro tabular-nums text-primary/50">
                 int {fmt(e.intensidad)}
@@ -607,12 +968,43 @@ function CompuestoEditor({
   // por elemento (compuesto_elementos.proporcion_molar/deducida) + análisis
   // de tensión/calidad de enlaces (compuesto_estabilidad). Las 3 fuentes son
   // solo lectura, derivadas — ver propiedadesCalculadasDeCompuesto en types.ts.
-  const { items: proporcionElementos, loading: proporcionLoading } =
-    useCompuestoElementosProporcion(compuesto.id);
+  const {
+    items: proporcionElementos,
+    loading: proporcionLoading,
+    load: recargarProporcionElementos,
+  } = useCompuestoElementosProporcion(compuesto.id);
   const { item: estabilidadDetalle, loading: estabilidadLoading } = useCompuestoEstabilidad(
     compuesto.id,
   );
-  const { items: enlacesCompuesto, loading: enlacesLoading, error: enlacesError } = useCompuestoEnlaces(compuesto.id);
+  const {
+    items: enlacesCompuesto,
+    loading: enlacesLoading,
+    error: enlacesError,
+    load: recargarEnlacesCompuesto,
+  } = useCompuestoEnlaces(compuesto.id);
+
+  // Elementos que efectivamente están en la composición de este compuesto
+  // (compuesto_elementos), resueltos contra el catálogo — es la lista de
+  // la que EnlacesCompuestoBloque arma su selector "agregar enlace": un
+  // enlace solo tiene sentido entre elementos que ya forman parte del
+  // compuesto.
+  const elementosDeLaComposicion = useMemo(
+    () =>
+      proporcionElementos
+        .map((p) => elementos.find((e) => e.id === p.elemento_id))
+        .filter((e): e is Elemento => !!e),
+    [proporcionElementos, elementos],
+  );
+
+  // ComposicionRealBloque y EnlacesCompuestoBloque ahora son editables:
+  // después de cualquier mutación (agregar/editar/quitar elemento o
+  // enlace) hay que refrescar ambos hooks — un cambio en compuesto_elementos
+  // puede alterar qué elementos están disponibles para enlazar, y viceversa
+  // ninguno de los dos recalcula al otro solo, así que se recargan juntos.
+  function recargarComposicionYEnlaces() {
+    recargarProporcionElementos();
+    recargarEnlacesCompuesto();
+  }
 
   // "Estabilidad — detalle" (compuesto_estabilidad) se funde acá dentro de
   // la misma lista que alimenta PropiedadesFisicasCompuestoBloque (pedido
@@ -784,17 +1176,22 @@ function CompuestoEditor({
         {/* Composición real (izquierda) · Enlaces (derecha). */}
         <div className="grid grid-cols-2 gap-3 items-start">
           <ComposicionRealBloque
+            compuestoId={compuesto.id}
             proporciones={proporcionElementos}
             loading={proporcionLoading}
             elementos={elementos}
             onAbrirElemento={setEditandoElementoId}
+            onRecargar={recargarComposicionYEnlaces}
           />
           <EnlacesCompuestoBloque
+            compuestoId={compuesto.id}
             enlaces={enlacesCompuesto}
             loading={enlacesLoading}
             error={enlacesError}
             elementos={elementos}
+            elementosDeLaComposicion={elementosDeLaComposicion}
             onAbrirElemento={setEditandoElementoId}
+            onRecargar={recargarComposicionYEnlaces}
           />
         </div>
       </div>

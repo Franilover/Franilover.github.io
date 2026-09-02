@@ -141,6 +141,28 @@ export async function actualizarCantidadElemento(
 }
 
 /**
+ * Edita el rol (texto libre, ej. "principal"/"traza") de una fila de
+ * compuesto_elementos ya existente — a diferencia de cantidad, rol no
+ * alimenta afinidad.ts, es puramente informativo/editorial, por eso vive
+ * como mutación aparte en vez de colgar de sincronizarComponentesCompuesto
+ * (que solo conoce elemento_id/cantidad). Usado por ComposicionRealBloque
+ * (ahora editable) en CompuestoEditor.
+ */
+export async function actualizarRolElemento(
+  compuestoId: string,
+  elementoId: string,
+  rol: string | null,
+) {
+  const { error } = await supabase
+    .from(CONFIG_COMPUESTO_ELEMENTOS.tabla)
+    .update({ rol })
+    .eq("compuesto_id", compuestoId)
+    .eq("elemento_id", elementoId);
+  if (error) console.error("[actualizarRolElemento] error:", error);
+  return !error;
+}
+
+/**
  * Reemplaza el set COMPLETO de componentes de un compuesto por el nuevo,
  * calculando el diff (agregar / actualizar cantidad / quitar) en vez de
  * borrar-todo-e-insertar — evita destruir y recrear filas (y su id) por
