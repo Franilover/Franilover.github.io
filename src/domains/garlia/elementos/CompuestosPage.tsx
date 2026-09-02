@@ -269,6 +269,40 @@ const ENLACE_COLOR: Record<TipoEnlace, string> = {
  * visual que PropiedadesFisicasBloque de ElementoEditor: nunca editable,
  * marcado como "derivado".
  */
+/**
+ * Fórmula expandida de un Compuesto para el header ("1 Cn + 2 Ep + 1 Fu"):
+ * se arma pura y exclusivamente desde compuesto_elementos (cantidad real,
+ * ver CompuestoElementoProporcion) + el símbolo real de cada elemento del
+ * catálogo — no un segundo cálculo independiente ni un campo duplicado.
+ * NO deriva de enlaces, proporcion_molar/deducida ni ninguna propiedad
+ * visual: eso describe otra cosa (la proporción real puede diferir de la
+ * cantidad simple, ver ComposicionRealBloque), acá específicamente se pide
+ * la cantidad canónica de compuesto_elementos.cantidad.
+ *
+ * Orden: el orden en que ya llegan las filas de compuesto_elementos (mismo
+ * orden que usa ComposicionRealBloque para listarlas) — no hay columna
+ * "orden" en el schema, así que no se inventa un criterio de reordenamiento
+ * en frontend (alfabético, por número atómico, etc.).
+ *
+ * Devuelve null si la composición está vacía o si algún elemento no
+ * resuelve contra el catálogo (no se inventa "??" en el header — mejor no
+ * mostrar fórmula que mostrar una incompleta/falsa).
+ */
+function formulaExpandidaCompuesto(
+  proporciones: CompuestoElementoProporcion[],
+  elementos: Elemento[],
+): string | null {
+  if (proporciones.length === 0) return null;
+
+  const partes: string[] = [];
+  for (const p of proporciones) {
+    const el = elementos.find((e) => e.id === p.elemento_id);
+    if (!el || !el.simbolo) return null;
+    partes.push(`${p.cantidad} ${el.simbolo}`);
+  }
+  return partes.join(" + ");
+}
+
 function PropiedadesFisicasCompuestoBloque({ propiedades }: { propiedades: PropiedadCalculada[] }) {
   // columnas=4 (antes 5): con Estabilidad-detalle + las columnas de
   // clasificación/estructura fundidas (ver auditoría 2026-08-30), varias
@@ -1022,6 +1056,15 @@ function CompuestoEditor({
     [local, estabilidadDetalle, estabilidadLoading],
   );
 
+  // Fórmula expandida para el header (ver formulaExpandidaCompuesto): null
+  // mientras proporcionElementos está cargando o si la composición no
+  // resuelve — el header simplemente no muestra subtítulo en ese caso, no
+  // un placeholder inventado.
+  const formulaHeader = useMemo(
+    () => (proporcionLoading ? null : formulaExpandidaCompuesto(proporcionElementos, elementos)),
+    [proporcionElementos, elementos, proporcionLoading],
+  );
+
   async function persistElemento(id: string, cambios: Partial<Elemento>) {
     try {
       const { error } = await supabase.from("elementos").update(cambios).eq("id", id);
@@ -1116,6 +1159,7 @@ function CompuestoEditor({
     placeholderNombre: "Nombre del compuesto",
     onChangeNombre: (nombre: string) => setLocal((p) => ({ ...p, nombre })),
     onBlurNombre: () => persist({ nombre: local.nombre }),
+    subtitulo: formulaHeader,
     status,
     onGuardar: handleGuardar,
     onEliminar: handleEliminar,

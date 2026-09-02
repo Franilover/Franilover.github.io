@@ -43,6 +43,12 @@ export interface EditorHeaderControls {
   /** Se llama al perder foco del input de nombre, para editores que
    *  autoguardan on-blur (Flora/Mineral) en vez de con botón Guardar. */
   onBlurNombre?: () => void;
+  /** Texto corto renderizado inmediatamente a la derecha del nombre, con
+   *  menor énfasis visual (ej. "Ceniza · 1 Cn + 2 Ep + 1 Fu" en
+   *  Compuesto: la fórmula expandida de compuesto_elementos). Opcional —
+   *  la mayoría de los editores no lo usan. Trunca en vez de romper el
+   *  header si nombre+subtitulo no entran en una línea. */
+  subtitulo?: ReactNode;
   status: SaveStatus;
   onGuardar: () => void;
   onEliminar: () => void;
@@ -75,6 +81,7 @@ export function usePublishHeaderControls(
     controls.imagenUrl,
     controls.prefix,
     controls.nombre,
+    controls.subtitulo,
     controls.status,
     controls.extra,
   ]);

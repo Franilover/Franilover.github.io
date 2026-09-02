@@ -33,6 +33,7 @@ export function EditorHeaderBar({ controls }: { controls: EditorHeaderControls }
     placeholderNombre,
     onChangeNombre,
     onBlurNombre,
+    subtitulo,
     status,
     onGuardar,
     onEliminar,
@@ -74,6 +75,15 @@ export function EditorHeaderBar({ controls }: { controls: EditorHeaderControls }
         onChange={(e) => onChangeNombre(e.target.value)}
         onBlur={onBlurNombre}
       />
+
+      {subtitulo && (
+        <span
+          className="shrink min-w-0 truncate text-micro font-bold text-primary/40"
+          title={typeof subtitulo === "string" ? subtitulo : undefined}
+        >
+          · {subtitulo}
+        </span>
+      )}
 
       {extra}
 
