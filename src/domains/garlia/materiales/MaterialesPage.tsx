@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Loader2,
   Plus,
+  Save,
   Trash2,
   X,
 } from "lucide-react";
@@ -349,8 +350,10 @@ function MaterialDetail({ material }: { material: Material }) {
   const { items: estructurasCatalogo, loading: loadingEstructurasCatalogo } = useEstructuras();
   const { item: perfilReactivo, loading: loadingPerfilReactivo } = usePerfilReactivoMaterial(material.id);
 
+  const [agregandoComponente, setAgregandoComponente] = useState(false);
   const [agregandoCompuestoId, setAgregandoCompuestoId] = useState<string | null>(null);
   const [guardandoComponente, setGuardandoComponente] = useState(false);
+  const [agregandoEstructura, setAgregandoEstructura] = useState(false);
   const [agregandoEstructuraId, setAgregandoEstructuraId] = useState<string | null>(null);
   const [guardandoEstructura, setGuardandoEstructura] = useState(false);
 
@@ -375,6 +378,7 @@ function MaterialDetail({ material }: { material: Material }) {
         cantidad: 1,
       });
       setAgregandoCompuestoId(null);
+      setAgregandoComponente(false);
     } finally {
       setGuardandoComponente(false);
     }
@@ -394,6 +398,7 @@ function MaterialDetail({ material }: { material: Material }) {
     try {
       await agregarEstructura({ estructura_id: agregandoEstructuraId, cantidad: 1 });
       setAgregandoEstructuraId(null);
+      setAgregandoEstructura(false);
     } finally {
       setGuardandoEstructura(false);
     }
@@ -454,16 +459,57 @@ function MaterialDetail({ material }: { material: Material }) {
 
         <div className="flex flex-col gap-2 min-w-0">
           <div className="flex flex-col gap-1.5 min-w-0 p-2">
-            <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Componentes
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                Componentes
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  agregandoComponente
+                    ? (setAgregandoComponente(false), setAgregandoCompuestoId(null))
+                    : setAgregandoComponente(true)
+                }
+                disabled={compuestosDisponibles.length === 0}
+                title="Agregar componente al material"
+                className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
+              >
+                <Plus size={10} />
+              </button>
+            </div>
+
+            {agregandoComponente && (
+              <div className="flex flex-col gap-1 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/5">
+                <ComboSelector
+                  icon={<Plus size={11} />}
+                  items={compuestosDisponibles.map((c) => ({ id: c.id, label: c.nombre }))}
+                  label=""
+                  loading={loadingCompuestos}
+                  mode="single"
+                  placeholder="Elegir compuesto del catálogo…"
+                  value={agregandoCompuestoId}
+                  onChange={setAgregandoCompuestoId}
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleAgregarComponente}
+                    disabled={!agregandoCompuestoId || guardandoComponente}
+                    className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    {guardandoComponente ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {loadingComponentes ? (
               <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
                 <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                {componentes.length === 0 && (
+                {componentes.length === 0 && !agregandoComponente && (
                   <p className="py-1 text-micro text-primary/30">Sin componentes registrados.</p>
                 )}
                 {componentes.map((componente) => {
@@ -490,42 +536,60 @@ function MaterialDetail({ material }: { material: Material }) {
                 })}
               </div>
             )}
-
-            <div className="mt-1 flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <ComboSelector
-                  icon={<Plus size={11} />}
-                  items={compuestosDisponibles.map((c) => ({ id: c.id, label: c.nombre }))}
-                  label=""
-                  loading={loadingCompuestos}
-                  mode="single"
-                  placeholder="Elegir compuesto del catálogo…"
-                  value={agregandoCompuestoId}
-                  onChange={setAgregandoCompuestoId}
-                />
-              </div>
-              <button
-                type="button"
-                disabled={!agregandoCompuestoId || guardandoComponente}
-                onClick={handleAgregarComponente}
-                className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary disabled:opacity-30 transition-all px-1"
-              >
-                {guardandoComponente ? "Agregando…" : "Agregar"}
-              </button>
-            </div>
           </div>
 
           <div className="flex flex-col gap-1.5 min-w-0 p-2">
-            <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-              Estructuras
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+                Estructuras
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  agregandoEstructura
+                    ? (setAgregandoEstructura(false), setAgregandoEstructuraId(null))
+                    : setAgregandoEstructura(true)
+                }
+                disabled={estructurasDisponibles.length === 0}
+                title="Agregar estructura al material"
+                className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
+              >
+                <Plus size={10} />
+              </button>
+            </div>
+
+            {agregandoEstructura && (
+              <div className="flex flex-col gap-1 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/5">
+                <ComboSelector
+                  icon={<Plus size={11} />}
+                  items={estructurasDisponibles.map((e) => ({ id: e.id, label: e.nombre }))}
+                  label=""
+                  loading={loadingEstructurasCatalogo}
+                  mode="single"
+                  placeholder="Elegir estructura del catálogo…"
+                  value={agregandoEstructuraId}
+                  onChange={setAgregandoEstructuraId}
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleAgregarEstructura}
+                    disabled={!agregandoEstructuraId || guardandoEstructura}
+                    className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    {guardandoEstructura ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {loadingEstructuras ? (
               <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
                 <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
               </div>
             ) : (
               <div className="flex flex-col gap-1">
-                {estructuras.length === 0 && (
+                {estructuras.length === 0 && !agregandoEstructura && (
                   <p className="py-1 text-micro text-primary/30">Sin estructuras asociadas.</p>
                 )}
                 {estructuras.map((relacion) => {
@@ -544,29 +608,6 @@ function MaterialDetail({ material }: { material: Material }) {
                 })}
               </div>
             )}
-
-            <div className="mt-1 flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <ComboSelector
-                  icon={<Plus size={11} />}
-                  items={estructurasDisponibles.map((e) => ({ id: e.id, label: e.nombre }))}
-                  label=""
-                  loading={loadingEstructurasCatalogo}
-                  mode="single"
-                  placeholder="Elegir estructura del catálogo…"
-                  value={agregandoEstructuraId}
-                  onChange={setAgregandoEstructuraId}
-                />
-              </div>
-              <button
-                type="button"
-                disabled={!agregandoEstructuraId || guardandoEstructura}
-                onClick={handleAgregarEstructura}
-                className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary disabled:opacity-30 transition-all px-1"
-              >
-                {guardandoEstructura ? "Agregando…" : "Agregar"}
-              </button>
-            </div>
           </div>
 
           {material.notas && (

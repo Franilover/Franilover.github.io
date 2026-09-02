@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Link2, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Box, Link2, Loader2, Plus, Save, Trash2, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -198,6 +198,7 @@ function ComposicionEstructuraBloque({ estructuraId }: { estructuraId: string })
   const { items, loading, agregar, actualizar, eliminar } = useEstructuraComposicion(estructuraId);
   const { items: compuestosCatalogo, loading: loadingCatalogo } = useCompuestos();
 
+  const [agregando, setAgregando] = useState(false);
   const [agregandoId, setAgregandoId] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -205,12 +206,17 @@ function ComposicionEstructuraBloque({ estructuraId }: { estructuraId: string })
     (c) => !items.some((item) => item.compuesto_id === c.id),
   );
 
+  function resetFormAgregar() {
+    setAgregando(false);
+    setAgregandoId(null);
+  }
+
   async function handleAgregar() {
     if (!agregandoId) return;
     setGuardando(true);
     try {
       await agregar({ compuesto_id: agregandoId, cantidad: 1 });
-      setAgregandoId(null);
+      resetFormAgregar();
     } finally {
       setGuardando(false);
     }
@@ -230,14 +236,49 @@ function ComposicionEstructuraBloque({ estructuraId }: { estructuraId: string })
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
           Compuestos
         </span>
+        <button
+          type="button"
+          onClick={() => (agregando ? resetFormAgregar() : setAgregando(true))}
+          disabled={disponibles.length === 0}
+          title="Agregar compuesto a la estructura"
+          className="shrink-0 flex items-center justify-center w-5 h-5 rounded border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ml-auto"
+        >
+          <Plus size={10} />
+        </button>
       </div>
+
+      {agregando && (
+        <div className="flex flex-col gap-1 px-2 py-1.5 rounded-md border border-primary/10 bg-primary/5">
+          <ComboSelector
+            icon={<Plus size={11} />}
+            items={disponibles.map((c) => ({ id: c.id, label: c.nombre }))}
+            label=""
+            loading={loadingCatalogo}
+            mode="single"
+            placeholder="Elegir compuesto del catálogo…"
+            value={agregandoId}
+            onChange={setAgregandoId}
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleAgregar}
+              disabled={!agregandoId || guardando}
+              className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md border border-primary/15 text-primary/40 hover:text-primary hover:border-primary/35 hover:bg-primary/5 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {guardando ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
           <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
         </div>
       ) : (
         <div className="flex flex-col gap-1">
-          {items.length === 0 && (
+          {items.length === 0 && !agregando && (
             <p className="py-1 text-micro text-primary/30">Sin compuestos asociados.</p>
           )}
           {items.map((item) => (
@@ -250,29 +291,6 @@ function ComposicionEstructuraBloque({ estructuraId }: { estructuraId: string })
           ))}
         </div>
       )}
-
-      <div className="mt-1 flex items-center gap-2">
-        <div className="flex-1 min-w-0">
-          <ComboSelector
-            icon={<Plus size={11} />}
-            items={disponibles.map((c) => ({ id: c.id, label: c.nombre }))}
-            label=""
-            loading={loadingCatalogo}
-            mode="single"
-            placeholder="Elegir compuesto del catálogo…"
-            value={agregandoId}
-            onChange={setAgregandoId}
-          />
-        </div>
-        <button
-          type="button"
-          disabled={!agregandoId || guardando}
-          onClick={handleAgregar}
-          className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary disabled:opacity-30 transition-all px-1"
-        >
-          {guardando ? "Agregando…" : "Agregar"}
-        </button>
-      </div>
       <ConfirmModal />
     </div>
   );
