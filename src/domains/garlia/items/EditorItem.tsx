@@ -326,7 +326,7 @@ export function EditorItem({
           </div>
 
           <div className="flex flex-col gap-2 min-w-0">
-            <div className="rounded-lg border border-primary/10 p-2 flex flex-col gap-2">
+            <div className="rounded-lg border border-primary/10 p-2 grid grid-cols-2 gap-2">
               <SelectorGrupoUnico
                 emptyLabel="Sin categoría"
                 label="Categoría"
