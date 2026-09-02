@@ -22,6 +22,12 @@
  * Este componente NUNCA calcula el volumen ni decide si "está bien" — solo
  * declara la causa (geometria_fisica) y muestra el veredicto que ya trae
  * Supabase en propiedades_fisicas.volumen_comparacion.
+ *
+ * Diseño: minimalista, sin tarjeta con fondo/borde propio — mismo criterio
+ * que PanelFisicaObjeto (el contorno vive en el contenedor exterior de
+ * EditorItem, no en cada sub-sección). El input usa solo un subrayado en
+ * vez de una caja completa, y el veredicto del motor es una línea de texto
+ * en vez de una tarjeta anidada.
  */
 
 import { Loader2 } from "lucide-react";
@@ -128,21 +134,17 @@ export function EditorGeometriaItem({
   const estado = volumenComparacion?.estado;
 
   return (
-    <div className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-      <div className="mb-3">
-        <h3 className="text-sm font-semibold text-primary">Volumen declarado</h3>
-        <p className="mt-1 text-xs text-primary/45">
-          Causa geométrica del objeto — el motor la compara contra el volumen que deriva de materiales y estructura.
-        </p>
-      </div>
+    <section className="flex flex-col gap-1.5">
+      <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+        Volumen declarado
+      </span>
 
-      <div className="flex items-end gap-2">
-        <label className="flex-1 min-w-0">
-          <span className="mb-1 block text-xs text-primary/50">Volumen</span>
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-1.5">
           <input
-            className="w-full rounded-lg border border-primary/15 bg-transparent px-2.5 py-1.5 text-sm text-primary"
+            className="w-20 bg-transparent px-0 py-1 text-sm font-black text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             min={0}
-            placeholder="Sin declarar"
+            placeholder="—"
             step="any"
             type="number"
             value={volumenTexto}
@@ -152,27 +154,26 @@ export function EditorGeometriaItem({
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
           />
+          <span className="text-micro font-bold text-primary/35">
+            {loadingUnidad ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              unidadVolumen?.simbolo ?? "—"
+            )}
+          </span>
         </label>
-        <span className="pb-2 text-xs text-primary/40">
-          {loadingUnidad ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            unidadVolumen?.simbolo ?? "—"
-          )}
-        </span>
-        {guardando && <Loader2 className="mb-2 h-3.5 w-3.5 shrink-0 animate-spin text-primary/40" />}
+        {guardando && <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary/40" />}
       </div>
 
-      {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+      {error && <p className="text-micro text-red-500">{error}</p>}
 
-      {/* Veredicto del motor — solo lectura, nunca reinterpretado. */}
+      {/* Veredicto del motor — solo lectura, nunca reinterpretado. Línea de
+          texto sin tarjeta anidada. */}
       {estado && (
-        <div className="mt-3 rounded-lg border border-primary/10 px-3 py-2">
-          <p className="text-xs text-primary/60">
-            {ESTADO_COMPARACION_LABEL[estado] ?? estado}
-          </p>
+        <div className="text-micro text-primary/45">
+          <p>{ESTADO_COMPARACION_LABEL[estado] ?? estado}</p>
           {estado === "requiere_tolerancia" && (
-            <div className="mt-1.5 flex gap-4 text-xs text-primary/40">
+            <div className="mt-0.5 flex gap-3 text-primary/35">
               <span>Diferencia: {formatNumero(volumenComparacion?.diferencia_si)}</span>
               <span>
                 Relativa:{" "}
@@ -184,7 +185,7 @@ export function EditorGeometriaItem({
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 

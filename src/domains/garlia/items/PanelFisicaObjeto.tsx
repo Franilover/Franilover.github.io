@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, Weight, X } from "lucide-react";
+import { Loader2, Pencil, X } from "lucide-react";
 import React, { useState } from "react";
 
 import { useMateriales } from "@/domains/garlia/materiales/useMateriales";
@@ -17,11 +17,17 @@ function formatValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function PropertyRow({ label, value }: { label: string; value: unknown }) {
+/** Tarjeta compacta de una propiedad — mismo lenguaje visual que
+ *  TarjetaPropiedadesFisicas de Química (elementos/GridPropiedadesCalculadas):
+ *  sin borde ni fondo propios, solo tipografía micro y separación por
+ *  espaciado, apoyándose en el contenedor exterior para el límite visual. */
+function PropertyCell({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-primary/10 py-2 last:border-b-0">
-      <span className="text-sm text-primary/55">{label}</span>
-      <span className="text-sm font-medium text-primary">{formatValue(value)}</span>
+    <div className="flex items-center justify-between gap-1 min-w-0 px-2 py-1.5">
+      <span className="text-micro font-bold text-primary/50 truncate">{label}</span>
+      <span className="text-micro font-black text-primary/70 tabular-nums shrink-0">
+        {formatValue(value)}
+      </span>
     </div>
   );
 }
@@ -58,6 +64,12 @@ const ESTADO_LABEL: Record<string, string> = {
  * Si el estado es "sin_materiales" o "incompleto_geometria", eso es falta
  * de datos constructivos del objeto — no un error del motor — y se muestra
  * así explícitamente, sin inventar valores ni tratarlo como cero.
+ *
+ * Diseño: minimalista, sin tarjetas anidadas con fondo/borde propio — cada
+ * bloque (Física / Geometría / Materiales) es solo un título micro-label +
+ * contenido, separado por gap-3 dentro de la tarjeta exterior que ya pone
+ * EditorItem. Mismo criterio que ElementoEditor/CompuestoEditor de Química:
+ * el contorno vive en el contenedor, no en cada sub-sección.
  */
 export function PanelFisicaObjeto({
   itemId,
@@ -89,23 +101,16 @@ export function PanelFisicaObjeto({
   const fuente = propiedades.fuente_fisica;
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Weight className="h-4 w-4 text-primary/50" />
-            <div>
-              <h3 className="text-sm font-semibold text-primary">Física del objeto</h3>
-              <p className="mt-1 text-xs text-primary/45">
-                Derivada de composición material · solo lectura
-              </p>
-            </div>
-          </div>
+    <div className="flex flex-col gap-3">
+      {/* Física — solo lectura, derivada de materiales + geometría. */}
+      <section className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            Física del objeto
+          </span>
           <span
-            className={`shrink-0 rounded-full border px-2 py-0.5 text-micro font-semibold ${
-              esCalculable
-                ? "border-primary/15 bg-primary/5 text-primary/60"
-                : "border-amber-500/25 bg-amber-500/5 text-amber-600/80"
+            className={`shrink-0 text-micro font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${
+              esCalculable ? "text-primary/40" : "text-amber-600/70"
             }`}
             title={
               fuente
@@ -118,16 +123,16 @@ export function PanelFisicaObjeto({
         </div>
 
         {!esCalculable ? (
-          <p className="py-2 text-sm text-primary/40">
+          <p className="text-micro text-primary/35 italic py-1">
             {estado === "incompleto_geometria"
-              ? "Este objeto tiene materiales asociados pero le falta geometría física (volumen) para derivar densidad."
-              : "Este objeto todavía no tiene composición material suficiente para derivar propiedades físicas. Es una falta de datos constructivos, no un error del motor."}
+              ? "Tiene materiales asociados pero falta geometría (volumen) para derivar densidad."
+              : "Todavía no tiene composición material suficiente para derivar propiedades físicas."}
           </p>
         ) : (
-          <div>
+          <div className="grid grid-cols-2 gap-x-1 gap-y-0.5">
             {PROPIEDADES_FISICAS_OBJETO.filter(([key]) => propiedades[key] !== undefined).map(
               ([key, label]) => (
-                <PropertyRow key={key} label={label} value={propiedades[key]} />
+                <PropertyCell key={key} label={label} value={propiedades[key]} />
               ),
             )}
           </div>
@@ -150,26 +155,24 @@ export function PanelFisicaObjeto({
         onGuardado={onRefrescarItem}
       />
 
-      <section className="rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-primary">Materiales</h3>
-            <p className="mt-1 text-xs text-primary/45">
-              Composición declarada del objeto — origen de la física de arriba
-            </p>
-          </div>
+      {/* Materiales — composición declarada, origen de la física de arriba. */}
+      <section className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            Materiales
+          </span>
           <button
-            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-primary/15 px-2.5 py-1 text-xs font-medium text-primary/60 hover:text-primary hover:border-primary/35 transition-all"
+            className="shrink-0 flex items-center gap-1 text-micro font-bold text-primary/40 hover:text-primary transition-colors"
             type="button"
             onClick={() => setEditandoComposicion((v) => !v)}
           >
             {editandoComposicion ? (
               <>
-                <X size={12} /> Cerrar
+                <X size={11} /> Cerrar
               </>
             ) : (
               <>
-                <Pencil size={12} /> Editar composición
+                <Pencil size={11} /> Editar
               </>
             )}
           </button>
@@ -177,32 +180,36 @@ export function PanelFisicaObjeto({
 
         {/* Capa 1: composición declarada, solo lectura, compacta. Distinta
             conceptualmente de "Editar composición" — esta es la lectura de
-            la causa ya guardada, no un formulario. */}
+            la causa ya guardada, no un formulario. Filas separadas por un
+            divisor sutil en vez de bordes/fondo por fila. */}
         {!editandoComposicion && (
           loadingComposicion ? (
-            <div className="flex items-center gap-2 py-3 text-sm text-primary/45">
-              <Loader2 className="h-4 w-4 animate-spin" /> Cargando materiales…
+            <div className="flex items-center gap-2 py-2 text-micro text-primary/40">
+              <Loader2 className="h-3 w-3 animate-spin" /> Cargando materiales…
             </div>
           ) : composicion.length === 0 ? (
-            <p className="py-2 text-sm text-primary/40">
-              Este objeto no tiene materiales asociados todavía.
+            <p className="text-micro text-primary/35 italic py-1">
+              Sin materiales asociados todavía.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col">
               {composicion.map((fila) => {
                 const material = materialesCatalogo.find((m) => m.id === fila.material_id);
                 return (
-                  <div key={fila.id} className="rounded-lg border border-primary/10 px-3 py-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-primary">
-                        {loadingCatalogo ? "…" : material?.nombre ?? fila.material_id.slice(0, 8)}
-                      </span>
-                      <span className="text-xs text-primary/50">
-                        × {formatValue(fila.cantidad)}
-                        {fila.proporcion !== null ? ` · prop. ${formatValue(fila.proporcion)}` : ""}
-                      </span>
+                  <div
+                    key={fila.id}
+                    className="flex items-center justify-between gap-3 py-1.5 border-b border-primary/8 last:border-b-0"
+                  >
+                    <span className="text-xs font-bold text-primary/75 truncate">
+                      {loadingCatalogo ? "…" : material?.nombre ?? fila.material_id.slice(0, 8)}
+                    </span>
+                    <div className="shrink-0 flex items-center gap-2 text-micro text-primary/40">
+                      <span className="tabular-nums">× {formatValue(fila.cantidad)}</span>
+                      {fila.proporcion !== null && (
+                        <span className="tabular-nums">prop. {formatValue(fila.proporcion)}</span>
+                      )}
+                      {fila.rol && <span className="text-primary/30">{fila.rol}</span>}
                     </div>
-                    {fila.rol && <div className="mt-1 text-xs text-primary/40">{fila.rol}</div>}
                   </div>
                 );
               })}

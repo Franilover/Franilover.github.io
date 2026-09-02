@@ -84,13 +84,13 @@ function FilaMaterial({
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-primary/10 px-3 py-2">
-      <span className="flex-1 min-w-0 truncate text-sm text-primary">{nombreMaterial}</span>
+    <div className="flex items-center gap-2 py-1.5 border-b border-primary/8 last:border-b-0">
+      <span className="flex-1 min-w-0 truncate text-sm font-bold text-primary/80">{nombreMaterial}</span>
 
-      <label className="flex items-center gap-1.5 text-xs text-primary/50">
+      <label className="flex items-center gap-1 text-micro font-bold text-primary/40">
         Cant.
         <input
-          className="w-16 rounded border border-primary/15 bg-transparent px-1.5 py-0.5 text-xs text-primary"
+          className="w-12 bg-transparent px-0 py-0.5 text-xs font-bold text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           min={0}
           step="any"
           type="number"
@@ -103,10 +103,10 @@ function FilaMaterial({
         />
       </label>
 
-      <label className="flex items-center gap-1.5 text-xs text-primary/50">
+      <label className="flex items-center gap-1 text-micro font-bold text-primary/40">
         Prop.
         <input
-          className="w-16 rounded border border-primary/15 bg-transparent px-1.5 py-0.5 text-xs text-primary"
+          className="w-12 bg-transparent px-0 py-0.5 text-xs font-bold text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           max={1}
           min={0}
           placeholder="—"
@@ -122,12 +122,12 @@ function FilaMaterial({
       </label>
 
       <button
-        className="shrink-0 rounded-lg p-1.5 text-primary/30 hover:text-red-500 hover:bg-red-500/8 transition-all"
+        className="shrink-0 rounded-md p-1 text-primary/25 hover:text-red-500 hover:bg-red-500/8 transition-all"
         title="Quitar material"
         type="button"
         onClick={onEliminar}
       >
-        <Trash2 size={13} />
+        <Trash2 size={12} />
       </button>
     </div>
   );
@@ -186,11 +186,11 @@ export function SelectorMaterialesItem({
   return (
     <div>
       {loadingComposicion ? (
-        <div className="flex items-center gap-2 py-4 text-sm text-primary/45">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando composición…
+        <div className="flex items-center gap-2 py-2 text-micro text-primary/40">
+          <Loader2 className="h-3 w-3 animate-spin" /> Cargando composición…
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-col">
           {composicion.map((fila) => {
             const material = materialesCatalogo.find((m) => m.id === fila.material_id);
             return (
@@ -205,14 +205,14 @@ export function SelectorMaterialesItem({
           })}
 
           {composicion.length === 0 && (
-            <p className="py-2 text-sm text-primary/40">
+            <p className="text-micro text-primary/35 italic py-1">
               Sin materiales todavía. Agrega uno del catálogo para que el motor pueda derivar la física.
             </p>
           )}
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-2">
         <div className="flex-1 min-w-0">
           <ComboSelector
             icon={<Plus size={11} />}
@@ -226,7 +226,7 @@ export function SelectorMaterialesItem({
           />
         </div>
         <button
-          className="shrink-0 rounded-lg border border-primary/15 px-3 py-1.5 text-xs font-semibold text-primary/60 hover:text-primary hover:border-primary/35 disabled:opacity-30 transition-all"
+          className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary disabled:opacity-30 transition-all px-1"
           disabled={!agregandoMaterialId || guardando}
           type="button"
           onClick={handleAgregar}
