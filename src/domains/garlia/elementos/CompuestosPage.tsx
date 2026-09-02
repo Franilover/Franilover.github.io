@@ -1506,6 +1506,18 @@ export function CompuestoPanelFlotante({
                 onChange={(e) => headerControls.onChangeNombre(e.target.value)}
                 onBlur={headerControls.onBlurNombre}
               />
+              {headerControls.subtitulo && (
+                <span
+                  className="shrink min-w-0 truncate text-micro font-bold text-primary/40"
+                  title={
+                    typeof headerControls.subtitulo === "string"
+                      ? headerControls.subtitulo
+                      : undefined
+                  }
+                >
+                  · {headerControls.subtitulo}
+                </span>
+              )}
               {headerControls.extra}
               <div className="shrink-0 flex items-center gap-1.5">
                 <SaveIndicator status={headerControls.status} />
