@@ -278,6 +278,12 @@ export interface PropiedadCalculada {
    *  fórmula documentada (ej. clasificaciones textuales derivadas por
    *  regla simple), se omite del popover. */
   formula?: string;
+  /** Familia a la que pertenece la propiedad, para agrupar visualmente en
+   *  TarjetaPropiedadesFisicas (ej. "Propiedades físicas", "Estructura",
+   *  "Enlaces", "Capacidad externa"). Si se omite, la propiedad cae en un
+   *  grupo genérico sin encabezado — mantiene compatibilidad con listas
+   *  (Compuesto/Material/Estructura) que todavía no clasifican por grupo. */
+  grupo?: string;
 }
 
 /** Arma la lista de propiedades físicas calculadas de un Elemento para
@@ -290,67 +296,70 @@ export function propiedadesCalculadasDeElemento(el: Elemento): PropiedadCalculad
   const prop = (v?: number | null) =>
     v === null || v === undefined ? undefined : Math.max(0, Math.min(1, v));
 
+  // ─── 4 familias, mismo orden en el que se muestran agrupadas en el
+  // panel (ver TarjetaPropiedadesFisicas con agruparPor="grupo"):
+  // Propiedades físicas → Estructura → Enlaces → Capacidad externa.
+  const G = {
+    fisicas: "Propiedades físicas",
+    estructura: "Estructura",
+    enlaces: "Enlaces",
+    capacidadExterna: "Capacidad externa",
+  } as const;
+
   return [
-    { clave: "masa_base", label: "Masa", valor: fmt(el.masa_base, 2), descripcion: "Cantidad de masa fundamental del elemento en la escala interna de Garlia.", formula: "Masa = 1.00·Masa(núcleo) + 0.75·Equilibrio(núcleo) + 0.50·Cinética(núcleo)" },
-    { clave: "volumen_base", label: "Volumen", valor: fmt(el.volumen_base, 2), descripcion: "Espacio de referencia asociado a la configuración del elemento; no es una magnitud 0–1.", formula: "Volumen base = número total de partículas de la configuración elemental" },
-    { clave: "estabilidad", label: "Estabilidad", valor: fmt(el.estabilidad), proporcion: prop(el.estabilidad), descripcion: "Qué tan resistente es a romperse o transformarse.", formula: "Propiedad derivada de la composición y estructura del compuesto." },
-    { clave: "rigidez", label: "Rigidez", valor: fmt(el.rigidez), proporcion: prop(el.rigidez), descripcion: "Resistencia a deformarse bajo fuerza.", formula: "Propiedad derivada de la composición y estructura del compuesto." },
-    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(el.flexibilidad), proporcion: prop(el.flexibilidad), descripcion: "Capacidad de deformarse sin romperse.", formula: "Propiedad derivada de la composición y estructura del compuesto." },
-    { clave: "dureza", label: "Dureza", valor: fmt(el.dureza), proporcion: prop(el.dureza), descripcion: "Resistencia a ser rayado o penetrado.", formula: "Dureza = 0.65·rigidez + 0.20·saturación de enlace + 0.15·saturación externa" },
-    { clave: "conductividad", label: "Conductividad", valor: fmt(el.conductividad), proporcion: prop(el.conductividad), descripcion: "Facilidad para transmitir energía/interacción.", formula: "Conductividad = 0.35·interacción externa + 0.30·interacción media + 0.20·información externa + 0.15·dinámica externa" },
-    { clave: "transparencia", label: "Transparencia", valor: fmt(el.transparencia), proporcion: prop(el.transparencia), descripcion: "Cuánto deja pasar en vez de bloquear/absorber.", formula: "Transparencia = propiedad derivada de la capacidad de paso y retención." },
-    { clave: "interaccion", label: "Interacción", valor: fmt(el.interaccion), proporcion: prop(el.interaccion), descripcion: "Facilidad con la que el elemento se acopla o responde a su entorno.", formula: "Interacción = propiedad derivada de la capacidad de acoplamiento del elemento." },
-    { clave: "capacidad_transformacion", label: "Cap. transformación", valor: fmt(el.capacidad_transformacion), proporcion: prop(el.capacidad_transformacion), descripcion: "Potencial/facilidad de cambio del elemento (no es velocidad real).", formula: "Cap. transformación = 0.60·transición + 0.20·(1−catálisis) + 0.20·(1−saturación externa)" },
-    { clave: "dinamismo_particular", label: "Dinamismo", valor: fmt(el.dinamismo_particular, 2), descripcion: "Magnitud combinada de dinámica/transformación/interacción — usada como base de duración de procesos.", formula: "Dinamismo = combinación de dinámica + transformación + interacción de la capa externa" },
-    { clave: "valencia_estructural", label: "Valencia estructural", valor: fmt(el.valencia_estructural, 0), descripcion: "Cantidad de enlaces que puede sostener estructuralmente.", formula: "Valencia = mín(ocupación, capacidad externa − ocupación, capacidad externa / 2)" },
-    { clave: "capacidad_enlace", label: "Capacidad de enlace", valor: fmt(el.capacidad_enlace), proporcion: prop(el.capacidad_enlace), descripcion: "Qué tan disponible está para formar enlaces nuevos.", formula: "Cap. de enlace = valencia / (capacidad externa / 2)" },
-    { clave: "saturacion_enlace", label: "Saturación de enlace", valor: fmt(el.saturacion_enlace), proporcion: prop(el.saturacion_enlace), descripcion: "Qué tan cerca está de agotar su capacidad de enlace.", formula: "Saturación de enlace = sitios de enlace usados / sitios de enlace disponibles" },
-    { clave: "regimen_estructural", label: "Régimen estructural", valor: el.regimen_estructural ?? null, descripcion: "Clasificación estructural derivada (ej. equilibrio).", formula: "Catálisis > Transición → conservación · Catálisis = Transición → equilibrio · Transición > Catálisis → transformación" },
+    // ─── Propiedades físicas ────────────────────────────────────────────
+    { clave: "masa_base", label: "Masa", valor: fmt(el.masa_base, 2), descripcion: "Cantidad de masa fundamental del elemento en la escala interna de Garlia.", formula: "Masa = 1.00·Masa(núcleo) + 0.75·Equilibrio(núcleo) + 0.50·Cinética(núcleo)", grupo: G.fisicas },
+    { clave: "volumen_base", label: "Volumen", valor: fmt(el.volumen_base, 2), descripcion: "Espacio de referencia asociado a la configuración del elemento; no es una magnitud 0–1.", formula: "Volumen base = número total de partículas de la configuración elemental", grupo: G.fisicas },
+    { clave: "estabilidad", label: "Estabilidad", valor: fmt(el.estabilidad), proporcion: prop(el.estabilidad), descripcion: "Qué tan resistente es a romperse o transformarse.", formula: "Propiedad derivada de la composición y estructura del compuesto.", grupo: G.fisicas },
+    { clave: "rigidez", label: "Rigidez", valor: fmt(el.rigidez), proporcion: prop(el.rigidez), descripcion: "Resistencia a deformarse bajo fuerza.", formula: "Propiedad derivada de la composición y estructura del compuesto.", grupo: G.fisicas },
+    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(el.flexibilidad), proporcion: prop(el.flexibilidad), descripcion: "Capacidad de deformarse sin romperse.", formula: "Propiedad derivada de la composición y estructura del compuesto.", grupo: G.fisicas },
+    { clave: "dureza", label: "Dureza", valor: fmt(el.dureza), proporcion: prop(el.dureza), descripcion: "Resistencia a ser rayado o penetrado.", formula: "Dureza = 0.65·rigidez + 0.20·saturación de enlace + 0.15·saturación externa", grupo: G.fisicas },
+    { clave: "conductividad", label: "Conductividad", valor: fmt(el.conductividad), proporcion: prop(el.conductividad), descripcion: "Facilidad para transmitir energía/interacción.", formula: "Conductividad = 0.35·interacción externa + 0.30·interacción media + 0.20·información externa + 0.15·dinámica externa", grupo: G.fisicas },
+    { clave: "transparencia", label: "Transparencia", valor: fmt(el.transparencia), proporcion: prop(el.transparencia), descripcion: "Cuánto deja pasar en vez de bloquear/absorber.", formula: "Transparencia = propiedad derivada de la capacidad de paso y retención.", grupo: G.fisicas },
+    { clave: "interaccion", label: "Interacción", valor: fmt(el.interaccion), proporcion: prop(el.interaccion), descripcion: "Facilidad con la que el elemento se acopla o responde a su entorno.", formula: "Interacción = propiedad derivada de la capacidad de acoplamiento del elemento.", grupo: G.fisicas },
+    { clave: "capacidad_transformacion", label: "Cap. transformación", valor: fmt(el.capacidad_transformacion), proporcion: prop(el.capacidad_transformacion), descripcion: "Potencial/facilidad de cambio del elemento (no es velocidad real).", formula: "Cap. transformación = 0.60·transición + 0.20·(1−catálisis) + 0.20·(1−saturación externa)", grupo: G.fisicas },
+    { clave: "dinamismo_particular", label: "Dinamismo", valor: fmt(el.dinamismo_particular, 2), descripcion: "Magnitud combinada de dinámica/transformación/interacción — usada como base de duración de procesos.", formula: "Dinamismo = combinación de dinámica + transformación + interacción de la capa externa", grupo: G.fisicas },
+    { clave: "carga_q", label: "Carga Q", valor: fmt(el.carga_q, 2), descripcion: "Carga cuántica total del elemento, suma de las 3 capas.", formula: "Carga Q = carga_q(núcleo) + carga_q(media) + carga_q(externa)", grupo: G.fisicas },
+    { clave: "carga_q_norm", label: "Carga Q (normalizada)", valor: fmt(el.carga_q_norm), proporcion: prop(el.carga_q_norm), descripcion: "Carga Q normalizada a escala 0–1 para comparar entre elementos.", grupo: G.fisicas },
 
-    // ─── Sitios, afinidades y enlaces posibles (columnas reales en
-    // Supabase, pobladas en las 67 filas, que no se mostraban en ningún
-    // editor/visualizador hasta ahora — ver auditoría 2026-08-30). No se
-    // incluye disponibilidad_enlace ni capacidad_enlace_bruta: ambas están
-    // en 0 en el 100% de las filas actuales (sin implementar todavía en el
-    // motor de cálculo), mostrarlas sería ruido de ceros sin significado.
-    { clave: "afinidad_enlace", label: "Afinidad de enlace", valor: fmt(el.afinidad_enlace), proporcion: prop(el.afinidad_enlace), descripcion: "Qué tan bien conecta el elemento con otros al formar enlaces.", formula: "Afinidad de enlace = (afinidad de enlace + interacción del elemento) / 2" },
-    { clave: "disponibilidad_sitios", label: "Sitios disponibles", valor: fmt(el.disponibilidad_sitios), proporcion: prop(el.disponibilidad_sitios), descripcion: "Proporción de sitios de enlace todavía libres para nuevos enlaces." },
-    { clave: "sitios_enlace_externos", label: "Sitios de enlace externos", valor: fmt(el.sitios_enlace_externos, 0), descripcion: "Cantidad de sitios de enlace disponibles en la capa externa." },
-    { clave: "capacidad_externa_enlace", label: "Capacidad externa de enlace", valor: fmt(el.capacidad_externa_enlace), proporcion: prop(el.capacidad_externa_enlace), descripcion: "Qué tan preparada está la capa externa para sostener enlaces nuevos." },
-    { clave: "selectividad_enlace", label: "Selectividad de enlace", valor: fmt(el.selectividad_enlace), proporcion: prop(el.selectividad_enlace), descripcion: "Qué tan exigente es el elemento al aceptar enlaces nuevos." },
-    { clave: "polaridad_estructural", label: "Polaridad estructural", valor: fmt(el.polaridad_estructural), proporcion: prop(el.polaridad_estructural), descripcion: "Desbalance direccional de su estructura de enlace.", formula: "Polaridad = |2 · saturación externa − 1|" },
+    // ─── Estructura ─────────────────────────────────────────────────────
+    { clave: "regimen_estructural", label: "Régimen estructural", valor: el.regimen_estructural ?? null, descripcion: "Clasificación estructural derivada (ej. equilibrio).", formula: "Catálisis > Transición → conservación · Catálisis = Transición → equilibrio · Transición > Catálisis → transformación", grupo: G.estructura },
+    { clave: "nucleo_particulas_totales", label: "Partículas (núcleo)", valor: fmt(el.nucleo_particulas_totales, 0), descripcion: "Cantidad total de partículas en la capa núcleo.", grupo: G.estructura },
+    { clave: "media_particulas_totales", label: "Partículas (media)", valor: fmt(el.media_particulas_totales, 0), descripcion: "Cantidad total de partículas en la capa media.", grupo: G.estructura },
+    { clave: "nucleo_catalisis", label: "Catálisis (núcleo)", valor: fmt(el.nucleo_catalisis, 2), descripcion: "Catálisis aportada solo por la capa núcleo.", grupo: G.estructura },
+    { clave: "media_catalisis", label: "Catálisis (media)", valor: fmt(el.media_catalisis, 2), descripcion: "Catálisis aportada solo por la capa media.", grupo: G.estructura },
+    { clave: "externa_catalisis", label: "Catálisis (externa)", valor: fmt(el.externa_catalisis, 2), descripcion: "Catálisis aportada solo por la capa externa.", grupo: G.estructura },
+    { clave: "nucleo_transicion", label: "Transición (núcleo)", valor: fmt(el.nucleo_transicion, 2), descripcion: "Transición aportada solo por la capa núcleo.", grupo: G.estructura },
+    { clave: "media_transicion", label: "Transición (media)", valor: fmt(el.media_transicion, 2), descripcion: "Transición aportada solo por la capa media.", grupo: G.estructura },
+    { clave: "externa_transicion", label: "Transición (externa)", valor: fmt(el.externa_transicion, 2), descripcion: "Transición aportada solo por la capa externa.", grupo: G.estructura },
+    { clave: "nucleo_carga_q", label: "Carga Q (núcleo)", valor: fmt(el.nucleo_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa núcleo.", grupo: G.estructura },
+    { clave: "media_carga_q", label: "Carga Q (media)", valor: fmt(el.media_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa media.", grupo: G.estructura },
+    { clave: "externa_carga_q", label: "Carga Q (externa)", valor: fmt(el.externa_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa externa.", grupo: G.estructura },
 
-    // ─── Carga, catálisis/transición y ocupación externa (columnas reales
-    // en Supabase, traídas en el select pero nunca mostradas hasta ahora —
-    // ver auditoría 2026-08-30 "qué propiedades faltan en Elemento"). Los
-    // totales primero, después el desglose por capa (núcleo/media/externa)
-    // de cada uno — mismo criterio que catalisis_total/transicion_total ya
-    // alimentan balance_ct y regimen_estructural arriba, solo que ahora
-    // también se ve el número.
-    { clave: "carga_q", label: "Carga Q", valor: fmt(el.carga_q, 2), descripcion: "Carga cuántica total del elemento, suma de las 3 capas.", formula: "Carga Q = carga_q(núcleo) + carga_q(media) + carga_q(externa)" },
-    { clave: "carga_q_norm", label: "Carga Q (normalizada)", valor: fmt(el.carga_q_norm), proporcion: prop(el.carga_q_norm), descripcion: "Carga Q normalizada a escala 0–1 para comparar entre elementos." },
+    // ─── Enlaces ────────────────────────────────────────────────────────
+    { clave: "valencia_estructural", label: "Valencia estructural", valor: fmt(el.valencia_estructural, 0), descripcion: "Cantidad de enlaces que puede sostener estructuralmente.", formula: "Valencia = mín(ocupación, capacidad externa − ocupación, capacidad externa / 2)", grupo: G.enlaces },
+    { clave: "valencia_fuente", label: "Fuente de valencia", valor: el.valencia_fuente ?? null, descripcion: "De dónde se derivó la valencia estructural (qué regla/capa la determinó).", grupo: G.enlaces },
+    { clave: "capacidad_enlace", label: "Capacidad de enlace", valor: fmt(el.capacidad_enlace), proporcion: prop(el.capacidad_enlace), descripcion: "Qué tan disponible está para formar enlaces nuevos.", formula: "Cap. de enlace = valencia / (capacidad externa / 2)", grupo: G.enlaces },
+    { clave: "afinidad_enlace", label: "Afinidad de enlace", valor: fmt(el.afinidad_enlace), proporcion: prop(el.afinidad_enlace), descripcion: "Qué tan bien conecta el elemento con otros al formar enlaces.", formula: "Afinidad de enlace = (afinidad de enlace + interacción del elemento) / 2", grupo: G.enlaces },
+    { clave: "polaridad_estructural", label: "Polaridad estructural", valor: fmt(el.polaridad_estructural), proporcion: prop(el.polaridad_estructural), descripcion: "Desbalance direccional de su estructura de enlace.", formula: "Polaridad = |2 · saturación externa − 1|", grupo: G.enlaces },
+    { clave: "saturacion_enlace", label: "Saturación de enlace", valor: fmt(el.saturacion_enlace), proporcion: prop(el.saturacion_enlace), descripcion: "Qué tan cerca está de agotar su capacidad de enlace.", formula: "Saturación de enlace = sitios de enlace usados / sitios de enlace disponibles", grupo: G.enlaces },
+    { clave: "selectividad_enlace", label: "Selectividad de enlace", valor: fmt(el.selectividad_enlace), proporcion: prop(el.selectividad_enlace), descripcion: "Qué tan exigente es el elemento al aceptar enlaces nuevos.", grupo: G.enlaces },
+    { clave: "disponibilidad_sitios", label: "Sitios disponibles", valor: fmt(el.disponibilidad_sitios), proporcion: prop(el.disponibilidad_sitios), descripcion: "Proporción de sitios de enlace todavía libres para nuevos enlaces.", grupo: G.enlaces },
+    { clave: "sitios_enlace_externos", label: "Sitios de enlace externos", valor: fmt(el.sitios_enlace_externos, 0), descripcion: "Cantidad de sitios de enlace disponibles en la capa externa.", grupo: G.enlaces },
+
+    // ─── Capacidad externa ──────────────────────────────────────────────
+    { clave: "capacidad_externa", label: "Capacidad externa", valor: fmt(el.capacidad_externa, 0), descripcion: "Cupo total de la capa externa para partículas de Voluntad/Percepción/Transición/Catálisis.", grupo: G.capacidadExterna },
+    { clave: "ocupacion_externa", label: "Ocupación externa", valor: fmt(el.ocupacion_externa, 0), descripcion: "Cuánto de la capacidad externa está ocupado actualmente.", grupo: G.capacidadExterna },
+    { clave: "capacidad_externa_restante", label: "Capacidad externa restante", valor: fmt(el.capacidad_externa_restante, 0), descripcion: "Cupo de la capa externa que todavía queda libre.", grupo: G.capacidadExterna },
+    { clave: "saturacion_externa", label: "Saturación externa", valor: fmt(el.saturacion_externa), proporcion: prop(el.saturacion_externa), descripcion: "Qué tan llena está la capa externa — en 100% determina si el elemento es Noble.", formula: "Saturación externa = ocupación externa / capacidad externa", grupo: G.capacidadExterna },
+    { clave: "capacidad_externa_enlace", label: "Capacidad externa de enlace", valor: fmt(el.capacidad_externa_enlace), proporcion: prop(el.capacidad_externa_enlace), descripcion: "Qué tan preparada está la capa externa para sostener enlaces nuevos.", grupo: G.capacidadExterna },
+
+    // ─── Sin familia definida: totales globales de catálisis/transición
+    // que alimentan el régimen estructural (balance_ct), no encajan en
+    // una sola capa ni en una sola familia — quedan sin agrupar, al final.
     { clave: "catalisis_total", label: "Catálisis total", valor: fmt(el.catalisis_total, 2), descripcion: "Suma de catálisis en las 3 capas — numerador de la relación R usada en régimen estructural." },
     { clave: "transicion_total", label: "Transición total", valor: fmt(el.transicion_total, 2), descripcion: "Suma de transición en las 3 capas — denominador de la relación R usada en régimen estructural." },
     { clave: "balance_ct", label: "Balance Catálisis/Transición", valor: fmt(el.balance_ct), descripcion: "R = Catálisis total / Transición total. Define la familia (Rígido/Intermedio/Reactivo) junto a Noble/Inerte.", formula: "R = Catálisis total / Transición total" },
-    { clave: "capacidad_externa", label: "Capacidad externa", valor: fmt(el.capacidad_externa, 0), descripcion: "Cupo total de la capa externa para partículas de Voluntad/Percepción/Transición/Catálisis." },
-    { clave: "ocupacion_externa", label: "Ocupación externa", valor: fmt(el.ocupacion_externa, 0), descripcion: "Cuánto de la capacidad externa está ocupado actualmente." },
-    { clave: "capacidad_externa_restante", label: "Capacidad externa restante", valor: fmt(el.capacidad_externa_restante, 0), descripcion: "Cupo de la capa externa que todavía queda libre." },
-    { clave: "saturacion_externa", label: "Saturación externa", valor: fmt(el.saturacion_externa), proporcion: prop(el.saturacion_externa), descripcion: "Qué tan llena está la capa externa — en 100% determina si el elemento es Noble.", formula: "Saturación externa = ocupación externa / capacidad externa" },
-
-    { clave: "nucleo_catalisis", label: "Catálisis (núcleo)", valor: fmt(el.nucleo_catalisis, 2), descripcion: "Catálisis aportada solo por la capa núcleo." },
-    { clave: "media_catalisis", label: "Catálisis (media)", valor: fmt(el.media_catalisis, 2), descripcion: "Catálisis aportada solo por la capa media." },
-    { clave: "externa_catalisis", label: "Catálisis (externa)", valor: fmt(el.externa_catalisis, 2), descripcion: "Catálisis aportada solo por la capa externa." },
-    { clave: "nucleo_transicion", label: "Transición (núcleo)", valor: fmt(el.nucleo_transicion, 2), descripcion: "Transición aportada solo por la capa núcleo." },
-    { clave: "media_transicion", label: "Transición (media)", valor: fmt(el.media_transicion, 2), descripcion: "Transición aportada solo por la capa media." },
-    { clave: "externa_transicion", label: "Transición (externa)", valor: fmt(el.externa_transicion, 2), descripcion: "Transición aportada solo por la capa externa." },
-    { clave: "nucleo_carga_q", label: "Carga Q (núcleo)", valor: fmt(el.nucleo_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa núcleo." },
-    { clave: "media_carga_q", label: "Carga Q (media)", valor: fmt(el.media_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa media." },
-    { clave: "externa_carga_q", label: "Carga Q (externa)", valor: fmt(el.externa_carga_q, 2), descripcion: "Carga cuántica aportada solo por la capa externa." },
-
-    { clave: "nucleo_particulas_totales", label: "Partículas (núcleo)", valor: fmt(el.nucleo_particulas_totales, 0), descripcion: "Cantidad total de partículas en la capa núcleo." },
-    { clave: "media_particulas_totales", label: "Partículas (media)", valor: fmt(el.media_particulas_totales, 0), descripcion: "Cantidad total de partículas en la capa media." },
-
-    { clave: "valencia_fuente", label: "Fuente de valencia", valor: el.valencia_fuente ?? null, descripcion: "De dónde se derivó la valencia estructural (qué regla/capa la determinó)." },
   ];
 }
 

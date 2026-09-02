@@ -163,49 +163,106 @@ export function propiedadesCalculadasGenerico(
  * propiedadesCalculadasDeCompuesto, propiedadesCalculadasGenerico), así que
  * un cambio visual acá se refleja en los 4 sin duplicar JSX/clases.
  */
+/** Una tarjeta individual de propiedad — extraído para no duplicar el JSX
+ *  entre el render agrupado y el plano de abajo. */
+function TarjetaPropiedad({ p }: { p: PropiedadCalculada }) {
+  return (
+    <div title={p.descripcion} className="flex flex-col gap-1 min-w-0 px-2 py-1.5">
+      <div className="flex items-center justify-between gap-1 min-w-0">
+        <span className="text-micro font-bold text-primary/50 truncate">{p.label}</span>
+        <span className="text-micro font-black text-primary/70 tabular-nums shrink-0 truncate max-w-[6.5rem] text-right">
+          {p.valor}
+        </span>
+      </div>
+      {p.proporcion !== undefined && (
+        <div className="h-1 rounded-full bg-primary/10 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-accent/50"
+            style={{ width: `${p.proporcion * 100}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TarjetaPropiedadesFisicas({
   propiedades,
   columnas = 3,
+  titulo = "Propiedades físicas",
 }: {
   propiedades: PropiedadCalculada[];
   /** Cuántas columnas usar en el grid — Compuesto tiene más propiedades
    *  visibles (5 cols) que Elemento/Material/Estructura (2–3). */
   columnas?: 2 | 3 | 4 | 5;
+  /** Encabezado general de la tarjeta. Por defecto "Propiedades físicas"
+   *  (compat con el uso existente); Elemento ahora pasa algo más genérico
+   *  ("Propiedades") porque el desglose real vive en los subtítulos de
+   *  cada grupo (p.grupo) — ver ElementoEditor. */
+  titulo?: string;
 }) {
   const conValor = propiedades.filter((p) => p.valor !== null);
   if (conValor.length === 0) return null;
 
   const gridCols = { 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4", 5: "grid-cols-5" }[columnas];
 
+  // Si al menos una propiedad trae "grupo", se renderiza agrupado en
+  // secciones (una por familia, en el orden en que aparecen por primera
+  // vez en la lista) con subtítulo propio — ej. Elemento: Propiedades
+  // físicas / Estructura / Enlaces / Capacidad externa. Las propiedades
+  // sin grupo (o la lista entera, si ninguna trae grupo) se muestran en
+  // un tramo final sin encabezado — mismo comportamiento de siempre para
+  // Compuesto/Material/Estructura, que no clasifican por grupo.
+  const tieneGrupos = conValor.some((p) => p.grupo);
+
+  if (!tieneGrupos) {
+    return (
+      <div className="flex flex-col gap-1.5 min-w-0 p-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            {titulo}
+          </span>
+          <InfoFormulasPopover propiedades={conValor} />
+        </div>
+        <div className={`grid ${gridCols} gap-1.5 min-w-0`}>
+          {conValor.map((p) => (
+            <TarjetaPropiedad key={p.clave} p={p} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const grupos: { nombre: string | null; items: PropiedadCalculada[] }[] = [];
+  for (const p of conValor) {
+    const nombre = p.grupo ?? null;
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.nombre === nombre) ultimo.items.push(p);
+    else grupos.push({ nombre, items: [p] });
+  }
+
   return (
     <div className="flex flex-col gap-1.5 min-w-0 p-2">
       <div className="flex items-center gap-1.5">
         <span className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
-          Propiedades físicas
+          {titulo}
         </span>
         <InfoFormulasPopover propiedades={conValor} />
       </div>
-      <div className={`grid ${gridCols} gap-1.5 min-w-0`}>
-        {conValor.map((p) => (
-          <div
-            key={p.clave}
-            title={p.descripcion}
-            className="flex flex-col gap-1 min-w-0 px-2 py-1.5"
-          >
-            <div className="flex items-center justify-between gap-1 min-w-0">
-              <span className="text-micro font-bold text-primary/50 truncate">{p.label}</span>
-              <span className="text-micro font-black text-primary/70 tabular-nums shrink-0 truncate max-w-[6.5rem] text-right">
-                {p.valor}
+      <div className="flex flex-col gap-2.5 min-w-0">
+        {grupos.map((g, i) => (
+          <div key={g.nombre ?? `_sin_grupo_${i}`} className="flex flex-col gap-1 min-w-0">
+            {g.nombre && (
+              <span className="text-[9px] font-black uppercase tracking-[0.12em] text-primary/35 px-2">
+                {g.nombre}
               </span>
-            </div>
-            {p.proporcion !== undefined && (
-              <div className="h-1 rounded-full bg-primary/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-accent/50"
-                  style={{ width: `${p.proporcion * 100}%` }}
-                />
-              </div>
             )}
+            <div className={`grid ${gridCols} gap-1.5 min-w-0`}>
+              {g.items.map((p) => (
+                <TarjetaPropiedad key={p.clave} p={p} />
+              ))}
+            </div>
+            {i < grupos.length - 1 && <div className="border-t border-primary/10 mt-0.5" />}
           </div>
         ))}
       </div>
