@@ -579,7 +579,7 @@ function MaterialDetail({ material }: { material: Material }) {
           )}
         </div>
       </div>
-      {ConfirmModal}
+      <ConfirmModal />
     </div>
   );
 }
