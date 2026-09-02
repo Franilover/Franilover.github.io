@@ -4,6 +4,8 @@ import {
   Box,
   ChevronRight,
   Loader2,
+  Plus,
+  Trash2,
   X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -16,12 +18,14 @@ import {
 import { useCompuestos } from "@/domains/garlia/elementos/useCompuestos";
 import { useEstructuras } from "@/domains/garlia/elementos/useEstructuras";
 import type { PropiedadCalculada } from "@/domains/garlia/elementos/types";
+import { ComboSelector } from "@/ui/ComboSelector";
+import { useConfirm } from "@/ui/ConfirmModal";
 
 import { useMaterialComponentes } from "./useMaterialComponentes";
 import { useMaterialEstructuras } from "./useMaterialEstructuras";
 import { useMateriales } from "./useMateriales";
 import { usePerfilReactivoMaterial } from "./usePerfilReactivoMaterial";
-import type { PerfilReactivoMaterial, Material } from "./types";
+import type { PerfilReactivoMaterial, Material, MaterialComponente, MaterialEstructura } from "./types";
 
 /** Etiqueta legible para el origen de una propiedad física (ver
  *  documentacion_sistema "Fuente por propiedad en Material v187", orden
@@ -100,12 +104,308 @@ function propiedadesDePerfilReactivo(
   });
 }
 
+/**
+ * Fila editable de un componente ya vinculado (material_componentes).
+ * Mismo criterio que FilaMaterial en items/SelectorMaterialesItem.tsx:
+ * estado local propio para los inputs numéricos, se persiste recién en
+ * onBlur y solo si el valor final es válido, para no disparar constraints
+ * de Supabase con valores intermedios (ej. cantidad = 0 mientras se
+ * retipea el campo).
+ */
+function FilaComponente({
+  fila,
+  nombreComponente,
+  onActualizar,
+  onEliminar,
+}: {
+  fila: MaterialComponente;
+  nombreComponente: string;
+  onActualizar: (
+    cambios: Partial<Pick<MaterialComponente, "cantidad" | "proporcion_min" | "proporcion_max" | "unidad" | "rol">>,
+  ) => void;
+  onEliminar: () => void;
+}) {
+  const [cantidadTexto, setCantidadTexto] = useState(String(fila.cantidad));
+  const [rolTexto, setRolTexto] = useState(fila.rol ?? "");
+  const [unidadTexto, setUnidadTexto] = useState(fila.unidad ?? "");
+
+  const cantidadGuardada = String(fila.cantidad);
+  const rolGuardado = fila.rol ?? "";
+  const unidadGuardada = fila.unidad ?? "";
+
+  function commitCantidad() {
+    const n = Number(cantidadTexto);
+    if (cantidadTexto.trim() === "" || Number.isNaN(n) || n <= 0) {
+      setCantidadTexto(cantidadGuardada);
+      return;
+    }
+    if (n !== fila.cantidad) onActualizar({ cantidad: n });
+  }
+
+  function commitRol() {
+    const v = rolTexto.trim();
+    if (v !== rolGuardado) onActualizar({ rol: v === "" ? null : v });
+  }
+
+  function commitUnidad() {
+    const v = unidadTexto.trim();
+    if (v !== unidadGuardada) onActualizar({ unidad: v === "" ? null : v });
+  }
+
+  return (
+    <div className="flex flex-col gap-1 px-2 py-1.5 rounded-md border border-primary/10">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-micro font-bold text-primary/70 truncate">{nombreComponente}</span>
+        <button
+          type="button"
+          onClick={onEliminar}
+          title="Quitar componente"
+          className="shrink-0 rounded-md p-1 text-primary/25 hover:text-red-500 hover:bg-red-500/8 transition-all"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1 text-micro font-bold text-primary/40">
+          Cant.
+          <input
+            className="w-12 bg-transparent px-0 py-0.5 text-xs font-bold text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            min={0}
+            step="any"
+            type="number"
+            value={cantidadTexto}
+            onChange={(e) => setCantidadTexto(e.target.value)}
+            onBlur={commitCantidad}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-micro font-bold text-primary/40">
+          Unidad
+          <input
+            className="w-14 bg-transparent px-0 py-0.5 text-xs font-bold text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors"
+            placeholder="—"
+            type="text"
+            value={unidadTexto}
+            onChange={(e) => setUnidadTexto(e.target.value)}
+            onBlur={commitUnidad}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-micro font-bold text-primary/40">
+          Rol
+          <input
+            className="w-20 bg-transparent px-0 py-0.5 text-xs font-bold text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors"
+            placeholder="—"
+            type="text"
+            value={rolTexto}
+            onChange={(e) => setRolTexto(e.target.value)}
+            onBlur={commitRol}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/** Fila editable de una estructura ya asociada (material_estructuras).
+ *  Mismo criterio de commit-on-blur que FilaComponente. */
+function FilaEstructura({
+  fila,
+  nombreEstructura,
+  onActualizar,
+  onEliminar,
+}: {
+  fila: MaterialEstructura;
+  nombreEstructura: string;
+  onActualizar: (cambios: Partial<Pick<MaterialEstructura, "cantidad" | "proporcion" | "rol">>) => void;
+  onEliminar: () => void;
+}) {
+  const [cantidadTexto, setCantidadTexto] = useState(String(fila.cantidad));
+  const [proporcionTexto, setProporcionTexto] = useState(
+    fila.proporcion === null ? "" : String(fila.proporcion),
+  );
+  const [rolTexto, setRolTexto] = useState(fila.rol ?? "");
+
+  const cantidadGuardada = String(fila.cantidad);
+  const proporcionGuardada = fila.proporcion === null ? "" : String(fila.proporcion);
+  const rolGuardado = fila.rol ?? "";
+
+  function commitCantidad() {
+    const n = Number(cantidadTexto);
+    if (cantidadTexto.trim() === "" || Number.isNaN(n) || n <= 0) {
+      setCantidadTexto(cantidadGuardada);
+      return;
+    }
+    if (n !== fila.cantidad) onActualizar({ cantidad: n });
+  }
+
+  function commitProporcion() {
+    if (proporcionTexto.trim() === "") {
+      if (fila.proporcion !== null) onActualizar({ proporcion: null });
+      return;
+    }
+    const n = Number(proporcionTexto);
+    if (Number.isNaN(n) || n < 0 || n > 1) {
+      setProporcionTexto(proporcionGuardada);
+      return;
+    }
+    if (n !== fila.proporcion) onActualizar({ proporcion: n });
+  }
+
+  function commitRol() {
+    const v = rolTexto.trim();
+    if (v !== rolGuardado) onActualizar({ rol: v === "" ? null : v });
+  }
+
+  return (
+    <div className="flex flex-col gap-1 px-2 py-1.5 rounded-md border border-primary/10">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-micro font-bold text-primary/70 truncate">{nombreEstructura}</span>
+        <button
+          type="button"
+          onClick={onEliminar}
+          title="Quitar estructura"
+          className="shrink-0 rounded-md p-1 text-primary/25 hover:text-red-500 hover:bg-red-500/8 transition-all"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1 text-micro font-bold text-primary/40">
+          Cant.
+          <input
+            className="w-12 bg-transparent px-0 py-0.5 text-xs font-bold text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            min={0}
+            step="any"
+            type="number"
+            value={cantidadTexto}
+            onChange={(e) => setCantidadTexto(e.target.value)}
+            onBlur={commitCantidad}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-micro font-bold text-primary/40">
+          Prop.
+          <input
+            className="w-12 bg-transparent px-0 py-0.5 text-xs font-bold text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            max={1}
+            min={0}
+            placeholder="—"
+            step="any"
+            type="number"
+            value={proporcionTexto}
+            onChange={(e) => setProporcionTexto(e.target.value)}
+            onBlur={commitProporcion}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-micro font-bold text-primary/40">
+          Rol
+          <input
+            className="w-20 bg-transparent px-0 py-0.5 text-xs font-bold text-primary outline-none border-0 border-b border-primary/15 focus:border-primary/40 transition-colors"
+            placeholder="—"
+            type="text"
+            value={rolTexto}
+            onChange={(e) => setRolTexto(e.target.value)}
+            onBlur={commitRol}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function MaterialDetail({ material }: { material: Material }) {
-  const { items: componentes, loading: loadingComponentes } = useMaterialComponentes(material.id);
-  const { items: estructuras, loading: loadingEstructuras } = useMaterialEstructuras(material.id);
-  const { items: compuestos } = useCompuestos();
-  const { items: estructurasCatalogo } = useEstructuras();
+  const { confirm, ConfirmModal } = useConfirm();
+  const {
+    items: componentes,
+    loading: loadingComponentes,
+    agregar: agregarComponente,
+    actualizar: actualizarComponente,
+    eliminar: eliminarComponente,
+  } = useMaterialComponentes(material.id);
+  const {
+    items: estructuras,
+    loading: loadingEstructuras,
+    agregar: agregarEstructura,
+    actualizar: actualizarEstructura,
+    eliminar: eliminarEstructura,
+  } = useMaterialEstructuras(material.id);
+  const { items: compuestos, loading: loadingCompuestos } = useCompuestos();
+  const { items: estructurasCatalogo, loading: loadingEstructurasCatalogo } = useEstructuras();
   const { item: perfilReactivo, loading: loadingPerfilReactivo } = usePerfilReactivoMaterial(material.id);
+
+  const [agregandoCompuestoId, setAgregandoCompuestoId] = useState<string | null>(null);
+  const [guardandoComponente, setGuardandoComponente] = useState(false);
+  const [agregandoEstructuraId, setAgregandoEstructuraId] = useState<string | null>(null);
+  const [guardandoEstructura, setGuardandoEstructura] = useState(false);
+
+  // Solo se ofrecen compuestos que todavía no están vinculados como
+  // componente de tipo "compuesto" — evita duplicar la misma fila.
+  const compuestosDisponibles = compuestos.filter(
+    (c) => !componentes.some((comp) => comp.componente_tipo === "compuesto" && comp.componente_id === c.id),
+  );
+  const estructurasDisponibles = estructurasCatalogo.filter(
+    (e) => !estructuras.some((rel) => rel.estructura_id === e.id),
+  );
+
+  async function handleAgregarComponente() {
+    if (!agregandoCompuestoId) return;
+    setGuardandoComponente(true);
+    try {
+      // Cantidad inicial neutra (1) — el usuario la ajusta después; no se
+      // inventa un valor físico, es solo el punto de partida editable.
+      await agregarComponente({
+        componente_tipo: "compuesto",
+        componente_id: agregandoCompuestoId,
+        cantidad: 1,
+      });
+      setAgregandoCompuestoId(null);
+    } finally {
+      setGuardandoComponente(false);
+    }
+  }
+
+  async function handleEliminarComponente(id: string, nombre: string) {
+    const ok = await confirm({
+      title: "Quitar componente",
+      message: `¿Quitar "${nombre}" de los componentes de este material?`,
+    });
+    if (ok) await eliminarComponente(id);
+  }
+
+  async function handleAgregarEstructura() {
+    if (!agregandoEstructuraId) return;
+    setGuardandoEstructura(true);
+    try {
+      await agregarEstructura({ estructura_id: agregandoEstructuraId, cantidad: 1 });
+      setAgregandoEstructuraId(null);
+    } finally {
+      setGuardandoEstructura(false);
+    }
+  }
+
+  async function handleEliminarEstructura(id: string, nombre: string) {
+    const ok = await confirm({
+      title: "Quitar estructura",
+      message: `¿Quitar "${nombre}" de las estructuras de este material?`,
+    });
+    if (ok) await eliminarEstructura(id);
+  }
 
   // Propiedades físicas (jsonb propiedades_calculadas, vía
   // propiedadesCalculadasGenerico) + Perfil Reactivo Emergente V2 (vista
@@ -161,38 +461,58 @@ function MaterialDetail({ material }: { material: Material }) {
               <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
                 <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
               </div>
-            ) : componentes.length === 0 ? (
-              <p className="py-1 text-micro text-primary/30">Sin componentes registrados.</p>
             ) : (
               <div className="flex flex-col gap-1">
+                {componentes.length === 0 && (
+                  <p className="py-1 text-micro text-primary/30">Sin componentes registrados.</p>
+                )}
                 {componentes.map((componente) => {
                   const compuesto =
                     componente.componente_tipo === "compuesto"
                       ? compuestos.find((item) => item.id === componente.componente_id)
                       : null;
                   return (
-                    <div key={componente.id} className="px-2 py-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-micro font-bold text-primary/70 truncate">
-                          {compuesto?.nombre ?? `${componente.componente_tipo} · ${componente.componente_id.slice(0, 8)}`}
-                        </span>
-                        <span className="text-micro text-primary/45 shrink-0">
-                          {formatValue(componente.cantidad)}
-                          {componente.unidad ? ` ${componente.unidad}` : ""}
-                        </span>
-                      </div>
-                      {(componente.rol || componente.proporcion_min !== null || componente.proporcion_max !== null) && (
-                        <div className="mt-0.5 flex flex-wrap gap-1.5 text-micro text-primary/35">
-                          {componente.rol && <span>{componente.rol}</span>}
-                          {componente.proporcion_min !== null && <span>mín. {formatValue(componente.proporcion_min)}</span>}
-                          {componente.proporcion_max !== null && <span>máx. {formatValue(componente.proporcion_max)}</span>}
-                        </div>
-                      )}
-                    </div>
+                    <FilaComponente
+                      key={componente.id}
+                      fila={componente}
+                      nombreComponente={
+                        compuesto?.nombre ?? `${componente.componente_tipo} · ${componente.componente_id.slice(0, 8)}`
+                      }
+                      onActualizar={(cambios) => actualizarComponente(componente.id, cambios)}
+                      onEliminar={() =>
+                        handleEliminarComponente(
+                          componente.id,
+                          compuesto?.nombre ?? componente.componente_id.slice(0, 8),
+                        )
+                      }
+                    />
                   );
                 })}
               </div>
             )}
+
+            <div className="mt-1 flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <ComboSelector
+                  icon={<Plus size={11} />}
+                  items={compuestosDisponibles.map((c) => ({ id: c.id, label: c.nombre }))}
+                  label=""
+                  loading={loadingCompuestos}
+                  mode="single"
+                  placeholder="Elegir compuesto del catálogo…"
+                  value={agregandoCompuestoId}
+                  onChange={setAgregandoCompuestoId}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={!agregandoCompuestoId || guardandoComponente}
+                onClick={handleAgregarComponente}
+                className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary disabled:opacity-30 transition-all px-1"
+              >
+                {guardandoComponente ? "Agregando…" : "Agregar"}
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5 min-w-0 p-2">
@@ -203,26 +523,50 @@ function MaterialDetail({ material }: { material: Material }) {
               <div className="flex items-center gap-1.5 py-2 text-micro text-primary/40">
                 <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
               </div>
-            ) : estructuras.length === 0 ? (
-              <p className="py-1 text-micro text-primary/30">Sin estructuras asociadas.</p>
             ) : (
               <div className="flex flex-col gap-1">
+                {estructuras.length === 0 && (
+                  <p className="py-1 text-micro text-primary/30">Sin estructuras asociadas.</p>
+                )}
                 {estructuras.map((relacion) => {
                   const estructura = estructurasCatalogo.find((item) => item.id === relacion.estructura_id);
                   return (
-                    <div
+                    <FilaEstructura
                       key={relacion.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-primary/10 px-2 py-1"
-                    >
-                      <span className="text-micro font-bold text-primary/70 truncate">
-                        {estructura?.nombre ?? relacion.estructura_id.slice(0, 8)}
-                      </span>
-                      <span className="text-micro text-primary/45 shrink-0">× {formatValue(relacion.cantidad)}</span>
-                    </div>
+                      fila={relacion}
+                      nombreEstructura={estructura?.nombre ?? relacion.estructura_id.slice(0, 8)}
+                      onActualizar={(cambios) => actualizarEstructura(relacion.id, cambios)}
+                      onEliminar={() =>
+                        handleEliminarEstructura(relacion.id, estructura?.nombre ?? relacion.estructura_id.slice(0, 8))
+                      }
+                    />
                   );
                 })}
               </div>
             )}
+
+            <div className="mt-1 flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <ComboSelector
+                  icon={<Plus size={11} />}
+                  items={estructurasDisponibles.map((e) => ({ id: e.id, label: e.nombre }))}
+                  label=""
+                  loading={loadingEstructurasCatalogo}
+                  mode="single"
+                  placeholder="Elegir estructura del catálogo…"
+                  value={agregandoEstructuraId}
+                  onChange={setAgregandoEstructuraId}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={!agregandoEstructuraId || guardandoEstructura}
+                onClick={handleAgregarEstructura}
+                className="shrink-0 text-micro font-black uppercase tracking-widest text-primary/40 hover:text-primary disabled:opacity-30 transition-all px-1"
+              >
+                {guardandoEstructura ? "Agregando…" : "Agregar"}
+              </button>
+            </div>
           </div>
 
           {material.notas && (
@@ -235,6 +579,7 @@ function MaterialDetail({ material }: { material: Material }) {
           )}
         </div>
       </div>
+      {ConfirmModal}
     </div>
   );
 }
@@ -264,11 +609,14 @@ function MaterialPill({ material, selected, onClick }: { material: Material; sel
  * CompuestosPage (createPortal a document.body, fixed inset-0 z-[9999],
  * backdrop con blur, contenedor w-full h-full max-w-6xl rounded-2xl con
  * animación popIn, header shrink-0 con caja de ícono + botón cerrar, cuerpo
- * flex-1 min-h-0 overflow-y-auto). Materiales es de solo lectura
- * (propiedades_calculadas viene de Supabase), así que no se replica el
- * sistema headerControls editable/guardable — se usa siempre el header
- * "default" (caja de ícono) que Elemento/Compuesto muestran cuando no hay
- * headerControls.
+ * flex-1 min-h-0 overflow-y-auto). Las propiedades_calculadas siguen siendo
+ * de solo lectura (vienen ya derivadas de Supabase), pero Componentes y
+ * Estructuras sí son editables desde acá (agregar/editar/quitar) — por eso
+ * no se replica el sistema headerControls editable/guardable de
+ * nombre/símbolo: se usa siempre el header "default" (caja de ícono) que
+ * Elemento/Compuesto muestran cuando no hay headerControls, y la edición
+ * vive dentro de cada bloque (Componentes/Estructuras) con su propio
+ * guardado inmediato, no con un botón "Guardar" global.
  */
 function MaterialEditorFlotante({ material, onClose }: { material: Material; onClose: () => void }) {
   useEffect(() => {
