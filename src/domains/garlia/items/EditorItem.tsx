@@ -274,43 +274,36 @@ export function EditorItem({
           sigue mostrando igual que siempre. */}
       {!onHeaderControlsChange && <EditorHeaderBar controls={headerControls} />}
 
-      {/* ── Content ─────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="p-4">
-          <div className="flex flex-col sm:flex-row gap-5">
-            {/* Columna izquierda: imagen */}
-            <div className="w-full sm:w-72 sm:shrink-0">
-              {/* Mobile: imagen con botón flotante */}
-              <div
-                className="sm:hidden relative w-full rounded-xl overflow-hidden border border-primary/10 bg-primary/3"
-                style={{ aspectRatio: "1 / 1" }}
-              >
-                {form.imagen_url ? (
-                  <Image
-                    alt={form.nombre}
-                    className="w-full h-full object-cover"
-                    src={form.imagen_url}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Package className="text-primary/15" size={48} />
-                  </div>
-                )}
-                <div className="absolute top-2 right-2 z-10">
-                  <PickerImagenItemBtn
-                    value={form.imagen_url ?? ""}
-                    onChange={(url) =>
-                      setForm((f: Item) => ({ ...f, imagen_url: url }))
-                    }
-                  />
+      {/* ── Content ───────────────────────────────────────────────────────
+          Misma distribución que ElementoEditor/CompuestoEditor (Química):
+          padding p-2.5, gap-3 entre bloques, cuerpo con scroll propio, y
+          cada sección agrupada en una tarjeta rounded-lg border
+          border-primary/10, en vez del layout anterior (p-4, columnas
+          sm:flex-row sueltas sin tarjetas). */}
+      <div className="flex-1 min-h-0 p-2.5 flex flex-col gap-3 overflow-y-auto">
+        {/* Imagen (columna fija) + Categoría/Criatura/Física (derecha) —
+            mismo patrón que el bloque "Gráfico a la izquierda + Propiedades
+            a la derecha" de CompuestoEditor. */}
+        <div className="grid grid-cols-[minmax(11rem,14rem)_1fr] gap-3 items-start">
+          <div className="rounded-lg border border-primary/10 p-1.5">
+            {/* Mobile: imagen con botón flotante */}
+            <div
+              className="sm:hidden relative w-full rounded-md overflow-hidden bg-primary/3"
+              style={{ aspectRatio: "1 / 1" }}
+            >
+              {form.imagen_url ? (
+                <Image
+                  alt={form.nombre}
+                  className="w-full h-full object-cover"
+                  src={form.imagen_url}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Package className="text-primary/15" size={48} />
                 </div>
-              </div>
-              {/* Desktop: selector normal */}
-              <div className="hidden sm:block w-full">
-                <SelectorImagen
-                  aspect="square"
-                  label="Imagen"
-                  placeholder={<Package className="opacity-20" size={20} />}
+              )}
+              <div className="absolute top-2 right-2 z-10">
+                <PickerImagenItemBtn
                   value={form.imagen_url ?? ""}
                   onChange={(url) =>
                     setForm((f: Item) => ({ ...f, imagen_url: url }))
@@ -318,9 +311,22 @@ export function EditorItem({
                 />
               </div>
             </div>
+            {/* Desktop: selector normal */}
+            <div className="hidden sm:block w-full">
+              <SelectorImagen
+                aspect="square"
+                label="Imagen"
+                placeholder={<Package className="opacity-20" size={20} />}
+                value={form.imagen_url ?? ""}
+                onChange={(url) =>
+                  setForm((f: Item) => ({ ...f, imagen_url: url }))
+                }
+              />
+            </div>
+          </div>
 
-            {/* Columna derecha: categoría + descripción */}
-            <div className="flex-1 min-w-0 space-y-4">
+          <div className="flex flex-col gap-2 min-w-0">
+            <div className="rounded-lg border border-primary/10 p-2 flex flex-col gap-2">
               <SelectorGrupoUnico
                 emptyLabel="Sin categoría"
                 label="Categoría"
@@ -356,15 +362,17 @@ export function EditorItem({
                     : undefined
                 }
               />
+            </div>
 
-              {/* Física del objeto (Modelo físico canónico v218). La
-                  sección "Física del objeto"/"Geometría" es solo lectura:
-                  item_materiales es la fuente principal; compuesto_id es
-                  solo compatibilidad secundaria y nunca se suma. La
-                  composición de materiales sí es editable dentro de este
-                  panel (capa "Editar composición") — al cambiar algo,
-                  Supabase recalcula vía trigger y acá se vuelve a pedir el
-                  item con la misma query real que lo cargó. */}
+            {/* Física del objeto (Modelo físico canónico v218). La
+                sección "Física del objeto"/"Geometría" es solo lectura:
+                item_materiales es la fuente principal; compuesto_id es
+                solo compatibilidad secundaria y nunca se suma. La
+                composición de materiales sí es editable dentro de este
+                panel (capa "Editar composición") — al cambiar algo,
+                Supabase recalcula vía trigger y acá se vuelve a pedir el
+                item con la misma query real que lo cargó. */}
+            <div className="rounded-lg border border-primary/10 p-2">
               <PanelFisicaObjeto
                 itemId={item.id}
                 propiedadesFisicas={form.propiedades_fisicas}
@@ -372,22 +380,24 @@ export function EditorItem({
                 geometriaFisica={form.geometria_fisica}
                 onRefrescarItem={refrescarPropiedadesFisicas}
               />
-
-              <div className="space-y-1.5">
-                <label className="text-micro font-black uppercase tracking-[0.25em] text-primary/35">
-                  Descripción
-                </label>
-                <RichEditor
-                  minHeight="12.5rem"
-                  placeholder="Qué es, qué hace, su historia…"
-                  value={form.descripcion ?? ""}
-                  wikiEntities={entities}
-                  onChange={(v) => setForm((f: Item) => ({ ...f, descripcion: v }))}
-                  onWikilinkNavigate={onWikilink}
-                />
-              </div>
             </div>
           </div>
+        </div>
+
+        {/* Descripción — bloque propio a todo el ancho, misma tarjeta que
+            el resto de secciones. */}
+        <div className="rounded-lg border border-primary/10 p-2 flex flex-col gap-1.5">
+          <label className="text-micro font-black uppercase tracking-[0.2em] text-primary/30">
+            Descripción
+          </label>
+          <RichEditor
+            minHeight="12.5rem"
+            placeholder="Qué es, qué hace, su historia…"
+            value={form.descripcion ?? ""}
+            wikiEntities={entities}
+            onChange={(v) => setForm((f: Item) => ({ ...f, descripcion: v }))}
+            onWikilinkNavigate={onWikilink}
+          />
         </div>
       </div>
 
