@@ -248,6 +248,23 @@ function AtomoVisualCompuesto({
   );
 }
 
+/**
+ * Estilo inline compartido para <option> dentro de cualquier <select> del
+ * editor de Compuesto: por defecto el navegador renderiza <option> con sus
+ * propios colores de sistema (fondo blanco sólido, sin relación con el
+ * tema de la página), incluso cuando el <select> que lo contiene ya usa
+ * bg-primary/N vía Tailwind — className no alcanza a <option> de forma
+ * confiable cross-browser, así que acá se fuerza vía style con la misma
+ * variable --primary que usa el resto del archivo (color-mix), mezclada
+ * sobre "Canvas" (keyword CSS del fondo real de la superficie del sistema)
+ * en vez de un color sólido inventado, para seguir el tema claro/oscuro
+ * activo sin asumir cuál es.
+ */
+const OPTION_STYLE: React.CSSProperties = {
+  backgroundColor: "color-mix(in srgb, var(--primary) 6%, Canvas)",
+  color: "color-mix(in srgb, var(--primary) 85%, CanvasText)",
+};
+
 const AFINIDAD_COLOR: Record<TipoAfinidad, string> = {
   complementa: "text-primary bg-primary/10 border-primary/20",
   compite: "text-primary/70 bg-primary/5 border-primary/10",
@@ -448,9 +465,11 @@ function ComposicionRealBloque({
             onChange={(e) => setNuevoElementoId(e.target.value)}
             className="bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
           >
-            <option value="">Elegir elemento…</option>
+            <option value="" style={OPTION_STYLE}>
+              Elegir elemento…
+            </option>
             {elementosDisponibles.map((e) => (
-              <option key={e.id} value={e.id}>
+              <option key={e.id} value={e.id} style={OPTION_STYLE}>
                 {e.simbolo || "??"} · {e.nombre}
               </option>
             ))}
@@ -463,7 +482,7 @@ function ComposicionRealBloque({
               value={nuevaCantidad}
               onChange={(e) => setNuevaCantidad(e.target.value)}
               placeholder="Cantidad"
-              className="w-16 bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+              className="w-16 bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
             <input
               value={nuevoRol}
@@ -536,7 +555,7 @@ function ComposicionRealBloque({
                   onBlur={(e) => handleCantidadBlur(p.elemento_id, e.target.value)}
                   disabled={ocupado}
                   title="Cantidad"
-                  className="w-14 bg-primary/5 rounded px-1.5 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
+                  className="w-14 bg-primary/5 rounded px-1.5 py-0.5 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <input
                   defaultValue={p.rol ?? ""}
@@ -650,9 +669,11 @@ function SelectorEnlaceSitios({
       onChange={(e) => onChange(e.target.value)}
       className="bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
     >
-      <option value="">Elegir enlace…</option>
+      <option value="" style={OPTION_STYLE}>
+        Elegir enlace…
+      </option>
       {items.map((e) => (
-        <option key={e.id} value={e.id}>
+        <option key={e.id} value={e.id} style={OPTION_STYLE}>
           int {fmt(e.intensidad)} · coste {fmt(e.coste_energetico)} · estab {fmt(e.estabilidad)}
         </option>
       ))}
@@ -787,9 +808,11 @@ function EnlacesCompuestoBloque({
               }}
               className="bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
             >
-              <option value="">Elemento A…</option>
+              <option value="" style={OPTION_STYLE}>
+                Elemento A…
+              </option>
               {elementosDeLaComposicion.map((e) => (
-                <option key={e.id} value={e.id} disabled={e.id === elementoBId}>
+                <option key={e.id} value={e.id} disabled={e.id === elementoBId} style={OPTION_STYLE}>
                   {e.simbolo || "??"} · {e.nombre}
                 </option>
               ))}
@@ -802,9 +825,11 @@ function EnlacesCompuestoBloque({
               }}
               className="bg-primary/5 rounded-md px-1.5 py-1 text-micro font-bold text-primary outline-none border border-primary/10 focus:border-primary/30"
             >
-              <option value="">Elemento B…</option>
+              <option value="" style={OPTION_STYLE}>
+                Elemento B…
+              </option>
               {elementosDeLaComposicion.map((e) => (
-                <option key={e.id} value={e.id} disabled={e.id === elementoAId}>
+                <option key={e.id} value={e.id} disabled={e.id === elementoAId} style={OPTION_STYLE}>
                   {e.simbolo || "??"} · {e.nombre}
                 </option>
               ))}
