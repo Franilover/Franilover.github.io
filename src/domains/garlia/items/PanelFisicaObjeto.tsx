@@ -32,11 +32,24 @@ function PropertyCell({ label, value }: { label: string; value: unknown }) {
   );
 }
 
-const PROPIEDADES_FISICAS_OBJETO = [
+function SubGroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[9px] font-black uppercase tracking-[0.15em] text-primary/25 px-2">
+      {children}
+    </span>
+  );
+}
   ["masa", "Masa"], ["densidad", "Densidad"], ["volumen", "Volumen"],
+] as const;
+
+const GEOMETRIA_OBJETO = [
+  ["factor_geometrico", "Factor geométrico"],
+] as const;
+
+const PROPIEDADES_OBJETO = [
   ["rigidez", "Rigidez"], ["estabilidad", "Estabilidad"], ["flexibilidad", "Flexibilidad"],
   ["dureza", "Dureza"], ["conductividad", "Conductividad"], ["transparencia", "Transparencia"],
-  ["resistencia_efectiva", "Resistencia efectiva"], ["factor_geometrico", "Factor geométrico"],
+  ["resistencia_efectiva", "Resistencia efectiva"],
 ] as const;
 
 const ESTADO_LABEL: Record<string, string> = {
@@ -129,11 +142,41 @@ export function PanelFisicaObjeto({
               : "Todavía no tiene composición material suficiente para derivar propiedades físicas."}
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-x-1 gap-y-0.5">
-            {PROPIEDADES_FISICAS_OBJETO.filter(([key]) => propiedades[key] !== undefined).map(
-              ([key, label]) => (
-                <PropertyCell key={key} label={label} value={propiedades[key]} />
-              ),
+          <div className="grid grid-cols-2 gap-3">
+            {/* Izquierda: Magnitudes + Geometría apiladas */}
+            <div className="flex flex-col gap-2">
+              {MAGNITUDES_OBJETO.some(([key]) => propiedades[key] !== undefined) && (
+                <div className="flex flex-col gap-0.5">
+                  <SubGroupLabel>Magnitudes</SubGroupLabel>
+                  {MAGNITUDES_OBJETO.filter(([key]) => propiedades[key] !== undefined).map(
+                    ([key, label]) => (
+                      <PropertyCell key={key} label={label} value={propiedades[key]} />
+                    ),
+                  )}
+                </div>
+              )}
+              {GEOMETRIA_OBJETO.some(([key]) => propiedades[key] !== undefined) && (
+                <div className="flex flex-col gap-0.5">
+                  <SubGroupLabel>Geometría</SubGroupLabel>
+                  {GEOMETRIA_OBJETO.filter(([key]) => propiedades[key] !== undefined).map(
+                    ([key, label]) => (
+                      <PropertyCell key={key} label={label} value={propiedades[key]} />
+                    ),
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Derecha: Propiedades */}
+            {PROPIEDADES_OBJETO.some(([key]) => propiedades[key] !== undefined) && (
+              <div className="flex flex-col gap-0.5">
+                <SubGroupLabel>Propiedades</SubGroupLabel>
+                {PROPIEDADES_OBJETO.filter(([key]) => propiedades[key] !== undefined).map(
+                  ([key, label]) => (
+                    <PropertyCell key={key} label={label} value={propiedades[key]} />
+                  ),
+                )}
+              </div>
             )}
           </div>
         )}
