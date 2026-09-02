@@ -395,13 +395,14 @@ function propiedadesDeEstabilidadDetalle(
   const prop = (v: number | null) => (v === null ? undefined : Math.max(0, Math.min(1, v)));
 
   const clasif = detalle.clasificacion ? ` (${detalle.clasificacion})` : "";
+  const grupo = "Análisis estructural";
 
   return [
-    { clave: "eb_tension", label: "Tensión", valor: fmt(detalle.tension), proporcion: prop(detalle.tension), descripcion: `Cuánto desbalance/estrés hay entre los enlaces del compuesto${clasif}.` },
-    { clave: "eb_calidad_enlaces", label: "Calidad de enlaces", valor: fmt(detalle.calidad_enlaces), proporcion: prop(detalle.calidad_enlaces), descripcion: `Qué tan buenos (compatibles y estables) son los enlaces formados${clasif}.` },
-    { clave: "eb_complejidad_estructural", label: "Complejidad estructural", valor: fmt(detalle.complejidad_estructural), proporcion: prop(detalle.complejidad_estructural), descripcion: `Qué tan compleja es la estructura de enlaces del compuesto${clasif}.` },
-    { clave: "eb_coste_organizacion", label: "Coste de organización", valor: fmt(detalle.coste_organizacion), proporcion: prop(detalle.coste_organizacion), descripcion: `Cuánto "cuesta" mantener organizada la estructura del compuesto${clasif}.` },
-    { clave: "eb_confianza", label: "Confianza", valor: fmt(detalle.confianza), proporcion: prop(detalle.confianza), descripcion: `Qué tan confiable es este cálculo dado el estado actual de datos${clasif}.` },
+    { clave: "eb_tension", label: "Tensión", valor: fmt(detalle.tension), proporcion: prop(detalle.tension), descripcion: `Cuánto desbalance/estrés hay entre los enlaces del compuesto${clasif}.`, grupo },
+    { clave: "eb_calidad_enlaces", label: "Calidad de enlaces", valor: fmt(detalle.calidad_enlaces), proporcion: prop(detalle.calidad_enlaces), descripcion: `Qué tan buenos (compatibles y estables) son los enlaces formados${clasif}.`, grupo },
+    { clave: "eb_complejidad_estructural", label: "Complejidad estructural", valor: fmt(detalle.complejidad_estructural), proporcion: prop(detalle.complejidad_estructural), descripcion: `Qué tan compleja es la estructura de enlaces del compuesto${clasif}.`, grupo },
+    { clave: "eb_coste_organizacion", label: "Coste de organización", valor: fmt(detalle.coste_organizacion), proporcion: prop(detalle.coste_organizacion), descripcion: `Cuánto "cuesta" mantener organizada la estructura del compuesto${clasif}.`, grupo },
+    { clave: "eb_confianza", label: "Confianza", valor: fmt(detalle.confianza), proporcion: prop(detalle.confianza), descripcion: `Qué tan confiable es este cálculo dado el estado actual de datos${clasif}.`, grupo },
   ];
 }
 

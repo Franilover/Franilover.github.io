@@ -473,38 +473,56 @@ export function propiedadesCalculadasDeCompuesto(c: Compuesto): PropiedadCalcula
   const prop = (v?: number | null) =>
     v === null || v === undefined ? undefined : Math.max(0, Math.min(1, v));
 
-  return [
-    { clave: "masa", label: "Masa", valor: fmt(c.masa, 2), descripcion: "Cantidad total de masa contenida en el compuesto. Es una magnitud interna, no un índice 0–1.", formula: "Masa = Σ (cantidad × masa base de cada elemento)" },
-    { clave: "volumen", label: "Volumen", valor: fmt(c.volumen, 2), descripcion: "Espacio ocupado por el compuesto según su cantidad de partículas y su organización estructural.", formula: "V = V_composición × F_geom" },
-    { clave: "densidad", label: "Densidad", valor: fmt(c.densidad, 4), descripcion: "Concentración de masa respecto al volumen ocupado. No es un índice 0–1.", formula: "ρ = M / V" },
-    { clave: "carga", label: "Carga", valor: fmt(c.carga, 2), descripcion: "Carga neta del compuesto, suma de la carga de sus elementos.", formula: "Carga = Σ (cantidad × carga de cada elemento)" },
-    { clave: "estabilidad", label: "Estabilidad", valor: fmt(c.estabilidad), proporcion: prop(c.estabilidad), descripcion: "Qué tan resistente es el compuesto a romperse o transformarse.", formula: "Estabilidad = propiedad derivada de la composición y estructura del compuesto." },
-    { clave: "rigidez", label: "Rigidez", valor: fmt(c.rigidez), proporcion: prop(c.rigidez), descripcion: "Resistencia del compuesto a deformarse bajo fuerza.", formula: "Rigidez = propiedad derivada de la composición y estructura del compuesto." },
-    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(c.flexibilidad), proporcion: prop(c.flexibilidad), descripcion: "Capacidad del compuesto de deformarse sin romperse.", formula: "Flexibilidad = propiedad derivada de la composición y estructura del compuesto." },
-    { clave: "dureza", label: "Dureza", valor: fmt(c.dureza), proporcion: prop(c.dureza), descripcion: "Resistencia del compuesto a ser rayado o penetrado.", formula: "Dureza = propiedad derivada de la composición del compuesto." },
-    { clave: "conductividad", label: "Conductividad", valor: fmt(c.conductividad), proporcion: prop(c.conductividad), descripcion: "Facilidad del compuesto para transmitir una influencia a través de su estructura.", formula: "Conductividad = propiedad derivada de la capacidad de transmisión de sus componentes." },
-    { clave: "transparencia", label: "Transparencia", valor: fmt(c.transparencia), proporcion: prop(c.transparencia), descripcion: "Facilidad con la que una influencia atraviesa el compuesto sin quedar retenida.", formula: "Transparencia = propiedad derivada de la capacidad de paso de sus componentes." },
-    { clave: "interaccion", label: "Interacción", valor: fmt(c.interaccion), proporcion: prop(c.interaccion), descripcion: "Facilidad con la que el compuesto se acopla con su entorno.", formula: "Interacción = propiedad derivada de la capacidad de acoplamiento de sus componentes." },
-    { clave: "compatibilidad", label: "Compatibilidad", valor: fmt(c.compatibilidad), proporcion: prop(c.compatibilidad), descripcion: "Qué tan compatibles son entre sí los sitios de enlace usados.", formula: "Compatibilidad = función de carga, catálisis, transición, interacción y transformación entre los sitios enlazados" },
-    { clave: "energia_enlace", label: "Energía de enlace", valor: fmt(c.energia_enlace, 4), descripcion: "Energía acumulada en los enlaces del compuesto.", formula: "Energía de enlace = Σ (coste energético × intensidad × (1 − reversibilidad)) de cada enlace" },
-    { clave: "tipo_compuesto", label: "Tipo", valor: c.tipo_compuesto ?? null, descripcion: "Clasificación estructural (sustancia, mezcla, aleación, material estructural).", formula: "Sin enlace definido → mezcla · con estructura de enlace válida → compuesto" },
-    { clave: "clasificacion", label: "Clasificación", valor: c.clasificacion ?? null, descripcion: "Clasificación derivada más específica del compuesto." },
-    { clave: "estado_estructura", label: "Estado de estructura", valor: c.estado_estructura ?? null, descripcion: "Qué tan completa/consistente está la definición estructural del compuesto." },
+  // ─── 3 familias propias del Compuesto (la 4ta, "Análisis estructural",
+  // se agrega en propiedadesDeEstabilidadDetalle porque viene de una fuente
+  // distinta — compuesto_estabilidad — pero comparte el mismo mecanismo de
+  // agrupación de TarjetaPropiedadesFisicas). Mismo patrón que
+  // propiedadesCalculadasDeElemento (grupo: G.xxx), ver comentario ahí.
+  const G = {
+    fisicas: "Propiedades físicas",
+    estructura: "Estructura",
+    clasificacion: "Clasificación",
+  } as const;
 
-    // ─── Columnas reales en Supabase, traídas en el select pero nunca
-    // mostradas hasta ahora (ver auditoría 2026-08-30 "qué propiedades
-    // faltan en Compuesto", mismo criterio que ya se aplicó a Elemento).
-    // Se excluyen a propósito estructura/validacion/auditoria/
-    // propiedades_emergentes: son jsonb de diagnóstico interno, no
-    // aplanables a una tarjeta simple sin decidir antes qué mostrar de
-    // cada uno.
-    { clave: "formula_canonica", label: "Fórmula canónica", valor: c.formula_canonica ?? null, descripcion: "Notación canónica de la composición del compuesto (ej. Fl2Cr)." },
-    { clave: "tipo_estructura", label: "Tipo de estructura", valor: c.tipo_estructura ?? null, descripcion: "Clasificación de la arquitectura de enlaces del compuesto." },
-    { clave: "tipo_estructura_derivada", label: "Tipo de estructura (derivada)", valor: c.tipo_estructura_derivada ?? null, descripcion: "Tipo de estructura recalculado automáticamente a partir de la composición y enlaces actuales." },
-    { clave: "topologia_enlace", label: "Topología de enlace", valor: c.topologia_enlace ?? null, descripcion: "Forma en que se organizan los enlaces entre los elementos del compuesto (ej. lineal, ramificada)." },
-    { clave: "naturaleza_semantica", label: "Naturaleza semántica", valor: c.naturaleza_semantica ?? null, descripcion: "Interpretación de qué tipo de sustancia representa el compuesto dentro del canon." },
-    { clave: "razon_clasificacion", label: "Razón de clasificación", valor: c.razon_clasificacion ?? null, descripcion: "Motivo/regla por la que Supabase asignó la Clasificación mostrada arriba." },
-    { clave: "umbral_estabilidad", label: "Umbral de estabilidad", valor: fmt(c.umbral_estabilidad), proporcion: prop(c.umbral_estabilidad), descripcion: "Estabilidad mínima requerida para que el compuesto se considere formado de manera consistente." },
+  return [
+    // ─── Propiedades físicas ────────────────────────────────────────────
+    { clave: "masa", label: "Masa", valor: fmt(c.masa, 2), descripcion: "Cantidad total de masa contenida en el compuesto. Es una magnitud interna, no un índice 0–1.", formula: "Masa = Σ (cantidad × masa base de cada elemento)", grupo: G.fisicas },
+    { clave: "volumen", label: "Volumen", valor: fmt(c.volumen, 2), descripcion: "Espacio ocupado por el compuesto según su cantidad de partículas y su organización estructural.", formula: "V = V_composición × F_geom", grupo: G.fisicas },
+    { clave: "densidad", label: "Densidad", valor: fmt(c.densidad, 4), descripcion: "Concentración de masa respecto al volumen ocupado. No es un índice 0–1.", formula: "ρ = M / V", grupo: G.fisicas },
+    { clave: "carga", label: "Carga", valor: fmt(c.carga, 2), descripcion: "Carga neta del compuesto, suma de la carga de sus elementos.", formula: "Carga = Σ (cantidad × carga de cada elemento)", grupo: G.fisicas },
+    { clave: "estabilidad", label: "Estabilidad", valor: fmt(c.estabilidad), proporcion: prop(c.estabilidad), descripcion: "Qué tan resistente es el compuesto a romperse o transformarse.", formula: "Estabilidad = propiedad derivada de la composición y estructura del compuesto.", grupo: G.fisicas },
+    { clave: "rigidez", label: "Rigidez", valor: fmt(c.rigidez), proporcion: prop(c.rigidez), descripcion: "Resistencia del compuesto a deformarse bajo fuerza.", formula: "Rigidez = propiedad derivada de la composición y estructura del compuesto.", grupo: G.fisicas },
+    { clave: "flexibilidad", label: "Flexibilidad", valor: fmt(c.flexibilidad), proporcion: prop(c.flexibilidad), descripcion: "Capacidad del compuesto de deformarse sin romperse.", formula: "Flexibilidad = propiedad derivada de la composición y estructura del compuesto.", grupo: G.fisicas },
+    { clave: "dureza", label: "Dureza", valor: fmt(c.dureza), proporcion: prop(c.dureza), descripcion: "Resistencia del compuesto a ser rayado o penetrado.", formula: "Dureza = propiedad derivada de la composición del compuesto.", grupo: G.fisicas },
+    { clave: "conductividad", label: "Conductividad", valor: fmt(c.conductividad), proporcion: prop(c.conductividad), descripcion: "Facilidad del compuesto para transmitir una influencia a través de su estructura.", formula: "Conductividad = propiedad derivada de la capacidad de transmisión de sus componentes.", grupo: G.fisicas },
+    { clave: "transparencia", label: "Transparencia", valor: fmt(c.transparencia), proporcion: prop(c.transparencia), descripcion: "Facilidad con la que una influencia atraviesa el compuesto sin quedar retenida.", formula: "Transparencia = propiedad derivada de la capacidad de paso de sus componentes.", grupo: G.fisicas },
+    { clave: "interaccion", label: "Interacción", valor: fmt(c.interaccion), proporcion: prop(c.interaccion), descripcion: "Facilidad con la que el compuesto se acopla con su entorno.", formula: "Interacción = propiedad derivada de la capacidad de acoplamiento de sus componentes.", grupo: G.fisicas },
+    { clave: "compatibilidad", label: "Compatibilidad", valor: fmt(c.compatibilidad), proporcion: prop(c.compatibilidad), descripcion: "Qué tan compatibles son entre sí los sitios de enlace usados.", formula: "Compatibilidad = función de carga, catálisis, transición, interacción y transformación entre los sitios enlazados", grupo: G.fisicas },
+    { clave: "energia_enlace", label: "Energía de enlace", valor: fmt(c.energia_enlace, 4), descripcion: "Energía acumulada en los enlaces del compuesto.", formula: "Energía de enlace = Σ (coste energético × intensidad × (1 − reversibilidad)) de cada enlace", grupo: G.fisicas },
+
+    // ─── Estructura ─────────────────────────────────────────────────────
+    { clave: "estado_estructura", label: "Estado de estructura", valor: c.estado_estructura ?? null, descripcion: "Qué tan completa/consistente está la definición estructural del compuesto.", grupo: G.estructura },
+    { clave: "tipo_estructura", label: "Tipo de estructura", valor: c.tipo_estructura ?? null, descripcion: "Clasificación de la arquitectura de enlaces del compuesto.", grupo: G.estructura },
+    { clave: "tipo_estructura_derivada", label: "Tipo de estructura (derivada)", valor: c.tipo_estructura_derivada ?? null, descripcion: "Tipo de estructura recalculado automáticamente a partir de la composición y enlaces actuales.", grupo: G.estructura },
+    { clave: "topologia_enlace", label: "Topología de enlace", valor: c.topologia_enlace ?? null, descripcion: "Forma en que se organizan los enlaces entre los elementos del compuesto (ej. lineal, ramificada).", grupo: G.estructura },
+
+    // ─── Clasificación ──────────────────────────────────────────────────
+    { clave: "tipo_compuesto", label: "Tipo", valor: c.tipo_compuesto ?? null, descripcion: "Clasificación estructural (sustancia, mezcla, aleación, material estructural).", formula: "Sin enlace definido → mezcla · con estructura de enlace válida → compuesto", grupo: G.clasificacion },
+    { clave: "clasificacion", label: "Clasificación", valor: c.clasificacion ?? null, descripcion: "Clasificación derivada más específica del compuesto.", grupo: G.clasificacion },
+    { clave: "naturaleza_semantica", label: "Naturaleza semántica", valor: c.naturaleza_semantica ?? null, descripcion: "Interpretación de qué tipo de sustancia representa el compuesto dentro del canon.", grupo: G.clasificacion },
+    { clave: "formula_canonica", label: "Fórmula canónica", valor: c.formula_canonica ?? null, descripcion: "Notación canónica de la composición del compuesto (ej. Fl2Cr).", grupo: G.clasificacion },
+    { clave: "razon_clasificacion", label: "Razón de clasificación", valor: c.razon_clasificacion ?? null, descripcion: "Motivo/regla por la que Supabase asignó la Clasificación mostrada arriba.", grupo: G.clasificacion },
+
+    // ─── Análisis estructural (parte 1: viene de columnas de "compuestos";
+    // el resto — tensión, calidad de enlaces, complejidad estructural,
+    // coste de organización, confianza — se agrega en
+    // propiedadesDeEstabilidadDetalle con el mismo nombre de grupo, ver ahí,
+    // porque sale de la tabla "compuesto_estabilidad" en vez de columnas
+    // directas de "compuestos"). Se excluyen a propósito
+    // estructura/validacion/auditoria/propiedades_emergentes: son jsonb de
+    // diagnóstico interno, no aplanables a una tarjeta simple sin decidir
+    // antes qué mostrar de cada uno.
+    { clave: "umbral_estabilidad", label: "Umbral de estabilidad", valor: fmt(c.umbral_estabilidad), proporcion: prop(c.umbral_estabilidad), descripcion: "Estabilidad mínima requerida para que el compuesto se considere formado de manera consistente.", grupo: "Análisis estructural" },
   ];
 }
 
