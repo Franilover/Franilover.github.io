@@ -39,6 +39,8 @@ function SubGroupLabel({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
+
+const MAGNITUDES_OBJETO = [
   ["masa", "Masa"], ["densidad", "Densidad"], ["volumen", "Volumen"],
 ] as const;
 
