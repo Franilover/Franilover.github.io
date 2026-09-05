@@ -487,6 +487,38 @@ export interface ReinoAreaLocal {
   orden?: number;
 }
 
+// ─── Librería de assets reutilizables del mapa (castillos, árboles, etc.) ────
+// Catálogo global (siempre world_id="garlia" por ahora) — ver map_assets.sql
+// y MapAssetLibraryPanel.tsx.
+export interface MapAssetLocal {
+  id: string;
+  world_id: string;
+  nombre: string;
+  categoria: string;
+  image_url: string;
+  ancho_base: number;
+  alto_base: number;
+  anchor_x: number;
+  anchor_y: number;
+}
+
+// ─── Instancias de assets colocados en el mapa (mundo o reino) ──────────────
+// Exactamente uno de world_id/reino_id está seteado — mismo criterio de
+// scoping que MapAreaLocal/ReinoAreaLocal.
+export interface MapAssetPlacementLocal {
+  id: string;
+  asset_id: string;
+  world_id?: string | null;
+  reino_id?: string | null;
+  tile_col: number;
+  tile_row: number;
+  coord_x: number;
+  coord_y: number;
+  escala: number;
+  rotacion: number;
+  z_index: number;
+}
+
 // ─── Eras de personaje (arcos vitales en la línea de tiempo) ─────────────────
 export interface PersonajeEra {
   id: string; // uuid
@@ -843,6 +875,10 @@ class AgendaFraniDB extends Dexie {
   // Áreas del mapa (círculo/rectángulo/polígono) vinculadas a reino o ciudad
   map_areas!: Table<MapAreaLocal, string>;
   reino_areas!: Table<ReinoAreaLocal, string>;
+
+  // Librería de assets del mapa (castillos, árboles, etc.) e instancias colocadas
+  map_assets!: Table<MapAssetLocal, string>;
+  map_asset_placements!: Table<MapAssetPlacementLocal, string>;
 
   // Descubrimientos personales (cache offline para GlobalCommandPalette)
   descubrimientos!: Table<DescubrimientoLocal, string>;
@@ -1942,6 +1978,20 @@ class AgendaFraniDB extends Dexie {
     // una tabla que se edite directo.
     this.version(43).stores({
       conversaciones_cache: "id, ultimo_mensaje_at",
+    });
+
+    // ─── v44: librería de assets reutilizables del mapa (castillos, árboles,
+    // montañas, ríos...) y sus instancias colocadas — ver map_assets.sql,
+    // useMapAssets.ts y MapAssetLibraryPanel.tsx. map_assets es un catálogo
+    // (siempre world_id="garlia" hoy) que cambia poco, mismo patrón
+    // cache-first que map_tiles. map_asset_placements sigue el mismo
+    // criterio de scoping que map_areas/reino_areas: se indexa por ambas
+    // columnas de scope aunque solo una esté seteada por fila, para poder
+    // filtrar por world_id (mapa global) o por reino_id (mapa de reino)
+    // sin dos tablas separadas.
+    this.version(44).stores({
+      map_assets: "id, world_id, categoria",
+      map_asset_placements: "id, asset_id, world_id, reino_id",
     });
   }
 }
