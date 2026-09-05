@@ -560,6 +560,7 @@ function PanelContenido({
   onVincularPersonaje,
   onDesvincularPersonaje,
   vinculandoPersonajeId,
+  onIniciarDibujoCiudad,
 }: any) {
   const router = useRouter();
   const [buscadorLibrosOpen, setBuscadorLibrosOpen] = useState(false);
@@ -646,7 +647,25 @@ function PanelContenido({
         {/* Editar área del mapa (círculo/rectángulo/forma libre) se sacó de
             acá — quedaba duplicado con la barra de herramientas flotante
             sobre el mapa (que ya cubre reino y ciudad) y generaba errores
-            por dos flujos de dibujo compitiendo entre sí. */}
+            por dos flujos de dibujo compitiendo entre sí. El botón de abajo
+            SÍ reusa esa misma barra flotante (drawTool compartido) en vez
+            de abrir un flujo propio — solo la activa con la ciudad ya
+            preseleccionada, para que el admin no tenga que buscarla. */}
+        {!puntoSeleccionado && onIniciarDibujoCiudad && (
+          <button
+            className="flex items-center justify-center gap-2 py-2.5 text-micro font-black uppercase tracking-widest transition-opacity hover:opacity-80"
+            style={{
+              borderRadius: "1px",
+              border: "1px dashed color-mix(in srgb, var(--accent) 40%, transparent)",
+              color: "var(--accent)",
+            }}
+            type="button"
+            onClick={() => void onIniciarDibujoCiudad()}
+          >
+            <Plus size={12} />
+            Añadir ciudad en el mapa
+          </button>
+        )}
 
         {/* Lore text — mismo marco decorativo con esquinas que el modo
             público, pero con un <textarea> editable adentro. */}
@@ -2099,6 +2118,45 @@ export default function MapaInteractivo({
     color: string | null;
   } | null>(null);
 
+  // Botón "Añadir ciudad" del panel de reino (ver panelProps más abajo):
+  // crea la ciudad (con reino_id ya seteado, a diferencia del flujo
+  // genérico de useCreateEntity que no lo conoce) y deja el dibujo activado
+  // con esa ciudad ya preseleccionada — el admin solo dibuja el área y se
+  // guarda directo, sin pasar por el selector de vínculo. Reusa el mismo
+  // drawTool/onAreaDrawEnd que la barra flotante en vez de abrir un flujo de
+  // dibujo paralelo (ver comentario en PanelContenido sobre por qué se sacó
+  // de ahí un botón de área duplicado).
+  const [creandoCiudadParaDibujo, setCreandoCiudadParaDibujo] = useState(false);
+  const iniciarDibujoCiudadDelReino = useCallback(async () => {
+    if (!reinoSeleccionado || creandoCiudadParaDibujo) return;
+    setCreandoCiudadParaDibujo(true);
+    try {
+      const { data, error } = await supabase
+        .from("ciudades")
+        .insert({ nombre: "Nueva ciudad", reino_id: reinoSeleccionado.id })
+        .select()
+        .single();
+      if (error || !data) {
+        showToast("Error al crear la ciudad", "error");
+        return;
+      }
+      // La agregamos ya mismo a detallesReino para que el panel/selector la
+      // vean sin esperar un refetch, igual que el resto de altas optimistas.
+      setDetallesReino((prev) => [...prev, data]);
+      setSelectedAreaId(null);
+      setAreaVinculoPreseleccionado({
+        reino_id: reinoSeleccionado.id,
+        ciudad_id: data.id,
+        label: data.nombre,
+        color: null,
+      });
+      setDrawTool("rectangulo");
+      showToast("Ciudad creada — dibujá su área en el mapa", "success");
+    } finally {
+      setCreandoCiudadParaDibujo(false);
+    }
+  }, [reinoSeleccionado, creandoCiudadParaDibujo]);
+
   const persistArea = useCallback(
     async (payload: {
       tipo: AreaTipo;
@@ -2502,7 +2560,19 @@ export default function MapaInteractivo({
   // Carga datos del reino (ciudades, personajes, libros, capítulos) y entra
   // a su vista de detalle. Compartida por el click normal (navegación) y
   // por el arranque directo en modo edición (initialEditReinoId más abajo).
-  const abrirVistaDeReino = async (reino: any, puntoInicial: any = null) => {
+  const abrirVistaDeReino = async (
+    reino: any,
+    puntoInicial: any = null,
+    opts: { cambiarVista?: boolean } = {},
+  ) => {
+    // cambiarVista=false (nuevo default): el click normal en un reino desde
+    // el mapa global ya NO entra al mapa de ese reino — solo abre el panel
+    // de info con sus datos (ciudades, libros, capítulos) cargados, y el
+    // mapa mundial sigue siendo el que se ve. El zoom-in al mapa propio del
+    // reino (ReinoTileCanvas) queda para cuando el admin lo pida
+    // explícitamente (ver botón "Editar mapa del reino" en el panel).
+    const cambiarVista = opts.cambiarVista ?? false;
+
     // Marcar qué reino estamos cargando — cualquier respuesta async va a chequear esto
     currentReinoIdRef.current = reino.id;
 
@@ -2512,7 +2582,7 @@ export default function MapaInteractivo({
     // parpadeo reino→ciudad al clickear un área vinculada a una ciudad.
     setReinoSeleccionado(reino);
     setPuntoSeleccionado(puntoInicial);
-    setVistaActual("reino");
+    if (cambiarVista) setVistaActual("reino");
     setPanelOpen(true);
     setDetallesReino([]);
     setPersonajesReino([]);
@@ -2656,9 +2726,11 @@ export default function MapaInteractivo({
     if (currentReinoIdRef.current === reino.id) setLoadingLibros(false);
   };
 
-  // Click izquierdo sobre un pin en el mapa global → entra a la vista de
-  // detalle del reino (su mapa/tile interno) y abre ahí el panel lateral
-  // con su info.
+  // Click izquierdo sobre un pin en el mapa global → abre el panel lateral
+  // con la info del reino (ciudades, libros, capítulos), sin cambiar de
+  // mapa — el mapa global sigue siendo el que se ve. Entrar al mapa propio
+  // del reino (su grid de tiles interno) es una acción explícita aparte,
+  // ver botón "Editar mapa del reino" en el panel.
   const handleReinoClick = async (reino: any) => {
     await abrirVistaDeReino(reino);
   };
@@ -2669,10 +2741,10 @@ export default function MapaInteractivo({
     setReinoParaMover((prev) => (prev === reino.id ? null : reino.id));
   };
 
-  // Click sobre el label de un área en el mapa global → abre el mapa del
-  // reino (o de la ciudad, si el área está vinculada a una ciudad) al que
-  // esa área está asociada. Si el reino no fue desbloqueado por el usuario
-  // (y no es admin), no navega — mismo criterio que oculta su pin.
+  // Click sobre el label/área de un reino o ciudad en el mapa global → abre
+  // el panel lateral con su info, sin cambiar de mapa (mismo criterio que
+  // handleReinoClick). Si el reino no fue desbloqueado por el usuario (y no
+  // es admin), no abre nada — mismo criterio que oculta su pin.
   const handleAreaLabelClick = useCallback(
     async (area: BaseArea) => {
       // Ojo: un área de ciudad también trae reino_id seteado (persistArea
@@ -2869,7 +2941,10 @@ export default function MapaInteractivo({
           (r) => r.id === (reinoIdHint ?? data.reino_id),
         );
         if (!reino) return false;
-        await handleReinoClick(reino);
+        // Deep-link explícito a una ciudad puntual: a diferencia del click
+        // casual sobre un reino, acá sí tiene sentido entrar a su mapa
+        // propio para ver la ciudad en su contexto (ReinoTileCanvas).
+        await abrirVistaDeReino(reino, null, { cambiarVista: true });
       }
 
       setPuntoSeleccionado(ciudad);
@@ -2941,14 +3016,10 @@ export default function MapaInteractivo({
   }, [reinos, isAdmin]);
 
   // ── initialEditReinoId: entrar directo en modo edición con un reino ──────
-  // puntual ya seleccionado (MapaSection → EditorMapa → "editar este
-  // reino"). Sin esto, el componente arranca en modo lectura y el primer
-  // click sobre el reino navega a su vista normal en vez de abrir el panel
-  // editable — hacen falta dos clicks. Usamos abrirVistaDeReino (la misma
-  // carga de datos que el click normal) para entrar directo a la vista de
-  // detalle del reino (ReinoTileCanvas, con sus ciudades editables) en vez
-  // de quedarnos en el mapa global — si no, se ve el mapa/visor global de
-  // solo lectura con el panel encima, no el editor de tiles del reino.
+  // puntual ya seleccionado, con su mapa propio abierto (ReinoTileCanvas).
+  // Es una entrada explícita (querystring/deep-link), no el click normal
+  // sobre un reino en el mapa global — por eso pasa cambiarVista:true en vez
+  // de depender del default (false) de abrirVistaDeReino.
   const initialEditAppliedRef = useRef(false);
   useEffect(() => {
     if (initialEditAppliedRef.current) return;
@@ -2958,7 +3029,7 @@ export default function MapaInteractivo({
     if (!reino) return; // esperamos a que "reinos" cargue
     initialEditAppliedRef.current = true;
     setEditMode(true);
-    void abrirVistaDeReino(reino);
+    void abrirVistaDeReino(reino, null, { cambiarVista: true });
   }, [allowEdit, initialEditReinoId, isAdmin, reinos]);
 
   const abrirPanelFlotante = usePanelFlotante((s) => s.abrir);
@@ -3261,6 +3332,10 @@ export default function MapaInteractivo({
     onVincularPersonaje: handleVincularPersonaje,
     onDesvincularPersonaje: handleDesvincularPersonaje,
     vinculandoPersonajeId,
+    // Botón "Añadir ciudad" del panel de reino — activa la herramienta de
+    // dibujo ya existente (barra flotante) con el reino actual
+    // preseleccionado, para no duplicar el flujo de dibujo.
+    onIniciarDibujoCiudad: iniciarDibujoCiudadDelReino,
   };
 
   // Solo bloquea la UI si no hay absolutamente ningún dato todavía (primera carga ever)

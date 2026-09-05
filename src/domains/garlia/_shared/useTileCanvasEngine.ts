@@ -717,15 +717,29 @@ export function useTileCanvasEngine<
         }
       };
 
+      // Umbral de zoom para decidir cómo se pinta un área de Reino (sin
+      // ciudad_id): por debajo, coloreada + nombre centrado, como siempre;
+      // por encima (zoomeado adentro), el relleno estorba para ver el
+      // territorio así que solo se marca el borde, con el nombre pegado a
+      // él en vez de tapando el centro. Las áreas de Ciudad no cambian —
+      // siempre coloreadas + nombre centrado, sin importar el zoom.
+      const REINO_ZOOM_CERCANO_TS = 420;
+      const zoomCercano = ts > REINO_ZOOM_CERCANO_TS;
+
       for (const area of areas) {
         const localPts = area.puntos.map((p) => worldToLocal(p, scale));
         const isSel = area.id === selectedAreaId;
         const baseColor = area.color || accent;
+        const esReinoPuro = !!area.reino_id && !area.ciudad_id;
+        const soloBorde = esReinoPuro && zoomCercano;
+
         drawAreaShape(localPts, area.tipo);
-        ctx.fillStyle = `${baseColor}${isSel ? "33" : "22"}`;
-        ctx.fill();
+        if (!soloBorde) {
+          ctx.fillStyle = `${baseColor}${isSel ? "33" : "22"}`;
+          ctx.fill();
+        }
         ctx.strokeStyle = isSel ? baseColor : `${baseColor}bb`;
-        ctx.lineWidth = isSel ? 2.5 : 1.5;
+        ctx.lineWidth = isSel ? 2.5 : soloBorde ? 2 : 1.5;
         if (area.tipo === "poligono") ctx.setLineDash([]);
         ctx.stroke();
 
@@ -742,11 +756,26 @@ export function useTileCanvasEngine<
           }
         }
 
-        // Label centrado (aprox: promedio de los puntos de forma, no de
-        // los 2 puntos de control de círculo/rectángulo)
+        // Label — centrado en la forma normalmente; en modo "solo borde"
+        // (reino con zoom cercano) se ancla al punto más alto del borde en
+        // vez de tapar el interior, ya que ahí no hay relleno que lo
+        // resalte del fondo del mapa.
         if (area.label && localPts.length >= 2) {
           let lx: number, ly: number;
-          if (area.tipo === "poligono") {
+          if (soloBorde) {
+            if (area.tipo === "circulo") {
+              const [c, edge] = localPts;
+              const r = Math.hypot(edge.lx - c.lx, edge.ly - c.ly);
+              lx = c.lx;
+              ly = c.ly - r - 8;
+            } else {
+              // rectángulo o polígono: punto más alto (menor ly) del borde,
+              // con un pequeño margen hacia arriba.
+              const top = localPts.reduce((min, p) => (p.ly < min.ly ? p : min));
+              lx = top.lx;
+              ly = top.ly - 8;
+            }
+          } else if (area.tipo === "poligono") {
             lx = localPts.reduce((s, p) => s + p.lx, 0) / localPts.length;
             ly = localPts.reduce((s, p) => s + p.ly, 0) / localPts.length;
           } else {
@@ -755,7 +784,7 @@ export function useTileCanvasEngine<
           }
           ctx.font = "700 11px 'Cinzel', serif";
           ctx.textAlign = "center";
-          ctx.fillStyle = labelText;
+          ctx.fillStyle = soloBorde ? baseColor : labelText;
           ctx.globalAlpha = 0.85;
           ctx.fillText(area.label, lx, ly);
           ctx.globalAlpha = 1;
