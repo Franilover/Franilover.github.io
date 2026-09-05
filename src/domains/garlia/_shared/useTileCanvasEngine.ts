@@ -792,26 +792,15 @@ export function useTileCanvasEngine<
         // Label — centrado en la forma normalmente; en modo "solo borde" de
         // un Reino con zoom cercano se ancla al punto más alto del borde en
         // vez de tapar el interior (ahí no hay relleno que lo resalte del
-        // fondo). Una Ciudad lejos en editMode no muestra label en
-        // absoluto: el borde tenue solo sirve para ubicarla/clickearla, el
-        // nombre recién aparece al acercarse (mismo criterio que el resto
-        // de "ciudad visible").
-        if (area.label && localPts.length >= 2 && !ciudadLejosEnEdicion) {
+        // Label — centrado en la forma normalmente. Se oculta del todo (sin
+        // dibujarse en ningún lado) en modo "solo borde": un Reino con zoom
+        // cercano no muestra su nombre — a esa escala se está viendo el
+        // territorio de cerca, no identificándolo desde lejos. Una Ciudad
+        // lejos en editMode tampoco muestra label — mismo criterio, el
+        // nombre recién aparece al acercarse (ver "ciudad visible").
+        if (area.label && localPts.length >= 2 && !soloBorde) {
           let lx: number, ly: number;
-          if (soloBorde) {
-            if (area.tipo === "circulo") {
-              const [c, edge] = localPts;
-              const r = Math.hypot(edge.lx - c.lx, edge.ly - c.ly);
-              lx = c.lx;
-              ly = c.ly - r - 8;
-            } else {
-              // rectángulo o polígono: punto más alto (menor ly) del borde,
-              // con un pequeño margen hacia arriba.
-              const top = localPts.reduce((min, p) => (p.ly < min.ly ? p : min));
-              lx = top.lx;
-              ly = top.ly - 8;
-            }
-          } else if (area.tipo === "poligono") {
+          if (area.tipo === "poligono") {
             lx = localPts.reduce((s, p) => s + p.lx, 0) / localPts.length;
             ly = localPts.reduce((s, p) => s + p.ly, 0) / localPts.length;
           } else {
@@ -820,7 +809,7 @@ export function useTileCanvasEngine<
           }
           ctx.font = "700 11px 'Cinzel', serif";
           ctx.textAlign = "center";
-          ctx.fillStyle = soloBorde ? baseColor : labelText;
+          ctx.fillStyle = labelText;
           ctx.globalAlpha = 0.85;
           ctx.fillText(area.label, lx, ly);
           ctx.globalAlpha = 1;
