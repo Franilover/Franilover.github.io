@@ -3379,10 +3379,13 @@ export default function MapaInteractivo({
         )}
       </AnimatePresence>
 
-      {/* ── MAP AREA ── */}
-      <div
-        className={`relative flex-1 min-h-0 overflow-hidden transition-all duration-500 pb-14 md:pb-0 ${panelOpen && !isMobile ? "" : "w-full"}`}
-      >
+      {/* ── MAP AREA ──
+          Siempre w-full: la barra lateral (desktop) se superpone con
+          position:absolute en vez de empujar como hermano flex — así el
+          contenedor del canvas nunca cambia de tamaño al abrir/cerrar el
+          panel, y el ResizeObserver del motor de tiles no dispara ningún
+          resize (que antes producía el flash negro / recentrado). */}
+      <div className="relative flex-1 min-h-0 overflow-hidden w-full pb-14 md:pb-0">
         {isAdmin && (
           <div
             className="absolute z-70 flex gap-2"
@@ -3831,15 +3834,21 @@ export default function MapaInteractivo({
         )}
       </div>
 
-      {/* ── SIDE PANEL (desktop) ── */}
+      {/* ── SIDE PANEL (desktop) ──
+          Se superpone al mapa (position:absolute, no ocupa espacio en el
+          flex) para que el contenedor del canvas nunca se resize al
+          abrir/cerrar — eso es lo que producía el flash negro y el
+          recentrado. Antes era un hermano flex con `width` animado que
+          angostaba el mapa de verdad. */}
       <AnimatePresence>
         {!isMobile && panelOpen && (reinoSeleccionado || puntoSeleccionado) && (
           <MotionDiv
-            animate={{ width: 380, opacity: 1 }}
-            className="relative overflow-hidden shrink-0"
-            exit={{ width: 0, opacity: 0 }}
-            initial={{ width: 0, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            className="absolute top-0 right-0 bottom-0 z-40 overflow-hidden"
+            exit={{ x: 380, opacity: 0 }}
+            initial={{ x: 380, opacity: 0 }}
             style={{
+              width: 380,
               background: "var(--white-custom)",
               borderLeft:
                 "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
