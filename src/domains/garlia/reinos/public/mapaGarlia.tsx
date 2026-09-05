@@ -1985,7 +1985,7 @@ export default function MapaInteractivo({
   // instancias (map_asset_placements), que sigue el mismo criterio que
   // areas vs reino_areas: world_id cuando vistaActual === "global",
   // reino_id cuando se está dentro de un reino.
-  const { assets: mapAssets, loading: loadingMapAssets } =
+  const { assets: mapAssets, loading: loadingMapAssets, createAsset: createMapAsset } =
     useMapAssetLibrary("garlia");
   const {
     placements: assetPlacementsGlobal,
@@ -3937,6 +3937,7 @@ export default function MapaInteractivo({
               setPlacingAssetId(null);
               setSelectedPlacementId(null);
             }}
+            onCreateAsset={createMapAsset}
             onDeletePlacement={(id) => {
               void deleteAssetPlacement(id);
               setSelectedPlacementId(null);

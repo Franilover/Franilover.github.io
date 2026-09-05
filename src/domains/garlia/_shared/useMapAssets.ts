@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/infra/supabase/supabase";
 import {
   loadMapAssets,
+  invalidateMapAssets,
   loadMapAssetPlacements,
   loadReinoAssetPlacements,
   invalidateMapAssetPlacements,
@@ -72,7 +73,46 @@ export function useMapAssetLibrary(worldId: string = "garlia") {
     };
   }, [worldId]);
 
-  return { assets, loading };
+  /** Da de alta un asset nuevo en la librería (botón "+" del panel). Las
+   * dimensiones naturales (ancho_base/alto_base) se calculan del lado del
+   * llamador antes de invocar esto — ver MapAssetLibraryPanel, que las
+   * detecta cargando la imagen en un <img> oculto para no pedírselas a
+   * mano al usuario. */
+  const createAsset = useCallback(
+    async (input: {
+      nombre: string;
+      categoria: string;
+      image_url: string;
+      ancho_base: number;
+      alto_base: number;
+      anchor_x?: number;
+      anchor_y?: number;
+    }) => {
+      const row = {
+        world_id: worldId,
+        nombre: input.nombre,
+        categoria: input.categoria,
+        image_url: input.image_url,
+        ancho_base: input.ancho_base,
+        alto_base: input.alto_base,
+        anchor_x: input.anchor_x ?? 0.5,
+        anchor_y: input.anchor_y ?? 1.0,
+      };
+      const { data, error } = await supabase
+        .from("map_assets")
+        .insert(row)
+        .select()
+        .single();
+      if (!error && data) {
+        setAssets((prev) => [...prev, data as MapAsset]);
+        await invalidateMapAssets(worldId);
+      }
+      return { data: data as MapAsset | null, error };
+    },
+    [worldId],
+  );
+
+  return { assets, loading, createAsset };
 }
 
 interface UseMapAssetPlacementsOpts {
