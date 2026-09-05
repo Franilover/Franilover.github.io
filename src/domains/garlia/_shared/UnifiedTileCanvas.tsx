@@ -3,7 +3,8 @@
 /**
  * UnifiedTileCanvas
  * ──────────────────
- * Canvas compartido entre EditorMapa (mundo) y ReinoTileCanvas (reino).
+ * Canvas compartido entre MapaInteractivo (mundo, en reinos/public/mapaGarlia.tsx)
+ * y ReinoTileCanvas (reino).
  * Une "puntos de interés" + "tiles" en una sola superficie:
  *
  *   - Pan / zoom (rueda + drag, pinch en touch)
