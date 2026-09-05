@@ -295,8 +295,17 @@ export function useTileCanvasEngine<
     const apply = () => {
       const hadValidSize = canvas.width > 0 && canvas.height > 0;
       const { w, h } = capDims(container.clientWidth, container.clientHeight);
-      canvas.width = w;
-      canvas.height = h;
+      // Reasignar canvas.width/height BORRA el bitmap al instante, aunque el
+      // valor sea el mismo que ya tenía. Durante la transición CSS de 500ms
+      // que angosta/ensancha el mapa al abrir o cerrar el panel lateral, el
+      // ResizeObserver dispara muchas veces seguidas — sin este chequeo,
+      // cada tick limpiaba el canvas a negro y esperaba el próximo frame del
+      // draw loop para repintar, lo que se veía como un parpadeo negro.
+      const sizeChanged = canvas.width !== w || canvas.height !== h;
+      if (sizeChanged) {
+        canvas.width = w;
+        canvas.height = h;
+      }
       renderScaleRef.current = container.clientWidth
         ? w / container.clientWidth
         : 1;
@@ -309,6 +318,11 @@ export function useTileCanvasEngine<
       // recentraba el mapa de golpe.
       if (!hasCenteredRef.current || !hadValidSize) {
         centerImage();
+      } else if (sizeChanged) {
+        // El resize sí borró el bitmap (cambió el tamaño real) — pedimos
+        // un repintado inmediato en vez de esperar a que el draw loop lo
+        // note en su propio rAF, para no dejar ni un frame en negro.
+        markDirty();
       }
     };
     apply();
