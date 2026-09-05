@@ -18,7 +18,7 @@
  * edición), que sí necesitan decidir cosas distintas según el modo.
  */
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import type { BaseArea, BaseMarker, BaseTile, WorldPoint } from "./UnifiedTileCanvas";
 
@@ -128,6 +128,29 @@ export function useTileCanvasEngine<
     tile: TTile;
   } | null>(null);
 
+  // ── Identidad estable por CONTENIDO (no por referencia) ───────────────────
+  // tiles/markers/hiddenMarkers llegan como arrays nuevos en cada render del
+  // consumidor (ej. mapaGarlia.tsx arma `markers={[...visibleMarkers, ...]}`
+  // inline, sin useMemo). Si algún efecto de acá abajo los usa tal cual como
+  // dependencia, un simple re-render del padre (ej. al abrir el panel de un
+  // reino) alcanza para "cambiar" la dependencia aunque el contenido sea
+  // idéntico, reiniciando ese efecto de la nada. Estas claves de texto
+  // representan el contenido real, así que solo cambian cuando los datos
+  // efectivamente cambian — mismo patrón que ya se usaba para el efecto de
+  // composición de tiles, ahora aplicado también al resto.
+  const tilesKey = useMemo(
+    () => tiles.map((t) => `${t.col}:${t.row}:${t.image_url}`).join("|"),
+    [tiles],
+  );
+  const markersKey = useMemo(
+    () => markers.map((m) => JSON.stringify(m)).join("|"),
+    [markers],
+  );
+  const hiddenMarkersKey = useMemo(
+    () => hiddenMarkers.map((m) => JSON.stringify(m)).join("|"),
+    [hiddenMarkers],
+  );
+
   // ── Dimensiones del canvas virtual ────────────────────────────────────────
   const minCol = tiles.length > 0 ? Math.min(...tiles.map((t) => t.col)) : 0;
   const minRow = tiles.length > 0 ? Math.min(...tiles.map((t) => t.row)) : 0;
@@ -214,12 +237,7 @@ export function useTileCanvasEngine<
       img.onerror = onDone;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    tiles.map((t) => `${t.col}:${t.row}:${t.image_url}`).join("|"),
-    tileSize,
-    totalW,
-    totalH,
-  ]);
+  }, [tilesKey, tileSize, totalW, totalH]);
 
   // ── Centrar al cargar ─────────────────────────────────────────────────────
   const hasCenteredRef = useRef(false);
@@ -403,7 +421,8 @@ export function useTileCanvasEngine<
   const findTileAt = useCallback(
     (col: number, row: number) =>
       tiles.find((t) => t.col === col && t.row === row) ?? null,
-    [tiles],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tilesKey],
   );
 
   // Convierte un WorldPoint a "unidades de tile" continuas (col + x/100),
@@ -550,13 +569,15 @@ export function useTileCanvasEngine<
       };
     }
     markDirty();
-  }, [editMode, tiles, markDirty]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editMode, tilesKey, markDirty]);
 
   // Invalidar caché de labels cuando cambian los markers
   useEffect(() => {
     labelCacheRef.current.clear();
     markDirty();
-  }, [markers, hiddenMarkers, markDirty]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [markersKey, hiddenMarkersKey, markDirty]);
 
   // Redibujar cuando cambian las áreas o la selección/herramienta de dibujo
   useEffect(() => {
@@ -917,9 +938,9 @@ export function useTileCanvasEngine<
     editMode,
     fondoColor,
     selectedMarkerId,
-    markers,
-    hiddenMarkers,
-    tiles,
+    markersKey,
+    hiddenMarkersKey,
+    tilesKey,
     totalW,
     totalH,
     tileSize,
