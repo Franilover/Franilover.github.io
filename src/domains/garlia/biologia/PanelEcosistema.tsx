@@ -26,7 +26,7 @@ import { useReinosMin } from "@/domains/garlia/reinos/useReinosMin";
 import { useCriaturasCatalogoMin } from "@/domains/garlia/runas/useCriaturasCatalogoMin";
 
 import { SelectorCriaturasMulti } from "./SelectorCriaturasMulti";
-import { useBiomas } from "./useBiologia";
+import { useBiomas, useEcosistemaCriaturas } from "./useBiologia";
 import {
   ROL_TROFICO_LABEL,
   ROLES_TROFICOS,
@@ -265,7 +265,11 @@ export function PanelEcosistema({
   // Reino no vive en el ecosistema directamente: se deriva del bioma_id
   // (bioma.reino_ids), y esta sección solo lo muestra como referencia
   // navegable — no es editable desde acá (se edita en el Bioma).
-  const criaturaIds = ecosistema.criatura_ids ?? [];
+  // Ruta canónica v226: la pertenencia de criaturas a este ecosistema vive
+  // en la tabla puente ecosistema_criaturas, no en una columna embebida.
+  const { criaturaIdsDe, asignar: asignarCriaturaAEcosistema, desasignar: desasignarCriaturaDeEcosistema } =
+    useEcosistemaCriaturas();
+  const criaturaIds = criaturaIdsDe(ecosistema.id);
   const floraIds = ecosistema.flora_ids ?? [];
   const mineralIds = ecosistema.mineral_ids ?? [];
 
@@ -284,11 +288,9 @@ export function PanelEcosistema({
   );
 
   const handleToggleCriatura = (id: string, add: boolean) =>
-    onSave({
-      criatura_ids: add
-        ? [...criaturaIds, id]
-        : criaturaIds.filter((x) => x !== id),
-    });
+    add
+      ? asignarCriaturaAEcosistema(id, ecosistema.id)
+      : desasignarCriaturaDeEcosistema(id, ecosistema.id);
   const handleToggleFlora = (id: string, add: boolean) =>
     onSave({
       flora_ids: add ? [...floraIds, id] : floraIds.filter((x) => x !== id),
@@ -570,8 +572,17 @@ export function PanelEcosistema({
 
           <div className="mb-4">
             <SelectorCriaturasMulti
-              ids={ecosistema.criatura_ids ?? []}
-              onChange={(ids) => onSave({ criatura_ids: ids })}
+              ids={criaturaIds}
+              onChange={(nuevosIds) => {
+                const anteriores = new Set(criaturaIds);
+                const siguientes = new Set(nuevosIds);
+                for (const id of nuevosIds) {
+                  if (!anteriores.has(id)) asignarCriaturaAEcosistema(id, ecosistema.id);
+                }
+                for (const id of criaturaIds) {
+                  if (!siguientes.has(id)) desasignarCriaturaDeEcosistema(id, ecosistema.id);
+                }
+              }}
               onSelectCriatura={onSelectCriatura}
               label="Criaturas que lo habitan"
             />

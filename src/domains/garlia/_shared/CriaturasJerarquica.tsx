@@ -22,7 +22,8 @@
  * grilla de personajes tal cual antes.
  *
  * Relaciones usadas:
- *  - Ecosistema.criatura_ids → agrupa criaturas bajo cada ecosistema que
+ *  - Tabla puente ecosistema_criaturas (ruta canónica v226, ver prop
+ *    criaturaIdsDeEcosistema) → agrupa criaturas bajo cada ecosistema que
  *    las contiene. Una criatura sin ecosistema, o cuyo ecosistema no está
  *    en la lista, cae en el bloque "Sin ecosistema".
  *  - Ecosistema.flora_ids / mineral_ids → se muestran como chips dentro de
@@ -72,7 +73,6 @@ interface Personaje {
 interface Ecosistema {
   id: string;
   nombre: string;
-  criatura_ids: string[];
   /** Flora presente en este ecosistema — opcional para no romper usos previos. */
   flora_ids?: string[];
   /** Minerales presentes en este ecosistema — opcional idem. */
@@ -96,6 +96,11 @@ interface Props {
   /** Ecosistemas — agrupan criaturas por encima de ellas (Ecosistema →
    *  Criatura → Personajes), opcional para no romper usos previos. */
   ecosistemas?: Ecosistema[];
+  /** Resuelve los ids de criatura que habitan un ecosistema dado — ruta
+   *  canónica v226 vía la tabla puente ecosistema_criaturas (ya no vive en
+   *  Ecosistema.criatura_ids, columna retirada). Si no se pasa, se asume
+   *  que ningún ecosistema tiene criaturas asignadas. */
+  criaturaIdsDeEcosistema?: (ecosistemaId: string) => string[];
   /** Biomas — nivel jerárquico por encima de Ecosistema (Bioma → Ecosistema
    *  → Criatura → Personajes), opcional idem. Solo se usa en modo "ojo
    *  apagado"; en modo "ojo prendido" no aplica (vista plana por especie). */
@@ -120,8 +125,9 @@ interface Props {
   creatingCriatura?: boolean;
   /** Asigna una criatura a un ecosistema (arrastre por click derecho de un
    *  chip de criatura sobre una card de ecosistema, modo "ojo apagado") —
-   *  agrega el id de la criatura a Ecosistema.criatura_ids. Si el elemento
-   *  no acepta esta prop, los chips de criatura no son arrastrables. */
+   *  crea la fila correspondiente en la tabla puente ecosistema_criaturas.
+   *  Si el elemento no acepta esta prop, los chips de criatura no son
+   *  arrastrables. */
   onAsignarCriaturaAEcosistema?: (criaturaId: string, ecosistemaId: string) => void;
   /** Mueve un ecosistema a otro bioma (arrastre por click derecho de una
    *  card/chip de ecosistema sobre el título de un bioma, mismo criterio
@@ -450,6 +456,7 @@ export function CriaturasJerarquica({
   criaturas,
   personajes,
   ecosistemas = [],
+  criaturaIdsDeEcosistema = () => [],
   biomas = [],
   flora = [],
   minerales = [],
@@ -563,13 +570,14 @@ export function CriaturasJerarquica({
   const personajesDe = (criaturaNombre: string) =>
     personajes.filter((p) => p.especie === criaturaNombre);
 
-  // Criaturas agrupadas por ecosistema (Ecosistema.criatura_ids → criatura).
-  const criaturasDe = (ecosistemaId: string) =>
-    criaturasBase
-      .filter((c) =>
-        ecosistemas.find((e) => e.id === ecosistemaId)?.criatura_ids.includes(c.id),
-      )
+  // Criaturas agrupadas por ecosistema, vía tabla puente ecosistema_criaturas
+  // (ruta canónica v226 — reemplaza la antigua Ecosistema.criatura_ids).
+  const criaturasDe = (ecosistemaId: string) => {
+    const ids = new Set(criaturaIdsDeEcosistema(ecosistemaId));
+    return criaturasBase
+      .filter((c) => ids.has(c.id))
       .sort((a, b) => personajesDe(b.nombre).length - personajesDe(a.nombre).length);
+  };
 
   // Flora / Minerales del ecosistema — solo lectura acá, edición vive en
   // PanelEcosistema. Mismo patrón que criaturasDe pero resolviendo contra
@@ -597,9 +605,10 @@ export function CriaturasJerarquica({
     ? mineralesSinEcosistemaBase.filter((m) => m.nombre?.toLocaleLowerCase("es").includes(qCriatura))
     : mineralesSinEcosistemaBase;
 
-  // Una criatura "tiene ecosistema" si algún ecosistema de la base la lista.
+  // Una criatura "tiene ecosistema" si algún ecosistema de la base la lista
+  // en la tabla puente ecosistema_criaturas.
   const criaturaTieneEcosistema = (criaturaId: string) =>
-    ecosistemas.some((e) => e.criatura_ids.includes(criaturaId));
+    ecosistemas.some((e) => criaturaIdsDeEcosistema(e.id).includes(criaturaId));
 
   // La búsqueda matchea ecosistema, cualquiera de sus criaturas, o
   // cualquiera de sus personajes — se muestra el ecosistema completo.

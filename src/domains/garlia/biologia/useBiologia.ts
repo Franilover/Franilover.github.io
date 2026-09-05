@@ -17,7 +17,7 @@
  * consumidores (BiologiaPage, CladisticaPage, etc.).
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useSupabaseData } from "@/infra/sync/useSupabaseData";
 import { supabase } from "@/infra/supabase/supabase";
@@ -30,6 +30,7 @@ import {
   type Clado,
   type CladoInput,
   type Ecosistema,
+  type EcosistemaCriatura,
   type EcosistemaInput,
   type PerfilAtomicoCriatura,
   type PerfilAtomicoCriaturaInput,
@@ -144,7 +145,6 @@ export function useEcosistemas() {
         bioma_id: null,
         clima: "",
         descripcion: "",
-        criatura_ids: [],
         flora_ids: [],
         mineral_ids: [],
       });
@@ -175,6 +175,104 @@ export function useEcosistemas() {
     crear,
     actualizar,
     eliminar,
+  };
+}
+
+// ─── Ecosistema ↔ Criatura (tabla puente, ruta canónica v226) ─────────────
+// Reemplaza la antigua ecosistemas.criatura_ids. No usa useSupabaseData (sin
+// caché offline por ahora) porque es una tabla puente pura sin PK propia
+// simple ni "orden" — se lee/escribe directo contra Supabase, mismo patrón
+// que useEntidadesDeCriatura.ts.
+
+export function useEcosistemaCriaturas() {
+  // No usa useSupabaseData: esa tabla puente tiene PK compuesta
+  // (ecosistema_id, criatura_id), sin columna id/orden — fetch propio.
+  const [filas, setData] = useState<EcosistemaCriatura[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("ecosistema_criaturas")
+        .select("ecosistema_id, criatura_id, rol, abundancia");
+      if (!cancelado) {
+        setData((data as EcosistemaCriatura[]) ?? []);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  /** Ids de criatura que habitan un ecosistema dado. */
+  const criaturaIdsDe = useCallback(
+    (ecosistemaId: string) =>
+      filas.filter((f) => f.ecosistema_id === ecosistemaId).map((f) => f.criatura_id),
+    [filas],
+  );
+
+  /** true si alguna fila liga esta criatura a algún ecosistema. */
+  const tieneEcosistema = useCallback(
+    (criaturaId: string) => filas.some((f) => f.criatura_id === criaturaId),
+    [filas],
+  );
+
+  /** Liga una criatura a un ecosistema (no-op si ya existe la fila). */
+  const asignar = useCallback(
+    async (criaturaId: string, ecosistemaId: string) => {
+      if (filas.some((f) => f.ecosistema_id === ecosistemaId && f.criatura_id === criaturaId)) {
+        return;
+      }
+      const fila: EcosistemaCriatura = {
+        ecosistema_id: ecosistemaId,
+        criatura_id: criaturaId,
+        rol: null,
+        abundancia: null,
+      };
+      setData((prev) => [...prev, fila]);
+      const { error } = await supabase.from("ecosistema_criaturas").insert(fila);
+      if (error) {
+        // revertir el optimista si falló la escritura
+        setData((prev) =>
+          prev.filter(
+            (f) => !(f.ecosistema_id === ecosistemaId && f.criatura_id === criaturaId),
+          ),
+        );
+      }
+    },
+    [filas, setData],
+  );
+
+  /** Quita el vínculo entre una criatura y un ecosistema. */
+  const desasignar = useCallback(
+    async (criaturaId: string, ecosistemaId: string) => {
+      const anterior = filas;
+      setData((prev) =>
+        prev.filter(
+          (f) => !(f.ecosistema_id === ecosistemaId && f.criatura_id === criaturaId),
+        ),
+      );
+      const { error } = await supabase
+        .from("ecosistema_criaturas")
+        .delete()
+        .eq("ecosistema_id", ecosistemaId)
+        .eq("criatura_id", criaturaId);
+      if (error) setData(anterior);
+    },
+    [filas, setData],
+  );
+
+  return {
+    ecosistemaCriaturas: filas,
+    setEcosistemaCriaturas: setData,
+    loading,
+    criaturaIdsDe,
+    tieneEcosistema,
+    asignar,
+    desasignar,
   };
 }
 

@@ -40,7 +40,7 @@ import { supabase } from "@/infra/supabase/supabase";
 import { CriaturaEditor } from "@/domains/garlia/criaturas/CriaturaEditor";
 import { EcosistemaEditor } from "@/domains/garlia/biologia/EcosistemaEditor";
 import { BiomaEditor } from "@/domains/garlia/biologia/BiomaEditor";
-import { useEcosistemas, useBiomas } from "@/domains/garlia/biologia/useBiologia";
+import { useEcosistemas, useEcosistemaCriaturas, useBiomas } from "@/domains/garlia/biologia/useBiologia";
 import { FloraEditor } from "@/domains/garlia/flora/FloraEditor";
 import { useFlora } from "@/domains/garlia/flora/useFlora";
 import { MineralEditor } from "@/domains/garlia/minerales/MineralEditor";
@@ -149,6 +149,10 @@ export function EntidadesPage({ section, selectedId }: Props) {
   const { data: items, loading: loadingI, addRow: addItem, updateRow: updateItem } =
     useSupabaseData<Item>("items");
   const { ecosistemas, loading: loadingEco, creating: creatingEco, crear: crearEcosistema, actualizar: actualizarEcosistema } = useEcosistemas();
+  // Ruta canónica v226: pertenencia Ecosistema↔Criatura vía tabla puente,
+  // ya no vive en ecosistemas.criatura_ids (columna retirada).
+  const { criaturaIdsDe: criaturaIdsDeEcosistema, asignar: asignarCriaturaAEcosistemaBridge } =
+    useEcosistemaCriaturas();
   const { biomas, loading: loadingBiomas, creating: creatingBiomas, crear: crearBioma, actualizar: actualizarBioma } = useBiomas();
   const { flora, loading: loadingFlora, creating: creatingFlora, crear: crearFlora } = useFlora();
   const { minerales, loading: loadingMinerales, creating: creatingMinerales, crear: crearMineral } = useMinerales();
@@ -1023,6 +1027,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
           criaturas={criaturas}
           personajes={personajes}
           ecosistemas={ecosistemas}
+          criaturaIdsDeEcosistema={criaturaIdsDeEcosistema}
           biomas={biomas}
           flora={flora}
           minerales={minerales}
@@ -1074,11 +1079,7 @@ export function EntidadesPage({ section, selectedId }: Props) {
             if (data?.id) abrirPanel("personaje", data.id);
           }}
           onAsignarCriaturaAEcosistema={async (criaturaId, ecosistemaId) => {
-            const eco = ecosistemas.find((e) => e.id === ecosistemaId);
-            if (!eco || eco.criatura_ids.includes(criaturaId)) return;
-            await actualizarEcosistema(eco.id, {
-              criatura_ids: [...eco.criatura_ids, criaturaId],
-            });
+            await asignarCriaturaAEcosistemaBridge(criaturaId, ecosistemaId);
           }}
           onAsignarEcosistemaABioma={async (ecosistemaId, biomaId) => {
             await actualizarEcosistema(ecosistemaId, { bioma_id: biomaId || null });

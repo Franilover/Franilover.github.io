@@ -10,8 +10,9 @@
  *   - Flora / Minerales: NO tienen columna directa a criatura_id — viven en
  *     `Ecosistema.flora_ids` / `Ecosistema.mineral_ids` (jsonb). Se muestran
  *     acá, al mismo nivel que Items, la Flora/Minerales de todo Ecosistema
- *     cuyo `criatura_ids` incluya a esta criatura (solo lectura — la edición
- *     del vínculo vive en PanelEcosistema).
+ *     ligado a esta criatura vía la tabla puente `ecosistema_criaturas`
+ *     (ruta canónica v226; solo lectura acá — la edición del vínculo vive
+ *     en PanelEcosistema).
  *
  * Ruta destino:
  *   src/features/editorGarlia/hooks/criaturas/useEntidadesDeCriatura.ts
@@ -47,18 +48,24 @@ export function useEntidadesDeCriatura(criaturaId: string) {
     }
     setLoading(true);
     try {
-      const [{ data: items }, { data: ecosistemas }] = await Promise.all([
+      const [{ data: items }, { data: vinculos }] = await Promise.all([
         supabase
           .from("items")
           .select("id, nombre, imagen_url")
           .eq("criatura_id", criaturaId)
           .order("nombre"),
-        // criatura_ids es jsonb array — contains busca por pertenencia.
+        // Ruta canónica v226: ecosistema_criaturas es la tabla puente que
+        // liga esta criatura a sus ecosistemas.
         supabase
-          .from("ecosistemas")
-          .select("flora_ids, mineral_ids")
-          .contains("criatura_ids", JSON.stringify([criaturaId])),
+          .from("ecosistema_criaturas")
+          .select("ecosistema_id")
+          .eq("criatura_id", criaturaId),
       ]);
+
+      const ecosistemaIds = (vinculos ?? []).map((v: any) => v.ecosistema_id as string);
+      const { data: ecosistemas } = ecosistemaIds.length
+        ? await supabase.from("ecosistemas").select("flora_ids, mineral_ids").in("id", ecosistemaIds)
+        : { data: [] as { flora_ids: string[]; mineral_ids: string[] }[] };
 
       const floraIds = Array.from(
         new Set((ecosistemas ?? []).flatMap((e: any) => (e.flora_ids ?? []) as string[])),

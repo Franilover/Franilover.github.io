@@ -99,7 +99,6 @@ export interface Ecosistema {
   bioma_id: string | null;
   clima: string;
   descripcion: string;
-  criatura_ids: string[];
   /** Flora (por id) que crece/habita en este ecosistema. */
   flora_ids: string[];
   /** Minerales (por id) presentes como recursos de este ecosistema. */
@@ -112,9 +111,25 @@ export interface Ecosistema {
 export type EcosistemaInput = Partial<
   Pick<
     Ecosistema,
-    "nombre" | "bioma_id" | "clima" | "descripcion" | "criatura_ids" | "flora_ids" | "mineral_ids" | "orden"
+    "nombre" | "bioma_id" | "clima" | "descripcion" | "flora_ids" | "mineral_ids" | "orden"
   >
 >;
+
+// ─── Ecosistema ↔ Criatura (tabla puente) ──────────────────────────────────
+// Ruta canónica (migración v226) para la relación M:N entre Ecosistema y
+// Criatura — reemplaza la antigua columna embebida `ecosistemas.criatura_ids`
+// (retirada por duplicar la misma relación). Vive en la tabla
+// "ecosistema_criaturas", con atributos propios de la asociación.
+
+/** Fila cruda tal cual vive en Supabase (tabla "ecosistema_criaturas"). */
+export interface EcosistemaCriatura {
+  ecosistema_id: string;
+  criatura_id: string;
+  /** Rol de la criatura dentro de ese ecosistema — semántica libre. */
+  rol: string | null;
+  /** Abundancia de la criatura dentro de ese ecosistema — semántica libre. */
+  abundancia: string | null;
+}
 
 // ─── Cadenas alimenticias ───────────────────────────────────────────────────
 
