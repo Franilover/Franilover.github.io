@@ -1,8 +1,32 @@
 "use client";
 
 /**
- * ReinoTileCanvas
- * ───────────────
+ * ⚠️ DESACTIVADO — sin ningún consumidor en el flujo actual (2026-09).
+ * ───────────────────────────────────────────────────────────────────
+ * Este componente quedó desactualizado frente al mapa global de
+ * mapaGarlia.tsx (UnifiedTileCanvas): no tiene, entre otras cosas, el
+ * hit-test correcto para assets colocados (ver fix de findMarkerAt en
+ * useTileCanvasEngine.ts) ni la bifurcación de onMarkerContextMenu por
+ * asset-placement:. En vez de duplicar esos fixes acá también, se decidió
+ * desactivar por completo los dos lugares que lo usaban:
+ *   - reinos/public/mapaGarlia.tsx: renderizaba esto cuando
+ *     vistaActual === "reino" (el mapa propio de un reino individual).
+ *     abrirVistaDeReino ya no pasa cambiarVista:true en ningún call-site,
+ *     así que vistaActual nunca llega a valer "reino" — esa rama del JSX
+ *     quedó reemplazada por un comentario explicando esto mismo.
+ *   - reinos/components/EditorReino.tsx: lo pasaba como
+ *     MapaConPuntosComponent a LoreTab (mapa propio dentro del editor de
+ *     ficha de un reino). Ese prop es opcional en LoreTab, así que
+ *     simplemente se dejó de pasar.
+ *
+ * El archivo se conserva sin borrar por si hace falta revertir, pero no
+ * está enlazado desde ningún flujo real — reinos/index.ts todavía lo
+ * re-exporta, así que si algo nuevo lo importa, avisar antes de reactivarlo
+ * sin antes traerle los fixes de hit-test/context-menu del mapa global.
+ *
+ * Documentación original del componente (ya no aplica en ningún flujo
+ * activo, se conserva como referencia):
+ * ───────────────────────────────────────────────────────────────────
  * Mapa de tiles para un reino individual.
  *
  * Unifica "puntos de interés" (ciudades) y "tiles" en una sola superficie

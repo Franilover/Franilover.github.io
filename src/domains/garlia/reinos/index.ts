@@ -11,5 +11,9 @@ export { reinosQueries } from "./queries";
 export { useReinosMin } from "./useReinosMin";
 export { ReinoEditor } from "./components/ReinoEditor";
 export { EditorReino } from "./components/EditorReino";
+// ReinoTileCanvas quedó desactivado (ver nota al tope del archivo) — sin
+// consumidores en el flujo actual. Se sigue re-exportando para no romper
+// el export en caso de import externo directo, pero no usarlo sin antes
+// leer esa nota.
 export { ReinoTileCanvas, useReinoTiles, type ReinoTile } from "./components/ReinoTileCanvas";
 export type { Reino, ReinoMin } from "./types";

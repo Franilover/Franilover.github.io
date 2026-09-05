@@ -35,7 +35,6 @@ import {
 import { type Reino } from "../types";
 import { reinosQueries } from "../queries";
 import { LoreTab } from "./LoreTab";
-import { ReinoTileCanvas } from "./ReinoTileCanvas";
 
 // ─── Hook: ciudades del reino ─────────────────────────────────────────────────
 function useCiudadesDelReino(reinoId: string) {
@@ -202,15 +201,13 @@ export function EditorReino({
         {/* LoreTab — ocupa todo el espacio restante */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <LoreTab
-            MapaConPuntosComponent={(props) => (
-              <ReinoTileCanvas
-                detalles={props.detalles}
-                editMode={true}
-                reinoId={form.id}
-                onDetallesChange={props.onDetallesChange}
-                onPinClick={(ciudad) => onSelectCiudad?.(ciudad.id)}
-              />
-            )}
+            // MapaConPuntosComponent (mapa propio del reino, vía
+            // ReinoTileCanvas) desactivado: ReinoTileCanvas quedó
+            // desactualizado frente al mapa global de mapaGarlia.tsx y ya no
+            // se usa en ningún flujo — ver nota en reinos/components/
+            // ReinoTileCanvas.tsx. LoreTab soporta el prop como opcional,
+            // así que simplemente no se pasa; sin mapa propio, el reino se
+            // sigue viendo y editando desde el mapa global.
             detalles={detalles}
             entities={entities}
             form={form}

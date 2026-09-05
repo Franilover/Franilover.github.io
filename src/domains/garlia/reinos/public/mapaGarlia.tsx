@@ -28,7 +28,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 import { MotionDiv, MotionButton } from "@/ui/Motion";
 import { rutaLibro, rutaLeer } from "@/domains/garlia/libros/utils/rutas";
-import { ReinoTileCanvas } from "@garlia/reinos";
 import {
   UnifiedTileCanvas,
   type MapTile,
@@ -2150,11 +2149,9 @@ export default function MapaInteractivo({
     null,
   );
   const [reinoParaMover, setReinoParaMover] = useState<string | null>(null);
-  // Análogo a reinoParaMover pero para las ciudades DENTRO de un reino
-  // (ReinoTileCanvas) — separado de puntoSeleccionado (el punto abierto en
-  // el panel lateral) para que un click izquierdo normal con el panel
-  // abierto no mueva el pin sin que el usuario lo pida.
-  const [puntoParaMover, setPuntoParaMover] = useState<string | null>(null);
+  // (puntoParaMover, el análogo a reinoParaMover para ciudades DENTRO de un
+  // reino, se sacó junto con ReinoTileCanvas — ver nota en reinos/
+  // components/ReinoTileCanvas.tsx. Ya no tiene ningún consumidor.)
 
   const handleTileCreated = useCallback((tile: MapTile) => {
     setMapTiles((prev) => [...prev, tile]);
@@ -3056,10 +3053,13 @@ export default function MapaInteractivo({
           (r) => r.id === (reinoIdHint ?? data.reino_id),
         );
         if (!reino) return false;
-        // Deep-link explícito a una ciudad puntual: a diferencia del click
-        // casual sobre un reino, acá sí tiene sentido entrar a su mapa
-        // propio para ver la ciudad en su contexto (ReinoTileCanvas).
-        await abrirVistaDeReino(reino, null, { cambiarVista: true });
+        // Deep-link explícito a una ciudad puntual. Antes esto entraba al
+        // mapa propio del reino (cambiarVista:true, ReinoTileCanvas) para
+        // ver la ciudad en su contexto — ReinoTileCanvas quedó desactivado
+        // (ver nota en reinos/components/ReinoTileCanvas.tsx), así que ahora
+        // se queda en el default (false): abre el panel de info sobre el
+        // mapa global, igual que el click casual sobre un reino.
+        await abrirVistaDeReino(reino, null);
       }
 
       setPuntoSeleccionado(ciudad);
@@ -3131,10 +3131,12 @@ export default function MapaInteractivo({
   }, [reinos, isAdmin]);
 
   // ── initialEditReinoId: entrar directo en modo edición con un reino ──────
-  // puntual ya seleccionado, con su mapa propio abierto (ReinoTileCanvas).
-  // Es una entrada explícita (querystring/deep-link), no el click normal
-  // sobre un reino en el mapa global — por eso pasa cambiarVista:true en vez
-  // de depender del default (false) de abrirVistaDeReino.
+  // puntual ya seleccionado. Es una entrada explícita (querystring/deep-link),
+  // no el click normal sobre un reino en el mapa global. Antes pasaba
+  // cambiarVista:true para abrir su mapa propio (ReinoTileCanvas); ese canvas
+  // quedó desactivado (ver nota en reinos/components/ReinoTileCanvas.tsx), así
+  // que ahora se apoya en el default (false) de abrirVistaDeReino: entra en
+  // modo edición con el panel del reino abierto sobre el mapa global.
   const initialEditAppliedRef = useRef(false);
   useEffect(() => {
     if (initialEditAppliedRef.current) return;
@@ -3144,7 +3146,7 @@ export default function MapaInteractivo({
     if (!reino) return; // esperamos a que "reinos" cargue
     initialEditAppliedRef.current = true;
     setEditMode(true);
-    void abrirVistaDeReino(reino, null, { cambiarVista: true });
+    void abrirVistaDeReino(reino, null);
   }, [allowEdit, initialEditReinoId, isAdmin, reinos]);
 
   const abrirPanelFlotante = usePanelFlotante((s) => s.abrir);
@@ -3382,20 +3384,10 @@ export default function MapaInteractivo({
         )
       : areas;
 
-  // Áreas de las ciudades del reino actualmente abierto — mismo criterio
-  // que areasParaMostrar, pero filtradas por ciudad_id en vez de reino_id.
-  const ciudadIdsDelReino = new Set(detallesReino.map((c) => c.id));
-  const areasDelReino = areas.filter(
-    (a) => a.ciudad_id && ciudadIdsDelReino.has(a.ciudad_id),
-  );
-  const areasDelReinoParaMostrar =
-    !editMode && !isAdmin
-      ? areasDelReino.map((a) =>
-          a.ciudad_id && !ciudadesDesbloqueadas.has(a.ciudad_id)
-            ? { ...a, label: null }
-            : a,
-        )
-      : areasDelReino;
+  // (areasDelReinoParaMostrar / areasDelReino / ciudadIdsDelReino — áreas de
+  // las ciudades del reino abierto, mismo criterio que areasParaMostrar pero
+  // por ciudad_id — se sacaron junto con ReinoTileCanvas, su único
+  // consumidor. Ver nota en reinos/components/ReinoTileCanvas.tsx.)
 
   // hiddenMarkers: para usuarios son los marcadores no desbloqueados (se muestran en niebla)
   const hiddenMarkers =
@@ -3836,101 +3828,19 @@ export default function MapaInteractivo({
             )}
           </>
         ) : (
-          <ReinoTileCanvas
-            areas={areasDelReinoParaMostrar}
-            className="absolute inset-0"
-            detalles={
-              editMode ? [...visibleMarkers, ...hiddenMarkers] : visibleMarkers
-            }
-            drawTool={editMode ? drawTool : null}
-            editMode={editMode}
-            extraMarkers={editMode ? assetMarkers : []}
-            eyedropperActive={eyedropperActive}
-            fondoColor={fondoColor}
-            hiddenMarkers={editMode ? [] : hiddenMarkers}
-            isFirstOpen={isFirstOpen}
-            placingAssetId={editMode ? placingAssetId : null}
-            reinoId={reinoSeleccionado.id}
-            selectedAreaId={editMode ? selectedAreaId : null}
-            selectedMarkerId={
-              editMode
-                ? selectedPlacementId
-                  ? `asset-placement:${selectedPlacementId}`
-                  : puntoParaMover
-                : null
-            }
-            onAreaDrawEnd={handleAreaDrawEnd}
-            onMoveExtraMarker={(id, coord) =>
-              void moveAssetPlacement(
-                id.slice("asset-placement:".length),
-                coord,
-              )
-            }
-            onPlaceAsset={handlePlaceAsset}
-            onSelectExtraMarker={(id) => {
-              setSelectedPlacementId(id.slice("asset-placement:".length));
-              setPuntoParaMover(null);
-            }}
-            onAreaClick={(area) => {
-              // Ya estamos DENTRO de un reino: acá un área siempre es una
-              // ciudad de este mismo reino, nunca otro reino. Antes esto
-              // reusaba handleAreaLabelClick (pensado para el mapa global,
-              // donde área = reino) — pasaba por abrirVistaDeReino(reino),
-              // que resetea reinoSeleccionado/puntoSeleccionado y recarga
-              // todo desde cero antes de mostrar la ciudad. Eso generaba el
-              // frame intermedio "se abre el panel del reino, después la
-              // ciudad". Acá el click debe comportarse EXACTAMENTE como
-              // onPinClick: abrir directo la ciudad, sin reentrar al reino.
-              if (!area.ciudad_id) return;
-              // Mismo criterio que reinos (ver handleAreaLabelClick): una
-              // ciudad no desbloqueada no debe abrir su panel con el
-              // nombre real — el área ya se ve sin label (areasDelReino-
-              // ParaMostrar), pero sin este chequeo el click igual la
-              // abría, mostrando el nombre adentro del panel.
-              if (!isAdmin && !ciudadesDesbloqueadas.has(area.ciudad_id))
-                return;
-              const ciudad = detallesReino.find((d) => d.id === area.ciudad_id);
-              if (!ciudad) return;
-              setPuntoSeleccionado(ciudad);
-              setPanelOpen(true);
-            }}
-            onAreaPointsChange={handleAreaPointsChange}
-            onAreaSelect={setSelectedAreaId}
-            onDetallesChange={(nuevos) => {
-              setDetallesReino(nuevos);
-              // Marcamos como modificados los que cambiaron de posición, para
-              // que handleSaveChanges (línea ~2866) los incluya al guardar.
-              const cambiados = nuevos.filter((n) => {
-                const prev = detallesReino.find((d) => d.id === n.id);
-                return (
-                  prev &&
-                  (prev.coord_x !== n.coord_x ||
-                    prev.coord_y !== n.coord_y ||
-                    prev.tile_col !== n.tile_col ||
-                    prev.tile_row !== n.tile_row)
-                );
-              });
-              if (cambiados.length) {
-                setModifiedDetalles(
-                  (prev) => new Set([...prev, ...cambiados.map((c) => c.id)]),
-                );
-              }
-            }}
-            onEyedropperPick={handleFondoColorChange}
-            onMarkerContextMenu={(m) =>
-              setPuntoParaMover((prev) => (prev === m.id ? null : m.id))
-            }
-            onMarkerSelect={setPuntoParaMover}
-            onOpenPanel={
-              isMobile && (reinoSeleccionado || puntoSeleccionado)
-                ? () => setPanelOpen(true)
-                : undefined
-            }
-            onPinClick={(m) => {
-              setPuntoSeleccionado(m);
-              setPanelOpen(true);
-            }}
-          />
+          // Rama "vistaActual === 'reino'": inalcanzable en runtime.
+          // abrirVistaDeReino ya no llama setVistaActual("reino") en ningún
+          // call-site (cambiarVista siempre queda en el default false — ver
+          // comentarios en abrirVistaDeReino y en sus dos call-sites). El
+          // mapa propio de un reino (ReinoTileCanvas) quedó desactualizado
+          // frente a este mapa global y se desactivó por completo — ver
+          // nota al tope de reinos/components/ReinoTileCanvas.tsx. El JSX
+          // que renderizaba ese canvas (con toda su lógica de detalles/
+          // assets/áreas del reino) se sacó de acá junto con este cambio; si
+          // en algún momento vuelve a hacer falta un mapa propio por reino,
+          // conviene revisar primero si tiene sentido reconstruirlo desde
+          // cero en vez de reactivar este componente.
+          null
         )}
 
         {/* ── Panel de librería de assets / controles de la instancia ── */}
