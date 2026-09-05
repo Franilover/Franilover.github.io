@@ -275,13 +275,23 @@ export function useTileCanvasEngine<
     };
 
     const apply = () => {
+      const hadValidSize = canvas.width > 0 && canvas.height > 0;
       const { w, h } = capDims(container.clientWidth, container.clientHeight);
       canvas.width = w;
       canvas.height = h;
       renderScaleRef.current = container.clientWidth
         ? w / container.clientWidth
         : 1;
-      centerImage();
+      // Solo recentramos si todavía no nos centramos nunca, o si el canvas
+      // pasó de no tener tamaño real (0) a tenerlo (primer layout válido).
+      // Un resize del contenedor DESPUÉS de eso (ej. al abrir el panel
+      // lateral de un reino, que angosta el mapa) NO debe resetear el
+      // zoom/pan que el usuario ya tiene — antes centerImage() se llamaba
+      // siempre acá y cualquier resize (incluido el de abrir el panel)
+      // recentraba el mapa de golpe.
+      if (!hasCenteredRef.current || !hadValidSize) {
+        centerImage();
+      }
     };
     apply();
 
