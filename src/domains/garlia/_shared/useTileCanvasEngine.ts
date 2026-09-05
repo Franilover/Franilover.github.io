@@ -20,7 +20,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
-import type { BaseArea, BaseMarker, BaseTile, WorldPoint } from "./UnifiedTileCanvas";
+import type { BaseArea, BaseMarker, BaseTile, BaseTileTerrain, WorldPoint } from "./UnifiedTileCanvas";
+import { TERRAIN_CHAR_TO_COLOR, TERRAIN_COLOR_HEX, TILE_TERRAIN_GRID_SIZE } from "./UnifiedTileCanvas";
 
 export interface TileCanvasEngineOptions<
   TTile extends BaseTile,
@@ -48,6 +49,9 @@ export interface TileCanvasEngineOptions<
   hoverTile: TTile | null;
   /** Casilla fantasma bajo el cursor. Igual, lo decide el consumidor de edición. */
   ghostHover: { col: number; row: number } | null;
+  /** Terreno decorativo (verde/azul/café/etc.) — uno por tile. Puramente
+   * visual: se dibuja acá pero nunca participa de findMarkerAt/isPointInArea. */
+  terrain?: BaseTileTerrain[];
 }
 
 export function useTileCanvasEngine<
@@ -69,6 +73,7 @@ export function useTileCanvasEngine<
     drawCursorRef,
     hoverTile,
     ghostHover,
+    terrain = [],
   } = opts;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -639,6 +644,14 @@ export function useTileCanvasEngine<
   useEffect(() => {
     markDirty();
   }, [areas, selectedAreaId, drawTool, markDirty]);
+
+  // Redibujar cuando cambia el terreno guardado (ej. tras recargar de
+  // Supabase, o cuando el consumidor actualiza su estado post-guardado).
+  // Durante el pintado activo, quien pinta ya llama markDirty() directo en
+  // cada celda — esto cubre los demás casos (carga inicial, guardado, etc).
+  useEffect(() => {
+    markDirty();
+  }, [terrain, markDirty]);
 
   // ── Draw loop ────────────────────────────────────────────────────────────
   useEffect(() => {

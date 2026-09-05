@@ -94,6 +94,54 @@ export type BaseArea = {
 /** Herramienta de dibujo activa. null = no se está dibujando nada. */
 export type DrawTool = "circulo" | "rectangulo" | "poligono" | null;
 
+// ─── Terreno decorativo (capa de pintura sobre tiles) ────────────────────────
+/** Paleta inicial fija — el color es el propio valor guardado en cada celda
+ * de la sub-grilla (ver TILE_TERRAIN_GRID_SIZE), así que agregar un color acá
+ * no requiere ninguna migración: solo hay que sumar la entrada a esta lista
+ * y al mapa TERRAIN_COLOR_HEX de abajo. */
+export type TerrainColor = "verde" | "azul" | "cafe";
+
+export const TERRAIN_COLORS: TerrainColor[] = ["verde", "azul", "cafe"];
+
+/** Un char por color, usado para codificar la sub-grilla como string plano
+ * (ver BaseTileTerrain.grid_data). ' ' (espacio) siempre significa "celda
+ * sin pintar" — nunca reasignar ese char a un color. */
+export const TERRAIN_COLOR_CHAR: Record<TerrainColor, string> = {
+  verde: "g",
+  azul: "a",
+  cafe: "c",
+};
+
+export const TERRAIN_CHAR_TO_COLOR: Record<string, TerrainColor> = {
+  g: "verde",
+  a: "azul",
+  c: "cafe",
+};
+
+export const TERRAIN_COLOR_HEX: Record<TerrainColor, string> = {
+  verde: "#4a7c3f",
+  azul: "#3f6a8c",
+  cafe: "#6b5138",
+};
+
+/** Resolución de la sub-grilla dentro de un tile (16x16 = 256 celdas). Debe
+ * coincidir con el char_length(grid_data) = 256 de la migración de
+ * map_tile_terrain — si esto cambia, hace falta una migración de datos. */
+export const TILE_TERRAIN_GRID_SIZE = 16;
+
+/** Herramienta de terreno activa: pintar un color específico, o "borrador"
+ * para volver celdas a "sin pintar". null = la herramienta no está activa
+ * (el click/drag no pinta nada). */
+export type TerrainTool = TerrainColor | "borrador" | null;
+
+/** Terreno de un tile, tal como se persiste en map_tile_terrain — 1:1 con
+ * BaseTile por tile_id. grid_data es un string de TILE_TERRAIN_GRID_SIZE²
+ * caracteres, fila por fila (índice = row*16+col dentro del tile). */
+export type BaseTileTerrain = {
+  tile_id: string;
+  grid_data: string;
+};
+
 interface UnifiedTileCanvasProps<
   TTile extends BaseTile,
   TMarker extends BaseMarker,
@@ -163,6 +211,27 @@ interface UnifiedTileCanvasProps<
     coord: { x: number; y: number; tile_col: number; tile_row: number },
   ) => void;
 
+  // ── Terreno decorativo (verde/azul/café/etc. pintado sobre tiles) ────────
+  /** Terreno ya guardado, uno por tile (map_tile_terrain) — se dibuja
+   * siempre (editMode o no), igual que áreas y tiles. */
+  terrain?: BaseTileTerrain[];
+  /** Herramienta de terreno activa: color a pintar, o "borrador". Mientras
+   * no sea null, click/arrastre sobre un tile pinta esa/s celda/s en vez de
+   * hacer cualquier otra cosa (seleccionar pin, abrir picker, etc.) —
+   * prioridad análoga a drawTool, pero de pintado continuo en vez de
+   * figura única. */
+  terrainTool?: TerrainTool;
+  /** Se llama con el estado COMPLETO de la sub-grilla de un tile cada vez
+   * que una celda cambia mientras se pinta (in-memory, sin golpear
+   * Supabase) — el consumidor decide cuándo persistir (ver
+   * onTerrainStrokeEnd, que sí debe persistir). */
+  onTerrainChange?: (tileId: string, gridData: string) => void;
+  /** Se llama una única vez al soltar el mouse tras un trazo de pintado
+   * (aunque el trazo haya tocado varios tiles) — este es el momento de
+   * persistir a Supabase, no onTerrainChange (que puede dispararse decenas
+   * de veces por segundo mientras se arrastra). */
+  onTerrainStrokeEnd?: (tileIds: string[]) => void;
+
   className?: string;
 }
 
@@ -198,6 +267,10 @@ export function UnifiedTileCanvas<
   onAreaClick,
   placingAssetId = null,
   onPlaceAsset,
+  terrain = [],
+  terrainTool = null,
+  onTerrainChange,
+  onTerrainStrokeEnd,
   className,
 }: UnifiedTileCanvasProps<TTile, TMarker>) {
   // ── Estado de edición (hover/drawing/drawCursor) vive en refs que se
@@ -229,6 +302,7 @@ export function UnifiedTileCanvas<
     drawCursorRef,
     hoverTile,
     ghostHover,
+    terrain,
   });
   const { canvasRef, containerRef, zoomIn, zoomOut } = engine;
 
@@ -257,6 +331,10 @@ export function UnifiedTileCanvas<
     onAreaPointsChange,
     placingAssetId,
     onPlaceAsset,
+    terrain,
+    terrainTool,
+    onTerrainChange,
+    onTerrainStrokeEnd,
     // Sink compartido: editing escribe acá, engine lee de acá.
     hoverState: [hoverTile, setHoverTile],
     ghostHoverState: [ghostHover, setGhostHover],
@@ -284,7 +362,7 @@ export function UnifiedTileCanvas<
       style={{
         cursor: eyedropperActive
           ? "crosshair"
-          : drawTool || placingAssetId
+          : drawTool || placingAssetId || terrainTool
             ? "crosshair"
             : selectedMarkerId
               ? "crosshair"
@@ -373,6 +451,23 @@ export function UnifiedTileCanvas<
             {drawTool === "poligono"
               ? "Click para agregar vértices · Doble-click o Enter para cerrar · Esc para cancelar"
               : "Arrastrá para dibujar el área"}
+          </span>
+        </div>
+      )}
+
+      {/* Hint de modo "pintar terreno" */}
+      {editMode && terrainTool && !placingAssetId && !drawTool && (
+        <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
+          <span
+            className="text-micro font-bold uppercase tracking-widest px-2 py-1 rounded-lg"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 85%, transparent)",
+              color: "#fff",
+            }}
+          >
+            {terrainTool === "borrador"
+              ? "Arrastrá para borrar terreno · Click pinta el tile entero"
+              : "Arrastrá para pintar terreno · Click pinta el tile entero"}
           </span>
         </div>
       )}
