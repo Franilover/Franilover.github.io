@@ -415,8 +415,25 @@ export function useTileCanvasEngine<
     return { col, row, x: (ux - col) * 100, y: (uy - row) * 100 };
   }, []);
 
+  // Mismo umbral que el draw loop (ver CIUDAD_ZOOM_CERCANO_TS reusada más
+  // abajo): una ciudad que no se está dibujando (de lejos, fuera de
+  // editMode) no debe registrar hits — sin esto, un click en esa zona
+  // "atravesaría" al reino de abajo pero en realidad activaría un área
+  // invisible.
+  const CIUDAD_ZOOM_CERCANO_TS = 420;
+  const isCiudadVisibleParaHit = useCallback(
+    (area: BaseArea): boolean => {
+      if (!area.ciudad_id) return true; // no es ciudad, no aplica este filtro
+      const ts = tileSize * camRef.current.scale;
+      if (ts > CIUDAD_ZOOM_CERCANO_TS) return true; // zoom cercano: visible y clickeable
+      return editMode; // lejos: solo clickeable en editMode (borde tenue)
+    },
+    [tileSize, editMode],
+  );
+
   const isPointInArea = useCallback(
     (wp: WorldPoint, area: BaseArea): boolean => {
+      if (!isCiudadVisibleParaHit(area)) return false;
       const p = toTileUnits(wp);
       if (area.tipo === "circulo" && area.puntos.length >= 2) {
         const c = toTileUnits(area.puntos[0]);
@@ -451,7 +468,7 @@ export function useTileCanvasEngine<
       }
       return false;
     },
-    [toTileUnits],
+    [toTileUnits, isCiudadVisibleParaHit],
   );
 
   const findMarkerAt = useCallback(
@@ -721,27 +738,43 @@ export function useTileCanvasEngine<
       // ciudad_id): por debajo, coloreada + nombre centrado, como siempre;
       // por encima (zoomeado adentro), el relleno estorba para ver el
       // territorio así que solo se marca el borde, con el nombre pegado a
-      // él en vez de tapando el centro. Las áreas de Ciudad no cambian —
-      // siempre coloreadas + nombre centrado, sin importar el zoom.
+      // él en vez de tapando el centro.
       const REINO_ZOOM_CERCANO_TS = 420;
       const zoomCercano = ts > REINO_ZOOM_CERCANO_TS;
 
+      // Umbral de zoom para áreas de Ciudad: de lejos no se muestran (ni
+      // relleno ni nombre) — a esa escala un puñado de ciudades por reino
+      // satura el mapa. Al acercarse (mismo umbral que el reino, ver
+      // CIUDAD_ZOOM_CERCANO_TS más arriba, reusada también dentro de
+      // isPointInArea para que dibujo y hit-testing nunca diverjan)
+      // aparecen coloreadas + nombre, igual que siempre. En editMode, de
+      // lejos se deja ver un borde tenue sin relleno ni label — sin eso el
+      // admin no tiene forma de ubicar/clickear una ciudad sin adivinar o
+      // zoomear a ciegas por todo el mapa.
+      const ciudadVisible = ts > CIUDAD_ZOOM_CERCANO_TS;
+
       for (const area of areas) {
+        const esCiudad = !!area.ciudad_id;
+        if (esCiudad && !ciudadVisible && !editMode) continue;
+
         const localPts = area.puntos.map((p) => worldToLocal(p, scale));
         const isSel = area.id === selectedAreaId;
         const baseColor = area.color || accent;
         const esReinoPuro = !!area.reino_id && !area.ciudad_id;
-        const soloBorde = esReinoPuro && zoomCercano;
+        const ciudadLejosEnEdicion = esCiudad && !ciudadVisible && editMode;
+        const soloBorde = (esReinoPuro && zoomCercano) || ciudadLejosEnEdicion;
 
         drawAreaShape(localPts, area.tipo);
         if (!soloBorde) {
           ctx.fillStyle = `${baseColor}${isSel ? "33" : "22"}`;
           ctx.fill();
         }
+        ctx.globalAlpha = ciudadLejosEnEdicion && !isSel ? 0.35 : 1;
         ctx.strokeStyle = isSel ? baseColor : `${baseColor}bb`;
         ctx.lineWidth = isSel ? 2.5 : soloBorde ? 2 : 1.5;
         if (area.tipo === "poligono") ctx.setLineDash([]);
         ctx.stroke();
+        ctx.globalAlpha = 1;
 
         // Vértices editables (solo en editMode + área seleccionada)
         if (editMode && isSel) {
@@ -756,11 +789,14 @@ export function useTileCanvasEngine<
           }
         }
 
-        // Label — centrado en la forma normalmente; en modo "solo borde"
-        // (reino con zoom cercano) se ancla al punto más alto del borde en
-        // vez de tapar el interior, ya que ahí no hay relleno que lo
-        // resalte del fondo del mapa.
-        if (area.label && localPts.length >= 2) {
+        // Label — centrado en la forma normalmente; en modo "solo borde" de
+        // un Reino con zoom cercano se ancla al punto más alto del borde en
+        // vez de tapar el interior (ahí no hay relleno que lo resalte del
+        // fondo). Una Ciudad lejos en editMode no muestra label en
+        // absoluto: el borde tenue solo sirve para ubicarla/clickearla, el
+        // nombre recién aparece al acercarse (mismo criterio que el resto
+        // de "ciudad visible").
+        if (area.label && localPts.length >= 2 && !ciudadLejosEnEdicion) {
           let lx: number, ly: number;
           if (soloBorde) {
             if (area.tipo === "circulo") {
