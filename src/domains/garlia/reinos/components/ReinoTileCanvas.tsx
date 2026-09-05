@@ -296,7 +296,13 @@ export function ReinoTileCanvas({
             }
             onPinClick?.(m);
           }}
-          onMarkerContextMenu={onMarkerContextMenuProp}
+          onMarkerContextMenu={(m: any) => {
+            if (typeof m.id === "string" && m.id.startsWith("asset-placement:")) {
+              onSelectExtraMarker?.(m.id);
+              return;
+            }
+            onMarkerContextMenuProp?.(m);
+          }}
           onMarkerMove={(markerId, coord) => {
             if (markerId.startsWith("asset-placement:")) {
               onMoveExtraMarker?.(markerId, coord);

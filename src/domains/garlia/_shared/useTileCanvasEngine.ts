@@ -542,6 +542,32 @@ export function useTileCanvasEngine<
       const allMarkers = editMode ? [...markers, ...hiddenMarkers] : markers;
       for (const m of [...allMarkers].reverse()) {
         const { mx, my } = getMarkerScreenPos(m, cx, cy, scale);
+        if (m.asset) {
+          // Hit-test contra el rectángulo real del asset (misma matemática
+          // que el draw loop: mx/my es el ancla, hay que retroceder hasta
+          // la esquina superior-izquierda y deshacer la rotación alrededor
+          // del ancla antes de comparar contra el rect en su propio espacio).
+          const asset = m.asset;
+          const drawW = asset.ancho_base * asset.escala * scale;
+          const drawH = asset.alto_base * asset.escala * scale;
+          let dx = px - mx;
+          let dy = py - my;
+          if (asset.rotacion) {
+            const rad = (-asset.rotacion * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            const rx = dx * cos - dy * sin;
+            const ry = dx * sin + dy * cos;
+            dx = rx;
+            dy = ry;
+          }
+          const localX = dx + asset.anchor_x * drawW;
+          const localY = dy + asset.anchor_y * drawH;
+          if (localX >= 0 && localX <= drawW && localY >= 0 && localY <= drawH) {
+            return m;
+          }
+          continue;
+        }
         if (Math.hypot(px - mx, py - my) < 12) return m;
       }
       return null;

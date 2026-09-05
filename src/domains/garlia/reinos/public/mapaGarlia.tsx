@@ -3760,7 +3760,17 @@ export default function MapaInteractivo({
                   }
                   void handleReinoClick(m);
                 }}
-                onMarkerContextMenu={handleReinoContextMenu}
+                onMarkerContextMenu={(m: any) => {
+                  if (typeof m.id === "string" && m.id.startsWith("asset-placement:")) {
+                    const placementId = m.id.slice("asset-placement:".length);
+                    setSelectedPlacementId((prev) =>
+                      prev === placementId ? null : placementId,
+                    );
+                    setReinoParaMover(null);
+                    return;
+                  }
+                  handleReinoContextMenu(m);
+                }}
                 onMarkerMove={(markerId, coord) => {
                   if (markerId.startsWith("asset-placement:")) {
                     void moveAssetPlacement(
