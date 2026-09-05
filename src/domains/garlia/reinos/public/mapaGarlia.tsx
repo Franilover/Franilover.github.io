@@ -177,7 +177,7 @@ function ModalNuevoTile({
 
         <h3
           className="font-black uppercase text-sm tracking-[0.15em]"
-          style={{ fontFamily: "'Cinzel', serif", color: "var(--foreground)" }}
+          style={{ fontFamily: "var(--font-cinzel), serif", color: "var(--foreground)" }}
         >
           Nuevo Tile
         </h3>
@@ -308,7 +308,7 @@ function ModalVincularArea({
 
         <h3
           className="font-black uppercase text-sm tracking-[0.15em]"
-          style={{ fontFamily: "'Cinzel', serif", color: "var(--foreground)" }}
+          style={{ fontFamily: "var(--font-cinzel), serif", color: "var(--foreground)" }}
         >
           Vincular área
         </h3>
@@ -593,7 +593,7 @@ function PanelContenido({
           </div>
           <input
             className="w-full bg-transparent font-bold text-2xl uppercase tracking-[0.18em] leading-none text-center outline-none"
-            style={{ fontFamily: "'Cinzel', serif", color: "var(--foreground)" }}
+            style={{ fontFamily: "var(--font-cinzel), serif", color: "var(--foreground)" }}
             type="text"
             value={
               puntoSeleccionado
@@ -1203,7 +1203,7 @@ function PanelContenido({
         </div>
         <h2
           className="font-bold text-2xl uppercase tracking-[0.18em] leading-none text-center"
-          style={{ fontFamily: "'Cinzel', serif", color: "var(--foreground)" }}
+          style={{ fontFamily: "var(--font-cinzel), serif", color: "var(--foreground)" }}
         >
           {puntoSeleccionado
             ? puntoSeleccionado.nombre
@@ -1695,7 +1695,7 @@ function PanelContenido({
                             className="text-sm font-bold uppercase leading-tight"
                             style={{
                               color: "var(--foreground)",
-                              fontFamily: "'Cinzel', serif",
+                              fontFamily: "var(--font-cinzel), serif",
                             }}
                           >
                             {libro.titulo}
@@ -3355,8 +3355,6 @@ export default function MapaInteractivo({
         transition: "background 0.5s ease",
       }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap');`}</style>
-
       {modalEntidad && (
         <ModalDetalle
           canciones={cancionesPersonaje}
@@ -3467,7 +3465,7 @@ export default function MapaInteractivo({
               <BookOpen size={13} />
               <span
                 className="max-w-[120px] truncate"
-                style={{ fontFamily: "'Cinzel', serif" }}
+                style={{ fontFamily: "var(--font-cinzel), serif" }}
               >
                 {puntoSeleccionado?.nombre ?? reinoSeleccionado?.nombre}
               </span>

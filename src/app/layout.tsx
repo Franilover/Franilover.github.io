@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Montserrat, Geist, Pixelify_Sans, Caveat, Lora, Literata } from 'next/font/google';
+import { Montserrat, Geist, Pixelify_Sans, Caveat, Lora, Literata, Cinzel } from 'next/font/google';
 
 import { GlobalCommandPalette } from "@/ui/command";
 import Navbar from "@/layout/navbar";
@@ -25,6 +25,12 @@ const pixelifySans = Pixelify_Sans({ subsets: ['latin'], weight: ['400', '700'],
 const caveat = Caveat({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-caveat', display: 'swap' });
 const lora = Lora({ subsets: ['latin'], weight: ['400', '600'], variable: '--font-lora', display: 'swap' });
 const literata = Literata({ subsets: ["latin"], variable: "--font-literata", display: "swap" });
+// Usada en el mapa de Garlia (mapaGarlia.tsx) — antes se cargaba con un
+// <style>@import url(...)</style> inline en cada render de ese componente,
+// lo que causaba un parpadeo la primera vez que el usuario veía texto con
+// esta fuente (el navegador recién ahí la resolvía). Cargándola acá, junto
+// con el resto, Next la optimiza y self-hostea una sola vez a nivel app.
+const cinzel = Cinzel({ subsets: ['latin'], weight: ['400', '700', '900'], variable: '--font-cinzel', display: 'swap' });
 
 export const metadata: Metadata = {
   title: {
@@ -85,7 +91,8 @@ export default function RootLayout({
         pixelifySans.variable, 
         caveat.variable, 
         lora.variable, 
-        literata.variable
+        literata.variable,
+        cinzel.variable
       )}
       lang="es"
     >
