@@ -52,6 +52,22 @@ export type BaseMarker = {
   tile_col?: number | null;
   tile_row?: number | null;
   oculto?: boolean;
+  /** Presente solo en markers que en realidad son un asset colocado
+   * (map_asset_placements) — un castillo/árbol/etc. de la librería en vez
+   * de un pin de reino/ciudad. Cuando está seteado, el motor dibuja la
+   * imagen en vez del pin+label estándar. */
+  asset?: {
+    image_url: string;
+    escala: number;
+    rotacion: number;
+    /** Ancla 0-1 dentro de la propia imagen — normalmente 0.5,1.0 (centro-
+     * abajo, como un árbol/castillo "parado" sobre el punto). */
+    anchor_x: number;
+    anchor_y: number;
+    ancho_base: number;
+    alto_base: number;
+    z_index: number;
+  };
 };
 
 /** Punto en coordenadas "mundo": col/row absoluto de tile + offset 0-100

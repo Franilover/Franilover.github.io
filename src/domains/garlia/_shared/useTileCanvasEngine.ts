@@ -77,6 +77,12 @@ export function useTileCanvasEngine<
   const compositeRef = useRef<OffscreenCanvas | null>(null);
   const compositeReadyRef = useRef(false);
   const [compositeReady, setCompositeReady] = useState(false);
+  // Caché de <Image> ya cargadas para los assets colocados (castillos,
+  // árboles, etc). Separada del composite de tiles porque los assets se
+  // mueven/escalan/rotan individualmente en cada frame — no tiene sentido
+  // volver a componerlos en un OffscreenCanvas propio, se dibujan directo
+  // en cada draw() como cualquier imagen normal, igual que un ícono.
+  const assetImageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
   const camRef = useRef({ x: 0, y: 0, scale: 1 });
   // Factor backing-store/CSS del canvas, actualizado solo en resize — evita
@@ -108,6 +114,13 @@ export function useTileCanvasEngine<
     labelBg: "#fdf6ee",
     labelText: "#2a1304",
     isDark: false,
+    // Nombre real de la fuente que Next.js genera para --font-cinzel (algo
+    // como "__Cinzel_a1b2c3"). ctx.font de Canvas 2D no resuelve var(...)
+    // como el CSS normal, así que hay que leerlo una vez con
+    // getComputedStyle y guardarlo como string plano — mismo motivo por el
+    // que los colores de acá arriba también se leen así en vez de escribir
+    // "var(--accent)" directo en fillStyle.
+    labelFont: "serif",
   });
 
   // Refs "espejo" de los valores hover, para que el render loop los lea sin
@@ -179,6 +192,8 @@ export function useTileCanvasEngine<
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
       };
       const dark = hexToLuma(bgMain) < 0.35;
+      const cinzelFamily =
+        s.getPropertyValue("--font-cinzel").trim() || "serif";
       cssColorsRef.current = {
         primary: get("--primary") || "#6b4423",
         accent: get("--accent") || "#c08040",
@@ -187,6 +202,7 @@ export function useTileCanvasEngine<
         labelBg: dark ? bgMenuColor : wc,
         labelText: fgColor,
         isDark: dark,
+        labelFont: cinzelFamily,
       };
     };
     read();
@@ -620,7 +636,7 @@ export function useTileCanvasEngine<
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const { accent, bg, labelText, isDark } = cssColorsRef.current;
+      const { accent, bg, labelText, isDark, labelFont } = cssColorsRef.current;
       ctx.fillStyle = fondoColor || bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -852,7 +868,7 @@ export function useTileCanvasEngine<
             lx = (localPts[0].lx + localPts[1].lx) / 2;
             ly = (localPts[0].ly + localPts[1].ly) / 2;
           }
-          ctx.font = "700 11px 'Cinzel', serif";
+          ctx.font = `700 11px ${labelFont}`;
           ctx.textAlign = "center";
           ctx.fillStyle = labelText;
           ctx.globalAlpha = 0.85;
@@ -889,6 +905,67 @@ export function useTileCanvasEngine<
               ctx.fill();
             }
           }
+        }
+      }
+
+      // ── Assets colocados (castillos, árboles, etc. de la librería) ─────────
+      // Se dibujan encima de tiles/áreas y debajo de nada más — son parte
+      // del "paisaje", no overlays de UI. Se ordenan por z_index para que
+      // un elemento pueda pintarse "detrás" de otro (ej. una montaña detrás
+      // de un árbol) sin depender del orden de inserción en la tabla.
+      const assetMarkers = [...allMarkers]
+        .filter((m) => m.asset)
+        .sort((a, b) => (a.asset!.z_index ?? 0) - (b.asset!.z_index ?? 0));
+
+      for (const m of assetMarkers) {
+        const asset = m.asset!;
+        const cache = assetImageCacheRef.current;
+        let img = cache.get(asset.image_url);
+        if (!img) {
+          img = new window.Image();
+          if (asset.image_url.startsWith("http")) img.crossOrigin = "anonymous";
+          img.src = asset.image_url;
+          img.onload = () => markDirty();
+          cache.set(asset.image_url, img);
+        }
+        if (!img.complete || img.naturalWidth === 0) continue;
+
+        const { mx, my } = getMarkerScreenPos(m, cx, cy, scale);
+        // mx/my ya están en coordenadas de pantalla (incluyen cx/cy), pero
+        // acá estamos dentro del ctx.translate(cx, cy) de más arriba — hay
+        // que restar ese offset para no aplicarlo dos veces.
+        const px = mx - cx;
+        const py = my - cy;
+
+        const drawW = asset.ancho_base * asset.escala * scale;
+        const drawH = asset.alto_base * asset.escala * scale;
+        // El punto (px, py) representa el ancla del asset (normalmente
+        // centro-abajo), no la esquina de la imagen — hay que retroceder
+        // desde el ancla hasta la esquina superior-izquierda antes de
+        // dibujar, y aplicar la rotación alrededor del propio ancla.
+        ctx.save();
+        ctx.translate(px, py);
+        if (asset.rotacion) ctx.rotate((asset.rotacion * Math.PI) / 180);
+        ctx.drawImage(
+          img,
+          -asset.anchor_x * drawW,
+          -asset.anchor_y * drawH,
+          drawW,
+          drawH,
+        );
+        ctx.restore();
+
+        if (m.id === selectedMarkerId && editMode) {
+          ctx.strokeStyle = accent;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(
+            px - asset.anchor_x * drawW,
+            py - asset.anchor_y * drawH,
+            drawW,
+            drawH,
+          );
+          ctx.setLineDash([]);
         }
       }
 
