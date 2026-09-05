@@ -913,7 +913,10 @@ export function useTileCanvasEngine<
       // del "paisaje", no overlays de UI. Se ordenan por z_index para que
       // un elemento pueda pintarse "detrás" de otro (ej. una montaña detrás
       // de un árbol) sin depender del orden de inserción en la tabla.
-      const assetMarkers = [...allMarkers]
+      // Mismo criterio que findMarkerAt: en editMode se incluyen también los
+      // hiddenMarkers (ciudades no descubiertas), que acá pueden traer su
+      // propio asset si en algún momento se usan para decorar niebla.
+      const assetMarkers = (editMode ? [...markers, ...hiddenMarkers] : markers)
         .filter((m) => m.asset)
         .sort((a, b) => (a.asset!.z_index ?? 0) - (b.asset!.z_index ?? 0));
 
