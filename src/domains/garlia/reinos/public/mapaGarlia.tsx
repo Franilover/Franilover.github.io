@@ -20,6 +20,7 @@ import {
   Trash2,
   Link2,
   Link2Off,
+  Trees,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -49,6 +50,12 @@ import {
   loadMapAreas,
   invalidateMapAreas,
 } from "@/infra/sync/syncEngine";
+import { MapAssetLibraryPanel } from "@/domains/garlia/_shared/MapAssetLibraryPanel";
+import {
+  useMapAssetLibrary,
+  useMapAssetPlacements,
+  type MapAssetPlacement,
+} from "@/domains/garlia/_shared/useMapAssets";
 
 // ─── Hourglass — reemplaza Loader2 en todos los indicadores de carga ──────────
 function Hourglass({ size = 14 }: { size?: number }) {
@@ -1972,6 +1979,114 @@ export default function MapaInteractivo({
     );
   }, []);
 
+  // ── Librería de assets (castillos/árboles/etc.) e instancias colocadas ──
+  // La librería (map_assets) es siempre global, sin importar si se está
+  // viendo el mapa del mundo o el de un reino — solo cambia el SCOPE de las
+  // instancias (map_asset_placements), que sigue el mismo criterio que
+  // areas vs reino_areas: world_id cuando vistaActual === "global",
+  // reino_id cuando se está dentro de un reino.
+  const { assets: mapAssets, loading: loadingMapAssets } =
+    useMapAssetLibrary("garlia");
+  const {
+    placements: assetPlacementsGlobal,
+    createPlacement: createAssetPlacementGlobal,
+    movePlacement: moveAssetPlacementGlobal,
+    updatePlacement: updateAssetPlacementGlobal,
+    deletePlacement: deleteAssetPlacementGlobal,
+  } = useMapAssetPlacements({ worldId: "garlia" });
+  const {
+    placements: assetPlacementsReino,
+    createPlacement: createAssetPlacementReino,
+    movePlacement: moveAssetPlacementReino,
+    updatePlacement: updateAssetPlacementReino,
+    deletePlacement: deleteAssetPlacementReino,
+  } = useMapAssetPlacements({
+    reinoId: reinoSeleccionado?.id ?? "__none__",
+  });
+  const [assetLibraryOpen, setAssetLibraryOpen] = useState(false);
+  const [placingAssetId, setPlacingAssetId] = useState<string | null>(null);
+  const [selectedPlacementId, setSelectedPlacementId] = useState<
+    string | null
+  >(null);
+
+  // Esc cancela tanto "colocar asset" como la instancia seleccionada —
+  // mismo criterio que el resto de los modos de edición del mapa (ver
+  // handleKeyDown en tileCanvasEditingGestures.ts, que ya cubre dibujo de
+  // áreas y "marker para mover" pero no sabe nada de assets).
+  useEffect(() => {
+    if (!editMode) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (placingAssetId) setPlacingAssetId(null);
+      else if (selectedPlacementId) setSelectedPlacementId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editMode, placingAssetId, selectedPlacementId]);
+
+  const assetPlacements =
+    vistaActual === "global" ? assetPlacementsGlobal : assetPlacementsReino;
+  const createAssetPlacement =
+    vistaActual === "global"
+      ? createAssetPlacementGlobal
+      : createAssetPlacementReino;
+  const moveAssetPlacement =
+    vistaActual === "global"
+      ? moveAssetPlacementGlobal
+      : moveAssetPlacementReino;
+  const updateAssetPlacement =
+    vistaActual === "global"
+      ? updateAssetPlacementGlobal
+      : updateAssetPlacementReino;
+  const deleteAssetPlacement =
+    vistaActual === "global"
+      ? deleteAssetPlacementGlobal
+      : deleteAssetPlacementReino;
+
+  const selectedPlacement: MapAssetPlacement | null =
+    assetPlacements.find((p) => p.id === selectedPlacementId) ?? null;
+
+  const handlePlaceAsset = useCallback(
+    async (
+      assetId: string,
+      coord: { x: number; y: number; tile_col: number; tile_row: number },
+    ) => {
+      const { data } = await createAssetPlacement(assetId, coord);
+      setPlacingAssetId(null);
+      if (data) setSelectedPlacementId(data.id);
+    },
+    [createAssetPlacement],
+  );
+
+  // Markers "asset" para pasarle al canvas: cada placement colocado, con el
+  // map_asset correspondiente resuelto, en la forma que espera
+  // BaseMarker.asset (ver UnifiedTileCanvas.tsx). Los placements sin asset
+  // resoluble (borrado de la librería, id viejo) se descartan en vez de
+  // romper el render.
+  const assetMarkers = assetPlacements
+    .map((p) => {
+      const asset = mapAssets.find((a) => a.id === p.asset_id);
+      if (!asset) return null;
+      return {
+        id: `asset-placement:${p.id}`,
+        coord_x: p.coord_x,
+        coord_y: p.coord_y,
+        tile_col: p.tile_col,
+        tile_row: p.tile_row,
+        asset: {
+          image_url: asset.image_url,
+          escala: p.escala,
+          rotacion: p.rotacion,
+          anchor_x: asset.anchor_x,
+          anchor_y: asset.anchor_y,
+          ancho_base: asset.ancho_base,
+          alto_base: asset.alto_base,
+          z_index: p.z_index,
+        },
+      };
+    })
+    .filter((m): m is NonNullable<typeof m> => m !== null);
+
   useEffect(() => {
     if (!isAdmin) return;
     supabase
@@ -3619,9 +3734,18 @@ export default function MapaInteractivo({
                 fondoColor={fondoColor}
                 hiddenMarkers={hiddenMarkers}
                 isFirstOpen={isFirstOpen}
-                markers={[...visibleMarkersSinDuplicado, ...hiddenMarkers]}
+                markers={[
+                  ...visibleMarkersSinDuplicado,
+                  ...hiddenMarkers,
+                  ...assetMarkers,
+                ]}
+                placingAssetId={placingAssetId}
                 selectedAreaId={selectedAreaId}
-                selectedMarkerId={reinoParaMover ?? null}
+                selectedMarkerId={
+                  selectedPlacementId
+                    ? `asset-placement:${selectedPlacementId}`
+                    : (reinoParaMover ?? null)
+                }
                 tiles={mapTiles}
                 onAreaClick={(area) => void handleAreaLabelClick(area)}
                 onAreaDrawEnd={handleAreaDrawEnd}
@@ -3629,15 +3753,39 @@ export default function MapaInteractivo({
                 onAreaSelect={setSelectedAreaId}
                 onEyedropperPick={handleFondoColorChange}
                 onMapClick={handleMapClick}
-                onMarkerClick={handleReinoClick}
+                onMarkerClick={(m: any) => {
+                  if (typeof m.id === "string" && m.id.startsWith("asset-placement:")) {
+                    setSelectedPlacementId(m.id.slice("asset-placement:".length));
+                    return;
+                  }
+                  void handleReinoClick(m);
+                }}
                 onMarkerContextMenu={handleReinoContextMenu}
-                onMarkerMove={handleReinoMarkerMove}
-                onMarkerSelect={setReinoParaMover}
+                onMarkerMove={(markerId, coord) => {
+                  if (markerId.startsWith("asset-placement:")) {
+                    void moveAssetPlacement(
+                      markerId.slice("asset-placement:".length),
+                      coord,
+                    );
+                    return;
+                  }
+                  handleReinoMarkerMove(markerId, coord);
+                }}
+                onMarkerSelect={(id) => {
+                  if (id && id.startsWith("asset-placement:")) {
+                    setSelectedPlacementId(id.slice("asset-placement:".length));
+                    setReinoParaMover(null);
+                    return;
+                  }
+                  setSelectedPlacementId(null);
+                  setReinoParaMover(id);
+                }}
                 onOpenPanel={
                   isMobile && reinoSeleccionado
                     ? () => setPanelOpen(true)
                     : undefined
                 }
+                onPlaceAsset={handlePlaceAsset}
                 onTileCreate={handleTileCreateAt}
                 onTileDelete={(tile) => void handleTileDelete(tile.id)}
                 onTilePick={(tile) => setTilePickerTarget(tile)}
@@ -3686,14 +3834,33 @@ export default function MapaInteractivo({
             }
             drawTool={editMode ? drawTool : null}
             editMode={editMode}
+            extraMarkers={editMode ? assetMarkers : []}
             eyedropperActive={eyedropperActive}
             fondoColor={fondoColor}
             hiddenMarkers={editMode ? [] : hiddenMarkers}
             isFirstOpen={isFirstOpen}
+            placingAssetId={editMode ? placingAssetId : null}
             reinoId={reinoSeleccionado.id}
             selectedAreaId={editMode ? selectedAreaId : null}
-            selectedMarkerId={editMode ? puntoParaMover : null}
+            selectedMarkerId={
+              editMode
+                ? selectedPlacementId
+                  ? `asset-placement:${selectedPlacementId}`
+                  : puntoParaMover
+                : null
+            }
             onAreaDrawEnd={handleAreaDrawEnd}
+            onMoveExtraMarker={(id, coord) =>
+              void moveAssetPlacement(
+                id.slice("asset-placement:".length),
+                coord,
+              )
+            }
+            onPlaceAsset={handlePlaceAsset}
+            onSelectExtraMarker={(id) => {
+              setSelectedPlacementId(id.slice("asset-placement:".length));
+              setPuntoParaMover(null);
+            }}
             onAreaClick={(area) => {
               // Ya estamos DENTRO de un reino: acá un área siempre es una
               // ciudad de este mismo reino, nunca otro reino. Antes esto
@@ -3756,6 +3923,33 @@ export default function MapaInteractivo({
           />
         )}
 
+        {/* ── Panel de librería de assets / controles de la instancia ── */}
+        {editMode && (
+          <MapAssetLibraryPanel
+            assets={mapAssets}
+            loadingAssets={loadingMapAssets}
+            open={assetLibraryOpen || !!selectedPlacementId}
+            placingAssetId={placingAssetId}
+            selectedPlacement={selectedPlacement}
+            onCancelPlacing={() => setPlacingAssetId(null)}
+            onClose={() => {
+              setAssetLibraryOpen(false);
+              setPlacingAssetId(null);
+              setSelectedPlacementId(null);
+            }}
+            onDeletePlacement={(id) => {
+              void deleteAssetPlacement(id);
+              setSelectedPlacementId(null);
+            }}
+            onDeselectPlacement={() => setSelectedPlacementId(null)}
+            onStartPlacing={(assetId) => {
+              setSelectedPlacementId(null);
+              setPlacingAssetId((prev) => (prev === assetId ? null : assetId));
+            }}
+            onUpdatePlacement={(id, patch) => void updateAssetPlacement(id, patch)}
+          />
+        )}
+
         {/* ── Barra de herramientas: dibujar áreas — global y reino ── */}
         {editMode && (
           <div
@@ -3767,6 +3961,31 @@ export default function MapaInteractivo({
               backdropFilter: "blur(10px)",
             }}
           >
+            <button
+              className="w-8 h-8 flex items-center justify-center transition-colors"
+              style={{
+                borderRadius: "6px",
+                background: assetLibraryOpen ? "var(--accent)" : "transparent",
+                color: assetLibraryOpen ? "#fff" : "var(--accent)",
+              }}
+              title="Librería de assets (castillos, árboles, etc.)"
+              onClick={() => {
+                setDrawTool(null);
+                setSelectedAreaId(null);
+                setAreaVinculoPreseleccionado(null);
+                setAssetLibraryOpen((prev) => !prev);
+              }}
+            >
+              <Trees size={14} />
+            </button>
+
+            <div
+              className="w-px h-5 mx-0.5"
+              style={{
+                background: "color-mix(in srgb, var(--primary) 25%, transparent)",
+              }}
+            />
+
             {(
               [
                 { tool: "circulo" as const, Icon: Circle, title: "Dibujar círculo" },

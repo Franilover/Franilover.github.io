@@ -1525,3 +1525,107 @@ export async function invalidateMapAreas(
 ): Promise<void> {
   await invalidateSessionCache(`map_areas:${worldId}`);
 }
+
+// ─── Librería de assets (map_assets) ───────────────────────────────────────
+// Catálogo reutilizable (castillos, árboles, montañas, ríos...) — no scoped
+// por reino, solo por world_id (siempre "garlia" por ahora, pero se respeta
+// el mismo parámetro que el resto para no hardcodear el string dos veces).
+// Cambia poco (se sube a mano por SQL / futuro uploader), así que usa el
+// mismo patrón Dexie-first que map_tiles.
+
+export async function loadMapAssets(
+  worldId: string = "garlia",
+  onUpdate?: (data: any[]) => void,
+): Promise<any[]> {
+  return loadWithCache(
+    {
+      cacheKey: `map_assets:${worldId}`,
+      dexieSource: () => dexieWhere(db?.map_assets, "world_id", worldId),
+      supabaseFetch: async () => {
+        const { data } = await supabase
+          .from("map_assets")
+          .select(
+            "id, world_id, nombre, categoria, image_url, ancho_base, alto_base, anchor_x, anchor_y",
+          )
+          .eq("world_id", worldId)
+          .order("categoria")
+          .order("nombre");
+        return data ?? null;
+      },
+      persist: (rows) => persistReplace("map_assets", rows),
+    },
+    onUpdate,
+  );
+}
+
+export async function invalidateMapAssets(
+  worldId: string = "garlia",
+): Promise<void> {
+  await invalidateSessionCache(`map_assets:${worldId}`);
+}
+
+// ─── Instancias de assets colocados (map_asset_placements) ────────────────
+// Scope exclusivo: exactamente uno de world_id/reino_id (ver constraint en
+// map_assets.sql). Se cachea por separado según el scope, igual que
+// map_areas vs reino_areas — dos funciones en vez de una con scope
+// polimórfico, mismo criterio que ya usa el resto del archivo.
+
+export async function loadMapAssetPlacements(
+  worldId: string = "garlia",
+  onUpdate?: (data: any[]) => void,
+): Promise<any[]> {
+  return loadWithCache(
+    {
+      cacheKey: `map_asset_placements:world:${worldId}`,
+      dexieSource: () =>
+        dexieWhere(db?.map_asset_placements, "world_id", worldId),
+      supabaseFetch: async () => {
+        const { data } = await supabase
+          .from("map_asset_placements")
+          .select(
+            "id, asset_id, world_id, reino_id, tile_col, tile_row, coord_x, coord_y, escala, rotacion, z_index",
+          )
+          .eq("world_id", worldId);
+        return data ?? null;
+      },
+      persist: (rows) => persistReplace("map_asset_placements", rows),
+    },
+    onUpdate,
+  );
+}
+
+export async function invalidateMapAssetPlacements(
+  worldId: string = "garlia",
+): Promise<void> {
+  await invalidateSessionCache(`map_asset_placements:world:${worldId}`);
+}
+
+export async function loadReinoAssetPlacements(
+  reinoId: string,
+  onUpdate?: (data: any[]) => void,
+): Promise<any[]> {
+  return loadWithCache(
+    {
+      cacheKey: `map_asset_placements:reino:${reinoId}`,
+      dexieSource: () =>
+        dexieWhere(db?.map_asset_placements, "reino_id", reinoId),
+      supabaseFetch: async () => {
+        const { data } = await supabase
+          .from("map_asset_placements")
+          .select(
+            "id, asset_id, world_id, reino_id, tile_col, tile_row, coord_x, coord_y, escala, rotacion, z_index",
+          )
+          .eq("reino_id", reinoId);
+        return data ?? null;
+      },
+      persist: (rows) => persistReplace("map_asset_placements", rows),
+    },
+    onUpdate,
+  );
+}
+
+export async function invalidateReinoAssetPlacements(
+  reinoId: string,
+): Promise<void> {
+  await invalidateSessionCache(`map_asset_placements:reino:${reinoId}`);
+}

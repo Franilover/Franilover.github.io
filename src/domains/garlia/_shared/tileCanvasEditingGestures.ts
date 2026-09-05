@@ -70,6 +70,15 @@ export interface TileCanvasEditingProps<
   drawTool: DrawTool;
   onAreaDrawEnd?: (tipo: AreaTipo, puntos: WorldPoint[]) => void;
   onAreaPointsChange?: (areaId: string, puntos: WorldPoint[]) => void;
+
+  /** Modo "colocar asset" activo (id del map_asset elegido en el panel de
+   * librería). Cuando no es null, un click en terreno vacío no se descarta
+   * como en el flujo normal: crea un map_asset_placement ahí mismo. */
+  placingAssetId?: string | null;
+  onPlaceAsset?: (
+    assetId: string,
+    coord: { x: number; y: number; tile_col: number; tile_row: number },
+  ) => void;
 }
 
 /**
@@ -105,6 +114,8 @@ export function useTileCanvasEditingState<
     drawTool,
     onAreaDrawEnd,
     onAreaPointsChange,
+    placingAssetId,
+    onPlaceAsset,
   } = props;
 
   const {
@@ -510,6 +521,25 @@ export function useTileCanvasEditingState<
         onTileDelete(trash.tile);
         return true;
       }
+    }
+
+    // ── Modo "colocar asset": un click en terreno (con o sin área/asset
+    // encima) coloca el asset elegido ahí. Prioridad alta a propósito —
+    // mientras el modo está activo, el click sirve para colocar, no para
+    // abrir el panel de lo que esté debajo del cursor. Se descarta si cayó
+    // afuera de cualquier tile (canvasToTileInfo null), igual que el resto
+    // de las interacciones que necesitan una celda válida.
+    if (placingAssetId && onPlaceAsset) {
+      const info = canvasToTileInfo(clientX, clientY);
+      if (info) {
+        onPlaceAsset(placingAssetId, {
+          x: info.x,
+          y: info.y,
+          tile_col: info.tile_col,
+          tile_row: info.tile_row,
+        });
+      }
+      return true;
     }
 
     // ── Click sobre un pin: Ctrl+click arma "para mover"; sin Ctrl, lo deja

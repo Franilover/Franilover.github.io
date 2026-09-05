@@ -191,6 +191,25 @@ interface ReinoTileCanvasProps {
   onAreaDrawEnd?: (tipo: AreaTipo, puntos: WorldPoint[]) => void;
   onAreaPointsChange?: (areaId: string, puntos: WorldPoint[]) => void;
   onAreaClick?: (area: BaseArea) => void;
+
+  // ── Modo "colocar asset" (mismo mecanismo que el mapa global) ────────────
+  placingAssetId?: string | null;
+  onPlaceAsset?: (
+    assetId: string,
+    coord: { x: number; y: number; tile_col: number; tile_row: number },
+  ) => void;
+  /** Markers de assets colocados (castillos/árboles/etc.), ya resueltos con
+   * su map_asset — ver assetMarkers en mapaGarlia.tsx. Se concatenan a los
+   * markers de ciudades, no reemplazan nada. */
+  extraMarkers?: any[];
+  /** Id seleccionado que en realidad es un asset-placement (prefijo
+   * "asset-placement:") en vez de una ciudad — mismo canal de selección
+   * que selectedMarkerId, pero el padre decide a quién corresponde. */
+  onSelectExtraMarker?: (id: string) => void;
+  onMoveExtraMarker?: (
+    id: string,
+    coord: { x: number; y: number; tile_col: number; tile_row: number },
+  ) => void;
 }
 
 export function ReinoTileCanvas({
@@ -217,6 +236,11 @@ export function ReinoTileCanvas({
   onAreaDrawEnd,
   onAreaPointsChange,
   onAreaClick,
+  placingAssetId = null,
+  onPlaceAsset,
+  extraMarkers = [],
+  onSelectExtraMarker,
+  onMoveExtraMarker,
 }: ReinoTileCanvasProps) {
   const { tiles, loading, addTile, updateTileImage, deleteTile } =
     useReinoTiles(reinoId);
@@ -255,7 +279,7 @@ export function ReinoTileCanvas({
           fondoColor={fondoColor}
           hiddenMarkers={hiddenMarkers}
           isFirstOpen={isFirstOpen}
-          markers={detallesSinDuplicado}
+          markers={[...detallesSinDuplicado, ...extraMarkers]}
           selectedAreaId={selectedAreaId}
           selectedMarkerId={selectedPinId}
           tileSize={tileSize}
@@ -265,9 +289,19 @@ export function ReinoTileCanvas({
           onAreaPointsChange={onAreaPointsChange}
           onAreaSelect={onAreaSelect}
           onEyedropperPick={onEyedropperPick}
-          onMarkerClick={(ciudad) => onPinClick?.(ciudad)}
+          onMarkerClick={(m: any) => {
+            if (typeof m.id === "string" && m.id.startsWith("asset-placement:")) {
+              onSelectExtraMarker?.(m.id);
+              return;
+            }
+            onPinClick?.(m);
+          }}
           onMarkerContextMenu={onMarkerContextMenuProp}
           onMarkerMove={(markerId, coord) => {
+            if (markerId.startsWith("asset-placement:")) {
+              onMoveExtraMarker?.(markerId, coord);
+              return;
+            }
             onDetallesChange(
               detalles.map((d) =>
                 d.id === markerId
@@ -283,11 +317,19 @@ export function ReinoTileCanvas({
             );
             setSelectedPinId(null);
           }}
-          onMarkerSelect={setSelectedPinId}
+          onMarkerSelect={(id) => {
+            if (id && id.startsWith("asset-placement:")) {
+              onSelectExtraMarker?.(id);
+              return;
+            }
+            setSelectedPinId(id);
+          }}
           onOpenPanel={onOpenPanel}
+          onPlaceAsset={onPlaceAsset}
           onTileCreate={(col, row) => addTile(col, row)}
           onTileDelete={(tile) => deleteTile(tile.id)}
           onTilePick={(tile) => setPickerTile(tile)}
+          placingAssetId={placingAssetId}
         />
       ) : (
         // ── Modo lectura: TileCanvasView no carga ni un byte de código de

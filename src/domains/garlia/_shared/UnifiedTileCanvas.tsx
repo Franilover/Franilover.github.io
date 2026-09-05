@@ -154,6 +154,15 @@ interface UnifiedTileCanvasProps<
    * para navegar al reino/ciudad al que esa área está vinculada. */
   onAreaClick?: (area: BaseArea) => void;
 
+  // ── Modo "colocar asset" (castillos/árboles/etc. de la librería) ─────────
+  /** Id del map_asset elegido en el panel de librería. Mientras no sea null,
+   * el próximo click en el mapa coloca una instancia nueva ahí. */
+  placingAssetId?: string | null;
+  onPlaceAsset?: (
+    assetId: string,
+    coord: { x: number; y: number; tile_col: number; tile_row: number },
+  ) => void;
+
   className?: string;
 }
 
@@ -187,6 +196,8 @@ export function UnifiedTileCanvas<
   onAreaDrawEnd,
   onAreaPointsChange,
   onAreaClick,
+  placingAssetId = null,
+  onPlaceAsset,
   className,
 }: UnifiedTileCanvasProps<TTile, TMarker>) {
   // ── Estado de edición (hover/drawing/drawCursor) vive en refs que se
@@ -244,6 +255,8 @@ export function UnifiedTileCanvas<
     drawTool,
     onAreaDrawEnd,
     onAreaPointsChange,
+    placingAssetId,
+    onPlaceAsset,
     // Sink compartido: editing escribe acá, engine lee de acá.
     hoverState: [hoverTile, setHoverTile],
     ghostHoverState: [ghostHover, setGhostHover],
@@ -271,7 +284,7 @@ export function UnifiedTileCanvas<
       style={{
         cursor: eyedropperActive
           ? "crosshair"
-          : drawTool
+          : drawTool || placingAssetId
             ? "crosshair"
             : selectedMarkerId
               ? "crosshair"
@@ -332,8 +345,23 @@ export function UnifiedTileCanvas<
         </div>
       )}
 
+      {/* Hint de modo "colocar asset" */}
+      {editMode && placingAssetId && (
+        <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
+          <span
+            className="text-micro font-bold uppercase tracking-widest px-2 py-1 rounded-lg"
+            style={{
+              background: "color-mix(in srgb, var(--accent) 85%, transparent)",
+              color: "#fff",
+            }}
+          >
+            Click en el mapa para colocar · Esc para cancelar
+          </span>
+        </div>
+      )}
+
       {/* Hint de dibujo de área (herramienta activa) */}
-      {editMode && drawTool && (
+      {editMode && drawTool && !placingAssetId && (
         <div className="absolute top-2 left-2 z-10 pointer-events-none flex flex-col gap-1">
           <span
             className="text-micro font-bold uppercase tracking-widest px-2 py-1 rounded-lg"
