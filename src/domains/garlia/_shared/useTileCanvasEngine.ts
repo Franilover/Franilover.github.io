@@ -21,7 +21,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import type { BaseArea, BaseMarker, BaseTile, BaseTileTerrain, WorldPoint } from "./UnifiedTileCanvas";
-import { TERRAIN_CHAR_TO_COLOR, TERRAIN_COLOR_HEX, TILE_TERRAIN_GRID_SIZE } from "./UnifiedTileCanvas";
+import {
+  TERRAIN_CHAR_TO_COLOR,
+  TERRAIN_COLOR_HEX,
+  TILE_TERRAIN_GRID_SIZE,
+} from "./UnifiedTileCanvas";
 
 export interface TileCanvasEngineOptions<
   TTile extends BaseTile,
@@ -782,6 +786,39 @@ export function useTileCanvasEngine<
         });
       }
 
+      // ── Terreno decorativo (pintado verde/azul/café sobre tiles) ───────────
+      // Se dibuja siempre que haya datos (editMode o no), igual que áreas y
+      // tiles base. Cada tile tiene una sub-grilla TILE_TERRAIN_GRID_SIZE² de
+      // celdas; grid_data es un string plano fila-por-fila (idx = row*N+col),
+      // ' ' = sin pintar, y cada char mapea a un color vía TERRAIN_CHAR_TO_COLOR.
+      if (terrain.length > 0) {
+        const cell = ts / TILE_TERRAIN_GRID_SIZE;
+        terrain.forEach((t) => {
+          const tile = tiles.find((tl) => tl.id === t.tile_id);
+          if (!tile) return;
+          const tx = (tile.col - minCol) * ts;
+          const ty = (tile.row - minRow) * ts;
+          const data = t.grid_data;
+          for (let idx = 0; idx < data.length; idx++) {
+            const ch = data[idx];
+            if (ch === " " || ch === undefined) continue;
+            const color = TERRAIN_CHAR_TO_COLOR[ch];
+            if (!color) continue;
+            const cellRow = Math.floor(idx / TILE_TERRAIN_GRID_SIZE);
+            const cellCol = idx % TILE_TERRAIN_GRID_SIZE;
+            ctx.fillStyle = TERRAIN_COLOR_HEX[color];
+            ctx.fillRect(
+              tx + cellCol * cell,
+              ty + cellRow * cell,
+              // +0.5 evita líneas finas entre celdas contiguas por
+              // redondeo subpíxel al hacer zoom.
+              cell + 0.5,
+              cell + 0.5,
+            );
+          }
+        });
+      }
+
       // ── Bordes de tiles existentes ────────────────────────────────────────
       if (tiles.length > 1) {
         ctx.strokeStyle = `rgba(${isDark ? "255,255,255" : "0,0,0"},0.12)`;
@@ -1089,6 +1126,7 @@ export function useTileCanvasEngine<
     drawingPoints,
     worldToLocal,
     markDirty,
+    terrain,
   ]);
 
   return {

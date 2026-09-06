@@ -21,6 +21,8 @@ import {
   Link2,
   Link2Off,
   Trees,
+  Paintbrush,
+  Eraser,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -35,6 +37,10 @@ import {
   type AreaTipo,
   type DrawTool,
   type WorldPoint,
+  type BaseTileTerrain,
+  type TerrainTool,
+  TERRAIN_COLORS,
+  TERRAIN_COLOR_HEX,
 } from "@/domains/garlia/_shared/UnifiedTileCanvas";
 import { TileCanvasView } from "@/domains/garlia/_shared/TileCanvasView";
 import { ModalDetalle } from "@/domains/garlia/perfil-jugador/PersonalComponents";
@@ -2003,6 +2009,9 @@ export default function MapaInteractivo({
     reinoId: reinoSeleccionado?.id ?? "__none__",
   });
   const [assetLibraryOpen, setAssetLibraryOpen] = useState(false);
+  // Dropdown de colores de terreno (verde/azul/café/borrador) — se abre al
+  // clickear el botón de pincel en la toolbar.
+  const [terrainMenuOpen, setTerrainMenuOpen] = useState(false);
   const [placingAssetId, setPlacingAssetId] = useState<string | null>(null);
   const [selectedPlacementId, setSelectedPlacementId] = useState<
     string | null
@@ -2142,6 +2151,95 @@ export default function MapaInteractivo({
       cancelled = true;
     };
   }, []);
+
+  // ── Terreno decorativo (verde/azul/café pintado sobre tiles) ─────────────
+  // Mismo patrón que mapTiles: Dexie primero (instantáneo), luego Supabase
+  // como fuente de verdad. map_tile_terrain es 1:1 con map_tiles por tile_id,
+  // así que no hace falta filtrar por world_id acá — se filtra indirectamente
+  // porque los tile_id de otros mundos no van a matchear ningún tile en
+  // mapTiles (ver bloque de dibujo en useTileCanvasEngine.ts).
+  const [mapTerrain, setMapTerrain] = useState<BaseTileTerrain[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (db) {
+          const local: any[] =
+            (await (db as any).map_tile_terrain?.toArray()) ?? [];
+          if (local.length && !cancelled) {
+            setMapTerrain(local as BaseTileTerrain[]);
+          }
+        }
+      } catch {}
+      if (!navigator.onLine) return;
+      const { data } = await supabase
+        .from("map_tile_terrain")
+        .select("tile_id, grid_data");
+      if (!cancelled && data) {
+        setMapTerrain(data as BaseTileTerrain[]);
+        try {
+          if (db) await (db as any).map_tile_terrain?.bulkPut(data);
+        } catch {}
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Herramienta de terreno activa (color a pintar, o "borrador"). null =
+  // desactivada, igual convención que drawTool/placingAssetId.
+  const [terrainTool, setTerrainTool] = useState<TerrainTool>(null);
+
+  // onTerrainChange: se dispara decenas de veces por segundo mientras se
+  // arrastra pintando — SOLO actualiza estado in-memory, nunca pega a
+  // Supabase (eso es onTerrainStrokeEnd).
+  const handleTerrainChange = useCallback(
+    (tileId: string, gridData: string) => {
+      setMapTerrain((prev) => {
+        const idx = prev.findIndex((t) => t.tile_id === tileId);
+        if (idx === -1) return [...prev, { tile_id: tileId, grid_data: gridData }];
+        const next = [...prev];
+        next[idx] = { tile_id: tileId, grid_data: gridData };
+        return next;
+      });
+    },
+    [],
+  );
+
+  // onTerrainStrokeEnd: se dispara una vez al soltar el mouse tras un trazo
+  // — acá sí persistimos a Supabase (y Dexie) los tiles que cambiaron.
+  const handleTerrainStrokeEnd = useCallback(
+    (tileIds: string[]) => {
+      void (async () => {
+        try {
+          setMapTerrain((current) => {
+            const rows = tileIds
+              .map((id) => current.find((t) => t.tile_id === id))
+              .filter((t): t is BaseTileTerrain => !!t);
+            if (rows.length) {
+              void supabase
+                .from("map_tile_terrain")
+                .upsert(rows, { onConflict: "tile_id" })
+                .then(({ error }) => {
+                  if (error) {
+                    showToast("Error al guardar el terreno", "error");
+                  } else if (db) {
+                    void (db as any).map_tile_terrain?.bulkPut(rows).catch(() => {});
+                  }
+                });
+            }
+            return current;
+          });
+        } catch {
+          showToast("Error al guardar el terreno", "error");
+        }
+      })();
+    },
+    [],
+  );
 
   // ── Gestión de tiles del mapa global (portado de EditorMapa) ─────────────────
   const [showNuevoTileModal, setShowNuevoTileModal] = useState(false);
@@ -3788,9 +3886,13 @@ export default function MapaInteractivo({
                     : undefined
                 }
                 onPlaceAsset={handlePlaceAsset}
+                onTerrainChange={handleTerrainChange}
+                onTerrainStrokeEnd={handleTerrainStrokeEnd}
                 onTileCreate={handleTileCreateAt}
                 onTileDelete={(tile) => void handleTileDelete(tile.id)}
                 onTilePick={(tile) => setTilePickerTarget(tile)}
+                terrain={mapTerrain}
+                terrainTool={terrainTool}
               />
             ) : (
               // ── Modo lectura: TileCanvasView, sin código de edición en el
@@ -3895,10 +3997,95 @@ export default function MapaInteractivo({
                 setSelectedAreaId(null);
                 setAreaVinculoPreseleccionado(null);
                 setAssetLibraryOpen((prev) => !prev);
+                setTerrainTool(null);
+                setTerrainMenuOpen(false);
               }}
             >
               <Trees size={14} />
             </button>
+
+            {/* ── Terreno decorativo: botón que abre el dropdown de colores ── */}
+            <div className="relative">
+              <button
+                className="w-8 h-8 flex items-center justify-center transition-colors"
+                style={{
+                  borderRadius: "6px",
+                  background: terrainTool ? "var(--accent)" : "transparent",
+                  color: terrainTool ? "#fff" : "var(--accent)",
+                }}
+                title="Pintar terreno (verde/azul/café)"
+                onClick={() => {
+                  setDrawTool(null);
+                  setSelectedAreaId(null);
+                  setAreaVinculoPreseleccionado(null);
+                  setAssetLibraryOpen(false);
+                  setPlacingAssetId(null);
+                  setTerrainMenuOpen((prev) => !prev);
+                }}
+              >
+                <Paintbrush size={14} />
+              </button>
+
+              {terrainMenuOpen && (
+                <div
+                  className="absolute bottom-full left-0 mb-2 flex items-center gap-1 px-1.5 py-1.5 z-20"
+                  style={{
+                    borderRadius: "8px",
+                    background:
+                      "color-mix(in srgb, var(--bg-menu) 95%, transparent)",
+                    border:
+                      "1px solid color-mix(in srgb, var(--primary) 25%, transparent)",
+                    backdropFilter: "blur(10px)",
+                  }}
+                >
+                  {TERRAIN_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      className="w-7 h-7 flex items-center justify-center transition-transform hover:scale-110"
+                      style={{
+                        borderRadius: "5px",
+                        background: TERRAIN_COLOR_HEX[color],
+                        border:
+                          terrainTool === color
+                            ? "2px solid var(--accent)"
+                            : "2px solid transparent",
+                      }}
+                      title={color}
+                      onClick={() =>
+                        setTerrainTool((prev) => (prev === color ? null : color))
+                      }
+                    />
+                  ))}
+                  <div
+                    className="w-px h-5 mx-0.5"
+                    style={{
+                      background:
+                        "color-mix(in srgb, var(--primary) 25%, transparent)",
+                    }}
+                  />
+                  <button
+                    className="w-7 h-7 flex items-center justify-center transition-colors"
+                    style={{
+                      borderRadius: "5px",
+                      background:
+                        terrainTool === "borrador"
+                          ? "var(--accent)"
+                          : "color-mix(in srgb, var(--primary) 12%, transparent)",
+                      color:
+                        terrainTool === "borrador" ? "#fff" : "var(--accent)",
+                    }}
+                    title="Borrador de terreno"
+                    onClick={() =>
+                      setTerrainTool((prev) =>
+                        prev === "borrador" ? null : "borrador",
+                      )
+                    }
+                  >
+                    <Eraser size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div
               className="w-px h-5 mx-0.5"
@@ -3930,6 +4117,8 @@ export default function MapaInteractivo({
                   setSelectedAreaId(null);
                   setAreaVinculoPreseleccionado(null);
                   setDrawTool((prev) => (prev === tool ? null : tool));
+                  setTerrainTool(null);
+                  setTerrainMenuOpen(false);
                 }}
               >
                 <Icon size={14} />

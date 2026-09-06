@@ -453,6 +453,15 @@ export interface ReinoTileLocal {
   order?: number;
 }
 
+// ─── Terreno decorativo (verde/azul/café pintado sobre tiles) ────────────────
+// 1:1 con MapTileLocal por tile_id (key local = tile_id, no un id propio —
+// ver migración de map_tile_terrain en Supabase, misma PK). grid_data es un
+// string plano TILE_TERRAIN_GRID_SIZE² (ver UnifiedTileCanvas.tsx).
+export interface MapTileTerrainLocal {
+  tile_id: string;
+  grid_data: string;
+}
+
 // ─── Áreas del mapa (círculo / rectángulo / polígono libre) ───────────────────
 // Vinculan una zona dibujada en el mapa global a un reino o una ciudad.
 // Las coordenadas de los puntos son "mundo" (mismo sistema que tile_col/
@@ -871,6 +880,10 @@ class AgendaFraniDB extends Dexie {
   // Tiles de mapa global y de reinos
   map_tiles!: Table<MapTileLocal, string>;
   reino_tiles!: Table<ReinoTileLocal, string>;
+
+  // Terreno decorativo (verde/azul/café pintado sobre tiles) — 1:1 con
+  // map_tiles por tile_id. Ver UnifiedTileCanvas.tsx (BaseTileTerrain).
+  map_tile_terrain!: Table<MapTileTerrainLocal, string>;
 
   // Áreas del mapa (círculo/rectángulo/polígono) vinculadas a reino o ciudad
   map_areas!: Table<MapAreaLocal, string>;
@@ -1992,6 +2005,18 @@ class AgendaFraniDB extends Dexie {
     this.version(44).stores({
       map_assets: "id, world_id, categoria",
       map_asset_placements: "id, asset_id, world_id, reino_id",
+    });
+
+    // ─── v45: cache offline del terreno decorativo (verde/azul/café pintado
+    // sobre tiles, ver UnifiedTileCanvas.tsx/useTileCanvasEngine.ts) — misma
+    // motivación que map_tiles/map_assets: mapaGarlia.tsx pinta este layer
+    // siempre (editMode o no), así que sin cache local el terreno
+    // desaparecería al recargar sin conexión. Key local = tile_id (no hay id
+    // propio: la fila es 1:1 con map_tiles por tile_id, misma PK que en la
+    // migración de Supabase). Se escribe offline en onTerrainStrokeEnd —
+    // entra en OFFLINE_WRITABLE (ver useSupabaseData.ts).
+    this.version(45).stores({
+      map_tile_terrain: "tile_id",
     });
   }
 }
