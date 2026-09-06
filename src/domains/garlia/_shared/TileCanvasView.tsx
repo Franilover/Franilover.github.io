@@ -19,7 +19,7 @@
 
 import { useTileCanvasEngine } from "./useTileCanvasEngine";
 import { useTileCanvasGestures } from "./useTileCanvasGestures";
-import type { BaseArea, BaseMarker, BaseTile } from "./UnifiedTileCanvas";
+import type { BaseArea, BaseMarker, BaseTile, BaseTileTerrain } from "./UnifiedTileCanvas";
 
 interface TileCanvasViewProps<
   TTile extends BaseTile,
@@ -39,6 +39,10 @@ interface TileCanvasViewProps<
   /** Click izquierdo sobre el label/forma de un área → navega al reino/ciudad
    * vinculado. No hay selección de vértices ni edición de forma acá. */
   onAreaClick?: (area: BaseArea) => void;
+
+  /** Terreno decorativo (verde/azul/café/etc.) ya guardado, uno por tile —
+   * se dibuja siempre, igual que en UnifiedTileCanvas (ver BaseTileTerrain). */
+  terrain?: BaseTileTerrain[];
 
   /** Click en cualquier punto del mapa que no cayó en pin ni área. */
   onMapClick?: (
@@ -63,6 +67,7 @@ export function TileCanvasView<
   onMarkerClick,
   areas = [],
   onAreaClick,
+  terrain = [],
   onMapClick,
   className,
 }: TileCanvasViewProps<TTile, TMarker>) {
@@ -86,6 +91,7 @@ export function TileCanvasView<
     drawCursorRef: EMPTY_DRAW_CURSOR_REF,
     hoverTile: null,
     ghostHover: null,
+    terrain,
   });
   const { canvasRef, containerRef, zoomIn, zoomOut } = engine;
 

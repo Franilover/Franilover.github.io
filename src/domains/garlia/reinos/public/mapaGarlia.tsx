@@ -3902,11 +3902,22 @@ export default function MapaInteractivo({
                 className="absolute inset-0"
                 fondoColor={fondoColor}
                 hiddenMarkers={hiddenMarkers}
-                markers={visibleMarkersSinDuplicado}
+                markers={[...visibleMarkersSinDuplicado, ...assetMarkers]}
+                terrain={mapTerrain}
                 tiles={mapTiles}
                 onAreaClick={(area) => void handleAreaLabelClick(area)}
                 onMapClick={handleMapClick}
-                onMarkerClick={handleReinoClick}
+                onMarkerClick={(m: any) => {
+                  // Los assets colocados (castillos/árboles/etc.) no son
+                  // reinos — un click sobre ellos en modo lectura no navega
+                  // a ningún lado (mismo criterio que en modo edición, ver
+                  // el onMarkerClick de arriba, solo que acá no hay nada que
+                  // seleccionar).
+                  if (typeof m.id === "string" && m.id.startsWith("asset-placement:")) {
+                    return;
+                  }
+                  void handleReinoClick(m);
+                }}
               />
             )}
 
