@@ -22,10 +22,99 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 
 import type { BaseArea, BaseMarker, BaseTile, BaseTileTerrain, WorldPoint } from "./UnifiedTileCanvas";
 import {
-  TERRAIN_CHAR_TO_COLOR,
   TERRAIN_COLOR_HEX,
-  TILE_TERRAIN_GRID_SIZE,
+  type TerrainStroke,
 } from "./UnifiedTileCanvas";
+
+/**
+ * Dibuja un trazo de pincel (polilínea de puntos {x%, y%, r%}) como curva
+ * suave sobre un canvas del tamaño de UN tile (ts x ts px). `x`/`y`/`r` de
+ * cada punto están en % del ancho del tile (0-100), así que escalan solos
+ * con el zoom sin recalcular nada.
+ *
+ * - 0 puntos: no dibuja nada.
+ * - 1 punto: un solo "dab" (círculo relleno) — cubre el caso de click
+ *   simple sin arrastre.
+ * - 2+ puntos: quadraticCurveTo entre puntos consecutivos, usando el punto
+ *   medio de cada par como control — la técnica estándar para suavizar una
+ *   polilínea capturada de pointermove sin depender de librerías externas.
+ *   El grosor de línea se toma como el radio del ÚLTIMO punto del segmento
+ *   (el pincel real varía poco de un pointermove al siguiente, así que
+ *   promediar no aporta nada visible y esto es más barato).
+ *
+ * El borrador (stroke.color === "borrador") usa
+ * globalCompositeOperation = "destination-out" en vez de un fillStyle, así
+ * que borra lo pintado antes en ESTE canvas offscreen sin importar qué
+ * color tenía — ver el llamador en useTileCanvasEngine.ts, que compone un
+ * canvas offscreen por tile antes de copiarlo al canvas principal.
+ */
+function drawTerrainStroke(
+  ctx: CanvasRenderingContext2D,
+  stroke: TerrainStroke,
+  tilePx: number,
+): void {
+  const pts = stroke.points;
+  if (pts.length === 0) return;
+
+  ctx.save();
+  if (stroke.color === "borrador") {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = "#000";
+    ctx.strokeStyle = "#000";
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = TERRAIN_COLOR_HEX[stroke.color];
+    ctx.strokeStyle = TERRAIN_COLOR_HEX[stroke.color];
+  }
+
+  const toPx = (p: { x: number; y: number; r: number }) => ({
+    x: (p.x / 100) * tilePx,
+    y: (p.y / 100) * tilePx,
+    r: (p.r / 100) * tilePx,
+  });
+
+  if (pts.length === 1) {
+    const p = toPx(pts[0]);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = toPx(pts[i]);
+    const p1 = toPx(pts[i + 1]);
+    const mid = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+    ctx.lineWidth = p1.r * 2;
+    ctx.beginPath();
+    if (i === 0) {
+      ctx.moveTo(p0.x, p0.y);
+    } else {
+      // Retoma desde el punto medio anterior, no desde p0 — así la curva
+      // que dibuja este segmento empalma exactamente donde terminó la del
+      // segmento anterior (técnica estándar de suavizado de trazo libre).
+      const pPrev = toPx(pts[i - 1]);
+      ctx.moveTo((pPrev.x + p0.x) / 2, (pPrev.y + p0.y) / 2);
+    }
+    ctx.quadraticCurveTo(p0.x, p0.y, mid.x, mid.y);
+    ctx.stroke();
+  }
+  // Último tramo: del último punto medio al punto final, para no dejar el
+  // extremo del trazo cortado a mitad de camino.
+  const last = toPx(pts[pts.length - 1]);
+  const prev = toPx(pts[pts.length - 2]);
+  ctx.lineWidth = last.r * 2;
+  ctx.beginPath();
+  ctx.moveTo((prev.x + last.x) / 2, (prev.y + last.y) / 2);
+  ctx.lineTo(last.x, last.y);
+  ctx.stroke();
+
+  ctx.restore();
+}
 
 export interface TileCanvasEngineOptions<
   TTile extends BaseTile,
@@ -786,36 +875,41 @@ export function useTileCanvasEngine<
         });
       }
 
-      // ── Terreno decorativo (pintado verde/azul/café sobre tiles) ───────────
+      // ── Terreno decorativo (pintado a mano alzada sobre tiles) ─────────────
       // Se dibuja siempre que haya datos (editMode o no), igual que áreas y
-      // tiles base. Cada tile tiene una sub-grilla TILE_TERRAIN_GRID_SIZE² de
-      // celdas; grid_data es un string plano fila-por-fila (idx = row*N+col),
-      // ' ' = sin pintar, y cada char mapea a un color vía TERRAIN_CHAR_TO_COLOR.
+      // tiles base. Cada tile tiene su lista de TerrainStroke (trazos de
+      // pincel, ver BaseTileTerrain en UnifiedTileCanvas.tsx); cada trazo es
+      // una polilínea de puntos {x%, y%, r%} que se dibuja como curva suave
+      // (quadraticCurveTo entre puntos consecutivos) en vez de celdas de
+      // grilla, para que el pincel se vea fluido a cualquier zoom.
+      //
+      // El borrador (color: "borrador") necesita borrar SOLO lo pintado
+      // antes en este tile, no el composite del mapa de abajo — por eso
+      // cada tile con terreno se compone primero en un canvas offscreen
+      // propio (solo esta capa) y recién ese resultado se copia al canvas
+      // principal con drawImage. drawImage es barato comparado con rehacer
+      // los trazos anteriores, y evita cachear el offscreen entre frames
+      // (los trazos cambian mientras se pinta, así que igual habría que
+      // invalidar el cache en cada pointermove).
       if (terrain.length > 0) {
-        const cell = ts / TILE_TERRAIN_GRID_SIZE;
         terrain.forEach((t) => {
+          if (!t.strokes || t.strokes.length === 0) return;
           const tile = tiles.find((tl) => tl.id === t.tile_id);
           if (!tile) return;
           const tx = (tile.col - minCol) * ts;
           const ty = (tile.row - minRow) * ts;
-          const data = t.grid_data;
-          for (let idx = 0; idx < data.length; idx++) {
-            const ch = data[idx];
-            if (ch === " " || ch === undefined) continue;
-            const color = TERRAIN_CHAR_TO_COLOR[ch];
-            if (!color) continue;
-            const cellRow = Math.floor(idx / TILE_TERRAIN_GRID_SIZE);
-            const cellCol = idx % TILE_TERRAIN_GRID_SIZE;
-            ctx.fillStyle = TERRAIN_COLOR_HEX[color];
-            ctx.fillRect(
-              tx + cellCol * cell,
-              ty + cellRow * cell,
-              // +0.5 evita líneas finas entre celdas contiguas por
-              // redondeo subpíxel al hacer zoom.
-              cell + 0.5,
-              cell + 0.5,
-            );
-          }
+
+          const off = document.createElement("canvas");
+          off.width = Math.max(1, Math.ceil(ts));
+          off.height = Math.max(1, Math.ceil(ts));
+          const octx = off.getContext("2d");
+          if (!octx) return;
+
+          t.strokes.forEach((stroke) => {
+            drawTerrainStroke(octx, stroke, ts);
+          });
+
+          ctx.drawImage(off, tx, ty);
         });
       }
 

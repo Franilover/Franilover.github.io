@@ -39,6 +39,7 @@ import {
   type WorldPoint,
   type BaseTileTerrain,
   type TerrainTool,
+  type TerrainStroke,
   TERRAIN_COLORS,
   TERRAIN_COLOR_HEX,
 } from "@/domains/garlia/_shared/UnifiedTileCanvas";
@@ -2175,7 +2176,7 @@ export default function MapaInteractivo({
       if (!navigator.onLine) return;
       const { data } = await supabase
         .from("map_tile_terrain")
-        .select("tile_id, grid_data");
+        .select("tile_id, strokes");
       if (!cancelled && data) {
         setMapTerrain(data as BaseTileTerrain[]);
         try {
@@ -2193,16 +2194,18 @@ export default function MapaInteractivo({
   // desactivada, igual convención que drawTool/placingAssetId.
   const [terrainTool, setTerrainTool] = useState<TerrainTool>(null);
 
-  // onTerrainChange: se dispara decenas de veces por segundo mientras se
-  // arrastra pintando — SOLO actualiza estado in-memory, nunca pega a
-  // Supabase (eso es onTerrainStrokeEnd).
+  // onTerrainChange: se dispara en cada punto que se agrega al trazo
+  // mientras se arrastra pintando — SOLO actualiza estado in-memory, nunca
+  // pega a Supabase (eso es onTerrainStrokeEnd). `strokes` viene con la
+  // lista COMPLETA de trazos del tile (no solo el nuevo punto), ya resuelta
+  // por tileCanvasEditingGestures.ts — acá solo hay que guardarla tal cual.
   const handleTerrainChange = useCallback(
-    (tileId: string, gridData: string) => {
+    (tileId: string, strokes: TerrainStroke[]) => {
       setMapTerrain((prev) => {
         const idx = prev.findIndex((t) => t.tile_id === tileId);
-        if (idx === -1) return [...prev, { tile_id: tileId, grid_data: gridData }];
+        if (idx === -1) return [...prev, { tile_id: tileId, strokes }];
         const next = [...prev];
-        next[idx] = { tile_id: tileId, grid_data: gridData };
+        next[idx] = { tile_id: tileId, strokes };
         return next;
       });
     },

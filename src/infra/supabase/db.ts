@@ -453,13 +453,19 @@ export interface ReinoTileLocal {
   order?: number;
 }
 
-// ─── Terreno decorativo (verde/azul/café pintado sobre tiles) ────────────────
-// 1:1 con MapTileLocal por tile_id (key local = tile_id, no un id propio —
-// ver migración de map_tile_terrain en Supabase, misma PK). grid_data es un
-// string plano TILE_TERRAIN_GRID_SIZE² (ver UnifiedTileCanvas.tsx).
+// ─── Terreno decorativo (trazos de pincel pintados sobre tiles) ──────────────
+// Key local = tile_id (no un id propio: es 1:1 con MapTileLocal; la PK real
+// en Supabase es un uuid separado, pero tile_id tiene UNIQUE ahí también,
+// así que sirve igual como key acá). `strokes` es la misma estructura que
+// TerrainStroke[] en UnifiedTileCanvas.tsx — Dexie la guarda tal cual
+// (objeto anidado, no hace falta serializar a mano).
 export interface MapTileTerrainLocal {
   tile_id: string;
-  grid_data: string;
+  strokes: Array<{
+    id: string;
+    color: string;
+    points: Array<{ x: number; y: number; r: number }>;
+  }>;
 }
 
 // ─── Áreas del mapa (círculo / rectángulo / polígono libre) ───────────────────

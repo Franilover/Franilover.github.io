@@ -30,10 +30,10 @@ import type {
   BaseTile,
   BaseTileTerrain,
   DrawTool,
+  TerrainStroke,
   TerrainTool,
   WorldPoint,
 } from "./UnifiedTileCanvas";
-import { TERRAIN_COLOR_CHAR, TILE_TERRAIN_GRID_SIZE } from "./UnifiedTileCanvas";
 import type { useTileCanvasEngine } from "./useTileCanvasEngine";
 
 type StateTuple<T> = [T, (v: T) => void];
@@ -86,7 +86,10 @@ export interface TileCanvasEditingProps<
   // ── Terreno decorativo (verde/azul/café/etc. pintado sobre tiles) ────────
   terrain?: BaseTileTerrain[];
   terrainTool?: TerrainTool;
-  onTerrainChange?: (tileId: string, gridData: string) => void;
+  /** Se llama con la lista COMPLETA de trazos de un tile cada vez que el
+   * trazo en curso agrega un punto nuevo (in-memory, sin golpear Supabase)
+   * — el consumidor decide cuándo persistir (ver onTerrainStrokeEnd). */
+  onTerrainChange?: (tileId: string, strokes: TerrainStroke[]) => void;
   onTerrainStrokeEnd?: (tileIds: string[]) => void;
 }
 
@@ -155,22 +158,27 @@ export function useTileCanvasEditingState<
   markerParaMoverIdRef.current = markerParaMoverId;
 
   // ── Terreno decorativo: estado del trazo de pintado en curso ────────────
-  // Mapa mutable tile_id → array de 256 chars (la grilla, ya "desempaquetada"
-  // para poder mutar celdas individuales sin reconstruir el string entero en
-  // cada pointermove). Se llena on-demand: al tocar un tile por primera vez
-  // en el trazo actual, se copia su grid_data existente (o 256 espacios si
-  // el tile no tenía fila en `terrain` todavía) y de ahí en más se muta acá.
-  // markDirty fuerza el repintado; onTerrainChange es lo que el consumidor
-  // usa para reflejar esto en su propio estado React (fuente de verdad para
-  // el próximo render), así que se llama en cada celda que cambia.
-  const terrainStrokeGridsRef = useRef<Map<string, string[]>>(new Map());
+  // Mapa mutable tile_id → lista de trazos "en vivo" (ya "desempaquetada"
+  // para poder appendear puntos sin reconstruir arrays en cada pointermove).
+  // Se llena on-demand: al tocar un tile por primera vez en el trazo actual,
+  // se copia su lista de trazos existente (o [] si el tile no tenía fila en
+  // `terrain` todavía) y de ahí en más se muta acá. markDirty fuerza el
+  // repintado; onTerrainChange es lo que el consumidor usa para reflejar
+  // esto en su propio estado React (fuente de verdad para el próximo
+  // render), así que se llama en cada punto agregado.
+  const terrainStrokesRef = useRef<Map<string, TerrainStroke[]>>(new Map());
+  // Id del trazo "en vivo" actual por tile — un mismo trazo de pincel puede
+  // cruzar varios tiles (cada tile recibe su propio TerrainStroke con el
+  // mismo id, para poder reconocerlos como "un solo trazo" a futuro si hace
+  // falta borrarlos juntos), así que se comparte un único id por pointerdown.
+  const terrainStrokeIdRef = useRef<string | null>(null);
   // Tiles tocados en el trazo actual — se resetea al soltar el mouse, se usa
   // para avisar onTerrainStrokeEnd con la lista exacta a persistir.
   const terrainStrokeTouchedRef = useRef<Set<string>>(new Set());
   const isPaintingTerrainRef = useRef(false);
   // true apenas hubo al menos un pointermove real durante el trazo — decide
-  // en pointerup si fue "click simple" (pinta tile entero) o "arrastre"
-  // (pinta celda a celda, ya aplicado en cada pointermove).
+  // en pointerup si fue "click simple" (un punto único, pincel redondo) o
+  // "arrastre" (trazo continuo, ya aplicado en cada pointermove).
   const terrainDraggedRef = useRef(false);
   const terrainPointerDownAtRef = useRef<{ x: number; y: number } | null>(
     null,
@@ -179,58 +187,55 @@ export function useTileCanvasEditingState<
   // solo el jitter normal de un click con mouse/touch.
   const TERRAIN_DRAG_THRESHOLD = 4;
 
-  const getTerrainGridFor = (tileId: string): string[] => {
-    const cached = terrainStrokeGridsRef.current.get(tileId);
+  // Radio del pincel en % del ancho del tile. Fijo por ahora — si en algún
+  // momento se agrega un selector de grosor en la UI, este valor pasa a ser
+  // una prop más (ver terrainTool) en vez de una constante acá.
+  const TERRAIN_BRUSH_RADIUS_BORRADOR = 7;
+  const TERRAIN_BRUSH_RADIUS_PINCEL = 4;
+
+  const getTerrainStrokesFor = (tileId: string): TerrainStroke[] => {
+    const cached = terrainStrokesRef.current.get(tileId);
     if (cached) return cached;
-    const existing = terrain.find((t) => t.tile_id === tileId)?.grid_data;
-    const fresh = (existing ?? " ".repeat(TILE_TERRAIN_GRID_SIZE * TILE_TERRAIN_GRID_SIZE)).split("");
-    terrainStrokeGridsRef.current.set(tileId, fresh);
+    const existing = terrain.find((t) => t.tile_id === tileId)?.strokes;
+    const fresh = existing ? [...existing] : [];
+    terrainStrokesRef.current.set(tileId, fresh);
     return fresh;
   };
 
-  /** Pinta (o borra) la celda de la sub-grilla bajo (clientX, clientY), si
-   * cae dentro de un tile existente. Devuelve true si pintó algo. */
+  /** Agrega un punto al trazo en curso bajo (clientX, clientY), si cae
+   * dentro de un tile existente. El borrador se guarda como un trazo más
+   * (color especial "__erase__", ver drawTerrainStroke en
+   * useTileCanvasEngine.ts) — dibujado con destination-out, tapa lo pintado
+   * antes sin necesidad de mutar los trazos previos. Devuelve true si
+   * agregó algo. */
   const paintTerrainAt = (clientX: number, clientY: number): boolean => {
+    if (!terrainTool) return false;
     const info = canvasToTileInfo(clientX, clientY);
     if (!info) return false;
     const tile = findTileAt(info.tile_col, info.tile_row);
     if (!tile) return false;
 
-    const cellCol = Math.min(
-      TILE_TERRAIN_GRID_SIZE - 1,
-      Math.floor((info.x / 100) * TILE_TERRAIN_GRID_SIZE),
-    );
-    const cellRow = Math.min(
-      TILE_TERRAIN_GRID_SIZE - 1,
-      Math.floor((info.y / 100) * TILE_TERRAIN_GRID_SIZE),
-    );
-    const idx = cellRow * TILE_TERRAIN_GRID_SIZE + cellCol;
+    const strokeId = terrainStrokeIdRef.current;
+    if (!strokeId) return false;
 
-    const grid = getTerrainGridFor(tile.id);
-    const nextChar = terrainTool === "borrador" ? " " : TERRAIN_COLOR_CHAR[terrainTool!];
-    if (grid[idx] === nextChar) return false; // ya estaba así, no hay cambio
-    grid[idx] = nextChar;
+    const strokes = getTerrainStrokesFor(tile.id);
+    let stroke = strokes.find((s) => s.id === strokeId);
+    if (!stroke) {
+      stroke = {
+        id: strokeId,
+        color: terrainTool,
+        points: [],
+      };
+      strokes.push(stroke);
+    }
+    const r =
+      terrainTool === "borrador"
+        ? TERRAIN_BRUSH_RADIUS_BORRADOR
+        : TERRAIN_BRUSH_RADIUS_PINCEL;
+    stroke.points.push({ x: info.x, y: info.y, r });
+
     terrainStrokeTouchedRef.current.add(tile.id);
-    onTerrainChange?.(tile.id, grid.join(""));
-    markDirty();
-    return true;
-  };
-
-  /** Pinta el tile COMPLETO (las 256 celdas) — usado por el click simple
-   * (sin arrastre), que pinta todo el tile de una. */
-  const paintWholeTileAt = (clientX: number, clientY: number): boolean => {
-    const info = canvasToTileInfo(clientX, clientY);
-    if (!info) return false;
-    const tile = findTileAt(info.tile_col, info.tile_row);
-    if (!tile) return false;
-
-    const nextChar = terrainTool === "borrador" ? " " : TERRAIN_COLOR_CHAR[terrainTool!];
-    const fresh = new Array(TILE_TERRAIN_GRID_SIZE * TILE_TERRAIN_GRID_SIZE).fill(
-      nextChar,
-    );
-    terrainStrokeGridsRef.current.set(tile.id, fresh);
-    terrainStrokeTouchedRef.current.add(tile.id);
-    onTerrainChange?.(tile.id, fresh.join(""));
+    onTerrainChange?.(tile.id, strokes);
     markDirty();
     return true;
   };
@@ -351,18 +356,18 @@ export function useTileCanvasEditingState<
     // Con la herramienta activa, cualquier click/arrastre en el canvas pinta
     // — no debe interpretarse como nada más (ni pan, ni seleccionar área).
     // Solo botón izquierdo/touch, igual que el resto de las herramientas.
-    // Nota: acá NO pintamos todavía — un click simple (sin pointermove de
-    // por medio) pinta el TILE ENTERO, mientras que un arrastre pinta celda
-    // a celda; hasta que no sepamos si hubo drag no podemos decidir cuál de
-    // los dos aplica. handlePointerMove pinta celda-a-celda apenas se mueve
-    // (marcando terrainDraggedRef); handlePointerUp pinta el tile completo
-    // si terrainDraggedRef nunca se activó.
+    // Se pinta un punto ya en el pointerdown (así un click simple, sin
+    // arrastre, deja un "dab" redondo del pincel en vez de no hacer nada);
+    // handlePointerMove va agregando puntos al mismo trazo mientras se
+    // arrastra, formando la curva continua.
     if (terrainTool && (e.button === 0 || e.pointerType === "touch")) {
       isPaintingTerrainRef.current = true;
       terrainDraggedRef.current = false;
       terrainStrokeTouchedRef.current = new Set();
-      terrainStrokeGridsRef.current = new Map();
+      terrainStrokesRef.current = new Map();
+      terrainStrokeIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       terrainPointerDownAtRef.current = { x: e.clientX, y: e.clientY };
+      paintTerrainAt(e.clientX, e.clientY);
       canvas.setPointerCapture(e.pointerId);
       return true;
     }
@@ -452,10 +457,10 @@ export function useTileCanvasEditingState<
         const dist = Math.hypot(e.clientX - startedAt.x, e.clientY - startedAt.y);
         if (dist > TERRAIN_DRAG_THRESHOLD) terrainDraggedRef.current = true;
       }
-      // Solo pintamos celda-a-celda una vez confirmado el arrastre — antes
-      // de eso podría terminar siendo un click simple (pinta el tile
-      // entero en pointerup), y no queremos haber pintado ya una celda
-      // suelta en el medio del tile en ese caso.
+      // El punto inicial ya se agregó en pointerdown — acá solo seguimos
+      // sumando puntos al mismo trazo mientras el mouse se mueve, formando
+      // la curva continua (ver drawTerrainStroke en useTileCanvasEngine.ts,
+      // que interpola entre puntos consecutivos con quadraticCurveTo).
       if (terrainDraggedRef.current) paintTerrainAt(e.clientX, e.clientY);
       return true;
     }
@@ -554,11 +559,10 @@ export function useTileCanvasEditingState<
       try {
         canvas.releasePointerCapture(e.pointerId);
       } catch {}
-      if (!terrainDraggedRef.current) {
-        // Click simple, sin arrastre: pinta el tile completo bajo el cursor
-        // (en vez de la única celda que hubiera tocado un drag).
-        paintWholeTileAt(e.clientX, e.clientY);
-      }
+      // El punto (o los puntos, si hubo arrastre) ya se agregaron en
+      // pointerdown/pointermove — acá solo cerramos el trazo y avisamos qué
+      // tiles cambiaron para que el consumidor persista.
+      terrainStrokeIdRef.current = null;
       terrainPointerDownAtRef.current = null;
       terrainDraggedRef.current = false;
       const touched = [...terrainStrokeTouchedRef.current];
