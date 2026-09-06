@@ -3,10 +3,9 @@
 
 
 
-import { Instagram, Youtube, Palette, NotebookPen } from "lucide-react";
+import { Instagram, Youtube, Palette, NotebookPen, Pencil, Check, X, Loader2 } from "lucide-react";
 import Link from "next/link";
-import React, { useState } from "react";
-
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 
 
@@ -14,6 +13,219 @@ import React, { useState } from "react";
 import { MotionA, MotionDiv, MotionH1, MotionMain, MotionSection } from '@/ui/Motion';
 import { ToastContainer } from "@/ui/ToastContainer";
 import { useToast } from "@/hooks/ui/useToast";
+import { db } from "@/infra/supabase/db";
+import { supabase } from "@/infra/supabase/supabase";
+import { useAuth } from "@/providers/AuthProvider";
+
+// ─── Textos editables de "Sobre Mí" ───────────────────────────────────────────
+// Tabla Supabase esperada: sobre_mi_textos (clave text PK, valor text, updated_at timestamptz)
+// Mismo patrón local-first que en galeria.tsx: Dexie como caché, Supabase como
+// fuente de verdad. Los admins (perfil.rol === "admin") pueden editar el texto
+// directamente desde esta misma página, sin tocar código.
+
+const TEXTOS_DEFAULT = {
+  bienvenida:
+    'Bienvenido a mi pequeño jardín digital. Uso este espacio para compartir mis hobbys y proyectos: Mi mayor proyecto es "Garden of Sins" el cual puedes ver en el icono de la flor.',
+  garden_of_sins:
+    "Este proyecto comenzo como una forma de compartir experiencias que no era capas de expresar verbalmente y a la vez explorar nuevas formas de arte. Luego se convirtio en algo mas grande. Ya no era solo mi historia, era un mundo entero que necesitaba sacar de mi mente. \n\nLos personajes de este mundo surgieron en base a personas que han dejado una marca en mi. Y pese a que los temas de esta historia son recurrentes en la actualidad, y muchos aconteciemtos estan basados en ciertos periodos historicos todo lo contado en estas historias es ficticio.",
+} as const;
+
+type TextoKey = keyof typeof TEXTOS_DEFAULT;
+type TextosSobreMi = Record<TextoKey, string>;
+
+async function readTextosFromDexie(): Promise<Partial<TextosSobreMi> | null> {
+  try {
+    if (!db) return null;
+    const rows = await (db as any).sobre_mi_textos?.toArray();
+    if (!rows || rows.length === 0) return null;
+    const map: Partial<TextosSobreMi> = {};
+    for (const row of rows) map[row.clave as TextoKey] = row.valor;
+    return map;
+  } catch {
+    return null;
+  }
+}
+
+async function writeTextoToDexie(clave: TextoKey, valor: string): Promise<void> {
+  try {
+    if (!db) return;
+    await (db as any).sobre_mi_textos?.put({ clave, valor });
+  } catch (e) {
+    console.warn("[Dexie] sobre_mi_textos put falló:", e);
+  }
+}
+
+function useTextosSobreMi() {
+  const [textos, setTextos] = useState<TextosSobreMi>({ ...TEXTOS_DEFAULT });
+  const isMounted = useRef(true);
+
+  const fetchRemote = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from("sobre_mi_textos").select("clave, valor");
+      if (error || !data || !isMounted.current) return;
+      setTextos((prev) => {
+        const next = { ...prev };
+        for (const row of data as { clave: string; valor: string }[]) {
+          if (row.clave in TEXTOS_DEFAULT) next[row.clave as TextoKey] = row.valor;
+        }
+        return next;
+      });
+      for (const row of data as { clave: string; valor: string }[]) {
+        if (row.clave in TEXTOS_DEFAULT) void writeTextoToDexie(row.clave as TextoKey, row.valor);
+      }
+    } catch {
+      // sin conexión: se mantiene lo que ya haya en pantalla (default o caché)
+    }
+  }, []);
+
+  useEffect(() => {
+    isMounted.current = true;
+    void readTextosFromDexie().then((local) => {
+      if (!isMounted.current) return;
+      if (local) setTextos((prev) => ({ ...prev, ...local }));
+      void fetchRemote();
+    });
+    return () => {
+      isMounted.current = false;
+    };
+  }, [fetchRemote]);
+
+  const guardarTexto = useCallback(async (clave: TextoKey, valor: string) => {
+    const { error } = await supabase
+      .from("sobre_mi_textos")
+      .upsert({ clave, valor, updated_at: new Date().toISOString() });
+    if (error) return { ok: false as const, error };
+    setTextos((prev) => ({ ...prev, [clave]: valor }));
+    void writeTextoToDexie(clave, valor);
+    return { ok: true as const };
+  }, []);
+
+  return { textos, guardarTexto };
+}
+
+/** Bloque de texto editable en línea: para todos es texto plano; para admins
+ *  muestra un lápiz al hacer hover que abre un textarea con guardar/cancelar.
+ *  Se guarda directo en Supabase (y se cachea en Dexie). */
+function TextoEditable({
+  valor,
+  onGuardar,
+  isAdmin,
+  as: Component = "p",
+  className,
+  style,
+}: {
+  valor: string;
+  onGuardar: (nuevoValor: string) => Promise<{ ok: boolean; error?: unknown }>;
+  isAdmin: boolean;
+  as?: "p" | "div";
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [borrador, setBorrador] = useState(valor);
+  const [guardando, setGuardando] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!editando) setBorrador(valor);
+  }, [valor, editando]);
+
+  const handleGuardar = async () => {
+    if (borrador.trim() === "") return;
+    setGuardando(true);
+    const res = await onGuardar(borrador.trim());
+    setGuardando(false);
+    if (res.ok) {
+      setEditando(false);
+      toast.success("Texto actualizado.");
+    } else {
+      toast.error("No se pudo guardar el texto.");
+    }
+  };
+
+  const handleCancelar = () => {
+    setBorrador(valor);
+    setEditando(false);
+  };
+
+  if (editando) {
+    return (
+      <div className="w-full">
+        <textarea
+          autoFocus
+          className={className}
+          onChange={(e) => setBorrador(e.target.value)}
+          rows={Math.max(4, Math.ceil(borrador.length / 60))}
+          style={{
+            ...style,
+            width: "100%",
+            resize: "vertical",
+            background: "var(--white-custom)",
+            border: "1px solid color-mix(in srgb, var(--primary) 30%, transparent)",
+            borderRadius: "var(--radius-btn)",
+            padding: "0.75rem",
+            outline: "none",
+          }}
+          value={borrador}
+        />
+        <div className="flex items-center gap-2 mt-3">
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold rounded-full disabled:opacity-50"
+            disabled={guardando}
+            onClick={handleGuardar}
+            style={{ background: "var(--primary)", color: "var(--white-custom)" }}
+            type="button"
+          >
+            {guardando ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />}
+            Guardar
+          </button>
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold rounded-full disabled:opacity-50"
+            disabled={guardando}
+            onClick={handleCancelar}
+            style={{
+              background: "color-mix(in srgb, var(--primary) 8%, transparent)",
+              color: "var(--primary)",
+            }}
+            type="button"
+          >
+            <X size={14} />
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group/editable relative w-full">
+      <Component className={className} style={style}>
+        {valor.split("\n").map((linea, i, arr) => (
+          <React.Fragment key={i}>
+            {linea}
+            {i < arr.length - 1 && <br />}
+          </React.Fragment>
+        ))}
+      </Component>
+      {isAdmin && (
+        <button
+          aria-label="Editar texto"
+          className="absolute -top-2 -right-2 opacity-0 group-hover/editable:opacity-100 transition-opacity duration-200 w-8 h-8 flex items-center justify-center rounded-full"
+          onClick={() => setEditando(true)}
+          style={{
+            background: "var(--primary)",
+            color: "var(--white-custom)",
+            boxShadow: "var(--shadow-card)",
+          }}
+          type="button"
+        >
+          <Pencil size={14} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 
 
@@ -34,12 +246,14 @@ const fade = (delay = 0) => ({
 
 
 
-
 export default function SobreMi() {
   const FORMSPREE_ID = "xvzpjdgr";
   const [_enviado, setEnviado] = useState(false);
   const [_loading, setLoading] = useState(false);
   const { toasts, toast, dismiss } = useToast();
+  const { perfil } = useAuth() as any;
+  const isAdmin = perfil?.rol === "admin";
+  const { textos, guardarTexto } = useTextosSobreMi();
 
   const _handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -101,13 +315,14 @@ export default function SobreMi() {
                   boxShadow: "var(--shadow-card)",
                 }}
               >
-                <p
+                <TextoEditable
+                  as="p"
                   className="text-xl md:text-2xl leading-[1.5] font-light italic"
+                  isAdmin={isAdmin}
+                  onGuardar={(nuevoValor) => guardarTexto("bienvenida", nuevoValor)}
                   style={{ color: "var(--primary)", opacity: 0.88 }}
-                >
-                  Bienvenido a mi pequeño jardín digital. Uso este espacio para compartir mis hobbys y
-                  proyectos: Mi mayor proyecto es &quot;Garden of Sins&quot; el cual puedes ver en el icono de la flor.
-                </p>
+                  valor={textos.bienvenida}
+                />
               </MotionSection>
             </div>
 
@@ -238,17 +453,14 @@ export default function SobreMi() {
                   className="absolute top-3 left-5 text-5xl font-black leading-none select-none"
                   style={{ color: "var(--primary)", opacity: 0.08, fontFamily: "serif" }}
                 >&quot;</span>
-                <p
+                <TextoEditable
+                  as="p"
                   className="relative text-base md:text-lg font-light italic leading-relaxed"
+                  isAdmin={isAdmin}
+                  onGuardar={(nuevoValor) => guardarTexto("garden_of_sins", nuevoValor)}
                   style={{ color: "var(--primary)", opacity: 0.7 }}
-                >
-                  Este proyecto comenzo como una forma de compartir experiencias que no era capas de expresar verbalmente
-                  y a la vez explorar nuevas formas de arte.
-                  Luego se convirtio en algo mas grande. Ya no era solo mi historia, era un mundo entero que necesitaba
-                  sacar de mi mente. <br /><br /> Los personajes de este mundo surgieron en base a personas que han dejado una marca
-                  en mi. Y pese a que los temas de esta historia son recurrentes en la actualidad, y muchos aconteciemtos
-                  estan basados en ciertos periodos historicos todo lo contado en estas historias es ficticio.
-                </p>
+                  valor={textos.garden_of_sins}
+                />
               </MotionDiv>
             </div>
 
